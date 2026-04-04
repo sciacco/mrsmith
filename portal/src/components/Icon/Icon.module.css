@@ -1,0 +1,14 @@
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: var(--green-primary);
+}
+
+.icon svg {
+  width: 40px;
+  height: 40px;
+  transition: filter var(--ease-default);
+}

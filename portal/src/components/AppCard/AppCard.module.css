@@ -1,0 +1,53 @@
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--green-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl) var(--space-lg);
+  cursor: pointer;
+  transition: all var(--ease-default);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  outline: none;
+}
+
+.card:hover,
+.card:focus-visible {
+  border-color: var(--green-primary);
+  box-shadow:
+    0 0 20px var(--green-glow-lg),
+    0 0 40px rgba(0, 255, 65, 0.05),
+    inset 0 0 20px rgba(0, 255, 65, 0.03);
+  transform: translateY(-2px);
+}
+
+.card:hover svg,
+.card:focus-visible svg {
+  filter: drop-shadow(0 0 8px var(--green-glow-md));
+}
+
+.name {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--green-primary);
+  letter-spacing: 0.02em;
+}
+
+.desc {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--green-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .card:hover,
+  .card:focus-visible {
+    transform: none;
+  }
+}

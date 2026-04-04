@@ -1,0 +1,39 @@
+:root {
+  /* ── Backgrounds ── */
+  --bg-primary: #0a0a0a;
+  --bg-card: #0f1a0f;
+  --bg-header: rgba(10, 10, 10, 0.92);
+
+  /* ── Greens ── */
+  --green-primary: #00ff41;
+  --green-secondary: #00cc33;
+  --green-hover: #33ff66;
+  --green-muted: #88aa88;
+  --green-border: #1a3a1a;
+  --green-glow-sm: rgba(0, 255, 65, 0.3);
+  --green-glow-md: rgba(0, 255, 65, 0.6);
+  --green-glow-lg: rgba(0, 255, 65, 0.15);
+  --green-tint: rgba(0, 255, 65, 0.05);
+  --green-tint-strong: rgba(0, 255, 65, 0.08);
+
+  /* ── Typography ── */
+  --font-mono: 'Share Tech Mono', 'Fira Code', 'Courier New', monospace;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* ── Spacing ── */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.25rem;
+  --space-2xl: 2rem;
+  --space-3xl: 2.5rem;
+
+  /* ── Radii ── */
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-full: 50%;
+
+  /* ── Transitions ── */
+  --ease-default: 0.3s ease;
+}
