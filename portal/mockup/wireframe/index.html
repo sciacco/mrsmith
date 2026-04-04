@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MrSmith Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary: #0a0a0a;
+      --bg-card: #0f1a0f;
+      --green-primary: #00ff41;
+      --green-secondary: #00cc33;
+      --green-hover: #33ff66;
+      --green-muted: #88aa88;
+      --green-border: #1a3a1a;
+      --font-mono: 'Share Tech Mono', 'Fira Code', 'Courier New', monospace;
+      --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--green-primary);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Matrix Rain Canvas ── */
+    #matrix-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      opacity: 0.12;
+      pointer-events: none;
+    }
+
+    /* ── Scanline Overlay ── */
+    .scanlines {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 0.03;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.3) 2px,
+        rgba(0, 0, 0, 0.3) 4px
+      );
+    }
+
+    /* ── Content Layer ── */
+    .content-wrapper {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: rgba(10, 10, 10, 0.92);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--green-border);
+    }
+
+    .logo {
+      font-family: var(--font-mono);
+      font-size: 1.75rem;
+      font-weight: 400;
+      color: var(--green-primary);
+      text-shadow:
+        0 0 10px rgba(0, 255, 65, 0.6),
+        0 0 30px rgba(0, 255, 65, 0.3),
+        0 0 60px rgba(0, 255, 65, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      letter-spacing: 0.02em;
+    }
+
+    .logo-glasses {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 0.25rem;
+    }
+
+    .logo-glasses svg {
+      width: 36px;
+      height: 16px;
+      filter: drop-shadow(0 0 4px rgba(0, 255, 65, 0.4));
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--green-muted);
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1.5px solid var(--green-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--green-primary);
+      background: rgba(0, 255, 65, 0.05);
+    }
+
+    /* ── Main ── */
+    main {
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* ── Categories Grid ── */
+    .categories-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2.5rem;
+      align-items: start;
+    }
+
+    /* ── Category ── */
+    .category {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .category-title {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--green-primary);
+      border-left: 3px solid var(--green-primary);
+      padding-left: 0.75rem;
+      text-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+    }
+
+    /* ── Cards Grid (within category) ── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.85rem;
+    }
+
+    /* ── App Card ── */
+    .app-card {
+      background: var(--bg-card);
+      border: 1px solid var(--green-border);
+      border-radius: 6px;
+      padding: 1.25rem 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      outline: none;
+    }
+
+    .app-card:hover,
+    .app-card:focus-visible {
+      border-color: var(--green-primary);
+      box-shadow:
+        0 0 20px rgba(0, 255, 65, 0.15),
+        0 0 40px rgba(0, 255, 65, 0.05),
+        inset 0 0 20px rgba(0, 255, 65, 0.03);
+      transform: translateY(-2px);
+    }
+
+    .app-card:hover .card-icon svg,
+    .app-card:focus-visible .card-icon svg {
+      filter: drop-shadow(0 0 8px rgba(0, 255, 65, 0.6));
+    }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-icon svg {
+      width: 40px;
+      height: 40px;
+      transition: filter 0.3s ease;
+    }
+
+    .card-name {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 400;
+      color: var(--green-primary);
+      letter-spacing: 0.02em;
+    }
+
+    .card-desc {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      line-height: 1.5;
+      color: var(--green-muted);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 1024px) {
+      .categories-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 640px) {
+      header { padding: 0.85rem 1.25rem; }
+      .logo { font-size: 1.35rem; }
+      main { padding: 1.25rem; }
+      .categories-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+      .cards-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ── Reduced Motion ── */
+    @media (prefers-reduced-motion: reduce) {
+      #matrix-canvas { display: none; }
+      .app-card { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+      .app-card:hover,
+      .app-card:focus-visible { transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Matrix Rain -->
+  <canvas id="matrix-canvas" aria-hidden="true"></canvas>
+
+  <!-- Scanline Overlay -->
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <!-- Content -->
+  <div class="content-wrapper">
+
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        MrSmith
+        <span class="logo-glasses">
+          <svg viewBox="0 0 48 20" fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="5" width="16" height="11" rx="2" fill="rgba(0,255,65,0.08)"/>
+            <rect x="30" y="5" width="16" height="11" rx="2" fill="rgba(0,255,65,0.08)"/>
+            <path d="M18 10 Q24 4 30 10"/>
+            <line x1="2" y1="8" x2="0" y2="5"/>
+            <line x1="46" y1="8" x2="48" y2="5"/>
+          </svg>
+        </span>
+      </div>
+      <div class="user-info">
+        <div class="avatar">JD</div>
+        Agent J. Doe
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+      <div class="categories-grid">
+
+        <!-- SALES -->
+        <section class="category">
+          <h2 class="category-title">Sales</h2>
+          <div class="cards-grid">
+
+            <article class="app-card" tabindex="0" role="button" aria-label="Launch CRM Pro">
+              <div class="card-icon">
+                <svg viewBox="0 0 48 48" fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="6" y="34" width="6" height="8" rx="1"/>
+                  <rect x="15" y="26" width="6" height="16" rx="1"/>
+                  <rect x="24" y="18" width="6" height="24" rx="1"/>
+                  <rect x="33" y="10" width="6" height="32" rx="1"/>
+                  <path d="M8 12 L18 16 L28 8 L38 4" stroke-width="1.5"/>
+                  <circle cx="38" cy="4" r="2"/>
+                </svg>
+              </div>
+              <div class="card-name">CRM Pro</div>
+              <div class="card-desc">Manage client relationships, track leads, and monitor</div>
+            </article>
+
+            <article class="app-card" tabindex="0" role="button" aria-label="Launch Pipeline Tracker">
+              <div class="card-icon">
+                <svg viewBox="0 0 48 48" fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 6 L40 6 L32 20 L32 38 L16 42 L16 20 Z"/>
+                  <line x1="8" y1="6" x2="40" y2="6"/>
+                  <line x1="14" y1="14" x2="34" y2="14"/>
+                </svg>
+              </div>
+              <div class="card-name">Pipeline Tracker</div>
+              <div class="card-desc">Visualize sales stages and track deals through the conversion funnel</div>
+            </article>
+
+            <article class="app-card" tabindex="0" role="button" aria-label="Launch Quote Generator">
+              <div class="card-icon">
+                <svg viewBox="0 0 48 48" fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 4 L32 4 L38 10 L38 44 L10 44 L10 4 Z"/>
+                  <polyline points="32 4 32 10 38 10"/>
+                  <line x1="16" y1="18" x2="32" y2="18"/>
+                  <line x1="16" y1="24" x2="32" y2="24"/>
+                  <line x1="16" y1="30" x2="28" y2="30"/>
+                  <line x1="16" y1="36" x2="24" y2="36"/>
+                </svg>
+              </div>
+              <div class="card-name">Quote Generator</div>
+              <div class="card-desc">Create, customize, and send professional sales quotes</div>
+            </article>
+
+            <article class="app-card" tabindex="0" role="button" aria-label="Launch Vendor Connect">
+              <div class="card-icon">
+                <svg viewBox="0 0 48 48" fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 28 C6 28 10 22 16 22 C18 22 20 24 22 24"/>
+                  <path d="M42 28 C42 28 38 22 32 22 C30 22 28 24 26 24"/>
+                  <path d="M22 24 Q24 26 26 24"/>
+                  <path d="M6 28 L6 34 Q6 36 8 36 L18 36"/>
+                  <path d="M42 28 L42 34 Q42 36 40 36 L30 36"/>
+                  <line x1="18" y1="36" x2="30" y2="36"/>
+                  <circle cx="14" cy="14" r="5"/>
+                  <circle cx="34" cy="14" r="5"/>
+                </svg>
+              </div>
+              <div class="card-name">Vendor Connect</div>
+              <div class="card-desc">Maintain supplier profiles, ratings, and communication history</div>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- PURCHASE -->
+        <section class="category">
+          <h2 class="category-title">Purchase</h2>
+          <div class="cards-grid">
+
+            <article class="app-card" tabindex="0" role="button" aria-label="Launch Purchase Orders">
+              <div class="card-icon">
+                <svg viewBox="0 0 48 48" fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="18" cy="40" r="3"/>
+                  <circle cx="36" cy="40" r="3"/>
+                  <path d="M4 4 L10 4 L16 30 L40 30 L44 12 L14 12"/>
+                  <line x1="20" y1="20" x2="40" y2="20"/>
+                </svg>
+              </div>
+              <div class="card-name">Purchase Orders</div>
+              <div class="card-desc">Generate and manage POs for internal and external procurement</div>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- CUSTOMER CARE -->
+        <section class="category">
+          <h2 class="category-title">Customer Care</h2>
+          <div class="cards-grid">
+
+            <article class="app-card" tabindex="0" role="button" aria-label="Launch Support Tickets">
+              <div class="card-icon">
+                <svg viewBox="0 0 48 48" fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 8 L42 8 Q44 8 44 10 L44 30 Q44 32 42 32 L28 32 L20 40 L20 32 L6 32 Q4 32 4 30 L4 10 Q4 8 6 8 Z"/>
+                  <line x1="14" y1="16" x2="34" y2="16"/>
+                  <line x1="14" y1="22" x2="30" y2="22"/>
+                  <line x1="14" y1="28" x2="24" y2="28"/>
+                </svg>
+              </div>
+              <div class="card-name">Support Tickets</div>
+              <div class="card-desc">Log, assign, and resolve customer support requests and inquiries</div>
+            </article>
+
+            <article class="app-card" tabindex="0" role="button" aria-label="Launch Feedback Portal">
+              <div class="card-icon">
+                <svg viewBox="0 0 48 48" fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="24,4 29,18 44,18 32,27 36,42 24,33 12,42 16,27 4,18 19,18"/>
+                </svg>
+              </div>
+              <div class="card-name">Feedback Portal</div>
+              <div class="card-desc">Collect, analyze, and report on customer satisfaction feedback</div>
+            </article>
+
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Matrix Rain Script -->
+  <script>
+    (function () {
+      const canvas = document.getElementById('matrix-canvas');
+      const ctx = canvas.getContext('2d');
+
+      const FONT_SIZE = 14;
+      const CHARS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF';
+
+      let columns, drops;
+
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        columns = Math.floor(canvas.width / FONT_SIZE);
+        drops = new Array(columns).fill(0).map(() => Math.random() * -100);
+      }
+
+      function draw() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#00ff41';
+        ctx.font = FONT_SIZE + 'px monospace';
+
+        for (let i = 0; i < columns; i++) {
+          const char = CHARS[Math.floor(Math.random() * CHARS.length)];
+          const x = i * FONT_SIZE;
+          const y = drops[i] * FONT_SIZE;
+
+          ctx.globalAlpha = 0.6 + Math.random() * 0.4;
+          ctx.fillText(char, x, y);
+
+          if (y > canvas.height && Math.random() > 0.975) {
+            drops[i] = 0;
+          }
+          drops[i]++;
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      // Check reduced motion preference
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      let interval;
+
+      function start() {
+        if (!mq.matches) {
+          interval = setInterval(draw, 33);
+        }
+      }
+
+      function stop() {
+        clearInterval(interval);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+      mq.addEventListener('change', function () {
+        if (mq.matches) stop(); else start();
+      });
+
+      start();
+    })();
+  </script>
+
+</body>
+</html>
