@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mrsmith-config
+data:
+  PORT: "8080"
+  KEYCLOAK_ISSUER_URL: "https://keycloak.example.com/realms/mrsmith"
+  CORS_ORIGINS: "https://mrsmith.example.com"
+  STATIC_DIR: "/static"

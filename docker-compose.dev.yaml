@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.dev
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8080:8080"
+    env_file: ./backend/.env
+
+  portal:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter portal dev --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - portal_node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  portal_node_modules:

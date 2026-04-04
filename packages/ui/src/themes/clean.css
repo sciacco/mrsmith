@@ -1,0 +1,11 @@
+/* Clean theme — Stripe-inspired aesthetic for mini-apps */
+:root[data-theme="clean"] {
+  --color-bg: #ffffff;
+  --color-surface: #f6f9fc;
+  --color-border: #e3e8ee;
+  --color-text: #1a1a2e;
+  --color-text-muted: #6b7c93;
+  --color-accent: #635bff;
+  --color-accent-hover: #7a73ff;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
