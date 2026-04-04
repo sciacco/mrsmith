@@ -1,0 +1,1 @@
+- [Project vision](docs/project_vision.md) — Matrix-themed portal launching corporate mini-apps with Stripe-level design
