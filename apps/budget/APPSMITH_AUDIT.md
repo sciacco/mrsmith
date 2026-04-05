@@ -2,7 +2,8 @@
 
 **Source:** `budget-management-main.zip` (Appsmith export)  
 **Audit date:** 2026-04-04  
-**Format version:** 5, Client schema: 2, Server schema: 11
+**Format version:** 5, Client schema: 2, Server schema: 11  
+**API reference:** `docs/mistra-dist.yaml` (Mistra NG Internal API v2.7.14)
 
 ---
 
@@ -57,10 +58,10 @@
   - `Table1` - User data with derived columns extracting `state.enabled` and `state.name`
 
 **Queries:**
-| Query | Method | Endpoint | Params | Auto-load |
-|-------|--------|----------|--------|-----------|
-| GetBudgetOverPercent | GET | `/arak/budget/v1/report/budget-used-over-percentage` | page_number=1, disable_pagination=true, percentage={{i_percent.text}} | Yes |
-| UnassignedUsers | GET | `/arak/budget/v1/report/unassigned-users` | page_number=1, disable_pagination=true, enabled=true | Yes |
+| Query | Method | Endpoint | operationId | Params | Auto-load |
+|-------|--------|----------|-------------|--------|-----------|
+| GetBudgetOverPercent | GET | `/arak/budget/v1/report/budget-used-over-percentage` | GetAllBudgetsUsedOverPercentage | page_number=1, disable_pagination=true, percentage={{i_percent.text}} | Yes |
+| UnassignedUsers | GET | `/arak/budget/v1/report/unassigned-users` | GetUnassignedArakInternalUser | page_number=1, disable_pagination=true, enabled=true | Yes |
 
 **Hidden logic:**
 - Container visibility driven by `total_number > 0` from API response
@@ -70,7 +71,7 @@
 **Migration notes:**
 - No error handling or loading indicators
 - Default percentage 80.1% hardcoded in widget
-- API response must include `total_number` and `items` fields
+- API `percentage` param is `float` (required) per spec; Appsmith sends it as text from `i_percent.text`
 
 ---
 
@@ -125,6 +126,7 @@ currentRow.year == new Date().getFullYear()
 - All mutations use `.then()` chaining; inconsistent refresh strategies
 - No loading indicators during async operations
 - Delete button initially disabled with no visible enable logic
+- Appsmith does not use `search_string` or `year` query params available on GetAllBudgets
 
 ---
 
@@ -204,26 +206,263 @@ currentRow.year == new Date().getFullYear()
 
 ---
 
-## 3. Datasource & Query Catalog
+## 3. API Contract Reference (from `docs/mistra-dist.yaml`)
 
-### REST API Endpoints (Arak)
+### 3.1 Endpoints Used by Appsmith
 
-| Base Path | Domain | Methods | Used By |
-|-----------|--------|---------|---------|
-| `/arak/budget/v1/budget` | Budget CRUD | GET, POST, PUT, DELETE | Home, Voci di costo |
-| `/arak/budget/v1/budget/{id}/user` | User-budget allocation | POST, PUT | Voci di costo |
-| `/arak/budget/v1/budget/{id}/cost-center` | CC-budget allocation | POST, PUT | Voci di costo |
-| `/arak/budget/v1/approval-rules/user-budget` | User approval rules | GET, POST, PUT, DELETE | Voci di costo |
-| `/arak/budget/v1/approval-rules/cost-center-budget` | CC approval rules | GET, POST, PUT, DELETE | Voci di costo |
-| `/arak/budget/v1/cost-center` | Cost center CRUD | GET, POST, PUT | Voci di costo, Centri di costo |
-| `/arak/budget/v1/group` | Group CRUD | GET, POST, PUT, DELETE | Centri di costo, Gruppi |
-| `/arak/budget/v1/report/budget-used-over-percentage` | Budget utilization report | GET | Home |
-| `/arak/budget/v1/report/unassigned-users` | Unassigned users report | GET | Home |
-| `/arak/users-int/v1/user` | User listing | GET | Voci di costo, Centri di costo, Gruppi |
+| Endpoint | operationId | Methods | Used By |
+|----------|-------------|---------|---------|
+| `/arak/budget/v1/budget` | GetAllBudgets / NewBudget | GET, POST | Home, Voci di costo |
+| `/arak/budget/v1/budget/{budget_id}` | GetBudgetDetails / EditBudget / DeleteBudget | GET, PUT, DELETE | Voci di costo |
+| `/arak/budget/v1/budget/{budget_id}/user` | NewUserBudget / EditUserBudget | POST, PUT | Voci di costo |
+| `/arak/budget/v1/budget/{budget_id}/cost-center` | NewCostCenterBudget / EditCostCenterBudget | POST, PUT | Voci di costo |
+| `/arak/budget/v1/approval-rules/user-budget` | GetAllUserBudgetApprovalRule / NewUserBudgetApprovalRule | GET, POST | Voci di costo |
+| `/arak/budget/v1/approval-rules/user-budget/{rule_id}` | EditUserBudgetApprovalRule / DeleteUserBudgetApprovalRule | PUT, DELETE | Voci di costo |
+| `/arak/budget/v1/approval-rules/cost-center-budget` | GetAllCostCenterBudgetApprovalRule / NewCostCenterBudgetApprovalRule | GET, POST | Voci di costo |
+| `/arak/budget/v1/approval-rules/cost-center-budget/{rule_id}` | EditCostCenterBudgetApprovalRule / DeleteCostCenterBudgetApprovalRule | PUT, DELETE | Voci di costo |
+| `/arak/budget/v1/cost-center` | GetAllBudgetCostCenters / NewBudgetCostCenter | GET, POST | Voci di costo, Centri di costo |
+| `/arak/budget/v1/cost-center/{cost_center_id}` | GetBudgetCostCenterDetails / EditBudgetCostCenter | GET, PUT | Centri di costo |
+| `/arak/budget/v1/group` | GetAllBudgetGroups / NewBudgetGroup | GET, POST | Centri di costo, Gruppi |
+| `/arak/budget/v1/group/{group_id}` | GetBudgetGroupDetails / EditBudgetGroup / DeleteBudgetGroup | GET, PUT, DELETE | Gruppi |
+| `/arak/budget/v1/report/budget-used-over-percentage` | GetAllBudgetsUsedOverPercentage | GET | Home |
+| `/arak/budget/v1/report/unassigned-users` | GetUnassignedArakInternalUser | GET | Home |
+| `/arak/users-int/v1/user` | GetAllArakInternalUser | GET | Voci di costo, Centri di costo, Gruppi |
+
+### 3.2 Available Endpoints NOT Used by Appsmith
+
+These exist in the API spec but the Appsmith app never calls them. They represent available capabilities for the new frontend:
+
+| Endpoint | operationId | Method | Purpose |
+|----------|-------------|--------|---------|
+| `/arak/budget/v1/budget-for-user` | GetAllBudgetsForUser | GET | Get budgets for a specific user (by `user_email` header) |
+| `/arak/users-int/v1/user` | NewArakInternalUser | POST | Create user |
+| `/arak/users-int/v1/user/{user_id}` | EditArakInternalUser | PUT | Edit user |
+| `/arak/users-int/v1/user/{user_id}` | DeleteArakInternalUser | DELETE | Soft-delete user |
+| `/arak/users-int/v1/role` | GetAllArakInternalRoles | GET | List all roles |
+
+### 3.3 Unused Query Parameters
+
+The API supports these filters that Appsmith never uses:
+
+| Endpoint | Parameter | Type | Purpose |
+|----------|-----------|------|---------|
+| GetAllBudgets | `search_string` | string | Filter budgets by name |
+| GetAllBudgets | `year` | integer | Filter budgets by year |
+| GetAllArakInternalUser | `search_string` | string | Filter users by email text |
+| GetAllUserBudgetApprovalRule | `level` | integer | Filter rules by approval level |
+| GetAllCostCenterBudgetApprovalRule | `level` | integer | Filter rules by approval level |
+
+### 3.4 Authoritative Schema Definitions
+
+Source of truth from the OpenAPI spec. Key detail: **`limit`, `current`, and `threshold` are `string` type** in the API (not numbers).
+
+#### `arak-int-user` (response)
+| Field | Type | Required |
+|-------|------|----------|
+| id | integer (int64) | yes |
+| first_name | string | yes |
+| last_name | string | yes |
+| email | string | yes |
+| created | string (date-time) | yes |
+| updated | string (date-time) | yes |
+| state | `arak-int-user-state` | yes |
+| role | `arak-int-role` | yes |
+
+`arak-int-user-state`: `{ name: string, enabled: boolean }` (both required)  
+`arak-int-role`: `{ name: string, created: date-time, updated: date-time }` (all required)
+
+#### `budget` (response)
+| Field | Type | Required |
+|-------|------|----------|
+| id | integer (int64) | yes |
+| name | string | yes |
+| year | integer | yes |
+| limit | **string** | yes |
+| current | **string** | yes |
+
+#### `budget-new` (request body)
+| Field | Type | Required |
+|-------|------|----------|
+| name | string | yes |
+| year | integer | yes |
+
+#### `budget-edit` (request body)
+| Field | Type | Required |
+|-------|------|----------|
+| name | string | no |
+| year | integer | no |
+
+#### `budget-details` (response)
+| Field | Type | Required |
+|-------|------|----------|
+| id | integer (int64) | yes |
+| name | string | yes |
+| year | integer | yes |
+| limit | **string** | yes |
+| current | **string** | yes |
+| cost_center_budgets | `cost_center-budget[]` | yes |
+| user_budgets | `user-budget[]` | yes |
+
+#### `user-budget` (response)
+| Field | Type | Required |
+|-------|------|----------|
+| limit | **string** | yes |
+| current | **string** | yes |
+| user_id | integer (int64) | yes |
+| user_email | string | yes |
+| budget_id | integer (int64) | yes |
+| enabled | boolean | yes |
+
+#### `user-budget-upsert` (request body for POST)
+| Field | Type | Required |
+|-------|------|----------|
+| limit | **string** | yes |
+| user_id | integer (int64) | yes |
+
+#### `user-budget-edit` (request body for PUT)
+| Field | Type | Required |
+|-------|------|----------|
+| limit | string | no |
+| user_id | integer (int64) | yes |
+| enabled | boolean | no |
+
+#### `cost_center-budget` (response)
+| Field | Type | Required |
+|-------|------|----------|
+| limit | **string** | yes |
+| current | **string** | yes |
+| cost_center | string | yes |
+| budget_id | integer (int64) | yes |
+| enabled | boolean | yes |
+
+#### `cost_center-budget-upsert` (request body for POST)
+| Field | Type | Required |
+|-------|------|----------|
+| limit | **string** | yes |
+| cost_center | string | yes |
+
+#### `cost_center-budget-edit` (request body for PUT)
+| Field | Type | Required |
+|-------|------|----------|
+| cost_center | string | yes |
+| limit | string | no |
+| enabled | boolean | no |
+
+#### `user-budget-approval-rule` (response)
+| Field | Type | Required |
+|-------|------|----------|
+| id | integer (int64) | yes |
+| threshold | **string** | yes |
+| approver_id | integer (int64) | yes |
+| approver_email | string | yes |
+| budget_id | integer (int64) | yes |
+| user_id | integer (int64) | yes |
+| level | integer | yes |
+| send_email | boolean | yes |
+
+#### `user-budget-approval-rule-new` (request body)
+| Field | Type | Required |
+|-------|------|----------|
+| threshold | **string** | yes |
+| approver_id | integer (int64) | yes |
+| budget_id | integer (int64) | yes |
+| user_id | integer (int64) | yes |
+| level | integer | yes |
+| send_email | boolean | yes |
+
+#### `user-budget-approval-rule-edit` (request body)
+All fields optional: threshold (string), approver_id (int64), budget_id (int64), user_id (int64), level (integer), send_email (boolean)
+
+#### `cc-budget-approval-rule` (response)
+Same as user-budget-approval-rule but with `cost_center: string` instead of `user_id`
+
+#### `cc-budget-approval-rule-new` / `cc-budget-approval-rule-edit` (request bodies)
+Same pattern as user variants, with `cost_center: string` instead of `user_id`
+
+#### `cost-center` (response)
+| Field | Type | Required |
+|-------|------|----------|
+| name | string | yes |
+| manager_email | string | yes |
+| user_count | integer (int64) | yes |
+| enabled | boolean | yes |
+
+#### `cost-center-new` (request body)
+| Field | Type | Required |
+|-------|------|----------|
+| name | string | yes |
+| manager_id | integer (int64) | yes |
+| user_ids | integer[] | yes |
+| group_names | string[] | yes |
+| enabled | boolean | yes |
+
+#### `cost-center-edit` (request body)
+All optional: new_name (string), manager_id (int64), user_ids (integer[]), group_names (string[]), enabled (boolean)
+
+#### `cost-center-details` (response)
+| Field | Type | Required |
+|-------|------|----------|
+| name | string | yes |
+| manager | `arak-int-user` | yes |
+| users | `arak-int-user[]` | yes |
+| groups | `group-details[]` | yes |
+| enabled | boolean | yes |
+
+#### `group` (response)
+| Field | Type | Required |
+|-------|------|----------|
+| name | string | yes |
+| user_count | integer (int64) | yes |
+
+#### `group-new` (request body)
+| Field | Type | Required |
+|-------|------|----------|
+| name | string | yes |
+| user_ids | integer[] | yes |
+
+#### `group-edit` (request body)
+All optional: new_name (string), user_ids (integer[])
+
+#### `group-details` (response)
+| Field | Type | Required |
+|-------|------|----------|
+| name | string | yes |
+| users | `arak-int-user[]` | yes |
+
+#### `budget-for-user` (response, unused endpoint)
+| Field | Type | Required |
+|-------|------|----------|
+| limit | string | yes |
+| current | string | yes |
+| budget_id | integer (int64) | yes |
+| name | string | yes |
+| user_id | integer (int64) | no |
+| cost_center | string | no |
+
+### 3.5 Paginated Response Envelope
+
+All list endpoints return a standard envelope:
+```
+{ total_number: integer, current_page: integer, total_pages: integer, items: T[] }
+```
+
+### 3.6 Authentication
+
+- OAuth2 with `openid` + `profile` scopes (global security scheme)
+- All endpoints require authentication
 
 ---
 
 ## 4. Findings Summary
+
+### Appsmith vs API Mismatches
+
+| Issue | Detail |
+|-------|--------|
+| **`limit`/`current`/`threshold` are strings** | API spec defines these as `string`, not `number`. Appsmith renders them in number-type table columns and uses `String()` coercion in POST/PUT bodies — this works by accident but the new frontend should treat them as strings (likely decimal values serialized as text). |
+| **`budget-edit` fields are all optional** | API allows partial updates (name-only or year-only). Appsmith's commented-out conditional spread was the correct approach; current code sends both fields unconditionally. |
+| **`percentage` param is required float** | Home page sends it as text from `i_percent.text`; API expects `number` type with `float` format. |
+| **`role` is a nested object** | API returns `role: { name, created, updated }` but Appsmith treats `role` as a flat string in some table columns. |
 
 ### Embedded Business Rules
 
@@ -258,22 +497,6 @@ currentRow.year == new Date().getFullYear()
 | **Wrong validation reference** in i_edit_cc_name (references i_new_cc_name) | Edit form validation broken | Centri di costo |
 | **Commented-out conditional logic** in Editbudget body | Full update sent regardless of field changes | Voci di costo |
 
-### Candidate Domain Entities
+### Next Step
 
-1. **User** (id, email, first_name, last_name, role, state{enabled, name}, created, updated)
-2. **Budget** (id, year, name, limit, current, active)
-3. **CostCenter** (name[PK], enabled, manager_id, users[], groups[])
-4. **Group** (name[PK], users[], user_count)
-5. **BudgetUserAllocation** (budget_id, user_id, limit, current, enabled)
-6. **BudgetCostCenterAllocation** (budget_id, cost_center, limit, current, enabled)
-7. **ApprovalRule** (id, budget_id, user_id/cost_center, threshold, approver_id, level, send_email)
-
-### Recommended Next Steps
-
-1. **Fix identified bugs** (JSON trailing commas, validation cross-reference, commented-out code)
-2. **Add error handling** across all query chains (most `.then()` chains lack `.catch()`)
-3. **Implement server-side pagination** (all queries currently use `disable_pagination=true`)
-4. **Add audit logging** for all budget and approval rule mutations
-5. **Extract business rules** (active year computation, threshold defaults) to backend
-6. **Design unified CRUD patterns** to eliminate form/modal duplication
-7. **Hand off to `appsmith-migration-spec`** for Phase 2 specification work
+Hand off this audit to **`appsmith-migration-spec`** (Phase 2) to produce the expert-led migration specification. That phase should address all findings above: API contract alignment, unused endpoint adoption, type handling, pagination, error handling, business rule extraction, and unified CRUD patterns.
