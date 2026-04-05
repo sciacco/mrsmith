@@ -1,0 +1,205 @@
+{
+  "source": "sample-export.zip",
+  "source_type": "zip",
+  "application_name": "sample-order-ops",
+  "declared_pages": [
+    "Order List",
+    "Order Detail"
+  ],
+  "pages": [
+    {
+      "name": "Order List",
+      "purpose": "Browse orders and open a specific order for review.",
+      "page_type": "list",
+      "main_entity": "Order",
+      "main_entity_confidence": "high",
+      "candidate_entities": [
+        "Order",
+        "Customer"
+      ],
+      "actions_available": [
+        "read",
+        "navigate"
+      ],
+      "page_load_actions": [
+        "fetchOrders"
+      ],
+      "widgets": [
+        {
+          "name": "OrdersTable",
+          "widget_type": "TABLE_WIDGET",
+          "role": "data_display"
+        },
+        {
+          "name": "OpenOrderButton",
+          "widget_type": "BUTTON_WIDGET",
+          "role": "trigger"
+        }
+      ]
+    },
+    {
+      "name": "Order Detail",
+      "purpose": "Review, edit, and submit one order.",
+      "page_type": "detail",
+      "main_entity": "Order",
+      "main_entity_confidence": "high",
+      "candidate_entities": [
+        "Order",
+        "Customer",
+        "Line Item"
+      ],
+      "actions_available": [
+        "read",
+        "update",
+        "submit"
+      ],
+      "page_load_actions": [
+        "fetchOrderDetail"
+      ],
+      "widgets": [
+        {
+          "name": "OrderForm",
+          "widget_type": "FORM_WIDGET",
+          "role": "editor"
+        },
+        {
+          "name": "SubmitOrderButton",
+          "widget_type": "BUTTON_WIDGET",
+          "role": "trigger"
+        }
+      ]
+    }
+  ],
+  "datasources": [
+    {
+      "name": "Orders API",
+      "datasource_type": "REST_API",
+      "purpose": "System of record for order and customer data."
+    }
+  ],
+  "actions": [
+    {
+      "name": "fetchOrders",
+      "action_type": "api",
+      "purpose": "Load a paginated order list for the landing page.",
+      "entity": "Order",
+      "operation": "read",
+      "parameters": [
+        "this.params.status",
+        "this.params.page"
+      ]
+    },
+    {
+      "name": "fetchOrderDetail",
+      "action_type": "api",
+      "purpose": "Load one order with customer and line item data.",
+      "entity": "Order",
+      "operation": "read",
+      "parameters": [
+        "appsmith.store.selectedOrderId"
+      ]
+    },
+    {
+      "name": "saveOrder",
+      "action_type": "api",
+      "purpose": "Persist edits made in the detail form.",
+      "entity": "Order",
+      "operation": "update",
+      "parameters": [
+        "OrderForm.formData"
+      ]
+    },
+    {
+      "name": "submitOrder",
+      "action_type": "api",
+      "purpose": "Submit the order for downstream fulfillment.",
+      "entity": "Order",
+      "operation": "submit",
+      "parameters": [
+        "appsmith.store.selectedOrderId"
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "name": "Order",
+      "role": "primary",
+      "fields": [
+        "id",
+        "orderNumber",
+        "status",
+        "customerId",
+        "submittedAt",
+        "totalAmount"
+      ],
+      "operations": [
+        "read",
+        "update",
+        "submit"
+      ],
+      "relationships": [
+        "belongs to Customer",
+        "has many Line Item"
+      ]
+    },
+    {
+      "name": "Customer",
+      "role": "supporting",
+      "fields": [
+        "id",
+        "name",
+        "email"
+      ],
+      "operations": [
+        "read"
+      ],
+      "relationships": [
+        "has many Order"
+      ]
+    },
+    {
+      "name": "Line Item",
+      "role": "supporting",
+      "fields": [
+        "sku",
+        "description",
+        "quantity",
+        "unitPrice"
+      ],
+      "operations": [
+        "read",
+        "update"
+      ],
+      "relationships": [
+        "belongs to Order"
+      ]
+    }
+  ],
+  "js_objects": [
+    {
+      "name": "orderWorkflow",
+      "methods": [
+        {
+          "name": "recalculateTotals",
+          "classification": "domain_logic"
+        },
+        {
+          "name": "submitCurrentOrder",
+          "classification": "frontend_orchestration"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "logic_placement",
+      "summary": "Order total recalculation appears in a JSObject and may belong in a backend or shared rule layer."
+    },
+    {
+      "severity": "medium",
+      "category": "workflow_gap",
+      "summary": "The audit shows a submit operation but does not reveal downstream approval or fulfillment rules."
+    }
+  ]
+}
