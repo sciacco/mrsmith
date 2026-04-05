@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-lg) var(--space-2xl);
+  padding: 0.625rem var(--space-2xl);
   background: var(--bg-header);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);

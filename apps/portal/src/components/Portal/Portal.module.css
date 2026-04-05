@@ -5,31 +5,77 @@
 }
 
 .main {
-  padding: var(--space-2xl);
+  padding: var(--space-lg) var(--space-2xl);
   max-width: 1400px;
   margin: 0 auto;
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-3xl);
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
 }
 
-@media (max-width: 1024px) {
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
+/* ── Section (title + card grid) ── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sectionTitle {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  color: var(--green-muted);
+  text-transform: uppercase;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--green-border);
+  text-shadow: 0 0 8px var(--green-glow-sm);
+}
+
+.prompt {
+  color: var(--green-primary);
+  margin-right: 0.25rem;
+}
+
+.cursor {
+  color: var(--green-primary);
+  animation: blink 1s step-end infinite;
+  margin-left: 0.1rem;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ── Card grid: 6 columns at desktop ── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.65rem;
+}
+
+@media (max-width: 1200px) {
+  .cards {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .cards {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (max-width: 640px) {
   .main {
-    padding: var(--space-xl);
+    padding: var(--space-lg);
   }
 
-  .grid {
-    grid-template-columns: 1fr;
-    gap: var(--space-2xl);
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

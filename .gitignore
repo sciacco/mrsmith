@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Build output
 dist/
@@ -22,3 +23,7 @@ backend/.env
 
 # Other artifacts
 apps/*/*.zip
+/.playwright-mcp
+/portal-1920x1080.png
+/portal-option-a-fullpage.png
+/portal-option-a-viewport.png
