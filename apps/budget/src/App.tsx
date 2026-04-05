@@ -8,7 +8,7 @@ const navItems = [
   { label: 'Home', path: '/home' },
   { label: 'Gruppi', path: '/groups' },
   { label: 'Centri di costo', path: '/cost-centers' },
-  { label: 'Voci di costo', path: '/cost-items' },
+  { label: 'Voci di costo', path: '/budgets' },
 ];
 
 export function App() {

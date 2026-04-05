@@ -1,6 +1,7 @@
 package budget
 
 import (
+	"strconv"
 	"sync"
 )
 
@@ -63,6 +64,74 @@ type costCenterData struct {
 	usersNil      bool
 }
 
+// ── Budget types ──
+
+type budget struct {
+	ID      int64  `json:"id"`
+	Name    string `json:"name"`
+	Year    int    `json:"year"`
+	Limit   string `json:"limit"`
+	Current string `json:"current"`
+}
+
+type userBudgetAllocation struct {
+	Limit     string `json:"limit"`
+	Current   string `json:"current"`
+	UserID    int64  `json:"user_id"`
+	UserEmail string `json:"user_email"`
+	BudgetID  int64  `json:"budget_id"`
+	Enabled   bool   `json:"enabled"`
+}
+
+type costCenterBudgetAllocation struct {
+	Limit      string `json:"limit"`
+	Current    string `json:"current"`
+	CostCenter string `json:"cost_center"`
+	BudgetID   int64  `json:"budget_id"`
+	Enabled    bool   `json:"enabled"`
+}
+
+type budgetDetails struct {
+	ID                int64                        `json:"id"`
+	Name              string                       `json:"name"`
+	Year              int                          `json:"year"`
+	Limit             string                       `json:"limit"`
+	Current           string                       `json:"current"`
+	UserBudgets       []userBudgetAllocation       `json:"user_budgets"`
+	CostCenterBudgets []costCenterBudgetAllocation `json:"cost_center_budgets"`
+}
+
+type budgetData struct {
+	name              string
+	year              int
+	limit             string
+	current           string
+	userAllocations   []userBudgetAllocation
+	ccAllocations     []costCenterBudgetAllocation
+}
+
+type userApprovalRule struct {
+	ID            int64  `json:"id"`
+	Threshold     string `json:"threshold"`
+	ApproverID    int64  `json:"approver_id"`
+	ApproverEmail string `json:"approver_email"`
+	BudgetID      int64  `json:"budget_id"`
+	UserID        int64  `json:"user_id"`
+	Level         int    `json:"level"`
+	SendEmail     bool   `json:"send_email"`
+}
+
+type ccApprovalRule struct {
+	ID            int64  `json:"id"`
+	Threshold     string `json:"threshold"`
+	ApproverID    int64  `json:"approver_id"`
+	ApproverEmail string `json:"approver_email"`
+	BudgetID      int64  `json:"budget_id"`
+	CostCenter    string `json:"cost_center"`
+	Level         int    `json:"level"`
+	SendEmail     bool   `json:"send_email"`
+}
+
 type paginatedResponse struct {
 	TotalNumber int `json:"total_number"`
 	CurrentPage int `json:"current_page"`
@@ -78,6 +147,17 @@ type store struct {
 	groupOrder      []string
 	costCenters     map[string]*costCenterData
 	costCenterOrder []string
+	// Budget domain
+	budgets      map[int64]*budgetData
+	budgetOrder  []int64
+	nextBudgetID int64
+	// Approval rules
+	userRules      map[int64]*userApprovalRule
+	userRuleOrder  []int64
+	nextUserRuleID int64
+	ccRules        map[int64]*ccApprovalRule
+	ccRuleOrder    []int64
+	nextCcRuleID   int64
 }
 
 const (
@@ -234,6 +314,70 @@ var db = &store{
 		"People",
 		"Test-cc [PER TEST]",
 	},
+	budgets: map[int64]*budgetData{
+		1: {name: "Marketing", year: 2026, limit: "50000.00", current: "32100.50",
+			userAllocations: []userBudgetAllocation{
+				{Limit: "5000.00", Current: "3200.00", UserID: 24, UserEmail: "salvatore.sciacco@cdlan.it", BudgetID: 1, Enabled: true},
+				{Limit: "3000.00", Current: "1800.00", UserID: 10, UserEmail: "giulia.mezzolla@cdlan.it", BudgetID: 1, Enabled: true},
+				{Limit: "2000.00", Current: "900.00", UserID: 21, UserEmail: "sara.gusmini@cdlan.it", BudgetID: 1, Enabled: true},
+			},
+			ccAllocations: []costCenterBudgetAllocation{
+				{Limit: "20000.00", Current: "15000.00", CostCenter: "Communication", BudgetID: 1, Enabled: true},
+				{Limit: "10000.00", Current: "8200.50", CostCenter: "CustXP", BudgetID: 1, Enabled: true},
+			},
+		},
+		2: {name: "IT", year: 2026, limit: "30000.00", current: "18200.00",
+			userAllocations: []userBudgetAllocation{
+				{Limit: "8000.00", Current: "5100.00", UserID: 28, UserEmail: "alessandra.ferrari@cdlan.it", BudgetID: 2, Enabled: true},
+				{Limit: "4000.00", Current: "2300.00", UserID: 1, UserEmail: "federico.deicas@cdlan.it", BudgetID: 2, Enabled: true},
+			},
+			ccAllocations: []costCenterBudgetAllocation{
+				{Limit: "15000.00", Current: "9800.00", CostCenter: "Applications", BudgetID: 2, Enabled: true},
+			},
+		},
+		3: {name: "HR", year: 2025, limit: "20000.00", current: "19800.00",
+			userAllocations: []userBudgetAllocation{
+				{Limit: "10000.00", Current: "9500.00", UserID: 11, UserEmail: "valentina.falcone@cdlan.it", BudgetID: 3, Enabled: true},
+				{Limit: "5000.00", Current: "4800.00", UserID: 8, UserEmail: "roberta.scattolin@cdlan.it", BudgetID: 3, Enabled: false},
+			},
+			ccAllocations: []costCenterBudgetAllocation{
+				{Limit: "5000.00", Current: "5500.00", CostCenter: "People", BudgetID: 3, Enabled: true},
+			},
+		},
+		4: {name: "Operations", year: 2026, limit: "45000.00", current: "22450.75",
+			userAllocations: []userBudgetAllocation{
+				{Limit: "12000.00", Current: "8200.00", UserID: 34, UserEmail: "fabio.gallo@cdlan.it", BudgetID: 4, Enabled: true},
+			},
+			ccAllocations: []costCenterBudgetAllocation{
+				{Limit: "25000.00", Current: "12000.75", CostCenter: "Delivery CLOUD", BudgetID: 4, Enabled: true},
+			},
+		},
+		5: {name: "Compliance", year: 2026, limit: "15000.00", current: "4200.00",
+			userAllocations:   []userBudgetAllocation{},
+			ccAllocations:     []costCenterBudgetAllocation{},
+		},
+		6: {name: "Formazione", year: 2025, limit: "12000.00", current: "11800.00",
+			userAllocations:   []userBudgetAllocation{},
+			ccAllocations:     []costCenterBudgetAllocation{},
+		},
+	},
+	budgetOrder:  []int64{1, 2, 3, 4, 5, 6},
+	nextBudgetID: 7,
+	userRules: map[int64]*userApprovalRule{
+		1: {ID: 1, Threshold: "500.00", ApproverID: 10, ApproverEmail: "giulia.mezzolla@cdlan.it", BudgetID: 1, UserID: 24, Level: 1, SendEmail: true},
+		2: {ID: 2, Threshold: "2000.00", ApproverID: 5, ApproverEmail: "eva.grimaldi@cdlan.it", BudgetID: 1, UserID: 24, Level: 2, SendEmail: true},
+		3: {ID: 3, Threshold: "1000.00", ApproverID: 21, ApproverEmail: "sara.gusmini@cdlan.it", BudgetID: 1, UserID: 10, Level: 1, SendEmail: false},
+		4: {ID: 4, Threshold: "3000.00", ApproverID: 28, ApproverEmail: "alessandra.ferrari@cdlan.it", BudgetID: 2, UserID: 28, Level: 1, SendEmail: true},
+	},
+	userRuleOrder:  []int64{1, 2, 3, 4},
+	nextUserRuleID: 5,
+	ccRules: map[int64]*ccApprovalRule{
+		1: {ID: 1, Threshold: "5000.00", ApproverID: 14, ApproverEmail: "marta.savoldi@cdlan.it", BudgetID: 1, CostCenter: "Communication", Level: 1, SendEmail: true},
+		2: {ID: 2, Threshold: "10000.00", ApproverID: 5, ApproverEmail: "eva.grimaldi@cdlan.it", BudgetID: 1, CostCenter: "Communication", Level: 2, SendEmail: true},
+		3: {ID: 3, Threshold: "8000.00", ApproverID: 25, ApproverEmail: "stefano.vatta@cdlan.it", BudgetID: 2, CostCenter: "Applications", Level: 1, SendEmail: false},
+	},
+	ccRuleOrder:  []int64{1, 2, 3},
+	nextCcRuleID: 4,
 }
 
 func (s *store) getUsers() []user {
@@ -464,4 +608,346 @@ func (s *store) editCostCenter(name string, newName *string, managerID *int64, u
 	}
 	s.costCenters[currentName] = cc
 	return true
+}
+
+// ── Budget store methods ──
+
+func (s *store) listBudgets() []budget {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]budget, 0, len(s.budgetOrder))
+	for _, id := range s.budgetOrder {
+		bd, ok := s.budgets[id]
+		if !ok {
+			continue
+		}
+		result = append(result, budget{
+			ID:      id,
+			Name:    bd.name,
+			Year:    bd.year,
+			Limit:   bd.limit,
+			Current: bd.current,
+		})
+	}
+	return result
+}
+
+func (s *store) getBudgetDetails(id int64) (budgetDetails, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	bd, ok := s.budgets[id]
+	if !ok {
+		return budgetDetails{}, false
+	}
+	ua := bd.userAllocations
+	if ua == nil {
+		ua = []userBudgetAllocation{}
+	}
+	ca := bd.ccAllocations
+	if ca == nil {
+		ca = []costCenterBudgetAllocation{}
+	}
+	return budgetDetails{
+		ID:                id,
+		Name:              bd.name,
+		Year:              bd.year,
+		Limit:             bd.limit,
+		Current:           bd.current,
+		UserBudgets:       ua,
+		CostCenterBudgets: ca,
+	}, true
+}
+
+func (s *store) createBudget(name string, year int) int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id := s.nextBudgetID
+	s.nextBudgetID++
+	s.budgets[id] = &budgetData{
+		name:            name,
+		year:            year,
+		limit:           "0.00",
+		current:         "0.00",
+		userAllocations: []userBudgetAllocation{},
+		ccAllocations:   []costCenterBudgetAllocation{},
+	}
+	s.budgetOrder = append(s.budgetOrder, id)
+	return id
+}
+
+func (s *store) editBudget(id int64, name *string, year *int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bd, ok := s.budgets[id]
+	if !ok {
+		return false
+	}
+	if name != nil {
+		bd.name = *name
+	}
+	if year != nil {
+		bd.year = *year
+	}
+	return true
+}
+
+func (s *store) deleteBudget(id int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.budgets[id]
+	if !ok {
+		return false
+	}
+	delete(s.budgets, id)
+	for i, oid := range s.budgetOrder {
+		if oid == id {
+			s.budgetOrder = append(s.budgetOrder[:i], s.budgetOrder[i+1:]...)
+			break
+		}
+	}
+	return true
+}
+
+// ── Allocation store methods ──
+
+func (s *store) createUserAllocation(budgetID int64, userID int64, limit string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bd, ok := s.budgets[budgetID]
+	if !ok {
+		return false
+	}
+	email := ""
+	if u, found := s.getUserByID(userID); found {
+		email = u.Email
+	}
+	bd.userAllocations = append(bd.userAllocations, userBudgetAllocation{
+		Limit: limit, Current: "0.00", UserID: userID, UserEmail: email, BudgetID: budgetID, Enabled: true,
+	})
+	return true
+}
+
+func (s *store) editUserAllocation(budgetID int64, userID int64, limit *string, enabled *bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bd, ok := s.budgets[budgetID]
+	if !ok {
+		return false
+	}
+	for i := range bd.userAllocations {
+		if bd.userAllocations[i].UserID == userID {
+			if limit != nil {
+				bd.userAllocations[i].Limit = *limit
+			}
+			if enabled != nil {
+				bd.userAllocations[i].Enabled = *enabled
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func (s *store) createCcAllocation(budgetID int64, costCenter string, limit string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bd, ok := s.budgets[budgetID]
+	if !ok {
+		return false
+	}
+	bd.ccAllocations = append(bd.ccAllocations, costCenterBudgetAllocation{
+		Limit: limit, Current: "0.00", CostCenter: costCenter, BudgetID: budgetID, Enabled: true,
+	})
+	return true
+}
+
+func (s *store) editCcAllocation(budgetID int64, costCenter string, limit *string, enabled *bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bd, ok := s.budgets[budgetID]
+	if !ok {
+		return false
+	}
+	for i := range bd.ccAllocations {
+		if bd.ccAllocations[i].CostCenter == costCenter {
+			if limit != nil {
+				bd.ccAllocations[i].Limit = *limit
+			}
+			if enabled != nil {
+				bd.ccAllocations[i].Enabled = *enabled
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// ── Approval rule store methods ──
+
+func (s *store) listUserRules(budgetID int64, userID int64) []userApprovalRule {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []userApprovalRule
+	for _, id := range s.userRuleOrder {
+		r, ok := s.userRules[id]
+		if !ok {
+			continue
+		}
+		if r.BudgetID == budgetID && r.UserID == userID {
+			result = append(result, *r)
+		}
+	}
+	if result == nil {
+		result = []userApprovalRule{}
+	}
+	return result
+}
+
+func (s *store) createUserRule(threshold string, approverID int64, budgetID int64, userID int64, level int, sendEmail bool) int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id := s.nextUserRuleID
+	s.nextUserRuleID++
+	email := ""
+	if u, found := s.getUserByID(approverID); found {
+		email = u.Email
+	}
+	s.userRules[id] = &userApprovalRule{
+		ID: id, Threshold: threshold, ApproverID: approverID, ApproverEmail: email,
+		BudgetID: budgetID, UserID: userID, Level: level, SendEmail: sendEmail,
+	}
+	s.userRuleOrder = append(s.userRuleOrder, id)
+	return id
+}
+
+func (s *store) editUserRule(ruleID int64, threshold *string, approverID *int64, level *int, sendEmail *bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, ok := s.userRules[ruleID]
+	if !ok {
+		return false
+	}
+	if threshold != nil {
+		r.Threshold = *threshold
+	}
+	if approverID != nil {
+		r.ApproverID = *approverID
+		if u, found := s.getUserByID(*approverID); found {
+			r.ApproverEmail = u.Email
+		}
+	}
+	if level != nil {
+		r.Level = *level
+	}
+	if sendEmail != nil {
+		r.SendEmail = *sendEmail
+	}
+	return true
+}
+
+func (s *store) deleteUserRule(ruleID int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.userRules[ruleID]
+	if !ok {
+		return false
+	}
+	delete(s.userRules, ruleID)
+	for i, id := range s.userRuleOrder {
+		if id == ruleID {
+			s.userRuleOrder = append(s.userRuleOrder[:i], s.userRuleOrder[i+1:]...)
+			break
+		}
+	}
+	return true
+}
+
+func (s *store) listCcRules(budgetID int64, costCenter string) []ccApprovalRule {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []ccApprovalRule
+	for _, id := range s.ccRuleOrder {
+		r, ok := s.ccRules[id]
+		if !ok {
+			continue
+		}
+		if r.BudgetID == budgetID && r.CostCenter == costCenter {
+			result = append(result, *r)
+		}
+	}
+	if result == nil {
+		result = []ccApprovalRule{}
+	}
+	return result
+}
+
+func (s *store) createCcRule(threshold string, approverID int64, budgetID int64, costCenter string, level int, sendEmail bool) int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id := s.nextCcRuleID
+	s.nextCcRuleID++
+	email := ""
+	if u, found := s.getUserByID(approverID); found {
+		email = u.Email
+	}
+	s.ccRules[id] = &ccApprovalRule{
+		ID: id, Threshold: threshold, ApproverID: approverID, ApproverEmail: email,
+		BudgetID: budgetID, CostCenter: costCenter, Level: level, SendEmail: sendEmail,
+	}
+	s.ccRuleOrder = append(s.ccRuleOrder, id)
+	return id
+}
+
+func (s *store) editCcRule(ruleID int64, threshold *string, approverID *int64, level *int, sendEmail *bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, ok := s.ccRules[ruleID]
+	if !ok {
+		return false
+	}
+	if threshold != nil {
+		r.Threshold = *threshold
+	}
+	if approverID != nil {
+		r.ApproverID = *approverID
+		if u, found := s.getUserByID(*approverID); found {
+			r.ApproverEmail = u.Email
+		}
+	}
+	if level != nil {
+		r.Level = *level
+	}
+	if sendEmail != nil {
+		r.SendEmail = *sendEmail
+	}
+	return true
+}
+
+func (s *store) deleteCcRule(ruleID int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.ccRules[ruleID]
+	if !ok {
+		return false
+	}
+	delete(s.ccRules, ruleID)
+	for i, id := range s.ccRuleOrder {
+		if id == ruleID {
+			s.ccRuleOrder = append(s.ccRuleOrder[:i], s.ccRuleOrder[i+1:]...)
+			break
+		}
+	}
+	return true
+}
+
+// parseBudgetID parses budget_id from a path parameter.
+func parseBudgetID(raw string) (int64, bool) {
+	id, err := strconv.ParseInt(raw, 10, 64)
+	return id, err == nil
+}
+
+// parseRuleID parses rule_id from a path parameter.
+func parseRuleID(raw string) (int64, bool) {
+	id, err := strconv.ParseInt(raw, 10, 64)
+	return id, err == nil
 }

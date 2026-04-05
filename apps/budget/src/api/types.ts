@@ -105,3 +105,146 @@ export interface CostCenterEdit {
   group_names?: string[];
   enabled?: boolean;
 }
+
+// ── Budget types ──
+
+/** schema: id-object — returned by NewBudget, NewUserBudgetApprovalRule, NewCCBudgetApprovalRule */
+export interface IdResponse {
+  id: number;
+}
+
+/** schema: budget */
+export interface Budget {
+  id: number;
+  name: string;
+  year: number;
+  limit: string;   // decimal as string — DO NOT parse to number in state
+  current: string;  // decimal as string — DO NOT parse to number in state
+}
+
+/** schema: budget-details */
+export interface BudgetDetails extends Budget {
+  cost_center_budgets: CostCenterBudgetAllocation[];
+  user_budgets: UserBudgetAllocation[];
+}
+
+/** schema: budget-new */
+export interface BudgetNew {
+  name: string;
+  year: number;
+}
+
+/** schema: budget-edit */
+export interface BudgetEdit {
+  name?: string;
+  year?: number;
+}
+
+// ── Allocation types ──
+
+/** schema: user-budget */
+export interface UserBudgetAllocation {
+  limit: string;
+  current: string;
+  user_id: number;
+  user_email: string;
+  budget_id: number;
+  enabled: boolean;
+}
+
+/** schema: user-budget-upsert */
+export interface UserBudgetNew {
+  limit: string;
+  user_id: number;
+}
+
+/** schema: user-budget-edit */
+export interface UserBudgetEdit {
+  user_id: number;
+  limit?: string;
+  enabled?: boolean;
+}
+
+/** schema: cost_center-budget */
+export interface CostCenterBudgetAllocation {
+  limit: string;
+  current: string;
+  cost_center: string;
+  budget_id: number;
+  enabled: boolean;
+}
+
+/** schema: cost_center-budget-upsert */
+export interface CostCenterBudgetNew {
+  limit: string;
+  cost_center: string;
+}
+
+/** schema: cost_center-budget-edit */
+export interface CostCenterBudgetEdit {
+  cost_center: string;
+  limit?: string;
+  enabled?: boolean;
+}
+
+// ── Approval rule types ──
+
+/** schema: user-budget-approval-rule */
+export interface UserBudgetApprovalRule {
+  id: number;
+  threshold: string;
+  approver_id: number;
+  approver_email: string;
+  budget_id: number;
+  user_id: number;
+  level: number;
+  send_email: boolean;
+}
+
+/** schema: user-budget-approval-rule-new */
+export interface UserBudgetApprovalRuleNew {
+  threshold: string;
+  approver_id: number;
+  budget_id: number;
+  user_id: number;
+  level: number;
+  send_email: boolean;
+}
+
+/** schema: user-budget-approval-rule-edit — MUTABLE FIELDS ONLY */
+export interface UserBudgetApprovalRuleEdit {
+  threshold?: string;
+  approver_id?: number;
+  level?: number;
+  send_email?: boolean;
+}
+
+/** schema: cc-budget-approval-rule */
+export interface CcBudgetApprovalRule {
+  id: number;
+  threshold: string;
+  approver_id: number;
+  approver_email: string;
+  budget_id: number;
+  cost_center: string;
+  level: number;
+  send_email: boolean;
+}
+
+/** schema: cc-budget-approval-rule-new */
+export interface CcBudgetApprovalRuleNew {
+  threshold: string;
+  approver_id: number;
+  budget_id: number;
+  cost_center: string;
+  level: number;
+  send_email: boolean;
+}
+
+/** schema: cc-budget-approval-rule-edit — MUTABLE FIELDS ONLY */
+export interface CcBudgetApprovalRuleEdit {
+  threshold?: string;
+  approver_id?: number;
+  level?: number;
+  send_email?: boolean;
+}
