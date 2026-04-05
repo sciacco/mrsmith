@@ -43,7 +43,7 @@ If the audit is incomplete or noisy, say exactly what is missing before asking t
 
 # Workflow
 
-Work one phase at a time. Do not skip ahead.
+Work one phase at a time. Do not skip ahead. for reference and to easy expert work write down all phases finding and questions in markdown {appname}-migspec-{phase}.md
 
 ## Phase A: Entity-Operation Model
 
