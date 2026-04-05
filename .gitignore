@@ -6,6 +6,7 @@ dist/
 *.tsbuildinfo
 backend/bin/
 backend/tmp/
+extracted/
 
 # Environment
 .env
