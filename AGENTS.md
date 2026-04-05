@@ -8,6 +8,9 @@
 - `backend/` — Go monolith with modular `internal/` packages per app
 - `deploy/` — Dockerfile (multi-stage), K8s manifests
 
+## Important Reference
+- `docs/mistra-dist.yaml` — authoritative Mistra NG Internal API spec; most mini-apps will integrate with these APIs, so use this file as the primary reference for backend contracts, client generation, and shared types.
+
 ## Dev
 - `make dev` — runs air (Go hot reload) + Vite concurrently
 - `make dev-docker` — same via docker-compose
