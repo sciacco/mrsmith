@@ -68,3 +68,40 @@ export interface GroupEdit {
   new_name?: string;
   user_ids?: number[];
 }
+
+/** schema: cost-center */
+export interface CostCenter {
+  name: string;
+  manager_email: string;
+  user_count: number;
+  group_count: number;
+  group_user_count: number;
+  enabled: boolean;
+}
+
+/** schema: cost-center-details */
+export interface CostCenterDetails {
+  name: string;
+  manager: ArakIntUser;
+  users: ArakIntUser[] | null;
+  groups: GroupDetails[];
+  enabled: boolean;
+}
+
+/** schema: cost-center-new */
+export interface CostCenterNew {
+  name: string;
+  manager_id: number;
+  user_ids: number[];
+  group_names: string[];
+  enabled: boolean;
+}
+
+/** schema: cost-center-edit */
+export interface CostCenterEdit {
+  new_name?: string;
+  manager_id?: number;
+  user_ids?: number[];
+  group_names?: string[];
+  enabled?: boolean;
+}

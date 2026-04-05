@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { Modal } from '../../components/Modal/Modal';
-import { MultiSelect } from '../../components/MultiSelect/MultiSelect';
-import { useToast } from '../../components/Toast/ToastProvider';
+import { Modal, MultiSelect, useToast } from '@mrsmith/ui';
 import { useCreateGroup, useUsers } from './queries';
 import { ApiError } from '@mrsmith/api-client';
 import styles from './GruppiPage.module.css';

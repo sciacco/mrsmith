@@ -1,5 +1,4 @@
-import { Modal } from '../../components/Modal/Modal';
-import { useToast } from '../../components/Toast/ToastProvider';
+import { Modal, useToast } from '@mrsmith/ui';
 import { useDeleteGroup } from './queries';
 import { ApiError } from '@mrsmith/api-client';
 import styles from './GruppiPage.module.css';

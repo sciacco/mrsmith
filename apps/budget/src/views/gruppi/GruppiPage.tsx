@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGroups, useGroupDetails } from './queries';
-import { Skeleton } from '../../components/Skeleton/Skeleton';
+import { Skeleton } from '@mrsmith/ui';
 import { GroupCreateModal } from './GroupCreateModal';
 import { GroupEditModal } from './GroupEditModal';
 import { GroupDeleteConfirm } from './GroupDeleteConfirm';

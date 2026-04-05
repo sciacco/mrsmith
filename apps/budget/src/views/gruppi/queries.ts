@@ -1,36 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../../api/client';
-import type {
-  PaginatedResponse,
-  MessageResponse,
-  ArakIntUser,
-  Group,
-  GroupDetails,
-  GroupNew,
-  GroupEdit,
-} from '../../api/types';
+import { sharedKeys } from '../../api/shared-queries';
+import type { MessageResponse, GroupDetails, GroupNew, GroupEdit } from '../../api/types';
+
+export { useGroups, useUsers } from '../../api/shared-queries';
 
 export const groupKeys = {
-  all: ['budget', 'groups'] as const,
+  all: sharedKeys.groups,
   details: (name: string) => ['budget', 'group-details', name] as const,
 };
-
-export const userKeys = {
-  all: ['budget', 'users'] as const,
-};
-
-export function useGroups() {
-  const api = useApiClient();
-  return useQuery({
-    queryKey: groupKeys.all,
-    queryFn: async () => {
-      const res = await api.get<PaginatedResponse<Group>>(
-        '/budget/v1/group?page_number=1&disable_pagination=true',
-      );
-      return res.items;
-    },
-  });
-}
 
 export function useGroupDetails(name: string | null) {
   const api = useApiClient();
@@ -41,19 +19,6 @@ export function useGroupDetails(name: string | null) {
       return api.get<GroupDetails>(`/budget/v1/group/${encoded}`);
     },
     enabled: !!name,
-  });
-}
-
-export function useUsers() {
-  const api = useApiClient();
-  return useQuery({
-    queryKey: userKeys.all,
-    queryFn: async () => {
-      const res = await api.get<PaginatedResponse<ArakIntUser>>(
-        '/users-int/v1/user?page_number=1&disable_pagination=true&enabled=true',
-      );
-      return res.items;
-    },
   });
 }
 

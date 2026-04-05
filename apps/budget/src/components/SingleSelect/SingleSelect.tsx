@@ -1,24 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
-import styles from './MultiSelect.module.css';
+import styles from './SingleSelect.module.css';
 
-interface Option<T extends number | string = number> {
-  value: T;
+interface Option {
+  value: number;
   label: string;
 }
 
-interface MultiSelectProps<T extends number | string = number> {
-  options: Option<T>[];
-  selected: T[];
-  onChange: (selected: T[]) => void;
+interface SingleSelectProps {
+  options: Option[];
+  selected: number | null;
+  onChange: (value: number | null) => void;
   placeholder?: string;
 }
 
-export function MultiSelect<T extends number | string = number>({
+export function SingleSelect({
   options,
   selected,
   onChange,
   placeholder = 'Seleziona...',
-}: MultiSelectProps<T>) {
+}: SingleSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,14 +37,12 @@ export function MultiSelect<T extends number | string = number>({
     o.label.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const selectedOptions = options.filter((o) => selected.includes(o.value));
+  const selectedOption = options.find((o) => o.value === selected);
 
-  function toggle(value: T) {
-    if (selected.includes(value)) {
-      onChange(selected.filter((v) => v !== value));
-    } else {
-      onChange([...selected, value]);
-    }
+  function handleSelect(value: number) {
+    onChange(value);
+    setOpen(false);
+    setSearch('');
   }
 
   return (
@@ -53,24 +51,8 @@ export function MultiSelect<T extends number | string = number>({
         className={`${styles.trigger} ${open ? styles.triggerOpen : ''}`}
         onClick={() => setOpen(!open)}
       >
-        {selectedOptions.length > 0 ? (
-          <div className={styles.chips}>
-            {selectedOptions.map((o) => (
-              <span key={o.value} className={styles.chip}>
-                {o.label}
-                <button
-                  className={styles.chipRemove}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggle(o.value);
-                  }}
-                  aria-label={`Rimuovi ${o.label}`}
-                >
-                  &times;
-                </button>
-              </span>
-            ))}
-          </div>
+        {selectedOption ? (
+          <span className={styles.selectedLabel}>{selectedOption.label}</span>
         ) : (
           <span className={styles.placeholder}>{placeholder}</span>
         )}
@@ -93,14 +75,16 @@ export function MultiSelect<T extends number | string = number>({
               <div className={styles.empty}>Nessun risultato</div>
             ) : (
               filtered.map((o) => (
-                <label key={o.value} className={styles.option}>
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(o.value)}
-                    onChange={() => toggle(o.value)}
-                  />
+                <div
+                  key={o.value}
+                  className={`${styles.option} ${o.value === selected ? styles.optionSelected : ''}`}
+                  onClick={() => handleSelect(o.value)}
+                >
+                  <span className={styles.radio}>
+                    {o.value === selected && <span className={styles.radioDot} />}
+                  </span>
                   <span>{o.label}</span>
-                </label>
+                </div>
               ))
             )}
           </div>

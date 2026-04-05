@@ -1,28 +1,39 @@
 import { useState, useEffect } from 'react';
-import { Modal, MultiSelect, useToast } from '@mrsmith/ui';
-import { useEditGroup, useGroupDetails, useUsers } from './queries';
+import { Modal, SingleSelect, MultiSelect, useToast } from '@mrsmith/ui';
+import { useCostCenterDetails, useEditCostCenter, useUsers, useGroups } from './queries';
 import { ApiError } from '@mrsmith/api-client';
-import styles from './GruppiPage.module.css';
+import type { CostCenterEdit } from '../../api/types';
+import styles from './CentriDiCostoPage.module.css';
 
-interface GroupEditModalProps {
+interface CostCenterEditModalProps {
   open: boolean;
   onClose: () => void;
-  groupName: string;
+  costCenterName: string;
   onRenamed: (newName: string) => void;
 }
 
-export function GroupEditModal({ open, onClose, groupName, onRenamed }: GroupEditModalProps) {
+export function CostCenterEditModal({
+  open,
+  onClose,
+  costCenterName,
+  onRenamed,
+}: CostCenterEditModalProps) {
   const [newName, setNewName] = useState('');
+  const [managerId, setManagerId] = useState<number | null>(null);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [selectedGroupNames, setSelectedGroupNames] = useState<string[]>([]);
   const { toast } = useToast();
-  const { data: details } = useGroupDetails(groupName);
+  const { data: details } = useCostCenterDetails(costCenterName);
   const { data: users } = useUsers();
-  const editGroup = useEditGroup();
+  const { data: groups } = useGroups();
+  const editCC = useEditCostCenter();
 
   useEffect(() => {
     if (details) {
       setNewName(details.name);
-      setSelectedUserIds(details.users.map((u) => u.id));
+      setManagerId(details.manager.id);
+      setSelectedUserIds((details.users ?? []).map((u) => u.id));
+      setSelectedGroupNames(details.groups.map((g) => g.name));
     }
   }, [details]);
 
@@ -31,17 +42,26 @@ export function GroupEditModal({ open, onClose, groupName, onRenamed }: GroupEdi
     label: `${u.first_name} ${u.last_name}`,
   }));
 
+  const groupOptions = (groups ?? []).map((g) => ({
+    value: g.name,
+    label: g.name,
+  }));
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const body: { new_name?: string; user_ids?: number[] } = {};
+    const body: CostCenterEdit = {};
     const trimmedName = newName.trim();
-    if (trimmedName && trimmedName !== groupName) {
+    if (trimmedName && trimmedName !== costCenterName) {
       body.new_name = trimmedName;
     }
+    if (managerId !== null) {
+      body.manager_id = managerId;
+    }
     body.user_ids = selectedUserIds;
+    body.group_names = selectedGroupNames;
 
-    editGroup.mutate(
-      { name: groupName, body },
+    editCC.mutate(
+      { name: costCenterName, body },
       {
         onSuccess: (res) => {
           toast(res.message);
@@ -62,7 +82,7 @@ export function GroupEditModal({ open, onClose, groupName, onRenamed }: GroupEdi
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Modifica gruppo">
+    <Modal open={open} onClose={onClose} title="Modifica centro di costo">
       <form onSubmit={handleSubmit}>
         <div className={styles.formGroup}>
           <label className={styles.label}>Nome</label>
@@ -71,7 +91,16 @@ export function GroupEditModal({ open, onClose, groupName, onRenamed }: GroupEdi
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Nome del gruppo"
+            placeholder="Nome del centro di costo"
+          />
+        </div>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Manager</label>
+          <SingleSelect
+            options={userOptions}
+            selected={managerId}
+            onChange={setManagerId}
+            placeholder="Seleziona manager..."
           />
         </div>
         <div className={styles.formGroup}>
@@ -83,6 +112,15 @@ export function GroupEditModal({ open, onClose, groupName, onRenamed }: GroupEdi
             placeholder="Seleziona utenti..."
           />
         </div>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Gruppi</label>
+          <MultiSelect<string>
+            options={groupOptions}
+            selected={selectedGroupNames}
+            onChange={setSelectedGroupNames}
+            placeholder="Seleziona gruppi..."
+          />
+        </div>
         <div className={styles.actions}>
           <button type="button" className={styles.btnSecondary} onClick={onClose}>
             Annulla
@@ -90,9 +128,9 @@ export function GroupEditModal({ open, onClose, groupName, onRenamed }: GroupEdi
           <button
             type="submit"
             className={styles.btnPrimary}
-            disabled={editGroup.isPending}
+            disabled={editCC.isPending}
           >
-            {editGroup.isPending ? 'Salvataggio...' : 'Conferma'}
+            {editCC.isPending ? 'Salvataggio...' : 'Conferma'}
           </button>
         </div>
       </form>

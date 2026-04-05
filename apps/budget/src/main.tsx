@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { AuthProvider } from '@mrsmith/auth-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
-import { ToastProvider } from './components/Toast/ToastProvider';
+import { ToastProvider } from '@mrsmith/ui';
 import { App } from './App';
 import './styles/global.css';
 
