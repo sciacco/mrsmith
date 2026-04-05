@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/auth"
+	"github.com/sciacco/mrsmith/internal/budget"
 	"github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/health"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/portal"
 	"github.com/sciacco/mrsmith/pkg/middleware"
 )
@@ -20,9 +22,16 @@ func main() {
 	cfg := config.Load()
 
 	// Auth middleware
-	authMiddleware, err := auth.NewMiddleware(cfg.KeycloakIssuerURL)
-	if err != nil {
-		log.Fatalf("failed to init auth: %v", err)
+	var authMiddleware *auth.Middleware
+	if os.Getenv("SKIP_KEYCLOAK") == "true" {
+		log.Println("WARNING: SKIP_KEYCLOAK=true — auth disabled, using fake John Doe user. DO NOT use in production.")
+		authMiddleware = auth.NewNoopMiddleware()
+	} else {
+		var err error
+		authMiddleware, err = auth.NewMiddleware(cfg.KeycloakIssuerURL)
+		if err != nil {
+			log.Fatalf("failed to init auth: %v", err)
+		}
 	}
 
 	mux := http.NewServeMux()
@@ -30,10 +39,19 @@ func main() {
 	// Health probes (no auth)
 	health.Register(mux)
 
+	// Frontend config (no auth — needed before auth initializes)
+	mux.HandleFunc("GET /config", func(w http.ResponseWriter, _ *http.Request) {
+		httputil.JSON(w, http.StatusOK, map[string]string{
+			"keycloakUrl": cfg.KeycloakFrontendURL,
+			"realm":       cfg.KeycloakFrontendRealm,
+			"clientId":    cfg.KeycloakFrontendClientId,
+		})
+	})
+
 	// API routes (with auth)
 	api := http.NewServeMux()
 	portal.RegisterRoutes(api)
-	// Future: hr.RegisterRoutes(api), finance.RegisterRoutes(api), etc.
+	budget.RegisterRoutes(api)
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),

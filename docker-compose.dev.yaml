@@ -21,5 +21,18 @@ services:
     depends_on:
       - backend
 
+  budget:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter mrsmith-budget dev --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - budget_node_modules:/app/node_modules
+    ports:
+      - "5174:5174"
+    depends_on:
+      - backend
+
 volumes:
   portal_node_modules:
+  budget_node_modules:

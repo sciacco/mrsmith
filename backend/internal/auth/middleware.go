@@ -33,8 +33,28 @@ func NewMiddleware(issuerURL string) (*Middleware, error) {
 	return &Middleware{verifier: verifier}, nil
 }
 
+// NewNoopMiddleware returns a middleware that skips token validation
+// and injects fake claims. Only for local development.
+func NewNoopMiddleware() *Middleware {
+	return &Middleware{verifier: nil}
+}
+
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Dev mode: skip token validation, inject fake claims
+		if m.verifier == nil {
+			claims := Claims{
+				Subject:  "dev-user-001",
+				Email:    "john.doe@acme.com",
+				Name:     "John Doe",
+				Roles:    []string{"admin", "manager"},
+				RawToken: "dev-token",
+			}
+			ctx := context.WithValue(r.Context(), ClaimsKey, claims)
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
 		authHeader := r.Header.Get("Authorization")
 		if !strings.HasPrefix(authHeader, "Bearer ") {
 			http.Error(w, "missing or invalid authorization header", http.StatusUnauthorized)

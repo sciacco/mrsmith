@@ -1,3 +1,14 @@
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public statusText: string,
+    public path: string,
+    public body?: unknown,
+  ) {
+    super(`API ${status} ${statusText}: ${path}`);
+  }
+}
+
 export interface ApiClientOptions {
   baseUrl: string;
   getToken: () => string | undefined;
@@ -23,7 +34,9 @@ export function createApiClient({ baseUrl, getToken }: ApiClientOptions): ApiCli
     });
 
     if (!res.ok) {
-      throw new Error(`API ${method} ${path}: ${res.status} ${res.statusText}`);
+      let body: unknown;
+      try { body = await res.json(); } catch { /* no body */ }
+      throw new ApiError(res.status, res.statusText, path, body);
     }
 
     return res.json() as Promise<T>;

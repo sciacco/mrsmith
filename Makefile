@@ -18,6 +18,9 @@ dev-backend:          ## Solo backend con air
 dev-portal:           ## Solo portal
 	pnpm --filter mrsmith-portal dev
 
+dev-budget:           ## Solo budget app
+	pnpm --filter mrsmith-budget dev
+
 # Build ────────────────────────────────────────
 build:                ## Build completo (frontend + backend)
 	pnpm -r --if-present build
@@ -66,5 +69,5 @@ tidy:                 ## go mod tidy
 help:                 ## Mostra questo help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: install bootstrap dev dev-docker dev-backend dev-portal build build-frontend build-backend docker-build test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
+.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget build build-frontend build-backend docker-build test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
 .DEFAULT_GOAL := help

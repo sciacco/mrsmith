@@ -1,1 +1,1 @@
-export { createApiClient, type ApiClient, type ApiClientOptions } from './client';
+export { createApiClient, ApiError, type ApiClient, type ApiClientOptions } from './client';

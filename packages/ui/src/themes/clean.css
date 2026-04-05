@@ -1,11 +1,69 @@
-/* Clean theme — Stripe-inspired aesthetic for mini-apps */
+/* Clean theme — Refined fintech aesthetic */
 :root[data-theme="clean"] {
-  --color-bg: #ffffff;
-  --color-surface: #f6f9fc;
-  --color-border: #e3e8ee;
-  --color-text: #1a1a2e;
-  --color-text-muted: #6b7c93;
+  /* ── Core palette ── */
+  --color-bg: #fafbfd;
+  --color-bg-elevated: #ffffff;
+  --color-surface: #f1f5f9;
+  --color-surface-hover: #e8edf3;
+  --color-border: #e2e8f0;
+  --color-border-subtle: #f0f3f7;
+
+  /* ── Text ── */
+  --color-text: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-muted: #94a3b8;
+  --color-text-faint: #cbd5e1;
+
+  /* ── Accent (Indigo) ── */
   --color-accent: #635bff;
-  --color-accent-hover: #7a73ff;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --color-accent-hover: #5046e5;
+  --color-accent-subtle: rgba(99, 91, 255, 0.08);
+  --color-accent-muted: rgba(99, 91, 255, 0.15);
+  --color-accent-glow: rgba(99, 91, 255, 0.25);
+
+  /* ── Semantic ── */
+  --color-success: #10b981;
+  --color-success-bg: #ecfdf5;
+  --color-danger: #ef4444;
+  --color-danger-hover: #dc2626;
+  --color-danger-subtle: rgba(239, 68, 68, 0.08);
+  --color-warning: #f59e0b;
+
+  /* ── Typography ── */
+  --font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* ── Spacing scale ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── Radii ── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* ── Shadows (layered for realism) ── */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  --shadow-accent: 0 4px 14px rgba(99, 91, 255, 0.25), 0 1px 3px rgba(99, 91, 255, 0.1);
+  --shadow-float: 0 24px 48px -12px rgba(15, 23, 42, 0.15);
+
+  /* ── Motion ── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
 }

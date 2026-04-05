@@ -1,0 +1,105 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useApiClient } from '../../api/client';
+import type {
+  PaginatedResponse,
+  MessageResponse,
+  ArakIntUser,
+  Group,
+  GroupDetails,
+  GroupNew,
+  GroupEdit,
+} from '../../api/types';
+
+export const groupKeys = {
+  all: ['budget', 'groups'] as const,
+  details: (name: string) => ['budget', 'group-details', name] as const,
+};
+
+export const userKeys = {
+  all: ['budget', 'users'] as const,
+};
+
+export function useGroups() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: groupKeys.all,
+    queryFn: async () => {
+      const res = await api.get<PaginatedResponse<Group>>(
+        '/budget/v1/group?page_number=1&disable_pagination=true',
+      );
+      return res.items;
+    },
+  });
+}
+
+export function useGroupDetails(name: string | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: groupKeys.details(name!),
+    queryFn: async () => {
+      const encoded = encodeURIComponent(name!);
+      return api.get<GroupDetails>(`/budget/v1/group/${encoded}`);
+    },
+    enabled: !!name,
+  });
+}
+
+export function useUsers() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: userKeys.all,
+    queryFn: async () => {
+      const res = await api.get<PaginatedResponse<ArakIntUser>>(
+        '/users-int/v1/user?page_number=1&disable_pagination=true&enabled=true',
+      );
+      return res.items;
+    },
+  });
+}
+
+export function useCreateGroup() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: GroupNew) =>
+      api.post<MessageResponse>('/budget/v1/group', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: groupKeys.all });
+    },
+  });
+}
+
+export function useEditGroup() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, body }: { name: string; body: GroupEdit }) => {
+      const encoded = encodeURIComponent(name);
+      return api.put<MessageResponse>(`/budget/v1/group/${encoded}`, body);
+    },
+    onSuccess: (_data, variables) => {
+      const { name, body } = variables;
+      queryClient.invalidateQueries({ queryKey: groupKeys.all });
+      if (body.new_name && body.new_name !== name) {
+        queryClient.removeQueries({ queryKey: groupKeys.details(name) });
+      } else {
+        queryClient.invalidateQueries({ queryKey: groupKeys.details(name) });
+      }
+    },
+  });
+}
+
+export function useDeleteGroup() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => {
+      const encoded = encodeURIComponent(name);
+      return api.delete<MessageResponse>(`/budget/v1/group/${encoded}`);
+    },
+    onSuccess: (_data, name) => {
+      queryClient.invalidateQueries({ queryKey: groupKeys.all });
+      queryClient.removeQueries({ queryKey: groupKeys.details(name) });
+    },
+  });
+}

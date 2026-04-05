@@ -3,9 +3,10 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "concurrently --names backend,portal --prefix-colors blue,green \"cd backend && air\" \"pnpm --filter mrsmith-portal dev\"",
+    "dev": "concurrently --names backend,portal,budget --prefix-colors blue,green,magenta \"cd backend && air\" \"pnpm --filter mrsmith-portal dev\" \"pnpm --filter mrsmith-budget dev\"",
     "dev:backend": "cd backend && air",
     "dev:portal": "pnpm --filter mrsmith-portal dev",
+    "dev:budget": "pnpm --filter mrsmith-budget dev",
     "build": "pnpm -r --if-present build && cd backend && go build -o bin/server ./cmd/server",
     "build:frontend": "pnpm -r --if-present build",
     "build:backend": "cd backend && go build -o bin/server ./cmd/server",
