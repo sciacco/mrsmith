@@ -12,6 +12,7 @@ interface RuleEditModalProps {
   type: 'user' | 'cc';
   budgetId: number;
   userId?: number;
+  userEmail?: string;
   costCenter?: string;
   rule: UserBudgetApprovalRule | CcBudgetApprovalRule;
 }
@@ -22,7 +23,7 @@ const LEVEL_OPTIONS = [
   { value: 3, label: 'Livello 3' },
 ];
 
-export function RuleEditModal({ open, onClose, type, budgetId, userId, costCenter, rule }: RuleEditModalProps) {
+export function RuleEditModal({ open, onClose, type, budgetId, userId, userEmail, costCenter, rule }: RuleEditModalProps) {
   const [level, setLevel] = useState<number | null>(rule.level);
   const [threshold, setThreshold] = useState(rule.threshold);
   const [approverId, setApproverId] = useState<number | null>(rule.approver_id);
@@ -89,6 +90,14 @@ export function RuleEditModal({ open, onClose, type, budgetId, userId, costCente
   return (
     <Modal open={open} onClose={onClose} title="Modifica regola">
       <form onSubmit={handleSubmit}>
+        <div className={styles.ruleContext}>
+          <span className={styles.ruleContextLabel}>
+            {type === 'cc' ? 'Centro di costo' : 'Utente'}
+          </span>
+          <span className={styles.ruleContextValue}>
+            {type === 'cc' ? costCenter : userEmail}
+          </span>
+        </div>
         <div className={styles.formGroup}>
           <label className={styles.label}>Livello</label>
           <SingleSelect options={LEVEL_OPTIONS} selected={level} onChange={setLevel} placeholder="Seleziona livello..." />

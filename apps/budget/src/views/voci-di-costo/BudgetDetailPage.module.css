@@ -236,20 +236,12 @@
 
 .allocHeader {
   display: grid;
+  grid-template-columns: 32px 1fr 110px 110px 56px 32px;
+  gap: var(--space-3, 12px);
   padding: var(--space-2, 8px) var(--space-4, 16px);
   border-bottom: 1px solid var(--color-border, #e2e8f0);
   background: var(--color-surface, #f1f5f9);
   border-radius: var(--radius-md, 10px) var(--radius-md, 10px) 0 0;
-}
-
-.allocHeaderUser {
-  grid-template-columns: 1fr 120px 120px 64px 40px 32px;
-  gap: var(--space-3, 12px);
-}
-
-.allocHeaderCc {
-  grid-template-columns: 1fr 120px 120px 64px 40px 32px;
-  gap: var(--space-3, 12px);
 }
 
 .allocHeader span {
@@ -262,27 +254,24 @@
 
 .allocRow {
   display: grid;
+  grid-template-columns: 32px 1fr 110px 110px 56px 32px;
+  gap: var(--space-3, 12px);
   align-items: center;
   padding: var(--space-3, 12px) var(--space-4, 16px);
   border-bottom: 1px solid var(--color-border-subtle, #f0f3f7);
+  cursor: pointer;
   transition: background var(--duration-fast, 150ms) var(--ease-out);
-}
-
-.allocRowUser {
-  grid-template-columns: 1fr 120px 120px 64px 40px 32px;
-  gap: var(--space-3, 12px);
-}
-
-.allocRowCc {
-  grid-template-columns: 1fr 120px 120px 64px 40px 32px;
-  gap: var(--space-3, 12px);
 }
 
 .allocRow:hover {
   background: var(--color-surface, #f1f5f9);
 }
 
-.allocEmail {
+.allocRowExpanded {
+  background: var(--color-accent-subtle, rgba(99, 91, 255, 0.04));
+}
+
+.allocName {
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--color-text, #0f172a);
@@ -460,6 +449,30 @@
 .ruleDeleteBtn:hover {
   background: rgba(239, 68, 68, 0.08);
   color: var(--color-danger, #ef4444);
+}
+
+.ruleContext {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background: var(--color-surface, #f1f5f9);
+  border-radius: var(--radius-md, 10px);
+  margin-bottom: var(--space-6, 24px);
+}
+
+.ruleContextLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.ruleContextValue {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
 }
 
 .rulesEmpty {

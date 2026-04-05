@@ -102,12 +102,13 @@ type budgetDetails struct {
 }
 
 type budgetData struct {
-	name              string
-	year              int
-	limit             string
-	current           string
-	userAllocations   []userBudgetAllocation
-	ccAllocations     []costCenterBudgetAllocation
+	name               string
+	year               int
+	limit              string
+	current            string
+	userAllocations    []userBudgetAllocation
+	ccAllocations      []costCenterBudgetAllocation
+	userAllocationsNil bool
 }
 
 type userApprovalRule struct {
@@ -315,69 +316,148 @@ var db = &store{
 		"Test-cc [PER TEST]",
 	},
 	budgets: map[int64]*budgetData{
-		1: {name: "Marketing", year: 2026, limit: "50000.00", current: "32100.50",
-			userAllocations: []userBudgetAllocation{
-				{Limit: "5000.00", Current: "3200.00", UserID: 24, UserEmail: "salvatore.sciacco@cdlan.it", BudgetID: 1, Enabled: true},
-				{Limit: "3000.00", Current: "1800.00", UserID: 10, UserEmail: "giulia.mezzolla@cdlan.it", BudgetID: 1, Enabled: true},
-				{Limit: "2000.00", Current: "900.00", UserID: 21, UserEmail: "sara.gusmini@cdlan.it", BudgetID: 1, Enabled: true},
-			},
-			ccAllocations: []costCenterBudgetAllocation{
-				{Limit: "20000.00", Current: "15000.00", CostCenter: "Communication", BudgetID: 1, Enabled: true},
-				{Limit: "10000.00", Current: "8200.50", CostCenter: "CustXP", BudgetID: 1, Enabled: true},
-			},
-		},
-		2: {name: "IT", year: 2026, limit: "30000.00", current: "18200.00",
-			userAllocations: []userBudgetAllocation{
-				{Limit: "8000.00", Current: "5100.00", UserID: 28, UserEmail: "alessandra.ferrari@cdlan.it", BudgetID: 2, Enabled: true},
-				{Limit: "4000.00", Current: "2300.00", UserID: 1, UserEmail: "federico.deicas@cdlan.it", BudgetID: 2, Enabled: true},
-			},
-			ccAllocations: []costCenterBudgetAllocation{
-				{Limit: "15000.00", Current: "9800.00", CostCenter: "Applications", BudgetID: 2, Enabled: true},
-			},
-		},
-		3: {name: "HR", year: 2025, limit: "20000.00", current: "19800.00",
-			userAllocations: []userBudgetAllocation{
-				{Limit: "10000.00", Current: "9500.00", UserID: 11, UserEmail: "valentina.falcone@cdlan.it", BudgetID: 3, Enabled: true},
-				{Limit: "5000.00", Current: "4800.00", UserID: 8, UserEmail: "roberta.scattolin@cdlan.it", BudgetID: 3, Enabled: false},
-			},
-			ccAllocations: []costCenterBudgetAllocation{
-				{Limit: "5000.00", Current: "5500.00", CostCenter: "People", BudgetID: 3, Enabled: true},
-			},
-		},
-		4: {name: "Operations", year: 2026, limit: "45000.00", current: "22450.75",
-			userAllocations: []userBudgetAllocation{
-				{Limit: "12000.00", Current: "8200.00", UserID: 34, UserEmail: "fabio.gallo@cdlan.it", BudgetID: 4, Enabled: true},
-			},
-			ccAllocations: []costCenterBudgetAllocation{
-				{Limit: "25000.00", Current: "12000.75", CostCenter: "Delivery CLOUD", BudgetID: 4, Enabled: true},
-			},
-		},
-		5: {name: "Compliance", year: 2026, limit: "15000.00", current: "4200.00",
-			userAllocations:   []userBudgetAllocation{},
-			ccAllocations:     []costCenterBudgetAllocation{},
-		},
-		6: {name: "Formazione", year: 2025, limit: "12000.00", current: "11800.00",
-			userAllocations:   []userBudgetAllocation{},
-			ccAllocations:     []costCenterBudgetAllocation{},
-		},
+		11: {name: "Accessi", year: 2026, limit: "44154.000", current: "44154.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 11, CostCenter: "Delivery TLC", Current: "44154.000", Enabled: true, Limit: "44154.000"},
+		}},
+		16: {name: "Associazioni/Abbonamenti", year: 2026, limit: "24000.000", current: "5860.760", userAllocations: []userBudgetAllocation{}, ccAllocations: []costCenterBudgetAllocation{}},
+		6: {name: "Automezzi", year: 2026, limit: "20833.690", current: "1833.690", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 6, CostCenter: "AI Process", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 6, CostCenter: "Board", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 6, CostCenter: "Compliance", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 6, CostCenter: "Data Center", Current: "0.000", Enabled: true, Limit: "2000.000"},
+			{BudgetID: 6, CostCenter: "Office - TR", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 6, CostCenter: "Delivery TLC", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 6, CostCenter: "Delivery MS", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 6, CostCenter: "CustXP", Current: "0.000", Enabled: true, Limit: "7000.000"},
+			{BudgetID: 6, CostCenter: "People", Current: "1833.690", Enabled: true, Limit: "1833.690"},
+		}},
+		24: {name: "Budget [PER TEST]", year: 2026, limit: "22300.000", current: "22300.000", userAllocations: []userBudgetAllocation{}, ccAllocations: []costCenterBudgetAllocation{}},
+		17: {name: "CEO", year: 2026, limit: "100000.000", current: "0.000", userAllocations: []userBudgetAllocation{}, ccAllocations: []costCenterBudgetAllocation{}},
+		3: {name: "Consulenza", year: 2026, limit: "95000.000", current: "10963.880", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 3, CostCenter: "Amministrazione", Current: "0.000", Enabled: true, Limit: "10000.000"},
+			{BudgetID: 3, CostCenter: "People", Current: "4662.000", Enabled: true, Limit: "10000.000"},
+			{BudgetID: 3, CostCenter: "MeA", Current: "0.000", Enabled: true, Limit: "50000.000"},
+			{BudgetID: 3, CostCenter: "Board", Current: "4130.880", Enabled: true, Limit: "20000.000"},
+			{BudgetID: 3, CostCenter: "Compliance", Current: "2171.000", Enabled: true, Limit: "5000.000"},
+		}},
+		5: {name: "Eventi esterni", year: 2026, limit: "70000.000", current: "750.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 5, CostCenter: "Board", Current: "0.000", Enabled: true, Limit: "20000.000"},
+			{BudgetID: 5, CostCenter: "Communication", Current: "750.000", Enabled: true, Limit: "50000.000"},
+		}},
+		10: {name: "Eventi interni", year: 2026, limit: "27000.000", current: "5152.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 10, CostCenter: "Communication", Current: "2460.000", Enabled: true, Limit: "10000.000"},
+			{BudgetID: 10, CostCenter: "Office - MI", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 10, CostCenter: "Office - TR", Current: "0.000", Enabled: true, Limit: "2000.000"},
+			{BudgetID: 10, CostCenter: "People", Current: "2692.000", Enabled: true, Limit: "10000.000"},
+		}},
+		18: {name: "Fonia", year: 2026, limit: "20000.000", current: "0.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 18, CostCenter: "Delivery CLOUD", Current: "0.000", Enabled: true, Limit: "10000.000"},
+			{BudgetID: 18, CostCenter: "Delivery MS", Current: "0.000", Enabled: true, Limit: "10000.000"},
+		}},
+		8: {name: "Formazione", year: 2026, limit: "46000.000", current: "1515.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 8, CostCenter: "Applications", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 8, CostCenter: "Data Center", Current: "0.000", Enabled: true, Limit: "3000.000"},
+			{BudgetID: 8, CostCenter: "Amministrazione", Current: "0.000", Enabled: true, Limit: "3000.000"},
+			{BudgetID: 8, CostCenter: "Communication", Current: "0.000", Enabled: true, Limit: "3000.000"},
+			{BudgetID: 8, CostCenter: "Compliance", Current: "0.000", Enabled: true, Limit: "2000.000"},
+			{BudgetID: 8, CostCenter: "Office - MI", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 8, CostCenter: "Office - TR", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 8, CostCenter: "Delivery CLOUD", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 8, CostCenter: "Delivery MS", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 8, CostCenter: "Delivery TLC", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 8, CostCenter: "CustXP", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 8, CostCenter: "Assurance", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 8, CostCenter: "People", Current: "1515.000", Enabled: true, Limit: "3000.000"},
+		}},
+		22: {name: "Hardware", year: 2026, limit: "162398.500", current: "36623.980", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 22, CostCenter: "Delivery MS", Current: "225.480", Enabled: true, Limit: "25000.000"},
+			{BudgetID: 22, CostCenter: "Infrastruttura SYS-NET", Current: "0.000", Enabled: true, Limit: "50000.000"},
+			{BudgetID: 22, CostCenter: "Delivery TLC", Current: "0.000", Enabled: true, Limit: "25000.000"},
+			{BudgetID: 22, CostCenter: "AI Process", Current: "0.000", Enabled: true, Limit: "26000.000"},
+			{BudgetID: 22, CostCenter: "Delivery CLOUD", Current: "36398.500", Enabled: true, Limit: "36398.500"},
+		}},
+		21: {name: "Manutenzioni", year: 2026, limit: "324060.000", current: "306060.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 21, CostCenter: "Office - MI", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 21, CostCenter: "Office - TR", Current: "0.000", Enabled: true, Limit: "3000.000"},
+			{BudgetID: 21, CostCenter: "Infrastruttura SYS-NET", Current: "0.000", Enabled: true, Limit: "10000.000"},
+			{BudgetID: 21, CostCenter: "Data Center", Current: "306060.000", Enabled: true, Limit: "306060.000"},
+		}},
+		4: {name: "Merci/Attrezzature", year: 2026, limit: "102794.910", current: "17889.290", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 4, CostCenter: "Delivery CLOUD", Current: "0.000", Enabled: true, Limit: "20000.000"},
+			{BudgetID: 4, CostCenter: "Delivery MS", Current: "1765.000", Enabled: true, Limit: "20000.000"},
+			{BudgetID: 4, CostCenter: "Amministrazione", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 4, CostCenter: "Applications", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 4, CostCenter: "Office - MI", Current: "674.030", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 4, CostCenter: "Communication", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 4, CostCenter: "Compliance", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 4, CostCenter: "CustXP", Current: "11794.910", Enabled: true, Limit: "11794.910"},
+			{BudgetID: 4, CostCenter: "Delivery TLC", Current: "404.910", Enabled: true, Limit: "20000.000"},
+			{BudgetID: 4, CostCenter: "Data Center", Current: "3196.100", Enabled: true, Limit: "15000.000"},
+			{BudgetID: 4, CostCenter: "Office - TR", Current: "54.340", Enabled: true, Limit: "3000.000"},
+		}},
+		23: {name: "Pubblicità", year: 2026, limit: "25000.000", current: "1640.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 23, CostCenter: "Communication", Current: "1640.000", Enabled: true, Limit: "25000.000"},
+		}},
+		15: {name: "Servizi Generali", year: 2026, limit: "20000.000", current: "0.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 15, CostCenter: "Amministrazione", Current: "0.000", Enabled: true, Limit: "20000.000"},
+		}},
+		7: {name: "Servizi Infrastruttura", year: 2026, limit: "25000.000", current: "16399.710", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 7, CostCenter: "Infrastruttura SYS-NET", Current: "16399.710", Enabled: true, Limit: "25000.000"},
+		}},
+		14: {name: "Software (per rivendita)", year: 2026, limit: "120000.000", current: "5891.710", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 14, CostCenter: "Delivery MS", Current: "44.890", Enabled: true, Limit: "60000.000"},
+			{BudgetID: 14, CostCenter: "Delivery CLOUD", Current: "5846.820", Enabled: true, Limit: "60000.000"},
+		}},
+		13: {name: "Software Uso Interno", year: 2026, limit: "57000.000", current: "3992.420", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 13, CostCenter: "Communication", Current: "0.000", Enabled: true, Limit: "2000.000"},
+			{BudgetID: 13, CostCenter: "Data Center", Current: "0.000", Enabled: true, Limit: "3000.000"},
+			{BudgetID: 13, CostCenter: "Compliance", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 13, CostCenter: "Infrastruttura SYS-NET", Current: "0.000", Enabled: true, Limit: "20000.000"},
+			{BudgetID: 13, CostCenter: "Board", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 13, CostCenter: "People", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 13, CostCenter: "AI Process", Current: "0.000", Enabled: true, Limit: "11000.000"},
+			{BudgetID: 13, CostCenter: "Amministrazione", Current: "3159.920", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 13, CostCenter: "Applications", Current: "832.500", Enabled: true, Limit: "5000.000"},
+		}},
+		20: {name: "Tasse/Imposte", year: 2026, limit: "10000.000", current: "0.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 20, CostCenter: "Amministrazione", Current: "0.000", Enabled: true, Limit: "10000.000"},
+		}},
+		25: {name: "Transito internet", year: 2026, limit: "17600.000", current: "10000.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 25, CostCenter: "Delivery CLOUD", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 25, CostCenter: "Delivery TLC", Current: "7600.000", Enabled: true, Limit: "7600.000"},
+			{BudgetID: 25, CostCenter: "Infrastruttura SYS-NET", Current: "2400.000", Enabled: true, Limit: "5000.000"},
+		}},
+		9: {name: "Trasferte", year: 2026, limit: "58000.000", current: "1822.920", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 9, CostCenter: "CustXP", Current: "0.000", Enabled: true, Limit: "10000.000"},
+			{BudgetID: 9, CostCenter: "Delivery CLOUD", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 9, CostCenter: "Delivery MS", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 9, CostCenter: "Delivery TLC", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 9, CostCenter: "Applications", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 9, CostCenter: "Board", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 9, CostCenter: "Compliance", Current: "0.000", Enabled: true, Limit: "1000.000"},
+			{BudgetID: 9, CostCenter: "Communication", Current: "0.000", Enabled: true, Limit: "3000.000"},
+			{BudgetID: 9, CostCenter: "Office - TR", Current: "0.000", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 9, CostCenter: "MeA", Current: "0.000", Enabled: true, Limit: "10000.000"},
+			{BudgetID: 9, CostCenter: "AI Process", Current: "0.000", Enabled: true, Limit: "6000.000"},
+			{BudgetID: 9, CostCenter: "Office - MI", Current: "721.650", Enabled: true, Limit: "5000.000"},
+			{BudgetID: 9, CostCenter: "People", Current: "777.270", Enabled: true, Limit: "2000.000"},
+			{BudgetID: 9, CostCenter: "Data Center", Current: "324.000", Enabled: true, Limit: "3000.000"},
+		}},
+		19: {name: "Welfare", year: 2026, limit: "60000.000", current: "510.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 19, CostCenter: "People", Current: "510.000", Enabled: true, Limit: "60000.000"},
+		}},
+		12: {name: "Xconnect", year: 2026, limit: "20000.000", current: "4430.000", userAllocations: nil, userAllocationsNil: true, ccAllocations: []costCenterBudgetAllocation{
+			{BudgetID: 12, CostCenter: "Data Center", Current: "4430.000", Enabled: true, Limit: "20000.000"},
+		}},
 	},
-	budgetOrder:  []int64{1, 2, 3, 4, 5, 6},
-	nextBudgetID: 7,
-	userRules: map[int64]*userApprovalRule{
-		1: {ID: 1, Threshold: "500.00", ApproverID: 10, ApproverEmail: "giulia.mezzolla@cdlan.it", BudgetID: 1, UserID: 24, Level: 1, SendEmail: true},
-		2: {ID: 2, Threshold: "2000.00", ApproverID: 5, ApproverEmail: "eva.grimaldi@cdlan.it", BudgetID: 1, UserID: 24, Level: 2, SendEmail: true},
-		3: {ID: 3, Threshold: "1000.00", ApproverID: 21, ApproverEmail: "sara.gusmini@cdlan.it", BudgetID: 1, UserID: 10, Level: 1, SendEmail: false},
-		4: {ID: 4, Threshold: "3000.00", ApproverID: 28, ApproverEmail: "alessandra.ferrari@cdlan.it", BudgetID: 2, UserID: 28, Level: 1, SendEmail: true},
-	},
-	userRuleOrder:  []int64{1, 2, 3, 4},
-	nextUserRuleID: 5,
-	ccRules: map[int64]*ccApprovalRule{
-		1: {ID: 1, Threshold: "5000.00", ApproverID: 14, ApproverEmail: "marta.savoldi@cdlan.it", BudgetID: 1, CostCenter: "Communication", Level: 1, SendEmail: true},
-		2: {ID: 2, Threshold: "10000.00", ApproverID: 5, ApproverEmail: "eva.grimaldi@cdlan.it", BudgetID: 1, CostCenter: "Communication", Level: 2, SendEmail: true},
-		3: {ID: 3, Threshold: "8000.00", ApproverID: 25, ApproverEmail: "stefano.vatta@cdlan.it", BudgetID: 2, CostCenter: "Applications", Level: 1, SendEmail: false},
-	},
-	ccRuleOrder:  []int64{1, 2, 3},
-	nextCcRuleID: 4,
+	budgetOrder:    []int64{11, 16, 6, 24, 17, 3, 5, 10, 18, 8, 22, 21, 4, 23, 15, 7, 14, 13, 20, 25, 9, 19, 12},
+	nextBudgetID:   26,
+	userRules:      map[int64]*userApprovalRule{},
+	userRuleOrder:  []int64{},
+	nextUserRuleID: 1,
+	ccRules:        map[int64]*ccApprovalRule{},
+	ccRuleOrder:    []int64{},
+	nextCcRuleID:   1,
 }
 
 func (s *store) getUsers() []user {
@@ -640,7 +720,7 @@ func (s *store) getBudgetDetails(id int64) (budgetDetails, bool) {
 		return budgetDetails{}, false
 	}
 	ua := bd.userAllocations
-	if ua == nil {
+	if !bd.userAllocationsNil && ua == nil {
 		ua = []userBudgetAllocation{}
 	}
 	ca := bd.ccAllocations
@@ -664,12 +744,13 @@ func (s *store) createBudget(name string, year int) int64 {
 	id := s.nextBudgetID
 	s.nextBudgetID++
 	s.budgets[id] = &budgetData{
-		name:            name,
-		year:            year,
-		limit:           "0.00",
-		current:         "0.00",
-		userAllocations: []userBudgetAllocation{},
-		ccAllocations:   []costCenterBudgetAllocation{},
+		name:               name,
+		year:               year,
+		limit:              "0.00",
+		current:            "0.00",
+		userAllocations:    []userBudgetAllocation{},
+		ccAllocations:      []costCenterBudgetAllocation{},
+		userAllocationsNil: false,
 	}
 	s.budgetOrder = append(s.budgetOrder, id)
 	return id

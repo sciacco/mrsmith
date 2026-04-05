@@ -125,7 +125,7 @@ export interface Budget {
 /** schema: budget-details */
 export interface BudgetDetails extends Budget {
   cost_center_budgets: CostCenterBudgetAllocation[];
-  user_budgets: UserBudgetAllocation[];
+  user_budgets: UserBudgetAllocation[] | null;
 }
 
 /** schema: budget-new */

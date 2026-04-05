@@ -8,8 +8,8 @@ import { RuleEditModal } from './RuleEditModal';
 import { RuleDeleteConfirm } from './RuleDeleteConfirm';
 import styles from './BudgetDetailPage.module.css';
 
-type UserProps = { type: 'user'; budgetId: number; userId: number; costCenter?: undefined };
-type CcProps = { type: 'cc'; budgetId: number; costCenter: string; userId?: undefined };
+type UserProps = { type: 'user'; budgetId: number; userId: number; userEmail: string; costCenter?: undefined };
+type CcProps = { type: 'cc'; budgetId: number; costCenter: string; userId?: undefined; userEmail?: undefined };
 
 type ApprovalRulesPanelProps = UserProps | CcProps;
 
@@ -84,6 +84,7 @@ export function ApprovalRulesPanel(props: ApprovalRulesPanelProps) {
         type={type}
         budgetId={budgetId}
         userId={props.userId}
+        userEmail={props.userEmail}
         costCenter={props.costCenter}
       />
 
@@ -94,6 +95,7 @@ export function ApprovalRulesPanel(props: ApprovalRulesPanelProps) {
           type={type}
           budgetId={budgetId}
           userId={props.userId}
+          userEmail={props.userEmail}
           costCenter={props.costCenter}
           rule={editRule}
         />

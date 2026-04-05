@@ -12,8 +12,8 @@ import styles from './BudgetDetailPage.module.css';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const TABS = [
-  { key: 'users', label: 'Utenti' },
   { key: 'cost-centers', label: 'Centri di costo' },
+  { key: 'users', label: 'Utenti' },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -26,7 +26,7 @@ export function BudgetDetailPage() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>('users');
+  const [activeTab, setActiveTab] = useState<TabKey>('cost-centers');
 
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
@@ -71,6 +71,8 @@ export function BudgetDetailPage() {
   if (!details) return null;
 
   const isActive = details.year === CURRENT_YEAR;
+  const userBudgets = details.user_budgets ?? [];
+  const costCenterBudgets = details.cost_center_budgets ?? [];
 
   return (
     <div className={styles.page}>
@@ -146,9 +148,9 @@ export function BudgetDetailPage() {
         </div>
         <div className={styles.tabContent} key={activeTab}>
           {activeTab === 'users' ? (
-            <UserAllocationTable budgetId={budgetId} allocations={details.user_budgets} />
+            <UserAllocationTable budgetId={budgetId} allocations={userBudgets} />
           ) : (
-            <CcAllocationTable budgetId={budgetId} allocations={details.cost_center_budgets} />
+            <CcAllocationTable budgetId={budgetId} allocations={costCenterBudgets} />
           )}
         </div>
       </div>

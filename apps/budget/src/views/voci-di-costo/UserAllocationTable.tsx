@@ -18,6 +18,10 @@ export function UserAllocationTable({ budgetId, allocations }: UserAllocationTab
 
   const allocatedUserIds = allocations.map((a) => a.user_id);
 
+  function toggleExpand(userId: number) {
+    setExpandedUserId(expandedUserId === userId ? null : userId);
+  }
+
   return (
     <>
       <div className={styles.allocToolbar}>
@@ -32,21 +36,33 @@ export function UserAllocationTable({ budgetId, allocations }: UserAllocationTab
       {allocations.length === 0 ? (
         <p className={styles.allocEmpty}>Nessuna allocazione</p>
       ) : (
-        <>
-          <div className={`${styles.allocHeader} ${styles.allocHeaderUser}`}>
+        <div>
+          <div className={styles.allocHeader}>
+            <span />
             <span>Utente</span>
             <span className={styles.allocRight}>Limite</span>
             <span className={styles.allocRight}>Corrente</span>
             <span className={styles.allocCenter}>Attivo</span>
-            <span />
             <span />
           </div>
           {allocations.map((a) => {
             const isExpanded = expandedUserId === a.user_id;
             return (
               <div key={a.user_id}>
-                <div className={`${styles.allocRow} ${styles.allocRowUser}`}>
-                  <span className={styles.allocEmail}>{a.user_email}</span>
+                <div
+                  className={`${styles.allocRow} ${isExpanded ? styles.allocRowExpanded : ''}`}
+                  onClick={() => toggleExpand(a.user_id)}
+                >
+                  <button
+                    className={`${styles.expandBtn} ${isExpanded ? styles.expandBtnOpen : ''}`}
+                    onClick={(e) => { e.stopPropagation(); toggleExpand(a.user_id); }}
+                    title="Regole di approvazione"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  <span className={styles.allocName}>{a.user_email}</span>
                   <span className={styles.allocMoney}>{formatMoneyDisplay(a.limit)}</span>
                   <span className={styles.allocMoney}>{formatMoneyDisplay(a.current)}</span>
                   <span className={styles.allocCenter}>
@@ -56,20 +72,11 @@ export function UserAllocationTable({ budgetId, allocations }: UserAllocationTab
                   </span>
                   <button
                     className={styles.allocEditBtn}
-                    onClick={() => setEditAlloc(a)}
+                    onClick={(e) => { e.stopPropagation(); setEditAlloc(a); }}
                     title="Modifica"
                   >
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                       <path d="M10.5 1.5l2 2-8 8H2.5v-2l8-8z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  <button
-                    className={`${styles.expandBtn} ${isExpanded ? styles.expandBtnOpen : ''}`}
-                    onClick={() => setExpandedUserId(isExpanded ? null : a.user_id)}
-                    title="Regole di approvazione"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
                 </div>
@@ -80,6 +87,7 @@ export function UserAllocationTable({ budgetId, allocations }: UserAllocationTab
                         type="user"
                         budgetId={budgetId}
                         userId={a.user_id}
+                        userEmail={a.user_email}
                       />
                     )}
                   </div>
@@ -87,7 +95,7 @@ export function UserAllocationTable({ budgetId, allocations }: UserAllocationTab
               </div>
             );
           })}
-        </>
+        </div>
       )}
 
       <AllocationCreateModal

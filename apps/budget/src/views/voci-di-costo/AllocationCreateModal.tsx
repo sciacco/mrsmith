@@ -11,10 +11,11 @@ interface AllocationCreateModalProps {
   type: 'user' | 'cc';
   budgetId: number;
   excludeUserIds?: number[];
+  excludeCostCenters?: string[];
 }
 
 export function AllocationCreateModal({
-  open, onClose, type, budgetId, excludeUserIds = [],
+  open, onClose, type, budgetId, excludeUserIds = [], excludeCostCenters = [],
 }: AllocationCreateModalProps) {
   const [userId, setUserId] = useState<number | null>(null);
   const [costCenter, setCostCenter] = useState('');
@@ -32,10 +33,10 @@ export function AllocationCreateModal({
     .filter((u) => !excludeSet.has(u.id))
     .map((u) => ({ value: u.id, label: `${u.first_name} ${u.last_name} (${u.email})` }));
 
-  const ccOptions = (costCenters ?? []).map((cc) => ({
-    value: cc.name,
-    label: cc.name,
-  }));
+  const excludeCcSet = new Set(excludeCostCenters);
+  const ccOptions = (costCenters ?? [])
+    .filter((cc) => !excludeCcSet.has(cc.name))
+    .map((cc) => ({ value: cc.name, label: cc.name }));
 
   function reset() {
     setUserId(null);

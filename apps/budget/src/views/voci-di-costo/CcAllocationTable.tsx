@@ -16,6 +16,10 @@ export function CcAllocationTable({ budgetId, allocations }: CcAllocationTablePr
   const [editAlloc, setEditAlloc] = useState<CostCenterBudgetAllocation | null>(null);
   const [expandedCc, setExpandedCc] = useState<string | null>(null);
 
+  function toggleExpand(cc: string) {
+    setExpandedCc(expandedCc === cc ? null : cc);
+  }
+
   return (
     <>
       <div className={styles.allocToolbar}>
@@ -30,21 +34,33 @@ export function CcAllocationTable({ budgetId, allocations }: CcAllocationTablePr
       {allocations.length === 0 ? (
         <p className={styles.allocEmpty}>Nessuna allocazione</p>
       ) : (
-        <>
-          <div className={`${styles.allocHeader} ${styles.allocHeaderCc}`}>
+        <div>
+          <div className={styles.allocHeader}>
+            <span />
             <span>Centro di costo</span>
             <span className={styles.allocRight}>Limite</span>
             <span className={styles.allocRight}>Corrente</span>
             <span className={styles.allocCenter}>Attivo</span>
-            <span />
             <span />
           </div>
           {allocations.map((a) => {
             const isExpanded = expandedCc === a.cost_center;
             return (
               <div key={a.cost_center}>
-                <div className={`${styles.allocRow} ${styles.allocRowCc}`}>
-                  <span className={styles.allocEmail}>{a.cost_center}</span>
+                <div
+                  className={`${styles.allocRow} ${isExpanded ? styles.allocRowExpanded : ''}`}
+                  onClick={() => toggleExpand(a.cost_center)}
+                >
+                  <button
+                    className={`${styles.expandBtn} ${isExpanded ? styles.expandBtnOpen : ''}`}
+                    onClick={(e) => { e.stopPropagation(); toggleExpand(a.cost_center); }}
+                    title="Regole di approvazione"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  <span className={styles.allocName}>{a.cost_center}</span>
                   <span className={styles.allocMoney}>{formatMoneyDisplay(a.limit)}</span>
                   <span className={styles.allocMoney}>{formatMoneyDisplay(a.current)}</span>
                   <span className={styles.allocCenter}>
@@ -54,20 +70,11 @@ export function CcAllocationTable({ budgetId, allocations }: CcAllocationTablePr
                   </span>
                   <button
                     className={styles.allocEditBtn}
-                    onClick={() => setEditAlloc(a)}
+                    onClick={(e) => { e.stopPropagation(); setEditAlloc(a); }}
                     title="Modifica"
                   >
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                       <path d="M10.5 1.5l2 2-8 8H2.5v-2l8-8z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  <button
-                    className={`${styles.expandBtn} ${isExpanded ? styles.expandBtnOpen : ''}`}
-                    onClick={() => setExpandedCc(isExpanded ? null : a.cost_center)}
-                    title="Regole di approvazione"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
                 </div>
@@ -85,7 +92,7 @@ export function CcAllocationTable({ budgetId, allocations }: CcAllocationTablePr
               </div>
             );
           })}
-        </>
+        </div>
       )}
 
       <AllocationCreateModal
@@ -93,6 +100,7 @@ export function CcAllocationTable({ budgetId, allocations }: CcAllocationTablePr
         onClose={() => setShowCreate(false)}
         type="cc"
         budgetId={budgetId}
+        excludeCostCenters={allocations.map((a) => a.cost_center)}
       />
 
       {editAlloc && (

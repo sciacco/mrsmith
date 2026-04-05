@@ -11,6 +11,7 @@ interface RuleCreateModalProps {
   type: 'user' | 'cc';
   budgetId: number;
   userId?: number;
+  userEmail?: string;
   costCenter?: string;
 }
 
@@ -20,7 +21,7 @@ const LEVEL_OPTIONS = [
   { value: 3, label: 'Livello 3' },
 ];
 
-export function RuleCreateModal({ open, onClose, type, budgetId, userId, costCenter }: RuleCreateModalProps) {
+export function RuleCreateModal({ open, onClose, type, budgetId, userId, userEmail, costCenter }: RuleCreateModalProps) {
   const [level, setLevel] = useState<number | null>(1);
   const [threshold, setThreshold] = useState('');
   const [approverId, setApproverId] = useState<number | null>(null);
@@ -95,6 +96,14 @@ export function RuleCreateModal({ open, onClose, type, budgetId, userId, costCen
   return (
     <Modal open={open} onClose={onClose} title="Nuova regola di approvazione">
       <form onSubmit={handleSubmit}>
+        <div className={styles.ruleContext}>
+          <span className={styles.ruleContextLabel}>
+            {type === 'cc' ? 'Centro di costo' : 'Utente'}
+          </span>
+          <span className={styles.ruleContextValue}>
+            {type === 'cc' ? costCenter : userEmail}
+          </span>
+        </div>
         <div className={styles.formGroup}>
           <label className={styles.label}>Livello</label>
           <SingleSelect options={LEVEL_OPTIONS} selected={level} onChange={setLevel} placeholder="Seleziona livello..." />

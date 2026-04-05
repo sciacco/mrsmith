@@ -11,5 +11,5 @@ export function formatMoneyDisplay(apiValue: string): string {
 
 /** Validates a monetary input string matches API decimal format. */
 export function isValidMoneyInput(value: string): boolean {
-  return /^\d+(\.\d{1,2})?$/.test(value);
+  return /^\d+(\.\d+)?$/.test(value);
 }
