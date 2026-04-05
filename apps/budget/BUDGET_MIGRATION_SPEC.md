@@ -601,6 +601,8 @@ No polling, WebSockets, timers, or background processes. All data fetching is us
 - Go BFF under `backend/internal/budget/` — proxies Arak API 1:1
 - Shared packages: `@mrsmith/ui`, `@mrsmith/auth-client`, `@mrsmith/api-client`
 - Frontend calls `/api/budget/v1/...` → Go backend → Arak (or fixtures during mock phase)
+- Frontend Keycloak config served by backend via `GET /config` (unprotected, public client data)
+- BFF → Arak uses client credentials grant (service-to-service token), NOT user token forwarding
 - API client should handle: response envelope unwrapping, monetary string formatting, `disable_pagination=true` default
 
 ---
