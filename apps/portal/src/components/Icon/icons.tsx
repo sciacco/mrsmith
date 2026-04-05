@@ -76,4 +76,121 @@ export const icons: Record<string, JSX.Element> = {
       <polygon points="24,4 29,18 44,18 32,27 36,42 24,33 12,42 16,27 4,18 19,18" />
     </svg>
   ),
+
+  coins: (
+    <svg {...svgProps}>
+      <ellipse cx="18" cy="15" rx="8" ry="4" />
+      <path d="M10 15 V24 C10 26.5 13.6 28 18 28 C22.4 28 26 26.5 26 24 V15" />
+      <ellipse cx="30" cy="27" rx="8" ry="4" />
+      <path d="M22 27 V35 C22 37.5 25.6 39 30 39 C34.4 39 38 37.5 38 35 V27" />
+    </svg>
+  ),
+
+  users: (
+    <svg {...svgProps}>
+      <circle cx="17" cy="16" r="5" />
+      <circle cx="31" cy="18" r="4" />
+      <path d="M8 36 C8 30.5 12.5 26 18 26 H20 C25.5 26 30 30.5 30 36" />
+      <path d="M25 35 C25 30.8 28.2 28 32.5 28 H33 C37.2 28 40 30.8 40 35" />
+    </svg>
+  ),
+
+  package: (
+    <svg {...svgProps}>
+      <path d="M24 6 L38 13 V35 L24 42 L10 35 V13 Z" />
+      <path d="M24 6 V42" />
+      <path d="M10 13 L24 20 L38 13" />
+    </svg>
+  ),
+
+  mail: (
+    <svg {...svgProps}>
+      <rect x="6" y="10" width="36" height="28" rx="3" />
+      <path d="M8 14 L24 27 L40 14" />
+    </svg>
+  ),
+
+  clipboard: (
+    <svg {...svgProps}>
+      <rect x="12" y="8" width="24" height="32" rx="3" />
+      <path d="M18 8 V6 H30 V8" />
+      <line x1="18" y1="18" x2="30" y2="18" />
+      <line x1="18" y1="25" x2="30" y2="25" />
+      <line x1="18" y1="32" x2="26" y2="32" />
+    </svg>
+  ),
+
+  tag: (
+    <svg {...svgProps}>
+      <path d="M8 22 L22 8 H38 V24 L24 38 Z" />
+      <circle cx="31" cy="15" r="2.5" />
+    </svg>
+  ),
+
+  folder: (
+    <svg {...svgProps}>
+      <path d="M6 14 H18 L22 18 H42 V34 C42 36.2 40.2 38 38 38 H10 C7.8 38 6 36.2 6 34 Z" />
+      <path d="M6 14 V12 C6 9.8 7.8 8 10 8 H18 L22 12 H38 C40.2 12 42 13.8 42 16 V18" />
+    </svg>
+  ),
+
+  spark: (
+    <svg {...svgProps}>
+      <path d="M24 6 L27 17 L38 20 L27 23 L24 34 L21 23 L10 20 L21 17 Z" />
+      <path d="M35 9 L36.5 13 L40.5 14.5 L36.5 16 L35 20 L33.5 16 L29.5 14.5 L33.5 13 Z" />
+    </svg>
+  ),
+
+  shield: (
+    <svg {...svgProps}>
+      <path d="M24 5 L38 10 V22 C38 30 32.5 37.2 24 41 C15.5 37.2 10 30 10 22 V10 Z" />
+      <path d="M18 22 L22 26 L30 18" />
+    </svg>
+  ),
+
+  settings: (
+    <svg {...svgProps}>
+      <circle cx="24" cy="24" r="5" />
+      <path d="M24 8 V13" />
+      <path d="M24 35 V40" />
+      <path d="M40 24 H35" />
+      <path d="M13 24 H8" />
+      <path d="M35.3 12.7 L31.8 16.2" />
+      <path d="M16.2 31.8 L12.7 35.3" />
+      <path d="M35.3 35.3 L31.8 31.8" />
+      <path d="M16.2 16.2 L12.7 12.7" />
+    </svg>
+  ),
+
+  briefcase: (
+    <svg {...svgProps}>
+      <rect x="8" y="14" width="32" height="22" rx="3" />
+      <path d="M18 14 V10 C18 8.9 18.9 8 20 8 H28 C29.1 8 30 8.9 30 10 V14" />
+      <path d="M8 24 H40" />
+    </svg>
+  ),
+
+  wrench: (
+    <svg {...svgProps}>
+      <path d="M29 8 C31.5 10.5 31.8 14.3 30 17 L20 27 L14 21 L24 11 C26.7 9.2 30.5 9.5 33 12" />
+      <path d="M12 29 L19 36" />
+      <path d="M10 38 L16 32" />
+    </svg>
+  ),
+
+  database: (
+    <svg {...svgProps}>
+      <ellipse cx="24" cy="10" rx="12" ry="5" />
+      <path d="M12 10 V22 C12 24.8 17.4 27 24 27 C30.6 27 36 24.8 36 22 V10" />
+      <path d="M12 22 V34 C12 36.8 17.4 39 24 39 C30.6 39 36 36.8 36 34 V22" />
+    </svg>
+  ),
+
+  launch: (
+    <svg {...svgProps}>
+      <path d="M18 14 H10 V38 H34 V30" />
+      <path d="M22 10 H38 V26" />
+      <path d="M38 10 L20 28" />
+    </svg>
+  ),
 };

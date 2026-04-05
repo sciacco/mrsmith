@@ -19,6 +19,7 @@ export function AppCategory({ title, apps }: AppCategoryProps) {
             name={app.name}
             description={app.description}
             href={app.href}
+            status={app.status}
           />
         ))}
       </div>

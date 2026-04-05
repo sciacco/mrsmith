@@ -8,7 +8,6 @@
   font-family: var(--font-mono);
   font-size: 0.8rem;
   font-weight: 400;
-  text-transform: uppercase;
   letter-spacing: 0.15em;
   color: var(--green-primary);
   border-left: 3px solid var(--green-primary);

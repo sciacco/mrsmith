@@ -9,6 +9,22 @@
   flex-direction: column;
   gap: 0.6rem;
   outline: none;
+  position: relative;
+  min-height: 10.5rem;
+}
+
+.badge {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  padding: 0.15rem 0.45rem;
+  border: 1px solid rgba(255, 184, 0, 0.55);
+  border-radius: 999px;
+  background: rgba(255, 184, 0, 0.12);
+  color: #ffd166;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
 }
 
 .card:hover,
@@ -28,10 +44,11 @@
 
 .name {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 400;
   color: var(--green-primary);
   letter-spacing: 0.02em;
+  line-height: 1.4;
 }
 
 .desc {
@@ -39,6 +56,7 @@
   font-size: 0.75rem;
   line-height: 1.5;
   color: var(--green-muted);
+  margin-top: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
