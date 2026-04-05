@@ -150,7 +150,7 @@
 
 **Flags:**
 - ✅ `send_email` — **Resolved:** Make user-configurable with default `true`. Appsmith hardcoded it; new frontend should expose as a toggle.
-- ✅ Approval `level` is `int4` in DB — supports N levels. **Resolved:** Current Appsmith UI is hardcoded to two levels, but the backend has no such limit. New frontend should support dynamic N-level approval chains.
+- ✅ Approval `level` is `int4` in DB — supports N levels. **Resolved:** New frontend uses a pre-filled select box with 3 levels (Livello 1, 2, 3). Expands from Appsmith's 2 to 3. No full dynamic N-level UI for now.
 - ⚠ Appsmith never uses `level` query param for filtering
 
 ---
@@ -359,7 +359,7 @@ Group ──→ (N) Users (membership)
 |---|----------|---------|
 | Q1 | ✅ **Resolved.** Budget `limit` is computed server-side via DB triggers (sum of allocations). Read-only in API. | Budget create flow |
 | Q2 | ✅ **Resolved.** `send_email` should be user-configurable, default `true`. | Approval rules |
-| Q3 | ✅ **Resolved.** DB uses `int4` — supports N levels. Appsmith was limited to two. New frontend should support dynamic N-level approval chains. | Approval rules |
+| Q3 | ✅ **Resolved.** DB uses `int4` — supports N levels. New frontend: pre-filled select box with 3 levels (Livello 1–3). Expands from Appsmith's 2. | Approval rules |
 | Q4 | ✅ **Resolved.** Add Enable action. API already supports it (`enabled: true` via PUT). New feature vs Appsmith. | CostCenter lifecycle |
 | Q5 | ✅ **Resolved.** Hard delete intentional. Cascading is API business — frontend just calls DELETE. | Group lifecycle |
 | Q6 | ✅ **Resolved.** No. Keep filtering `enabled=true` only, same as Appsmith. | User filtering |
