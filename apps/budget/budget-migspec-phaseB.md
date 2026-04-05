@@ -86,7 +86,7 @@ t_budget row select
 - ⚠ Delete button initially disabled with no visible enable logic
 - ⚠ Inconsistent refresh strategies after mutations (`.then()` chaining)
 - ⚠ Bugs: trailing comma JSON in EditRuleUser/EditRuleCC; commented-out conditional logic in Editbudget
-- ⚠ **Mixed pattern:** This single page handles 5 entity types across 3 cascading levels. **Q13: Should this remain one view, or be split? For example: budget CRUD as one view, allocation + approval rules as a separate detail view navigated from budget selection?**
+- ✅ **Resolved:** Split into two-page drill-down. `/budgets` list page → `/budgets/:id` full-width detail page. Detail uses tabs (User/CC allocations) with row-expansion for approval rules. Aligns with Stripe-level design: clean hierarchy, whitespace, deep-linkable URLs.
 
 ---
 
@@ -122,7 +122,7 @@ t_budget row select
 - ⚠ No error handling in query chains
 - ⚠ Detail panel is read-only — edit only via modal
 - ⚠ JSObject `utils.user_list` transforms data on load; `utils.test` is unused dead code
-- ⚠ **Q14: Should the detail panel remain read-only (view + modal edit), or become inline-editable?**
+- ✅ Read-only detail panel + modal edit. Same pattern app-wide.
 
 ---
 
@@ -201,10 +201,10 @@ Appsmith uses sidebar navigation between the 4 pages. No cross-page links, no de
 | # | Question | Context |
 |---|----------|---------|
 | Q12 | ✅ **Resolved.** Per-session input is sufficient. No saved preferences needed. | Home view |
-| Q13 | Should "Voci di costo" remain one view with 3 cascading levels, or be split into budget list + detail view? It currently handles 5 entity types, 19 queries, 12+ modals. | Voci di costo complexity |
-| Q14 | Should detail panels (cost center, group) remain read-only with modal edit, or become inline-editable? | Centri di costo, Gruppi detail panels |
-| Q15 | Should the sidebar navigation model be preserved, or should the new app use a different layout (e.g., tabs, breadcrumb drill-down)? | App-wide navigation |
-| Q16 | The page name "Voci di costo" literally means "cost items" but the page manages budgets and their allocations. Should it be renamed to something clearer (e.g., "Budget", "Gestione Budget")? | Italian UI naming |
+| Q13 | ✅ **Resolved.** Two-page drill-down: `/budgets` (list) → `/budgets/:id` (full-width detail with tabbed allocations + row-expansion for approval rules). Chosen for Stripe-level design alignment: clean hierarchy, generous whitespace, deep-linkable URLs. | Voci di costo layout |
+| Q14 | ✅ **Resolved.** Read-only detail panels + modal edit. Consistent app-wide pattern: view in-place, edit in modal. Aligns with Stripe pattern — clean view state, focused edit context. Complex forms (multi-select, dropdowns) need proper modal layout. | Detail panels |
+| Q15 | ✅ **Resolved.** Top horizontal tabs + contextual breadcrumbs. Slim top bar: MrSmith logo (portal return) → section tabs → user area. Breadcrumb strip below for drill-down pages. Mirrors Stripe's navigation model, maximizes content width for tables. Replaces Appsmith sidebar. | App-wide navigation |
+| Q16 | ✅ **Resolved.** Keep "Voci di costo" — compatibility with current Appsmith app. | Italian UI naming |
 
 ---
 
