@@ -450,7 +450,7 @@ var db = &store{
 			{BudgetID: 12, CostCenter: "Data Center", Current: "4430.000", Enabled: true, Limit: "20000.000"},
 		}},
 	},
-	budgetOrder:    []int64{11, 16, 6, 24, 17, 3, 5, 10, 18, 8, 22, 21, 4, 23, 15, 7, 14, 13, 20, 25, 9, 19, 12},
+	budgetOrder:  []int64{11, 16, 6, 24, 17, 3, 5, 10, 18, 8, 22, 21, 4, 23, 15, 7, 14, 13, 20, 25, 9, 19, 12},
 	nextBudgetID:   26,
 	userRules:      map[int64]*userApprovalRule{},
 	userRuleOrder:  []int64{},
@@ -1019,6 +1019,65 @@ func (s *store) deleteCcRule(ruleID int64) bool {
 		}
 	}
 	return true
+}
+
+// ── Report store methods ──
+
+func (s *store) listBudgetsOverPercentage(pct float64) []budget {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []budget
+	for _, id := range s.budgetOrder {
+		bd, ok := s.budgets[id]
+		if !ok {
+			continue
+		}
+		limit, err := strconv.ParseFloat(bd.limit, 64)
+		if err != nil || limit <= 0 {
+			continue
+		}
+		current, err := strconv.ParseFloat(bd.current, 64)
+		if err != nil {
+			continue
+		}
+		if (current/limit)*100 > pct {
+			result = append(result, budget{
+				ID:      id,
+				Name:    bd.name,
+				Year:    bd.year,
+				Limit:   bd.limit,
+				Current: bd.current,
+			})
+		}
+	}
+	if result == nil {
+		result = []budget{}
+	}
+	return result
+}
+
+func (s *store) listUnassignedUsers() []user {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	assigned := make(map[int64]bool)
+	for _, bd := range s.budgets {
+		if bd.userAllocationsNil {
+			continue
+		}
+		for _, ua := range bd.userAllocations {
+			assigned[ua.UserID] = true
+		}
+	}
+	var result []user
+	for _, u := range s.users {
+		if u.Enabled && !assigned[u.ID] {
+			result = append(result, u)
+		}
+	}
+	if result == nil {
+		result = []user{}
+	}
+	return result
 }
 
 // parseBudgetID parses budget_id from a path parameter.

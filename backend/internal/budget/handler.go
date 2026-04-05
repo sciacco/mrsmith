@@ -29,6 +29,9 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /budget/v1/budget", handleNewBudget)
 	mux.HandleFunc("PUT /budget/v1/budget/{budget_id}", handleEditBudget)
 	mux.HandleFunc("DELETE /budget/v1/budget/{budget_id}", handleDeleteBudget)
+	// Reports
+	mux.HandleFunc("GET /budget/v1/report/budget-used-over-percentage", handleGetBudgetOverPercent)
+	mux.HandleFunc("GET /budget/v1/report/unassigned-users", handleGetUnassignedUsers)
 	// User allocations
 	mux.HandleFunc("POST /budget/v1/budget/{budget_id}/user", handleNewUserBudget)
 	mux.HandleFunc("PUT /budget/v1/budget/{budget_id}/user", handleEditUserBudget)
@@ -268,6 +271,46 @@ func handleDeleteBudget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.JSON(w, http.StatusOK, map[string]string{"message": "budget deleted"})
+}
+
+// ═══ Report handlers ═══
+
+func handleGetBudgetOverPercent(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("page_number") == "" {
+		httputil.Error(w, http.StatusBadRequest, "page_number is required")
+		return
+	}
+	pctStr := r.URL.Query().Get("percentage")
+	if pctStr == "" {
+		httputil.Error(w, http.StatusBadRequest, "percentage is required")
+		return
+	}
+	pct, err := strconv.ParseFloat(pctStr, 64)
+	if err != nil || pct < 0 || pct > 100 {
+		httputil.Error(w, http.StatusBadRequest, "percentage must be a number between 0 and 100")
+		return
+	}
+	budgets := db.listBudgetsOverPercentage(pct)
+	httputil.JSON(w, http.StatusOK, paginatedResponse{
+		TotalNumber: len(budgets),
+		CurrentPage: 1,
+		TotalPages:  1,
+		Items:       budgets,
+	})
+}
+
+func handleGetUnassignedUsers(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("page_number") == "" {
+		httputil.Error(w, http.StatusBadRequest, "page_number is required")
+		return
+	}
+	users := db.listUnassignedUsers()
+	httputil.JSON(w, http.StatusOK, paginatedResponse{
+		TotalNumber: len(users),
+		CurrentPage: 1,
+		TotalPages:  1,
+		Items:       users,
+	})
 }
 
 // ═══ User allocation handlers ═══

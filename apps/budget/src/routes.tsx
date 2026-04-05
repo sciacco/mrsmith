@@ -6,7 +6,7 @@ import { BudgetDetailPage } from './views/voci-di-costo/BudgetDetailPage';
 import { CentriDiCostoPage } from './views/centri-di-costo/CentriDiCostoPage';
 
 export const routes: RouteObject[] = [
-  { index: true, element: <Navigate to="/groups" replace /> },
+  { index: true, element: <Navigate to="/home" replace /> },
   { path: 'home', element: <HomePage /> },
   { path: 'groups', element: <GruppiPage /> },
   { path: 'cost-centers', element: <CentriDiCostoPage /> },
