@@ -17,5 +17,8 @@
 - Backend proxy: Vite proxies `/api` → `localhost:8080`
 - Auth: OAuth2/OIDC with remote Keycloak (no local instance)
 
+## TODOs
+- [`docs/TODO.md`](docs/TODO.md) — project-wide open items, deferred decisions, and out-of-scope work tracked for future implementation
+
 ## Memory Rule
 ALWAYS update the relevant skill's `MEMORY.md` when making substantive changes to code, tests, fixtures, heuristics, or contributor workflow. The memory file is the persisted handoff state for future work.
