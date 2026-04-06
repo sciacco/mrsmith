@@ -19,6 +19,11 @@ import (
 // nil means fixture mode (all handlers use in-memory data).
 var arakClient *arak.Client
 
+const (
+	upstreamAuthFailedCode = "UPSTREAM_AUTH_FAILED"
+	upstreamUnavailableCode = "UPSTREAM_UNAVAILABLE"
+)
+
 // RegisterRoutes registers all budget API handlers.
 // If client is non-nil, all handlers proxy to the real Arak API;
 // otherwise they fall back to fixture data.
@@ -79,14 +84,37 @@ func proxyToArak(w http.ResponseWriter, r *http.Request, arakPath string) {
 	resp, err := arakClient.Do(r.Method, arakPath, r.URL.RawQuery, r.Body)
 	if err != nil {
 		log.Printf("budget: arak proxy error: %v", err)
-		httputil.Error(w, http.StatusBadGateway, "upstream API error")
+		writeUpstreamError(w, http.StatusBadGateway, upstreamUnavailableCode, "upstream API error")
 		return
 	}
 	defer resp.Body.Close()
 
+	if translateUpstreamAuthFailure(w, resp.StatusCode) {
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
+}
+
+func isUpstreamAuthFailure(status int) bool {
+	return status == http.StatusUnauthorized || status == http.StatusForbidden
+}
+
+func translateUpstreamAuthFailure(w http.ResponseWriter, status int) bool {
+	if !isUpstreamAuthFailure(status) {
+		return false
+	}
+	writeUpstreamError(w, http.StatusBadGateway, upstreamAuthFailedCode, "upstream authorization failed")
+	return true
+}
+
+func writeUpstreamError(w http.ResponseWriter, status int, code, message string) {
+	httputil.JSON(w, status, map[string]string{
+		"error": message,
+		"code":  code,
+	})
 }
 
 // ═══ Users ═══
@@ -207,10 +235,14 @@ func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
 	resp, err := arakClient.Do("GET", "/arak/budget/v1/cost-center", r.URL.RawQuery, nil)
 	if err != nil {
 		log.Printf("budget: arak cost-center list error: %v", err)
-		httputil.Error(w, http.StatusBadGateway, "upstream API error")
+		writeUpstreamError(w, http.StatusBadGateway, upstreamUnavailableCode, "upstream API error")
 		return
 	}
 	defer resp.Body.Close()
+
+	if translateUpstreamAuthFailure(w, resp.StatusCode) {
+		return
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		w.Header().Set("Content-Type", "application/json")
@@ -247,6 +279,8 @@ func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
 
 	results := make([]detailResult, len(listResp.Items))
 	var wg sync.WaitGroup
+	var detailAuthFailed bool
+	var detailMu sync.Mutex
 	for i, item := range listResp.Items {
 		wg.Add(1)
 		go func(idx int, name string) {
@@ -259,6 +293,12 @@ func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			defer detResp.Body.Close()
+			if isUpstreamAuthFailure(detResp.StatusCode) {
+				detailMu.Lock()
+				detailAuthFailed = true
+				detailMu.Unlock()
+				return
+			}
 			if detResp.StatusCode != http.StatusOK {
 				return
 			}
@@ -282,6 +322,11 @@ func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
 		}(i, item.Name)
 	}
 	wg.Wait()
+
+	if detailAuthFailed {
+		writeUpstreamError(w, http.StatusBadGateway, upstreamAuthFailedCode, "upstream authorization failed")
+		return
+	}
 
 	// 3. Build enriched response.
 	type enrichedCC struct {

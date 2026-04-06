@@ -3,6 +3,7 @@
 package arak
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,6 +31,8 @@ type Client struct {
 	accessToken string
 	expiry      time.Time
 }
+
+const maxUnauthorizedRetries = 2
 
 // New creates a ready-to-use Arak client.
 func New(cfg Config) *Client {
@@ -79,6 +82,14 @@ func (c *Client) token() (string, error) {
 	return c.accessToken, nil
 }
 
+func (c *Client) invalidateToken() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.accessToken = ""
+	c.expiry = time.Time{}
+}
+
 // Do performs an authenticated request to the Arak API.
 // method is the HTTP method (GET, POST, PUT, DELETE).
 // path should start with "/" (e.g. "/arak/budget/v1/budget").
@@ -90,20 +101,48 @@ func (c *Client) Do(method, path, queryString string, body io.Reader) (*http.Res
 		fullURL += "?" + queryString
 	}
 
-	tok, err := c.token()
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(method, fullURL, body)
-	if err != nil {
-		return nil, fmt.Errorf("arak: failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Header.Set("Accept", "application/json")
+	var bodyBytes []byte
+	var err error
 	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, fmt.Errorf("arak: failed to read request body: %w", err)
+		}
 	}
 
-	return c.httpClient.Do(req)
+	for attempt := 0; attempt <= maxUnauthorizedRetries; attempt++ {
+		tok, err := c.token()
+		if err != nil {
+			return nil, err
+		}
+
+		var requestBody io.Reader
+		if bodyBytes != nil {
+			requestBody = bytes.NewReader(bodyBytes)
+		}
+
+		req, err := http.NewRequest(method, fullURL, requestBody)
+		if err != nil {
+			return nil, fmt.Errorf("arak: failed to create request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Accept", "application/json")
+		if bodyBytes != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode != http.StatusUnauthorized || attempt == maxUnauthorizedRetries {
+			return resp, nil
+		}
+
+		resp.Body.Close()
+		c.invalidateToken()
+	}
+
+	return nil, fmt.Errorf("arak: exhausted unauthorized retries")
 }
