@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	BudgetAppID = "budget"
+	BudgetAppID   = "budget"
+	BudgetAppHref = "/apps/budget/"
 )
 
 var (
@@ -42,7 +43,7 @@ type Category struct {
 }
 
 // Catalog returns the full app catalog. hrefOverrides maps app IDs to
-// custom hrefs (e.g. BudgetAppID → "http://localhost:5174" in dev).
+// custom hrefs, primarily for split-server local development.
 func Catalog(hrefOverrides map[string]string) []Definition {
 	defaultRoles := DefaultAccessRoles()
 
@@ -52,7 +53,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			ID:            BudgetAppID,
 			Name:          "Budget Management",
 			Icon:          "coins",
-			Href:          "/budget",
+			Href:          BudgetAppHref,
 			CategoryID:    "acquisti",
 			CategoryTitle: "Acquisti",
 			AccessRoles:   BudgetAccessRoles(),

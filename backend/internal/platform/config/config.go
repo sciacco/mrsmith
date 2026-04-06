@@ -7,7 +7,9 @@ type Config struct {
 	KeycloakIssuerURL string
 	CORSOrigins       string
 	StaticDir         string
-	BudgetAppURL      string
+
+	// Optional launcher override for split-server local development.
+	BudgetAppURL string
 
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
@@ -27,7 +29,7 @@ func Load() Config {
 		KeycloakIssuerURL: envOr("KEYCLOAK_ISSUER_URL", ""),
 		CORSOrigins:       envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174"),
 		StaticDir:         envOr("STATIC_DIR", ""),
-		BudgetAppURL:      envOr("BUDGET_APP_URL", "http://localhost:5174"),
+		BudgetAppURL:      envOr("BUDGET_APP_URL", ""),
 
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),

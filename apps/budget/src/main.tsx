@@ -7,6 +7,11 @@ import { ToastProvider } from '@mrsmith/ui';
 import { App } from './App';
 import './styles/global.css';
 
+const routerBasename =
+  import.meta.env.BASE_URL === '/'
+    ? '/'
+    : import.meta.env.BASE_URL.replace(/\/$/, '');
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -35,7 +40,7 @@ async function bootstrap() {
         clientId={config.clientId}
       >
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
+          <BrowserRouter basename={routerBasename}>
             <ToastProvider>
               <App />
             </ToastProvider>

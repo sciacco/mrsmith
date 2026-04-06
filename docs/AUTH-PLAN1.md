@@ -21,7 +21,7 @@
 - Config and deployment:
   Add frontend Keycloak env vars to local and Kubernetes config, and register redirect URIs/web origins in Keycloak for each deployed frontend. Keep one public client per deployed frontend bundle.
 - Hosting constraint to account for:
-  The current server/image shape still serves one static bundle per deployment. `deploy/Dockerfile` copies portal assets to `/static/portal` while config uses one `STATIC_DIR`; fix that path mismatch immediately, and treat true multi-frontend hosting under one backend as a separate follow-up milestone.
+  The production image now serves portal at `/` and budget at `/apps/budget/` from the same backend/static root. Future mini-apps should follow the same `/apps/<app_id>/` hosting pattern rather than introducing separate deployment origins.
 
 ## Test Plan
 - Backend tests for `/api/portal/apps` filtering by role and for guarded app routes returning `401` without a token and `403` with the wrong role.

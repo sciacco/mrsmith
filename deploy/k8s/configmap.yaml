@@ -8,6 +8,5 @@ data:
   KEYCLOAK_FRONTEND_URL: "https://keycloak.example.com"
   KEYCLOAK_FRONTEND_REALM: "mrsmith"
   KEYCLOAK_FRONTEND_CLIENT_ID: "mrsmith-portal"
-  BUDGET_APP_URL: "https://budget.example.com"
-  CORS_ORIGINS: "https://mrsmith.example.com,https://budget.example.com"
+  CORS_ORIGINS: "https://mrsmith.example.com"
   STATIC_DIR: "/static"

@@ -26,6 +26,10 @@
 - Budget backend now exposes the report fixture endpoint `GET /budget/v1/report/budget-used-over-percentage`; it validates `page_number` and `percentage` query params and returns the provided 3-item over-threshold budget payload (`Accessi`, `Budget [PER TEST]`, `Manutenzioni`).
 
 ## 2026-04-06
+- The Makefile now provides `docker-build-amd64`, which runs `docker buildx build --platform linux/amd64 ... --load` and tags the local image as `mrsmith:amd64` for pre-production hosts that cannot run arm64 images.
+- Pre-production compose now lives in [docker-compose.preprod.yaml](docker-compose.preprod.yaml) and expects a locally imported/re-tagged image `mrsmith:preprod` plus runtime env vars in `.env.preprod`; `.env.preprod.example` is the template and intentionally omits `BUDGET_APP_URL` because portal and budget share one backend origin.
+- Pre-production and production now use a single backend-served static root for multiple SPAs: the portal stays at `/`, the budget app is built with Vite `base: /apps/budget/`, copied to `/static/apps/budget`, and deep links are served by the generic SPA fallback handler in [backend/internal/platform/staticspa/handler.go](backend/internal/platform/staticspa/handler.go).
+- The launcher catalog’s default Budget href is now the internal path `/apps/budget/`; `BUDGET_APP_URL` remains only as an optional split-server local-development override and is no longer part of the Kubernetes sample runtime config.
 - The production Docker frontend stage in [deploy/Dockerfile](deploy/Dockerfile) must copy the repo-root [tsconfig.base.json](tsconfig.base.json); without it, `pnpm -r build` inside the image fails in `packages/api-client` with `TS5083: Cannot read file '/app/tsconfig.base.json'`.
 - Shared `UserMenu` component added to `@mrsmith/ui` at [packages/ui/src/components/UserMenu/UserMenu.tsx](packages/ui/src/components/UserMenu/UserMenu.tsx); shows Mr. Smith SVG avatar (inline) + "Agent {userName}" with a click-to-toggle dropdown containing Logout. Used by both portal Header and AppShell (budget and future mini-apps).
 - `AppShell` now accepts `onLogout` prop and delegates user display to `UserMenu`; the old inline initials avatar and `.userArea`/`.userName`/`.avatar` CSS were removed from AppShell.
@@ -35,5 +39,5 @@
 - Portal API `GET /portal/apps` is now role-filtered from Keycloak claims instead of returning an empty placeholder, and the portal frontend now bootstraps Keycloak from `/config`, fetches `/api/portal/me` plus `/api/portal/apps`, and renders explicit loading/error/empty entitlement states.
 - Budget API routes are now wrapped with `acl.RequireRole("app_budget_access")`, so hiding the Budget card in the portal is matched by backend enforcement.
 - Both portal and budget frontends now fail closed on missing `/config` auth bootstrap values instead of silently running without browser auth.
-- Backend config gained `BUDGET_APP_URL` for launcher targets; Kubernetes sample config now also includes `KEYCLOAK_FRONTEND_URL`, `KEYCLOAK_FRONTEND_REALM`, `KEYCLOAK_FRONTEND_CLIENT_ID`, and a cross-origin `CORS_ORIGINS` example for the budget frontend.
-- The production Docker build now copies portal assets directly to `/static`, aligning the image layout with `STATIC_DIR=/static`.
+- Kubernetes sample config now includes `KEYCLOAK_FRONTEND_URL`, `KEYCLOAK_FRONTEND_REALM`, `KEYCLOAK_FRONTEND_CLIENT_ID`, and single-origin `CORS_ORIGINS` for the backend-served portal+budget deployment.
+- The production Docker build now copies portal assets to `/static` and budget assets to `/static/apps/budget`, matching the single-backend static hosting layout.

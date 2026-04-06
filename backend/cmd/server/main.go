@@ -16,6 +16,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/health"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/staticspa"
 	"github.com/sciacco/mrsmith/internal/portal"
 	"github.com/sciacco/mrsmith/pkg/middleware"
 )
@@ -64,9 +65,14 @@ func main() {
 
 	// API routes (with auth)
 	api := http.NewServeMux()
-	appCatalog := applaunch.Catalog(map[string]string{
-		applaunch.BudgetAppID: cfg.BudgetAppURL,
-	})
+	hrefOverrides := map[string]string{}
+	if cfg.BudgetAppURL != "" {
+		hrefOverrides[applaunch.BudgetAppID] = cfg.BudgetAppURL
+	} else if cfg.StaticDir == "" {
+		// Local split-server development still launches Budget on its own Vite server.
+		hrefOverrides[applaunch.BudgetAppID] = "http://localhost:5174"
+	}
+	appCatalog := applaunch.Catalog(hrefOverrides)
 	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
 
@@ -79,7 +85,7 @@ func main() {
 
 	// Static files (production)
 	if cfg.StaticDir != "" {
-		mux.Handle("/", http.FileServer(http.Dir(cfg.StaticDir)))
+		mux.Handle("/", staticspa.New(cfg.StaticDir))
 	}
 
 	srv := &http.Server{

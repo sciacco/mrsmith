@@ -3,7 +3,7 @@ package applaunch
 import "testing"
 
 func TestVisibleCategoriesFiltersByBudgetRole(t *testing.T) {
-	categories := VisibleCategories(Catalog(map[string]string{BudgetAppID: "http://localhost:5174"}), []string{"app_budget_access"})
+	categories := VisibleCategories(Catalog(nil), []string{"app_budget_access"})
 	// Only budget-specific app visible (no default-roles-cdlan)
 	if len(categories) != 1 {
 		t.Fatalf("expected 1 category, got %d", len(categories))
@@ -17,10 +17,13 @@ func TestVisibleCategoriesFiltersByBudgetRole(t *testing.T) {
 	if categories[0].Apps[0].ID != BudgetAppID {
 		t.Fatalf("expected budget app, got %q", categories[0].Apps[0].ID)
 	}
+	if categories[0].Apps[0].Href != BudgetAppHref {
+		t.Fatalf("expected budget href %q, got %q", BudgetAppHref, categories[0].Apps[0].Href)
+	}
 }
 
 func TestVisibleCategoriesDefaultRoleSeesAllPlaceholders(t *testing.T) {
-	catalog := Catalog(map[string]string{BudgetAppID: "http://localhost:5174"})
+	catalog := Catalog(nil)
 	categories := VisibleCategories(catalog, []string{"default-roles-cdlan"})
 
 	// Should see all 4 categories (acquisti placeholders, mkt-sales, smart-apps, provisioning)
@@ -34,28 +37,44 @@ func TestVisibleCategoriesDefaultRoleSeesAllPlaceholders(t *testing.T) {
 		total += len(cat.Apps)
 	}
 	// All placeholder apps (excludes budget which requires app_budget_access)
-	if total != 23 {
-		t.Fatalf("expected 23 placeholder apps, got %d", total)
+	if total != 19 {
+		t.Fatalf("expected 19 placeholder apps, got %d", total)
 	}
 }
 
 func TestVisibleCategoriesBothRolesSeesEverything(t *testing.T) {
-	catalog := Catalog(map[string]string{BudgetAppID: "http://localhost:5174"})
+	catalog := Catalog(nil)
 	categories := VisibleCategories(catalog, []string{"default-roles-cdlan", "app_budget_access"})
 
 	total := 0
 	for _, cat := range categories {
 		total += len(cat.Apps)
 	}
-	// All 24 apps (23 placeholders + 1 budget)
-	if total != 24 {
-		t.Fatalf("expected 24 total apps, got %d", total)
+	// All 20 apps (19 placeholders + 1 budget)
+	if total != 20 {
+		t.Fatalf("expected 20 total apps, got %d", total)
 	}
 }
 
 func TestVisibleCategoriesHidesAppsWithoutRole(t *testing.T) {
-	categories := VisibleCategories(Catalog(map[string]string{BudgetAppID: "http://localhost:5174"}), []string{"viewer"})
+	categories := VisibleCategories(Catalog(nil), []string{"viewer"})
 	if len(categories) != 0 {
 		t.Fatalf("expected 0 categories, got %d", len(categories))
 	}
+}
+
+func TestCatalogAppliesHrefOverrides(t *testing.T) {
+	catalog := Catalog(map[string]string{BudgetAppID: "http://localhost:5174"})
+
+	for _, definition := range catalog {
+		if definition.ID != BudgetAppID {
+			continue
+		}
+		if definition.Href != "http://localhost:5174" {
+			t.Fatalf("expected dev override href, got %q", definition.Href)
+		}
+		return
+	}
+
+	t.Fatal("expected budget definition in catalog")
 }

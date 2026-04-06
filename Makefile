@@ -42,6 +42,9 @@ build-backend:        ## Solo backend
 docker-build:         ## Build immagine produzione
 	docker build -f deploy/Dockerfile -t mrsmith .
 
+docker-build-amd64:   ## Build immagine produzione linux/amd64
+	docker buildx build --platform linux/amd64 -f deploy/Dockerfile -t mrsmith:amd64 --load .
+
 # Test ─────────────────────────────────────────
 test:                 ## Tutti i test
 	cd backend && go test ./...
@@ -75,5 +78,5 @@ tidy:                 ## go mod tidy
 help:                 ## Mostra questo help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget build build-frontend build-backend docker-build test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
+.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget build build-frontend build-backend docker-build docker-build-amd64 test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
 .DEFAULT_GOAL := help
