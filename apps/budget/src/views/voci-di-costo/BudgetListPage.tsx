@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@mrsmith/ui';
+import { isUpstreamAuthFailed } from '../../api/errors';
 import { useBudgets } from './queries';
 import { BudgetCreateModal } from './BudgetCreateModal';
 import { formatMoneyDisplay } from '../../utils/format';
@@ -10,7 +11,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 export function BudgetListPage() {
   const [showCreate, setShowCreate] = useState(false);
-  const { data: budgets, isLoading } = useBudgets();
+  const { data: budgets, isLoading, error } = useBudgets();
   const navigate = useNavigate();
 
   return (
@@ -32,6 +33,17 @@ export function BudgetListPage() {
         {isLoading ? (
           <div className={styles.tableBody}>
             <Skeleton rows={5} />
+          </div>
+        ) : isUpstreamAuthFailed(error) ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                <rect x="8" y="6" width="32" height="36" rx="4" stroke="currentColor" strokeWidth="2" />
+                <path d="M16 16h16M16 24h12M16 32h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <p className={styles.emptyTitle}>Servizio temporaneamente non disponibile</p>
+            <p className={styles.emptyText}>L&apos;elenco budget non puo essere caricato in questo momento.</p>
           </div>
         ) : !budgets || budgets.length === 0 ? (
           <div className={styles.emptyState}>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isUpstreamAuthFailed } from '../../api/errors';
 import { useGroups, useGroupDetails } from './queries';
 import { Skeleton } from '@mrsmith/ui';
 import { GroupCreateModal } from './GroupCreateModal';
@@ -12,8 +13,8 @@ export function GruppiPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
 
-  const { data: groups, isLoading: groupsLoading } = useGroups();
-  const { data: details, isLoading: detailsLoading } = useGroupDetails(selectedGroupName);
+  const { data: groups, isLoading: groupsLoading, error: groupsError } = useGroups();
+  const { data: details, isLoading: detailsLoading, error: detailsError } = useGroupDetails(selectedGroupName);
 
   return (
     <div className={styles.page}>
@@ -36,6 +37,11 @@ export function GruppiPage() {
           {groupsLoading ? (
             <div className={styles.tableBody}>
               <Skeleton rows={5} />
+            </div>
+          ) : isUpstreamAuthFailed(groupsError) ? (
+            <div className={styles.emptyState}>
+              <p className={styles.emptyTitle}>Servizio temporaneamente non disponibile</p>
+              <p className={styles.emptyText}>L&apos;elenco gruppi non puo essere caricato in questo momento.</p>
             </div>
           ) : !groups || groups.length === 0 ? (
             <div className={styles.emptyState}>
@@ -103,6 +109,11 @@ export function GruppiPage() {
           </div>
         ) : detailsLoading ? (
           <Skeleton rows={4} />
+        ) : isUpstreamAuthFailed(detailsError) ? (
+          <div className={styles.emptyState}>
+            <p className={styles.emptyTitle}>Dettaglio non disponibile</p>
+            <p className={styles.emptyText}>I dettagli del gruppo non sono al momento raggiungibili.</p>
+          </div>
         ) : details ? (
           <div className={styles.detailContent}>
             <div className={styles.detailHeader}>

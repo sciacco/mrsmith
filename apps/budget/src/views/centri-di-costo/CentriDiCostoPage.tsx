@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getApiErrorMessage, isUpstreamAuthFailed } from '../../api/errors';
 import {
   useCostCenters,
   useCostCenterDetails,
@@ -17,8 +18,8 @@ export function CentriDiCostoPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showDisable, setShowDisable] = useState(false);
 
-  const { data: costCenters, isLoading: listLoading } = useCostCenters();
-  const { data: details, isLoading: detailsLoading } = useCostCenterDetails(selectedName);
+  const { data: costCenters, isLoading: listLoading, error: listError } = useCostCenters();
+  const { data: details, isLoading: detailsLoading, error: detailsError } = useCostCenterDetails(selectedName);
   const enableCC = useEnableCostCenter();
   const { toast } = useToast();
 
@@ -28,7 +29,7 @@ export function CentriDiCostoPage() {
       onSuccess: (res) => toast(res.message),
       onError: (error) => {
         if (error instanceof ApiError) {
-          toast((error.body as { message?: string })?.message ?? error.statusText, 'error');
+          toast(getApiErrorMessage(error), 'error');
         } else {
           toast('Errore di connessione', 'error');
         }
@@ -59,6 +60,11 @@ export function CentriDiCostoPage() {
           {listLoading ? (
             <div className={styles.tableBody}>
               <Skeleton rows={5} />
+            </div>
+          ) : isUpstreamAuthFailed(listError) ? (
+            <div className={styles.emptyState}>
+              <p className={styles.emptyTitle}>Servizio temporaneamente non disponibile</p>
+              <p className={styles.emptyText}>L&apos;elenco dei centri di costo non puo essere caricato ora.</p>
             </div>
           ) : !costCenters || costCenters.length === 0 ? (
             <div className={styles.emptyState}>
@@ -140,6 +146,11 @@ export function CentriDiCostoPage() {
             </div>
           ) : detailsLoading ? (
             <Skeleton rows={4} />
+          ) : isUpstreamAuthFailed(detailsError) ? (
+            <div className={styles.emptyState}>
+              <p className={styles.emptyTitle}>Dettaglio non disponibile</p>
+              <p className={styles.emptyText}>I dettagli del centro di costo non sono al momento raggiungibili.</p>
+            </div>
           ) : details ? (
             <div className={styles.detailContent}>
               <div className={styles.detailHeader}>

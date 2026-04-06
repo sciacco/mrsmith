@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useToast, Skeleton } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
+import { getApiErrorMessage, isUpstreamAuthFailed } from '../../api/errors';
 import { useBudgetDetails } from './queries';
 import { formatMoneyDisplay } from '../../utils/format';
 import { BudgetEditModal } from './BudgetEditModal';
@@ -41,11 +42,13 @@ export function BudgetDetailPage() {
       if (error instanceof ApiError && error.status === 404) {
         toast('Budget non trovato', 'error');
         navigate('/budgets');
+      } else if (isUpstreamAuthFailed(error)) {
+        toast('Servizio budget temporaneamente non disponibile', 'error');
       } else {
-        toast('Errore di connessione', 'error');
+        toast(getApiErrorMessage(error), 'error');
       }
     }
-  }, [error]);
+  }, [error, navigate, toast]);
 
   // Tab indicator position
   useEffect(() => {
@@ -64,6 +67,17 @@ export function BudgetDetailPage() {
     return (
       <div className={styles.page}>
         <Skeleton rows={6} />
+      </div>
+    );
+  }
+
+  if (isUpstreamAuthFailed(error)) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.headerCard}>
+          <h1 className={styles.headerTitle}>Servizio temporaneamente non disponibile</h1>
+          <p className={styles.moneyLabel}>Il dettaglio budget non e al momento raggiungibile dal backend.</p>
+        </div>
       </div>
     );
   }
