@@ -5,14 +5,14 @@ import { Portal } from './components/Portal';
 import type { Category, PortalUser } from './types';
 
 export function App() {
-  const { authenticated, loading, token, logout } = useAuth();
+  const { authenticated, loading, status, getAccessToken, logout } = useAuth();
   const api = useMemo(
     () =>
       createApiClient({
         baseUrl: '/api',
-        getToken: () => token,
+        getToken: getAccessToken,
       }),
-    [token],
+    [getAccessToken],
   );
 
   const [user, setUser] = useState<PortalUser | null>(null);
@@ -22,7 +22,8 @@ export function App() {
 
   useEffect(() => {
     if (loading) return;
-    if (!authenticated || !token) {
+    if (status === 'reauthenticating') return;
+    if (!authenticated) {
       setBootstrapping(false);
       setUser(null);
       setCategories([]);
@@ -45,8 +46,10 @@ export function App() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        if (err instanceof ApiError && err.status === 403) {
           setError('Your session is authenticated but not authorized to load launcher data.');
+        } else if (err instanceof ApiError && err.status === 401) {
+          setError('Your session expired while loading launcher data. Redirecting to login.');
         } else {
           setError('The portal could not load your identity and app entitlements.');
         }
@@ -56,15 +59,19 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [api, authenticated, loading, token]);
+  }, [api, authenticated, loading, status]);
 
-  if (loading || bootstrapping) {
+  if (loading || bootstrapping || status === 'reauthenticating') {
     return (
       <Portal
         categories={[]}
         userName="Agent Session"
-        statusTitle="AUTHENTICATING SESSION"
-        statusMessage="Connecting to Keycloak and loading your launcher entitlements."
+        statusTitle={status === 'reauthenticating' ? 'RESTORING SESSION' : 'AUTHENTICATING SESSION'}
+        statusMessage={
+          status === 'reauthenticating'
+            ? 'Your session expired while idle. Redirecting to Keycloak to restore access.'
+            : 'Connecting to Keycloak and loading your launcher entitlements.'
+        }
       />
     );
   }

@@ -11,7 +11,8 @@ export class ApiError extends Error {
 
 export interface ApiClientOptions {
   baseUrl: string;
-  getToken: () => string | undefined;
+  getToken: () => Promise<string | undefined> | string | undefined;
+  onUnauthorized?: (error: ApiError) => Promise<void> | void;
 }
 
 export interface ApiClient {
@@ -21,9 +22,9 @@ export interface ApiClient {
   delete: <T>(path: string) => Promise<T>;
 }
 
-export function createApiClient({ baseUrl, getToken }: ApiClientOptions): ApiClient {
+export function createApiClient({ baseUrl, getToken, onUnauthorized }: ApiClientOptions): ApiClient {
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const token = getToken();
+    const token = await getToken();
     const res = await fetch(`${baseUrl}${path}`, {
       method,
       headers: {
@@ -36,7 +37,11 @@ export function createApiClient({ baseUrl, getToken }: ApiClientOptions): ApiCli
     if (!res.ok) {
       let body: unknown;
       try { body = await res.json(); } catch { /* no body */ }
-      throw new ApiError(res.status, res.statusText, path, body);
+      const error = new ApiError(res.status, res.statusText, path, body);
+      if (res.status === 401) {
+        await onUnauthorized?.(error);
+      }
+      throw error;
     }
 
     return res.json() as Promise<T>;

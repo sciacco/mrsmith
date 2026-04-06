@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AuthProvider } from '@mrsmith/auth-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ApiError } from '@mrsmith/api-client';
 import { BrowserRouter } from 'react-router-dom';
 import { ToastProvider } from '@mrsmith/ui';
 import { App } from './App';
@@ -17,6 +18,12 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+          return false;
+        }
+        return failureCount < 3;
+      },
     },
   },
 });

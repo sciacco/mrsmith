@@ -12,10 +12,26 @@ const navItems = [
 ];
 
 export function App() {
-  const { user, loading, logout } = useOptionalAuth();
+  const { user, loading, logout, status } = useOptionalAuth();
   const element = useRoutes(routes);
 
   if (loading) return null;
+
+  if (status === 'reauthenticating') {
+    return (
+      <AppShell userName={user?.name ?? 'John Doe'} onLogout={logout}>
+        <AppShell.Nav>
+          <TabNav items={navItems} />
+        </AppShell.Nav>
+        <AppShell.Content>
+          <section>
+            <h1>Sessione in ripristino</h1>
+            <p>La sessione e scaduta durante l&apos;inattivita. Reindirizzamento a Keycloak in corso.</p>
+          </section>
+        </AppShell.Content>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell userName={user?.name ?? 'John Doe'} onLogout={logout}>
