@@ -12,3 +12,9 @@ export type Category = {
   title: string;
   apps: App[];
 };
+
+export type PortalUser = {
+  name: string;
+  email: string;
+  roles: string[];
+};

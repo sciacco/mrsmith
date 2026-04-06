@@ -16,7 +16,7 @@ RUN go mod download && CGO_ENABLED=0 go build -o server ./cmd/server
 # Stage 3: Production image
 FROM gcr.io/distroless/static-debian12
 COPY --from=backend /app/server /server
-COPY --from=frontend /app/apps/portal/dist /static/portal
+COPY --from=frontend /app/apps/portal/dist /static
 # Future: COPY --from=frontend /app/apps/hr-app/dist /static/hr
 EXPOSE 8080
 USER nonroot:nonroot

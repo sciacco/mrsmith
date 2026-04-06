@@ -11,6 +11,7 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/budget"
+	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/health"
@@ -63,7 +64,8 @@ func main() {
 
 	// API routes (with auth)
 	api := http.NewServeMux()
-	portal.RegisterRoutes(api)
+	appCatalog := applaunch.Catalog(cfg.BudgetAppURL)
+	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
 
 	mux.Handle("/api/", middleware.Chain(

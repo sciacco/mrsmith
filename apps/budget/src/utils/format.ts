@@ -4,7 +4,7 @@
  * Presentation only — never used for input or state.
  */
 export function formatMoneyDisplay(apiValue: string): string {
-  const [intPart, decPart = '00'] = apiValue.split('.');
+  const [intPart = '0', decPart = '00'] = apiValue.split('.');
   const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return `${withThousands},${decPart.padEnd(2, '0')}`;
 }

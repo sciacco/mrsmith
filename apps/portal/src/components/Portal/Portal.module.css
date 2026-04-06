@@ -16,6 +16,53 @@
   gap: var(--space-lg);
 }
 
+.statusPanel,
+.statusPanelError {
+  max-width: 46rem;
+  margin: 4rem auto 0;
+  padding: 1.4rem 1.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--green-border);
+  background:
+    linear-gradient(180deg, rgba(0, 255, 65, 0.06), rgba(0, 255, 65, 0.02)),
+    rgba(8, 14, 8, 0.88);
+  box-shadow:
+    0 0 30px rgba(0, 255, 65, 0.05),
+    inset 0 0 0 1px rgba(0, 255, 65, 0.03);
+}
+
+.statusPanelError {
+  border-color: rgba(255, 104, 104, 0.35);
+  background:
+    linear-gradient(180deg, rgba(255, 104, 104, 0.08), rgba(255, 104, 104, 0.02)),
+    rgba(19, 10, 10, 0.9);
+}
+
+.statusEyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--green-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.statusTitle {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: var(--green-primary);
+  letter-spacing: 0.04em;
+}
+
+.statusMessage {
+  margin-top: var(--space-md);
+  font-family: var(--font-body);
+  line-height: 1.7;
+  color: var(--green-muted);
+  max-width: 38rem;
+}
+
 /* ── Section (title + card grid) ── */
 .section {
   display: flex;
@@ -73,6 +120,12 @@
 @media (max-width: 640px) {
   .main {
     padding: var(--space-lg);
+  }
+
+  .statusPanel,
+  .statusPanelError {
+    margin-top: 2rem;
+    padding: 1.1rem;
   }
 
   .cards {

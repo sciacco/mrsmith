@@ -4,11 +4,13 @@ type HeaderProps = {
   appName?: string;
   userName?: string;
   avatarUrl?: string;
+  onLogout?: () => void;
 };
 
 export function Header({
   appName = 'MrSmith',
   userName = 'Agent J. Doe',
+  onLogout,
 }: HeaderProps) {
   const initials = userName
     .split(' ')
@@ -55,6 +57,11 @@ export function Header({
       <div className={styles.userInfo}>
         <div className={styles.avatar}>{initials}</div>
         <span>{userName}</span>
+        {onLogout ? (
+          <button type="button" className={styles.logoutButton} onClick={onLogout}>
+            Logout
+          </button>
+        ) : null}
       </div>
     </header>
   );

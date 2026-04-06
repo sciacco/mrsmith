@@ -5,5 +5,9 @@ metadata:
 data:
   PORT: "8080"
   KEYCLOAK_ISSUER_URL: "https://keycloak.example.com/realms/mrsmith"
-  CORS_ORIGINS: "https://mrsmith.example.com"
+  KEYCLOAK_FRONTEND_URL: "https://keycloak.example.com"
+  KEYCLOAK_FRONTEND_REALM: "mrsmith"
+  KEYCLOAK_FRONTEND_CLIENT_ID: "mrsmith-portal"
+  BUDGET_APP_URL: "https://budget.example.com"
+  CORS_ORIGINS: "https://mrsmith.example.com,https://budget.example.com"
   STATIC_DIR: "/static"

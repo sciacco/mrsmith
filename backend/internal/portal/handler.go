@@ -4,18 +4,27 @@ import (
 	"net/http"
 
 	"github.com/sciacco/mrsmith/internal/auth"
+	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
-func RegisterRoutes(mux *http.ServeMux) {
+var appCatalog []applaunch.Definition
+
+func RegisterRoutes(mux *http.ServeMux, definitions []applaunch.Definition) {
+	appCatalog = append([]applaunch.Definition(nil), definitions...)
 	mux.HandleFunc("GET /portal/apps", handleListApps)
 	mux.HandleFunc("GET /portal/me", handleMe)
 }
 
-func handleListApps(w http.ResponseWriter, _ *http.Request) {
-	// TODO: return list of apps the user has access to
+func handleListApps(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.GetClaims(r.Context())
+	if !ok {
+		httputil.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	httputil.JSON(w, http.StatusOK, map[string]any{
-		"apps": []any{},
+		"categories": applaunch.VisibleCategories(appCatalog, claims.Roles),
 	})
 }
 

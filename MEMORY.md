@@ -24,3 +24,11 @@
 - Budget backend fixtures now also match the provided detail payloads for `Fonia` (`id: 18`), `Formazione` (`id: 8`), `Hardware` (`id: 22`), `Manutenzioni` (`id: 21`), `Merci/Attrezzature` (`id: 4`), `Pubblicità` (`id: 23`), and `Servizi Generali` (`id: 15`), again preserving `user_budgets: null`.
 - Budget backend fixtures now also match the provided detail payload for `Accessi` (`id: 11`), preserving `user_budgets: null` and the exact `Delivery TLC` cost-center allocation.
 - Budget backend now exposes the report fixture endpoint `GET /budget/v1/report/budget-used-over-percentage`; it validates `page_number` and `percentage` query params and returns the provided 3-item over-threshold budget payload (`Accessi`, `Budget [PER TEST]`, `Manutenzioni`).
+
+## 2026-04-06
+- Auth enablement now uses a backend-owned app catalog in [backend/internal/platform/applaunch/catalog.go](backend/internal/platform/applaunch/catalog.go); the first enforced launcher role is `app_budget_access`, which drives both portal visibility and budget API authorization.
+- Portal API `GET /portal/apps` is now role-filtered from Keycloak claims instead of returning an empty placeholder, and the portal frontend now bootstraps Keycloak from `/config`, fetches `/api/portal/me` plus `/api/portal/apps`, and renders explicit loading/error/empty entitlement states.
+- Budget API routes are now wrapped with `acl.RequireRole("app_budget_access")`, so hiding the Budget card in the portal is matched by backend enforcement.
+- Both portal and budget frontends now fail closed on missing `/config` auth bootstrap values instead of silently running without browser auth.
+- Backend config gained `BUDGET_APP_URL` for launcher targets; Kubernetes sample config now also includes `KEYCLOAK_FRONTEND_URL`, `KEYCLOAK_FRONTEND_REALM`, `KEYCLOAK_FRONTEND_CLIENT_ID`, and a cross-origin `CORS_ORIGINS` example for the budget frontend.
+- The production Docker build now copies portal assets directly to `/static`, aligning the image layout with `STATIC_DIR=/static`.

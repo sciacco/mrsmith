@@ -7,6 +7,7 @@ type Config struct {
 	KeycloakIssuerURL string
 	CORSOrigins       string
 	StaticDir         string
+	BudgetAppURL      string
 
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
@@ -14,10 +15,10 @@ type Config struct {
 	KeycloakFrontendClientId string
 
 	// Arak / MISTRA-NG API proxy (service account client credentials)
-	ArakBaseURL            string
-	ArakServiceClientID    string
-	ArakServiceSecret      string
-	ArakServiceTokenURL    string
+	ArakBaseURL         string
+	ArakServiceClientID string
+	ArakServiceSecret   string
+	ArakServiceTokenURL string
 }
 
 func Load() Config {
@@ -26,6 +27,7 @@ func Load() Config {
 		KeycloakIssuerURL: envOr("KEYCLOAK_ISSUER_URL", ""),
 		CORSOrigins:       envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174"),
 		StaticDir:         envOr("STATIC_DIR", ""),
+		BudgetAppURL:      envOr("BUDGET_APP_URL", "http://localhost:5174"),
 
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),

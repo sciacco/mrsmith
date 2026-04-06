@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useToast, Skeleton } from '@mrsmith/ui';
+import { Skeleton } from '@mrsmith/ui';
 import { useBudgets } from './queries';
 import { BudgetCreateModal } from './BudgetCreateModal';
 import { formatMoneyDisplay } from '../../utils/format';
@@ -12,7 +12,6 @@ export function BudgetListPage() {
   const [showCreate, setShowCreate] = useState(false);
   const { data: budgets, isLoading } = useBudgets();
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   return (
     <div className={styles.page}>

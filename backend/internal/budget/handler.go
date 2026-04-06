@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/sciacco/mrsmith/internal/acl"
+	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
@@ -24,44 +26,48 @@ func RegisterRoutes(mux *http.ServeMux, client ...*arak.Client) {
 		arakClient = client[0]
 		log.Println("budget: all handlers will proxy to Arak API")
 	}
+	protectBudget := acl.RequireRole(applaunch.BudgetAccessRoles()...)
+	handle := func(pattern string, handler http.HandlerFunc) {
+		mux.Handle(pattern, protectBudget(http.HandlerFunc(handler)))
+	}
 	// Users
-	mux.HandleFunc("GET /users-int/v1/user", handleGetAllUsers)
+	handle("GET /users-int/v1/user", handleGetAllUsers)
 	// Groups
-	mux.HandleFunc("GET /budget/v1/group", handleGetAllGroups)
-	mux.HandleFunc("GET /budget/v1/group/{group_id}", handleGetGroupDetails)
-	mux.HandleFunc("POST /budget/v1/group", handleNewGroup)
-	mux.HandleFunc("PUT /budget/v1/group/{group_id}", handleEditGroup)
-	mux.HandleFunc("DELETE /budget/v1/group/{group_id}", handleDeleteGroup)
+	handle("GET /budget/v1/group", handleGetAllGroups)
+	handle("GET /budget/v1/group/{group_id}", handleGetGroupDetails)
+	handle("POST /budget/v1/group", handleNewGroup)
+	handle("PUT /budget/v1/group/{group_id}", handleEditGroup)
+	handle("DELETE /budget/v1/group/{group_id}", handleDeleteGroup)
 	// Cost centers
-	mux.HandleFunc("GET /budget/v1/cost-center", handleGetAllCostCenters)
-	mux.HandleFunc("GET /budget/v1/cost-center/{cost_center_id}", handleGetCostCenterDetails)
-	mux.HandleFunc("POST /budget/v1/cost-center", handleNewCostCenter)
-	mux.HandleFunc("PUT /budget/v1/cost-center/{cost_center_id}", handleEditCostCenter)
+	handle("GET /budget/v1/cost-center", handleGetAllCostCenters)
+	handle("GET /budget/v1/cost-center/{cost_center_id}", handleGetCostCenterDetails)
+	handle("POST /budget/v1/cost-center", handleNewCostCenter)
+	handle("PUT /budget/v1/cost-center/{cost_center_id}", handleEditCostCenter)
 	// Budgets
-	mux.HandleFunc("GET /budget/v1/budget", handleGetAllBudgets)
-	mux.HandleFunc("GET /budget/v1/budget/{budget_id}", handleGetBudgetDetails)
-	mux.HandleFunc("POST /budget/v1/budget", handleNewBudget)
-	mux.HandleFunc("PUT /budget/v1/budget/{budget_id}", handleEditBudget)
-	mux.HandleFunc("DELETE /budget/v1/budget/{budget_id}", handleDeleteBudget)
+	handle("GET /budget/v1/budget", handleGetAllBudgets)
+	handle("GET /budget/v1/budget/{budget_id}", handleGetBudgetDetails)
+	handle("POST /budget/v1/budget", handleNewBudget)
+	handle("PUT /budget/v1/budget/{budget_id}", handleEditBudget)
+	handle("DELETE /budget/v1/budget/{budget_id}", handleDeleteBudget)
 	// Reports
-	mux.HandleFunc("GET /budget/v1/report/budget-used-over-percentage", handleGetBudgetOverPercent)
-	mux.HandleFunc("GET /budget/v1/report/unassigned-users", handleGetUnassignedUsers)
+	handle("GET /budget/v1/report/budget-used-over-percentage", handleGetBudgetOverPercent)
+	handle("GET /budget/v1/report/unassigned-users", handleGetUnassignedUsers)
 	// User allocations
-	mux.HandleFunc("POST /budget/v1/budget/{budget_id}/user", handleNewUserBudget)
-	mux.HandleFunc("PUT /budget/v1/budget/{budget_id}/user", handleEditUserBudget)
+	handle("POST /budget/v1/budget/{budget_id}/user", handleNewUserBudget)
+	handle("PUT /budget/v1/budget/{budget_id}/user", handleEditUserBudget)
 	// Cost center allocations
-	mux.HandleFunc("POST /budget/v1/budget/{budget_id}/cost-center", handleNewCcBudget)
-	mux.HandleFunc("PUT /budget/v1/budget/{budget_id}/cost-center", handleEditCcBudget)
+	handle("POST /budget/v1/budget/{budget_id}/cost-center", handleNewCcBudget)
+	handle("PUT /budget/v1/budget/{budget_id}/cost-center", handleEditCcBudget)
 	// Approval rules — user budget
-	mux.HandleFunc("GET /budget/v1/approval-rules/user-budget", handleGetUserBudgetRules)
-	mux.HandleFunc("POST /budget/v1/approval-rules/user-budget", handleNewUserBudgetRule)
-	mux.HandleFunc("PUT /budget/v1/approval-rules/user-budget/{rule_id}", handleEditUserBudgetRule)
-	mux.HandleFunc("DELETE /budget/v1/approval-rules/user-budget/{rule_id}", handleDeleteUserBudgetRule)
+	handle("GET /budget/v1/approval-rules/user-budget", handleGetUserBudgetRules)
+	handle("POST /budget/v1/approval-rules/user-budget", handleNewUserBudgetRule)
+	handle("PUT /budget/v1/approval-rules/user-budget/{rule_id}", handleEditUserBudgetRule)
+	handle("DELETE /budget/v1/approval-rules/user-budget/{rule_id}", handleDeleteUserBudgetRule)
 	// Approval rules — cost center budget
-	mux.HandleFunc("GET /budget/v1/approval-rules/cost-center-budget", handleGetCcBudgetRules)
-	mux.HandleFunc("POST /budget/v1/approval-rules/cost-center-budget", handleNewCcBudgetRule)
-	mux.HandleFunc("PUT /budget/v1/approval-rules/cost-center-budget/{rule_id}", handleEditCcBudgetRule)
-	mux.HandleFunc("DELETE /budget/v1/approval-rules/cost-center-budget/{rule_id}", handleDeleteCcBudgetRule)
+	handle("GET /budget/v1/approval-rules/cost-center-budget", handleGetCcBudgetRules)
+	handle("POST /budget/v1/approval-rules/cost-center-budget", handleNewCcBudgetRule)
+	handle("PUT /budget/v1/approval-rules/cost-center-budget/{rule_id}", handleEditCcBudgetRule)
+	handle("DELETE /budget/v1/approval-rules/cost-center-budget/{rule_id}", handleDeleteCcBudgetRule)
 }
 
 // ═══ Proxy helper ═══

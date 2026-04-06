@@ -1,4 +1,4 @@
-import { StrictMode, type ReactNode } from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AuthProvider } from '@mrsmith/auth-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -18,26 +18,22 @@ const queryClient = new QueryClient({
 
 async function bootstrap() {
   const res = await fetch('/config');
+  if (!res.ok) {
+    throw new Error(`Budget auth bootstrap failed with status ${res.status}.`);
+  }
+
   const config: { keycloakUrl: string; realm: string; clientId: string } = await res.json();
+  if (!config.keycloakUrl || !config.realm || !config.clientId) {
+    throw new Error('Budget auth bootstrap is missing Keycloak frontend configuration.');
+  }
 
-  const hasAuth = Boolean(config.keycloakUrl && config.realm && config.clientId);
-
-  function AuthWrapper({ children }: { children: ReactNode }) {
-    if (!hasAuth) return <>{children}</>;
-    return (
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
       <AuthProvider
         keycloakUrl={config.keycloakUrl}
         realm={config.realm}
         clientId={config.clientId}
       >
-        {children}
-      </AuthProvider>
-    );
-  }
-
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <AuthWrapper>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
             <ToastProvider>
@@ -45,9 +41,42 @@ async function bootstrap() {
             </ToastProvider>
           </BrowserRouter>
         </QueryClientProvider>
-      </AuthWrapper>
+      </AuthProvider>
     </StrictMode>,
   );
 }
 
-bootstrap();
+function renderFatalError(message: string) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <main
+        style={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          padding: '2rem',
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '40rem',
+            border: '1px solid rgba(220, 53, 69, 0.18)',
+            background: '#fff',
+            color: '#7b1f2d',
+            padding: '1.5rem',
+            borderRadius: '0.75rem',
+            lineHeight: 1.6,
+          }}
+        >
+          {message}
+        </div>
+      </main>
+    </StrictMode>,
+  );
+}
+
+bootstrap().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : 'Budget auth bootstrap failed.';
+  renderFatalError(message);
+});
