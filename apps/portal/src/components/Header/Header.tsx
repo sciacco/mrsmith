@@ -12,12 +12,7 @@ export function Header({
   userName = 'Agent J. Doe',
   onLogout,
 }: HeaderProps) {
-  const initials = userName
-    .split(' ')
-    .filter((w) => w[0] && w[0] === w[0].toUpperCase())
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2);
+  const displayName = userName.startsWith('Agent ') ? userName : `Agent ${userName}`;
 
   return (
     <header className={styles.header}>
@@ -55,8 +50,8 @@ export function Header({
         </span>
       </div>
       <div className={styles.userInfo}>
-        <div className={styles.avatar}>{initials}</div>
-        <span>{userName}</span>
+        <img src="/mr-smith-avatar.svg" alt="Agent Smith" className={styles.avatar} />
+        <span>{displayName}</span>
         {onLogout ? (
           <button type="button" className={styles.logoutButton} onClick={onLogout}>
             Logout

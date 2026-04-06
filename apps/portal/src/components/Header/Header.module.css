@@ -54,13 +54,9 @@
   height: 36px;
   border-radius: var(--radius-full);
   border: 1.5px solid var(--green-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--green-primary);
+  object-fit: cover;
   background: var(--green-tint);
+  filter: drop-shadow(0 0 4px rgba(0, 255, 65, 0.3));
 }
 
 .logoutButton {
