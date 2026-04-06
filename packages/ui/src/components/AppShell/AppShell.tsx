@@ -1,8 +1,10 @@
 import { type ReactNode } from 'react';
+import { UserMenu } from '../UserMenu/UserMenu';
 import styles from './AppShell.module.css';
 
 interface AppShellProps {
   userName?: string;
+  onLogout?: () => void;
   children: ReactNode;
 }
 
@@ -14,7 +16,7 @@ function Content({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-export function AppShell({ userName, children }: AppShellProps) {
+export function AppShell({ userName, onLogout, children }: AppShellProps) {
   let nav: ReactNode = null;
   let content: ReactNode = null;
 
@@ -26,10 +28,6 @@ export function AppShell({ userName, children }: AppShellProps) {
     }
   }
 
-  const initials = userName
-    ? userName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-    : null;
-
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
@@ -38,12 +36,7 @@ export function AppShell({ userName, children }: AppShellProps) {
           <span className={styles.logoText}>MrSmith</span>
         </a>
         <nav className={styles.nav}>{nav}</nav>
-        {userName && (
-          <div className={styles.userArea}>
-            <span className={styles.userName}>{userName}</span>
-            <div className={styles.avatar}>{initials}</div>
-          </div>
-        )}
+        {userName && <UserMenu userName={userName} onLogout={onLogout} />}
       </header>
       <main className={styles.main}>{content}</main>
     </div>

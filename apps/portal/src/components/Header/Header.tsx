@@ -1,9 +1,9 @@
+import { UserMenu } from '@mrsmith/ui';
 import styles from './Header.module.css';
 
 type HeaderProps = {
   appName?: string;
   userName?: string;
-  avatarUrl?: string;
   onLogout?: () => void;
 };
 
@@ -12,8 +12,6 @@ export function Header({
   userName = 'Agent J. Doe',
   onLogout,
 }: HeaderProps) {
-  const displayName = userName.startsWith('Agent ') ? userName : `Agent ${userName}`;
-
   return (
     <header className={styles.header}>
       <div className={styles.logo}>
@@ -49,15 +47,7 @@ export function Header({
           </svg>
         </span>
       </div>
-      <div className={styles.userInfo}>
-        <img src="/mr-smith-avatar.svg" alt="Agent Smith" className={styles.avatar} />
-        <span>{displayName}</span>
-        {onLogout ? (
-          <button type="button" className={styles.logoutButton} onClick={onLogout}>
-            Logout
-          </button>
-        ) : null}
-      </div>
+      <UserMenu userName={userName} onLogout={onLogout} />
     </header>
   );
 }

@@ -1,4 +1,5 @@
 export { AppShell } from './components/AppShell/AppShell';
+export { UserMenu } from './components/UserMenu/UserMenu';
 export { TabNav } from './components/TabNav/TabNav';
 export type { TabNavItem } from './components/TabNav/TabNav';
 export { Modal } from './components/Modal/Modal';

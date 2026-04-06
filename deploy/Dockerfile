@@ -3,6 +3,7 @@ FROM node:20-slim AS frontend
 RUN corepack enable
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY tsconfig.base.json ./
 COPY packages/ packages/
 COPY apps/ apps/
 RUN pnpm install --frozen-lockfile && pnpm -r build

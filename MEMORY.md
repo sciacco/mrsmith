@@ -26,8 +26,10 @@
 - Budget backend now exposes the report fixture endpoint `GET /budget/v1/report/budget-used-over-percentage`; it validates `page_number` and `percentage` query params and returns the provided 3-item over-threshold budget payload (`Accessi`, `Budget [PER TEST]`, `Manutenzioni`).
 
 ## 2026-04-06
-- Portal header avatar replaced: initials-based `<div>` swapped for a Mr. Smith SVG image at [apps/portal/public/mr-smith-avatar.svg](apps/portal/public/mr-smith-avatar.svg); the `<img>` uses the `.avatar` CSS class with `object-fit: cover` and a green glow drop-shadow.
-- Portal header now prepends "Agent " to the displayed username (guards against double-prefixing if name already starts with "Agent ").
+- The production Docker frontend stage in [deploy/Dockerfile](deploy/Dockerfile) must copy the repo-root [tsconfig.base.json](tsconfig.base.json); without it, `pnpm -r build` inside the image fails in `packages/api-client` with `TS5083: Cannot read file '/app/tsconfig.base.json'`.
+- Shared `UserMenu` component added to `@mrsmith/ui` at [packages/ui/src/components/UserMenu/UserMenu.tsx](packages/ui/src/components/UserMenu/UserMenu.tsx); shows Mr. Smith SVG avatar (inline) + "Agent {userName}" with a click-to-toggle dropdown containing Logout. Used by both portal Header and AppShell (budget and future mini-apps).
+- `AppShell` now accepts `onLogout` prop and delegates user display to `UserMenu`; the old inline initials avatar and `.userArea`/`.userName`/`.avatar` CSS were removed from AppShell.
+- Portal gained `@mrsmith/ui` as a workspace dependency; its Header now uses the shared `UserMenu` instead of its own avatar/logout markup. The standalone `apps/portal/public/mr-smith-avatar.svg` was deleted.
 - Type-checking must use `pnpm --filter <app> exec tsc --noEmit`, never bare `npx tsc`; the global TS is 4.9.5 but workspaces require TS 5.x (`moduleResolution: "bundler"`, `allowImportingTsExtensions`). This rule is also documented in [CLAUDE.md](CLAUDE.md).
 - Auth enablement now uses a backend-owned app catalog in [backend/internal/platform/applaunch/catalog.go](backend/internal/platform/applaunch/catalog.go); the first enforced launcher role is `app_budget_access`, which drives both portal visibility and budget API authorization.
 - Portal API `GET /portal/apps` is now role-filtered from Keycloak claims instead of returning an empty placeholder, and the portal frontend now bootstraps Keycloak from `/config`, fetches `/api/portal/me` plus `/api/portal/apps`, and renders explicit loading/error/empty entitlement states.

@@ -12,13 +12,13 @@ const navItems = [
 ];
 
 export function App() {
-  const { user, loading } = useOptionalAuth();
+  const { user, loading, logout } = useOptionalAuth();
   const element = useRoutes(routes);
 
   if (loading) return null;
 
   return (
-    <AppShell userName={user?.name ?? 'John Doe'}>
+    <AppShell userName={user?.name ?? 'John Doe'} onLogout={logout}>
       <AppShell.Nav>
         <TabNav items={navItems} />
       </AppShell.Nav>
