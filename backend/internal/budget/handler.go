@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
@@ -198,9 +199,124 @@ func handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 
 // ═══ Cost centers ═══
 
+// enrichedCostCenterList fetches the cost-center list from Arak, then fetches
+// details for each to compute group_count and group_user_count (which the
+// upstream list endpoint does not include).
+func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
+	// 1. Fetch the list from Arak.
+	resp, err := arakClient.Do("GET", "/arak/budget/v1/cost-center", r.URL.RawQuery, nil)
+	if err != nil {
+		log.Printf("budget: arak cost-center list error: %v", err)
+		httputil.Error(w, http.StatusBadGateway, "upstream API error")
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		io.Copy(w, resp.Body)
+		return
+	}
+
+	// Parse the paginated list.
+	var listResp struct {
+		TotalNumber int `json:"total_number"`
+		CurrentPage int `json:"current_page"`
+		TotalPages  int `json:"total_pages"`
+		Items       []struct {
+			Name         string `json:"name"`
+			ManagerEmail string `json:"manager_email"`
+			UserCount    int    `json:"user_count"`
+			Enabled      bool   `json:"enabled"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&listResp); err != nil {
+		log.Printf("budget: failed to decode cost-center list: %v", err)
+		httputil.Error(w, http.StatusBadGateway, "failed to parse upstream response")
+		return
+	}
+
+	// 2. Fetch details concurrently for each cost center.
+	type detailResult struct {
+		idx            int
+		userCount      int
+		groupCount     int
+		groupUserCount int
+	}
+
+	results := make([]detailResult, len(listResp.Items))
+	var wg sync.WaitGroup
+	for i, item := range listResp.Items {
+		wg.Add(1)
+		go func(idx int, name string) {
+			defer wg.Done()
+			dr := detailResult{idx: idx}
+			encoded := url.PathEscape(name)
+			detResp, err := arakClient.Do("GET", "/arak/budget/v1/cost-center/"+encoded, "", nil)
+			if err != nil {
+				log.Printf("budget: arak cost-center detail error for %q: %v", name, err)
+				return
+			}
+			defer detResp.Body.Close()
+			if detResp.StatusCode != http.StatusOK {
+				return
+			}
+			var det struct {
+				Users  []json.RawMessage `json:"users"`
+				Groups []struct {
+					Name  string            `json:"name"`
+					Users []json.RawMessage `json:"users"`
+				} `json:"groups"`
+			}
+			if err := json.NewDecoder(detResp.Body).Decode(&det); err != nil {
+				log.Printf("budget: failed to decode cost-center detail for %q: %v", name, err)
+				return
+			}
+			dr.userCount = len(det.Users)
+			dr.groupCount = len(det.Groups)
+			for _, g := range det.Groups {
+				dr.groupUserCount += len(g.Users)
+			}
+			results[idx] = dr
+		}(i, item.Name)
+	}
+	wg.Wait()
+
+	// 3. Build enriched response.
+	type enrichedCC struct {
+		Name           string `json:"name"`
+		ManagerEmail   string `json:"manager_email"`
+		UserCount      int    `json:"user_count"`
+		GroupCount     int    `json:"group_count"`
+		GroupUserCount int    `json:"group_user_count"`
+		Enabled        bool   `json:"enabled"`
+	}
+	items := make([]enrichedCC, len(listResp.Items))
+	for i, item := range listResp.Items {
+		items[i] = enrichedCC{
+			Name:           item.Name,
+			ManagerEmail:   item.ManagerEmail,
+			UserCount:      results[i].userCount,
+			GroupCount:     results[i].groupCount,
+			GroupUserCount: results[i].groupUserCount,
+			Enabled:        item.Enabled,
+		}
+	}
+
+	httputil.JSON(w, http.StatusOK, paginatedResponse{
+		TotalNumber: listResp.TotalNumber,
+		CurrentPage: listResp.CurrentPage,
+		TotalPages:  listResp.TotalPages,
+		Items:       items,
+	})
+}
+
+
+
 func handleGetAllCostCenters(w http.ResponseWriter, r *http.Request) {
 	if arakClient != nil {
-		proxyToArak(w, r, "/arak/budget/v1/cost-center")
+		enrichedCostCenterList(w, r)
 		return
 	}
 	if r.URL.Query().Get("page_number") == "" {
