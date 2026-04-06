@@ -6,7 +6,7 @@ type AppCardProps = {
   name: string;
   description?: string;
   href?: string;
-  status?: 'default' | 'test';
+  status?: 'default' | 'test' | 'ready';
   onClick?: () => void;
 };
 
@@ -43,6 +43,7 @@ export function AppCard({
       onKeyDown={handleKeyDown}
     >
       {status === 'test' ? <span className={styles.badge}>TEST</span> : null}
+      {status === 'ready' ? <span className={styles.badgeReady}>READY</span> : null}
       <Icon name={icon} />
       <div className={styles.name}>{name}</div>
       {description ? <div className={styles.desc}>{description}</div> : null}

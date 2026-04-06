@@ -54,6 +54,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			Name:          "Budget Management",
 			Icon:          "coins",
 			Href:          BudgetAppHref,
+			Status:        "ready",
 			CategoryID:    "acquisti",
 			CategoryTitle: "Acquisti",
 			AccessRoles:   BudgetAccessRoles(),

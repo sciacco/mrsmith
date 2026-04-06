@@ -27,6 +27,20 @@
   letter-spacing: 0.12em;
 }
 
+.badgeReady {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid rgba(0, 255, 65, 0.55);
+  border-radius: 999px;
+  background: rgba(0, 255, 65, 0.12);
+  color: var(--green-primary);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+}
+
 .card:hover,
 .card:focus-visible {
   border-color: var(--green-primary);

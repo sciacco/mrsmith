@@ -4,7 +4,7 @@ export type App = {
   description?: string;
   icon: string;
   href: string;
-  status?: 'default' | 'test';
+  status?: 'default' | 'test' | 'ready';
 };
 
 export type Category = {
