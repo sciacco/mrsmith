@@ -64,7 +64,9 @@ func main() {
 
 	// API routes (with auth)
 	api := http.NewServeMux()
-	appCatalog := applaunch.Catalog(cfg.BudgetAppURL)
+	appCatalog := applaunch.Catalog(map[string]string{
+		applaunch.BudgetAppID: cfg.BudgetAppURL,
+	})
 	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
 

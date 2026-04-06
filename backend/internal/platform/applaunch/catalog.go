@@ -9,7 +9,10 @@ const (
 	BudgetAppID = "budget"
 )
 
-var budgetAccessRoles = []string{"app_budget_access"}
+var (
+	budgetAccessRoles  = []string{"app_budget_access"}
+	defaultAccessRoles = []string{"default-roles-cdlan"}
+)
 
 type Definition struct {
 	ID            string
@@ -38,27 +41,253 @@ type Category struct {
 	Apps  []App  `json:"apps"`
 }
 
-func Catalog(budgetAppURL string) []Definition {
-	href := strings.TrimSpace(budgetAppURL)
-	if href == "" {
-		href = "/budget"
-	}
+// Catalog returns the full app catalog. hrefOverrides maps app IDs to
+// custom hrefs (e.g. BudgetAppID → "http://localhost:5174" in dev).
+func Catalog(hrefOverrides map[string]string) []Definition {
+	defaultRoles := DefaultAccessRoles()
 
-	return []Definition{
+	defs := []Definition{
+		// ── Acquisti ──
 		{
 			ID:            BudgetAppID,
 			Name:          "Budget Management",
 			Icon:          "coins",
-			Href:          href,
+			Href:          "/budget",
 			CategoryID:    "acquisti",
 			CategoryTitle: "Acquisti",
 			AccessRoles:   BudgetAccessRoles(),
 		},
+		{
+			ID:            "gestione-utenti",
+			Name:          "Gestione Utenti",
+			Icon:          "users",
+			Href:          "/apps/acquisti/gestione-utenti",
+			CategoryID:    "acquisti",
+			CategoryTitle: "Acquisti",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "rda-richieste-di-acquisto",
+			Name:          "RDA Richieste di Acquisto",
+			Icon:          "cart",
+			Href:          "/apps/acquisti/rda-richieste-di-acquisto",
+			CategoryID:    "acquisti",
+			CategoryTitle: "Acquisti",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "fornitori",
+			Name:          "Fornitori",
+			Icon:          "handshake",
+			Href:          "/apps/acquisti/fornitori",
+			CategoryID:    "acquisti",
+			CategoryTitle: "Acquisti",
+			AccessRoles:   defaultRoles,
+		},
+		// ── MKT&Sales ──
+		{
+			ID:            "kit-e-prodotti",
+			Name:          "Kit e Prodotti",
+			Icon:          "package",
+			Href:          "/apps/mkt-sales/kit-e-prodotti",
+			CategoryID:    "mkt-sales",
+			CategoryTitle: "MKT&Sales",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "proposte",
+			Name:          "Proposte",
+			Icon:          "mail",
+			Href:          "/apps/mkt-sales/proposte",
+			CategoryID:    "mkt-sales",
+			CategoryTitle: "MKT&Sales",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "richieste-fattibilita",
+			Name:          "Richieste Fattibilità",
+			Icon:          "clipboard",
+			Href:          "/apps/mkt-sales/richieste-fattibilita",
+			CategoryID:    "mkt-sales",
+			CategoryTitle: "MKT&Sales",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "listini-e-sconti",
+			Name:          "Listini e Sconti",
+			Icon:          "tag",
+			Href:          "/apps/mkt-sales/listini-e-sconti",
+			CategoryID:    "mkt-sales",
+			CategoryTitle: "MKT&Sales",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "ordini",
+			Name:          "Ordini",
+			Icon:          "document",
+			Href:          "/apps/mkt-sales/ordini",
+			CategoryID:    "mkt-sales",
+			CategoryTitle: "MKT&Sales",
+			AccessRoles:   defaultRoles,
+		},
+		// ── SMART APPS ──
+		{
+			ID:            "reports",
+			Name:          "Reports",
+			Icon:          "chart",
+			Href:          "/apps/smart-apps/reports",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "panoramica-cliente",
+			Name:          "Panoramica cliente",
+			Icon:          "folder",
+			Href:          "/apps/smart-apps/panoramica-cliente",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "customer-portal",
+			Name:          "Customer Portal",
+			Icon:          "chat",
+			Href:          "/apps/smart-apps/customer-portal",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "zammu",
+			Name:          "Zammù",
+			Icon:          "spark",
+			Href:          "/apps/smart-apps/zammu",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "compliance",
+			Name:          "Compliance",
+			Icon:          "shield",
+			Href:          "/apps/smart-apps/compliance",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   defaultRoles,
+		},
+		// {
+		// 	ID:            "customer-portal-settings",
+		// 	Name:          "Customer Portal settings - APPLICATIONS...",
+		// 	Icon:          "settings",
+		// 	Href:          "/apps/smart-apps/customer-portal-settings",
+		// 	CategoryID:    "smart-apps",
+		// 	CategoryTitle: "SMART APPS",
+		// 	AccessRoles:   defaultRoles,
+		// },
+		// {
+		// 	ID:            "nardini",
+		// 	Name:          "Nardini",
+		// 	Icon:          "briefcase",
+		// 	Href:          "/apps/smart-apps/nardini",
+		// 	CategoryID:    "smart-apps",
+		// 	CategoryTitle: "SMART APPS",
+		// 	AccessRoles:   defaultRoles,
+		// },
+		// {
+		// 	ID:            "non-usare-app-di-test",
+		// 	Name:          "NON usare - App di TEST",
+		// 	Icon:          "spark",
+		// 	Status:        "test",
+		// 	Href:          "/apps/smart-apps/non-usare-app-di-test",
+		// 	CategoryID:    "smart-apps",
+		// 	CategoryTitle: "SMART APPS",
+		// 	AccessRoles:   defaultRoles,
+		// },
+		{
+			ID:            "afc-tools",
+			Name:          "AFC Tools",
+			Icon:          "settings",
+			Href:          "/apps/smart-apps/afc-tools",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "coperture",
+			Name:          "Coperture",
+			Icon:          "shield",
+			Href:          "/apps/smart-apps/coperture",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   defaultRoles,
+		},
+		// {
+		// 	ID:            "fdc-playground",
+		// 	Name:          "FDC_playground",
+		// 	Icon:          "spark",
+		// 	Status:        "test",
+		// 	Href:          "/apps/smart-apps/fdc-playground",
+		// 	CategoryID:    "smart-apps",
+		// 	CategoryTitle: "SMART APPS",
+		// 	AccessRoles:   defaultRoles,
+		// },
+		{
+			ID:            "manutenzioni",
+			Name:          "Manutenzioni",
+			Icon:          "wrench",
+			Href:          "/apps/smart-apps/manutenzioni",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   defaultRoles,
+		},
+		// ── Provisioning ──
+		{
+			ID:            "rdf-backend-strafatti",
+			Name:          "RDF Backend StraFatti",
+			Icon:          "database",
+			Href:          "/apps/provisioning/rdf-backend-strafatti",
+			CategoryID:    "provisioning",
+			CategoryTitle: "Provisioning",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "la-vendetta-di-timoo",
+			Name:          "La vendetta di Timoo",
+			Icon:          "briefcase",
+			Href:          "/apps/provisioning/la-vendetta-di-timoo",
+			CategoryID:    "provisioning",
+			CategoryTitle: "Provisioning",
+			AccessRoles:   defaultRoles,
+		},
+		{
+			ID:            "s3cchiate-di-storage",
+			Name:          "S3cchiate di storage",
+			Icon:          "launch",
+			Href:          "/apps/provisioning/s3cchiate-di-storage",
+			CategoryID:    "provisioning",
+			CategoryTitle: "Provisioning",
+			AccessRoles:   defaultRoles,
+		},
 	}
+
+	for i, d := range defs {
+		if override, ok := hrefOverrides[d.ID]; ok {
+			if v := strings.TrimSpace(override); v != "" {
+				defs[i].Href = v
+			}
+		}
+	}
+
+	return defs
 }
 
 func BudgetAccessRoles() []string {
 	return slices.Clone(budgetAccessRoles)
+}
+
+func DefaultAccessRoles() []string {
+	return slices.Clone(defaultAccessRoles)
 }
 
 func VisibleCategories(definitions []Definition, roles []string) []Category {

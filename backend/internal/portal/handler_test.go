@@ -13,7 +13,7 @@ import (
 
 func TestHandleListAppsFiltersAppsByRole(t *testing.T) {
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, applaunch.Catalog("http://localhost:5174"))
+	RegisterRoutes(mux, applaunch.Catalog(map[string]string{applaunch.BudgetAppID: "http://localhost:5174"}))
 
 	req := httptest.NewRequest(http.MethodGet, "/portal/apps", nil)
 	req = req.WithContext(context.WithValue(req.Context(), auth.ClaimsKey, auth.Claims{
@@ -46,7 +46,7 @@ func TestHandleListAppsFiltersAppsByRole(t *testing.T) {
 
 func TestHandleListAppsRequiresClaims(t *testing.T) {
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, applaunch.Catalog("http://localhost:5174"))
+	RegisterRoutes(mux, applaunch.Catalog(map[string]string{applaunch.BudgetAppID: "http://localhost:5174"}))
 
 	req := httptest.NewRequest(http.MethodGet, "/portal/apps", nil)
 	rec := httptest.NewRecorder()
