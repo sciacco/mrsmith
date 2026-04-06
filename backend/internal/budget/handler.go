@@ -2,14 +2,28 @@ package budget
 
 import (
 	"encoding/json"
+	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 
+	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
-func RegisterRoutes(mux *http.ServeMux) {
+// arakClient is set by RegisterRoutes when a live Arak client is provided.
+// nil means fixture mode (all handlers use in-memory data).
+var arakClient *arak.Client
+
+// RegisterRoutes registers all budget API handlers.
+// If client is non-nil, all handlers proxy to the real Arak API;
+// otherwise they fall back to fixture data.
+func RegisterRoutes(mux *http.ServeMux, client ...*arak.Client) {
+	if len(client) > 0 && client[0] != nil {
+		arakClient = client[0]
+		log.Println("budget: all handlers will proxy to Arak API")
+	}
 	// Users
 	mux.HandleFunc("GET /users-int/v1/user", handleGetAllUsers)
 	// Groups
@@ -50,7 +64,31 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /budget/v1/approval-rules/cost-center-budget/{rule_id}", handleDeleteCcBudgetRule)
 }
 
+// ═══ Proxy helper ═══
+
+// proxyToArak forwards the request to the real Arak API and streams the
+// response back. arakPath is the full Arak path (e.g. "/arak/budget/v1/group").
+func proxyToArak(w http.ResponseWriter, r *http.Request, arakPath string) {
+	resp, err := arakClient.Do(r.Method, arakPath, r.URL.RawQuery, r.Body)
+	if err != nil {
+		log.Printf("budget: arak proxy error: %v", err)
+		httputil.Error(w, http.StatusBadGateway, "upstream API error")
+		return
+	}
+	defer resp.Body.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
+
+// ═══ Users ═══
+
 func handleGetAllUsers(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/users-int/v1/user")
+		return
+	}
 	if r.URL.Query().Get("page_number") == "" {
 		httputil.Error(w, http.StatusBadRequest, "page_number is required")
 		return
@@ -64,7 +102,13 @@ func handleGetAllUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ═══ Groups ═══
+
 func handleGetAllGroups(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/group")
+		return
+	}
 	if r.URL.Query().Get("page_number") == "" {
 		httputil.Error(w, http.StatusBadRequest, "page_number is required")
 		return
@@ -80,6 +124,10 @@ func handleGetAllGroups(w http.ResponseWriter, r *http.Request) {
 
 func handleGetGroupDetails(w http.ResponseWriter, r *http.Request) {
 	groupID, _ := url.PathUnescape(r.PathValue("group_id"))
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/group/"+url.PathEscape(groupID))
+		return
+	}
 	details, ok := db.getGroupDetails(groupID)
 	if !ok {
 		httputil.Error(w, http.StatusNotFound, "group not found")
@@ -89,6 +137,10 @@ func handleGetGroupDetails(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleNewGroup(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/group")
+		return
+	}
 	var body struct {
 		Name    string  `json:"name"`
 		UserIDs []int64 `json:"user_ids"`
@@ -106,6 +158,10 @@ func handleNewGroup(w http.ResponseWriter, r *http.Request) {
 
 func handleEditGroup(w http.ResponseWriter, r *http.Request) {
 	groupID, _ := url.PathUnescape(r.PathValue("group_id"))
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/group/"+url.PathEscape(groupID))
+		return
+	}
 	var body struct {
 		NewName *string  `json:"new_name,omitempty"`
 		UserIDs *[]int64 `json:"user_ids,omitempty"`
@@ -123,6 +179,10 @@ func handleEditGroup(w http.ResponseWriter, r *http.Request) {
 
 func handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 	groupID, _ := url.PathUnescape(r.PathValue("group_id"))
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/group/"+url.PathEscape(groupID))
+		return
+	}
 	if !db.deleteGroup(groupID) {
 		httputil.Error(w, http.StatusNotFound, "group not found")
 		return
@@ -130,7 +190,13 @@ func handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, map[string]string{"message": "group deleted"})
 }
 
+// ═══ Cost centers ═══
+
 func handleGetAllCostCenters(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/cost-center")
+		return
+	}
 	if r.URL.Query().Get("page_number") == "" {
 		httputil.Error(w, http.StatusBadRequest, "page_number is required")
 		return
@@ -146,6 +212,10 @@ func handleGetAllCostCenters(w http.ResponseWriter, r *http.Request) {
 
 func handleGetCostCenterDetails(w http.ResponseWriter, r *http.Request) {
 	ccID, _ := url.PathUnescape(r.PathValue("cost_center_id"))
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/cost-center/"+url.PathEscape(ccID))
+		return
+	}
 	details, ok := db.getCostCenterDetails(ccID)
 	if !ok {
 		httputil.Error(w, http.StatusNotFound, "cost center not found")
@@ -155,6 +225,10 @@ func handleGetCostCenterDetails(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleNewCostCenter(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/cost-center")
+		return
+	}
 	var body struct {
 		Name       string   `json:"name"`
 		ManagerID  int64    `json:"manager_id"`
@@ -178,6 +252,10 @@ func handleNewCostCenter(w http.ResponseWriter, r *http.Request) {
 
 func handleEditCostCenter(w http.ResponseWriter, r *http.Request) {
 	ccID, _ := url.PathUnescape(r.PathValue("cost_center_id"))
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/cost-center/"+url.PathEscape(ccID))
+		return
+	}
 	var body struct {
 		NewName    *string   `json:"new_name,omitempty"`
 		ManagerID  *int64    `json:"manager_id,omitempty"`
@@ -196,9 +274,13 @@ func handleEditCostCenter(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, map[string]string{"message": "cost center updated"})
 }
 
-// ═══ Budget handlers ═══
+// ═══ Budgets ═══
 
 func handleGetAllBudgets(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/budget")
+		return
+	}
 	if r.URL.Query().Get("page_number") == "" {
 		httputil.Error(w, http.StatusBadRequest, "page_number is required")
 		return
@@ -213,7 +295,12 @@ func handleGetAllBudgets(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetBudgetDetails(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseBudgetID(r.PathValue("budget_id"))
+	budgetID := r.PathValue("budget_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/budget/"+budgetID)
+		return
+	}
+	id, ok := parseBudgetID(budgetID)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid budget_id")
 		return
@@ -227,6 +314,10 @@ func handleGetBudgetDetails(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleNewBudget(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/budget")
+		return
+	}
 	var body struct {
 		Name string `json:"name"`
 		Year int    `json:"year"`
@@ -240,7 +331,12 @@ func handleNewBudget(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleEditBudget(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseBudgetID(r.PathValue("budget_id"))
+	budgetID := r.PathValue("budget_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/budget/"+budgetID)
+		return
+	}
+	id, ok := parseBudgetID(budgetID)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid budget_id")
 		return
@@ -261,7 +357,12 @@ func handleEditBudget(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteBudget(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseBudgetID(r.PathValue("budget_id"))
+	budgetID := r.PathValue("budget_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/budget/"+budgetID)
+		return
+	}
+	id, ok := parseBudgetID(budgetID)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid budget_id")
 		return
@@ -273,9 +374,13 @@ func handleDeleteBudget(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, map[string]string{"message": "budget deleted"})
 }
 
-// ═══ Report handlers ═══
+// ═══ Reports ═══
 
 func handleGetBudgetOverPercent(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/report/budget-used-over-percentage")
+		return
+	}
 	if r.URL.Query().Get("page_number") == "" {
 		httputil.Error(w, http.StatusBadRequest, "page_number is required")
 		return
@@ -300,6 +405,10 @@ func handleGetBudgetOverPercent(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetUnassignedUsers(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/report/unassigned-users")
+		return
+	}
 	if r.URL.Query().Get("page_number") == "" {
 		httputil.Error(w, http.StatusBadRequest, "page_number is required")
 		return
@@ -313,10 +422,15 @@ func handleGetUnassignedUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ═══ User allocation handlers ═══
+// ═══ User allocations ═══
 
 func handleNewUserBudget(w http.ResponseWriter, r *http.Request) {
-	budgetID, ok := parseBudgetID(r.PathValue("budget_id"))
+	budgetID := r.PathValue("budget_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/budget/"+budgetID+"/user")
+		return
+	}
+	id, ok := parseBudgetID(budgetID)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid budget_id")
 		return
@@ -329,7 +443,7 @@ func handleNewUserBudget(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if !db.createUserAllocation(budgetID, body.UserID, body.Limit) {
+	if !db.createUserAllocation(id, body.UserID, body.Limit) {
 		httputil.Error(w, http.StatusNotFound, "budget not found")
 		return
 	}
@@ -337,7 +451,12 @@ func handleNewUserBudget(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleEditUserBudget(w http.ResponseWriter, r *http.Request) {
-	budgetID, ok := parseBudgetID(r.PathValue("budget_id"))
+	budgetID := r.PathValue("budget_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/budget/"+budgetID+"/user")
+		return
+	}
+	id, ok := parseBudgetID(budgetID)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid budget_id")
 		return
@@ -351,17 +470,22 @@ func handleEditUserBudget(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if !db.editUserAllocation(budgetID, body.UserID, body.Limit, body.Enabled) {
+	if !db.editUserAllocation(id, body.UserID, body.Limit, body.Enabled) {
 		httputil.Error(w, http.StatusNotFound, "allocation not found")
 		return
 	}
 	httputil.JSON(w, http.StatusOK, map[string]string{"message": "user budget updated"})
 }
 
-// ═══ Cost center allocation handlers ═══
+// ═══ Cost center allocations ═══
 
 func handleNewCcBudget(w http.ResponseWriter, r *http.Request) {
-	budgetID, ok := parseBudgetID(r.PathValue("budget_id"))
+	budgetID := r.PathValue("budget_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/budget/"+budgetID+"/cost-center")
+		return
+	}
+	id, ok := parseBudgetID(budgetID)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid budget_id")
 		return
@@ -374,7 +498,7 @@ func handleNewCcBudget(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if !db.createCcAllocation(budgetID, body.CostCenter, body.Limit) {
+	if !db.createCcAllocation(id, body.CostCenter, body.Limit) {
 		httputil.Error(w, http.StatusNotFound, "budget not found")
 		return
 	}
@@ -382,7 +506,12 @@ func handleNewCcBudget(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleEditCcBudget(w http.ResponseWriter, r *http.Request) {
-	budgetID, ok := parseBudgetID(r.PathValue("budget_id"))
+	budgetID := r.PathValue("budget_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/budget/"+budgetID+"/cost-center")
+		return
+	}
+	id, ok := parseBudgetID(budgetID)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid budget_id")
 		return
@@ -396,16 +525,20 @@ func handleEditCcBudget(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if !db.editCcAllocation(budgetID, body.CostCenter, body.Limit, body.Enabled) {
+	if !db.editCcAllocation(id, body.CostCenter, body.Limit, body.Enabled) {
 		httputil.Error(w, http.StatusNotFound, "allocation not found")
 		return
 	}
 	httputil.JSON(w, http.StatusOK, map[string]string{"message": "cost center budget updated"})
 }
 
-// ═══ User budget approval rule handlers ═══
+// ═══ User budget approval rules ═══
 
 func handleGetUserBudgetRules(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/approval-rules/user-budget")
+		return
+	}
 	if r.URL.Query().Get("page_number") == "" {
 		httputil.Error(w, http.StatusBadRequest, "page_number is required")
 		return
@@ -430,6 +563,10 @@ func handleGetUserBudgetRules(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleNewUserBudgetRule(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/approval-rules/user-budget")
+		return
+	}
 	var body struct {
 		Threshold  string `json:"threshold"`
 		ApproverID int64  `json:"approver_id"`
@@ -447,7 +584,12 @@ func handleNewUserBudgetRule(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleEditUserBudgetRule(w http.ResponseWriter, r *http.Request) {
-	ruleID, ok := parseRuleID(r.PathValue("rule_id"))
+	ruleIDStr := r.PathValue("rule_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/approval-rules/user-budget/"+ruleIDStr)
+		return
+	}
+	ruleID, ok := parseRuleID(ruleIDStr)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid rule_id")
 		return
@@ -470,7 +612,12 @@ func handleEditUserBudgetRule(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteUserBudgetRule(w http.ResponseWriter, r *http.Request) {
-	ruleID, ok := parseRuleID(r.PathValue("rule_id"))
+	ruleIDStr := r.PathValue("rule_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/approval-rules/user-budget/"+ruleIDStr)
+		return
+	}
+	ruleID, ok := parseRuleID(ruleIDStr)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid rule_id")
 		return
@@ -482,9 +629,13 @@ func handleDeleteUserBudgetRule(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, map[string]string{"message": "rule deleted"})
 }
 
-// ═══ Cost center budget approval rule handlers ═══
+// ═══ Cost center budget approval rules ═══
 
 func handleGetCcBudgetRules(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/approval-rules/cost-center-budget")
+		return
+	}
 	if r.URL.Query().Get("page_number") == "" {
 		httputil.Error(w, http.StatusBadRequest, "page_number is required")
 		return
@@ -509,6 +660,10 @@ func handleGetCcBudgetRules(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleNewCcBudgetRule(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/approval-rules/cost-center-budget")
+		return
+	}
 	var body struct {
 		Threshold  string `json:"threshold"`
 		ApproverID int64  `json:"approver_id"`
@@ -526,7 +681,12 @@ func handleNewCcBudgetRule(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleEditCcBudgetRule(w http.ResponseWriter, r *http.Request) {
-	ruleID, ok := parseRuleID(r.PathValue("rule_id"))
+	ruleIDStr := r.PathValue("rule_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/approval-rules/cost-center-budget/"+ruleIDStr)
+		return
+	}
+	ruleID, ok := parseRuleID(ruleIDStr)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid rule_id")
 		return
@@ -549,7 +709,12 @@ func handleEditCcBudgetRule(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteCcBudgetRule(w http.ResponseWriter, r *http.Request) {
-	ruleID, ok := parseRuleID(r.PathValue("rule_id"))
+	ruleIDStr := r.PathValue("rule_id")
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/budget/v1/approval-rules/cost-center-budget/"+ruleIDStr)
+		return
+	}
+	ruleID, ok := parseRuleID(ruleIDStr)
 	if !ok {
 		httputil.Error(w, http.StatusBadRequest, "invalid rule_id")
 		return

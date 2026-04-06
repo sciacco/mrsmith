@@ -1,5 +1,11 @@
 # MrSmith — Development & Build Commands
 
+# Load backend/.env if it exists
+ifneq (,$(wildcard backend/.env))
+  include backend/.env
+  export
+endif
+
 # Dev ──────────────────────────────────────────
 install:              ## Installa dipendenze workspace con pnpm
 	pnpm install

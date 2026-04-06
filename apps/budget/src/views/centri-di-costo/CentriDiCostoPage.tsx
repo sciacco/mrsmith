@@ -209,7 +209,7 @@ export function CentriDiCostoPage() {
               </div>
 
               {/* Groups */}
-              {details.groups.length > 0 && (
+              {details.groups && details.groups.length > 0 && (
                 <>
                   <div className={styles.divider} />
                   <div className={styles.membersSection}>
@@ -267,7 +267,7 @@ export function CentriDiCostoPage() {
         </div>
 
         {/* Group members list — below the detail card */}
-        {details && details.groups.length > 0 && (
+        {details && details.groups && details.groups.length > 0 && (
           <div className={styles.groupMembersCard}>
             <h3 className={styles.groupMembersTitle}>Utenti per gruppo</h3>
             {details.groups.map((g) => (

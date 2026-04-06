@@ -12,6 +12,12 @@ type Config struct {
 	KeycloakFrontendURL      string
 	KeycloakFrontendRealm    string
 	KeycloakFrontendClientId string
+
+	// Arak / MISTRA-NG API proxy (service account client credentials)
+	ArakBaseURL            string
+	ArakServiceClientID    string
+	ArakServiceSecret      string
+	ArakServiceTokenURL    string
 }
 
 func Load() Config {
@@ -24,6 +30,11 @@ func Load() Config {
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),
 		KeycloakFrontendClientId: envOr("KEYCLOAK_FRONTEND_CLIENT_ID", ""),
+
+		ArakBaseURL:         envOr("ARAK_BASE_URL", ""),
+		ArakServiceClientID: envOr("ARAK_SERVICE_CLIENT_ID", ""),
+		ArakServiceSecret:   envOr("ARAK_SERVICE_CLIENT_SECRET", ""),
+		ArakServiceTokenURL: envOr("ARAK_SERVICE_TOKEN_URL", ""),
 	}
 }
 

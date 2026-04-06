@@ -33,7 +33,7 @@ export function CostCenterEditModal({
       setNewName(details.name);
       setManagerId(details.manager.id);
       setSelectedUserIds((details.users ?? []).map((u) => u.id));
-      setSelectedGroupNames(details.groups.map((g) => g.name));
+      setSelectedGroupNames((details.groups ?? []).map((g) => g.name));
     }
   }, [details]);
 

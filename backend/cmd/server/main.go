@@ -11,6 +11,7 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/budget"
+	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/health"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
@@ -48,10 +49,22 @@ func main() {
 		})
 	})
 
+	// Arak API client (optional — when configured, report handlers proxy to real API)
+	var arakCli *arak.Client
+	if cfg.ArakBaseURL != "" && cfg.ArakServiceTokenURL != "" {
+		arakCli = arak.New(arak.Config{
+			BaseURL:      cfg.ArakBaseURL,
+			TokenURL:     cfg.ArakServiceTokenURL,
+			ClientID:     cfg.ArakServiceClientID,
+			ClientSecret: cfg.ArakServiceSecret,
+		})
+		log.Println("Arak API client configured — report handlers will proxy to", cfg.ArakBaseURL)
+	}
+
 	// API routes (with auth)
 	api := http.NewServeMux()
 	portal.RegisterRoutes(api)
-	budget.RegisterRoutes(api)
+	budget.RegisterRoutes(api, arakCli)
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),
