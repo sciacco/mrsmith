@@ -26,6 +26,9 @@
 - Budget backend now exposes the report fixture endpoint `GET /budget/v1/report/budget-used-over-percentage`; it validates `page_number` and `percentage` query params and returns the provided 3-item over-threshold budget payload (`Accessi`, `Budget [PER TEST]`, `Manutenzioni`).
 
 ## 2026-04-06
+- Portal header avatar replaced: initials-based `<div>` swapped for a Mr. Smith SVG image at [apps/portal/public/mr-smith-avatar.svg](apps/portal/public/mr-smith-avatar.svg); the `<img>` uses the `.avatar` CSS class with `object-fit: cover` and a green glow drop-shadow.
+- Portal header now prepends "Agent " to the displayed username (guards against double-prefixing if name already starts with "Agent ").
+- Type-checking must use `pnpm --filter <app> exec tsc --noEmit`, never bare `npx tsc`; the global TS is 4.9.5 but workspaces require TS 5.x (`moduleResolution: "bundler"`, `allowImportingTsExtensions`). This rule is also documented in [CLAUDE.md](CLAUDE.md).
 - Auth enablement now uses a backend-owned app catalog in [backend/internal/platform/applaunch/catalog.go](backend/internal/platform/applaunch/catalog.go); the first enforced launcher role is `app_budget_access`, which drives both portal visibility and budget API authorization.
 - Portal API `GET /portal/apps` is now role-filtered from Keycloak claims instead of returning an empty placeholder, and the portal frontend now bootstraps Keycloak from `/config`, fetches `/api/portal/me` plus `/api/portal/apps`, and renders explicit loading/error/empty entitlement states.
 - Budget API routes are now wrapped with `acl.RequireRole("app_budget_access")`, so hiding the Budget card in the portal is matched by backend enforcement.
