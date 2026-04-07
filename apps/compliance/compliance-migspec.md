@@ -93,6 +93,7 @@ The existing PostgreSQL schema **must not be altered** in ways that break the Ap
 | Operations | Full CRUD: Create, List, Read, Update, Soft Delete (set `is_active=false`) |
 | Constraints | Soft-deleted origins do not appear in the "Origine" dropdown for new block requests but remain visible in historical data. Hard SQL DELETE is never performed. |
 | Default | "AGCOM" is the frontend-hardcoded default selection (decision D12) |
+| Current values | `AGCOM` → AGCOM, `GDF` → Guardia di Finanza, `MININT` → Ministero dell'interno, `POLPOST` → Polizia Postale |
 
 ### DomainStatus (computed, no source table)
 
@@ -168,9 +169,9 @@ Default landing: Blocchi (`/blocks`).
 | Interaction pattern | Read-only tabbed list with search and export |
 | Sub-tabs | "Bloccati" (default active) / "Rilasciati" |
 | Table columns | domain, block count, release count |
-| Search | Client-side text filter |
+| Search | Client-side text filter. **Persists across tab switches** — single shared `searchQuery` state lifted above tabs. Clear "X" button for explicit reset. |
 | Export | CSV and XLSX buttons. Export all records matching active tab + search filter. Server-side file generation. |
-| Changes from legacy | Two pages merged into one tabbed view. Export formats specified. |
+| Changes from legacy | Two pages merged into one tabbed view. Export formats specified. Search persists across tabs. |
 
 ### View 4: Riepilogo (`/history`)
 
@@ -380,7 +381,7 @@ All endpoints require:
 1. Seleziona richiesta → pannello dettaglio in **modalità lettura**
 2. "Modifica" → campi editabili nel form → "Salva" → `PUT`
 3. Torna in modalità lettura con dati aggiornati
-4. Per dominio singolo: click → campo editabile → salva → `PUT .../domains/:id`
+4. Per dominio singolo: click icona edit (visibile al hover) → mini-popover con campo + Salva/Annulla → `PUT .../domains/:id` → indicatore successo/errore sulla riga
 
 ### J4: Consulta stato domini
 1. Tab **Stato domini** → sub-tab "Bloccati" (default)
@@ -413,13 +414,13 @@ All endpoints require:
 - Appsmith and DNS sync jobs must continue to function unchanged
 
 ### Performance
-- Domain status and history views: pagination strategy TBD (~10K+ rows currently)
+- Domain status and history views: full data load + virtual scrolling (`@tanstack/react-virtual`). Client-side search/filter on full dataset. Revisit if rows exceed ~100K.
 - Export: server-side streaming to handle large datasets
 - Batch domain insert replaces N+1 sequential inserts
 
 ### Operational
 - Coexistence with Appsmith during transition
-- DNS sync jobs are external consumers — app must not interfere with their reads
+- DNS sync jobs are external read-only consumers — app is the sole writer to `dns_bl_*` tables
 - Go backend follows existing monolith pattern (`backend/internal/compliance/`)
 
 ---
@@ -428,13 +429,13 @@ All endpoints require:
 
 | # | Question | Needed Input | Decision Owner |
 |---|----------|-------------|----------------|
-| O1 | Exact current values in `dns_bl_method` table | DB query | Dev team |
-| O2 | Pagination strategy for history and status views | UX + performance assessment | Dev team + expert |
-| O3 | Should search filter persist across sub-tabs in Stato domini? | UX preference | Expert |
+| ~~O1~~ | ~~Exact current values in `dns_bl_method`~~ | **Resolved**: AGCOM, GDF (Guardia di Finanza), MININT (Ministero dell'interno), POLPOST (Polizia Postale) | — |
+| ~~O2~~ | ~~Pagination strategy for history and status views~~ | **Resolved**: Full data load + frontend virtual scrolling (`@tanstack/react-virtual`). Client-side search on full dataset. Revisit if rows exceed ~100K. | — |
+| ~~O3~~ | ~~Should search filter persist across sub-tabs in Stato domini?~~ | **Resolved**: Yes — search persists across tab switches. Single `searchQuery` state lifted above tabs. Clear "X" button for explicit reset. | — |
 | O4 | Canonical FQDN validation regex pattern | Document and test | Dev team |
-| O5 | DNS sync jobs: do they write to `dns_bl_*` tables or only read? | Ops team confirmation | Ops |
+| ~~O5~~ | ~~DNS sync jobs: do they write to `dns_bl_*` tables or only read?~~ | **Resolved**: Read-only. The compliance app is the sole writer. | — |
 | O6 | XLSX Go library selection (`excelize` or alternative) | Dev team evaluation | Dev team |
-| O7 | Domain edit UX in detail panel: inline field or mini-modal? | UX refinement | Implementation phase |
+| ~~O7~~ | ~~Domain edit UX in detail panel: inline field or mini-modal?~~ | **Resolved**: Mini-popover triggered by edit icon on row hover. Single field + Save/Cancel. PUT on save with row-level success/error indicator. | — |
 
 ---
 
