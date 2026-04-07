@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,6 +21,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/database"
 	"github.com/sciacco/mrsmith/internal/platform/health"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/staticspa"
 	"github.com/sciacco/mrsmith/internal/portal"
 	"github.com/sciacco/mrsmith/pkg/middleware"
@@ -28,17 +29,20 @@ import (
 
 func main() {
 	cfg := config.Load()
+	logger := logging.New(cfg.LogLevel)
+	slog.SetDefault(logger)
 
 	// Auth middleware
 	var authMiddleware *auth.Middleware
 	if os.Getenv("SKIP_KEYCLOAK") == "true" {
-		log.Println("WARNING: SKIP_KEYCLOAK=true — auth disabled, using fake John Doe user. DO NOT use in production.")
+		logger.Warn("auth disabled via SKIP_KEYCLOAK", "component", "auth")
 		authMiddleware = auth.NewNoopMiddleware()
 	} else {
 		var err error
 		authMiddleware, err = auth.NewMiddleware(cfg.KeycloakIssuerURL)
 		if err != nil {
-			log.Fatalf("failed to init auth: %v", err)
+			logger.Error("failed to initialize auth", "component", "auth", "error", err)
+			os.Exit(1)
 		}
 	}
 
@@ -65,7 +69,7 @@ func main() {
 			ClientID:     cfg.ArakServiceClientID,
 			ClientSecret: cfg.ArakServiceSecret,
 		})
-		log.Println("Arak API client configured — report handlers will proxy to", cfg.ArakBaseURL)
+		logger.Info("arak client configured", "component", "budget", "base_url", cfg.ArakBaseURL)
 	}
 
 	// Anisetta DB (compliance module)
@@ -74,9 +78,10 @@ func main() {
 		var err error
 		anisettaDB, err = database.New(database.Config{Driver: "postgres", DSN: cfg.AnisettaDSN})
 		if err != nil {
-			log.Fatalf("failed to connect to anisetta: %v", err)
+			logger.Error("failed to connect to anisetta", "component", "compliance", "error", err)
+			os.Exit(1)
 		}
-		log.Println("Anisetta database connected — compliance handlers will use real DB")
+		logger.Info("anisetta database connected", "component", "compliance")
 	}
 
 	// API routes (with auth)
@@ -100,8 +105,10 @@ func main() {
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),
+		middleware.Recover(logger),
 		middleware.RequestID,
 		middleware.CORS(cfg.CORSOrigins),
+		middleware.AccessLog(logger),
 		authMiddleware.Handler,
 	))
 
@@ -120,9 +127,10 @@ func main() {
 
 	// Graceful shutdown
 	go func() {
-		log.Printf("server listening on :%s", cfg.Port)
+		logger.Info("server listening", "component", "http", "addr", ":"+cfg.Port)
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+			logger.Error("server exited unexpectedly", "component", "http", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -133,7 +141,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("shutdown error: %v", err)
+		logger.Error("shutdown error", "component", "http", "error", err)
+		os.Exit(1)
 	}
-	log.Println("server stopped")
+	logger.Info("server stopped", "component", "http")
 }

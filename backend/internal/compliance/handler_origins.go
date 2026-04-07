@@ -22,7 +22,7 @@ func (h *Handler) handleListOrigins(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.QueryContext(r.Context(), query)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "list_origins", err)
 		return
 	}
 	defer rows.Close()
@@ -31,10 +31,13 @@ func (h *Handler) handleListOrigins(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var o Origin
 		if err := rows.Scan(&o.MethodID, &o.Description, &o.IsActive); err != nil {
-			httputil.Error(w, http.StatusInternalServerError, err.Error())
+			h.dbFailure(w, r, "list_origins", err)
 			return
 		}
 		origins = append(origins, o)
+	}
+	if !h.rowsDone(w, r, rows, "list_origins") {
+		return
 	}
 
 	httputil.JSON(w, http.StatusOK, origins)
@@ -62,7 +65,7 @@ func (h *Handler) handleCreateOrigin(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO dns_bl_method (method_id, description, is_active) VALUES ($1, $2, true)`,
 		body.MethodID, body.Description)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "create_origin", err, "method_id", body.MethodID)
 		return
 	}
 
@@ -94,7 +97,7 @@ func (h *Handler) handleUpdateOrigin(w http.ResponseWriter, r *http.Request) {
 			`UPDATE dns_bl_method SET description = $1 WHERE method_id = $2`,
 			desc, methodID)
 		if err != nil {
-			httputil.Error(w, http.StatusInternalServerError, err.Error())
+			h.dbFailure(w, r, "update_origin_description", err, "method_id", methodID)
 			return
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
@@ -108,7 +111,7 @@ func (h *Handler) handleUpdateOrigin(w http.ResponseWriter, r *http.Request) {
 			`UPDATE dns_bl_method SET is_active = $1 WHERE method_id = $2`,
 			*body.IsActive, methodID)
 		if err != nil {
-			httputil.Error(w, http.StatusInternalServerError, err.Error())
+			h.dbFailure(w, r, "update_origin_active", err, "method_id", methodID)
 			return
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
@@ -130,7 +133,7 @@ func (h *Handler) handleDeleteOrigin(w http.ResponseWriter, r *http.Request) {
 		`UPDATE dns_bl_method SET is_active = false WHERE method_id = $1`,
 		methodID)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "delete_origin", err, "method_id", methodID)
 		return
 	}
 	if n, _ := res.RowsAffected(); n == 0 {

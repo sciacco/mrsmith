@@ -3,12 +3,14 @@ package compliance
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 // Handler holds the database connection for compliance endpoints.
@@ -67,4 +69,38 @@ func pathID(r *http.Request, name string) (int, error) {
 func decodeBody(r *http.Request, v any) error {
 	defer r.Body.Close()
 	return json.NewDecoder(r.Body).Decode(v)
+}
+
+func (h *Handler) dbFailure(w http.ResponseWriter, r *http.Request, operation string, err error, attrs ...any) {
+	args := []any{"component", "compliance", "operation", operation}
+	args = append(args, attrs...)
+	httputil.InternalError(w, r, err, "database operation failed", args...)
+}
+
+func (h *Handler) rowError(w http.ResponseWriter, r *http.Request, operation string, err error, attrs ...any) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		httputil.Error(w, http.StatusNotFound, "not_found")
+		return true
+	}
+	h.dbFailure(w, r, operation, err, attrs...)
+	return true
+}
+
+func (h *Handler) rowsDone(w http.ResponseWriter, r *http.Request, rows *sql.Rows, operation string, attrs ...any) bool {
+	if err := rows.Err(); err != nil {
+		h.dbFailure(w, r, operation, err, attrs...)
+		return false
+	}
+	return true
+}
+
+func (h *Handler) rollbackTx(r *http.Request, tx *sql.Tx, operation string, attrs ...any) {
+	if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+		args := []any{"component", "compliance", "operation", operation, "error", err}
+		args = append(args, attrs...)
+		logging.FromContext(r.Context()).Warn("transaction rollback failed", args...)
+	}
 }

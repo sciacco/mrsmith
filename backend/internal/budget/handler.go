@@ -3,7 +3,7 @@ package budget
 import (
 	"encoding/json"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -13,6 +13,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 // arakClient is set by RegisterRoutes when a live Arak client is provided.
@@ -20,7 +21,7 @@ import (
 var arakClient *arak.Client
 
 const (
-	upstreamAuthFailedCode = "UPSTREAM_AUTH_FAILED"
+	upstreamAuthFailedCode  = "UPSTREAM_AUTH_FAILED"
 	upstreamUnavailableCode = "UPSTREAM_UNAVAILABLE"
 )
 
@@ -30,7 +31,7 @@ const (
 func RegisterRoutes(mux *http.ServeMux, client ...*arak.Client) {
 	if len(client) > 0 && client[0] != nil {
 		arakClient = client[0]
-		log.Println("budget: all handlers will proxy to Arak API")
+		slog.Default().Info("arak proxy mode enabled", "component", "budget")
 	}
 	protectBudget := acl.RequireRole(applaunch.BudgetAccessRoles()...)
 	handle := func(pattern string, handler http.HandlerFunc) {
@@ -76,6 +77,12 @@ func RegisterRoutes(mux *http.ServeMux, client ...*arak.Client) {
 	handle("DELETE /budget/v1/approval-rules/cost-center-budget/{rule_id}", handleDeleteCcBudgetRule)
 }
 
+func requestLogger(r *http.Request, operation string, attrs ...any) *slog.Logger {
+	args := []any{"component", "budget", "operation", operation}
+	args = append(args, attrs...)
+	return logging.FromContext(r.Context()).With(args...)
+}
+
 // ═══ Proxy helper ═══
 
 // proxyToArak forwards the request to the real Arak API and streams the
@@ -83,7 +90,7 @@ func RegisterRoutes(mux *http.ServeMux, client ...*arak.Client) {
 func proxyToArak(w http.ResponseWriter, r *http.Request, arakPath string) {
 	resp, err := arakClient.Do(r.Method, arakPath, r.URL.RawQuery, r.Body)
 	if err != nil {
-		log.Printf("budget: arak proxy error: %v", err)
+		requestLogger(r, "proxy_to_arak", "upstream_path", arakPath).Error("upstream request failed", "error", err)
 		writeUpstreamError(w, http.StatusBadGateway, upstreamUnavailableCode, "upstream API error")
 		return
 	}
@@ -95,7 +102,9 @@ func proxyToArak(w http.ResponseWriter, r *http.Request, arakPath string) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		requestLogger(r, "proxy_to_arak", "upstream_path", arakPath).Warn("failed to stream upstream response", "error", err)
+	}
 }
 
 func isUpstreamAuthFailure(status int) bool {
@@ -234,7 +243,7 @@ func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
 	// 1. Fetch the list from Arak.
 	resp, err := arakClient.Do("GET", "/arak/budget/v1/cost-center", r.URL.RawQuery, nil)
 	if err != nil {
-		log.Printf("budget: arak cost-center list error: %v", err)
+		requestLogger(r, "list_cost_centers").Error("failed to fetch upstream cost-center list", "error", err)
 		writeUpstreamError(w, http.StatusBadGateway, upstreamUnavailableCode, "upstream API error")
 		return
 	}
@@ -247,7 +256,9 @@ func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
 	if resp.StatusCode != http.StatusOK {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(resp.StatusCode)
-		io.Copy(w, resp.Body)
+		if _, err := io.Copy(w, resp.Body); err != nil {
+			requestLogger(r, "list_cost_centers").Warn("failed to stream upstream cost-center list", "error", err)
+		}
 		return
 	}
 
@@ -264,7 +275,7 @@ func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
 		} `json:"items"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&listResp); err != nil {
-		log.Printf("budget: failed to decode cost-center list: %v", err)
+		requestLogger(r, "list_cost_centers").Error("failed to decode upstream cost-center list", "error", err)
 		httputil.Error(w, http.StatusBadGateway, "failed to parse upstream response")
 		return
 	}
@@ -289,7 +300,7 @@ func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
 			encoded := url.PathEscape(name)
 			detResp, err := arakClient.Do("GET", "/arak/budget/v1/cost-center/"+encoded, "", nil)
 			if err != nil {
-				log.Printf("budget: arak cost-center detail error for %q: %v", name, err)
+				requestLogger(r, "get_cost_center_detail", "cost_center", name).Error("failed to fetch upstream cost-center detail", "error", err)
 				return
 			}
 			defer detResp.Body.Close()
@@ -310,7 +321,7 @@ func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
 				} `json:"groups"`
 			}
 			if err := json.NewDecoder(detResp.Body).Decode(&det); err != nil {
-				log.Printf("budget: failed to decode cost-center detail for %q: %v", name, err)
+				requestLogger(r, "get_cost_center_detail", "cost_center", name).Error("failed to decode upstream cost-center detail", "error", err)
 				return
 			}
 			dr.userCount = len(det.Users)
@@ -356,8 +367,6 @@ func enrichedCostCenterList(w http.ResponseWriter, r *http.Request) {
 		Items:       items,
 	})
 }
-
-
 
 func handleGetAllCostCenters(w http.ResponseWriter, r *http.Request) {
 	if arakClient != nil {

@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 type contextKey string
@@ -41,6 +43,7 @@ func NewNoopMiddleware() *Middleware {
 
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.FromContext(r.Context()).With("component", "auth")
 		// Dev mode: skip token validation, inject fake claims
 		if m.verifier == nil {
 			claims := Claims{
@@ -51,12 +54,14 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 				RawToken: "dev-token",
 			}
 			ctx := context.WithValue(r.Context(), ClaimsKey, claims)
+			ctx = logging.WithAttrs(ctx, "auth_subject", claims.Subject)
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 
 		authHeader := r.Header.Get("Authorization")
 		if !strings.HasPrefix(authHeader, "Bearer ") {
+			logger.Warn("authentication failed", "reason", "missing_bearer")
 			http.Error(w, "missing or invalid authorization header", http.StatusUnauthorized)
 			return
 		}
@@ -64,18 +69,20 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		idToken, err := m.verifier.Verify(r.Context(), rawToken)
 		if err != nil {
+			logger.Warn("authentication failed", "reason", "token_verify_failed", "error", err)
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
 
 		var tokenClaims struct {
-			Email             string   `json:"email"`
-			PreferredUsername string   `json:"preferred_username"`
+			Email             string `json:"email"`
+			PreferredUsername string `json:"preferred_username"`
 			RealmAccess       struct {
 				Roles []string `json:"roles"`
 			} `json:"realm_access"`
 		}
 		if err := idToken.Claims(&tokenClaims); err != nil {
+			logger.Warn("authentication failed", "reason", "claims_parse_failed", "error", err)
 			http.Error(w, "failed to parse claims", http.StatusInternalServerError)
 			return
 		}
@@ -89,6 +96,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), ClaimsKey, claims)
+		ctx = logging.WithAttrs(ctx, "auth_subject", claims.Subject)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

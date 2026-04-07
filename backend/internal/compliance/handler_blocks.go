@@ -19,7 +19,7 @@ func (h *Handler) handleListBlocks(w http.ResponseWriter, r *http.Request) {
 		JOIN dns_bl_method m ON m.method_id = b.method_id
 		ORDER BY b.request_date DESC, b.id DESC`)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "list_blocks", err)
 		return
 	}
 	defer rows.Close()
@@ -28,10 +28,13 @@ func (h *Handler) handleListBlocks(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var b BlockRequest
 		if err := rows.Scan(&b.ID, &b.RequestDate, &b.Reference, &b.MethodID, &b.MethodDescription); err != nil {
-			httputil.Error(w, http.StatusInternalServerError, err.Error())
+			h.dbFailure(w, r, "list_blocks", err)
 			return
 		}
 		blocks = append(blocks, b)
+	}
+	if !h.rowsDone(w, r, rows, "list_blocks") {
+		return
 	}
 
 	httputil.JSON(w, http.StatusOK, blocks)
@@ -54,8 +57,7 @@ func (h *Handler) handleGetBlock(w http.ResponseWriter, r *http.Request) {
 		JOIN dns_bl_method m ON m.method_id = b.method_id
 		WHERE b.id = $1`, id).
 		Scan(&b.ID, &b.RequestDate, &b.Reference, &b.MethodID, &b.MethodDescription)
-	if err != nil {
-		httputil.Error(w, http.StatusNotFound, "not_found")
+	if h.rowError(w, r, "get_block", err, "block_id", id) {
 		return
 	}
 
@@ -96,10 +98,10 @@ func (h *Handler) handleCreateBlock(w http.ResponseWriter, r *http.Request) {
 
 	tx, err := h.db.BeginTx(r.Context(), nil)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "create_block", err)
 		return
 	}
-	defer tx.Rollback()
+	defer h.rollbackTx(r, tx, "create_block")
 
 	var blockID int
 	err = tx.QueryRowContext(r.Context(),
@@ -107,17 +109,17 @@ func (h *Handler) handleCreateBlock(w http.ResponseWriter, r *http.Request) {
 		 VALUES ($1, $2, $3) RETURNING id`,
 		body.RequestDate, body.Reference, body.MethodID).Scan(&blockID)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "create_block", err)
 		return
 	}
 
 	if err := insertDomains(r.Context(), tx, "dns_bl_block_domain", "block_id", blockID, valid); err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "create_block", err, "block_id", blockID)
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "create_block", err, "block_id", blockID)
 		return
 	}
 
@@ -147,7 +149,7 @@ func (h *Handler) handleUpdateBlock(w http.ResponseWriter, r *http.Request) {
 		`UPDATE dns_bl_block SET request_date = $1, reference = $2, method_id = $3 WHERE id = $4`,
 		body.RequestDate, body.Reference, body.MethodID, id)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "update_block", err, "block_id", id)
 		return
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
@@ -171,7 +173,7 @@ func (h *Handler) handleListBlockDomains(w http.ResponseWriter, r *http.Request)
 	rows, err := h.db.QueryContext(r.Context(),
 		`SELECT id, domain FROM dns_bl_block_domain WHERE block_id = $1 ORDER BY id`, id)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "list_block_domains", err, "block_id", id)
 		return
 	}
 	defer rows.Close()
@@ -180,10 +182,13 @@ func (h *Handler) handleListBlockDomains(w http.ResponseWriter, r *http.Request)
 	for rows.Next() {
 		var d BlockDomain
 		if err := rows.Scan(&d.ID, &d.Domain); err != nil {
-			httputil.Error(w, http.StatusInternalServerError, err.Error())
+			h.dbFailure(w, r, "list_block_domains", err, "block_id", id)
 			return
 		}
 		domains = append(domains, d)
+	}
+	if !h.rowsDone(w, r, rows, "list_block_domains", "block_id", id) {
+		return
 	}
 
 	httputil.JSON(w, http.StatusOK, domains)
@@ -223,18 +228,18 @@ func (h *Handler) handleAddBlockDomains(w http.ResponseWriter, r *http.Request) 
 
 	tx, err := h.db.BeginTx(r.Context(), nil)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "add_block_domains", err, "block_id", id)
 		return
 	}
-	defer tx.Rollback()
+	defer h.rollbackTx(r, tx, "add_block_domains", "block_id", id)
 
 	if err := insertDomains(r.Context(), tx, "dns_bl_block_domain", "block_id", id, valid); err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "add_block_domains", err, "block_id", id)
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "add_block_domains", err, "block_id", id)
 		return
 	}
 
@@ -273,7 +278,7 @@ func (h *Handler) handleUpdateBlockDomain(w http.ResponseWriter, r *http.Request
 		`UPDATE dns_bl_block_domain SET domain = $1 WHERE id = $2 AND block_id = $3`,
 		domain, domainID, blockID)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "update_block_domain", err, "block_id", blockID, "domain_id", domainID)
 		return
 	}
 	if n, _ := res.RowsAffected(); n == 0 {

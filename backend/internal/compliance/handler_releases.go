@@ -18,19 +18,22 @@ func (h *Handler) handleListReleases(w http.ResponseWriter, r *http.Request) {
 		FROM dns_bl_release
 		ORDER BY request_date DESC, id DESC`)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "list_releases", err)
 		return
 	}
 	defer rows.Close()
 
 	releases := make([]ReleaseRequest, 0)
 	for rows.Next() {
-		var r ReleaseRequest
-		if err := rows.Scan(&r.ID, &r.RequestDate, &r.Reference); err != nil {
-			httputil.Error(w, http.StatusInternalServerError, err.Error())
+		var rel ReleaseRequest
+		if err := rows.Scan(&rel.ID, &rel.RequestDate, &rel.Reference); err != nil {
+			h.dbFailure(w, r, "list_releases", err)
 			return
 		}
-		releases = append(releases, r)
+		releases = append(releases, rel)
+	}
+	if !h.rowsDone(w, r, rows, "list_releases") {
+		return
 	}
 
 	httputil.JSON(w, http.StatusOK, releases)
@@ -50,8 +53,7 @@ func (h *Handler) handleGetRelease(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRowContext(r.Context(),
 		`SELECT id, request_date, reference FROM dns_bl_release WHERE id = $1`, id).
 		Scan(&rel.ID, &rel.RequestDate, &rel.Reference)
-	if err != nil {
-		httputil.Error(w, http.StatusNotFound, "not_found")
+	if h.rowError(w, r, "get_release", err, "release_id", id) {
 		return
 	}
 
@@ -92,10 +94,10 @@ func (h *Handler) handleCreateRelease(w http.ResponseWriter, r *http.Request) {
 
 	tx, err := h.db.BeginTx(r.Context(), nil)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "create_release", err)
 		return
 	}
-	defer tx.Rollback()
+	defer h.rollbackTx(r, tx, "create_release")
 
 	var releaseID int
 	err = tx.QueryRowContext(r.Context(),
@@ -103,17 +105,17 @@ func (h *Handler) handleCreateRelease(w http.ResponseWriter, r *http.Request) {
 		 VALUES ($1, $2) RETURNING id`,
 		body.RequestDate, body.Reference).Scan(&releaseID)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "create_release", err)
 		return
 	}
 
 	if err := insertDomains(r.Context(), tx, "dns_bl_release_domain", "release_id", releaseID, valid); err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "create_release", err, "release_id", releaseID)
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "create_release", err, "release_id", releaseID)
 		return
 	}
 
@@ -143,7 +145,7 @@ func (h *Handler) handleUpdateRelease(w http.ResponseWriter, r *http.Request) {
 		`UPDATE dns_bl_release SET request_date = $1, reference = $2 WHERE id = $3`,
 		body.RequestDate, body.Reference, id)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "update_release", err, "release_id", id)
 		return
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
@@ -167,7 +169,7 @@ func (h *Handler) handleListReleaseDomains(w http.ResponseWriter, r *http.Reques
 	rows, err := h.db.QueryContext(r.Context(),
 		`SELECT id, domain FROM dns_bl_release_domain WHERE release_id = $1 ORDER BY id`, id)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "list_release_domains", err, "release_id", id)
 		return
 	}
 	defer rows.Close()
@@ -176,10 +178,13 @@ func (h *Handler) handleListReleaseDomains(w http.ResponseWriter, r *http.Reques
 	for rows.Next() {
 		var d ReleaseDomain
 		if err := rows.Scan(&d.ID, &d.Domain); err != nil {
-			httputil.Error(w, http.StatusInternalServerError, err.Error())
+			h.dbFailure(w, r, "list_release_domains", err, "release_id", id)
 			return
 		}
 		domains = append(domains, d)
+	}
+	if !h.rowsDone(w, r, rows, "list_release_domains", "release_id", id) {
+		return
 	}
 
 	httputil.JSON(w, http.StatusOK, domains)
@@ -219,18 +224,18 @@ func (h *Handler) handleAddReleaseDomains(w http.ResponseWriter, r *http.Request
 
 	tx, err := h.db.BeginTx(r.Context(), nil)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "add_release_domains", err, "release_id", id)
 		return
 	}
-	defer tx.Rollback()
+	defer h.rollbackTx(r, tx, "add_release_domains", "release_id", id)
 
 	if err := insertDomains(r.Context(), tx, "dns_bl_release_domain", "release_id", id, valid); err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "add_release_domains", err, "release_id", id)
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "add_release_domains", err, "release_id", id)
 		return
 	}
 
@@ -269,7 +274,7 @@ func (h *Handler) handleUpdateReleaseDomain(w http.ResponseWriter, r *http.Reque
 		`UPDATE dns_bl_release_domain SET domain = $1 WHERE id = $2 AND release_id = $3`,
 		domain, domainID, releaseID)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "update_release_domain", err, "release_id", releaseID, "domain_id", domainID)
 		return
 	}
 	if n, _ := res.RowsAffected(); n == 0 {

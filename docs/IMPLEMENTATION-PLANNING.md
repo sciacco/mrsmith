@@ -26,6 +26,9 @@ Use this document when drafting or reviewing implementation plans for new apps, 
 - Do not leave infrastructure contracts half-decided.
   Env var names, migration strategy, DB bootstrap pattern, and deployment assumptions should be fixed early. "X or Y" placeholders usually become drift later.
 
+- Do not leave observability implicit.
+  For backend features and refactors, decide the log shape, request-correlation strategy, panic/failure logging, and client-facing 5xx sanitization policy as part of the plan. If internal failures should be diagnosable only from server logs, that must be explicit before implementation.
+
 - Prefer dependency injection over package-global state for new backend modules.
   New DB-backed modules should receive dependencies explicitly so tests and handler composition stay predictable.
 
@@ -42,6 +45,7 @@ Use this document when drafting or reviewing implementation plans for new apps, 
 
 - When a plan introduces a new app, confirm the final URL shape, static hosting path, local Vite port, and split-server launch path before writing view work.
 - When a plan introduces a new backend integration, confirm the env contract, dependency wiring, migration story, and testability pattern before writing handler breakdowns.
+- When a plan introduces backend failure paths or cross-cutting middleware changes, confirm the observability contract: request IDs, structured logging fields, panic handling, and whether internal errors are sanitized for clients.
 - When a plan introduces export/download behavior, confirm how authenticated file transfer works before choosing frontend UX.
 - When a plan touches legacy tables or shared consumers, define coexistence checks as part of the plan, not as post-implementation cleanup.
 
@@ -84,6 +88,8 @@ Before approving an implementation plan, verify these explicitly:
 - Are transaction and rollback cases covered?
 - Is export output expected to match visible filtering semantics?
 - Are deep-link refresh, auth-protected export, and legacy coexistence checked where applicable?
+- Are internal failure responses sanitized while the underlying errors are still observable in server logs?
+- Are request correlation, access logging, panic recovery, and dependency-failure logging covered where the plan changes backend runtime behavior?
 
 ## Review Rule
 

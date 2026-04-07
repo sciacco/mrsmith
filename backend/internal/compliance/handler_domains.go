@@ -18,8 +18,9 @@ func (h *Handler) handleListDomainStatus(w http.ResponseWriter, r *http.Request)
 	format := r.URL.Query().Get("format")
 	search := r.URL.Query().Get("search")
 
-	query := `
-		SELECT domain, block_count, release_count FROM (
+	fullQuery := fmt.Sprintf(`
+		SELECT domain, SUM(block_count) AS block_count, SUM(release_count) AS release_count
+		FROM (
 			SELECT domain, COUNT(*) AS block_count, 0 AS release_count
 			FROM dns_bl_block_domain
 			GROUP BY domain
@@ -27,23 +28,16 @@ func (h *Handler) handleListDomainStatus(w http.ResponseWriter, r *http.Request)
 			SELECT domain, 0, COUNT(*)
 			FROM dns_bl_release_domain
 			GROUP BY domain
-		) sub
-		GROUP BY domain
-		HAVING SUM(block_count) > 0 OR SUM(release_count) > 0`
-
-	// Wrap in outer query for aggregation
-	fullQuery := fmt.Sprintf(`
-		SELECT domain, SUM(block_count) AS block_count, SUM(release_count) AS release_count
-		FROM (%s) agg
+		) agg
 		%s
 		GROUP BY domain
-		ORDER BY domain`, query[1:], searchWhere(search))
+		ORDER BY domain`, searchWhere(search))
 
 	args := searchArgs(search)
 
 	rows, err := h.db.QueryContext(r.Context(), fullQuery, args...)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "list_domain_status", err)
 		return
 	}
 	defer rows.Close()
@@ -52,10 +46,13 @@ func (h *Handler) handleListDomainStatus(w http.ResponseWriter, r *http.Request)
 	for rows.Next() {
 		var d DomainStatus
 		if err := rows.Scan(&d.Domain, &d.BlockCount, &d.ReleaseCount); err != nil {
-			httputil.Error(w, http.StatusInternalServerError, err.Error())
+			h.dbFailure(w, r, "list_domain_status", err)
 			return
 		}
 		domains = append(domains, d)
+	}
+	if !h.rowsDone(w, r, rows, "list_domain_status") {
+		return
 	}
 
 	if format == "csv" || format == "xlsx" {
@@ -108,7 +105,7 @@ func (h *Handler) handleListHistory(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.QueryContext(r.Context(), fullQuery, args...)
 	if err != nil {
-		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		h.dbFailure(w, r, "list_domain_history", err)
 		return
 	}
 	defer rows.Close()
@@ -117,10 +114,13 @@ func (h *Handler) handleListHistory(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var e HistoryEntry
 		if err := rows.Scan(&e.Domain, &e.RequestDate, &e.Reference, &e.RequestType); err != nil {
-			httputil.Error(w, http.StatusInternalServerError, err.Error())
+			h.dbFailure(w, r, "list_domain_history", err)
 			return
 		}
 		entries = append(entries, e)
+	}
+	if !h.rowsDone(w, r, rows, "list_domain_history") {
+		return
 	}
 
 	if format == "csv" || format == "xlsx" {
