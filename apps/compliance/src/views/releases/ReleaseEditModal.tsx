@@ -19,7 +19,7 @@ export function ReleaseEditModal({ open, onClose, releaseId }: ReleaseEditModalP
 
   useEffect(() => {
     if (release) {
-      setDate(release.request_date);
+      setDate(release.request_date.split('T')[0]!);
       setReference(release.reference);
     }
   }, [release]);

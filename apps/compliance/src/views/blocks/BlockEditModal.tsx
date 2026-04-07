@@ -21,7 +21,7 @@ export function BlockEditModal({ open, onClose, blockId }: BlockEditModalProps) 
 
   useEffect(() => {
     if (block) {
-      setDate(block.request_date);
+      setDate(block.request_date.split('T')[0]!);
       setReference(block.reference);
       setMethodId(block.method_id);
     }
