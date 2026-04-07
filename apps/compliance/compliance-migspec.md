@@ -281,9 +281,9 @@ All endpoints require:
 | Method | Path | Query Params / Body | Response |
 |--------|------|---------------------|----------|
 | `GET` | `/api/compliance/origins` | `include_inactive=true` (optional) | `[{method_id, description, is_active}]` |
-| `POST` | `/api/compliance/origins` | `{description}` | `{method_id}` |
+| `POST` | `/api/compliance/origins` | `{method_id, description}` | `{method_id}` |
 | `PUT` | `/api/compliance/origins/:id` | `{description}` | `{method_id}` |
-| `DELETE` | `/api/compliance/origins/:id` | — | `204` (soft delete) |
+| `DELETE` | `/api/compliance/origins/:id` | — | `200 {"method_id":"..."}` (soft delete) |
 
 ### Error Responses
 
@@ -291,8 +291,8 @@ All endpoints require:
 |--------|------|------|
 | `400` | Validation failure (invalid domains) | `{error: "invalid_domains", message: "...", invalid: ["bad.domain", ...]}` |
 | `400` | Missing required fields | `{error: "validation_error", message: "..."}` |
-| `401` | No token or invalid token | `{error: "unauthorized"}` |
-| `403` | Missing `app_compliance_access` role | `{error: "forbidden"}` |
+| `401` | No token or invalid token | Plain text (middleware `http.Error`) |
+| `403` | Missing `app_compliance_access` role | Plain text (middleware `http.Error`) |
 | `404` | Request or domain not found | `{error: "not_found"}` |
 
 ---

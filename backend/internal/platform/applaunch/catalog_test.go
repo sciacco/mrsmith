@@ -36,24 +36,59 @@ func TestVisibleCategoriesDefaultRoleSeesAllPlaceholders(t *testing.T) {
 	for _, cat := range categories {
 		total += len(cat.Apps)
 	}
-	// All placeholder apps (excludes budget which requires app_budget_access)
-	if total != 19 {
-		t.Fatalf("expected 19 placeholder apps, got %d", total)
+	// All placeholder apps (excludes budget and compliance which require specific roles)
+	if total != 18 {
+		t.Fatalf("expected 18 placeholder apps, got %d", total)
 	}
 }
 
 func TestVisibleCategoriesBothRolesSeesEverything(t *testing.T) {
 	catalog := Catalog(nil)
-	categories := VisibleCategories(catalog, []string{"default-roles-cdlan", "app_budget_access"})
+	categories := VisibleCategories(catalog, []string{"default-roles-cdlan", "app_budget_access", "app_compliance_access"})
 
 	total := 0
 	for _, cat := range categories {
 		total += len(cat.Apps)
 	}
-	// All 20 apps (19 placeholders + 1 budget)
+	// All 20 apps (18 placeholders + 1 budget + 1 compliance)
 	if total != 20 {
 		t.Fatalf("expected 20 total apps, got %d", total)
 	}
+}
+
+func TestVisibleCategoriesFiltersByComplianceRole(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"app_compliance_access"})
+	if len(categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(categories))
+	}
+	if categories[0].ID != "smart-apps" {
+		t.Fatalf("expected smart-apps category, got %q", categories[0].ID)
+	}
+	if len(categories[0].Apps) != 1 {
+		t.Fatalf("expected 1 app, got %d", len(categories[0].Apps))
+	}
+	if categories[0].Apps[0].ID != ComplianceAppID {
+		t.Fatalf("expected compliance app, got %q", categories[0].Apps[0].ID)
+	}
+	if categories[0].Apps[0].Href != ComplianceAppHref {
+		t.Fatalf("expected compliance href %q, got %q", ComplianceAppHref, categories[0].Apps[0].Href)
+	}
+}
+
+func TestCatalogAppliesComplianceHrefOverride(t *testing.T) {
+	catalog := Catalog(map[string]string{ComplianceAppID: "http://localhost:5175"})
+
+	for _, definition := range catalog {
+		if definition.ID != ComplianceAppID {
+			continue
+		}
+		if definition.Href != "http://localhost:5175" {
+			t.Fatalf("expected dev override href, got %q", definition.Href)
+		}
+		return
+	}
+
+	t.Fatal("expected compliance definition in catalog")
 }
 
 func TestVisibleCategoriesHidesAppsWithoutRole(t *testing.T) {

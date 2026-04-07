@@ -70,6 +70,22 @@ func TestHandlerDoesNotFallbackMissingAssetRequests(t *testing.T) {
 	}
 }
 
+func TestHandlerFallsBackToComplianceIndexForDeepLinks(t *testing.T) {
+	root := buildStaticFixture(t)
+	handler := New(root)
+
+	req := httptest.NewRequest(http.MethodGet, "/apps/compliance/domains/123", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "compliance-shell") {
+		t.Fatalf("expected compliance index, got %q", body)
+	}
+}
+
 func buildStaticFixture(t *testing.T) string {
 	t.Helper()
 
@@ -77,6 +93,7 @@ func buildStaticFixture(t *testing.T) string {
 	writeFixtureFile(t, filepath.Join(root, "index.html"), "<html>portal-shell</html>")
 	writeFixtureFile(t, filepath.Join(root, "apps", "budget", "index.html"), "<html>budget-shell</html>")
 	writeFixtureFile(t, filepath.Join(root, "apps", "budget", "assets", "app.js"), "budget-asset")
+	writeFixtureFile(t, filepath.Join(root, "apps", "compliance", "index.html"), "<html>compliance-shell</html>")
 	return root
 }
 

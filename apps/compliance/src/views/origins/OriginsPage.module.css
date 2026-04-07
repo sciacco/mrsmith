@@ -1,0 +1,93 @@
+/* ═══ Layout ═══ */
+.page {
+  display: flex; flex-direction: column; gap: var(--space-6, 24px);
+  min-height: calc(100vh - 60px - 80px);
+  animation: pageEnter 0.5s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.toolbar { display: flex; align-items: flex-start; justify-content: space-between; }
+.pageTitle { font-size: 1.75rem; font-weight: 700; color: var(--color-text, #0f172a); letter-spacing: -0.04em; }
+.pageSubtitle { font-size: 0.875rem; color: var(--color-text-muted, #94a3b8); margin-top: var(--space-1, 4px); }
+
+.tableCard {
+  background: var(--color-bg-elevated, #fff); border-radius: var(--radius-lg, 14px);
+  border: 1px solid var(--color-border, #e2e8f0); box-shadow: var(--shadow-sm); overflow: hidden;
+}
+
+.tableHeader {
+  display: grid; grid-template-columns: 1fr 2fr 1fr 80px;
+  padding: var(--space-3, 12px) var(--space-5, 20px);
+  border-bottom: 1px solid var(--color-border, #e2e8f0); background: var(--color-surface, #f1f5f9);
+}
+.tableHeader span { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-muted); }
+
+.tableBody { padding: var(--space-1, 4px); }
+
+.row {
+  display: grid; grid-template-columns: 1fr 2fr 1fr 80px; align-items: center;
+  padding: var(--space-3, 12px) var(--space-5, 20px); border-radius: var(--radius-md, 10px);
+  transition: background var(--duration-fast, 150ms);
+  animation: rowEnter 0.4s var(--ease-out) both;
+}
+@keyframes rowEnter {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.row:hover { background: var(--color-surface, #f1f5f9); }
+
+.rowDisabled { opacity: 0.6; }
+
+.cellCode { font-size: 0.875rem; font-weight: 600; color: var(--color-text); font-family: 'SF Mono', 'Fira Code', monospace; }
+.cellDesc { font-size: 0.875rem; color: var(--color-text); }
+
+/* ═══ Status badge ═══ */
+.statusBadge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.75rem; font-weight: 500;
+}
+
+.statusDot {
+  width: 7px; height: 7px; border-radius: 50%;
+}
+
+.statusEnabled .statusDot { background: var(--color-success, #10b981); }
+.statusEnabled { color: var(--color-success, #10b981); }
+
+.statusDisabled .statusDot { background: var(--color-text-muted, #94a3b8); }
+.statusDisabled { color: var(--color-text-muted, #94a3b8); }
+
+/* ═══ Row actions ═══ */
+.rowActions { display: flex; gap: var(--space-1, 4px); justify-content: flex-end; }
+
+.actionBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; border-radius: var(--radius-md, 10px);
+  background: transparent; color: var(--color-text-muted, #94a3b8);
+  cursor: pointer; transition: all var(--duration-fast, 150ms) var(--ease-out);
+}
+.actionBtn:hover { background: var(--color-surface, #f1f5f9); color: var(--color-accent, #635bff); }
+.actionBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.actionBtnDanger:hover { color: var(--color-danger, #ef4444); }
+.actionBtnSuccess:hover { color: var(--color-success, #10b981); }
+
+/* ═══ Empty / Buttons ═══ */
+.emptyState { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--space-16, 64px) var(--space-8, 32px); text-align: center; }
+.emptyIcon { display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: var(--radius-xl, 20px); background: var(--color-surface, #f1f5f9); color: var(--color-text-faint, #cbd5e1); margin-bottom: var(--space-5, 20px); }
+.emptyTitle { font-size: 0.9375rem; font-weight: 600; color: var(--color-text-secondary, #334155); }
+.emptyText { font-size: 0.8125rem; color: var(--color-text-muted); margin-top: var(--space-1, 4px); }
+
+.btnPrimary {
+  display: inline-flex; align-items: center; gap: var(--space-2, 8px);
+  padding: 10px 20px; border: none; border-radius: var(--radius-md, 10px);
+  font-size: 0.8125rem; font-weight: 600; cursor: pointer;
+  background: var(--color-accent, #635bff); color: #fff;
+  box-shadow: var(--shadow-accent), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: all var(--duration-normal, 250ms) var(--ease-out);
+}
+.btnPrimary:hover { background: var(--color-accent-hover, #5046e5); transform: translateY(-1px); }
+.btnPrimary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }

@@ -8,11 +8,15 @@ import (
 const (
 	BudgetAppID   = "budget"
 	BudgetAppHref = "/apps/budget/"
+
+	ComplianceAppID   = "compliance"
+	ComplianceAppHref = "/apps/compliance/"
 )
 
 var (
-	budgetAccessRoles  = []string{"app_budget_access"}
-	defaultAccessRoles = []string{"default-roles-cdlan"}
+	budgetAccessRoles     = []string{"app_budget_access"}
+	complianceAccessRoles = []string{"app_compliance_access"}
+	defaultAccessRoles    = []string{"default-roles-cdlan"}
 )
 
 type Definition struct {
@@ -170,13 +174,14 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			AccessRoles:   defaultRoles,
 		},
 		{
-			ID:            "compliance",
+			ID:            ComplianceAppID,
 			Name:          "Compliance",
 			Icon:          "shield",
-			Href:          "/apps/smart-apps/compliance",
+			Href:          ComplianceAppHref,
+			Status:        "ready",
 			CategoryID:    "smart-apps",
 			CategoryTitle: "SMART APPS",
-			AccessRoles:   defaultRoles,
+			AccessRoles:   ComplianceAccessRoles(),
 		},
 		// {
 		// 	ID:            "customer-portal-settings",
@@ -286,6 +291,10 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 
 func BudgetAccessRoles() []string {
 	return slices.Clone(budgetAccessRoles)
+}
+
+func ComplianceAccessRoles() []string {
+	return slices.Clone(complianceAccessRoles)
 }
 
 func DefaultAccessRoles() []string {

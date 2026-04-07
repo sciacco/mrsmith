@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -9,11 +10,15 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/budget"
+	"github.com/sciacco/mrsmith/internal/compliance"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/config"
+	"github.com/sciacco/mrsmith/internal/platform/database"
 	"github.com/sciacco/mrsmith/internal/platform/health"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/staticspa"
@@ -63,6 +68,17 @@ func main() {
 		log.Println("Arak API client configured — report handlers will proxy to", cfg.ArakBaseURL)
 	}
 
+	// Anisetta DB (compliance module)
+	var anisettaDB *sql.DB
+	if cfg.AnisettaDSN != "" {
+		var err error
+		anisettaDB, err = database.New(database.Config{Driver: "postgres", DSN: cfg.AnisettaDSN})
+		if err != nil {
+			log.Fatalf("failed to connect to anisetta: %v", err)
+		}
+		log.Println("Anisetta database connected — compliance handlers will use real DB")
+	}
+
 	// API routes (with auth)
 	api := http.NewServeMux()
 	hrefOverrides := map[string]string{}
@@ -72,9 +88,15 @@ func main() {
 		// Local split-server development still launches Budget on its own Vite server.
 		hrefOverrides[applaunch.BudgetAppID] = "http://localhost:5174"
 	}
+	if cfg.ComplianceAppURL != "" {
+		hrefOverrides[applaunch.ComplianceAppID] = cfg.ComplianceAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.ComplianceAppID] = "http://localhost:5175"
+	}
 	appCatalog := applaunch.Catalog(hrefOverrides)
 	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
+	compliance.RegisterRoutes(api, anisettaDB)
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),

@@ -9,7 +9,11 @@ type Config struct {
 	StaticDir         string
 
 	// Optional launcher override for split-server local development.
-	BudgetAppURL string
+	BudgetAppURL     string
+	ComplianceAppURL string
+
+	// Anisetta PostgreSQL (compliance module)
+	AnisettaDSN string
 
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
@@ -27,9 +31,11 @@ func Load() Config {
 	return Config{
 		Port:              envOr("PORT", "8080"),
 		KeycloakIssuerURL: envOr("KEYCLOAK_ISSUER_URL", ""),
-		CORSOrigins:       envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174"),
+		CORSOrigins:       envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175"),
 		StaticDir:         envOr("STATIC_DIR", ""),
 		BudgetAppURL:      envOr("BUDGET_APP_URL", ""),
+		ComplianceAppURL:  envOr("COMPLIANCE_APP_URL", ""),
+		AnisettaDSN:       envOr("ANISETTA_DSN", ""),
 
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),
