@@ -1,0 +1,1157 @@
+{
+  "name": "anisetta",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "common"
+    },
+    {
+      "name": "public",
+      "tables": [
+        {
+          "name": "as7_pbx",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "customer_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "as7_pbx_id",
+              "position": 3,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "users",
+              "position": 4,
+              "type": "integer",
+              "nullable": false,
+              "default": "1"
+            },
+            {
+              "name": "service_extensions",
+              "position": 5,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "internal_name",
+              "position": 6,
+              "type": "character varying(45)",
+              "nullable": false,
+              "default": "'Internal Name'::character varying"
+            },
+            {
+              "name": "channels_flat",
+              "position": 7,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "channels_regular",
+              "position": 8,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "serial_no",
+              "position": 9,
+              "type": "character varying(45)",
+              "nullable": true
+            },
+            {
+              "name": "note_migration",
+              "position": 10,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "note_generals",
+              "position": 11,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "hs_deal_id",
+              "position": 12,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "hs_quote_id",
+              "position": 13,
+              "type": "bigint",
+              "nullable": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 8192
+        },
+        {
+          "name": "as7_pbx_accounting",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false,
+              "default": "nextval('public.as7_pbx_accounting_id_seq'::regclass)"
+            },
+            {
+              "name": "as7_tenant_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "data",
+              "position": 3,
+              "type": "timestamp without time zone",
+              "nullable": false,
+              "default": "CURRENT_TIMESTAMP"
+            },
+            {
+              "name": "pbx_id",
+              "position": 4,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "pbx_name",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "users",
+              "position": 6,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "service_extensions",
+              "position": 7,
+              "type": "integer",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "as7_pbx_accounting_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "as7_pbx_accounting_as7_tenant_id_fkey",
+              "columns": [
+                "as7_tenant_id"
+              ],
+              "referencedTable": "public.as7_tenants",
+              "referencedColumns": [
+                "as7_tenant_id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 161986,
+          "dataSize": 14057472,
+          "indexSize": 3719168
+        },
+        {
+          "name": "as7_tenants",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "customer_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "as7_tenant_id",
+              "position": 3,
+              "type": "integer",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "as7_tenants_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "as7_tenants_pk_2",
+              "type": "BTREE",
+              "expressions": [
+                "as7_tenant_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 7,
+          "dataSize": 8192,
+          "indexSize": 32768
+        },
+        {
+          "name": "dids",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "did",
+              "position": 2,
+              "type": "character varying(48)",
+              "nullable": false
+            },
+            {
+              "name": "customer_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "status",
+              "position": 4,
+              "type": "smallint",
+              "nullable": true,
+              "default": "10",
+              "comment": "10 free 20 assigned 30 reserved 99 terminated"
+            }
+          ],
+          "rowCount": 100,
+          "dataSize": 8192
+        },
+        {
+          "name": "dns_bl_block",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "request_date",
+              "position": 2,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "reference",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "method_id",
+              "position": 4,
+              "type": "character varying(40)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "dns_bl_block_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "dns_bl_block_request_date_index",
+              "type": "BTREE",
+              "expressions": [
+                "request_date"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            }
+          ],
+          "rowCount": 1255,
+          "dataSize": 98304,
+          "indexSize": 106496
+        },
+        {
+          "name": "dns_bl_block_domain",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "domain",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "block_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "dns_bl_block_domain_domain_index",
+              "type": "BTREE",
+              "expressions": [
+                "domain"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "dns_bl_block_domain_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "dns_bl_block_domain_dns_bl_block_id_fk",
+              "columns": [
+                "block_id"
+              ],
+              "referencedTable": "public.dns_bl_block",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 10270,
+          "dataSize": 688128,
+          "indexSize": 819200
+        },
+        {
+          "name": "dns_bl_block_original",
+          "columns": [
+            {
+              "name": "block_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "request_date",
+              "position": 2,
+              "type": "character(10)",
+              "nullable": true
+            },
+            {
+              "name": "reference",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "zoho_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "method_id",
+              "position": 5,
+              "type": "character varying(20)",
+              "nullable": true
+            }
+          ],
+          "rowCount": 1238,
+          "dataSize": 106496,
+          "indexSize": 24576
+        },
+        {
+          "name": "dns_bl_domain_original",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "domain_name",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "request_date",
+              "position": 3,
+              "type": "character(8)",
+              "nullable": true
+            },
+            {
+              "name": "block_request",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "release_request",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "request_type",
+              "position": 6,
+              "type": "character varying(10)",
+              "nullable": true
+            },
+            {
+              "name": "zoho_id",
+              "position": 7,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "block_method",
+              "position": 8,
+              "type": "character varying(40)",
+              "nullable": true
+            }
+          ],
+          "rowCount": 9849,
+          "dataSize": 1220608,
+          "indexSize": 32768
+        },
+        {
+          "name": "dns_bl_method",
+          "columns": [
+            {
+              "name": "method_id",
+              "position": 1,
+              "type": "character varying(20)",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 2,
+              "type": "character varying(100)",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "dns_bl_method_pk",
+              "type": "BTREE",
+              "expressions": [
+                "method_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "dns_bl_release",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "request_date",
+              "position": 2,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "reference",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "dns_bl_release_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 14,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "dns_bl_release_domain",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "domain",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "release_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "dns_bl_release_domain_domain_index",
+              "type": "BTREE",
+              "expressions": [
+                "domain"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "dns_bl_release_domain_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "dns_bl_release_domain_dns_bl_release_id_fk",
+              "columns": [
+                "release_id"
+              ],
+              "referencedTable": "public.dns_bl_release",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 62,
+          "dataSize": 8192,
+          "indexSize": 32768
+        },
+        {
+          "name": "rdf_allegati",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "allegati",
+              "position": 2,
+              "type": "text[]",
+              "nullable": true
+            }
+          ],
+          "rowCount": -1,
+          "indexSize": 8192
+        },
+        {
+          "name": "rdf_fattibilita_fornitori",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false,
+              "default": "nextval('public.rdf_fattibilita_fornitori_id_seq'::regclass)"
+            },
+            {
+              "name": "richiesta_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "fornitore_id",
+              "position": 3,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "data_richiesta",
+              "position": 4,
+              "type": "date",
+              "nullable": false,
+              "default": "CURRENT_DATE"
+            },
+            {
+              "name": "tecnologia_id",
+              "position": 5,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "descrizione",
+              "position": 6,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "contatto_fornitore",
+              "position": 7,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "riferimento_fornitore",
+              "position": 8,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "stato",
+              "position": 9,
+              "type": "character varying(20)",
+              "nullable": false,
+              "default": "'bozza'::character varying"
+            },
+            {
+              "name": "annotazioni",
+              "position": 10,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "esito_ricevuto_il",
+              "position": 11,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "da_ordinare",
+              "position": 12,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "profilo_fornitore",
+              "position": 13,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "nrc",
+              "position": 14,
+              "type": "numeric(12,2)",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "mrc",
+              "position": 15,
+              "type": "numeric(12,2)",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "durata_mesi",
+              "position": 16,
+              "type": "integer",
+              "nullable": true,
+              "default": "24"
+            },
+            {
+              "name": "aderenza_budget",
+              "position": 17,
+              "type": "integer",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "copertura",
+              "position": 19,
+              "type": "smallint",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "giorni_rilascio",
+              "position": 20,
+              "type": "integer",
+              "nullable": true,
+              "default": "0"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "rdf_fattibilita_fornitori_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "rdf_fattibilita_fornitori_fornitore_id_fkey",
+              "columns": [
+                "fornitore_id"
+              ],
+              "referencedTable": "public.rdf_fornitori",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "rdf_fattibilita_fornitori_richiesta_id_fkey",
+              "columns": [
+                "richiesta_id"
+              ],
+              "referencedTable": "public.rdf_richieste",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "rdf_fattibilita_fornitori_tecnologia_id_fkey",
+              "columns": [
+                "tecnologia_id"
+              ],
+              "referencedTable": "public.rdf_tecnologie",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "rdf_fattibilita_fornitori_stato_check",
+              "expression": "((stato)::text = ANY (ARRAY[('bozza'::character varying)::text, ('inviata'::character varying)::text, ('sollecitata'::character varying)::text, ('completata'::character varying)::text, ('annullata'::character varying)::text]))"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "trigger_aggiorna_stato_richiesta",
+              "event": "INSERT",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER trigger_aggiorna_stato_richiesta AFTER INSERT ON public.rdf_fattibilita_fornitori FOR EACH ROW EXECUTE FUNCTION public.aggiorna_stato_richiesta_dopo_fattibilita()"
+            }
+          ],
+          "rowCount": 137,
+          "dataSize": 81920,
+          "indexSize": 57344
+        },
+        {
+          "name": "rdf_fornitori",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "nome",
+              "position": 2,
+              "type": "character varying(50)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "rdf_fornitori_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "rdf_richieste",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false,
+              "default": "nextval('public.rdf_richieste_id_seq'::regclass)"
+            },
+            {
+              "name": "deal_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "data_richiesta",
+              "position": 3,
+              "type": "date",
+              "nullable": false,
+              "default": "CURRENT_DATE"
+            },
+            {
+              "name": "descrizione",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "indirizzo",
+              "position": 5,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "stato",
+              "position": 6,
+              "type": "character varying(40)",
+              "nullable": false,
+              "default": "'nuova'::character varying"
+            },
+            {
+              "name": "annotazioni_richiedente",
+              "position": 7,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "annotazioni_carrier",
+              "position": 8,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "created_by",
+              "position": 9,
+              "type": "character varying(120)",
+              "nullable": true
+            },
+            {
+              "name": "created_at",
+              "position": 10,
+              "type": "timestamp without time zone",
+              "nullable": false,
+              "default": "CURRENT_TIMESTAMP"
+            },
+            {
+              "name": "updated_at",
+              "position": 11,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP"
+            },
+            {
+              "name": "fornitori_preferiti",
+              "position": 12,
+              "type": "text",
+              "nullable": true,
+              "default": "''::text"
+            },
+            {
+              "name": "codice_deal",
+              "position": 13,
+              "type": "character varying(64)",
+              "nullable": true,
+              "default": "''::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "rdf_richieste_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "check_stato",
+              "expression": "((stato)::text = ANY ((ARRAY['nuova'::character varying, 'in corso'::character varying, 'completata'::character varying, 'annullata'::character varying])::text[]))"
+            }
+          ],
+          "rowCount": 77,
+          "dataSize": 32768,
+          "indexSize": 49152
+        },
+        {
+          "name": "rdf_tecnologie",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "nome",
+              "position": 2,
+              "type": "character varying(100)",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "rdf_tecnologie_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 16384
+        }
+      ],
+      "functions": [
+        {
+          "name": "aggiorna_stato_richiesta_dopo_fattibilita",
+          "definition": "CREATE OR REPLACE FUNCTION public.aggiorna_stato_richiesta_dopo_fattibilita()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    -- Aggiorna lo stato della richiesta da 'nuova' a 'in corso'\n    UPDATE rdf_richieste \n    SET stato = 'in corso'\n    WHERE id = NEW.richiesta_id \n    AND stato = 'nuova';\n    \n    RETURN NEW;\nEND;\n$function$\n"
+        }
+      ],
+      "sequences": [
+        {
+          "name": "as7_pbx_accounting_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "as7_pbx_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "as7_tenants_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "dids_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "dns_bl_block_domain_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "dns_bl_block_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "dns_bl_block_original_block_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "dns_bl_domain_original_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "dns_bl_release_domain_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "dns_bl_release_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "rdf_allegati_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "rdf_fattibilita_fornitori_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "rdf_fornitori_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "rdf_richieste_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "rdf_tecnologie_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    }
+  ]
+}
