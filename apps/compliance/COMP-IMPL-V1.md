@@ -1,4 +1,4 @@
-# Compliance App — Implementation Plan V1.1
+# Compliance App — Implementation Plan V1.2
 
 Source: `apps/compliance/compliance-migspec.md`
 Reference app: `apps/budget/`
@@ -15,6 +15,9 @@ Revision: incorporates all findings from `COMP-IMPL-V1-FB.md`
 | FB4 | Origin creation requires explicit `{method_id, description}` | Existing PKs are human-chosen codes (AGCOM, GDF, MININT, POLPOST); auto-generation would be fragile |
 | FB5 | Origins management page fetches with `include_inactive=true` | Page must show deactivated origins with status badges; active-only default is for creation dropdowns |
 | FB6 | Reuse `backend/internal/platform/database/database.go` with `pgx` driver; handler struct with injected `*sql.DB`; env var `ANISETTA_DSN` | Avoids competing DB patterns; enables testability; single env var name across code/deploy/docs |
+| FB-V1.2-1 | `DELETE /origins/:id` returns `200` with JSON body `{"method_id":"..."}` (not `204 No Content`) | Shared `ApiClient` always calls `res.json()` on success; 204 would throw a parse error |
+| FB-V1.2-2 | Auth middleware 401/403 responses remain plain text | Shared middleware uses `http.Error()`; compliance documents its handler-level errors as JSON but does not promise JSON for middleware-generated auth failures |
+| FB-V1.2-3 | `compliance-migspec.md` must be updated to match `POST /origins` contract (`{method_id, description}`) before implementation starts | Plan and source spec must agree; plan supersedes on this point |
 
 ---
 
@@ -28,7 +31,17 @@ Phase 1: Backend (Go)          ──┐
 Phase 2: Frontend Scaffold      ──┘
 ```
 
-Estimated file count: ~30 new files (backend: ~10, frontend: ~18, config/build: ~2), ~7 modified files.
+Estimated file count: ~30 new files (backend: ~10, frontend: ~18, config/build: ~2), ~9 modified files.
+
+---
+
+## Phase 0: Spec Reconciliation (before implementation)
+
+**Goal**: Single source of truth across plan and spec.
+
+- [ ] Update `apps/compliance/compliance-migspec.md` section on `POST /origins` to require `{method_id, description}` (not just `{description}`)
+- [ ] Update `apps/compliance/compliance-migspec.md` section on `DELETE /origins/:id` to document `200 {"method_id":"..."}` response (not `204 No Content`)
+- [ ] Update `apps/compliance/compliance-migspec.md` auth error section to clarify: middleware-generated 401/403 are plain text (`http.Error`), handler-level errors (400, 404, 500) are JSON
 
 ---
 
@@ -45,11 +58,16 @@ Estimated file count: ~30 new files (backend: ~10, frontend: ~18, config/build: 
 
 **Modify** `backend/cmd/server/main.go`:
 - Import `compliance` and `database` packages
+- Add side-effect import: `_ "github.com/jackc/pgx/v5/stdlib"` — registers the `pgx` driver with `database/sql`
 - If `cfg.AnisettaDSN != ""`, call `database.New(database.Config{Driver: "postgres", DSN: cfg.AnisettaDSN})` to get `*sql.DB`
 - Call `compliance.RegisterRoutes(api, db)` (db may be nil — handlers return 503)
 - Add compliance href override logic (same pattern as budget, lines 68-74)
 
-**Reuse** `backend/internal/platform/database/database.go` — already supports postgres via `pgx` driver.
+**Modify** `backend/go.mod`:
+- Add `github.com/jackc/pgx/v5` (the `stdlib` sub-package requires the module)
+- Add `github.com/xuri/excelize/v2` (XLSX export)
+
+**Reuse** `backend/internal/platform/database/database.go` — already supports postgres via `pgx` driver. The `driverName()` func maps `"postgres"` → `"pgx"`, which matches the driver name registered by `pgx/v5/stdlib`.
 
 **Migration** — single SQL file `apps/compliance/migrations/001_add_is_active.sql`:
 ```sql
@@ -64,6 +82,17 @@ Manual execution, no migration runner. Document in deploy notes.
 - Add `ComplianceAccessRoles() []string` func
 - Add `ComplianceAppID = "compliance"` and `ComplianceAppHref = "/apps/compliance/"` constants
 - Update compliance app definition: `Href: "/apps/compliance/"`, `AccessRoles: complianceAccessRoles`
+- **Remove compliance from default-roles-cdlan placeholder set** (it now requires `app_compliance_access`)
+
+**Modify** `backend/internal/platform/applaunch/catalog_test.go`:
+- `TestVisibleCategoriesDefaultRoleSeesAllPlaceholders`: update expected category count and app total (compliance is no longer a placeholder — currently expects 4 categories / 19 apps, both will decrease by the compliance entry)
+- `TestVisibleCategoriesBothRolesSeesEverything`: update expected total and add `app_compliance_access` to the role set (currently expects 20 total)
+- **Add** `TestVisibleCategoriesFiltersByComplianceRole`: same pattern as `TestVisibleCategoriesFiltersByBudgetRole` — pass `[]string{"app_compliance_access"}`, verify only compliance app visible
+- **Add** `TestCatalogAppliesComplianceHrefOverride`: same pattern as budget href override test
+
+**Modify** `backend/internal/portal/handler_test.go`:
+- **Add** test: user with `app_compliance_access` sees only compliance app in portal response
+- **Add** test: user with both `app_budget_access` and `app_compliance_access` sees both apps
 
 ### 1.3 Handler Struct & Route Registration
 
@@ -161,8 +190,6 @@ Search filter: `?search=` applies `WHERE domain ILIKE '%' || $1 || '%'` — same
 - `writeXLSX(w http.ResponseWriter, filename string, headers []string, rows [][]string)` using `excelize`
 - Sets `Content-Disposition: attachment` and correct `Content-Type`
 
-**Add** `excelize` to `backend/go.mod`.
-
 Response headers:
 ```
 Content-Type: text/csv / application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
@@ -175,7 +202,7 @@ Content-Disposition: attachment; filename="domains-blocked-2026-04-07.csv"
 - `GET /origins` — default returns `is_active=true` only. `?include_inactive=true` returns all.
 - `POST /origins` — requires `{method_id, description}`. Validates `method_id` is non-empty and unique. Inserts with `is_active=true`.
 - `PUT /origins/{id}` — updates `description` only (`method_id` is immutable PK).
-- `DELETE /origins/{id}` — soft delete: `UPDATE dns_bl_method SET is_active = false WHERE method_id = $1`.
+- `DELETE /origins/{id}` — soft delete: `UPDATE dns_bl_method SET is_active = false WHERE method_id = $1`. **Returns `200 {"method_id":"..."}` (not 204)** — required for compatibility with shared `ApiClient` which always calls `res.json()`.
 
 ### 1.10 Tests
 
@@ -186,16 +213,21 @@ Content-Disposition: attachment; filename="domains-blocked-2026-04-07.csv"
 - Handler tests via `httptest` with test DB or mock
 - **Ownership validation**: attempt to update domain with wrong parent ID → 404
 - **Transaction rollback**: create block with mix of valid/invalid domains → 400, verify no partial insert
-- **Export auth**: verify export endpoints require Bearer token (not accessible via unauthenticated GET)
+- **Export**: verify export endpoints return correct Content-Type and Content-Disposition headers behind ACL
 - **Filter parity**: verify export with `?search=` matches expected rows
+- **Delete origin**: verify `DELETE /origins/:id` returns `200` with JSON body `{"method_id":"..."}`
+
+**Note on auth testing**: Handler-level tests verify ACL (role enforcement) only. Token-level auth (`Authorization: Bearer`) is enforced by the shared `auth.Middleware` in `main.go` and is tested separately (see Phase 4, item 4.3).
 
 ### Phase 1 Deliverables
 
 - [ ] `backend/internal/compliance/` — 10 Go files
 - [ ] `backend/internal/platform/applaunch/catalog.go` — role + catalog update
+- [ ] `backend/internal/platform/applaunch/catalog_test.go` — updated counts + new compliance role tests
+- [ ] `backend/internal/portal/handler_test.go` — new compliance role visibility tests
 - [ ] `backend/internal/platform/config/config.go` — `AnisettaDSN`, `ComplianceAppURL`, CORS
-- [ ] `backend/cmd/server/main.go` — compliance module registration + DB init + href override
-- [ ] `backend/go.mod` — `excelize` dependency
+- [ ] `backend/cmd/server/main.go` — compliance module registration + DB init + href override + `pgx/stdlib` import
+- [ ] `backend/go.mod` — `pgx/v5` + `excelize` dependencies
 - [ ] Migration script for `is_active` column
 
 ---
@@ -211,8 +243,14 @@ Content-Disposition: attachment; filename="domains-blocked-2026-04-07.csv"
 {
   "name": "mrsmith-compliance",
   "private": true,
+  "version": "0.1.0",
   "type": "module",
-  "scripts": { "dev": "vite", "build": "tsc && vite build" },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "tsc --noEmit",
+    "preview": "vite preview"
+  },
   "dependencies": {
     "@mrsmith/api-client": "workspace:*",
     "@mrsmith/auth-client": "workspace:*",
@@ -232,6 +270,8 @@ Content-Disposition: attachment; filename="domains-blocked-2026-04-07.csv"
   }
 }
 ```
+
+**Note**: Scripts match budget convention exactly: `build` uses `tsc -b`, `lint` uses `tsc --noEmit`, `preview` included.
 
 **Create** `apps/compliance/vite.config.ts`:
 ```typescript
@@ -279,6 +319,37 @@ if cfg.ComplianceAppURL != "" {
 ```dockerfile
 COPY --from=frontend /app/apps/compliance/dist /static/apps/compliance
 ```
+
+**Modify** `docker-compose.dev.yaml` — add compliance frontend service:
+```yaml
+  compliance:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter mrsmith-compliance dev --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - compliance_node_modules:/app/node_modules
+    ports:
+      - "5175:5175"
+    depends_on:
+      - backend
+```
+Add `compliance_node_modules:` to the `volumes:` section.
+
+**Modify** `deploy/k8s/deployment.yaml` — add `ANISETTA_DSN` from a Secret:
+```yaml
+          envFrom:
+            - configMapRef:
+                name: mrsmith-config
+          env:
+            - name: ANISETTA_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: ANISETTA_DSN
+                  optional: true
+```
+DSN is a credential — sourced from a Secret, not the ConfigMap. `optional: true` so the app still starts without it (handlers return 503).
 
 ### 2.3 Bootstrap & Layout
 
@@ -364,6 +435,8 @@ Create stub components for each route so routing works end-to-end:
 - [ ] Root `package.json` dev script updated
 - [ ] `packages/api-client/src/client.ts` — `getBlob()` added
 - [ ] `deploy/Dockerfile` updated
+- [ ] `docker-compose.dev.yaml` — compliance service added
+- [ ] `deploy/k8s/deployment.yaml` — `ANISETTA_DSN` from Secret
 - [ ] Config: CORS origins, compliance href override
 - [ ] App boots on port 5175, tabs navigate, auth works, API client ready
 
@@ -471,9 +544,18 @@ pnpm --filter mrsmith-compliance lint
 
 ```bash
 cd backend && go test ./internal/compliance/...
+cd backend && go test ./internal/platform/applaunch/...
+cd backend && go test ./internal/portal/...
 ```
 
-### 4.3 E2E Smoke Tests
+### 4.3 Static SPA Deep-Link Test
+
+**Modify** `backend/internal/platform/staticspa/handler_test.go`:
+- Add compliance path to `buildStaticFixture()`: `writeFixtureFile(t, filepath.Join(root, "apps", "compliance", "index.html"), "<html>compliance-shell</html>")`
+- **Add** `TestHandlerFallsBackToComplianceIndexForDeepLinks`: request `/apps/compliance/domains/123` → verify response contains `compliance-shell`
+- This locks down the deep-link fallback behavior that motivated the FB1 path correction
+
+### 4.4 E2E Smoke Tests
 
 | Test | Verification |
 |------|-------------|
@@ -488,16 +570,24 @@ cd backend && go test ./internal/compliance/...
 | **Ownership guard** | PUT block domain with wrong block_id → 404 |
 | Domain status | Blocked/released tabs show correct counts per BR1 |
 | **Export (authenticated)** | CSV/XLSX download via blob fetch with Bearer token; content matches visible filtered rows |
-| Origins | Create with method_id + description → visible in dropdown. Deactivate → hidden from dropdown, visible in management page and history. |
+| Origins CRUD | Create with method_id + description → visible in dropdown. Edit description. Deactivate → hidden from dropdown, visible in management page and history. **Delete returns 200 JSON body.** |
 | Search persistence | Type in search on Bloccati tab → switch to Rilasciati → search still active |
 | **Appsmith coexistence** | Legacy app still reads/writes same tables after `is_active` column addition |
+| **Middleware auth** | Unauthenticated request to `/api/compliance/blocks` returns 401 plain text (not JSON) — validates that shared auth middleware gates all compliance endpoints |
 
-### 4.4 Keycloak Role Setup
+### 4.5 Server-Level Auth Test
+
+**Add** a higher-level integration test in `backend/cmd/server/` or a dedicated test file:
+- Build the full mux (including auth middleware + compliance routes)
+- Verify unauthenticated `GET /api/compliance/domains?format=csv` → 401
+- This confirms Bearer token enforcement through the real middleware stack, not just the compliance ACL layer
+
+### 4.6 Keycloak Role Setup
 
 - Create `app_compliance_access` role in Keycloak realm
 - Assign to appropriate users/groups
 
-### 4.5 Resolve Open Questions
+### 4.7 Resolve Open Questions
 
 | # | Question | Action |
 |---|----------|--------|
@@ -507,7 +597,10 @@ cd backend && go test ./internal/compliance/...
 ### Phase 4 Deliverables
 
 - [ ] Type-check clean
-- [ ] Backend tests passing (including ownership, transaction, export tests)
+- [ ] Backend tests passing (including ownership, transaction, export, delete-origin-200 tests)
+- [ ] Catalog + portal tests updated and passing
+- [ ] Static SPA deep-link test added and passing
+- [ ] Server-level auth integration test passing
 - [ ] All smoke tests passing
 - [ ] Keycloak role created
 - [ ] O4 and O6 resolved and documented
@@ -529,7 +622,7 @@ backend/internal/compliance/
 ├── models.go                — Go structs (request/response types)
 ├── validation.go            — FQDN validation (canonical regex)
 ├── validation_test.go       — Validation tests
-└── handler_test.go          — Handler tests (ownership, transactions, export)
+└── handler_test.go          — Handler tests (ownership, transactions, export, delete-origin)
 
 apps/compliance/
 ├── package.json
@@ -585,16 +678,21 @@ apps/compliance/
         └── global.css
 ```
 
-### Modified Files (7)
+### Modified Files (9)
 
 ```
-backend/cmd/server/main.go                          — Register compliance, DB init, href override
+backend/cmd/server/main.go                          — Register compliance, DB init, href override, pgx/stdlib import
 backend/internal/platform/applaunch/catalog.go       — Roles, constants, href, catalog entry
+backend/internal/platform/applaunch/catalog_test.go  — Updated counts, new compliance role tests
+backend/internal/portal/handler_test.go              — New compliance role visibility tests
 backend/internal/platform/config/config.go           — AnisettaDSN, ComplianceAppURL, CORS origins
-backend/go.mod                                       — excelize dependency
+backend/internal/platform/staticspa/handler_test.go  — Compliance deep-link fallback test
+backend/go.mod                                       — pgx/v5 + excelize dependencies
 packages/api-client/src/client.ts                    — Add getBlob() to ApiClient interface
 package.json                                         — Dev script includes compliance
+docker-compose.dev.yaml                              — Compliance frontend service
 deploy/Dockerfile                                    — Copy compliance dist to /static/apps/compliance
+deploy/k8s/deployment.yaml                           — ANISETTA_DSN from Secret
 ```
 
 ---
@@ -602,13 +700,15 @@ deploy/Dockerfile                                    — Copy compliance dist to
 ## Dependency Graph
 
 ```
-Phase 1.1 (DB config) + 1.2 (Roles)
+Phase 0 (Spec reconciliation) — before everything
+
+Phase 1.1 (DB config + pgx dep) + 1.2 (Roles + test updates)
   └──► 1.3 (Route registration + handler struct)
          └──► 1.4 (Models/Validation)
                 └──► 1.5, 1.6, 1.7, 1.8, 1.9 (All handlers — parallelizable)
                        └──► 1.10 (Tests)
 
-Phase 2.1 (Project setup) + 2.2 (Build integration)
+Phase 2.1 (Project setup) + 2.2 (Build integration + docker-compose + K8s)
   └──► 2.3 (Bootstrap/layout)
          └──► 2.4 (API layer) + 2.5 (getBlob) + 2.6 (Utils) — parallelizable
                 └──► 2.7 (Placeholder views)
@@ -618,6 +718,11 @@ Phase 3.1 (Shared components)
        3.4 (Domains) + 3.5 (History) + 3.6 (Origins) — parallelizable after 3.1
 
 Phase 4 depends on: all above
+  4.1–4.2 (Type-check + backend tests)
+  4.3 (Static SPA deep-link test)
+  4.4 (E2E smoke tests)
+  4.5 (Server-level auth test)
+  4.6 (Keycloak role setup)
 ```
 
 ---
@@ -626,13 +731,16 @@ Phase 4 depends on: all above
 
 | Risk | Mitigation |
 |------|-----------|
-| PostgreSQL connection is a new backend pattern (budget uses Arak proxy) | Reuse existing `platform/database` package with `pgx` driver. Handler struct with injected `*sql.DB` for testability. No new patterns introduced. |
+| PostgreSQL connection is a new backend pattern (budget uses Arak proxy) | Reuse existing `platform/database` package with `pgx` driver. Explicit `pgx/v5/stdlib` import in `main.go`. Handler struct with injected `*sql.DB` for testability. |
 | Schema retrocompatibility — `is_active` column addition | Column uses `DEFAULT TRUE` and `IF NOT EXISTS`. No impact on existing queries. Validate with Appsmith before deploying. |
 | Large dataset performance (10K+ block domains) | Virtual scrolling (`@tanstack/react-virtual`) handles rendering. Full dataset from server. Revisit with server-side pagination if rows exceed ~100K. |
 | FQDN regex divergence between frontend and backend | Canonical regex documented once, tested with identical edge-case suite in both Go and TypeScript. |
 | Coexistence with Appsmith | Read-only validation: run Appsmith against same DB after migration. No schema-breaking changes by design. |
-| Export auth failure in production | Authenticated blob download via `getBlob()` — tested in smoke tests with real JWT. |
+| Export auth failure in production | Authenticated blob download via `getBlob()` — tested in smoke tests with real JWT + server-level auth integration test. |
 | Cross-parent domain updates | Ownership check (`WHERE id = $1 AND parent_id = $2`) on all nested resource updates. Tested explicitly. |
+| Shared ApiClient assumes JSON responses | `DELETE /origins` returns `200` with JSON body. No `204 No Content` endpoints in compliance API. |
+| Auth error body format mismatch | Documented: middleware 401/403 = plain text, handler errors = JSON. Frontend error handling does not assume JSON for auth failures. |
+| Catalog test breakage from role migration | Tests updated in Phase 1.2 alongside the catalog change. |
 
 ---
 
@@ -640,9 +748,14 @@ Phase 4 depends on: all above
 
 1. `pnpm install` — workspace resolves
 2. `pnpm dev` — all 4 processes start (backend, portal, budget, compliance)
-3. Open `http://localhost:5175/blocks` — compliance app loads with 5 tabs
-4. `pnpm --filter mrsmith-compliance exec tsc --noEmit` — clean
-5. `cd backend && go test ./internal/compliance/...` — all pass
-6. `cd backend && go build ./cmd/server` — compiles
-7. Manual: create block request with domains → verify in domain status view → export CSV via authenticated download
-8. Manual: refresh browser on `/apps/compliance/domains` → SPA loads correctly (deep link test)
+3. `make dev-docker` — all 4 services start via docker-compose
+4. Open `http://localhost:5175/blocks` — compliance app loads with 5 tabs
+5. `pnpm --filter mrsmith-compliance exec tsc --noEmit` — clean
+6. `cd backend && go test ./internal/compliance/...` — all pass
+7. `cd backend && go test ./internal/platform/applaunch/...` — all pass (updated counts)
+8. `cd backend && go test ./internal/portal/...` — all pass (new role tests)
+9. `cd backend && go test ./internal/platform/staticspa/...` — all pass (compliance deep-link)
+10. `cd backend && go build ./cmd/server` — compiles (pgx import resolves)
+11. Manual: create block request with domains → verify in domain status view → export CSV via authenticated download
+12. Manual: refresh browser on `/apps/compliance/domains` → SPA loads correctly (deep link test)
+13. Manual: delete origin → verify 200 JSON response, origin hidden from dropdowns but visible in management page

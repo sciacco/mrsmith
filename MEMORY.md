@@ -51,3 +51,5 @@
 
 ## 2026-04-07
 - Compliance plan review heuristic: when a mini-app sits behind the shared auth/ACL middleware, do not force a plan to normalize middleware-generated `401`/`403` responses to JSON unless there is an intentional cross-app auth middleware change. Prefer narrowing the documented contract so plain-text middleware auth failures remain acceptable, while app-owned handler errors keep explicit JSON shapes.
+- Compliance plan review heuristic: for the first DB-backed mini-app in a repo, `DSN + manual migration + test DB or mock` is not an executable plan. Approval should require a concrete dev/preprod/test database story, explicit migration application steps, and a decided handler-test strategy.
+- Compliance frontend planning heuristic: when a hook can fetch both active-only and include-inactive lookup data, the React Query key must include that parameter, and edit flows for historical records must explicitly support currently referenced inactive values instead of assuming create-form dropdown behavior.

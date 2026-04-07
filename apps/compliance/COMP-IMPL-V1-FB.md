@@ -1,193 +1,187 @@
-# Compliance App — Implementation Plan V1.1 Feedback
+# Compliance App — Implementation Plan V1.2 Feedback
 
+Date: 2026-04-07
 Reviewed against:
-- `apps/compliance/COMP-IMPL-V1.md`
 - `docs/IMPLEMENTATION-PLANNING.md`
-- Current repo wiring in `backend/`, `apps/`, `packages/`, `deploy/`, and `docker-compose.dev.yaml`
+- current repo runtime/dev/deploy wiring
+- `apps/compliance/compliance-migspec.md`
+- `apps/compliance/compliance-migspec-phaseD.md`
 
 ## Verdict
 
-The plan is materially stronger than the earlier version and it fixes the largest path/auth assumptions, but it is not implementation-ready yet. There are still a few repo-fit and contract gaps that will either break the build/runtime outright or leave the repo in an inconsistent state.
+This revision fixes several important issues from the earlier draft: the SPA path now matches the static host, export no longer relies on unauthenticated browser navigation, the plan adopts dependency injection for the DB-backed handlers, and the auth-response nuance is correctly narrowed to middleware vs handler-owned errors.
 
-## Blocking Findings
+It is closer, but it is still **not fully implementation-ready**. The main remaining problems are execution fit, not product scope. The biggest gap is that the plan introduces a brand-new PostgreSQL dependency without turning that into an executable dev/preprod/test contract.
 
-### 1. `DELETE /origins/:id` is incompatible with the current shared API client
+## Findings
 
-**Plan references**
-- `apps/compliance/COMP-IMPL-V1.md:174-178`
-- `apps/compliance/COMP-IMPL-V1.md:337-342`
+### 1. Blocker — the database/dev/test/deploy contract is still not executable
 
-**Repo evidence**
-- `packages/api-client/src/client.ts:18-23`
-- `packages/api-client/src/client.ts:25-55`
-- `apps/compliance/compliance-migspec.md:283-286`
+References:
+- `apps/compliance/COMP-IMPL-V1.md`: 1.1 DB wiring and manual migration (`lines 54-76`)
+- `apps/compliance/COMP-IMPL-V1.md`: handler tests are still "test DB or mock" (`lines 212-220`)
+- `apps/compliance/COMP-IMPL-V1.md`: K8s-only DSN wiring (`lines 339-352`)
+- `apps/compliance/COMP-IMPL-V1.md`: verification expects `make dev-docker`, manual create flows, and backend tests to work (`lines 747-760`)
+- current repo preprod contract is `docker-compose.preprod.yaml` + `.env.preprod.example`, but neither currently carries `ANISETTA_DSN`:
+  - `docker-compose.preprod.yaml` (`lines 1-10`)
+  - `.env.preprod.example` (`lines 5-21`)
 
-The plan keeps the origin delete contract at `204 No Content`, but the shared `ApiClient` always calls `res.json()` on successful responses. That means any frontend mutation using `api.delete(...)` against `/compliance/origins/:id` will fail on a successful 204 before React Query can settle cleanly.
+Why this matters:
+- Budget can run locally without extra infrastructure because it has fixtures and an optional upstream proxy. Compliance is the opposite: it is DB-backed from day one.
+- The plan adds `ANISETTA_DSN`, but it does not define how developers, CI, or preprod obtain a compatible Postgres instance with the required schema and the `is_active` migration applied.
+- "test DB or mock" is not a real verification strategy for SQL-heavy handlers. Until the plan chooses one, the test section is still aspirational.
+- `make dev-docker` is called out in AGENTS and in the plan, but the proposed docker-compose change only adds the frontend container. It does not make the backend functional for compliance unless an external DSN is already present and reachable.
 
-This is a real contract bug, not just a documentation mismatch.
+Required change:
+- Pick one concrete strategy and document it end-to-end:
+  1. Add a local Postgres service for dev/test, with schema bootstrap instructions and migration application, or
+  2. Explicitly require an external shared `ANISETTA_DSN` for dev/preprod and update all repo entry points/docs to match.
+- Make the test plan choose a real handler-testing approach:
+  - preferred: integration tests against Postgres (ephemeral DB/container or dedicated DSN)
+  - acceptable only if truly unavoidable: query layer abstraction plus narrower unit tests
+- Update the repo-level runtime docs/configs that operators will actually use:
+  - `.env.preprod.example`
+  - any preprod rollout notes
+  - deployment notes for applying `001_add_is_active.sql`
 
-**Required plan change**
-- Pick one of these explicitly:
-- Change the endpoint contract to return JSON, for example `200 {method_id}`.
-- Or extend `@mrsmith/api-client` so successful empty responses are supported across verbs, then call that out as part of the shared-package change, not just `getBlob()`.
+### 2. High — the React Query key design is wrong for `useOrigins(includeInactive?)`
 
-### 2. The DB bootstrap section omits the actual PostgreSQL driver registration needed for `database/sql`
+References:
+- proposed query keys: `apps/compliance/COMP-IMPL-V1.md` (`lines 392-405`)
+- proposed origins hook usage: `apps/compliance/COMP-IMPL-V1.md` (`lines 502-512`)
 
-**Plan references**
-- `apps/compliance/COMP-IMPL-V1.md:46-52`
-- `apps/compliance/COMP-IMPL-V1.md:194-199`
+Why this matters:
+- The plan defines one cache key, `['compliance', 'origins']`, but also defines two different datasets:
+  - creation dropdown: active-only
+  - management page: `include_inactive=true`
+- Those are not the same resource. Reusing one key will cause cache pollution and stale UI behavior.
 
-**Repo evidence**
-- `backend/internal/platform/database/database.go:13-39`
-- `backend/go.mod:1-10`
+Required change:
+- Parameterize the key, e.g. `origins(includeInactive: boolean)`.
+- Use that keyed form consistently for reads and invalidation.
 
-The plan correctly reuses `backend/internal/platform/database/database.go`, and that code maps `"postgres"` to the `"pgx"` driver. But the repo currently has no `pgx` stdlib dependency and no side-effect import that registers the driver with `database/sql`.
+### 3. High — inactive origins are handled for creation and management, but not for editing historical block records
 
-As written, `database.New(database.Config{Driver: "postgres", ...})` will fail at runtime with an unknown driver error.
+References:
+- active-only default for `GET /origins`: `apps/compliance/COMP-IMPL-V1.md` (`lines 201-205`)
+- block edit/detail form exists: `apps/compliance/COMP-IMPL-V1.md` (`lines 463-470`)
+- create modal explicitly uses active origins only: `apps/compliance/COMP-IMPL-V1.md` (`lines 465-466`)
+- management page uses `include_inactive=true`: `apps/compliance/COMP-IMPL-V1.md` (`lines 506-512`)
 
-**Required plan change**
-- Add `github.com/jackc/pgx/v5/stdlib` to the backend dependency plan.
-- State where the side-effect import lives, for example in `backend/cmd/server/main.go` or a dedicated database package file.
-- Treat this as part of the deliverables, not an implied implementation detail.
+Why this matters:
+- Historical block requests can legitimately reference a soft-deleted origin.
+- The plan is explicit about active-only for creation and include-inactive for management, but it does not define how the block edit form behaves when the current `method_id` is inactive.
+- Without that rule, the edit form can render an empty select, force an unintended origin change, or fail validation on a previously valid record.
 
-### 3. The plan promises JSON `401`/`403` bodies, but the shared auth stack currently returns plain text
+Required change:
+- Define edit-mode behavior explicitly. One of these needs to be in the plan:
+  - edit forms fetch `include_inactive=true`, or
+  - edit forms fetch active-only plus inject the current inactive origin as a locked/displayable option.
+- Also decide whether changing a historical request from an inactive origin to a new origin is allowed or intentionally blocked.
 
-**Plan/spec references**
-- `apps/compliance/compliance-migspec.md:288-295`
-- `apps/compliance/COMP-IMPL-V1.md:189`
-- `apps/compliance/COMP-IMPL-V1.md:480-481`
+### 4. Medium — Phases 1 and 2 are not actually parallel in the current plan
 
-**Repo evidence**
-- `backend/internal/auth/middleware.go:58-79`
-- `backend/internal/acl/acl.go:13-27`
+References:
+- Phase 1 modifies `backend/internal/platform/config/config.go` and `backend/cmd/server/main.go`: `apps/compliance/COMP-IMPL-V1.md` (`lines 54-64`)
+- Phase 2 modifies the same files again: `apps/compliance/COMP-IMPL-V1.md` (`lines 304-316`)
+- dependency graph still presents Phase 1 and Phase 2 as parallel tracks: `apps/compliance/COMP-IMPL-V1.md` (`lines 705-713`)
+- current single points of change:
+  - `backend/internal/platform/config/config.go` (`lines 5-42`)
+  - `backend/cmd/server/main.go` (`lines 24-89`)
 
-The spec says auth failures return JSON bodies like `{error: "unauthorized"}` and `{error: "forbidden"}`. The actual shared middleware uses `http.Error(...)`, which produces plain-text responses. Because compliance routes sit behind that shared middleware, the documented contract is not currently achievable as written.
+Why this matters:
+- The plan claims Phase 1 and Phase 2 can run in parallel, but they share the exact same backend files.
+- That creates merge conflicts and sequencing ambiguity if multiple contributors follow the plan literally.
 
-This matters for frontend error handling, automated tests, and consistency with the published API contract.
+Required change:
+- Move all `config.go` and `main.go` changes into one phase/owner.
+- Keep the frontend scaffold parallel only where the write set is actually disjoint.
 
-**Required plan change**
-- Narrow the documented contract so compliance does not promise JSON for middleware-generated `401`/`403` responses.
-- Reserve JSON error-shape guarantees for compliance-handler errors such as validation/not-found/internal failures that the compliance module itself produces.
+### 5. Medium — the planned server-level auth test is blocked by current `main.go` structure
 
-### 4. Deployment and dev wiring are still incomplete for the actual repo
+References:
+- planned test: `apps/compliance/COMP-IMPL-V1.md` (`lines 578-583`)
+- current server bootstrap is embedded directly in `main()`: `backend/cmd/server/main.go` (`lines 24-117`)
 
-**Plan references**
-- `apps/compliance/COMP-IMPL-V1.md:41-58`
-- `apps/compliance/COMP-IMPL-V1.md:256-281`
-- `apps/compliance/COMP-IMPL-V1.md:588-597`
+Why this matters:
+- The plan wants a higher-level test of the real auth middleware stack, which is a good goal.
+- The current code does not expose a reusable `buildMux`/`newServer` function. Everything is wired directly inside `main()`.
+- Without adding that refactor to the plan, this test will either be awkward or get skipped.
 
-**Repo evidence**
-- `docker-compose.dev.yaml:1-38`
-- `deploy/k8s/configmap.yaml:1-12`
+Required change:
+- Add an explicit pre-step:
+  - extract server construction into a testable function that returns the mux or server
+  - then write the auth integration test against that function
 
-The plan updates root `package.json` and `deploy/Dockerfile`, but it does not account for two repo paths that are part of the documented dev/deploy flow:
+### 6. Medium — the frontend scaffold is missing `src/vite-env.d.ts`
 
-- `make dev-docker` uses `docker-compose.dev.yaml`, and there is no compliance frontend service there yet.
-- Production config currently has no declared wiring for `ANISETTA_DSN`. The plan names the env var, but it does not say where it comes from in K8s or any deploy manifest.
+References:
+- compliance scaffold list: `apps/compliance/COMP-IMPL-V1.md` (`lines 293-294`, `356-374`, `627-678`)
+- existing apps include Vite env typing:
+  - `apps/budget/src/vite-env.d.ts` (`lines 1-5`)
+  - `apps/portal/src/vite-env.d.ts` (`line 1`)
+- compliance `main.tsx` is planned to use `import.meta.env.BASE_URL`, matching budget's pattern:
+  - `apps/budget/src/main.tsx` (`lines 11-14`)
 
-This fails the repo-fit checklist on both Dev Fit and Deployment Fit.
+Why this matters:
+- If the new app follows the budget bootstrap, it will use Vite env types and CSS Modules.
+- The plan does not list the corresponding declaration file, so the type-check section is incomplete.
 
-**Required plan change**
-- Add `docker-compose.dev.yaml` updates so `make dev-docker` actually includes the compliance app.
-- Add deployment/env wiring tasks for `ANISETTA_DSN`.
-- Because DSNs are sensitive, this should likely be a Secret/deployment env change, not a ConfigMap change.
+Required change:
+- Add `apps/compliance/src/vite-env.d.ts` to the file inventory and scaffold phase.
 
-### 5. Changing compliance visibility from default roles to a dedicated role will break existing launcher tests, but the plan does not include those updates
+### 7. Medium — spec reconciliation is still incomplete; the plan only fixes one of the drifting sources
 
-**Plan references**
-- `apps/compliance/COMP-IMPL-V1.md:62-66`
+References:
+- Phase 0 only names `apps/compliance/compliance-migspec.md`: `apps/compliance/COMP-IMPL-V1.md` (`lines 39-44`)
+- main spec still has stale origins/auth contracts:
+  - `apps/compliance/compliance-migspec.md` (`lines 283-295`)
+- Phase D spec also still has stale origins contracts and contradictory table-ownership wording:
+  - `apps/compliance/compliance-migspec-phaseD.md` (`lines 13-16`)
+  - `apps/compliance/compliance-migspec-phaseD.md` (`lines 24-27`)
+  - `apps/compliance/compliance-migspec-phaseD.md` (`lines 96-100`)
 
-**Repo evidence**
-- `backend/internal/platform/applaunch/catalog_test.go:25-56`
-- `backend/internal/portal/handler_test.go:14-47`
+Why this matters:
+- The plan already recognizes that plan and source spec must agree.
+- Right now there are still multiple sources in `apps/compliance/` that disagree on:
+  - `POST /origins` body
+  - `DELETE /origins` response
+  - whether 401/403 are JSON
+  - whether DNS sync jobs are read-only consumers or write alongside the app
 
-Today the compliance app is part of the default-role placeholder set. The plan correctly moves it to `app_compliance_access`, but that changes the visible app counts and portal expectations immediately.
+Required change:
+- Reconcile all documents that are still being treated as living references, not just the top-level assembled spec.
+- If only one file is canonical going forward, state that explicitly in the plan and mark the phase docs as historical.
 
-The current tests hard-code totals assuming compliance is still visible to `default-roles-cdlan`. Those tests will fail as soon as the catalog change lands.
+### 8. Medium — the `/domains` endpoint contract is still underspecified for implementation
 
-**Required plan change**
-- Explicitly include updates to `backend/internal/platform/applaunch/catalog_test.go`.
-- Add or update portal handler coverage so a user with `app_compliance_access` sees the compliance launcher entry and a default-role-only user no longer does.
+References:
+- handler plan: `apps/compliance/COMP-IMPL-V1.md` (`lines 174-184`)
+- API contract shape in Phase D: `apps/compliance/compliance-migspec-phaseD.md` (`lines 85-90`)
 
-### 6. The plan and the source spec still disagree on the `POST /origins` request contract
+Why this matters:
+- The plan says `/compliance/domains` supports blocked/released behavior, export, and search, but it never locks down:
+  - whether `status` is required
+  - what happens when `status` is missing or invalid
+  - whether `?search=` is supported for JSON list responses, export responses, or both
+- That ambiguity is small in prose but expensive in implementation because frontend hooks, query keys, and tests all depend on it.
 
-**Plan references**
-- `apps/compliance/COMP-IMPL-V1.md:176`
+Required change:
+- Document the exact contract, for example:
+  - `GET /api/compliance/domains?status=blocked|released`
+  - missing/invalid `status` => `400 validation_error`
+  - `search` is accepted for both JSON and export so visible rows and downloaded rows stay aligned
 
-**Spec evidence**
-- `apps/compliance/compliance-migspec.md:283-286`
+## What Is Solid
 
-The plan resolves origin creation to require `{method_id, description}`, which is reasonable given the existing PK strategy. But the source spec it cites still says `POST /origins` accepts only `{description}`.
+- Runtime pathing is now aligned with the existing static SPA host model.
+- Authenticated export via blob download is the correct approach for this repo's Bearer-token transport.
+- The move to injected `*sql.DB` handlers is the right backend shape.
+- Role/catalog coverage and static deep-link verification are appropriately called out.
 
-That leaves the plan in a self-contradictory state: implementation would follow one contract while the stated source of truth says another.
+## Suggested Exit Criteria Before Approval
 
-**Required plan change**
-- Update `apps/compliance/compliance-migspec.md` first, or explicitly mark the plan as superseding that section of the spec.
-- Do not start backend/frontend implementation while those two documents disagree.
-
-## Important Non-Blocking Improvements
-
-### 7. The frontend scaffold is internally inconsistent with the repo conventions
-
-**Plan references**
-- `apps/compliance/COMP-IMPL-V1.md:209-216`
-- `apps/compliance/COMP-IMPL-V1.md:466-467`
-
-**Repo evidence**
-- `apps/budget/package.json:6-10`
-- `apps/budget/tsconfig.json:1-13`
-
-The proposed `apps/compliance/package.json` only defines `dev` and `build`, but Phase 4 later runs `pnpm --filter mrsmith-compliance lint`. That command will fail unless a `lint` script is added.
-
-Also, the existing app pattern uses `tsc -b && vite build`, while the plan says `tsc && vite build`. Since the app is meant to copy the budget scaffold, it should stay aligned unless there is a deliberate reason not to.
-
-**Recommended plan change**
-- Add `"lint": "tsc --noEmit"` and `"preview": "vite preview"` to match the current workspace convention.
-- Use the same `build` script shape as the existing apps unless the plan intentionally wants something different.
-
-### 8. The deep-link risk that motivated the path correction should be covered by an automated static SPA test, not only a manual smoke check
-
-**Plan references**
-- `apps/compliance/COMP-IMPL-V1.md:13`
-- `apps/compliance/COMP-IMPL-V1.md:482`
-
-**Repo evidence**
-- `backend/internal/platform/staticspa/handler_test.go:12-80`
-
-The plan correctly fixes the app path to `/apps/compliance/`, but the only explicit verification is a manual browser-refresh smoke test. This exact issue already proved subtle enough to require a plan correction.
-
-The repo already has targeted `staticspa` tests. This is the right place to lock the compliance path behavior down.
-
-**Recommended plan change**
-- Add a unit test proving `/apps/compliance/...` falls back to `/apps/compliance/index.html`.
-- Optionally add a negative/assertion case showing the old nested path would not be used.
-
-### 9. The planned export-auth test cannot prove Bearer-token behavior if it only exercises `compliance.RegisterRoutes(...)`
-
-**Plan references**
-- `apps/compliance/COMP-IMPL-V1.md:185-190`
-
-**Repo evidence**
-- `backend/cmd/server/main.go:71-76`
-- `backend/internal/auth/middleware.go:58-68`
-- `backend/internal/acl/acl.go:13-27`
-
-`compliance.RegisterRoutes(...)` will only attach role middleware. It does not attach the top-level auth middleware that enforces the `Authorization: Bearer ...` header. If the test setup injects claims directly into context, it can verify ACL, but not real token-gated transport.
-
-**Recommended plan change**
-- Split the test intent into:
-- handler/ACL tests at the compliance package level
-- one higher-level server/mux test for unauthenticated export access through the real `/api` middleware stack
-
-## Suggested Approval Conditions
-
-The plan is ready to execute once these are folded back in:
-
-1. Resolve the `DELETE /origins` vs shared client contract.
-2. Add explicit `pgx` stdlib dependency/import work.
-3. Narrow the auth error-body contract to match the shared middleware behavior.
-4. Add `docker-compose.dev.yaml` and deployment env wiring tasks.
-5. Include launcher/catalog test updates caused by the new compliance role.
-6. Reconcile the origin-create contract between the plan and `compliance-migspec.md`.
-
-After those fixes, the remaining items are implementation details rather than plan-level blockers.
+- Resolve Finding 1 fully. That is the blocker.
+- Resolve Findings 2 and 3 in the data/query contract before frontend work starts.
+- Resolve Findings 4 and 5 before assigning implementation slices across contributors.
+- Resolve Findings 6, 7, and 8 while updating the plan/spec set so the implementer has one unambiguous contract.
