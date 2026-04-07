@@ -43,7 +43,16 @@ docker-build:         ## Build immagine produzione
 	docker build -f deploy/Dockerfile -t mrsmith .
 
 docker-build-amd64:   ## Build immagine produzione linux/amd64
-	docker buildx build --platform linux/amd64 -f deploy/Dockerfile -t mrsmith:amd64 --load .
+	./scripts/deploy/prod.sh build
+
+package-prod-amd64:   ## Build + export tar produzione linux/amd64 in artifacts/releases
+	./scripts/deploy/prod.sh package --build
+
+deploy-prod:          ## Build + export + upload + load + restart del servizio produzione
+	./scripts/deploy/prod.sh deploy --build
+
+rollback-prod:        ## Ricarica una release remota esistente con RELEASE_TS=YYYYmmddHHMMSS
+	RELEASE_TS=$(RELEASE_TS) ./scripts/deploy/prod.sh rollback
 
 # Test ─────────────────────────────────────────
 test:                 ## Tutti i test
@@ -76,7 +85,7 @@ tidy:                 ## go mod tidy
 	cd backend && go mod tidy
 
 help:                 ## Mostra questo help
-	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget build build-frontend build-backend docker-build docker-build-amd64 test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
+.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget build build-frontend build-backend docker-build docker-build-amd64 package-prod-amd64 deploy-prod rollback-prod test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
 .DEFAULT_GOAL := help

@@ -12,6 +12,7 @@ extracted/
 # Environment
 .env
 backend/.env
+.env.deploy.prod
 
 # IDE
 .idea/
@@ -27,3 +28,4 @@ apps/*/*.zip
 /portal-1920x1080.png
 /portal-option-a-fullpage.png
 /portal-option-a-viewport.png
+/artifacts/
