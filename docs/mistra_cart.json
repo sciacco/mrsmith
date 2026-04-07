@@ -1,0 +1,1317 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "cart",
+      "tables": [
+        {
+          "name": "cart",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.cart_id_seq'::regclass)"
+            },
+            {
+              "name": "created_at",
+              "position": 2,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "updated_at",
+              "position": 3,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "account_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "client_po",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "cart_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 597,
+          "dataSize": 40960,
+          "indexSize": 73728
+        },
+        {
+          "name": "cart_item",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.cart_item_id_seq'::regclass)"
+            },
+            {
+              "name": "created_at",
+              "position": 2,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "updated_at",
+              "position": 3,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "cart_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "kit_id",
+              "position": 5,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "is_main_prd_sellable",
+              "position": 6,
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "starter_subscription_months",
+              "position": 7,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "regular_subscription_months",
+              "position": 8,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "activation_days",
+              "position": 9,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "highlighted",
+              "position": 10,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "category",
+              "position": 11,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "title",
+              "position": 12,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 13,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "base_price_nrc",
+              "position": 14,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "base_price_mrc",
+              "position": 15,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "total_price_nrc",
+              "position": 16,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "total_price_mrc",
+              "position": 17,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "category_specific_details",
+              "position": 18,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "client_po",
+              "position": 19,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "notes",
+              "position": 20,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "auto_renew",
+              "position": 21,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "expire_date",
+              "position": 22,
+              "type": "timestamp(0) without time zone",
+              "nullable": false
+            },
+            {
+              "name": "billing_period",
+              "position": 23,
+              "type": "integer",
+              "nullable": false,
+              "default": "3"
+            },
+            {
+              "name": "main_product_code",
+              "position": 24,
+              "type": "character varying(32)",
+              "nullable": false,
+              "default": "''::character varying"
+            },
+            {
+              "name": "bundle_prefix",
+              "position": 25,
+              "type": "character varying(32)",
+              "nullable": false,
+              "default": "''::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "cart_item_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "cart_item_cart_id_foreign",
+              "columns": [
+                "cart_id"
+              ],
+              "referencedTable": "cart.cart",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "dataSize": 16384,
+          "indexSize": 57344
+        },
+        {
+          "name": "cart_item_r_p_s",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.cart_item_r_p_s_id_seq'::regclass)"
+            },
+            {
+              "name": "created_at",
+              "position": 2,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "updated_at",
+              "position": 3,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "cart_item_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "group_name",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "required",
+              "position": 6,
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "product_code",
+              "position": 7,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "title",
+              "position": 8,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "min_qty",
+              "position": 9,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "max_qty",
+              "position": 10,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "price_nrc",
+              "position": 11,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "price_mrc",
+              "position": 12,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 13,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "qty",
+              "position": 14,
+              "type": "integer",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "cart_item_r_p_s_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "cart_item_r_p_s_cart_item_id_foreign",
+              "columns": [
+                "cart_item_id"
+              ],
+              "referencedTable": "cart.cart_item",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 1,
+          "dataSize": 8192,
+          "indexSize": 57344
+        },
+        {
+          "name": "cart_item_r_p_s_translations",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.cart_item_r_p_s_translations_id_seq'::regclass)"
+            },
+            {
+              "name": "cart_item_r_p_s_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "language",
+              "position": 3,
+              "type": "character varying(2)",
+              "nullable": false
+            },
+            {
+              "name": "group_name",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "title",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 6,
+              "type": "character varying(255)",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "cart_item_r_p_s_translations_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "cart_item_r_p_s_translations_cart_item_r_p_s_id_foreign",
+              "columns": [
+                "cart_item_r_p_s_id"
+              ],
+              "referencedTable": "cart.cart_item_r_p_s",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "dataSize": 8192,
+          "indexSize": 57344
+        },
+        {
+          "name": "cart_item_translations",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.cart_item_translations_id_seq'::regclass)"
+            },
+            {
+              "name": "cart_item_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "language",
+              "position": 3,
+              "type": "character varying(2)",
+              "nullable": false
+            },
+            {
+              "name": "title",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "cart_item_translations_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "cart_item_translations_cart_item_id_foreign",
+              "columns": [
+                "cart_item_id"
+              ],
+              "referencedTable": "cart.cart_item",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "dataSize": 8192,
+          "indexSize": 57344
+        },
+        {
+          "name": "order_item_r_p_s",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.order_item_r_p_s_id_seq'::regclass)"
+            },
+            {
+              "name": "created_at",
+              "position": 2,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "updated_at",
+              "position": 3,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "order_item_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "group_name",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "required",
+              "position": 6,
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "product_code",
+              "position": 7,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "title",
+              "position": 8,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "min_qty",
+              "position": 9,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "max_qty",
+              "position": 10,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "price_nrc",
+              "position": 11,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "price_mrc",
+              "position": 12,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 13,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "qty",
+              "position": 14,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "order_item_number",
+              "position": 15,
+              "type": "character varying(32)",
+              "nullable": true,
+              "default": "common.new_item_id('IN'::character varying)"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "cart_order_item_r_p_s_order_item_number_unique",
+              "type": "BTREE",
+              "expressions": [
+                "order_item_number"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "order_item_r_p_s_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "order_item_r_p_s_order_item_id_foreign",
+              "columns": [
+                "order_item_id"
+              ],
+              "referencedTable": "cart.order_items",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 76,
+          "dataSize": 40960,
+          "indexSize": 73728
+        },
+        {
+          "name": "order_item_r_p_s_translations",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.order_item_r_p_s_translations_id_seq'::regclass)"
+            },
+            {
+              "name": "order_item_r_p_s_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "language",
+              "position": 3,
+              "type": "character varying(2)",
+              "nullable": false
+            },
+            {
+              "name": "group_name",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "title",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 6,
+              "type": "character varying(255)",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "order_item_r_p_s_translations_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "order_item_r_p_s_translations_order_item_r_p_s_id_foreign",
+              "columns": [
+                "order_item_r_p_s_id"
+              ],
+              "referencedTable": "cart.order_item_r_p_s",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 148,
+          "dataSize": 40960,
+          "indexSize": 49152
+        },
+        {
+          "name": "order_items",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.order_items_id_seq'::regclass)"
+            },
+            {
+              "name": "created_at",
+              "position": 2,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "updated_at",
+              "position": 3,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "order_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "state_id",
+              "position": 5,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "kit_id",
+              "position": 6,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "is_main_prd_sellable",
+              "position": 7,
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "starter_subscription_months",
+              "position": 8,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "regular_subscription_months",
+              "position": 9,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "activation_days",
+              "position": 10,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "highlighted",
+              "position": 11,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "category",
+              "position": 12,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "title",
+              "position": 13,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 14,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "base_price_nrc",
+              "position": 15,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "base_price_mrc",
+              "position": 16,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "total_price_nrc",
+              "position": 17,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "total_price_mrc",
+              "position": 18,
+              "type": "double precision",
+              "nullable": false
+            },
+            {
+              "name": "category_specific_details",
+              "position": 19,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "client_po",
+              "position": 20,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "notes",
+              "position": 21,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "auto_renew",
+              "position": 22,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "order_item_number",
+              "position": 23,
+              "type": "character varying(32)",
+              "nullable": true,
+              "default": "''::character varying"
+            },
+            {
+              "name": "main_product_order_item_num",
+              "position": 24,
+              "type": "character varying(32)",
+              "nullable": false,
+              "default": "common.new_item_id('IN'::character varying)"
+            },
+            {
+              "name": "billing_period",
+              "position": 25,
+              "type": "integer",
+              "nullable": false,
+              "default": "3"
+            },
+            {
+              "name": "main_product_code",
+              "position": 26,
+              "type": "character varying(32)",
+              "nullable": false,
+              "default": "''::character varying"
+            },
+            {
+              "name": "bundle_prefix",
+              "position": 27,
+              "type": "character varying(32)",
+              "nullable": false,
+              "default": "''::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "cart_order_items_main_product_order_item_num_unique",
+              "type": "BTREE",
+              "expressions": [
+                "main_product_order_item_num"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "cart_order_items_order_item_number_unique",
+              "type": "BTREE",
+              "expressions": [
+                "order_item_number"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "order_items_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "order_items_order_id_foreign",
+              "columns": [
+                "order_id"
+              ],
+              "referencedTable": "cart.orders",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "order_items_state_id_foreign",
+              "columns": [
+                "state_id"
+              ],
+              "referencedTable": "cart.order_states",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "before_insert_order_item",
+              "event": "INSERT",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER before_insert_order_item BEFORE INSERT ON cart.order_items FOR EACH ROW EXECUTE FUNCTION cart.set_order_item_number()"
+            },
+            {
+              "name": "order_items_state_update",
+              "event": "UPDATE",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER order_items_state_update AFTER UPDATE OF state_id ON cart.order_items FOR EACH ROW EXECUTE FUNCTION cart.update_order_state()"
+            }
+          ],
+          "rowCount": 81,
+          "dataSize": 212992,
+          "indexSize": 90112
+        },
+        {
+          "name": "order_items_translations",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.order_items_translations_id_seq'::regclass)"
+            },
+            {
+              "name": "order_item_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "language",
+              "position": 3,
+              "type": "character varying(2)",
+              "nullable": false
+            },
+            {
+              "name": "title",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "order_items_translations_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "order_items_translations_order_item_id_foreign",
+              "columns": [
+                "order_item_id"
+              ],
+              "referencedTable": "cart.order_items",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 144,
+          "dataSize": 24576,
+          "indexSize": 49152
+        },
+        {
+          "name": "order_states",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.order_states_id_seq'::regclass)"
+            },
+            {
+              "name": "created_at",
+              "position": 2,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "updated_at",
+              "position": 3,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "name",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "order_states_name_unique",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "order_states_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 32768
+        },
+        {
+          "name": "orders",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('cart.orders_id_seq'::regclass)"
+            },
+            {
+              "name": "created_at",
+              "position": 2,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "updated_at",
+              "position": 3,
+              "type": "timestamp(0) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "state_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "account_id",
+              "position": 5,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "order_number",
+              "position": 6,
+              "type": "character varying(32)",
+              "nullable": true,
+              "default": "common.new_document_number('OC-'::character varying)"
+            },
+            {
+              "name": "client_po",
+              "position": 7,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "processed",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "cart_orders_order_number_unique",
+              "type": "BTREE",
+              "expressions": [
+                "order_number"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "orders_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "orders_state_id_foreign",
+              "columns": [
+                "state_id"
+              ],
+              "referencedTable": "cart.order_states",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "order_state_update_notify",
+              "event": "UPDATE",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER order_state_update_notify AFTER UPDATE OF state_id ON cart.orders FOR EACH ROW EXECUTE FUNCTION cart.notify_order_state_change()"
+            }
+          ],
+          "rowCount": 62,
+          "dataSize": 16384,
+          "indexSize": 57344
+        }
+      ],
+      "functions": [
+        {
+          "name": "generate_bundle_code",
+          "definition": "CREATE OR REPLACE FUNCTION cart.generate_bundle_code(bundle_prefix text, order_item_id bigint)\n RETURNS text\n LANGUAGE plpgsql\nAS $function$\n                BEGIN\n                    -- Generate the code in the format \"bundle_prefix - A - order_item_id\"\n                    RETURN bundle_prefix || '-A-' || order_item_id::TEXT;\n                END;\n                $function$\n"
+        },
+        {
+          "name": "notify_order_state_change",
+          "definition": "CREATE OR REPLACE FUNCTION cart.notify_order_state_change()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\n            BEGIN\n                -- Check if the new state_id corresponds to 'activated' state\n                IF NEW.state_id = (SELECT id FROM cart.order_states WHERE name = 'in-delivery') THEN\n                    -- Notify the 'order_state_channel' with the actual order_number and state\n                    PERFORM pg_notify('order_state_channel', format('{\"order_number\": \"%s\", \"state\": \"%s\"}', NEW.order_number, 'in-delivery'));\n                END IF;\n                RETURN NEW;\n            END;\n            $function$\n"
+        },
+        {
+          "name": "set_order_item_number",
+          "definition": "CREATE OR REPLACE FUNCTION cart.set_order_item_number()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\n                BEGIN\n                    -- Set the order_item_number by calling the generate_bundle_code function\n                    NEW.order_item_number := cart.generate_bundle_code(NEW.bundle_prefix, NEW.id);\n                    RETURN NEW;\n                END;\n                $function$\n"
+        },
+        {
+          "name": "update_order_state",
+          "definition": "CREATE OR REPLACE FUNCTION cart.update_order_state()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$            BEGIN\n                -- Declare variables to store the count of different order item states\n                DECLARE\n                    completed_count INT;\n                    cancelled_count INT;\n                    in_delivery_count INT;\n                    completed_state_id INT;\n                    cancelled_state_id INT;\n                    in_delivery_state_id INT;\n                    total_count INT;\n                BEGIN\n                    -- Get the total number of order_items for the order\n                    SELECT COUNT(*) INTO total_count\n                    FROM cart.order_items\n                    WHERE order_id = NEW.order_id;\n        \n                    -- Get the count of completed order_items for the order\n                    SELECT COUNT(*) INTO completed_count\n                    FROM cart.order_items oi\n                    JOIN cart.order_states os ON os.id = oi.state_id\n                    WHERE oi.order_id = NEW.order_id AND os.name = 'activated';\n        \n                    -- Get the count of cancelled order_items for the order\n                    SELECT COUNT(*) INTO cancelled_count\n                    FROM cart.order_items oi\n                    JOIN cart.order_states os ON os.id = oi.state_id\n                    WHERE oi.order_id = NEW.order_id AND os.name = 'cancelled';\n        \n                    -- Get the count of in-delivery order_items for the order\n                    SELECT COUNT(*) INTO in_delivery_count\n                    FROM cart.order_items oi\n                    JOIN cart.order_states os ON os.id = oi.state_id\n                    WHERE oi.order_id = NEW.order_id AND os.name = 'in-delivery';\n        \n                    -- Get the state_id for 'activated', 'cancelled', and 'in-delivery' from the order_states table\n                    SELECT id INTO completed_state_id\n                    FROM cart.order_states\n                    WHERE name = 'activated'\n                    LIMIT 1;\n        \n                    SELECT id INTO cancelled_state_id\n                    FROM cart.order_states\n                    WHERE name = 'cancelled'\n                    LIMIT 1;\n        \n                    SELECT id INTO in_delivery_state_id\n                    FROM cart.order_states\n                    WHERE name = 'in-delivery'\n                    LIMIT 1;\n        \n                    -- Check the conditions and update the orders state_id accordingly\n                    IF total_count = cancelled_count THEN\n                        -- All items are cancelled, so set the order to cancelled state\n                        UPDATE cart.orders\n                        SET state_id = cancelled_state_id\n                        WHERE id = NEW.order_id;\n\n                    ELSIF (completed_count + cancelled_count) = total_count THEN\n                        -- All items are either activated or cancelled, set the order to activated state\n                        UPDATE cart.orders\n                        SET state_id = completed_state_id\n                        WHERE id = NEW.order_id;\n\n                    ELSIF (in_delivery_count + cancelled_count) = total_count THEN\n                        -- All items are either in delivery or cancelled, set the order to in-delivery state\n                        UPDATE cart.orders\n                        SET state_id = in_delivery_state_id\n                        WHERE id = NEW.order_id;\n                    END IF;\n                \n                    RETURN NEW;\n                END;\n            END;$function$\n"
+        }
+      ],
+      "sequences": [
+        {
+          "name": "cart_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "cart_item_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "cart_item_r_p_s_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "cart_item_r_p_s_translations_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "cart_item_translations_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "order_item_r_p_s_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "order_item_r_p_s_translations_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "order_items_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "order_items_translations_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "order_states_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "orders_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    }
+  ]
+}

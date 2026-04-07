@@ -1,0 +1,47 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "migrations",
+      "tables": [
+        {
+          "name": "migrations",
+          "columns": [
+            {
+              "name": "filename",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "migrated_at",
+              "position": 2,
+              "type": "timestamp without time zone",
+              "nullable": false,
+              "default": "CURRENT_TIMESTAMP"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "migrations_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "filename"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 48,
+          "dataSize": 8192,
+          "indexSize": 57344
+        }
+      ]
+    }
+  ]
+}

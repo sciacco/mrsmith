@@ -1,0 +1,760 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "orders",
+      "tables": [
+        {
+          "name": "legacy_orders",
+          "columns": [
+            {
+              "name": "quote_id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "vodka_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "jdata",
+              "position": 3,
+              "type": "jsonb",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "legacy_orders_pk",
+              "type": "BTREE",
+              "expressions": [
+                "quote_id",
+                "vodka_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 393,
+          "dataSize": 598016,
+          "indexSize": 65536
+        },
+        {
+          "name": "order",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false,
+              "default": "nextval('orders.order_id_seq'::regclass)"
+            },
+            {
+              "name": "created_at",
+              "position": 2,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP"
+            },
+            {
+              "name": "updated_at",
+              "position": 3,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP"
+            },
+            {
+              "name": "order_number",
+              "position": 4,
+              "type": "character varying(64)",
+              "nullable": false,
+              "default": "common.new_document_number('OC-'::character varying)"
+            },
+            {
+              "name": "state_id",
+              "position": 5,
+              "type": "bigint",
+              "nullable": false,
+              "default": "orders.get_default_order_state()"
+            },
+            {
+              "name": "kit_id",
+              "position": 6,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "kit_category",
+              "position": 7,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "kit_title_id",
+              "position": 8,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "kit_description_id",
+              "position": 9,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "initial_subscription_months",
+              "position": 10,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "next_subscription_months",
+              "position": 11,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "activation_days",
+              "position": 12,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "billing_period",
+              "position": 13,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "auto_renew",
+              "position": 14,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "bundle_prefix",
+              "position": 15,
+              "type": "character varying(64)",
+              "nullable": false
+            },
+            {
+              "name": "bundle_prefix_unique",
+              "position": 16,
+              "type": "character varying(128)",
+              "nullable": false
+            },
+            {
+              "name": "client_po",
+              "position": 17,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "nrc",
+              "position": 18,
+              "type": "numeric(14,5)",
+              "nullable": false
+            },
+            {
+              "name": "mrc",
+              "position": 19,
+              "type": "numeric(14,5)",
+              "nullable": false
+            },
+            {
+              "name": "notes",
+              "position": 20,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "processed",
+              "position": 21,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "processed_erp",
+              "position": 22,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "processed_deal",
+              "position": 23,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "customer_id",
+              "position": 24,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "created_by_first_name",
+              "position": 25,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "created_by_last_name",
+              "position": 26,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "created_by_email",
+              "position": 27,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "created_by_phone",
+              "position": 28,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "ticket_id",
+              "position": 29,
+              "type": "character varying(64)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "order_bundle_prefix_unique_key",
+              "type": "BTREE",
+              "expressions": [
+                "bundle_prefix_unique"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "order_order_number_key",
+              "type": "BTREE",
+              "expressions": [
+                "order_number"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "order_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "order_customer_id_fkey",
+              "columns": [
+                "customer_id"
+              ],
+              "referencedTable": "customers.customer",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "order_kit_description_id_fkey",
+              "columns": [
+                "kit_description_id"
+              ],
+              "referencedTable": "orders.translation",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "order_kit_title_id_fkey",
+              "columns": [
+                "kit_title_id"
+              ],
+              "referencedTable": "orders.translation",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "order_state_id_fkey",
+              "columns": [
+                "state_id"
+              ],
+              "referencedTable": "orders.order_state",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "order_activation_days_check",
+              "expression": "(activation_days >= 0)"
+            },
+            {
+              "name": "order_billing_period_check",
+              "expression": "(billing_period >= 0)"
+            },
+            {
+              "name": "order_initial_subscription_months_check",
+              "expression": "(initial_subscription_months >= 0)"
+            },
+            {
+              "name": "order_mrc_check",
+              "expression": "(mrc >= (0)::numeric)"
+            },
+            {
+              "name": "order_next_subscription_months_check",
+              "expression": "(next_subscription_months >= 0)"
+            },
+            {
+              "name": "order_nrc_check",
+              "expression": "(nrc >= (0)::numeric)"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "trigger_set_bundle_prefix_unique",
+              "event": "INSERT",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER trigger_set_bundle_prefix_unique BEFORE INSERT ON orders.\"order\" FOR EACH ROW EXECUTE FUNCTION orders.set_bundle_prefix_unique()"
+            },
+            {
+              "name": "trigger_update_order_row_state",
+              "event": "UPDATE",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER trigger_update_order_row_state AFTER UPDATE ON orders.\"order\" FOR EACH ROW WHEN ((new.state_id <> old.state_id)) EXECUTE FUNCTION orders.update_order_row_state()"
+            }
+          ],
+          "rowCount": 181,
+          "dataSize": 90112,
+          "indexSize": 90112
+        },
+        {
+          "name": "order_row",
+          "columns": [
+            {
+              "name": "serial_number",
+              "position": 1,
+              "type": "character varying(255)",
+              "nullable": false,
+              "default": "common.new_item_id('IN'::character varying)"
+            },
+            {
+              "name": "order_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "state_id",
+              "position": 3,
+              "type": "integer",
+              "nullable": false,
+              "default": "orders.get_default_order_row_state()"
+            },
+            {
+              "name": "product_code",
+              "position": 4,
+              "type": "character varying(50)",
+              "nullable": false
+            },
+            {
+              "name": "asset_flow",
+              "position": 5,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "title_id",
+              "position": 6,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "description_id",
+              "position": 7,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "is_main_prod",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "qty",
+              "position": 9,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "unit_nrc",
+              "position": 10,
+              "type": "numeric(14,5)",
+              "nullable": false
+            },
+            {
+              "name": "unit_mrc",
+              "position": 11,
+              "type": "numeric(14,5)",
+              "nullable": false
+            },
+            {
+              "name": "category_specific_details",
+              "position": 12,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "kit_group_name",
+              "position": 13,
+              "type": "character varying(255)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "order_row_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "serial_number"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "order_row_asset_flow_fkey",
+              "columns": [
+                "asset_flow"
+              ],
+              "referencedTable": "products.asset_flow",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "order_row_description_id_fkey",
+              "columns": [
+                "description_id"
+              ],
+              "referencedTable": "orders.translation",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "order_row_product_code_fkey",
+              "columns": [
+                "product_code"
+              ],
+              "referencedTable": "products.product",
+              "referencedColumns": [
+                "code"
+              ],
+              "onDelete": "SET NULL",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "order_row_state_id_fkey",
+              "columns": [
+                "state_id"
+              ],
+              "referencedTable": "orders.order_row_state",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "order_row_title_id_fkey",
+              "columns": [
+                "title_id"
+              ],
+              "referencedTable": "orders.translation",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "order_row_qty_check",
+              "expression": "(qty > 0)"
+            },
+            {
+              "name": "order_row_unit_mrc_check",
+              "expression": "(unit_mrc >= (0)::numeric)"
+            },
+            {
+              "name": "order_row_unit_nrc_check",
+              "expression": "(unit_nrc >= (0)::numeric)"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "trigger_update_order_state",
+              "event": "UPDATE",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER trigger_update_order_state AFTER UPDATE ON orders.order_row REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table FOR EACH STATEMENT EXECUTE FUNCTION orders.update_order_state()"
+            }
+          ],
+          "rowCount": 220,
+          "dataSize": 540672,
+          "indexSize": 81920
+        },
+        {
+          "name": "order_row_state",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('orders.order_row_state_id_seq'::regclass)"
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(64)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "order_row_state_name_key",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "order_row_state_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 32768
+        },
+        {
+          "name": "order_state",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('orders.order_state_id_seq'::regclass)"
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(64)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "order_state_name_key",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "order_state_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 32768
+        },
+        {
+          "name": "translation",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('orders.translation_id_seq'::regclass)"
+            },
+            {
+              "name": "value_it",
+              "position": 2,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "value_en",
+              "position": 3,
+              "type": "text",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "translation_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 750,
+          "dataSize": 81920,
+          "indexSize": 73728
+        }
+      ],
+      "functions": [
+        {
+          "name": "get_default_order_row_state",
+          "definition": "CREATE OR REPLACE FUNCTION orders.get_default_order_row_state()\n RETURNS bigint\n LANGUAGE sql\nAS $function$\nSELECT id FROM order_row_state WHERE name = 'INVIATO';\n$function$\n"
+        },
+        {
+          "name": "get_default_order_state",
+          "definition": "CREATE OR REPLACE FUNCTION orders.get_default_order_state()\n RETURNS bigint\n LANGUAGE sql\nAS $function$\nSELECT id FROM order_state WHERE name = 'INVIATO';\n$function$\n"
+        },
+        {
+          "name": "set_bundle_prefix_unique",
+          "definition": "CREATE OR REPLACE FUNCTION orders.set_bundle_prefix_unique()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    NEW.bundle_prefix_unique = concat(NEW.bundle_prefix,'-',NEW.id::TEXT);\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_order_row_state",
+          "definition": "CREATE OR REPLACE FUNCTION orders.update_order_row_state()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    IF (NEW.state_id = (SELECT id FROM orders.order_state WHERE name = 'IN ATTIVAZIONE'))\n    THEN\n        UPDATE orders.order_row SET state_id = (SELECT id FROM orders.order_row_state WHERE name = 'IN ATTIVAZIONE') WHERE order_id = NEW.id AND asset_flow IS NULL;\n    end if;\n\n    IF (NEW.state_id = (SELECT id FROM orders.order_state WHERE name = 'EVASO'))\n    THEN\n        UPDATE orders.order_row SET state_id = (SELECT id FROM orders.order_row_state WHERE name = 'EVASO') WHERE order_id = NEW.id AND asset_flow IS NULL;\n    end if;\n\n    IF (NEW.state_id = (SELECT id FROM orders.order_state WHERE name = 'ANNULLATO'))\n    THEN\n        UPDATE orders.order_row SET state_id = (SELECT id FROM orders.order_row_state WHERE name = 'ANNULLATO') WHERE order_id = NEW.id;\n    end if;\n\n    RETURN NEW;\n\nend;\n$function$\n"
+        },
+        {
+          "name": "update_order_state",
+          "definition": "CREATE OR REPLACE FUNCTION orders.update_order_state()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    prev_search_path TEXT;\nBEGIN\n\n    IF EXISTS (SELECT * FROM new_table n INNER JOIN old_table o ON o.serial_number = n.serial_number WHERE n.state_id <> o.state_id AND n.asset_flow IS NOT NULL)\n    THEN\n\n        -- Store the current search_path\n        SELECT current_setting('search_path') INTO prev_search_path;\n\n        -- Set the new search_path to 'orders'\n        EXECUTE 'SET search_path TO orders';\n\n        -- IN ATTIVAZIONE\n        UPDATE \"order\" SET state_id = (SELECT id from order_state WHERE name = 'IN ATTIVAZIONE') WHERE id IN\n            (\n            SELECT order_id FROM (\n            SELECT\n            order_id,\n            count(serial_number)                          as mapped_rows,\n            SUM(CASE WHEN state_id = (SELECT id from order_row_state WHERE name = 'IN ATTIVAZIONE') THEN 1 ELSE 0 END) AS ready_rows\n            FROM order_row\n            WHERE asset_flow IS NOT NULL\n            GROUP BY order_id\n            )x WHERE mapped_rows = ready_rows\n            );\n\n        -- EVASO\n        UPDATE \"order\" SET state_id = (SELECT id from order_state WHERE name = 'EVASO') WHERE id IN\n            (\n            SELECT order_id FROM (\n            SELECT\n            order_id,\n            count(serial_number)    as mapped_rows,\n            SUM(CASE WHEN state_id = (SELECT id from order_row_state WHERE name = 'EVASO') THEN 1 ELSE 0 END) AS ready_rows\n            FROM order_row\n            WHERE asset_flow IS NOT NULL\n            GROUP BY order_id\n            )x WHERE mapped_rows = ready_rows\n            );\n\n        -- ANNULLATO\n        UPDATE \"order\" SET state_id = (SELECT id from order_state WHERE name = 'ANNULLATO') WHERE id IN\n            (\n            SELECT DISTINCT order_id FROM order_row WHERE state_id = (SELECT id FROM order_row_state WHERE name = 'ANNULLATO')\n            );\n\n        -- Restore the previous search_path\n        EXECUTE 'SET search_path TO ' || prev_search_path;\n\n    END IF;\n\n    RETURN NULL;  -- Statement-level triggers return NULL\nEND;\n$function$\n"
+        }
+      ],
+      "sequences": [
+        {
+          "name": "order_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "order_row_state_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "order_state_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "serial_number",
+          "dataType": "integer",
+          "start": 123456789,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "system_odv_alyante",
+          "dataType": "integer",
+          "start": 350000,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "translation_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    }
+  ]
+}

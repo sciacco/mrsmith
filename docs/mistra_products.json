@@ -1,0 +1,1352 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "products",
+      "tables": [
+        {
+          "name": "asset_flow",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "label",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false,
+              "default": "'''TODO'''::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "asset_flow_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "custom_items",
+          "columns": [
+            {
+              "name": "key_label",
+              "position": 1,
+              "type": "character varying(32)",
+              "nullable": false
+            },
+            {
+              "name": "customer_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false,
+              "default": "'-1'::integer"
+            },
+            {
+              "name": "prices",
+              "position": 3,
+              "type": "jsonb",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "custom_items_pk",
+              "type": "BTREE",
+              "expressions": [
+                "key_label",
+                "customer_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "kit",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "internal_name",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": false,
+              "default": "''::character varying"
+            },
+            {
+              "name": "main_product_code",
+              "position": 3,
+              "type": "character varying(32)",
+              "nullable": false
+            },
+            {
+              "name": "initial_subscription_months",
+              "position": 4,
+              "type": "smallint",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "next_subscription_months",
+              "position": 5,
+              "type": "smallint",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "activation_time_days",
+              "position": 6,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "nrc",
+              "position": 7,
+              "type": "numeric(14,5)",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "mrc",
+              "position": 8,
+              "type": "numeric(14,5)",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "translation_uuid",
+              "position": 9,
+              "type": "uuid",
+              "nullable": false,
+              "default": "gen_random_uuid()"
+            },
+            {
+              "name": "bundle_prefix",
+              "position": 10,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "ecommerce",
+              "position": 11,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "category_id",
+              "position": 12,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "is_main_prd_sellable",
+              "position": 13,
+              "type": "boolean",
+              "nullable": true,
+              "default": "true"
+            },
+            {
+              "name": "is_active",
+              "position": 14,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "quotable",
+              "position": 15,
+              "type": "boolean",
+              "nullable": true,
+              "default": "true"
+            },
+            {
+              "name": "billing_period",
+              "position": 16,
+              "type": "integer",
+              "nullable": false,
+              "default": "3"
+            },
+            {
+              "name": "sconto_massimo",
+              "position": 17,
+              "type": "numeric(5,2)",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "variable_billing",
+              "position": 18,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "h24_assurance",
+              "position": 19,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "sla_resolution_hours",
+              "position": 20,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "notes",
+              "position": 21,
+              "type": "text",
+              "nullable": true,
+              "default": "''::text"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "kit_internal_name_uk",
+              "type": "BTREE",
+              "expressions": [
+                "internal_name"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "kit_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "kit_category_id_fkey",
+              "columns": [
+                "category_id"
+              ],
+              "referencedTable": "products.product_category",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "kit_product_code_fk",
+              "columns": [
+                "main_product_code"
+              ],
+              "referencedTable": "products.product",
+              "referencedColumns": [
+                "code"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 83,
+          "dataSize": 24576,
+          "indexSize": 73728
+        },
+        {
+          "name": "kit_custom_value",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "kit_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "key_name",
+              "position": 3,
+              "type": "character varying(32)",
+              "nullable": false
+            },
+            {
+              "name": "value",
+              "position": 4,
+              "type": "jsonb",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "kit_custom_value_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "kit_custom_value_key_name_fkey",
+              "columns": [
+                "key_name"
+              ],
+              "referencedTable": "common.custom_field_key",
+              "referencedColumns": [
+                "key_name"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "kit_custom_value_kit_id_fkey",
+              "columns": [
+                "kit_id"
+              ],
+              "referencedTable": "products.kit",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "comment": "contiene i valori dei campi custom definiti per la categoria",
+          "rowCount": 12,
+          "dataSize": 8192,
+          "indexSize": 49152
+        },
+        {
+          "name": "kit_customer_group",
+          "columns": [
+            {
+              "name": "kit_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "group_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "sellable",
+              "position": 3,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "discount_mrc",
+              "position": 4,
+              "type": "numeric(6,3)",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "use_int_rounding",
+              "position": 5,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "discount_nrc",
+              "position": 6,
+              "type": "numeric(6,3)",
+              "nullable": false,
+              "default": "0.0"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "kit_customer_group_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "kit_id",
+                "group_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "kit_customer_group_group_id_fkey",
+              "columns": [
+                "group_id"
+              ],
+              "referencedTable": "customers.customer_group",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "kit_customer_group_kit_id_fkey",
+              "columns": [
+                "kit_id"
+              ],
+              "referencedTable": "products.kit",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "trg_validate_discount",
+              "event": "INSERT",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER trg_validate_discount BEFORE INSERT OR UPDATE ON products.kit_customer_group FOR EACH ROW EXECUTE FUNCTION products.validate_discount_kit_customer_group()"
+            }
+          ],
+          "rowCount": 182,
+          "dataSize": 24576,
+          "indexSize": 49152
+        },
+        {
+          "name": "kit_help",
+          "columns": [
+            {
+              "name": "kit_id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "help_url",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "created_at",
+              "position": 3,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP"
+            },
+            {
+              "name": "updated_at",
+              "position": 4,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "kit_help_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "kit_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "kit_help_kit_id_fkey",
+              "columns": [
+                "kit_id"
+              ],
+              "referencedTable": "products.kit",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "kit_product",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "kit_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "product_code",
+              "position": 3,
+              "type": "character varying(32)",
+              "nullable": false
+            },
+            {
+              "name": "minimum",
+              "position": 4,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "maximum",
+              "position": 5,
+              "type": "integer",
+              "nullable": false,
+              "default": "'-1'::integer"
+            },
+            {
+              "name": "required",
+              "position": 6,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "nrc",
+              "position": 7,
+              "type": "double precision",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "mrc",
+              "position": 8,
+              "type": "double precision",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "position",
+              "position": 9,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "group_name",
+              "position": 10,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "notes",
+              "position": 11,
+              "type": "text",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "kit_product_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "kit_product_kit_id_fk",
+              "columns": [
+                "kit_id"
+              ],
+              "referencedTable": "products.kit",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "kit_product_product_code_fk",
+              "columns": [
+                "product_code"
+              ],
+              "referencedTable": "products.product",
+              "referencedColumns": [
+                "code"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 730,
+          "dataSize": 106496,
+          "indexSize": 90112
+        },
+        {
+          "name": "kit_product_group",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "kit_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 3,
+              "type": "character varying(64)",
+              "nullable": false
+            },
+            {
+              "name": "required",
+              "position": 4,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "translation_uuid",
+              "position": 5,
+              "type": "uuid",
+              "nullable": false,
+              "default": "gen_random_uuid()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "kit_product_group_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "fk_kit_product_group_kit_id",
+              "columns": [
+                "kit_id"
+              ],
+              "referencedTable": "products.kit",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 4,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "product",
+          "columns": [
+            {
+              "name": "code",
+              "position": 1,
+              "type": "character varying(32)",
+              "nullable": false
+            },
+            {
+              "name": "internal_name",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": false,
+              "default": "''::character varying"
+            },
+            {
+              "name": "category_id",
+              "position": 3,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "translation_uuid",
+              "position": 4,
+              "type": "uuid",
+              "nullable": false,
+              "default": "gen_random_uuid()"
+            },
+            {
+              "name": "nrc",
+              "position": 5,
+              "type": "numeric(14,5)",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "mrc",
+              "position": 6,
+              "type": "numeric(14,5)",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "img_url",
+              "position": 7,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "erp_sync",
+              "position": 8,
+              "type": "boolean",
+              "nullable": true,
+              "default": "true"
+            },
+            {
+              "name": "asset_flow",
+              "position": 9,
+              "type": "character varying(50)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_product_name",
+              "type": "BTREE",
+              "expressions": [
+                "internal_name"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "product_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "fk_asset_flow",
+              "columns": [
+                "asset_flow"
+              ],
+              "referencedTable": "products.asset_flow",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "SET NULL",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "fk_product_category",
+              "columns": [
+                "category_id"
+              ],
+              "referencedTable": "products.product_category",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "RESTRICT"
+            }
+          ],
+          "rowCount": 836,
+          "dataSize": 155648,
+          "indexSize": 204800
+        },
+        {
+          "name": "product_category",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(64)",
+              "nullable": false
+            },
+            {
+              "name": "color",
+              "position": 3,
+              "type": "character varying(12)",
+              "nullable": false,
+              "default": "'#231F20'::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "product_category_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 11,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "product_category_custom_field",
+          "columns": [
+            {
+              "name": "category_id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "field_key",
+              "position": 2,
+              "type": "character varying(32)",
+              "nullable": false
+            },
+            {
+              "name": "required",
+              "position": 3,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "apply_to",
+              "position": 4,
+              "type": "products.category_field_apply_to",
+              "nullable": true,
+              "default": "'Kit and Products'::products.category_field_apply_to"
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "product_category_custom_field_custom_field_key_key_name_fk",
+              "columns": [
+                "field_key"
+              ],
+              "referencedTable": "common.custom_field_key",
+              "referencedColumns": [
+                "key_name"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "product_category_custom_field_product_category_id_fk",
+              "columns": [
+                "category_id"
+              ],
+              "referencedTable": "products.product_category",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192
+        },
+        {
+          "name": "product_custom_value",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "product_code",
+              "position": 2,
+              "type": "character varying(32)",
+              "nullable": false
+            },
+            {
+              "name": "key_name",
+              "position": 3,
+              "type": "character varying(32)",
+              "nullable": false
+            },
+            {
+              "name": "value",
+              "position": 4,
+              "type": "jsonb",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "product_custom_value_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "product_custom_value_key_name_fkey",
+              "columns": [
+                "key_name"
+              ],
+              "referencedTable": "common.custom_field_key",
+              "referencedColumns": [
+                "key_name"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "product_custom_value_product_code_fkey",
+              "columns": [
+                "product_code"
+              ],
+              "referencedTable": "products.product",
+              "referencedColumns": [
+                "code"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 8,
+          "dataSize": 81920,
+          "indexSize": 49152
+        }
+      ],
+      "views": [
+        {
+          "name": "v_kit_customer_group",
+          "definition": " SELECT kcg.kit_id,\n    kcg.group_id,\n    customer_group.name,\n    customer_group.is_partner,\n    kcg.sellable\n   FROM (products.kit_customer_group kcg\n     JOIN customers.customer_group ON ((kcg.group_id = customer_group.id)));",
+          "columns": [
+            {
+              "name": "kit_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "group_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "name",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "is_partner",
+              "position": 4,
+              "type": "boolean",
+              "nullable": true
+            },
+            {
+              "name": "sellable",
+              "position": 5,
+              "type": "boolean",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "v_kit_extended",
+          "definition": " SELECT kit.id,\n    kit.internal_name,\n    kit.main_product_code,\n    kit.is_main_prd_sellable,\n    kit.is_active,\n    common.get_translations(kit.translation_uuid) AS translation,\n    kit.initial_subscription_months,\n    kit.next_subscription_months,\n    kit.activation_time_days,\n    kit.billing_period,\n    json_build_object('nrc', kit.nrc, 'mrc', kit.mrc) AS base_price,\n    pc.name AS category,\n    pc.id AS category_id,\n    products.related_product_get_by_kit_id(kit.id) AS related_products,\n    products.get_kit_customer_group(kit.id, true) AS sellable_to_customer_groups,\n    ( SELECT json_agg(x.*) AS json_agg\n           FROM ( SELECT kit_custom_value.key_name,\n                    kit_custom_value.value\n                   FROM products.kit_custom_value\n                  WHERE (kit_custom_value.kit_id = kit.id)) x) AS custom_fields,\n    kit.bundle_prefix,\n    kit.ecommerce\n   FROM (products.kit\n     JOIN products.product_category pc ON ((pc.id = kit.category_id)));",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "internal_name",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "main_product_code",
+              "position": 3,
+              "type": "character varying(32)",
+              "nullable": true
+            },
+            {
+              "name": "is_main_prd_sellable",
+              "position": 4,
+              "type": "boolean",
+              "nullable": true
+            },
+            {
+              "name": "is_active",
+              "position": 5,
+              "type": "boolean",
+              "nullable": true
+            },
+            {
+              "name": "translation",
+              "position": 6,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "initial_subscription_months",
+              "position": 7,
+              "type": "smallint",
+              "nullable": true
+            },
+            {
+              "name": "next_subscription_months",
+              "position": 8,
+              "type": "smallint",
+              "nullable": true
+            },
+            {
+              "name": "activation_time_days",
+              "position": 9,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "billing_period",
+              "position": 10,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "base_price",
+              "position": 11,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "category",
+              "position": 12,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "category_id",
+              "position": 13,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "related_products",
+              "position": 14,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "sellable_to_customer_groups",
+              "position": 15,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "custom_fields",
+              "position": 16,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "bundle_prefix",
+              "position": 17,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "ecommerce",
+              "position": 18,
+              "type": "boolean",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "v_timoo_indiretta_test",
+          "definition": " SELECT key_label,\n    customer_id,\n    user_month,\n    se_month\n   FROM ( SELECT custom_items.key_label,\n            custom_items.customer_id,\n            (custom_items.prices ->> 'user_month'::text) AS user_month,\n            (custom_items.prices ->> 'se_month'::text) AS se_month\n           FROM products.custom_items\n          WHERE (((custom_items.key_label)::text = 'timoo_indiretta'::text) AND (custom_items.customer_id = 110))\n        UNION\n         SELECT custom_items.key_label,\n            custom_items.customer_id,\n            (custom_items.prices ->> 'user_month'::text) AS user_month,\n            (custom_items.prices ->> 'se_month'::text)\n           FROM products.custom_items\n          WHERE (((custom_items.key_label)::text = 'timoo_indiretta'::text) AND (custom_items.customer_id = '-1'::integer))) prezzi\n LIMIT 1;",
+          "columns": [
+            {
+              "name": "key_label",
+              "position": 1,
+              "type": "character varying(32)",
+              "nullable": true
+            },
+            {
+              "name": "customer_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "user_month",
+              "position": 3,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "se_month",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            }
+          ]
+        }
+      ],
+      "functions": [
+        {
+          "name": "clone_kit",
+          "definition": "CREATE OR REPLACE FUNCTION products.clone_kit(p_old_kit bigint, p_new_kit_name character varying)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\ndeclare\n    kit_next_id                        bigint;\n    kit_translation_uuid               uuid;\n    f_internal_name                    varchar;\n    r_old_kit                          products.kit%rowtype;\nbegin\n\n    BEGIN\n        select into kit_next_id nextval('products.kit_id_seq');\n        select into kit_translation_uuid gen_random_uuid();\n        select * into r_old_kit from products.kit where id = p_old_kit;\n        f_internal_name := coalesce(p_new_kit_name, r_old_kit.internal_name || ' - clone');\n        insert into products.kit (id, internal_name, main_product_code, initial_subscription_months,\n                                  next_subscription_months, activation_time_days, nrc, mrc, bundle_prefix, ecommerce,\n                                  category_id, translation_uuid, is_main_prd_sellable, is_active)\n        values (kit_next_id, f_internal_name, r_old_kit.main_product_code, r_old_kit.initial_subscription_months,\n                r_old_kit.next_subscription_months, r_old_kit.activation_time_days, r_old_kit.nrc, r_old_kit.mrc,\n                f_internal_name , r_old_kit.ecommerce, r_old_kit.category_id, kit_translation_uuid,\n                r_old_kit.is_main_prd_sellable, r_old_kit.is_active);\n\n\n        --  insert into products.kit_customer_group (kit_id, group_id) values (kit_next_id, 1);\n\n        -- inserisco le traduzioni di default per il kit\n        insert into common.translation (translation_uuid, language, short, long)\n        select kit_translation_uuid, iso,f_internal_name, ''   from common.language;\n\n        -- copio da kit_custom_value\n        insert into products.kit_custom_value (kit_id, key_name, value)\n        select kit_next_id, key_name, value from products.kit_custom_value where kit_id = p_old_kit;\n\n        -- copio da kit_product\n        insert into products.kit_product (kit_id, product_code, minimum, maximum, required, nrc, mrc, position, group_name)\n        select kit_next_id, product_code, minimum, maximum, required, nrc, mrc, position, group_name from products.kit_product where kit_id = p_old_kit;\n\n\n    EXCEPTION\n        WHEN OTHERS THEN\n            RAISE NOTICE 'Error: %', SQLERRM;\n            RETURN -1;\n    END;\n\n    return kit_next_id;\nend;\n\n$function$\n"
+        },
+        {
+          "name": "create_kit",
+          "definition": "CREATE OR REPLACE FUNCTION products.create_kit(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\ndeclare\n    kit_next_id                        bigint;\n    kit_translation_uuid               uuid;\n    kit_product_group_id               integer;\n    custom_field                       json;\n    customer_group                     json;\n    product                            json;\n    product_group                      json;\n    kit_product_group_product          json;\n    translation                        json;\nbegin\n    -- kit\n    select into kit_next_id nextval('products.kit_id_seq');\n    select into kit_translation_uuid gen_random_uuid();\n    insert into products.kit (id, internal_name, main_product_code, initial_subscription_months,\n                              next_subscription_months, activation_time_days, nrc, mrc, bundle_prefix, ecommerce,\n                              category_id, translation_uuid)\n    values (kit_next_id, json_data ->> 'internal_name', json_data ->> 'main_product_code',\n            (json_data ->> 'initial_subscription_months')::smallint, (json_data ->> 'next_subscription_months')::smallint,\n            (json_data ->> 'activation_time_days')::integer, (json_data ->> 'nrc')::float8, (json_data ->> 'mrc')::float8,\n            json_data ->> 'bundle_prefix', (json_data ->> 'ecommerce')::bool, (json_data ->> 'category_id')::integer, kit_translation_uuid);\n\n    -- kit custom field\n    for custom_field in select * from json_array_elements(json_data -> 'custom_fields')\n        loop\n            insert into products.kit_custom_value (id, kit_id, key_name, value)\n            values (nextval('products.kit_custom_value_id_seq'), kit_next_id, custom_field ->> 'key_name', (custom_field ->> 'value')::jsonb);\n        end loop;\n\n      -- translation\n      for translation in select * from json_array_elements(json_data->'translation' )\n      loop\n        insert into common.translation (translation_uuid, language, short, long)\n        values (kit_translation_uuid, translation->>'language', translation->>'short', translation->>'long');\n      end loop;\n\n    -- kit customer group\n    for customer_group in select * from json_array_elements( json_data -> 'customer_groups')\n        loop\n            insert into products.kit_customer_group ( kit_id, group_id , sellable)\n            values ( kit_next_id, (customer_group ->> 'group_id')::integer , (customer_group ->> 'sellable')::bool);\n        end loop;\n\n    -- kit product\n    for product in select * from json_array_elements(json_data -> 'products')\n        loop\n            insert into products.kit_product (id, kit_id, product_code, group_id, minimum, maximum, required, nrc, mrc)\n            values (nextval('products.kit_product_id_seq'), kit_next_id, product ->> 'product_code', (product ->> 'group_id')::bigint,\n                    (product ->> 'minimum')::integer,\n                    (product ->> 'maximum')::integer, (product ->> 'required')::bool , (product ->> 'nrc')::float8, (product ->> 'mrc')::float8);\n        end loop;\n\n    -- kit product group\n    for product_group in select * from json_array_elements(json_data -> 'product_groups')\n        loop\n            kit_product_group_id = nextval('products.kit_product_group_id_seq');\n            insert into products.kit_product_group (id, kit_id, name, required)\n            values (kit_product_group_id, kit_next_id, product_group ->> 'name', (product_group ->> 'required')::bool);\n            -- kit product group product\n            for kit_product_group_product in select * from json_array_elements(product_group -> 'products')\n                loop\n                    insert into products.kit_product (id, kit_id, product_code, group_id, minimum, maximum, required,\n                                                      nrc, mrc)\n                    values (nextval('products.kit_product_id_seq'), kit_next_id, kit_product_group_product ->> 'product_code',\n                            kit_product_group_id, (kit_product_group_product ->> 'minimum')::integer,\n                            (kit_product_group_product ->> 'maximum')::integer,\n                            (kit_product_group_product ->> 'required')::bool, (kit_product_group_product ->> 'nrc')::float8,\n                            (kit_product_group_product ->> 'mrc')::float8);\n                end loop;\n        end loop;\n    return kit_next_id;\nend;\n\n$function$\n"
+        },
+        {
+          "name": "discount_get_for_kit",
+          "definition": "CREATE OR REPLACE FUNCTION products.discount_get_for_kit(_kit_id bigint, _customer_group_ids bigint[])\n RETURNS TABLE(discount_nrc numeric, int_rounding_nrc boolean, group_id_nrc bigint, discount_mrc numeric, int_rounding_mrc boolean, group_id_mrc bigint)\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _is_inflation_nrc boolean;\n    _discount_nrc numeric;\n    _integer_rounding_nrc boolean;\n    _group_id_nrc bigint;\n\n    _is_inflation_mrc boolean;\n    _discount_mrc numeric;\n    _integer_rounding_mrc boolean;\n    _group_id_mrc bigint;\nBEGIN\n\n    --\n    -- NRC\n    --\n\n    -- check if inflation or discount\n    SELECT max(kcg.discount_nrc) > 0\n    FROM products.kit_customer_group kcg\n    WHERE kcg.group_id = ANY(_customer_group_ids) AND\n        kcg.kit_id = _kit_id INTO _is_inflation_nrc;\n\n    -- select appropriate adjustment and its use_int_rounding flag\n    IF _is_inflation_nrc THEN\n\n        SELECT kcg.group_id, kcg.discount_nrc, kcg.use_int_rounding\n            FROM products.kit_customer_group kcg\n            WHERE kcg.group_id = ANY(_customer_group_ids)\n              AND kcg.kit_id = _kit_id\n            ORDER BY kcg.discount_nrc DESC -- order by DESC => the higher first\n            LIMIT 1\n            INTO _group_id_nrc, _discount_nrc, _integer_rounding_nrc\n        ;\n    ELSE\n\n        SELECT kcg.group_id, kcg.discount_nrc, kcg.use_int_rounding\n            FROM products.kit_customer_group kcg\n            WHERE kcg.group_id = ANY(_customer_group_ids)\n              AND kcg.kit_id = _kit_id\n            ORDER BY kcg.discount_nrc ASC -- order by ASC => the lower first\n            LIMIT 1\n            INTO _group_id_nrc, _discount_nrc, _integer_rounding_nrc\n        ;\n    END IF;\n\n    --\n    -- MRC\n    --\n\n    -- check if inflation or discount\n    SELECT max(kcg.discount_mrc) > 0\n    FROM products.kit_customer_group kcg\n    WHERE kcg.group_id = ANY(_customer_group_ids) AND\n        kcg.kit_id = _kit_id INTO _is_inflation_mrc;\n\n    -- select appropriate adjustment and its use_int_rounding flag\n    IF _is_inflation_mrc THEN\n\n        SELECT kcg.group_id, kcg.discount_mrc, kcg.use_int_rounding\n        FROM products.kit_customer_group kcg\n        WHERE kcg.group_id = ANY(_customer_group_ids)\n          AND kcg.kit_id = _kit_id\n        ORDER BY kcg.discount_mrc DESC -- order by DESC => the higher first\n        LIMIT 1\n        INTO _group_id_mrc, _discount_mrc, _integer_rounding_mrc\n        ;\n    ELSE\n\n        SELECT kcg.group_id, kcg.discount_mrc, kcg.use_int_rounding\n        FROM products.kit_customer_group kcg\n        WHERE kcg.group_id = ANY(_customer_group_ids)\n          AND kcg.kit_id = _kit_id\n        ORDER BY kcg.discount_mrc ASC -- order by ASC => the lower first\n        LIMIT 1\n        INTO _group_id_mrc, _discount_mrc, _integer_rounding_mrc\n        ;\n    END IF;\n\n    RETURN QUERY (\n        SELECT\n            _discount_nrc as discount_nrc,\n            _integer_rounding_nrc as integer_rounding_nrc,\n            _group_id_nrc as group_id_nrc,\n            _discount_mrc as discount_mrc,\n            _integer_rounding_mrc as int_rounding_mrc,\n            _group_id_mrc as group_id_mrc\n\n    );\n\nend;\n$function$\n"
+        },
+        {
+          "name": "get_all_kit",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_all_kit()\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\n-- restituisce la lista dei campi custom\nselect json_agg(x) from (\nselect * from products.v_kit_extended\n    ) x;\n\n$function$\n"
+        },
+        {
+          "name": "get_all_kit_ecommerce",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_all_kit_ecommerce()\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n-- restituisce la lista dei campi custom\n    select json_agg(x) \nfrom (\n    select \n        v.*, \n        k.bundle_prefix\n    from products.v_kit_extended v\n    join products.kit k \n        ON v.id = k.id\n    where k.ecommerce = true\n) x;\n\n    $function$\n"
+        },
+        {
+          "name": "get_kit_by_id",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_by_id(search_kit bigint)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n    -- restituisco il primo oggetto\n    select json_agg(x) -> 0\n    from (select kit.*, k.billing_period\n          from products.v_kit_extended kit join products.kit k using (id)\n          where kit.id = search_kit) x;\n\n$function$\n"
+        },
+        {
+          "name": "get_kit_by_id_ecommerce",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_by_id_ecommerce(search_kit bigint)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\nset search_path = pg_catalog,pg_temp;\n-- restituisco il primo oggetto\nselect json_agg(x) -> 0\nfrom (select kit.*, k.billing_period, k.bundle_prefix\n      from products.v_kit_extended kit join products.kit k using (id)\n      where kit.id = search_kit and k.ecommerce = true) x;\n\n$function$\n"
+        },
+        {
+          "name": "get_kit_custom_fields",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_custom_fields(search_kit bigint)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\n-- restituisce la lista dei campi custom\nselect json_agg(x) from (\nselect key_name, value from products.kit_custom_value\n    where kit_id = search_kit\n    ) x;\n\n$function$\n"
+        },
+        {
+          "name": "get_kit_customer_group",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_customer_group(search_kit bigint, only_sellable boolean)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\n-- restituisce la lista dei profili collegati a questo kit, con l'indicazione se i kit è vendibile o no\nselect json_agg(x) from (\nselect group_id, name, is_partner from products.v_kit_customer_group\n    where kit_id = search_kit and (only_sellable = false or sellable = true)\n    ) x;\n\n$function$\n"
+        },
+        {
+          "name": "get_kit_customer_group",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_customer_group(search_kit bigint)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\n\nselect json_agg(x) from (\nselect group_id, name, is_partner, sellable from products.v_kit_customer_group where kit_id = search_kit\n    ) x;\n\n$function$\n"
+        },
+        {
+          "name": "get_kit_filtered",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_filtered(p_category_id integer, p_customer_group_id integer)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n-- restituisce la lista di tutti i kit filtrati per categoria\n    select json_agg(x) from (\n                                select * from products.v_kit_extended\n                                where id in (select id from products.kit join products.kit_customer_group kcg on kit.id = kcg.kit_id\n                                             where (p_category_id is null or kit.category_id = p_category_id) and\n                                                   ( p_customer_group_id is null or kcg.group_id = p_customer_group_id)\n                                )\n                            ) x;\n\n    $function$\n"
+        },
+        {
+          "name": "get_kit_filtered_ecommerce",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_filtered_ecommerce(p_category_id integer, p_customer_group_id integer)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n-- restituisce la lista di tutti i kit filtrati per categoria\n    select json_agg(x) from (\n        select vkit.*, k.bundle_prefix from products.v_kit_extended vkit\n\t\tjoin products.kit k on vkit.id = k.id\n        where vkit.id in (select id from products.kit join products.kit_customer_group kcg on kit.id = kcg.kit_id\n                     where (p_category_id is null or kit.category_id = p_category_id) and\n                         ( p_customer_group_id is null or kcg.group_id = p_customer_group_id) and kit.ecommerce = true\n        )\n    ) x;\n\n    $function$\n"
+        },
+        {
+          "name": "get_kit_related_product",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_related_product(search_kit bigint)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n    select json_agg(x) from (\n\n                                select coalesce(nullif(kp.group_name,''), p.internal_name) as group_name,\n                                       kp.required as required,\n                                       json_agg(\n                                               json_build_object(\n                                                       'name', p.internal_name ,\n                                                       'id', p.code ,\n                                                       'min_qty', kp.minimum ,\n                                                       'max_qty' , kp.maximum ,\n                                                       'price' , json_build_object( 'nrc', kp.nrc , 'mrc', kp.mrc  ),\n                                                       'translation', common.get_translations(p.translation_uuid),\n                                                       'image_url', p.img_url,\n                                                       'custom_fields', products.get_product_custom_fields(p.code)\n                                               )\n                                       ) as products\n\n                                from products.kit_product kp join products.product p on kp.product_code = p.code\n\n                                where kp.kit_id = search_kit\n                                group by 1,2\n                            ) x;\n$function$\n"
+        },
+        {
+          "name": "get_product_categories",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_product_categories()\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\n-- restituisce la lista dei campi custom\nselect json_agg(x) from (\nselect id, name from products.product_category\n    ) x;\n\n$function$\n"
+        },
+        {
+          "name": "get_product_custom_fields",
+          "definition": "CREATE OR REPLACE FUNCTION products.get_product_custom_fields(input_product_code character varying)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\n-- restituisce la lista dei campi custom\nselect json_agg(x) from (\nselect key_name, value from products.product_custom_value\n    where product_code = input_product_code\n    ) x;\n\n$function$\n"
+        },
+        {
+          "name": "kit_discount_get_filtered",
+          "definition": "CREATE OR REPLACE FUNCTION products.kit_discount_get_filtered(_customer_group_id bigint, _kit_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    IF _customer_group_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM customers.customer_group WHERE id = _customer_group_id) THEN\n        RAISE EXCEPTION 'No customer group with id % found', _customer_group_id USING ERRCODE = 'T1BZ0';\n    END IF;\n\n    IF _kit_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM products.kit WHERE id = _kit_id) THEN\n        RAISE EXCEPTION 'No kit with id % found', _kit_id USING ERRCODE = 'T1PZ0';\n    END IF;\n\n    RETURN json_agg(x)\n    FROM (\n        SELECT kcg.* ,\n               cg.name as group_name\n        FROM products.kit_customer_group kcg\n        INNER JOIN customers.customer_group cg on kcg.group_id = cg.id\n        WHERE\n            (_customer_group_id IS NULL OR kcg.group_id = _customer_group_id) AND\n            (_kit_id IS NULL OR kcg.kit_id = _kit_id)\n        )x;\nEND;\n$function$\n"
+        },
+        {
+          "name": "kit_discount_update",
+          "definition": "CREATE OR REPLACE FUNCTION products.kit_discount_update(_kit_discount json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    IF EXISTS(SELECT 1 FROM products.kit_customer_group WHERE group_id = (_kit_discount->>'group_id')::bigint AND kit_id = (_kit_discount->>'kit_id')::bigint)\n    THEN\n\n        RAISE NOTICE 'EXISTS';\n\n        -- already exists -> update\n        UPDATE products.kit_customer_group SET\n            sellable = (_kit_discount->>'sellable')::boolean,\n            discount_nrc = (_kit_discount->>'discount_nrc')::numeric(6,3),\n            discount_mrc = (_kit_discount->>'discount_mrc')::numeric(6,3),\n            use_int_rounding = (_kit_discount->>'use_int_rounding')::boolean\n        WHERE\n            group_id = (_kit_discount->>'group_id')::bigint AND\n            kit_id = (_kit_discount->>'kit_id')::bigint;\n    ELSE\n\n        -- not exists -> create\n        INSERT INTO products.kit_customer_group (kit_id, group_id, sellable, discount_nrc, discount_mrc, use_int_rounding) VALUES (\n            (_kit_discount->>'kit_id')::bigint,\n            (_kit_discount->>'group_id')::bigint,\n            (_kit_discount->>'sellable')::boolean,\n            (_kit_discount->>'discount_nrc')::numeric(6,3),\n            (_kit_discount->>'discount_mrc')::numeric(6,3),\n            (_kit_discount->>'use_int_rounding')::boolean\n        );\n    END IF;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "kit_get_by_id",
+          "definition": "CREATE OR REPLACE FUNCTION products.kit_get_by_id(_id bigint, _only_ecommerce boolean)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    IF NOT EXISTS(SELECT 1 FROM products.kit WHERE id = _id AND (_only_ecommerce IS NULL OR _only_ecommerce IS FALSE OR ecommerce = true))\n    THEN\n        RAISE EXCEPTION 'No kit with id % found', _id USING ERRCODE = 'T1PZ0';\n    END IF;\n\n    RETURN json_agg(x) -> 0\n    from (\n        select *\n        from products.v_kit_extended\n        where id = _id AND\n        -- only if flag is true apply filter, (filter = false) != (ecommerce = false)\n        (_only_ecommerce IS NULL OR _only_ecommerce IS FALSE OR ecommerce = true)\n    ) x;\nEND;\n$function$\n"
+        },
+        {
+          "name": "kit_get_by_id_customer",
+          "definition": "CREATE OR REPLACE FUNCTION products.kit_get_by_id_customer(_search_kit bigint, _customer_id bigint, _only_ecommerce boolean)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _cg_id bigint[];\n    _tmp json;\nBEGIN\n\n    IF NOT EXISTS(SELECT 1 FROM customers.customer WHERE id = _customer_id) THEN\n        RAISE EXCEPTION 'No customer with id % found', _customer_id USING ERRCODE = 'T1BZ0';\n    END IF;\n\n    SELECT array(\n        SELECT group_id FROM customers.customer WHERE id = _customer_id\n        UNION\n        SELECT group_id FROM customers.group_association WHERE customer_id = _customer_id\n    ) INTO _cg_id;\n\n    -- restituisco il primo oggetto\n\n    SELECT INTO _tmp json_agg(x) -> 0\n        FROM (\n            SELECT *\n            FROM products.v_kit_extended_customer(_cg_id, _only_ecommerce)\n            WHERE id = _search_kit\n            LIMIT 1\n        ) x;\n\n    IF _tmp IS NULL THEN\n        RAISE EXCEPTION 'No kit with id % found', _search_kit USING ERRCODE = 'T1PZ0';\n    end if;\n\n    RETURN _tmp;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "kit_get_filtered",
+          "definition": "CREATE OR REPLACE FUNCTION products.kit_get_filtered(_category_id integer, _cg_id bigint, _net_commercial_profile_id bigint[], _only_ecommerce boolean)\n RETURNS json\n LANGUAGE sql\nAS $function$\n    SELECT json_agg(x)\n    FROM (\n        SELECT *\n        FROM products.v_kit_extended\n        WHERE (_category_id is null or category_id = _category_id) AND\n            (\n                _net_commercial_profile_id is null OR\n                EXISTS(\n                    SELECT 1\n                    FROM json_array_elements(custom_fields) AS elem\n                    WHERE elem->>'key_name' = 'commercial_profile_id'\n                      AND (elem->'value'->>'id')::bigint = ANY(_net_commercial_profile_id)\n                )\n            ) AND\n            -- only if flag is true apply filter, (filter = false) != (ecommerce = false)\n            (_only_ecommerce IS NULL OR _only_ecommerce IS FALSE OR ecommerce = true) AND\n            (\n                _cg_id is null OR\n                EXISTS(\n                    SELECT 1\n                    FROM json_array_elements(sellable_to_customer_groups) AS _cg\n                    WHERE (_cg->>'group_id')::bigint = _cg_id\n                )\n            )\n    )x;\n\n$function$\n"
+        },
+        {
+          "name": "kit_get_filtered_customer",
+          "definition": "CREATE OR REPLACE FUNCTION products.kit_get_filtered_customer(_category_id integer, _customer_id bigint, _net_commercial_profile_id bigint[], _only_ecommerce boolean)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _cg_id bigint[];\nBEGIN\n\n    IF NOT EXISTS(SELECT 1 FROM customers.customer WHERE id = _customer_id) THEN\n        RAISE EXCEPTION 'No customer with id % found', _customer_id USING ERRCODE = 'T1BZ0';\n    END IF;\n\n    SELECT array(\n                   SELECT group_id FROM customers.customer WHERE id = _customer_id\n                   UNION\n                   SELECT group_id FROM customers.group_association WHERE customer_id = _customer_id\n           ) INTO _cg_id;\n\n    RETURN json_agg(x)\n        FROM (\n            SELECT *\n            FROM products.v_kit_extended_customer(_cg_id, true)\n            WHERE (_category_id is null or category_id = _category_id) AND\n                (_net_commercial_profile_id is null OR EXISTS(\n                    SELECT 1\n                    FROM json_array_elements(custom_fields) AS elem\n                    WHERE elem->>'key_name' = 'commercial_profile_id'\n                      AND (elem->'value'->>'id')::bigint = ANY(_net_commercial_profile_id)\n                )) AND\n                -- only if flag is true apply filter, (filter = false) != (ecommerce = false)\n                (_only_ecommerce IS NULL OR _only_ecommerce IS FALSE OR ecommerce = true)\n        ) x;\nEND;\n$function$\n"
+        },
+        {
+          "name": "new_kit",
+          "definition": "CREATE OR REPLACE FUNCTION products.new_kit(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\ndeclare\n    kit_next_id                        bigint;\n    kit_translation_uuid               uuid;\n    f_internal_name                    varchar;\nbegin\n\n    BEGIN\n        select into kit_next_id nextval('products.kit_id_seq');\n        select into kit_translation_uuid gen_random_uuid();\n        f_internal_name := json_data ->> 'f_internal_name';\n        insert into products.kit (id, internal_name, main_product_code, initial_subscription_months,\n                                  next_subscription_months, activation_time_days, nrc, mrc, bundle_prefix, ecommerce,\n                                  category_id, translation_uuid)\n        values (kit_next_id, f_internal_name, json_data ->> 's_main_product',\n                (json_data ->> 'f_initial_subscription')::smallint, (json_data ->> 'f_next_period')::smallint,\n                (json_data ->> 'f_activation_time')::integer, (json_data ->> 'f_nrc')::numeric, (json_data ->> 'f_mrc')::numeric,\n                json_data ->> 'f_bundle_prefix', (json_data ->> 'sw_ecommerce')::bool, (json_data ->> 's_category')::integer, kit_translation_uuid);\n\n        --  insert into products.kit_customer_group (kit_id, group_id) values (kit_next_id, 1);\n\n        -- inserisco le traduzioni di default per il kit\n        insert into common.translation (translation_uuid, language, short, long)\n        select kit_translation_uuid, iso,f_internal_name, ''   from common.language;\n    EXCEPTION\n        WHEN OTHERS THEN\n            RAISE NOTICE 'Error: %', SQLERRM;\n            RETURN -1;\n    END;\n\n    return kit_next_id;\nend;\n\n$function$\n"
+        },
+        {
+          "name": "new_kit_product",
+          "definition": "CREATE OR REPLACE FUNCTION products.new_kit_product(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\ndeclare\n    kit_next_id                        bigint;\nbegin\n\n    BEGIN\n        select into kit_next_id nextval('products.kit_product_id_seq');\n\n        insert into products.kit_product (id, kit_id, product_code, minimum, maximum, required, nrc, mrc, position, group_name, notes)\n        values (kit_next_id, (json_data ->> 'kit_id')::bigint, json_data ->> 'product_code',\n                (json_data ->> 'minimum')::smallint, (json_data ->> 'maximum')::smallint,\n                (json_data ->> 'required')::bool, (json_data ->> 'nrc')::numeric, (json_data ->> 'mrc')::numeric,\n                (json_data ->> 'position')::smallint , json_data ->> 'group_name', json_data ->> 'notes');\n    EXCEPTION\n        WHEN OTHERS THEN\n            RAISE NOTICE 'Error: %', SQLERRM;\n            RETURN -1;\n    END;\n\n    return kit_next_id;\nend;\n\n$function$\n"
+        },
+        {
+          "name": "related_product_get_by_kit_id",
+          "definition": "CREATE OR REPLACE FUNCTION products.related_product_get_by_kit_id(_kit_id bigint)\n RETURNS json\n LANGUAGE sql\nAS $function$\nSELECT json_agg(x)\nFROM (SELECT coalesce(nullif(kp.group_name, ''), p.internal_name) AS group_name,\n             kp.required                                          AS required,\n             json_agg(\n                     json_build_object(\n                             'name', p.internal_name,\n                             'id', p.code,\n                             'min_qty', kp.minimum,\n                             'max_qty', kp.maximum,\n                             'price', json_build_object('nrc', kp.nrc, 'mrc', kp.mrc),\n                             'translation', common.get_translations(p.translation_uuid),\n                             'image_url', p.img_url,\n                             'custom_fields', products.get_product_custom_fields(p.code)\n                     )\n             ) AS products\n      FROM products.kit_product kp\n               JOIN products.product p on kp.product_code = p.code\n      WHERE kp.kit_id = _kit_id\n      GROUP by 1, 2\n     ) x;\n$function$\n"
+        },
+        {
+          "name": "related_product_get_by_kit_id_discount",
+          "definition": "CREATE OR REPLACE FUNCTION products.related_product_get_by_kit_id_discount(search_kit bigint, _adjustment_nrc numeric DEFAULT 0.00, _adjustment_mrc numeric DEFAULT 0.00, _integer_rounding_nrc boolean DEFAULT false, _integer_rounding_mrc boolean DEFAULT false)\n RETURNS json\n LANGUAGE sql\nAS $function$\n    SELECT json_agg(x)\n    FROM (SELECT coalesce(nullif(kp.group_name, ''), p.internal_name) AS group_name,\n                 kp.required                                          AS required,\n                 json_agg(\n                         json_build_object(\n                                 'name', p.internal_name,\n                                 'id', p.code,\n                                 'min_qty', kp.minimum,\n                                 'max_qty', kp.maximum,\n                                 'price', json_build_object(\n                                         'nrc', CASE WHEN _integer_rounding_nrc THEN ROUND((kp.nrc)::numeric * _adjustment_nrc) ELSE (kp.nrc)::numeric * _adjustment_nrc END,\n                                         'mrc', CASE WHEN _integer_rounding_mrc THEN ROUND((kp.mrc)::numeric * _adjustment_mrc) ELSE (kp.mrc)::numeric * _adjustment_mrc END\n                                    ),\n                                 'translation', common.get_translations(p.translation_uuid),\n                                 'image_url', p.img_url,\n                                 'custom_fields', products.get_product_custom_fields(p.code)\n                         )\n                 ) AS products\n          FROM products.kit_product kp\n                   JOIN products.product p on kp.product_code = p.code\n          WHERE kp.kit_id = search_kit\n          GROUP by 1, 2\n    ) x;\n$function$\n"
+        },
+        {
+          "name": "upd_kit",
+          "definition": "CREATE OR REPLACE FUNCTION products.upd_kit(p_kit_id integer, json_data json)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\ndeclare\n    v_updated                    bool;\n    v_group_id                   int;\nbegin\n\n    update products.kit set internal_name = json_data ->> 'f_internal_name',\n                           main_product_code = json_data ->> 's_main_product',\n                           initial_subscription_months = (json_data ->> 'f_initial_subscription')::smallint,\n                           next_subscription_months = (json_data ->> 'f_next_period')::smallint,\n                           activation_time_days = (json_data ->> 'f_activation_time')::integer,\n                           nrc = (json_data ->> 'f_nrc')::float8,\n                           mrc = (json_data ->> 'f_mrc')::float8,\n                           bundle_prefix = json_data ->> 'f_bundle_prefix',\n                           ecommerce = (json_data ->> 'sw_ecommerce')::bool,\n                           category_id = (json_data ->> 's_category')::integer,\n                           is_main_prd_sellable = (json_data ->> 'sw_main_sellable')::bool,\n                           is_active = (json_data ->> 'sw_active')::bool,\n                           sconto_massimo = (json_data ->> 'f_sconto_massimo')::float4,\n                           billing_period = (json_data ->> 'sl_billing_period')::integer,\n                           variable_billing = (json_data ->> 'sw_variable_billing')::bool,\n                           sla_resolution_hours = (json_data ->> 'f_sla_resolution_hours')::INTEGER,\n                           h24_assurance = (json_data ->> 'sw_h24_assurance')::bool,\n                           notes = (json_data ->> 'f_notes')::TEXT\n    where id = p_kit_id;\n    v_updated := FOUND;\n\n    -- kit customer group\n    delete from products.kit_customer_group where kit_id = p_kit_id;\n    for v_group_id in select json_array_elements( json_data -> 'ms_sellable_to')\n        loop\n            insert into products.kit_customer_group ( kit_id, group_id , sellable)\n            values ( p_kit_id, v_group_id , true);\n        end loop;\n\n    return v_updated;\nend;\n\n$function$\n"
+        },
+        {
+          "name": "upd_kit_product",
+          "definition": "CREATE OR REPLACE FUNCTION products.upd_kit_product(p_id bigint, json_data json)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\ndeclare\n    v_updated                    bool;\nbegin\n\n    update products.kit_product set\n        product_code = json_data ->> 'product_code',\n        minimum = (json_data ->> 'minimum')::smallint,\n        maximum = (json_data ->> 'maximum')::smallint,\n        required = (json_data ->> 'required')::bool,\n        nrc = (json_data ->> 'nrc')::numeric,\n        mrc = (json_data ->> 'mrc')::numeric,\n        position = (json_data ->> 'position')::smallint,\n        group_name = json_data ->> 'group_name',\n        notes = json_data ->> 'notes'\n    where id = p_id;\n    v_updated := FOUND;\n\n\n    return v_updated;\nend;\n\n$function$\n"
+        },
+        {
+          "name": "v_kit_extended_customer",
+          "definition": "CREATE OR REPLACE FUNCTION products.v_kit_extended_customer(_customer_group_ids bigint[], _only_ecommerce boolean DEFAULT false)\n RETURNS TABLE(id bigint, internal_name character varying, main_product_code character varying, is_main_prd_sellable boolean, is_active boolean, translation json, initial_subscription_months integer, next_subscription_months integer, activation_time_days integer, billing_period integer, base_price json, category character varying, category_id bigint, related_products json, sellable_to_customer_groups json, custom_fields json, bundle_prefix character varying, ecommerce boolean)\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n\n    RETURN QUERY(\n        SELECT DISTINCT ON (k.id)\n            k.id,\n            k.internal_name,\n            k.main_product_code,\n            k.is_main_prd_sellable,\n            k.is_active,\n            common.get_translations(k.translation_uuid) AS translation,\n            (k.initial_subscription_months)::INT,\n            (k.next_subscription_months)::INT,\n            (k.activation_time_days)::INT,\n            (k.billing_period)::INT,\n            json_build_object(\n                    'nrc', CASE WHEN kcg_nrc.use_int_rounding THEN ROUND((k.nrc)::numeric * (kcg_nrc.discount_nrc + 1)) ELSE (k.nrc)::numeric * (kcg_nrc.discount_nrc + 1) END,\n                    'mrc', CASE WHEN kcg_mrc.use_int_rounding THEN ROUND((k.mrc)::numeric * (kcg_mrc.discount_mrc + 1)) ELSE (k.mrc)::numeric * (kcg_mrc.discount_mrc + 1) END\n            ) AS base_price,\n            pc.name AS category,\n            (pc.id)::bigint AS category_id,\n            products.related_product_get_by_kit_id_discount(k.id, (kcg_nrc.discount_nrc + 1), (kcg_mrc.discount_mrc + 1), kcg_nrc.use_int_rounding, kcg_mrc.use_int_rounding) AS related_products,\n            products.get_kit_customer_group(k.id, true) AS sellable_to_customer_groups,\n            products.get_kit_custom_fields(k.id) AS custom_fields,\n            k.bundle_prefix,\n            k.ecommerce\n        FROM products.kit k\n                INNER JOIN products.product_category pc ON pc.id = k.category_id\n                INNER JOIN products.kit_customer_group kcg_nrc ON k.id = kcg_nrc.kit_id\n                INNER JOIN products.kit_customer_group kcg_mrc ON k.id = kcg_mrc.kit_id\n        WHERE\n            -- compute values for discounts\n            kcg_nrc.sellable = true AND\n            kcg_nrc.group_id = (SELECT group_id_nrc FROM products.discount_get_for_kit(k.id, _customer_group_ids)) AND\n\n            kcg_mrc.sellable = true AND\n            kcg_mrc.group_id = (SELECT group_id_mrc FROM products.discount_get_for_kit(k.id, _customer_group_ids)) AND\n\n            -- only if flag is true apply filter, (filter = false) != (ecommerce = false)\n            (_only_ecommerce IS NULL OR _only_ecommerce IS FALSE OR k.ecommerce = true)\n        ORDER BY\n            k.id\n    );\nEND;\n$function$\n"
+        },
+        {
+          "name": "validate_discount_kit_customer_group",
+          "definition": "CREATE OR REPLACE FUNCTION products.validate_discount_kit_customer_group()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    IF NEW.discount_mrc < -1 THEN\n        RAISE EXCEPTION 'discount_mrc % cannot be less than -1', NEW.discount_mrc;\n    END IF;\n\n    IF NEW.discount_nrc < -1 THEN\n        RAISE EXCEPTION 'discount_nrc % cannot be less than -1', NEW.discount_nrc;\n    END IF;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        }
+      ],
+      "sequences": [
+        {
+          "name": "kit_custom_value_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "kit_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "kit_product_group_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "kit_product_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "product_category_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "product_custom_value_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        }
+      ],
+      "enumTypes": [
+        {
+          "name": "category_field_apply_to",
+          "values": [
+            "Kit and Products",
+            "Kit",
+            "Products"
+          ],
+          "schema": "products"
+        }
+      ]
+    }
+  ]
+}

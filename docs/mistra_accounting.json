@@ -1,0 +1,132 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "accounting",
+      "tables": [
+        {
+          "name": "acct_log",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('accounting.acct_log_id_seq'::regclass)"
+            },
+            {
+              "name": "time",
+              "position": 2,
+              "type": "timestamp without time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "user_struct_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "source_ip",
+              "position": 4,
+              "type": "cidr",
+              "nullable": true
+            },
+            {
+              "name": "trace_id",
+              "position": 5,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "api_path",
+              "position": 6,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "api_method",
+              "position": 7,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "response_code",
+              "position": 8,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "params",
+              "position": 9,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "query",
+              "position": 10,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "request_body",
+              "position": 11,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "duration_ms",
+              "position": 12,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "response_body",
+              "position": 13,
+              "type": "json",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "acct_log_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 247102,
+          "dataSize": 41099264,
+          "indexSize": 5668864
+        }
+      ],
+      "functions": [
+        {
+          "name": "acct_log_new",
+          "definition": "CREATE OR REPLACE FUNCTION accounting.acct_log_new(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _log_id bigint;\nBEGIN\n\n    INSERT INTO acct_log (api_path,\n    api_method,\n    params,\n    query,\n    request_body,\n    time,\n    duration_ms,\n    response_code,\n                          response_body,\n                          user_struct_id, source_ip, trace_id)\n    VALUES (\n    \t\tjson_data ->> 'api_path',\n            json_data ->> 'api_method',\n            (json_data ->> 'params')::JSON,\n            (json_data ->> 'query')::JSON,\n            (json_data ->> 'request_body')::JSON,\n            (json_data ->> 'time')::TIMESTAMP,\n            NULLIF((json_data ->> 'duration_ms')::BIGINT, 0),\n            (json_data ->> 'response_code')::INT,\n            (json_data ->> 'response_body')::JSON,\n            (json_data ->> 'user_struct_id')::BIGINT,\n            (json_data ->> 'source_ip')::CIDR,\n            json_data ->> 'trace_id'\n\n            )\n            RETURNING id INTO _log_id;\n\nRETURN _log_id;\n\nEND;\n$function$\n"
+        }
+      ],
+      "sequences": [
+        {
+          "name": "acct_log_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "public",
+      "tables": [
+        {
+          "name": "cart",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "user_struct_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "cart_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "indexSize": 8192
+        }
+      ],
+      "functions": [
+        {
+          "name": "get_all_kit_ecommerce",
+          "definition": "CREATE OR REPLACE FUNCTION public.get_all_kit_ecommerce()\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n-- restituisce la lista dei campi custom\n    select json_agg(x) from (\n                                select * from products.v_kit_extended WHERE id in (SELECT id from products.kit WHERE ecommerce = true)\n                            ) x;\n\n    $function$\n"
+        },
+        {
+          "name": "get_kit_by_id_ecommerce",
+          "definition": "CREATE OR REPLACE FUNCTION public.get_kit_by_id_ecommerce(search_kit bigint)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\nset search_path = pg_catalog,pg_temp;\n-- restituisco il primo oggetto\nselect json_agg(x) -> 0\nfrom (select kit.*, k.billing_period\n      from products.v_kit_extended kit join products.kit k using (id)\n      where kit.id = search_kit and k.ecommerce = true) x;\n\n$function$\n"
+        },
+        {
+          "name": "get_kit_filtered_ecommerce",
+          "definition": "CREATE OR REPLACE FUNCTION public.get_kit_filtered_ecommerce(p_category_id integer, p_customer_group_id integer)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n-- restituisce la lista di tutti i kit filtrati per categoria\n    select json_agg(x) from (\n        select * from products.v_kit_extended\n        where id in (select id from products.kit join products.kit_customer_group kcg on kit.id = kcg.kit_id\n                     where (p_category_id is null or kit.category_id = p_category_id) and\n                         ( p_customer_group_id is null or kcg.group_id = p_customer_group_id) and kit.ecommerce = true\n        )\n    ) x;\n\n    $function$\n"
+        },
+        {
+          "name": "get_product_custom_fields",
+          "definition": "CREATE OR REPLACE FUNCTION public.get_product_custom_fields(search_code character varying)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n    -- restituisce la lista dei campi custom\n    select json_agg(x) from (\n                                select key_name, value from products.product_custom_value\n                                where product_code = search_code\n                            ) x;\n\n    $function$\n"
+        },
+        {
+          "name": "set_selectable_on_create",
+          "definition": "CREATE OR REPLACE FUNCTION public.set_selectable_on_create()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    PERFORM set_config('search_path', TG_TABLE_SCHEMA, true);\n\n    IF NEW.protected = true THEN\n\n        -- set current selectable to false\n        NEW.selectable = false;\n\n    ELSE\n\n        -- set current selectable to true\n        NEW.selectable = true;\n\n    END IF;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        }
+      ]
+    }
+  ]
+}

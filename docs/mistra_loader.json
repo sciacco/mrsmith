@@ -1,0 +1,4810 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "loader",
+      "tables": [
+        {
+          "name": "commercial_profiles",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "technology_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "upstream_bandwidth",
+              "position": 4,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "downstream_bandwidth",
+              "position": 5,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "operator_id",
+              "position": 6,
+              "type": "bigint",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "commercial_profiles_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 29,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "cp_ordini",
+          "columns": [
+            {
+              "name": "hs_deal_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "order_number",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "loader_cp_ordini_order_number_unique",
+              "type": "BTREE",
+              "expressions": [
+                "order_number"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "loader_cp_ordini_hs_deal_id_foreign",
+              "columns": [
+                "hs_deal_id"
+              ],
+              "referencedTable": "loader.hubs_deal",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 48,
+          "dataSize": 8192,
+          "indexSize": 49152
+        },
+        {
+          "name": "erp_anagrafica_articoli_vendita",
+          "columns": [
+            {
+              "name": "famiglia",
+              "position": 1,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "sotto_famiglia",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "cod_articolo",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "descrizione_ita",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_ing",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "desc_conto_ricavo",
+              "position": 6,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "gruppo_statistico",
+              "position": 7,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "gruppo_statistico2",
+              "position": 8,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "lotti",
+              "position": 9,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "data_dismissione",
+              "position": 10,
+              "type": "timestamp without time zone",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "erp_anagrafica_articoli_vendita_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "cod_articolo"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 826,
+          "dataSize": 163840,
+          "indexSize": 98304
+        },
+        {
+          "name": "erp_anagrafiche_clienti",
+          "columns": [
+            {
+              "name": "ragione_sociale",
+              "position": 1,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "ditta_individuale",
+              "position": 2,
+              "type": "smallint",
+              "nullable": true
+            },
+            {
+              "name": "agente",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "codice_fiscale",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "partita_iva",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "lingua",
+              "position": 6,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "codice_sdi",
+              "position": 7,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "tipologia_azienda",
+              "position": 8,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "id_anagrafica",
+              "position": 9,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "numero_azienda",
+              "position": 10,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "valuta",
+              "position": 11,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "telefono",
+              "position": 12,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "fax",
+              "position": 13,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "email",
+              "position": 14,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "pec",
+              "position": 15,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "data_dismissione",
+              "position": 16,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "indirizzo_fatturazione",
+              "position": 17,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "citta_fatturazione",
+              "position": 18,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "provincia_fatturazione",
+              "position": 19,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "cap_fatturazione",
+              "position": 20,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "paese_fatturazione",
+              "position": 21,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "iban",
+              "position": 22,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "rid_iban",
+              "position": 23,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "rid_banca",
+              "position": 24,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "bic",
+              "position": 25,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "rid_data",
+              "position": 26,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "cod_rif_mandato",
+              "position": 27,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "metodo_pagamento",
+              "position": 28,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "data_creazione",
+              "position": 29,
+              "type": "timestamp(6) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_ultima_modifica",
+              "position": 30,
+              "type": "timestamp(6) without time zone",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "erp_anagrafiche_clienti_pk",
+              "type": "BTREE",
+              "expressions": [
+                "numero_azienda"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 1382,
+          "dataSize": 466944,
+          "indexSize": 114688
+        },
+        {
+          "name": "erp_clienti_provenienza",
+          "columns": [
+            {
+              "name": "numero_azienda",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "fatgamma",
+              "position": 2,
+              "type": "integer",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "fatecomm",
+              "position": 3,
+              "type": "integer",
+              "nullable": true,
+              "default": "0"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "erp_clienti_provenienza_pk",
+              "type": "BTREE",
+              "expressions": [
+                "numero_azienda"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "comment": "somma documenti ecomm o fattimm",
+          "rowCount": 1308,
+          "dataSize": 589824,
+          "indexSize": 237568
+        },
+        {
+          "name": "erp_fatture",
+          "columns": [
+            {
+              "name": "anno_documento",
+              "position": 1,
+              "type": "smallint",
+              "nullable": false
+            },
+            {
+              "name": "mese_documento",
+              "position": 2,
+              "type": "smallint",
+              "nullable": false
+            },
+            {
+              "name": "tipo_documento",
+              "position": 3,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "data_documento",
+              "position": 4,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "num_documento",
+              "position": 5,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "id_cliente",
+              "position": 6,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "cliente",
+              "position": 7,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "partita_iva",
+              "position": 8,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "codice_fiscale",
+              "position": 9,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "progressivo_riga",
+              "position": 10,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "qta",
+              "position": 11,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "codice_articolo",
+              "position": 12,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_riga",
+              "position": 13,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "prezzo_unitario",
+              "position": 14,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "prezzo_totale_netto",
+              "position": 15,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "prezzo_unitario_ivato",
+              "position": 16,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "prezzo_totale_ivato",
+              "position": 17,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "iva",
+              "position": 18,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "valuta",
+              "position": 19,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_inizio_competenza",
+              "position": 20,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_fine_competenza",
+              "position": 21,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "serialnumber",
+              "position": 22,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "riferimento_ordine_cliente",
+              "position": 23,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "tipo_addebito",
+              "position": 24,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "centro_addebito",
+              "position": 25,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "condizione_pagamento",
+              "position": 26,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "scadenza",
+              "position": 27,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "desc_conto_ricavo",
+              "position": 28,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "gruppo",
+              "position": 29,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "sottogruppo",
+              "position": 30,
+              "type": "character varying",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "erp_fatture_id_cliente_data_documento_index",
+              "type": "BTREE",
+              "expressions": [
+                "id_cliente",
+                "data_documento"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "erp_fatture_pk",
+              "type": "BTREE",
+              "expressions": [
+                "anno_documento",
+                "mese_documento",
+                "num_documento",
+                "progressivo_riga",
+                "tipo_documento"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 151432,
+          "dataSize": 60014592,
+          "indexSize": 10870784
+        },
+        {
+          "name": "erp_metodi_pagamento",
+          "columns": [
+            {
+              "name": "cod_pagamento",
+              "position": 1,
+              "type": "character(6)",
+              "nullable": false
+            },
+            {
+              "name": "desc_pagamento",
+              "position": 2,
+              "type": "character varying(40)",
+              "nullable": false
+            },
+            {
+              "name": "selezionabile",
+              "position": 3,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "erp_metodi_pagamento_pk",
+              "type": "BTREE",
+              "expressions": [
+                "cod_pagamento"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 49,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "erp_ordini",
+          "columns": [
+            {
+              "name": "nome_testata_ordine",
+              "position": 1,
+              "type": "character varying(50)",
+              "nullable": false
+            },
+            {
+              "name": "cliente",
+              "position": 2,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "numero_azienda",
+              "position": 3,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_gamma",
+              "position": 4,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "commerciale",
+              "position": 5,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "data_documento",
+              "position": 6,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_conferma",
+              "position": 7,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "stato_ordine",
+              "position": 8,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_ordine",
+              "position": 9,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_documento",
+              "position": 10,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "sost_ord",
+              "position": 11,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "riferimento_odv_cliente",
+              "position": 12,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "durata_servizio",
+              "position": 13,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "tacito_rinnovo",
+              "position": 14,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "durata_rinnovo",
+              "position": 15,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "tempi_rilascio",
+              "position": 16,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "metodo_pagamento",
+              "position": 17,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "note_legali",
+              "position": 18,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_nome",
+              "position": 19,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_mail",
+              "position": 20,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_tel",
+              "position": 21,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_nome",
+              "position": 22,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_mail",
+              "position": 23,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_tel",
+              "position": 24,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_nome",
+              "position": 25,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_mail",
+              "position": 26,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_tel",
+              "position": 27,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "data_creazione",
+              "position": 28,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_variazione",
+              "position": 29,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "sostituito_da",
+              "position": 30,
+              "type": "character varying(250)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "erp_ordini_pk",
+              "type": "BTREE",
+              "expressions": [
+                "nome_testata_ordine"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 6543,
+          "dataSize": 1843200,
+          "indexSize": 344064
+        },
+        {
+          "name": "erp_partite",
+          "columns": [
+            {
+              "name": "num_reg",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "cod_cliente",
+              "position": 2,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "cliente",
+              "position": 3,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "cod_documento",
+              "position": 4,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "tipo_documento",
+              "position": 5,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_documento",
+              "position": 6,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "num_documento",
+              "position": 7,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "anno_documento",
+              "position": 8,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "importo",
+              "position": 9,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "valuta",
+              "position": 10,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_scadenza",
+              "position": 11,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_alert",
+              "position": 12,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "flg_acconto",
+              "position": 13,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "pagata",
+              "position": 14,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "pagata_il",
+              "position": 15,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "last_change",
+              "position": 16,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "condizione_pagamento",
+              "position": 17,
+              "type": "character varying",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "erp_partite_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "num_reg"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 20649,
+          "dataSize": 3899392,
+          "indexSize": 933888
+        },
+        {
+          "name": "erp_righe_ordini",
+          "columns": [
+            {
+              "name": "cliente",
+              "position": 1,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "quantita",
+              "position": 2,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "codice_kit",
+              "position": 3,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "codice_prodotto",
+              "position": 4,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_prodotto",
+              "position": 5,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_estesa",
+              "position": 6,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "serialnumber",
+              "position": 7,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "nome_testata_ordine",
+              "position": 8,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "setup",
+              "position": 9,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "canone",
+              "position": 10,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "valuta",
+              "position": 11,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "costo_cessazione",
+              "position": 12,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "data_attivazione",
+              "position": 13,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_disdetta",
+              "position": 14,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_cessazione",
+              "position": 15,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "raggruppamento_fatturazione",
+              "position": 16,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "intervallo_fatt_attivazione",
+              "position": 17,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "intervallo_fatt_canone",
+              "position": 18,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_ultima_fatt",
+              "position": 19,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_fine_fatt",
+              "position": 20,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "system_odv_row",
+              "position": 21,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "id_gamma_testata",
+              "position": 22,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "progressivo_riga",
+              "position": 23,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "annullato",
+              "position": 24,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "data_scadenza_ordine",
+              "position": 25,
+              "type": "timestamp without time zone",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "erp_righe_ordini_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id_gamma_testata",
+                "progressivo_riga"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 12326,
+          "dataSize": 4407296,
+          "indexSize": 557056
+        },
+        {
+          "name": "grappa_cli_fatturazione",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "intestazione",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "raggruppamento",
+              "position": 3,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "codice_aggancio_gest",
+              "position": 4,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "codice_cow",
+              "position": 5,
+              "type": "character varying(3)",
+              "nullable": true
+            },
+            {
+              "name": "accesso_portale",
+              "position": 6,
+              "type": "character(1)",
+              "nullable": true,
+              "default": "'0'::bpchar"
+            },
+            {
+              "name": "lingua",
+              "position": 7,
+              "type": "character varying(2)",
+              "nullable": true
+            },
+            {
+              "name": "escludi_controlli",
+              "position": 8,
+              "type": "character(1)",
+              "nullable": true,
+              "default": "'0'::bpchar"
+            },
+            {
+              "name": "codice_aggancio_portale",
+              "position": 9,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "rh_listino",
+              "position": 10,
+              "type": "character varying(32)",
+              "nullable": false,
+              "default": "'vecchio'::character varying"
+            },
+            {
+              "name": "un_min_rh_bt",
+              "position": 11,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "un_min_rh_exbt",
+              "position": 12,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "rh_illimitate",
+              "position": 13,
+              "type": "character(1)",
+              "nullable": false,
+              "default": "'0'::bpchar"
+            },
+            {
+              "name": "rh_free_bt",
+              "position": 14,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "rh_free_exbt",
+              "position": 15,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "bulk_cable",
+              "position": 16,
+              "type": "character(1)",
+              "nullable": true,
+              "default": "'0'::bpchar"
+            },
+            {
+              "name": "un_min_ho_bt",
+              "position": 17,
+              "type": "integer",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "un_min_ho_exbt",
+              "position": 18,
+              "type": "integer",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "supporto_sistemistico",
+              "position": 19,
+              "type": "character(1)",
+              "nullable": false,
+              "default": "'0'::bpchar"
+            },
+            {
+              "name": "c4b",
+              "position": 20,
+              "type": "integer",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "stato",
+              "position": 21,
+              "type": "character varying(32)",
+              "nullable": true,
+              "default": "'attivo'::character varying"
+            },
+            {
+              "name": "localxcon",
+              "position": 22,
+              "type": "integer",
+              "nullable": true,
+              "default": "1"
+            },
+            {
+              "name": "mixxcon",
+              "position": 23,
+              "type": "integer",
+              "nullable": true,
+              "default": "1"
+            },
+            {
+              "name": "irideosxcon",
+              "position": 24,
+              "type": "integer",
+              "nullable": true,
+              "default": "1"
+            },
+            {
+              "name": "seewebxcon",
+              "position": 25,
+              "type": "integer",
+              "nullable": true,
+              "default": "1"
+            },
+            {
+              "name": "email_commerciale",
+              "position": 26,
+              "type": "character varying(128)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "grappa_cli_fatturazione_codice_aggancio_gest_index",
+              "type": "BTREE",
+              "expressions": [
+                "codice_aggancio_gest"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "grappa_cli_fatturazione_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 596,
+          "dataSize": 196608,
+          "indexSize": 114688
+        },
+        {
+          "name": "grappa_foglio_linee",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "nprog",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "codice_ordine",
+              "position": 3,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "cli_fatturazione",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_conn",
+              "position": 5,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "fornitore",
+              "position": 6,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "unione_linee",
+              "position": 7,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "modulazione",
+              "position": 8,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "mod_accesso",
+              "position": 9,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "stato",
+              "position": 10,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "att_trasf",
+              "position": 11,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "data_ord_fornitore",
+              "position": 12,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_att_telecom",
+              "position": 13,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_att_cdlan",
+              "position": 14,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_cess_telecom",
+              "position": 15,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_cess_cdlan",
+              "position": 16,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_mig_telecom",
+              "position": 17,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "cod_ordine_sp",
+              "position": 18,
+              "type": "character varying(32)",
+              "nullable": true
+            },
+            {
+              "name": "cod_ordine_ti_originario",
+              "position": 19,
+              "type": "character varying(23)",
+              "nullable": true
+            },
+            {
+              "name": "nome_int_linea",
+              "position": 20,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "cogn_rsoc_intest_linea",
+              "position": 21,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "piva",
+              "position": 22,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "codfisc",
+              "position": 23,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "tipologia_linea",
+              "position": 24,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "utenza_num_pilota",
+              "position": 25,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "td_linea_telecom",
+              "position": 26,
+              "type": "character varying(32)",
+              "nullable": true
+            },
+            {
+              "name": "td_linea_telecom2",
+              "position": 27,
+              "type": "character varying(32)",
+              "nullable": true
+            },
+            {
+              "name": "prefisso_zona",
+              "position": 28,
+              "type": "character varying(6)",
+              "nullable": true
+            },
+            {
+              "name": "particella",
+              "position": 29,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "indirizzo",
+              "position": 30,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "civico",
+              "position": 31,
+              "type": "character varying(10)",
+              "nullable": true
+            },
+            {
+              "name": "cap",
+              "position": 32,
+              "type": "character varying(10)",
+              "nullable": true
+            },
+            {
+              "name": "comune",
+              "position": 33,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "provincia",
+              "position": 34,
+              "type": "character varying(10)",
+              "nullable": true
+            },
+            {
+              "name": "referente",
+              "position": 35,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "splitter_telecom",
+              "position": 36,
+              "type": "character varying(10)",
+              "nullable": true
+            },
+            {
+              "name": "modem_telecom",
+              "position": 37,
+              "type": "character varying(10)",
+              "nullable": true
+            },
+            {
+              "name": "interfaccia",
+              "position": 38,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "cow_mig",
+              "position": 39,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "cor_mig",
+              "position": 40,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "cos_mig",
+              "position": 41,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "note",
+              "position": 42,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "note_att_telecom",
+              "position": 43,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "id_anagrafica",
+              "position": 44,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_profilo",
+              "position": 45,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_profilo_commerciale",
+              "position": 46,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "monitoraggio",
+              "position": 47,
+              "type": "character(1)",
+              "nullable": true,
+              "default": "'0'::bpchar"
+            },
+            {
+              "name": "pin_mig",
+              "position": 48,
+              "type": "character varying(1)",
+              "nullable": true
+            },
+            {
+              "name": "invio_code_mig",
+              "position": 49,
+              "type": "character(1)",
+              "nullable": true,
+              "default": "'0'::bpchar"
+            },
+            {
+              "name": "codice_progetto",
+              "position": 50,
+              "type": "character varying(15)",
+              "nullable": true
+            },
+            {
+              "name": "banda",
+              "position": 51,
+              "type": "numeric(12,3)",
+              "nullable": true,
+              "default": "0.000"
+            },
+            {
+              "name": "user_vlan_1_tagging",
+              "position": 52,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "encapsulation",
+              "position": 53,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "clli_centrale",
+              "position": 54,
+              "type": "character varying(11)",
+              "nullable": true
+            },
+            {
+              "name": "serialnumber",
+              "position": 55,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "id_ditta",
+              "position": 56,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_anello",
+              "position": 57,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_linea_drop",
+              "position": 58,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "latitudine",
+              "position": 59,
+              "type": "character varying(45)",
+              "nullable": true
+            },
+            {
+              "name": "longitudine",
+              "position": 60,
+              "type": "character varying(45)",
+              "nullable": true
+            },
+            {
+              "name": "id_sla",
+              "position": 61,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "cod_istat",
+              "position": 62,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "monitoraggio_base",
+              "position": 63,
+              "type": "character(1)",
+              "nullable": true
+            },
+            {
+              "name": "aggancio_fatture",
+              "position": 64,
+              "type": "character varying(32)",
+              "nullable": true
+            },
+            {
+              "name": "migration_code",
+              "position": 65,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "created_at",
+              "position": 66,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "gen_pass",
+              "position": 67,
+              "type": "character varying(50)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "grappa_foglio_linee_cli_fatturazione_index",
+              "type": "BTREE",
+              "expressions": [
+                "cli_fatturazione"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "grappa_foglio_linee_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "idx_fl_codord",
+              "type": "BTREE",
+              "expressions": [
+                "cod_ordine_sp"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 4187,
+          "dataSize": 5824512,
+          "indexSize": 688128
+        },
+        {
+          "name": "grappa_profili",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "tipo",
+              "position": 2,
+              "type": "character varying(200)",
+              "nullable": false
+            },
+            {
+              "name": "tariffa",
+              "position": 3,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "profilo_commerciale",
+              "position": 4,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "profilo",
+              "position": 5,
+              "type": "character varying(5)",
+              "nullable": false
+            },
+            {
+              "name": "tecnologia_liv1",
+              "position": 6,
+              "type": "character varying(40)",
+              "nullable": true
+            },
+            {
+              "name": "tecnologia_liv2",
+              "position": 7,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "banda_up",
+              "position": 8,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "banda_down",
+              "position": 9,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "mod_accesso",
+              "position": 10,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "vel_agg_down",
+              "position": 11,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "vel_agg_up",
+              "position": 12,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "modulazione",
+              "position": 13,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "max_vc",
+              "position": 14,
+              "type": "character varying(40)",
+              "nullable": true
+            },
+            {
+              "name": "modem",
+              "position": 15,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "fornitore",
+              "position": 16,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "cos",
+              "position": 17,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "status",
+              "position": 18,
+              "type": "character varying(15)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "grappa_profili_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 211,
+          "dataSize": 65536,
+          "indexSize": 57344
+        },
+        {
+          "name": "grappa_profili_commerciali",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "tipo",
+              "position": 2,
+              "type": "character varying(25)",
+              "nullable": false
+            },
+            {
+              "name": "banda_down",
+              "position": 3,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "banda_up",
+              "position": 4,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "tecnologia",
+              "position": 5,
+              "type": "character varying(45)",
+              "nullable": true
+            },
+            {
+              "name": "dedicata",
+              "position": 6,
+              "type": "character varying(45)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "grappa_profili_commerciali_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 78,
+          "dataSize": 16384,
+          "indexSize": 49152
+        },
+        {
+          "name": "hubs_company",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true,
+              "default": "''::character varying"
+            },
+            {
+              "name": "partita_iva",
+              "position": 3,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "domain",
+              "position": 4,
+              "type": "character varying",
+              "nullable": true,
+              "default": "''::character varying"
+            },
+            {
+              "name": "created_at",
+              "position": 5,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "now()"
+            },
+            {
+              "name": "updated_at",
+              "position": 6,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "now()"
+            },
+            {
+              "name": "country",
+              "position": 7,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "provincia_di_fatturazione",
+              "position": 8,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "pec",
+              "position": 9,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "codice_fiscale",
+              "position": 10,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "alyante_id_anagrafica",
+              "position": 11,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "numero_azienda",
+              "position": 12,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "city",
+              "position": 13,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "email",
+              "position": 14,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "zip",
+              "position": 15,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "address",
+              "position": 16,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "lingua",
+              "position": 17,
+              "type": "character varying",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "hubs_company_name_index",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "hubs_company_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "triggers": [
+            {
+              "name": "set_timestamp",
+              "event": "UPDATE",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER set_timestamp BEFORE UPDATE ON loader.hubs_company FOR EACH ROW EXECUTE FUNCTION common.trigger_set_timestamp()"
+            }
+          ],
+          "rowCount": 4443,
+          "dataSize": 737280,
+          "indexSize": 434176
+        },
+        {
+          "name": "hubs_contact",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "firstname",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true,
+              "default": "''::character varying"
+            },
+            {
+              "name": "lastname",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": true,
+              "default": "''::character varying"
+            },
+            {
+              "name": "email",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true,
+              "default": "''::character varying"
+            },
+            {
+              "name": "created_at",
+              "position": 5,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "now()"
+            },
+            {
+              "name": "updated_at",
+              "position": 6,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "hubs_contact_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "triggers": [
+            {
+              "name": "set_timestamp",
+              "event": "UPDATE",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER set_timestamp BEFORE UPDATE ON loader.hubs_contact FOR EACH ROW EXECUTE FUNCTION common.trigger_set_timestamp()"
+            }
+          ],
+          "rowCount": 9878,
+          "dataSize": 991232,
+          "indexSize": 393216
+        },
+        {
+          "name": "hubs_deal",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true,
+              "default": "''::character varying"
+            },
+            {
+              "name": "company_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "codice",
+              "position": 4,
+              "type": "character varying(64)",
+              "nullable": false,
+              "default": "common.new_document_number('HP-'::character varying)"
+            },
+            {
+              "name": "created_at",
+              "position": 5,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "now()"
+            },
+            {
+              "name": "updated_at",
+              "position": 6,
+              "type": "timestamp without time zone",
+              "nullable": true,
+              "default": "now()"
+            },
+            {
+              "name": "dealtype",
+              "position": 7,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "nome_azienda",
+              "position": 8,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "pipeline",
+              "position": 9,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "dealstage",
+              "position": 10,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "hubspot_owner_id",
+              "position": 11,
+              "type": "character varying(64)",
+              "nullable": true,
+              "default": "''::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "hubs_deal_name_index",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "hubs_deal_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "triggers": [
+            {
+              "name": "set_timestamp",
+              "event": "UPDATE",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER set_timestamp BEFORE UPDATE ON loader.hubs_deal FOR EACH ROW EXECUTE FUNCTION common.trigger_set_timestamp()"
+            }
+          ],
+          "rowCount": 4098,
+          "dataSize": 835584,
+          "indexSize": 540672
+        },
+        {
+          "name": "hubs_owner",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "character varying(64)",
+              "nullable": false
+            },
+            {
+              "name": "email",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "first_name",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "last_name",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "user_id",
+              "position": 5,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "created_at",
+              "position": 6,
+              "type": "timestamp with time zone",
+              "nullable": false
+            },
+            {
+              "name": "updated_at",
+              "position": 7,
+              "type": "timestamp with time zone",
+              "nullable": false
+            },
+            {
+              "name": "archived",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "teams",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "hubs_owner_email_key",
+              "type": "BTREE",
+              "expressions": [
+                "email"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "hubs_owner_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "hubs_owner_user_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "user_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 127,
+          "dataSize": 57344,
+          "indexSize": 90112
+        },
+        {
+          "name": "hubs_pipeline",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "character varying(64)",
+              "nullable": false,
+              "default": "''::character varying"
+            },
+            {
+              "name": "label",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false,
+              "default": "''::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "hubs_pipeline_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 10,
+          "dataSize": 8192,
+          "indexSize": 57344
+        },
+        {
+          "name": "hubs_stages",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "character varying(64)",
+              "nullable": false
+            },
+            {
+              "name": "label",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "pipeline",
+              "position": 3,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "display_order",
+              "position": 4,
+              "type": "integer",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "hubs_stages_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 88,
+          "dataSize": 16384,
+          "indexSize": 57344
+        },
+        {
+          "name": "trascodifica_gamma_product_category",
+          "columns": [
+            {
+              "name": "famiglia",
+              "position": 1,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "sotto_famiglia",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "category_id",
+              "position": 3,
+              "type": "integer",
+              "nullable": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 8192
+        },
+        {
+          "name": "zoho_account",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "character varying(100)",
+              "nullable": false
+            },
+            {
+              "name": "account_name",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "account_number",
+              "position": 3,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "codice_automatico",
+              "position": 4,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "hubspot_id",
+              "position": 5,
+              "type": "bigint",
+              "nullable": true,
+              "default": "0"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "account_details_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 1987,
+          "dataSize": 180224,
+          "indexSize": 139264
+        }
+      ],
+      "views": [
+        {
+          "name": "erp_clienti_con_fatture",
+          "definition": " SELECT c.ragione_sociale,\n    c.ditta_individuale,\n    c.agente,\n    c.codice_fiscale,\n    c.partita_iva,\n    c.lingua,\n    c.codice_sdi,\n    c.tipologia_azienda,\n    c.id_anagrafica,\n    c.numero_azienda,\n    c.valuta,\n    c.telefono,\n    c.fax,\n    c.email,\n    c.pec,\n    c.data_dismissione,\n    c.indirizzo_fatturazione,\n    c.citta_fatturazione,\n    c.provincia_fatturazione,\n    c.cap_fatturazione,\n    c.paese_fatturazione,\n    c.iban,\n    c.rid_iban,\n    c.rid_banca,\n    c.bic,\n    c.rid_data,\n    c.cod_rif_mandato,\n    c.metodo_pagamento,\n    c.data_creazione,\n    c.data_ultima_modifica\n   FROM (loader.erp_anagrafiche_clienti c\n     JOIN loader.erp_clienti_provenienza ecp ON ((c.numero_azienda = ecp.numero_azienda)))\n  WHERE ((ecp.fatgamma > 0) AND ((c.tipologia_azienda)::text <> 'DIPENDENTE'::text));",
+          "columns": [
+            {
+              "name": "ragione_sociale",
+              "position": 1,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "ditta_individuale",
+              "position": 2,
+              "type": "smallint",
+              "nullable": true
+            },
+            {
+              "name": "agente",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "codice_fiscale",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "partita_iva",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "lingua",
+              "position": 6,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "codice_sdi",
+              "position": 7,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "tipologia_azienda",
+              "position": 8,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "id_anagrafica",
+              "position": 9,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "numero_azienda",
+              "position": 10,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "valuta",
+              "position": 11,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "telefono",
+              "position": 12,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "fax",
+              "position": 13,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "email",
+              "position": 14,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "pec",
+              "position": 15,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "data_dismissione",
+              "position": 16,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "indirizzo_fatturazione",
+              "position": 17,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "citta_fatturazione",
+              "position": 18,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "provincia_fatturazione",
+              "position": 19,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "cap_fatturazione",
+              "position": 20,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "paese_fatturazione",
+              "position": 21,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "iban",
+              "position": 22,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "rid_iban",
+              "position": 23,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "rid_banca",
+              "position": 24,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "bic",
+              "position": 25,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "rid_data",
+              "position": 26,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "cod_rif_mandato",
+              "position": 27,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "metodo_pagamento",
+              "position": 28,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "data_creazione",
+              "position": 29,
+              "type": "timestamp(6) without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_ultima_modifica",
+              "position": 30,
+              "type": "timestamp(6) without time zone",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "v_erp_fatture",
+          "definition": " SELECT concat_ws('|'::text, tipo_documento, anno_documento, mese_documento, num_documento, progressivo_riga) AS row_id,\n    anno_documento,\n    mese_documento,\n    tipo_documento,\n    data_documento,\n    num_documento,\n    id_cliente,\n    cliente,\n    partita_iva,\n    codice_fiscale,\n    progressivo_riga,\n    qta,\n    codice_articolo,\n    descrizione_riga,\n    prezzo_unitario,\n    prezzo_totale_netto,\n    prezzo_unitario_ivato,\n    prezzo_totale_ivato,\n    iva,\n    valuta,\n    data_inizio_competenza,\n    data_fine_competenza,\n    serialnumber,\n    riferimento_ordine_cliente,\n    tipo_addebito,\n    centro_addebito,\n    condizione_pagamento,\n    scadenza,\n    desc_conto_ricavo,\n    gruppo,\n    sottogruppo\n   FROM loader.erp_fatture;",
+          "columns": [
+            {
+              "name": "row_id",
+              "position": 1,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "anno_documento",
+              "position": 2,
+              "type": "smallint",
+              "nullable": true
+            },
+            {
+              "name": "mese_documento",
+              "position": 3,
+              "type": "smallint",
+              "nullable": true
+            },
+            {
+              "name": "tipo_documento",
+              "position": 4,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_documento",
+              "position": 5,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "num_documento",
+              "position": 6,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_cliente",
+              "position": 7,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "cliente",
+              "position": 8,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "partita_iva",
+              "position": 9,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "codice_fiscale",
+              "position": 10,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "progressivo_riga",
+              "position": 11,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "qta",
+              "position": 12,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "codice_articolo",
+              "position": 13,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_riga",
+              "position": 14,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "prezzo_unitario",
+              "position": 15,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "prezzo_totale_netto",
+              "position": 16,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "prezzo_unitario_ivato",
+              "position": 17,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "prezzo_totale_ivato",
+              "position": 18,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "iva",
+              "position": 19,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "valuta",
+              "position": 20,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_inizio_competenza",
+              "position": 21,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_fine_competenza",
+              "position": 22,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "serialnumber",
+              "position": 23,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "riferimento_ordine_cliente",
+              "position": 24,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "tipo_addebito",
+              "position": 25,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "centro_addebito",
+              "position": 26,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "condizione_pagamento",
+              "position": 27,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "scadenza",
+              "position": 28,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "desc_conto_ricavo",
+              "position": 29,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "gruppo",
+              "position": 30,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "sottogruppo",
+              "position": 31,
+              "type": "character varying",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "v_erp_fatture_nc",
+          "definition": " WITH fatture AS (\n         SELECT erp_fatture.anno_documento,\n            erp_fatture.mese_documento,\n                CASE\n                    WHEN ((erp_fatture.tipo_documento)::text = 'TSC-FATIMM    '::text) THEN 'FATT '::text\n                    ELSE 'N.C.'::text\n                END AS doc,\n            erp_fatture.tipo_documento,\n            erp_fatture.data_documento,\n            erp_fatture.num_documento,\n            erp_fatture.id_cliente,\n            erp_fatture.progressivo_riga,\n            erp_fatture.qta,\n            erp_fatture.codice_articolo,\n            erp_fatture.descrizione_riga,\n            erp_fatture.prezzo_unitario,\n            erp_fatture.prezzo_totale_netto,\n            erp_fatture.serialnumber,\n            erp_fatture.riferimento_ordine_cliente,\n            erp_fatture.condizione_pagamento,\n            erp_fatture.scadenza,\n            erp_fatture.desc_conto_ricavo,\n            erp_fatture.gruppo,\n            erp_fatture.sottogruppo,\n            row_number() OVER (PARTITION BY erp_fatture.anno_documento, erp_fatture.mese_documento, erp_fatture.tipo_documento, erp_fatture.num_documento ORDER BY erp_fatture.progressivo_riga) AS rn,\n                CASE\n                    WHEN ((erp_fatture.tipo_documento)::text = 'TSC-FATIMM    '::text) THEN 1\n                    ELSE '-1'::integer\n                END AS segno\n           FROM loader.erp_fatture\n          WHERE ((erp_fatture.tipo_documento)::text = ANY (ARRAY[('TSC-FATIMM    '::character varying)::text, ('TSC-NOTACR    '::character varying)::text]))\n          ORDER BY erp_fatture.anno_documento, erp_fatture.mese_documento, erp_fatture.tipo_documento, erp_fatture.num_documento, erp_fatture.progressivo_riga\n        )\n SELECT\n        CASE\n            WHEN (rn = 1) THEN ((((doc || ' '::text) || num_documento) || '/'::text) || anno_documento)\n            ELSE NULL::text\n        END AS documento,\n    anno_documento,\n    mese_documento,\n    doc,\n    tipo_documento,\n    data_documento,\n    num_documento,\n    id_cliente,\n    progressivo_riga,\n    qta,\n    codice_articolo,\n    descrizione_riga,\n    prezzo_unitario,\n    prezzo_totale_netto,\n    serialnumber,\n    riferimento_ordine_cliente,\n    condizione_pagamento,\n    scadenza,\n    desc_conto_ricavo,\n    gruppo,\n    sottogruppo,\n    rn,\n    segno\n   FROM fatture;",
+          "columns": [
+            {
+              "name": "documento",
+              "position": 1,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "anno_documento",
+              "position": 2,
+              "type": "smallint",
+              "nullable": true
+            },
+            {
+              "name": "mese_documento",
+              "position": 3,
+              "type": "smallint",
+              "nullable": true
+            },
+            {
+              "name": "doc",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "tipo_documento",
+              "position": 5,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_documento",
+              "position": 6,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "num_documento",
+              "position": 7,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_cliente",
+              "position": 8,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "progressivo_riga",
+              "position": 9,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "qta",
+              "position": 10,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "codice_articolo",
+              "position": 11,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_riga",
+              "position": 12,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "prezzo_unitario",
+              "position": 13,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "prezzo_totale_netto",
+              "position": 14,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "serialnumber",
+              "position": 15,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "riferimento_ordine_cliente",
+              "position": 16,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "condizione_pagamento",
+              "position": 17,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "scadenza",
+              "position": 18,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "desc_conto_ricavo",
+              "position": 19,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "gruppo",
+              "position": 20,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "sottogruppo",
+              "position": 21,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "rn",
+              "position": 22,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "segno",
+              "position": 23,
+              "type": "integer",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "v_ordini_non_ricorrenti",
+          "definition": " SELECT c.ragione_sociale,\n        CASE\n            WHEN (o.data_conferma > o.data_documento) THEN o.data_conferma\n            ELSE o.data_documento\n        END AS data_ordine,\n    o.nome_testata_ordine,\n    o.cliente,\n    o.numero_azienda,\n    o.id_gamma,\n    o.commerciale,\n    o.data_documento,\n    o.data_conferma,\n    o.stato_ordine,\n    o.tipo_ordine,\n    o.tipo_documento,\n    o.sost_ord,\n    o.riferimento_odv_cliente,\n    o.durata_servizio,\n    o.tacito_rinnovo,\n    o.durata_rinnovo,\n    o.tempi_rilascio,\n    o.metodo_pagamento,\n    o.note_legali,\n    o.referente_amm_nome,\n    o.referente_amm_mail,\n    o.referente_amm_tel,\n    o.referente_tech_nome,\n    o.referente_tech_mail,\n    o.referente_tech_tel,\n    o.referente_altro_nome,\n    o.referente_altro_mail,\n    o.referente_altro_tel,\n    o.data_creazione,\n    o.data_variazione,\n    o.sostituito_da,\n    r.quantita,\n    r.codice_kit,\n    r.codice_prodotto,\n    r.descrizione_prodotto,\n    r.descrizione_estesa,\n    r.serialnumber,\n    r.setup,\n    r.canone,\n    r.valuta,\n    r.costo_cessazione,\n    NULLIF(r.data_attivazione, '0001-01-01 00:00:00'::timestamp without time zone) AS data_attivazione,\n    NULLIF(r.data_disdetta, '0001-01-01 00:00:00'::timestamp without time zone) AS data_disdetta,\n    NULLIF(r.data_cessazione, '0001-01-01 00:00:00'::timestamp without time zone) AS data_cessazione,\n    r.raggruppamento_fatturazione,\n    r.intervallo_fatt_attivazione,\n    r.intervallo_fatt_canone,\n    NULLIF(r.data_ultima_fatt, '0001-01-01 00:00:00'::timestamp without time zone) AS data_ultima_fatt,\n    NULLIF(r.data_fine_fatt, '0001-01-01 00:00:00'::timestamp without time zone) AS data_fine_fatt,\n    r.system_odv_row,\n    r.id_gamma_testata,\n    r.progressivo_riga,\n    r.annullato,\n    NULLIF(r.data_scadenza_ordine, '0001-01-01 00:00:00'::timestamp without time zone) AS data_scadenza_ordine,\n    (r.quantita * r.canone) AS mrc,\n    p.famiglia,\n    p.sotto_famiglia,\n    p.desc_conto_ricavo AS conto_ricavo,\n        CASE\n            WHEN ((o.stato_ordine)::text = 'Cessato'::text) THEN 'Cessata'::text\n            WHEN ((o.stato_ordine)::text = 'Bloccato'::text) THEN 'Bloccata'::text\n            WHEN (((o.stato_ordine)::text = 'Confermato'::text) AND (date_part('year'::text, r.data_attivazione) = (1)::double precision)) THEN 'Da attivare'::text\n            WHEN (((o.stato_ordine)::text = 'Confermato'::text) AND (date_part('year'::text, r.data_attivazione) > (1)::double precision)) THEN 'Attiva'::text\n            WHEN (r.annullato = 1) THEN 'Annullata'::text\n            WHEN (date_part('year'::text, r.data_cessazione) = (1)::double precision) THEN 'Attiva'::text\n            WHEN ((r.data_cessazione >= '0001-01-01 00:00:00'::timestamp without time zone) AND (r.data_cessazione <= now())) THEN 'Cessata'::text\n            WHEN (r.data_cessazione > now()) THEN 'Cessazione richiesta'::text\n            ELSE 'Unknown'::text\n        END AS stato_riga,\n    ((((((o.nome_testata_ordine)::text || ' del '::text) || to_char((o.data_documento)::timestamp with time zone, 'YYYY-MM-DD'::text)) || ' ('::text) || (o.stato_ordine)::text) || ')'::text) AS intestazione_ordine,\n        CASE\n            WHEN (((r.descrizione_prodotto)::text = (r.descrizione_estesa)::text) OR (r.descrizione_estesa IS NULL) OR ((r.descrizione_estesa)::text = ''::text)) THEN (r.descrizione_prodotto)::text\n            ELSE ((((r.descrizione_prodotto)::text || chr(13)) || chr(10)) || (r.descrizione_estesa)::text)\n        END AS descrizione_long\n   FROM (((loader.erp_ordini o\n     JOIN loader.erp_righe_ordini r ON (((o.id_gamma)::text = (r.id_gamma_testata)::text)))\n     JOIN loader.erp_anagrafiche_clienti c ON ((o.numero_azienda = c.numero_azienda)))\n     LEFT JOIN loader.erp_anagrafica_articoli_vendita p ON (((r.codice_prodotto)::text = btrim((p.cod_articolo)::text))))\n  WHERE (((o.tipo_documento)::text = 'TSC-ORDINE    '::text) AND ((r.codice_prodotto)::text <> 'CDL-AUTO'::text));",
+          "columns": [
+            {
+              "name": "ragione_sociale",
+              "position": 1,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "data_ordine",
+              "position": 2,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "nome_testata_ordine",
+              "position": 3,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "cliente",
+              "position": 4,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "numero_azienda",
+              "position": 5,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_gamma",
+              "position": 6,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "commerciale",
+              "position": 7,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "data_documento",
+              "position": 8,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_conferma",
+              "position": 9,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "stato_ordine",
+              "position": 10,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_ordine",
+              "position": 11,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_documento",
+              "position": 12,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "sost_ord",
+              "position": 13,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "riferimento_odv_cliente",
+              "position": 14,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "durata_servizio",
+              "position": 15,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "tacito_rinnovo",
+              "position": 16,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "durata_rinnovo",
+              "position": 17,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "tempi_rilascio",
+              "position": 18,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "metodo_pagamento",
+              "position": 19,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "note_legali",
+              "position": 20,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_nome",
+              "position": 21,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_mail",
+              "position": 22,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_tel",
+              "position": 23,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_nome",
+              "position": 24,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_mail",
+              "position": 25,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_tel",
+              "position": 26,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_nome",
+              "position": 27,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_mail",
+              "position": 28,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_tel",
+              "position": 29,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "data_creazione",
+              "position": 30,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_variazione",
+              "position": 31,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "sostituito_da",
+              "position": 32,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "quantita",
+              "position": 33,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "codice_kit",
+              "position": 34,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "codice_prodotto",
+              "position": 35,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_prodotto",
+              "position": 36,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_estesa",
+              "position": 37,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "serialnumber",
+              "position": 38,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "setup",
+              "position": 39,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "canone",
+              "position": 40,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "valuta",
+              "position": 41,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "costo_cessazione",
+              "position": 42,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "data_attivazione",
+              "position": 43,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_disdetta",
+              "position": 44,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_cessazione",
+              "position": 45,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "raggruppamento_fatturazione",
+              "position": 46,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "intervallo_fatt_attivazione",
+              "position": 47,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "intervallo_fatt_canone",
+              "position": 48,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_ultima_fatt",
+              "position": 49,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_fine_fatt",
+              "position": 50,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "system_odv_row",
+              "position": 51,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "id_gamma_testata",
+              "position": 52,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "progressivo_riga",
+              "position": 53,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "annullato",
+              "position": 54,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "data_scadenza_ordine",
+              "position": 55,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "mrc",
+              "position": 56,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "famiglia",
+              "position": 57,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "sotto_famiglia",
+              "position": 58,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "conto_ricavo",
+              "position": 59,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "stato_riga",
+              "position": 60,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "intestazione_ordine",
+              "position": 61,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_long",
+              "position": 62,
+              "type": "text",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "v_ordini_ric_spot",
+          "definition": " SELECT c.ragione_sociale,\n        CASE\n            WHEN (o.data_conferma > o.data_documento) THEN o.data_conferma\n            ELSE o.data_documento\n        END AS data_ordine,\n    o.nome_testata_ordine,\n    o.cliente,\n    o.numero_azienda,\n    o.id_gamma,\n    o.commerciale,\n    o.data_documento,\n    o.data_conferma,\n    o.stato_ordine,\n    o.tipo_ordine,\n    o.tipo_documento,\n    o.sost_ord,\n    o.riferimento_odv_cliente,\n    o.durata_servizio,\n    o.tacito_rinnovo,\n    o.durata_rinnovo,\n    o.tempi_rilascio,\n    o.metodo_pagamento,\n    o.note_legali,\n    o.referente_amm_nome,\n    o.referente_amm_mail,\n    o.referente_amm_tel,\n    o.referente_tech_nome,\n    o.referente_tech_mail,\n    o.referente_tech_tel,\n    o.referente_altro_nome,\n    o.referente_altro_mail,\n    o.referente_altro_tel,\n    o.data_creazione,\n    o.data_variazione,\n    o.sostituito_da,\n    r.quantita,\n    r.codice_kit,\n    r.codice_prodotto,\n    r.descrizione_prodotto,\n    r.descrizione_estesa,\n    r.serialnumber,\n    r.setup,\n    r.canone,\n    r.valuta,\n    r.costo_cessazione,\n    NULLIF(r.data_attivazione, '0001-01-01 00:00:00'::timestamp without time zone) AS data_attivazione,\n    NULLIF(r.data_disdetta, '0001-01-01 00:00:00'::timestamp without time zone) AS data_disdetta,\n    NULLIF(r.data_cessazione, '0001-01-01 00:00:00'::timestamp without time zone) AS data_cessazione,\n    r.raggruppamento_fatturazione,\n    r.intervallo_fatt_attivazione,\n    r.intervallo_fatt_canone,\n    NULLIF(r.data_ultima_fatt, '0001-01-01 00:00:00'::timestamp without time zone) AS data_ultima_fatt,\n    NULLIF(r.data_fine_fatt, '0001-01-01 00:00:00'::timestamp without time zone) AS data_fine_fatt,\n    r.system_odv_row,\n    r.id_gamma_testata,\n    r.progressivo_riga,\n    r.annullato,\n    NULLIF(r.data_scadenza_ordine, '0001-01-01 00:00:00'::timestamp without time zone) AS data_scadenza_ordine,\n    (r.quantita * r.canone) AS mrc,\n    p.famiglia,\n    p.sotto_famiglia,\n    p.desc_conto_ricavo AS conto_ricavo,\n        CASE\n            WHEN ((o.stato_ordine)::text = 'Cessato'::text) THEN 'Cessata'::text\n            WHEN ((o.stato_ordine)::text = 'Bloccato'::text) THEN 'Bloccata'::text\n            WHEN (((o.stato_ordine)::text = 'Confermato'::text) AND (date_part('year'::text, r.data_attivazione) = (1)::double precision)) THEN 'Da attivare'::text\n            WHEN (((o.stato_ordine)::text = 'Confermato'::text) AND (date_part('year'::text, r.data_attivazione) > (1)::double precision)) THEN 'Attiva'::text\n            WHEN (r.annullato = 1) THEN 'Annullata'::text\n            WHEN (date_part('year'::text, r.data_cessazione) = (1)::double precision) THEN 'Attiva'::text\n            WHEN ((r.data_cessazione >= '0001-01-01 00:00:00'::timestamp without time zone) AND (r.data_cessazione <= now())) THEN 'Cessata'::text\n            WHEN (r.data_cessazione > now()) THEN 'Cessazione richiesta'::text\n            ELSE 'Unknown'::text\n        END AS stato_riga,\n    ((((((o.nome_testata_ordine)::text || ' del '::text) || to_char((o.data_documento)::timestamp with time zone, 'YYYY-MM-DD'::text)) || ' ('::text) || (o.stato_ordine)::text) || ')'::text) AS intestazione_ordine,\n        CASE\n            WHEN (((r.descrizione_prodotto)::text = (r.descrizione_estesa)::text) OR (r.descrizione_estesa IS NULL) OR ((r.descrizione_estesa)::text = ''::text)) THEN (r.descrizione_prodotto)::text\n            ELSE ((((r.descrizione_prodotto)::text || chr(13)) || chr(10)) || (r.descrizione_estesa)::text)\n        END AS descrizione_long\n   FROM (((loader.erp_ordini o\n     JOIN loader.erp_righe_ordini r ON (((o.id_gamma)::text = (r.id_gamma_testata)::text)))\n     JOIN loader.erp_anagrafiche_clienti c ON ((o.numero_azienda = c.numero_azienda)))\n     LEFT JOIN loader.erp_anagrafica_articoli_vendita p ON (((r.codice_prodotto)::text = btrim((p.cod_articolo)::text))))\n  WHERE (((TRIM(BOTH FROM o.tipo_documento) = 'TSC-ORDINE-RIC'::text) OR (TRIM(BOTH FROM o.tipo_documento) = 'TSC-ORDINE'::text)) AND ((r.codice_prodotto)::text <> 'CDL-AUTO'::text));",
+          "columns": [
+            {
+              "name": "ragione_sociale",
+              "position": 1,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "data_ordine",
+              "position": 2,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "nome_testata_ordine",
+              "position": 3,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "cliente",
+              "position": 4,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "numero_azienda",
+              "position": 5,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_gamma",
+              "position": 6,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "commerciale",
+              "position": 7,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "data_documento",
+              "position": 8,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_conferma",
+              "position": 9,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "stato_ordine",
+              "position": 10,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_ordine",
+              "position": 11,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_documento",
+              "position": 12,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "sost_ord",
+              "position": 13,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "riferimento_odv_cliente",
+              "position": 14,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "durata_servizio",
+              "position": 15,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "tacito_rinnovo",
+              "position": 16,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "durata_rinnovo",
+              "position": 17,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "tempi_rilascio",
+              "position": 18,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "metodo_pagamento",
+              "position": 19,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "note_legali",
+              "position": 20,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_nome",
+              "position": 21,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_mail",
+              "position": 22,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_tel",
+              "position": 23,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_nome",
+              "position": 24,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_mail",
+              "position": 25,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_tel",
+              "position": 26,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_nome",
+              "position": 27,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_mail",
+              "position": 28,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_tel",
+              "position": 29,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "data_creazione",
+              "position": 30,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_variazione",
+              "position": 31,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "sostituito_da",
+              "position": 32,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "quantita",
+              "position": 33,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "codice_kit",
+              "position": 34,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "codice_prodotto",
+              "position": 35,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_prodotto",
+              "position": 36,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_estesa",
+              "position": 37,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "serialnumber",
+              "position": 38,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "setup",
+              "position": 39,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "canone",
+              "position": 40,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "valuta",
+              "position": 41,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "costo_cessazione",
+              "position": 42,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "data_attivazione",
+              "position": 43,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_disdetta",
+              "position": 44,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_cessazione",
+              "position": 45,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "raggruppamento_fatturazione",
+              "position": 46,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "intervallo_fatt_attivazione",
+              "position": 47,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "intervallo_fatt_canone",
+              "position": 48,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_ultima_fatt",
+              "position": 49,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_fine_fatt",
+              "position": 50,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "system_odv_row",
+              "position": 51,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "id_gamma_testata",
+              "position": 52,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "progressivo_riga",
+              "position": 53,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "annullato",
+              "position": 54,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "data_scadenza_ordine",
+              "position": 55,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "mrc",
+              "position": 56,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "famiglia",
+              "position": 57,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "sotto_famiglia",
+              "position": 58,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "conto_ricavo",
+              "position": 59,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "stato_riga",
+              "position": 60,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "intestazione_ordine",
+              "position": 61,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_long",
+              "position": 62,
+              "type": "text",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "v_ordini_ricorrenti",
+          "definition": " SELECT c.ragione_sociale,\n        CASE\n            WHEN (o.data_conferma > o.data_documento) THEN o.data_conferma\n            ELSE o.data_documento\n        END AS data_ordine,\n    o.nome_testata_ordine,\n    o.cliente,\n    o.numero_azienda,\n    o.id_gamma,\n    o.commerciale,\n    o.data_documento,\n    o.data_conferma,\n    o.stato_ordine,\n    o.tipo_ordine,\n    o.tipo_documento,\n    o.sost_ord,\n    o.riferimento_odv_cliente,\n    o.durata_servizio,\n    o.tacito_rinnovo,\n    o.durata_rinnovo,\n    o.tempi_rilascio,\n    o.metodo_pagamento,\n    o.note_legali,\n    o.referente_amm_nome,\n    o.referente_amm_mail,\n    o.referente_amm_tel,\n    o.referente_tech_nome,\n    o.referente_tech_mail,\n    o.referente_tech_tel,\n    o.referente_altro_nome,\n    o.referente_altro_mail,\n    o.referente_altro_tel,\n    o.data_creazione,\n    o.data_variazione,\n    o.sostituito_da,\n    r.quantita,\n    r.codice_kit,\n    r.codice_prodotto,\n    r.descrizione_prodotto,\n    r.descrizione_estesa,\n    r.serialnumber,\n    r.setup,\n    r.canone,\n    r.valuta,\n    r.costo_cessazione,\n    NULLIF(r.data_attivazione, '0001-01-01 00:00:00'::timestamp without time zone) AS data_attivazione,\n    NULLIF(r.data_disdetta, '0001-01-01 00:00:00'::timestamp without time zone) AS data_disdetta,\n    NULLIF(r.data_cessazione, '0001-01-01 00:00:00'::timestamp without time zone) AS data_cessazione,\n    r.raggruppamento_fatturazione,\n    r.intervallo_fatt_attivazione,\n    r.intervallo_fatt_canone,\n    NULLIF(r.data_ultima_fatt, '0001-01-01 00:00:00'::timestamp without time zone) AS data_ultima_fatt,\n    NULLIF(r.data_fine_fatt, '0001-01-01 00:00:00'::timestamp without time zone) AS data_fine_fatt,\n    r.system_odv_row,\n    r.id_gamma_testata,\n    r.progressivo_riga,\n    r.annullato,\n    NULLIF(r.data_scadenza_ordine, '0001-01-01 00:00:00'::timestamp without time zone) AS data_scadenza_ordine,\n    (r.quantita * r.canone) AS mrc,\n    p.famiglia,\n    p.sotto_famiglia,\n    p.desc_conto_ricavo AS conto_ricavo,\n        CASE\n            WHEN ((o.stato_ordine)::text = 'Cessato'::text) THEN 'Cessata'::text\n            WHEN ((o.stato_ordine)::text = 'Bloccato'::text) THEN 'Bloccata'::text\n            WHEN (((o.stato_ordine)::text = 'Confermato'::text) AND (date_part('year'::text, r.data_attivazione) = (1)::double precision)) THEN 'Da attivare'::text\n            WHEN (((o.stato_ordine)::text = 'Confermato'::text) AND (date_part('year'::text, r.data_attivazione) > (1)::double precision)) THEN 'Attiva'::text\n            WHEN (r.annullato = 1) THEN 'Annullata'::text\n            WHEN (date_part('year'::text, r.data_cessazione) = (1)::double precision) THEN 'Attiva'::text\n            WHEN ((r.data_cessazione >= '0001-01-01 00:00:00'::timestamp without time zone) AND (r.data_cessazione <= now())) THEN 'Cessata'::text\n            WHEN (r.data_cessazione > now()) THEN 'Cessazione richiesta'::text\n            ELSE 'Unknown'::text\n        END AS stato_riga,\n    ((((((o.nome_testata_ordine)::text || ' del '::text) || to_char((o.data_documento)::timestamp with time zone, 'YYYY-MM-DD'::text)) || ' ('::text) || (o.stato_ordine)::text) || ')'::text) AS intestazione_ordine,\n        CASE\n            WHEN (((r.descrizione_prodotto)::text = (r.descrizione_estesa)::text) OR (r.descrizione_estesa IS NULL) OR ((r.descrizione_estesa)::text = ''::text)) THEN (r.descrizione_prodotto)::text\n            ELSE ((((r.descrizione_prodotto)::text || chr(13)) || chr(10)) || (r.descrizione_estesa)::text)\n        END AS descrizione_long\n   FROM (((loader.erp_ordini o\n     JOIN loader.erp_righe_ordini r ON (((o.id_gamma)::text = (r.id_gamma_testata)::text)))\n     JOIN loader.erp_anagrafiche_clienti c ON ((o.numero_azienda = c.numero_azienda)))\n     LEFT JOIN loader.erp_anagrafica_articoli_vendita p ON (((r.codice_prodotto)::text = btrim((p.cod_articolo)::text))))\n  WHERE (((o.tipo_documento)::text = 'TSC-ORDINE-RIC'::text) AND ((r.codice_prodotto)::text <> 'CDL-AUTO'::text));",
+          "columns": [
+            {
+              "name": "ragione_sociale",
+              "position": 1,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "data_ordine",
+              "position": 2,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "nome_testata_ordine",
+              "position": 3,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "cliente",
+              "position": 4,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "numero_azienda",
+              "position": 5,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_gamma",
+              "position": 6,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "commerciale",
+              "position": 7,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "data_documento",
+              "position": 8,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_conferma",
+              "position": 9,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "stato_ordine",
+              "position": 10,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_ordine",
+              "position": 11,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_documento",
+              "position": 12,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "sost_ord",
+              "position": 13,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "riferimento_odv_cliente",
+              "position": 14,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "durata_servizio",
+              "position": 15,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "tacito_rinnovo",
+              "position": 16,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "durata_rinnovo",
+              "position": 17,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "tempi_rilascio",
+              "position": 18,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "metodo_pagamento",
+              "position": 19,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "note_legali",
+              "position": 20,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_nome",
+              "position": 21,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_mail",
+              "position": 22,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_tel",
+              "position": 23,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_nome",
+              "position": 24,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_mail",
+              "position": 25,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_tel",
+              "position": 26,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_nome",
+              "position": 27,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_mail",
+              "position": 28,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_tel",
+              "position": 29,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "data_creazione",
+              "position": 30,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_variazione",
+              "position": 31,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "sostituito_da",
+              "position": 32,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "quantita",
+              "position": 33,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "codice_kit",
+              "position": 34,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "codice_prodotto",
+              "position": 35,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_prodotto",
+              "position": 36,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_estesa",
+              "position": 37,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "serialnumber",
+              "position": 38,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "setup",
+              "position": 39,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "canone",
+              "position": 40,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "valuta",
+              "position": 41,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "costo_cessazione",
+              "position": 42,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "data_attivazione",
+              "position": 43,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_disdetta",
+              "position": 44,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_cessazione",
+              "position": 45,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "raggruppamento_fatturazione",
+              "position": 46,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "intervallo_fatt_attivazione",
+              "position": 47,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "intervallo_fatt_canone",
+              "position": 48,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_ultima_fatt",
+              "position": 49,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_fine_fatt",
+              "position": 50,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "system_odv_row",
+              "position": 51,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "id_gamma_testata",
+              "position": 52,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "progressivo_riga",
+              "position": 53,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "annullato",
+              "position": 54,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "data_scadenza_ordine",
+              "position": 55,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "mrc",
+              "position": 56,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "famiglia",
+              "position": 57,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "sotto_famiglia",
+              "position": 58,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "conto_ricavo",
+              "position": 59,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "stato_riga",
+              "position": 60,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "intestazione_ordine",
+              "position": 61,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_long",
+              "position": 62,
+              "type": "text",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "v_ordini_ricorrenti_conrinnovo",
+          "definition": " SELECT ragione_sociale,\n    data_ordine,\n    nome_testata_ordine,\n    cliente,\n    numero_azienda,\n    id_gamma,\n    commerciale,\n    data_documento,\n    data_conferma,\n    stato_ordine,\n    tipo_ordine,\n    tipo_documento,\n    sost_ord,\n    riferimento_odv_cliente,\n    durata_servizio,\n    tacito_rinnovo,\n    durata_rinnovo,\n    tempi_rilascio,\n    metodo_pagamento,\n    note_legali,\n    referente_amm_nome,\n    referente_amm_mail,\n    referente_amm_tel,\n    referente_tech_nome,\n    referente_tech_mail,\n    referente_tech_tel,\n    referente_altro_nome,\n    referente_altro_mail,\n    referente_altro_tel,\n    data_creazione,\n    data_variazione,\n    sostituito_da,\n    quantita,\n    codice_kit,\n    codice_prodotto,\n    descrizione_prodotto,\n    descrizione_estesa,\n    serialnumber,\n    setup,\n    canone,\n    valuta,\n    costo_cessazione,\n    data_attivazione,\n    data_disdetta,\n    data_cessazione,\n    raggruppamento_fatturazione,\n    intervallo_fatt_attivazione,\n    intervallo_fatt_canone,\n    data_ultima_fatt,\n    data_fine_fatt,\n    system_odv_row,\n    id_gamma_testata,\n    progressivo_riga,\n    annullato,\n    data_scadenza_ordine,\n    mrc,\n    famiglia,\n    sotto_famiglia,\n    conto_ricavo,\n    stato_riga,\n    intestazione_ordine,\n    descrizione_long,\n        CASE\n            WHEN ((stato_riga = 'Attiva'::text) AND (data_attivazione IS NOT NULL) AND ((data_cessazione IS NULL) OR (data_cessazione > CURRENT_DATE))) THEN loader.ordine_prossima_scadenza(data_attivazione, (durata_servizio)::integer, (durata_rinnovo)::integer, tacito_rinnovo)\n            ELSE NULL::date\n        END AS prossimo_rinnovo\n   FROM loader.v_ordini_ricorrenti os;",
+          "columns": [
+            {
+              "name": "ragione_sociale",
+              "position": 1,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "data_ordine",
+              "position": 2,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "nome_testata_ordine",
+              "position": 3,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "cliente",
+              "position": 4,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "numero_azienda",
+              "position": 5,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "id_gamma",
+              "position": 6,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "commerciale",
+              "position": 7,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "data_documento",
+              "position": 8,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_conferma",
+              "position": 9,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "stato_ordine",
+              "position": 10,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_ordine",
+              "position": 11,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "tipo_documento",
+              "position": 12,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "sost_ord",
+              "position": 13,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "riferimento_odv_cliente",
+              "position": 14,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "durata_servizio",
+              "position": 15,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "tacito_rinnovo",
+              "position": 16,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "durata_rinnovo",
+              "position": 17,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "tempi_rilascio",
+              "position": 18,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "metodo_pagamento",
+              "position": 19,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "note_legali",
+              "position": 20,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_nome",
+              "position": 21,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_mail",
+              "position": 22,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_amm_tel",
+              "position": 23,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_nome",
+              "position": 24,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_mail",
+              "position": 25,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_tech_tel",
+              "position": 26,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_nome",
+              "position": 27,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_mail",
+              "position": 28,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "referente_altro_tel",
+              "position": 29,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "data_creazione",
+              "position": 30,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "data_variazione",
+              "position": 31,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "sostituito_da",
+              "position": 32,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "quantita",
+              "position": 33,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "codice_kit",
+              "position": 34,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "codice_prodotto",
+              "position": 35,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_prodotto",
+              "position": 36,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_estesa",
+              "position": 37,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "serialnumber",
+              "position": 38,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "setup",
+              "position": 39,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "canone",
+              "position": 40,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "valuta",
+              "position": 41,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "costo_cessazione",
+              "position": 42,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "data_attivazione",
+              "position": 43,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_disdetta",
+              "position": 44,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_cessazione",
+              "position": 45,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "raggruppamento_fatturazione",
+              "position": 46,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "intervallo_fatt_attivazione",
+              "position": 47,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "intervallo_fatt_canone",
+              "position": 48,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "data_ultima_fatt",
+              "position": 49,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_fine_fatt",
+              "position": 50,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "system_odv_row",
+              "position": 51,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "id_gamma_testata",
+              "position": 52,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "progressivo_riga",
+              "position": 53,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "annullato",
+              "position": 54,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "data_scadenza_ordine",
+              "position": 55,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "mrc",
+              "position": 56,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "famiglia",
+              "position": 57,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "sotto_famiglia",
+              "position": 58,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "conto_ricavo",
+              "position": 59,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "stato_riga",
+              "position": 60,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "intestazione_ordine",
+              "position": 61,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_long",
+              "position": 62,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "prossimo_rinnovo",
+              "position": 63,
+              "type": "date",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "v_ordini_sintesi",
+          "definition": " WITH ranked_orders AS (\n         SELECT v_ordini_ricorrenti.stato_ordine,\n            v_ordini_ricorrenti.nome_testata_ordine,\n            v_ordini_ricorrenti.descrizione_prodotto,\n            v_ordini_ricorrenti.quantita,\n            v_ordini_ricorrenti.setup AS nrc,\n            v_ordini_ricorrenti.canone AS mrc,\n            v_ordini_ricorrenti.mrc AS totale_mrc,\n            v_ordini_ricorrenti.numero_azienda,\n            v_ordini_ricorrenti.data_documento,\n            v_ordini_ricorrenti.stato_riga,\n            v_ordini_ricorrenti.serialnumber,\n            v_ordini_ricorrenti.descrizione_estesa,\n            v_ordini_ricorrenti.descrizione_long,\n            v_ordini_ricorrenti.metodo_pagamento,\n                CASE\n                    WHEN (date_part('year'::text, v_ordini_ricorrenti.data_ultima_fatt) = (1)::double precision) THEN NULL::timestamp without time zone\n                    ELSE v_ordini_ricorrenti.data_ultima_fatt\n                END AS data_ultima_fatt,\n            row_number() OVER (PARTITION BY v_ordini_ricorrenti.stato_ordine, v_ordini_ricorrenti.nome_testata_ordine ORDER BY v_ordini_ricorrenti.progressivo_riga) AS rn,\n            v_ordini_ricorrenti.durata_servizio,\n            v_ordini_ricorrenti.durata_rinnovo,\n            v_ordini_ricorrenti.data_cessazione,\n            v_ordini_ricorrenti.data_attivazione,\n            v_ordini_ricorrenti.note_legali,\n            v_ordini_ricorrenti.sost_ord,\n            v_ordini_ricorrenti.sostituito_da\n           FROM loader.v_ordini_ricorrenti\n        )\n SELECT\n        CASE\n            WHEN (rn = 1) THEN stato_ordine\n            ELSE NULL::character varying\n        END AS stato,\n        CASE\n            WHEN (rn = 1) THEN nome_testata_ordine\n            ELSE NULL::character varying\n        END AS numero_ordine,\n    descrizione_prodotto,\n    quantita,\n    nrc,\n    mrc,\n    totale_mrc,\n    stato_ordine,\n    nome_testata_ordine,\n    rn,\n    numero_azienda,\n    data_documento,\n    stato_riga,\n    data_ultima_fatt,\n    serialnumber,\n    descrizione_estesa,\n    descrizione_long,\n    metodo_pagamento,\n    durata_servizio,\n    durata_rinnovo,\n    data_cessazione,\n    data_attivazione,\n    note_legali,\n    sost_ord,\n    sostituito_da\n   FROM ranked_orders\n  ORDER BY stato_ordine, nome_testata_ordine, rn;",
+          "columns": [
+            {
+              "name": "stato",
+              "position": 1,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "numero_ordine",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_prodotto",
+              "position": 3,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "quantita",
+              "position": 4,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "nrc",
+              "position": 5,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "mrc",
+              "position": 6,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "totale_mrc",
+              "position": 7,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "stato_ordine",
+              "position": 8,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "nome_testata_ordine",
+              "position": 9,
+              "type": "character varying(50)",
+              "nullable": true
+            },
+            {
+              "name": "rn",
+              "position": 10,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "numero_azienda",
+              "position": 11,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "data_documento",
+              "position": 12,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "stato_riga",
+              "position": 13,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "data_ultima_fatt",
+              "position": 14,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "serialnumber",
+              "position": 15,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_estesa",
+              "position": 16,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_long",
+              "position": 17,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "metodo_pagamento",
+              "position": 18,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "durata_servizio",
+              "position": 19,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "durata_rinnovo",
+              "position": 20,
+              "type": "double precision",
+              "nullable": true
+            },
+            {
+              "name": "data_cessazione",
+              "position": 21,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "data_attivazione",
+              "position": 22,
+              "type": "timestamp without time zone",
+              "nullable": true
+            },
+            {
+              "name": "note_legali",
+              "position": 23,
+              "type": "character varying(250)",
+              "nullable": true
+            },
+            {
+              "name": "sost_ord",
+              "position": 24,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "sostituito_da",
+              "position": 25,
+              "type": "character varying(250)",
+              "nullable": true
+            }
+          ]
+        }
+      ],
+      "functions": [
+        {
+          "name": "get_order_history_path",
+          "definition": "CREATE OR REPLACE FUNCTION loader.get_order_history_path(ordine_numero character varying)\n RETURNS text\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    -- Variabile per costruire il percorso degli ordini\n    ordine_path TEXT := '';\n    current_ordine varchar;\n    next_ordine varchar;\nBEGIN\n    -- Inizializza il percorso con l'ordine iniziale\n    current_ordine := ordine_numero;\n\n    LOOP\n        -- Cerca l'ordine corrente per vedere se è stato sostituito da un altro ordine\n        SELECT nome_testata_ordine INTO next_ordine\n        FROM loader.erp_ordini\n        WHERE sost_ord = current_ordine;\n\n        -- Controlla se l'ordine corrente è stato trovato\n        IF next_ordine IS NULL THEN\n            -- Se non ci sono altri ordini sostitutivi, esce dal loop\n            EXIT;\n        ELSE\n            -- Aggiunge l'ordine corrente al percorso\n            ordine_path := ordine_path || current_ordine || ' -> ';\n            -- Imposta l'ordine corrente al prossimo ordine nella catena\n            current_ordine := next_ordine;\n        END IF;\n    END LOOP;\n\n    -- Aggiunge l'ultimo ordine al percorso\n    ordine_path := ordine_path || current_ordine;\n\n    RETURN ordine_path;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_reverse_order_history_path",
+          "definition": "CREATE OR REPLACE FUNCTION loader.get_reverse_order_history_path(ordine_recente character varying)\n RETURNS text\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    -- Variabile per costruire il percorso degli ordini\n    ordine_path TEXT := ordine_recente;\n    current_ordine varchar := ordine_recente;\n    prev_ordine varchar;\nBEGIN\n    LOOP\n        -- Cerca l'ordine precedente che questo ordine ha sostituito\n        SELECT sost_ord INTO prev_ordine\n        FROM loader.erp_ordini\n        WHERE nome_testata_ordine = current_ordine;\n\n        -- Controlla se è stato trovato un ordine precedente\n        IF prev_ordine IS NULL or prev_ordine = '' THEN\n            -- Se non ci sono altri ordini precedenti, esce dal loop\n            EXIT;\n        ELSE\n            -- Prepara il percorso aggiungendo l'ordine precedente all'inizio\n            ordine_path := prev_ordine || ' -> ' || ordine_path;\n            -- Imposta l'ordine corrente all'ordine precedente per la prossima iterazione\n            current_ordine := prev_ordine;\n        END IF;\n    END LOOP;\n\n    RETURN ordine_path;\nEND;\n$function$\n"
+        },
+        {
+          "name": "ordine_prossima_scadenza",
+          "definition": "CREATE OR REPLACE FUNCTION loader.ordine_prossima_scadenza(data_attivazione timestamp without time zone, durata_servizio integer, durata_rinnovo integer, tacito_rinnovo integer)\n RETURNS date\n LANGUAGE plpgsql\nAS $function$\nDECLARE\nprossima_scadenza DATE;\nBEGIN\n    -- Controlla se data_attivazione è NULL o inferiore a 1001-01-01\n    IF data_attivazione IS NULL OR data_attivazione < '1001-01-01'::TIMESTAMP WITHOUT TIME ZONE OR\n    coalesce(durata_servizio, 0) = 0\n    THEN\n        RETURN NULL;\n    END IF;\n\n    -- Calcola la prossima scadenza aggiungendo la durata del servizio alla data di attivazione\n    prossima_scadenza := data_attivazione + (durata_servizio || ' months')::INTERVAL;\n\n    -- Se il tacito rinnovo è attivo, calcola la prossima scadenza tenendo conto dei rinnovi\n    IF tacito_rinnovo = 1 and coalesce(durata_rinnovo, 0) > 0 THEN\n        WHILE prossima_scadenza <= CURRENT_DATE LOOP\n            prossima_scadenza := prossima_scadenza + (durata_rinnovo || ' months')::INTERVAL;\n        END LOOP;\n    END IF;\n\nRETURN prossima_scadenza;\nEND;\n$function$\n"
+        }
+      ],
+      "procedures": [
+        {
+          "name": "update_customers_account_from_gamma",
+          "definition": "CREATE OR REPLACE PROCEDURE loader.update_customers_account_from_gamma()\n LANGUAGE sql\nAS $procedure$\nINSERT INTO customers.customer (id, name, group_id)\nSELECT\n    c.numero_azienda,\n    c.ragione_sociale,\n    (\n        SELECT id FROM customers.customer_group\n        WHERE name ILIKE c.tipologia_azienda\n        UNION ALL\n        SELECT id FROM customers.customer_group\n        WHERE is_default = true\n        LIMIT 1\n    )\nFROM\n    loader.erp_anagrafiche_clienti c\nON CONFLICT (id) DO UPDATE\n    SET name = EXCLUDED.name,\n        group_id = EXCLUDED.group_id;\n\n$procedure$\n"
+        },
+        {
+          "name": "update_products_product_from_gamma",
+          "definition": "CREATE OR REPLACE PROCEDURE loader.update_products_product_from_gamma()\n LANGUAGE plpgsql\nAS $procedure$\nDECLARE\n    rec_articoli record;\nBEGIN\ninsert into products.product (code, internal_name, category_id)\nselect trim(cod_articolo), descrizione_ita, tgpc.category_id\n    from loader.erp_anagrafica_articoli_vendita a left outer join loader.trascodifica_gamma_product_category tgpc on (a.famiglia = tgpc.famiglia or tgpc.famiglia is null)\n        and (a.sotto_famiglia = tgpc.sotto_famiglia or tgpc.sotto_famiglia is null)\n    where descrizione_ita is not null\n    on conflict do nothing ;\n\nfor rec_articoli IN\n        select code, translation_uuid, a.descrizione_ita, a.descrizione_ing\n            from products.product p join loader.erp_anagrafica_articoli_vendita a on p.code = trim(a.cod_articolo)\nloop\n\n    if rec_articoli.descrizione_ita is not null then\n        insert into common.translation (translation_uuid, language, short, long) values\n            (rec_articoli.translation_uuid, 'it', rec_articoli.descrizione_ita, '' )\n        on conflict do nothing ;\n    end if;\n\n    if rec_articoli.descrizione_ing is not null then\n        insert into common.translation (translation_uuid, language, short, long) values\n            (rec_articoli.translation_uuid, 'en', rec_articoli.descrizione_ing, '' )\n        on conflict do nothing ;\n    end if;\n\n\n\nend loop;\n\n\n\nEND\n$procedure$\n"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,251 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "common",
+      "tables": [
+        {
+          "name": "custom_field_key",
+          "columns": [
+            {
+              "name": "key_name",
+              "position": 1,
+              "type": "character varying(32)",
+              "nullable": false
+            },
+            {
+              "name": "key_description",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false,
+              "default": "''::character varying"
+            },
+            {
+              "name": "get_values",
+              "position": 3,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "schema",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "custom_field_key_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "key_name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 3,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "language",
+          "columns": [
+            {
+              "name": "iso",
+              "position": 1,
+              "type": "character(2)",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(64)",
+              "nullable": false,
+              "default": "''::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "language_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "iso"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 2,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "translation",
+          "columns": [
+            {
+              "name": "translation_uuid",
+              "position": 1,
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "language",
+              "position": 2,
+              "type": "character(2)",
+              "nullable": false
+            },
+            {
+              "name": "short",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": false,
+              "default": "''::character varying"
+            },
+            {
+              "name": "long",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "translation_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "translation_uuid",
+                "language"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "translation_language_fkey",
+              "columns": [
+                "language"
+              ],
+              "referencedTable": "common.language",
+              "referencedColumns": [
+                "iso"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 1856,
+          "dataSize": 212992,
+          "indexSize": 147456
+        },
+        {
+          "name": "vocabulary",
+          "columns": [
+            {
+              "name": "section",
+              "position": 1,
+              "type": "character varying(20)",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(60)",
+              "nullable": false
+            },
+            {
+              "name": "translation_uuid",
+              "position": 3,
+              "type": "uuid",
+              "nullable": false,
+              "default": "gen_random_uuid()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "vocabulary_pk",
+              "type": "BTREE",
+              "expressions": [
+                "section",
+                "name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 15,
+          "dataSize": 8192,
+          "indexSize": 16384
+        }
+      ],
+      "functions": [
+        {
+          "name": "get_dynamic_json",
+          "definition": "CREATE OR REPLACE FUNCTION common.get_dynamic_json(p_sql text)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\ndeclare\n    l_statement text;\n    retval json;\nbegin\n\n    l_statement := format('select json_agg(t) from ('|| p_sql  ||') t');\n    -- raise notice 'l_statement: %', l_statement;\n    execute l_statement into retval;\n    return retval;\n\n\n\nend;\n$function$\n"
+        },
+        {
+          "name": "get_long_translation",
+          "definition": "CREATE OR REPLACE FUNCTION common.get_long_translation(tr_uuid uuid, p_lang character varying)\n RETURNS character varying\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n    select long from common.translation where translation_uuid = tr_uuid and language = p_lang limit 1;\n\n$function$\n"
+        },
+        {
+          "name": "get_short_translation",
+          "definition": "CREATE OR REPLACE FUNCTION common.get_short_translation(tr_uuid uuid, p_lang character varying)\n RETURNS character varying\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n    select short from common.translation where translation_uuid = tr_uuid and language = p_lang limit 1;\n\n    $function$\n"
+        },
+        {
+          "name": "get_translations",
+          "definition": "CREATE OR REPLACE FUNCTION common.get_translations(tr_uuid uuid)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\nselect json_agg(x) from (\nselect language, short, long from common.translation where translation_uuid = tr_uuid) x;\n\n$function$\n"
+        },
+        {
+          "name": "new_document_number",
+          "definition": "CREATE OR REPLACE FUNCTION common.new_document_number(p_lead_str character varying)\n RETURNS character varying\n LANGUAGE sql\nAS $function$\n    select (p_lead_str || (nextval('common.document_seq'::regclass))::text || '/'::text) || to_char(now(), 'YYYY'::text) numero;\n\n$function$\n"
+        },
+        {
+          "name": "new_item_id",
+          "definition": "CREATE OR REPLACE FUNCTION common.new_item_id(_prefix character varying)\n RETURNS text\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    chars TEXT = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';\n    r1 char(1);\n    r2 char(1);\n    r3 varchar(32);\nBEGIN\n    r1 := substr(chars, floor(random() * length(chars) + 1)::int, 1);\n    r2 := substr(chars, floor(random() * length(chars) + 1)::int, 1);\n    r3 := upper(to_hex(((extract(epoch from now()) - random())*1000)::bigint));\n    if _prefix is null then\n        _prefix := 'YC';\n    end if;\n    RETURN _prefix || '-' || r1 || r2 || '-' || r3;\nEND;\n$function$\n"
+        },
+        {
+          "name": "new_line_to_br",
+          "definition": "CREATE OR REPLACE FUNCTION common.new_line_to_br(str text)\n RETURNS text\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  RETURN REPLACE(str, E'\\n', '<br>');\nEND;\n$function$\n"
+        },
+        {
+          "name": "random_crockford_base32",
+          "definition": "CREATE OR REPLACE FUNCTION common.random_crockford_base32()\n RETURNS text\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    -- Array of characters for Crockford's Base32\n    crockford_chars TEXT[] := ARRAY[\n        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',\n        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K',\n        'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Y', 'Z'\n        ];\n    num BIGINT;\n    base32_text TEXT := '';\nBEGIN\n    -- Generate a random large integer\n    num := (random() * 4611686018427387903 + random() * 4611686018427387903)::BIGINT;\n\n    -- Convert the number to a Base32 string\n    WHILE num > 0 LOOP\n            base32_text := crockford_chars[1 + (num % 32)] || base32_text;\n            num := num / 32;\n        END LOOP;\n\n    RETURN left(base32_text, 24);\nEND;\n$function$\n"
+        },
+        {
+          "name": "random_string",
+          "definition": "CREATE OR REPLACE FUNCTION common.random_string()\n RETURNS text\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    chars TEXT = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';\n    result TEXT = '';\n    i INT;\nBEGIN\n    FOR i IN 1..8 LOOP\n            result := result || substr(chars, floor(random() * length(chars) + 1)::int, 1);\n        END LOOP;\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "trigger_set_timestamp",
+          "definition": "CREATE OR REPLACE FUNCTION common.trigger_set_timestamp()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  NEW.updated_at = NOW();\nRETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "upd_translation",
+          "definition": "CREATE OR REPLACE FUNCTION common.upd_translation(p_translation_uuid uuid, json_data json)\n RETURNS smallint\n LANGUAGE plpgsql\nAS $function$\ndeclare\n    updated_rows    int2 default 0;\n    rc              int2;\n    v_translation   json;\nbegin\n\n\n    for v_translation in select * from json_array_elements(json_data )\n        loop\n            update common.translation set\n                short = v_translation->>'short',\n                long = v_translation->>'long'\n            where\n                translation_uuid = p_translation_uuid\n                and language = v_translation->>'language';\n            GET DIAGNOSTICS rc = ROW_COUNT;\n            updated_rows = updated_rows + rc;\n        end loop;\n\n    return updated_rows;\nend;\n\n$function$\n"
+        }
+      ],
+      "sequences": [
+        {
+          "name": "document_seq",
+          "dataType": "integer",
+          "start": 1002,
+          "increment": 1,
+          "min": 1002,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    }
+  ]
+}

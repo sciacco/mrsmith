@@ -1,0 +1,340 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "templates",
+      "tables": [
+        {
+          "name": "document",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(225)",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "document_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "document_id_fkey",
+              "columns": [
+                "id"
+              ],
+              "referencedTable": "templates.template",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 1,
+          "dataSize": 8192,
+          "indexSize": 49152
+        },
+        {
+          "name": "email",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "from_address",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "subject",
+              "position": 3,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "template_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "email_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "email_template_id_fkey",
+              "columns": [
+                "template_id"
+              ],
+              "referencedTable": "templates.template",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 5,
+          "dataSize": 8192,
+          "indexSize": 49152
+        },
+        {
+          "name": "language",
+          "columns": [
+            {
+              "name": "lang",
+              "position": 1,
+              "type": "character(2)",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 2,
+              "type": "character varying(32)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "language_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "lang"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "template",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('templates.template_id_seq'::regclass)"
+            },
+            {
+              "name": "type",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "template",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "template_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "template_type_fkey",
+              "columns": [
+                "type"
+              ],
+              "referencedTable": "templates.template_type",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 6,
+          "dataSize": 49152,
+          "indexSize": 212992
+        },
+        {
+          "name": "template_type",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "template_type_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "translation",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('templates.translation_id_seq'::regclass)"
+            },
+            {
+              "name": "template_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "language",
+              "position": 3,
+              "type": "character(2)",
+              "nullable": false
+            },
+            {
+              "name": "key",
+              "position": 4,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "value",
+              "position": 5,
+              "type": "text",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "translation_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "translation_unique",
+              "type": "BTREE",
+              "expressions": [
+                "template_id",
+                "language",
+                "key"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "translation_language_fkey",
+              "columns": [
+                "language"
+              ],
+              "referencedTable": "templates.language",
+              "referencedColumns": [
+                "lang"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "translation_template_id_fkey",
+              "columns": [
+                "template_id"
+              ],
+              "referencedTable": "templates.template",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 106,
+          "dataSize": 32768,
+          "indexSize": 73728
+        }
+      ],
+      "sequences": [
+        {
+          "name": "template_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "translation_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    }
+  ]
+}

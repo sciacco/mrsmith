@@ -1,0 +1,2254 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "customers",
+      "tables": [
+        {
+          "name": "api_path",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('customers.api_path_id_seq'::regclass)"
+            },
+            {
+              "name": "path",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "method",
+              "position": 3,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "api_path_path_method_key",
+              "type": "BTREE",
+              "expressions": [
+                "path",
+                "method"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "api_path_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 314,
+          "dataSize": 24576,
+          "indexSize": 90112
+        },
+        {
+          "name": "api_path_page",
+          "columns": [
+            {
+              "name": "api_path_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "page_name",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "api_path_page_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "api_path_id",
+                "page_name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "api_path_page_api_path_id_fkey",
+              "columns": [
+                "api_path_id"
+              ],
+              "referencedTable": "customers.api_path",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "api_path_page_page_name_fkey",
+              "columns": [
+                "page_name"
+              ],
+              "referencedTable": "customers.page",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 318,
+          "dataSize": 24576,
+          "indexSize": 81920
+        },
+        {
+          "name": "biometric_request",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false,
+              "default": "nextval('customers.biometric_request_id_seq'::regclass)"
+            },
+            {
+              "name": "admin_user_struct_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "user_struct_id",
+              "position": 3,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "request_type",
+              "position": 4,
+              "type": "customers.request_type_enum",
+              "nullable": false
+            },
+            {
+              "name": "request_source",
+              "position": 5,
+              "type": "customers.request_source_enum",
+              "nullable": false
+            },
+            {
+              "name": "notified_dc",
+              "position": 6,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "notified_user",
+              "position": 7,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "request_date",
+              "position": 8,
+              "type": "timestamp with time zone",
+              "nullable": true,
+              "default": "now()"
+            },
+            {
+              "name": "request_approval_date",
+              "position": 9,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "request_completed",
+              "position": 10,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "customer_id",
+              "position": 11,
+              "type": "integer",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "biometric_request_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "idx_biometric_request_customer_id",
+              "type": "BTREE",
+              "expressions": [
+                "customer_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_biometric_request_user_struct_id_request_date",
+              "type": "BTREE",
+              "expressions": [
+                "user_struct_id",
+                "request_date DESC"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_biometric_request_user_type_date",
+              "type": "BTREE",
+              "expressions": [
+                "user_struct_id",
+                "request_type",
+                "request_date DESC"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "biometric_request_admin_user_struct_id_fkey",
+              "columns": [
+                "admin_user_struct_id"
+              ],
+              "referencedTable": "customers.user_struct",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "SET NULL",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "biometric_request_customer_id_fkey",
+              "columns": [
+                "customer_id"
+              ],
+              "referencedTable": "customers.customer",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "SET NULL",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "biometric_request_user_struct_id_fkey",
+              "columns": [
+                "user_struct_id"
+              ],
+              "referencedTable": "customers.user_struct",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "chk_admin_required_for_external",
+              "expression": "((request_source <> 'external'::customers.request_source_enum) OR (admin_user_struct_id IS NOT NULL))"
+            }
+          ],
+          "rowCount": 14,
+          "dataSize": 16384,
+          "indexSize": 98304
+        },
+        {
+          "name": "contact",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('customers.contact_id_seq'::regclass)"
+            },
+            {
+              "name": "type_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "name",
+              "position": 3,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "user_struct_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "value",
+              "position": 5,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_notification",
+              "position": 6,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "marketing_notification",
+              "position": 7,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "contact_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "contact_type_id_user_struct_id_value_key",
+              "type": "BTREE",
+              "expressions": [
+                "type_id",
+                "user_struct_id",
+                "value"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "contact_type_id_fkey",
+              "columns": [
+                "type_id"
+              ],
+              "referencedTable": "customers.contact_type",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 206,
+          "dataSize": 24576,
+          "indexSize": 81920
+        },
+        {
+          "name": "contact_type",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('customers.contact_type_id_seq'::regclass)"
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "contact_type_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "customer",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "group_id",
+              "position": 3,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "state_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": false,
+              "default": "1"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "accounts_name_idx",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "accounts_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "accounts_group_id_fkey",
+              "columns": [
+                "group_id"
+              ],
+              "referencedTable": "customers.customer_group",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "customer_state_id_fkey",
+              "columns": [
+                "state_id"
+              ],
+              "referencedTable": "customers.customer_state",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 1391,
+          "dataSize": 311296,
+          "indexSize": 344064
+        },
+        {
+          "name": "customer_credit_transaction",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false,
+              "default": "nextval('customers.customer_credit_transaction_id_seq'::regclass)"
+            },
+            {
+              "name": "customer_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "transaction_date",
+              "position": 3,
+              "type": "timestamp without time zone",
+              "nullable": false,
+              "default": "CURRENT_TIMESTAMP"
+            },
+            {
+              "name": "amount",
+              "position": 4,
+              "type": "numeric(14,4)",
+              "nullable": false
+            },
+            {
+              "name": "operation_sign",
+              "position": 5,
+              "type": "character(1)",
+              "nullable": false,
+              "default": "'-'::bpchar"
+            },
+            {
+              "name": "description",
+              "position": 6,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "signed_amount",
+              "position": 7,
+              "type": "numeric",
+              "nullable": true,
+              "default": "\nCASE\n    WHEN (operation_sign = '+'::bpchar) THEN amount\n    ELSE (- amount)\nEND",
+              "generation": {
+                "type": "STORED",
+                "expression": "\nCASE\n    WHEN (operation_sign = '+'::bpchar) THEN amount\n    ELSE (- amount)\nEND"
+              }
+            },
+            {
+              "name": "operated_by",
+              "position": 8,
+              "type": "character varying(128)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "customer_credit_transaction_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "fk_customer_transaction",
+              "columns": [
+                "customer_id"
+              ],
+              "referencedTable": "customers.customer",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "customer_credit_transaction_operation_sign_check",
+              "expression": "(operation_sign = ANY (ARRAY['+'::bpchar, '-'::bpchar]))"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "tr_update_customer_credit",
+              "event": "INSERT",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER tr_update_customer_credit AFTER INSERT ON customers.customer_credit_transaction FOR EACH ROW EXECUTE FUNCTION customers.update_customer_credit()"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "customer_credits",
+          "columns": [
+            {
+              "name": "customer_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "credit",
+              "position": 3,
+              "type": "numeric(14,4)",
+              "nullable": false,
+              "default": "0"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "customer_credits_pk",
+              "type": "BTREE",
+              "expressions": [
+                "customer_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "fk_customer",
+              "columns": [
+                "customer_id"
+              ],
+              "referencedTable": "customers.customer",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "customer_group",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "is_default",
+              "position": 3,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "is_partner",
+              "position": 4,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "read_only",
+              "position": 5,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "base_discount",
+              "position": 6,
+              "type": "integer",
+              "nullable": true,
+              "default": "0"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "customer_group_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 5,
+          "dataSize": 8192,
+          "indexSize": 16384
+        },
+        {
+          "name": "customer_group_variable",
+          "columns": [
+            {
+              "name": "customer_group_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "resource",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "action",
+              "position": 3,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "customer_group_variable_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "customer_group_id",
+                "resource",
+                "action"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "customer_group_variable_customer_group_id_fkey",
+              "columns": [
+                "customer_group_id"
+              ],
+              "referencedTable": "customers.customer_group",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "customer_group_variable_resource_action_fkey",
+              "columns": [
+                "resource",
+                "action"
+              ],
+              "referencedTable": "customers.variable",
+              "referencedColumns": [
+                "resource",
+                "action"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "customer_state",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('customers.customer_state_id_seq'::regclass)"
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "enabled",
+              "position": 3,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true",
+              "comment": "If false customers from this customers will not be able to login"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "customer_state_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "customer_variable",
+          "columns": [
+            {
+              "name": "customer_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "resource",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "action",
+              "position": 3,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "customer_variable_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "customer_id",
+                "resource",
+                "action"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "customer_variable_customer_id_fkey",
+              "columns": [
+                "customer_id"
+              ],
+              "referencedTable": "customers.customer",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "customer_variable_resource_action_fkey",
+              "columns": [
+                "resource",
+                "action"
+              ],
+              "referencedTable": "customers.variable",
+              "referencedColumns": [
+                "resource",
+                "action"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": -1,
+          "indexSize": 16384
+        },
+        {
+          "name": "group_association",
+          "columns": [
+            {
+              "name": "customer_id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "group_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "active",
+              "position": 3,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true",
+              "comment": "DEPRECATED, DO NOT USE !!!!"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "group_association_pk",
+              "type": "BTREE",
+              "expressions": [
+                "customer_id",
+                "group_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "group_association_customer_group_id_fk",
+              "columns": [
+                "group_id"
+              ],
+              "referencedTable": "customers.customer_group",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "group_association_customer_id_fk",
+              "columns": [
+                "customer_id"
+              ],
+              "referencedTable": "customers.customer",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 535,
+          "dataSize": 65536,
+          "indexSize": 81920
+        },
+        {
+          "name": "page",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "only_selectable_by_cdlan",
+              "position": 2,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "auto_add",
+              "position": 3,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "page_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "triggers": [
+            {
+              "name": "auto_add_pages_to_page",
+              "event": "INSERT",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER auto_add_pages_to_page AFTER INSERT OR UPDATE ON customers.page FOR EACH ROW EXECUTE FUNCTION customers.auto_add_pages_from_page()"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "page_customer_group",
+          "columns": [
+            {
+              "name": "page_name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "customer_group_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "page_customer_group_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "page_name",
+                "customer_group_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "page_customer_group_customer_group_id_fkey",
+              "columns": [
+                "customer_group_id"
+              ],
+              "referencedTable": "customers.customer_group",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "page_customer_group_page_name_fkey",
+              "columns": [
+                "page_name"
+              ],
+              "referencedTable": "customers.page",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 207,
+          "dataSize": 16384,
+          "indexSize": 49152
+        },
+        {
+          "name": "page_tree",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('customers.page_tree_id_seq'::regclass)"
+            },
+            {
+              "name": "child_page_name",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true,
+              "comment": "only for leaves"
+            },
+            {
+              "name": "parent_name",
+              "position": 3,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "child_name",
+              "position": 4,
+              "type": "character varying",
+              "nullable": true,
+              "comment": "use this if child is not a leaf"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "page_tree_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "page_tree_child_page_name_fkey",
+              "columns": [
+                "child_page_name"
+              ],
+              "referencedTable": "customers.page",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "preference",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('customers.preference_id_seq'::regclass)"
+            },
+            {
+              "name": "user_struct_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "avatar_link",
+              "position": 4,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "json_preferences",
+              "position": 5,
+              "type": "json",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "preference_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "preference_user_struct_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "user_struct_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "preference_user_struct_id_fkey",
+              "columns": [
+                "user_struct_id"
+              ],
+              "referencedTable": "customers.user_struct",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 325,
+          "dataSize": 24576,
+          "indexSize": 65536
+        },
+        {
+          "name": "role",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('customers.role_id_seq'::regclass)"
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "customer_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "color",
+              "position": 4,
+              "type": "character varying(7)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "role_name_customer_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "name",
+                "customer_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "role_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "role_customer_id_fkey",
+              "columns": [
+                "customer_id"
+              ],
+              "referencedTable": "customers.customer",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "auto_add_pages_to_role",
+              "event": "INSERT",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER auto_add_pages_to_role AFTER INSERT OR UPDATE ON customers.role FOR EACH ROW EXECUTE FUNCTION customers.auto_add_pages_to_role()"
+            }
+          ],
+          "rowCount": 138,
+          "dataSize": 16384,
+          "indexSize": 65536
+        },
+        {
+          "name": "role_page",
+          "columns": [
+            {
+              "name": "role_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "page_name",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "role_page_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "role_id",
+                "page_name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "role_page_page_name_fkey",
+              "columns": [
+                "page_name"
+              ],
+              "referencedTable": "customers.page",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "role_page_role_id_fkey",
+              "columns": [
+                "role_id"
+              ],
+              "referencedTable": "customers.role",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 2734,
+          "dataSize": 155648,
+          "indexSize": 237568
+        },
+        {
+          "name": "user",
+          "columns": [
+            {
+              "name": "email",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "active_user_struct_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": true,
+              "comment": "the active user struct for this user"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "user_active_user_struct_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "active_user_struct_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "user_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "email"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "active_user_struct_id_fk",
+              "columns": [
+                "active_user_struct_id"
+              ],
+              "referencedTable": "customers.user_struct",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "SET NULL",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "create_entrance_detail_trigger",
+              "event": "INSERT",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER create_entrance_detail_trigger AFTER INSERT ON customers.\"user\" FOR EACH ROW EXECUTE FUNCTION customers.create_user_entrance_detail()"
+            }
+          ],
+          "rowCount": 1029,
+          "dataSize": 106496,
+          "indexSize": 188416
+        },
+        {
+          "name": "user_entrance_detail",
+          "columns": [
+            {
+              "name": "email",
+              "position": 1,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "is_biometric",
+              "position": 2,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_user_entrance_detail_is_biometric",
+              "type": "BTREE",
+              "expressions": [
+                "is_biometric"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "user_entrance_detail_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "email"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 1050,
+          "dataSize": 131072,
+          "indexSize": 180224
+        },
+        {
+          "name": "user_state",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('customers.user_state_id_seq'::regclass)"
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "enabled",
+              "position": 3,
+              "type": "boolean",
+              "nullable": true,
+              "comment": "If false cdlan will not see customers in this state"
+            },
+            {
+              "name": "visible_ext",
+              "position": 4,
+              "type": "boolean",
+              "nullable": true
+            },
+            {
+              "name": "visible_cdlan",
+              "position": 5,
+              "type": "boolean",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "user_state_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "user_struct",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('customers.user_struct_id_seq'::regclass)"
+            },
+            {
+              "name": "customer_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "primary_email",
+              "position": 3,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "state_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": false,
+              "default": "1"
+            },
+            {
+              "name": "created",
+              "position": 5,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "updated",
+              "position": 6,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "last_login",
+              "position": 7,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "phone",
+              "position": 8,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "first_name",
+              "position": 9,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "last_name",
+              "position": 10,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "role_id",
+              "position": 11,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "marketing_on_primary_email",
+              "position": 12,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false",
+              "comment": "if true the user can receive marketing notification on primary email"
+            },
+            {
+              "name": "maintenance_on_primary_email",
+              "position": 13,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false",
+              "comment": "if true the user can receive maintenance notification on primary email"
+            },
+            {
+              "name": "language",
+              "position": 14,
+              "type": "character varying(3)",
+              "nullable": false,
+              "default": "'it'::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "user_struct_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "user_struct_customer_id_fkey",
+              "columns": [
+                "customer_id"
+              ],
+              "referencedTable": "customers.customer",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "user_struct_role_id_fkey",
+              "columns": [
+                "role_id"
+              ],
+              "referencedTable": "customers.role",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "user_struct_state_id_fkey",
+              "columns": [
+                "state_id"
+              ],
+              "referencedTable": "customers.user_state",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "check_min_length_email",
+              "expression": "(length((primary_email)::text) > 0)"
+            },
+            {
+              "name": "check_min_length_phone",
+              "expression": "(length((phone)::text) > 0)"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "trg_delete_biometric_requests",
+              "event": "UPDATE",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER trg_delete_biometric_requests BEFORE UPDATE ON customers.user_struct FOR EACH ROW WHEN (((old.primary_email IS NOT NULL) AND (new.primary_email IS NULL))) EXECUTE FUNCTION customers.delete_biometric_requests_on_email_null()"
+            },
+            {
+              "name": "update_biometric_user_struct_trigger",
+              "event": "UPDATE",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER update_biometric_user_struct_trigger AFTER UPDATE ON customers.user_struct FOR EACH ROW EXECUTE FUNCTION customers.update_biometric_user_struct()"
+            }
+          ],
+          "rowCount": 1136,
+          "dataSize": 204800,
+          "indexSize": 98304
+        },
+        {
+          "name": "variable",
+          "columns": [
+            {
+              "name": "resource",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "action",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "variable_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "resource",
+                "action"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        }
+      ],
+      "functions": [
+        {
+          "name": "anonymize_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION customers.anonymize_user_struct(_user_struct_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _email varchar;\nBEGIN\n\n    SELECT INTO _email _user_struct_id || '@mail.example';\n\n    perform customers.user_create_if_not_exists(_email);\n\n    -- update email, first_name, last_name, phone\n    UPDATE customers.user_struct SET\n        primary_email = NULL,\n        first_name = 'deleted_user_' || _user_struct_id,\n        last_name = '',\n        phone = LPAD('0' || _user_struct_id, 10, '0'),\n        marketing_on_primary_email = false,\n        maintenance_on_primary_email = false,\n        role_id = NULL,\n        state_id = 4, -- DELETED state\n        updated = NOW()\n    WHERE id = _user_struct_id;\n\n    -- delete preferences\n    DELETE FROM customers.preference WHERE user_struct_id = _user_struct_id;\n\n    -- delete contacts\n    DELETE FROM customers.contact WHERE user_struct_id = _user_struct_id;\nend;\n$function$\n"
+        },
+        {
+          "name": "api_path_delete",
+          "definition": "CREATE OR REPLACE FUNCTION customers.api_path_delete(_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM api_path WHERE id = _id) THEN\n        RAISE EXCEPTION 'No api_path with id % found', _id USING ERRCODE = 'T1AZ0';\n    end if;\n\n    -- delete api paths\n    DELETE FROM api_path_page WHERE api_path_id = _id;\n\n    -- delete page\n    DELETE FROM api_path WHERE id = _id;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "api_path_get",
+          "definition": "CREATE OR REPLACE FUNCTION customers.api_path_get(_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    pages json;\n    result json;\nBEGIN\n\n    -- if page not found -> error\n    IF NOT EXISTS (SELECT * FROM api_path WHERE id = _id) THEN\n        RAISE EXCEPTION 'No api_path with id % found', _id USING ERRCODE = 'T1AZ0';\n    end if;\n\n    SELECT into pages json_agg(x) FROM (\n        SELECT page_name from api_path_page WHERE api_path_id = _id\n    ) x;\n\n    -- get global json\n    SELECT INTO result json_agg(x) -> 0 FROM (\n         SELECT api_path.*, pages FROM api_path WHERE id = _id LIMIT 1\n     ) x;\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "api_path_get_all",
+          "definition": "CREATE OR REPLACE FUNCTION customers.api_path_get_all(_search_struct json)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\nBEGIN\n    SELECT array (\n        SELECT api_path_get(p.id)\n        FROM api_path p\n        WHERE path LIKE concat('%', _search_struct->>'search_string', '%')\n        ORDER BY p.path\n    ) into tmp;\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "api_path_get_or_insert",
+          "definition": "CREATE OR REPLACE FUNCTION customers.api_path_get_or_insert(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _api_path_id bigint;\nBEGIN\n\n    IF NOT EXISTS(SELECT * FROM api_path WHERE method = json_data->> 'method' AND path = json_data ->> 'path') THEN\n        SELECT api_path_new(json_data) INTO _api_path_id;\n    ELSE\n        SELECT id FROM api_path WHERE method = json_data->> 'method' AND path = json_data ->> 'path' INTO _api_path_id;\n    end if;\n\n    RETURN _api_path_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "api_path_new",
+          "definition": "CREATE OR REPLACE FUNCTION customers.api_path_new(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _id bigint;\nBEGIN\n    -- check already exists\n    IF EXISTS(SELECT * FROM api_path WHERE path = json_data->>'path' AND method = json_data->>'method') THEN\n        RAISE EXCEPTION 'ApiPath with path = % and method = % already exists', json_data ->> 'path', json_data->>'method' USING ERRCODE = 'T1AZ1';\n    end if;\n\n    INSERT INTO api_path (path, method) VALUES (json_data->>'path', json_data->>'method') RETURNING id INTO _id;\n    RETURN _id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "auto_add_pages_from_page",
+          "definition": "CREATE OR REPLACE FUNCTION customers.auto_add_pages_from_page()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    IF NEW.auto_add THEN\n        -- add to role all the\n        INSERT INTO customers.role_page (role_id, page_name)\n        SELECT\n            id,\n            NEW.name\n        FROM customers.role\n        ON CONFLICT DO NOTHING;\n    END IF;\n\n    IF OLD.auto_add IS TRUE AND NEW.auto_add IS NOT TRUE THEN\n\n        -- delete from role <-> page the\n        RAISE NOTICE 'page % changed from auto_add=% to %', NEW.name, OLD.auto_add, NEW.auto_add;\n        DELETE FROM customers.role_page\n        WHERE page_name = NEW.name;\n    END IF;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "auto_add_pages_to_role",
+          "definition": "CREATE OR REPLACE FUNCTION customers.auto_add_pages_to_role()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    -- add to role all the\n    INSERT INTO customers.role_page (role_id, page_name)\n    SELECT\n        NEW.id,\n        name\n    FROM customers.page\n    WHERE auto_add IS true\n    ON CONFLICT DO NOTHING;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "biometric_request_new_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.biometric_request_new_ext(json_data json, _caller_customer_id bigint)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n_request_id bigint;\nBEGIN\n\n    -- check user_struct exists\n    IF NOT EXISTS (SELECT 1 FROM customers.user_struct WHERE id = (json_data->>'user_struct_id')::bigint AND customer_id = _caller_customer_id) THEN\n        RAISE EXCEPTION 'No user_struct with id % found for customer %', (json_data->>'user_struct_id')::bigint, _caller_customer_id USING ERRCODE = 'T5AZ0';\n    END IF;\n\n    -- check admin exists\n    IF NOT EXISTS (SELECT 1 FROM customers.user_struct WHERE id = (json_data->>'admin_user_struct_id')::bigint AND customer_id = _caller_customer_id) THEN\n        RAISE EXCEPTION 'No admin user_struct with id % found for customer %', (json_data->>'admin_user_struct_id')::bigint, _caller_customer_id USING ERRCODE = 'T5AZ0';\n    END IF;\n\n        -- insert into biometric_request\n    INSERT INTO customers.biometric_request (\n        user_struct_id,\n        admin_user_struct_id,\n        request_type,\n        request_source,\n        customer_id\n    ) VALUES (\n         (json_data->>'user_struct_id')::bigint,\n         (json_data->>'admin_user_struct_id')::bigint,\n         (json_data->>'request_type')::request_type_enum,\n         'external'::request_source_enum,\n         _caller_customer_id\n     )\n    RETURNING id INTO _request_id;\n\n    RETURN _request_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "biometric_request_new_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.biometric_request_new_sudo(json_data json, _caller_customer_id bigint)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n_request_id bigint;\nBEGIN\n    -- check user_struct exists\n    IF NOT EXISTS (\n        SELECT 1\n        FROM customers.user_struct\n        WHERE id = (json_data->>'user_struct_id')::bigint\n          AND customer_id = _caller_customer_id\n    ) THEN\n        RAISE EXCEPTION 'No user_struct with id % found for customer %',\n            (json_data->>'user_struct_id')::bigint,\n            _caller_customer_id\n            USING ERRCODE = 'T5AZ0';\n    END IF;\n\n    -- insert into biometric_request\n    INSERT INTO customers.biometric_request (\n        user_struct_id,\n        admin_user_struct_id,\n        request_type,\n        request_source,\n        customer_id\n    ) VALUES (\n                 (json_data->>'user_struct_id')::bigint,\n                 NULL,  -- no admin\n                 (json_data->>'request_type')::request_type_enum,\n                 'internal'::request_source_enum,\n                 _caller_customer_id\n             )\n    RETURNING id INTO _request_id;\n\nRETURN _request_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "biometric_request_set_completed",
+          "definition": "CREATE OR REPLACE FUNCTION customers.biometric_request_set_completed(_request_id bigint, _completed boolean)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check request exists\n    IF NOT EXISTS (SELECT 1 FROM customers.biometric_request WHERE id = _request_id) THEN\n        RAISE EXCEPTION 'No biometric_request with id % found', _request_id USING ERRCODE = 'T5AZ1';\n    END IF;\n\n    -- update request_completed and set timestamp\n    UPDATE customers.biometric_request\n    SET\n        request_completed = _completed,\n        request_approval_date = now()\n    WHERE id = _request_id;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "biometric_request_set_notified_dc",
+          "definition": "CREATE OR REPLACE FUNCTION customers.biometric_request_set_notified_dc(_biometric_request_id bigint, _notified boolean)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if biometric request exists\n    IF NOT EXISTS (SELECT 1 FROM customers.biometric_request WHERE id = _biometric_request_id) THEN\n        RAISE EXCEPTION 'No biometric_request with id % found', _biometric_request_id\n            USING ERRCODE = 'T8AZ0';\n    END IF;\n\n    -- update notified_dc flag\n    UPDATE customers.biometric_request\n    SET notified_dc = _notified\n    WHERE id = _biometric_request_id;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "biometric_request_set_notified_user",
+          "definition": "CREATE OR REPLACE FUNCTION customers.biometric_request_set_notified_user(_biometric_request_id bigint, _notified boolean)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    -- check if biometric request exists\n    IF NOT EXISTS (SELECT 1 FROM customers.biometric_request WHERE id = _biometric_request_id) THEN\n        RAISE EXCEPTION 'No biometric_request with id % found', _biometric_request_id\n            USING ERRCODE = 'T8AZ0';\n    END IF;\n\n    -- update notified_user flag\n    UPDATE customers.biometric_request\n    SET notified_user = _notified\n    WHERE id = _biometric_request_id;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "contact_get",
+          "definition": "CREATE OR REPLACE FUNCTION customers.contact_get(_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _contact json;\nBEGIN\n\n    -- raise exception if not found\n    IF NOT EXISTS(SELECT * FROM customers.contact WHERE id = _id) THEN\n        RAISE EXCEPTION 'No contact with id % found', _id USING ERRCODE = 'T9AZ0';\n    end if;\n\n    -- get contact\n    SELECT INTO _contact json_agg(x) -> 0 FROM (\n        SELECT c.id,ct.name as type,c.name,c.maintenance_notification,c.marketing_notification,c.value,c.user_struct_id FROM customers.contact c LEFT JOIN customers.contact_type ct ON c.type_id = ct.id WHERE c.id = _id LIMIT 1\n    ) x;\n\n    -- return json\n    RETURN _contact;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "create_user_entrance_detail",
+          "definition": "CREATE OR REPLACE FUNCTION customers.create_user_entrance_detail()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\nINSERT INTO user_entrance_detail(email)\nVALUES (NEW.email);\nRETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "customer_get_all",
+          "definition": "CREATE OR REPLACE FUNCTION customers.customer_get_all(_filter_struct json)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _customers json[];\n    _search_pattern varchar;\nBEGIN\n\n    SELECT concat('%', _filter_struct ->> 'search_string', '%') INTO _search_pattern;\n\n    SELECT ARRAY(\n        SELECT customers.get_customer_by_id(id) FROM customers.customer\n           WHERE name LIKE _search_pattern\n           AND ( _filter_struct ->> 'customer_group_id' IS NULL OR group_id = (_filter_struct ->> 'customer_group_id')::bigint)\n           AND ( _filter_struct ->> 'state_id' IS NULL OR state_id = (_filter_struct ->> 'state_id')::bigint)\n           ORDER BY name\n    ) INTO _customers;\n\n    RETURN to_json(_customers);\n\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "customer_group_get",
+          "definition": "CREATE OR REPLACE FUNCTION customers.customer_group_get(_cg_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _vars json;\nBEGIN\n\n    -- check cg exists\n    IF NOT EXISTS(SELECT 1 FROM customers.customer_group WHERE id = _cg_id) THEN\n        RAISE EXCEPTION 'No customer_group with id % found', _cg_id USING ERRCODE = 'T2BZ0';\n    end if;\n\n    -- get variables in json array\n    SELECT json_agg(x) FROM (SELECT action, resource FROM customers.customer_group_variable WHERE customer_group_id = _cg_id )x INTO _vars;\n\n    -- to_json()\n\n    RETURN json_agg(x)->0 FROM(\n        SELECT *\n             ,_vars as variables\n        FROM customers.customer_group WHERE id = _cg_id\n    )x;\nEND;\n$function$\n"
+        },
+        {
+          "name": "customer_group_get_all",
+          "definition": "CREATE OR REPLACE FUNCTION customers.customer_group_get_all(_filter_struct json)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _customer_groups json[];\n    _search_pattern varchar;\nBEGIN\n\n    SELECT concat('%', _filter_struct ->> 'search_string', '%') INTO _search_pattern;\n\n    SELECT ARRAY(\n                   SELECT customers.customer_group_get(id) FROM customer_group\n                   WHERE name LIKE _search_pattern\n                     AND ( _filter_struct ->> 'is_partner' IS NULL OR is_partner = (_filter_struct ->> 'is_partner')::bool)\n                     AND ( _filter_struct ->> 'is_default' IS NULL OR is_default = (_filter_struct ->> 'is_default')::bool)\n                   ORDER BY id\n           ) INTO _customer_groups;\n\n    RETURN to_json(_customer_groups);\n\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "customer_group_update",
+          "definition": "CREATE OR REPLACE FUNCTION customers.customer_group_update(_json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _var json;\nBEGIN\n\n    -- check if exist customer\n    IF NOT EXISTS (SELECT 1 FROM customers.customer_group WHERE id = (_json_data ->> 'id')::bigint) THEN\n        RAISE EXCEPTION 'No customer_group with id % found', (_json_data ->> 'id')::bigint USING ERRCODE = 'T2BZ0';\n    end if;\n\n    -- update name\n    IF _json_data ->> 'name' IS NOT NULL THEN\n        UPDATE customers.customer_group SET name = _json_data ->> 'name' WHERE id = (_json_data ->> 'id')::bigint;\n    END IF;\n\n    IF _json_data ->> 'is_default' IS NOT NULL THEN\n\n        UPDATE customers.customer_group SET is_default = (_json_data ->> 'is_default')::bool WHERE id = (_json_data ->> 'id')::bigint;\n    END IF;\n\n    IF _json_data ->> 'is_partner' IS NOT NULL THEN\n\n        UPDATE customers.customer_group SET is_partner = (_json_data ->> 'is_partner')::bool WHERE id = (_json_data ->> 'id')::bigint;\n    END IF;\n\n    -- delete and replace vars\n    if (_json_data ->> 'variables') IS NOT NULL THEN\n\n        -- delete old\n        DELETE FROM customers.customer_group_variable WHERE customer_group_id = (_json_data ->> 'id')::bigint;\n\n        -- insert new\n        for _var in select * from json_array_elements(_json_data -> 'variables')\n            loop\n\n                INSERT INTO customers.customer_group_variable (customer_group_id, resource, action) VALUES\n                    (\n                        (_json_data ->> 'id')::bigint,\n                        _var ->> 'resource',\n                        _var ->> 'action'\n                    );\n            end loop;\n\n    end if;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "customer_update",
+          "definition": "CREATE OR REPLACE FUNCTION customers.customer_update(_json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _var json;\nBEGIN\n\n    -- check if exist customer\n    IF NOT EXISTS (SELECT 1 FROM customers.customer WHERE id = (_json_data ->> 'id')::bigint) THEN\n        RAISE EXCEPTION 'No customer with id % found', (_json_data ->> 'id')::bigint USING ERRCODE = 'T1BZ0';\n    end if;\n\n    -- update name\n    IF _json_data ->> 'name' IS NOT NULL THEN\n        UPDATE customers.customer SET name = _json_data ->> 'name' WHERE id = (_json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update group_id\n    IF _json_data ->> 'group_id' IS NOT NULL THEN\n\n        -- check if exist customer_group\n        IF NOT EXISTS (SELECT 1 FROM customers.customer_group WHERE id = (_json_data ->> 'group_id')::bigint) THEN\n            RAISE EXCEPTION 'No customer_group with id % found', (_json_data ->> 'group_id')::bigint USING ERRCODE = 'T2BZ0';\n        end if;\n\n        UPDATE customers.customer SET group_id = (_json_data ->> 'group_id')::bigint WHERE id = (_json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update group_id\n    IF _json_data ->> 'state_id' IS NOT NULL THEN\n\n        -- check if exist customer_group\n        IF NOT EXISTS (SELECT 1 FROM customers.customer_state WHERE id = (_json_data ->> 'state_id')::bigint) THEN\n            RAISE EXCEPTION 'No customer_state with id % found', (_json_data ->> 'state_id')::bigint USING ERRCODE = 'T1BZ3';\n        end if;\n\n        UPDATE customers.customer SET state_id = (_json_data ->> 'state_id')::bigint WHERE id = (_json_data ->> 'id')::bigint;\n    END IF;\n\n    -- delete and replace vars\n    if (_json_data ->> 'variables') IS NOT NULL THEN\n\n        -- delete old\n        DELETE FROM customers.customer_variable WHERE customer_id = (_json_data ->> 'id')::bigint;\n\n        -- insert new\n        for _var in select * from json_array_elements(_json_data -> 'variables')\n        loop\n\n            INSERT INTO customers.customer_variable (customer_id, resource, action) VALUES\n                (\n                    (_json_data ->> 'id')::bigint,\n                    _var ->> 'resource',\n                    _var ->> 'action'\n                );\n        end loop;\n\n    end if;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "delete_biometric_requests_on_email_null",
+          "definition": "CREATE OR REPLACE FUNCTION customers.delete_biometric_requests_on_email_null()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    -- Check if primary_email is being set to NULL\n    IF NEW.primary_email IS NULL AND OLD.primary_email IS NOT NULL THEN\n        DELETE FROM customers.biometric_request\n        WHERE user_struct_id = OLD.id;\n    END IF;\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_customer_by_id",
+          "definition": "CREATE OR REPLACE FUNCTION customers.get_customer_by_id(_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _customer customers.customer%rowtype;\n    _customer_state customers.customer_state%rowtype;\n    _customer_group json;\n    _vars json;\n    _language varchar;\nBEGIN\n\n    IF NOT EXISTS(SELECT * FROM customers.customer WHERE id = _customer_id)THEN\n        RAISE EXCEPTION 'Invalid customer_id: %', _customer_id USING ERRCODE = 'T1BZ3';\n    end if;\n\n    SELECT * FROM customers.customer WHERE id = _customer_id LIMIT 1 INTO _customer;\n\n    SELECT cs.* FROM customers.customer_state cs INNER JOIN customers.customer c ON cs.id = c.state_id WHERE c.id = _customer_id LIMIT 1 INTO _customer_state;\n\n    IF NOT EXISTS(SELECT * FROM customers.customer_group WHERE id = _customer.group_id)THEN\n        RAISE EXCEPTION 'MECHAERROR: Nonexistent customer_group_id: % from customer w/ id: %', _customer.group_id, _customer_id USING ERRCODE = 'T2BZ4';\n    end if;\n\n    -- get variables in json array\n    SELECT json_agg(x) FROM (SELECT action, resource FROM customers.customer_variable WHERE customer_id = _customer_id )x INTO _vars;\n\n    SELECT json_agg(x)->0 FROM (\n        SELECT * FROM customers.customer_group WHERE id = _customer.group_id LIMIT 1\n    )x INTO _customer_group;\n\n    SELECT COALESCE((\n        CASE\n            WHEN LOWER(lingua) LIKE 'ita%' THEN 'it'\n            WHEN LOWER(lingua) LIKE 'eng%' THEN 'en'\n            WHEN LOWER(lingua) LIKE 'ing%' THEN 'en'\n            ELSE 'it'\n            END\n    ), 'it')\n    FROM loader.erp_anagrafiche_clienti WHERE numero_azienda = _customer_id INTO _language;\n\n    -- handle edge case where no customer is found in erp_anagrafiche_clienti\n    IF _language IS NULL THEN\n        _language = 'it';\n    end if;\n\n    RETURN json_agg(x)->0 FROM (\n        SELECT _customer.*, _customer_group as customer_group, _customer_state as state, _vars as variables, _language as language\n    )x;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_customer_disable_biometric_user_ids",
+          "definition": "CREATE OR REPLACE FUNCTION customers.get_customer_disable_biometric_user_ids(_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    result JSONB := '[]'::jsonb;\n    r RECORD;\n    br_json JSONB;\nBEGIN\n    -- Validate customer exists\n    IF NOT EXISTS (SELECT 1 FROM customers.customer WHERE id = _customer_id) THEN\n        RAISE EXCEPTION 'Customer not found: %', _customer_id\n            USING ERRCODE = 'T1BZ0';\n    END IF;\n\n    FOR r IN (SELECT id FROM customers.user_struct WHERE customer_id = _customer_id) LOOP\n        BEGIN\n            br_json := customers.get_latest_biometric_request(r.id);\n\n            -- Include only if last request is 'activation'\n            IF br_json->>'request_type' = 'activation' THEN\n                result := result || to_jsonb(r.id);\n            END IF;\n\n        EXCEPTION\n            WHEN SQLSTATE 'T8AZ0' THEN\n                NULL; -- Ignore users with no biometric request\n        END;\n    END LOOP;\n\n    RETURN result::json;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_customer_enable_biometric_user_ids",
+          "definition": "CREATE OR REPLACE FUNCTION customers.get_customer_enable_biometric_user_ids(_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\nresult JSONB := '[]'::jsonb;\n    r RECORD;\n    br_json JSONB;\nBEGIN\n    IF NOT EXISTS (SELECT 1 FROM customers.customer WHERE id = _customer_id) THEN\n        RAISE EXCEPTION 'Customer not found: %', _customer_id\n            USING ERRCODE = 'T1BZ0';\n    END IF;\n\n    FOR r IN (SELECT id FROM customers.user_struct WHERE customer_id = _customer_id) LOOP\n        BEGIN\n            \n            br_json := customers.get_latest_biometric_request(r.id);\n\n            IF br_json->>'request_type' = 'deactivation'\n                AND br_json->>'request_source' = 'internal' THEN\n                result := result || to_jsonb(r.id);\n            END IF;\n            \n        EXCEPTION \n            WHEN SQLSTATE 'T8AZ0' THEN\n                NULL;\n        END;\n    END LOOP;\n\n    RETURN result::json;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_customer_group_id",
+          "definition": "CREATE OR REPLACE FUNCTION customers.get_customer_group_id(customer_id integer)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\ndeclare\n    l_context text;\n    result int;\nbegin\n    set search_path = pg_catalog,pg_temp;\n\n    -- PRE CHECK\n    -- check if customer with the requested customer_id exists, if not return false\n    if ( not exists ( select c.id from customers.customer c where c.id = customer_id ) ) then \n        RAISE EXCEPTION 'Customer with ID: % does not exist', customer_id USING ERRCODE = 'C1CE2';\n    end if;\n\n    select into result ( select c.group_id from customers.customer c where c.id = customer_id );\n\n    return result;\n\n    EXCEPTION\n        WHEN SQLSTATE 'C1CE2' THEN RAISE EXCEPTION 'Customer with ID: % does not exist', customer_id USING ERRCODE = 'C1CE2';\n        WHEN OTHERS THEN\n            GET STACKED DIAGNOSTICS l_context = PG_EXCEPTION_CONTEXT;\n            RAISE EXCEPTION 'Error: %, %', SQLERRM, l_context;\n            RETURN -1;\n\nend;\n\n    $function$\n"
+        },
+        {
+          "name": "get_customer_groups",
+          "definition": "CREATE OR REPLACE FUNCTION customers.get_customer_groups()\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n    set search_path = pg_catalog,pg_temp;\n    select json_agg(x) from (select id, name, is_default, is_partner from customers.customer_group order by id)  x;\n    $function$\n"
+        },
+        {
+          "name": "get_is_biometric",
+          "definition": "CREATE OR REPLACE FUNCTION customers.get_is_biometric(_user_struct_id bigint)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n_is_biometric bool;\n_ued_is_biometric bool;\n_latest_request_type text;\n_latest_request_completed bool;\nBEGIN\n    -- get user_entrance_detail flag\n    SELECT ued.is_biometric\n    INTO _ued_is_biometric\n    FROM user_struct us\n             JOIN \"user\" u ON u.email = us.primary_email\n             LEFT JOIN user_entrance_detail ued ON ued.email = u.email\n    WHERE us.id = _user_struct_id\n            LIMIT 1;\n\n    -- latest biometric request type and whether it is completed\n    SELECT br.request_type, br.request_completed\n    INTO _latest_request_type, _latest_request_completed\n    FROM biometric_request br\n    WHERE br.user_struct_id = _user_struct_id\n    ORDER BY br.request_date DESC\n        LIMIT 1;\n\n    -- _is_biometric determination\n    -- true:\n    --    (_ued_is_biometric AND ((last_request_type = 'activation' AND last_request_completed = TRUE)\n    --    OR (last_request_type = 'deactivation' AND last_request_completed = FALSE)))  -- pending deactivation\n    -- false:\n    --    (!_ued_is_biometric OR (last_request_type = 'deactivation' AND last_request_completed = TRUE)\n    --     OR (last_request_type = 'activation' AND last_request_completed = FALSE))  -- pending activation\n\n    IF _latest_request_type IS NULL THEN\n            _is_biometric := FALSE;\n\n    ELSIF ( _ued_is_biometric = TRUE\n            AND ( (_latest_request_type = 'activation' AND _latest_request_completed = TRUE)\n            OR (_latest_request_type = 'deactivation' AND _latest_request_completed = FALSE) ) ) THEN\n                _is_biometric := TRUE;\n\n    ELSIF ( _ued_is_biometric = FALSE\n            OR (_latest_request_type = 'deactivation' AND _latest_request_completed = TRUE)\n            OR (_latest_request_type = 'activation' AND _latest_request_completed = FALSE) ) THEN\n                _is_biometric := FALSE;\n\n    ELSE\n        -- last fallback, should never happen anyway\n        _is_biometric := FALSE;\n\n    END IF;\n\n    RETURN _is_biometric;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_latest_biometric_request",
+          "definition": "CREATE OR REPLACE FUNCTION customers.get_latest_biometric_request(_user_struct_id bigint)\n RETURNS jsonb\n LANGUAGE plpgsql\nAS $function$\nDECLARE\nresult jsonb;\nBEGIN\nSELECT jsonb_build_object(\n               'request_type', br.request_type,\n               'request_completed', br.request_completed,\n               'request_source', br.request_source\n       )\nINTO result\nFROM biometric_request br\nWHERE br.user_struct_id = _user_struct_id\nORDER BY br.request_date DESC\n    LIMIT 1;\n\nIF result IS NULL THEN\n        RAISE EXCEPTION 'No biometric request found for user_struct_id %', _user_struct_id\n            USING ERRCODE = 'T8AZ0';\nEND IF;\n\nRETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "is_user_active",
+          "definition": "CREATE OR REPLACE FUNCTION customers.is_user_active(_user_struct_id bigint)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    RETURN EXISTS(\n        SELECT *\n        FROM customers.user_struct u\n            INNER JOIN customers.user_state us ON u.state_id = us.id\n            INNER JOIN customers.customer c ON u.customer_id = c.id\n            INNER JOIN customers.customer_state cs ON c.state_id = cs.id\n        WHERE u.id = _user_struct_id AND us.enabled =true AND cs.enabled\n    );\nEND;\n$function$\n"
+        },
+        {
+          "name": "is_user_deleted",
+          "definition": "CREATE OR REPLACE FUNCTION customers.is_user_deleted(_user_struct_id bigint)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    RETURN NOT EXISTS(SELECT * FROM customers.user_struct WHERE id = _user_struct_id AND state_id <> 4);\nEND;\n$function$\n"
+        },
+        {
+          "name": "maintenance_email_get_by_customer_id",
+          "definition": "CREATE OR REPLACE FUNCTION customers.maintenance_email_get_by_customer_id(_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    IF NOT EXISTS(SELECT * FROM customers.customer WHERE id = _customer_id)THEN\n        RAISE EXCEPTION 'Invalid customer_id: %', _customer_id USING ERRCODE = 'T1BZ3';\n    end if;\n\n    RETURN json_agg(x) FROM (SELECT maintenance_email.email , maintenance_email.first_name, maintenance_email.last_name, c.name as customer_name, maintenance_email.language\nFROM (\n    SELECT u.email, us.first_name, us.last_name, us.customer_id, COALESCE(us.language, 'it') AS language\n    FROM customers.\"user\" u\n        INNER JOIN customers.user_struct us on us.primary_email = u.email\n    WHERE maintenance_on_primary_email = true\n    UNION\n    SELECT c.value as email, us.first_name, us.last_name, us.customer_id, COALESCE(us.language, 'it') AS language\n    FROM customers.contact c\n       INNER JOIN customers.user_struct us on c.user_struct_id = us.id\n    WHERE c.type_id = (SELECT id FROM contact_type WHERE name = 'secondary_email') AND maintenance_notification = true\n) as maintenance_email\n\n    LEFT JOIN customers.customer c ON maintenance_email.customer_id = c.id\nWHERE maintenance_email.customer_id = _customer_id) as x;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "my_data_get",
+          "definition": "CREATE OR REPLACE FUNCTION customers.my_data_get(_email character varying, _log_in boolean)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_struct_id bigint;\n    _customer_id bigint;\n    _state json;\n    _role json;\n    _customer json;\n    _variables json;\n    _disabled boolean;\nBEGIN\n\n    -- check user -> if true -> user has no user_structs and is deleted\n    -- this should never happen, but better safe than sorry\n    IF customers.user_check(_email) THEN\n        RETURN NULL;\n    end if;\n\n    -- check if user exists\n    IF NOT EXISTS (SELECT * FROM customers.\"user\" WHERE email = _email) THEN\n        RAISE EXCEPTION 'No user_struct with email % found', _email USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- get active user struct id\n    SELECT id FROM customers.\"user\" u INNER JOIN customers.user_struct us ON u.active_user_struct_id = us.id WHERE email = _email INTO _user_struct_id;\n\n    SELECT customer_id from customers.user_struct us WHERE us.id = _user_struct_id INTO _customer_id;\n\n    -- log login\n    IF _log_in THEN\n        UPDATE customers.user_struct SET last_login = NOW() WHERE id = _user_struct_id;\n    end if;\n\n    SELECT json_agg(x) -> 0 FROM (\n        SELECT s.* FROM customers.user_struct us INNER JOIN customers.user_state s ON us.state_id = s.id WHERE us.id = _user_struct_id\n    )x\n    INTO _state;\n\n    SELECT NOT (((_state->>'enabled')::bool ) AND (SELECT cs.enabled FROM customers.customer c INNER JOIN customers.customer_state cs on c.state_id = cs.id WHERE c.id = _customer_id)) INTO _disabled;\n    RAISE NOTICE '_disabled = ( % && % ) = %', NOT((_state->>'enabled')::bool), (SELECT NOT(cs.enabled) FROM customers.customer c INNER JOIN customers.customer_state cs on c.state_id = cs.id WHERE c.id = _customer_id), _disabled;\n\n\n    SELECT customers.get_customer_by_id(_customer_id) INTO _customer;\n\n    -- get role\n    SELECT customers.role_build_json_ext(role_id, _customer_id, _disabled) FROM customers.user_struct us WHERE us.id = _user_struct_id INTO _role;\n\n    -- get variables\n    SELECT customers.variable_get_by_user_struct(_user_struct_id) INTO _variables;\n\n    -- join in json\n    RETURN json_agg(x) -> 0 FROM (\n       SELECT us.*, _role as role, _variables as variables, _customer as customer, _state as state FROM customers.user_struct us WHERE us.id = _user_struct_id LIMIT 1\n    ) x;\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_add_api_path",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_add_api_path(_page_name character varying, _api_path_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if page exists\n    IF NOT EXISTS (SELECT * FROM customers.page WHERE name = _page_name) THEN\n        RAISE EXCEPTION '[page_add_api_path] No page with name % found', _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- check api path exists\n    IF NOT EXISTS (SELECT * FROM customers.api_path WHERE id = _api_path_id) THEN\n        RAISE EXCEPTION '[page_add_api_path] No api_path with id % found', _api_path_id USING ERRCODE = 'T1AZ0';\n    END IF;\n\n    -- check already exists link\n    IF EXISTS (SELECT * FROM customers.api_path_page WHERE page_name = _page_name AND api_path_id = _api_path_id) THEN\n        RAISE EXCEPTION '[page_add_api_path] ApiPath w/ id = % is already assigned to page %s', _api_path_id, _page_name USING ERRCODE = 'T2AZ1';\n    end if;\n\n    INSERT INTO customers.api_path_page (page_name, api_path_id) VALUES (_page_name, _api_path_id);\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_delete",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_delete(_name character varying)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM customers.page WHERE name = _name) THEN\n        RAISE EXCEPTION '[page_delete] No page with name % found', _name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- delete api paths\n    DELETE FROM customers.api_path_page WHERE page_name = _name;\n\n    -- delete link to cg\n    DELETE FROM customers.page_customer_group WHERE page_name = _name;\n\n    -- delete page\n    DELETE FROM customers.page WHERE name = _name;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_all_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_all_ext(_customer_id bigint, _search_string character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\n    _customer_group_id bigint;\n    _search_pattern varchar;\nBEGIN\n\n    SELECT concat('%', _search_string, '%') INTO _search_pattern;\n    SELECT group_id FROM customers.customer WHERE id = _customer_id INTO _customer_group_id;\n\n    SELECT array(\n                SELECT\n                    customers.page_get_ext(p.name, _customer_group_id)\n                FROM customers.page p\n                    LEFT JOIN customers.page_customer_group pcg ON p.name = pcg.page_name\n                WHERE p.only_selectable_by_cdlan = false\n                    AND pcg.customer_group_id = _customer_group_id\n                    AND p.name LIKE _search_pattern\n                ORDER BY p.name\n           )\n    into tmp;\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_all_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_all_sudo(_search_struct json)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\n    _group_id bigint;\nBEGIN\n\n    IF (_search_struct->>'customer_id' IS NULL)\n    THEN\n        SELECT array (SELECT customers.page_get_sudo(p.name)\n            FROM customers.page p\n            WHERE p.name LIKE concat('%', _search_struct->>'search_string', '%')\n                AND (_search_struct->>'customer_group_id' IS NULL OR (_search_struct->>'customer_group_id')::bigint IN (SELECT customer_group_id FROM customers.page_customer_group pcg WHERE pcg.page_name = p.name))\n                AND (_search_struct->>'selectable_only_by_cdlan' IS NULL OR p.only_selectable_by_cdlan = (_search_struct->>'selectable_only_by_cdlan')::bool)\n            ORDER BY p.name\n        ) into tmp;\n\n    ELSE\n\n        SELECT group_id FROM customers.customer WHERE id = (_search_struct->>'customer_id')::bigint INTO _group_id;\n\n        IF _group_id IS NULL THEN\n            RAISE EXCEPTION 'customer not found for customer_id %', (_search_struct->>'customer_id')::bigint USING ERRCODE = 'T1BZ0';\n        END IF;\n\n        SELECT array (SELECT customers.page_get_sudo(p.name)\n            FROM customers.page p\n            WHERE p.name LIKE concat('%', _search_struct->>'search_string', '%')\n                AND _group_id IN (SELECT customer_group_id FROM customers.page_customer_group pcg WHERE pcg.page_name = p.name)\n                AND (_search_struct->>'selectable_only_by_cdlan' IS NULL OR p.only_selectable_by_cdlan = (_search_struct->>'selectable_only_by_cdlan')::bool)\n            ORDER BY p.name\n        ) into tmp;\n    end if;\n\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_by_role_id_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_by_role_id_ext(_role_id bigint, _customer_group_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\nBEGIN\n\n    SELECT array (\n                   SELECT customers.page_get_ext(name, _customer_group_id)\n                   FROM customers.page_get_by_role_id_table_ext(_role_id, _customer_group_id)\n                    ORDER BY name\n           ) into tmp;\n\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_by_role_id_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_by_role_id_sudo(_role_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\nBEGIN\n\n    SELECT array (\n                   SELECT customers.page_get_sudo(name)\n                   FROM customers.page_get_by_role_id_table_sudo(_role_id)\n                    ORDER BY name\n           ) into tmp;\n\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_by_role_id_table_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_by_role_id_table_ext(_role_id bigint, _customer_group_id bigint)\n RETURNS SETOF customers.page\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if role exists\n    IF NOT EXISTS (SELECT * FROM customers.role WHERE id = _role_id) THEN\n        RAISE EXCEPTION '[page_get_by_role_id_table_ext] No role with id %d found', _role_id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    RETURN QUERY (\n        SELECT p.*\n        FROM customers.role r\n                 LEFT JOIN customers.role_page rp on r.id = rp.role_id\n                 LEFT JOIN customers.page p on rp.page_name = p.name\n                 LEFT JOIN customers.page_customer_group pcg ON p.name = pcg.page_name\n        WHERE r.id = _role_id AND p.only_selectable_by_cdlan = false AND pcg.customer_group_id = _customer_group_id\n        ORDER BY p.name\n    );\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_by_role_id_table_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_by_role_id_table_sudo(_role_id bigint)\n RETURNS SETOF customers.page\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if role exists\n    IF NOT EXISTS (SELECT * FROM customers.role WHERE id = _role_id) THEN\n        RAISE EXCEPTION '[page_get_by_role_id_table_sudo] No role with id %d found', _role_id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    RETURN QUERY (\n        SELECT p.*\n        FROM customers.role r\n                 LEFT JOIN customers.role_page rp on r.id = rp.role_id\n                 LEFT JOIN customers.page p on rp.page_name = p.name\n        WHERE r.id = _role_id\n        ORDER BY p.name\n    );\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_by_user_struct_id_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_by_user_struct_id_ext(_user_struct_id bigint, _customer_group_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\nBEGIN\n\n    SELECT array (\n                   SELECT customers.page_get_ext(name, _customer_group_id)\n                   FROM customers.page_get_by_user_struct_id_table_ext(_user_struct_id, _customer_group_id)\n                    ORDER BY name\n           ) into tmp;\n\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_by_user_struct_id_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_by_user_struct_id_sudo(_user_struct_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\nBEGIN\n\n    SELECT array (\n                   SELECT customers.page_get_sudo(name)\n                   FROM customers.page_get_by_user_struct_id_table_sudo(_user_struct_id)\n                    ORDER BY name\n           ) into tmp;\n\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_by_user_struct_id_table_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_by_user_struct_id_table_ext(user_struct_id bigint, _customer_group_id bigint)\n RETURNS SETOF customers.page\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if user_struct exists\n    IF NOT EXISTS (SELECT * FROM customers.user_struct WHERE id = user_struct_id) THEN\n        RAISE EXCEPTION '[page_get_by_user_struct_id_table_ext] No user_struct with id %d found', user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    RETURN QUERY (\n        SELECT p.*\n        FROM customers.user_struct us\n                 INNER JOIN customers.role r on us.role_id = r.id\n                 INNER JOIN customers.role_page rp on r.id = rp.role_id\n                 INNER JOIN customers.page p on rp.page_name = p.name\n                 INNER JOIN customers.page_customer_group pcg ON p.name = pcg.page_name\n                 INNER JOIN customers.user_state uss ON us.state_id = uss.id\n                 INNER JOIN customers.customer c ON us.customer_id = c.id\n                 INNER JOIN customers.customer_state cs ON c.state_id = cs.id\n        WHERE us.id = user_struct_id\n          AND uss.enabled = true\n          AND cs.enabled = true\n          AND p.only_selectable_by_cdlan = false\n          AND pcg.customer_group_id = _customer_group_id\n        ORDER BY p.name\n    );\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_by_user_struct_id_table_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_by_user_struct_id_table_sudo(user_struct_id bigint)\n RETURNS SETOF customers.page\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if user_struct exists\n    IF NOT EXISTS (SELECT * FROM customers.user_struct WHERE id = user_struct_id) THEN\n        RAISE EXCEPTION '[page_get_by_user_struct_id_table_sudo] No user_struct with id %d found', user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    RETURN QUERY (\n        SELECT p.*\n        FROM customers.user_struct us\n                 LEFT JOIN customers.role r on us.role_id = r.id\n                 LEFT JOIN customers.role_page rp on r.id = rp.role_id\n                 LEFT JOIN customers.page p on rp.page_name = p.name\n                LEFT JOIN customers.user_state uss ON us.state_id = uss.id\n        WHERE us.id = user_struct_id\n          AND uss.enabled = true\n        ORDER BY p.name\n    );\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_ext(_name character varying, _customer_group_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    paths json;\n    _available_to_cg bigint[];\nBEGIN\n\n    -- check page exists and user can access it\n    IF NOT EXISTS (SELECT * FROM customers.page p LEFT JOIN customers.page_customer_group pcg ON p.name = pcg.page_name WHERE p.name = _name AND pcg.customer_group_id = _customer_group_id) THEN\n        RAISE EXCEPTION '[page_get_ext] No page with name % found', _name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- get resources as json array\n    SELECT into paths json_agg(x) FROM (\n       SELECT ap.path, ap.method from customers.api_path ap INNER JOIN customers.api_path_page app ON ap.id = app.api_path_id WHERE page_name = _name\n    ) x;\n\n    SELECT INTO _available_to_cg ARRAY (\n        SELECT _customer_group_id\n    );\n\n    -- get global json\n    RETURN json_agg(x) -> 0 FROM (\n        SELECT page.*, paths, to_json(_available_to_cg) as available_to_cg FROM customers.page WHERE name = _name LIMIT 1\n    ) x;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_get_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_get_sudo(_name character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    paths json;\n    _available_to_cg bigint[];\nBEGIN\n\n    -- if page not found -> error\n    IF NOT EXISTS (SELECT * FROM customers.page WHERE name = _name) THEN\n        RAISE EXCEPTION '[page_get_sudo] No page with name % found', _name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- get resources as json array\n    SELECT into paths json_agg(x) FROM (\n        SELECT ap.path, ap.method from customers.api_path ap INNER JOIN customers.api_path_page app ON ap.id = app.api_path_id WHERE page_name = _name\n    ) x;\n\n    SELECT INTO _available_to_cg ARRAY (\n        SELECT customer_group_id FROM customers.page_customer_group WHERE page_name = _name\n    );\n\n    -- get global json\n    RETURN json_agg(x) -> 0 FROM (\n        SELECT page.*, paths, to_json(_available_to_cg) as available_to_cg FROM customers.page WHERE name = _name LIMIT 1\n    ) x;\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_new",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_new(json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _cg_id bigint;\n    _res json;\n    _api_path_id bigint;\n    _auto_add boolean DEFAULT FALSE;\n    _only_selectable_by_cdlan boolean DEFAULT FALSE;\nBEGIN\n\n    -- check already exists\n    IF EXISTS (SELECT * FROM customers.page WHERE name = json_data ->> 'name') THEN\n        RAISE EXCEPTION '[page_new] Page with name % already exists', json_data ->> 'name' USING ERRCODE = 'T2AZ1';\n    end if;\n\n    IF json_data ->> 'only_selectable_by_cdlan' IS NOT NULL THEN\n        _only_selectable_by_cdlan = (json_data ->> 'only_selectable_by_cdlan')::boolean;\n    end if;\n\n    IF json_data ->> 'auto_add' IS NOT NULL AND (json_data ->> 'auto_add')::boolean IS TRUE THEN\n        _auto_add = (json_data ->> 'auto_add')::boolean;\n\n        -- if auto_add use only_selectable_by_cdlan to hide it from selectable pages\n        _only_selectable_by_cdlan = true;\n    end if;\n\n    -- create page\n    IF _only_selectable_by_cdlan IS TRUE THEN\n\n        INSERT INTO customers.page (name, only_selectable_by_cdlan, auto_add) values (json_data ->> 'name', TRUE, _auto_add);\n    ELSE\n\n        INSERT INTO customers.page (name, auto_add) values (json_data ->> 'name', _auto_add);\n    end if;\n\n    if (json_data->>'available_to_cg') IS NOT NULL THEN\n        FOR _cg_id IN SELECT * FROM json_array_elements(json_data->'available_to_cg')\n        LOOP\n            INSERT INTO customers.page_customer_group (page_name, customer_group_id) VALUES (json_data ->> 'name', _cg_id);\n        END LOOP;\n    end if;\n\n    -- create res access\n    if (json_data->>'paths') IS NOT NULL THEN\n\n        for _res in select * from json_array_elements(json_data -> 'paths')\n            loop\n                SELECT customers.api_path_get_or_insert(_res) INTO _api_path_id;\n                PERFORM customers.page_add_api_path(json_data ->> 'name', _api_path_id);\n            end loop;\n    END IF;\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_rm_api_path",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_rm_api_path(_page_name character varying, _api_path_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if page exists\n    IF NOT EXISTS (SELECT * FROM customers.page WHERE name = _page_name) THEN\n        RAISE EXCEPTION '[page_rm_api_path] No page with name % found', _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- check api path exists\n    IF NOT EXISTS (SELECT * FROM customers.api_path WHERE id = _api_path_id) THEN\n        RAISE EXCEPTION '[page_rm_api_path] No api_path with id % found', _api_path_id USING ERRCODE = 'T1AZ0';\n    END IF;\n\n    -- check already exists link\n    IF NOT EXISTS (SELECT * FROM customers.api_path_page WHERE page_name = _page_name AND api_path_id = _api_path_id) THEN\n        RAISE EXCEPTION '[page_rm_api_path] ApiPath w/ id = % is not assigned to page %s', _api_path_id, _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- delete\n    DELETE FROM customers.api_path_page WHERE page_name = _page_name AND api_path_id = _api_path_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "page_update",
+          "definition": "CREATE OR REPLACE FUNCTION customers.page_update(json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _path json;\n    _cg_id bigint;\n    _api_path_id bigint;\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM customers.page WHERE name = json_data ->> 'name') THEN\n        RAISE EXCEPTION '[page_update] No page with name % found', json_data ->> 'name' USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- update only_selectable_by_cdlan\n    IF json_data ->> 'only_selectable_by_cdlan' IS NOT NULL THEN\n        UPDATE customers.page SET only_selectable_by_cdlan = (json_data ->> 'only_selectable_by_cdlan')::bool WHERE name = json_data ->> 'name';\n    END IF;\n\n    IF json_data ->> 'auto_add' IS NOT NULL THEN\n        UPDATE customers.page SET auto_add = (json_data ->> 'auto_add')::boolean WHERE name = json_data ->> 'name';\n\n        IF (json_data ->> 'auto_add')::boolean IS TRUE THEN\n            UPDATE customers.page SET only_selectable_by_cdlan = true WHERE name = json_data ->> 'name';\n        end if;\n    end if;\n\n\n\n    -- create res access if exists\n    IF (json_data->'paths') IS NOT NULL THEN\n\n        -- delete old\n        DELETE FROM customers.api_path_page WHERE page_name = json_data ->> 'name';\n\n        -- insert new\n        for _path in select * from json_array_elements(json_data -> 'paths')\n        loop\n            SELECT customers.api_path_get_or_insert(_path) INTO _api_path_id;\n            PERFORM customers.page_add_api_path(json_data ->> 'name', _api_path_id);\n        end loop;\n    END IF;\n\n    -- if available_to_cg not null -> override\n    IF (json_data->'available_to_cg') IS NOT NULL THEN\n\n        -- delete old\n        DELETE FROM customers.page_customer_group WHERE page_name = json_data ->> 'name';\n\n        -- insert new\n        FOR _cg_id IN SELECT * FROM json_array_elements(json_data->'available_to_cg')\n        LOOP\n            INSERT INTO customers.page_customer_group (page_name, customer_group_id) VALUES (json_data ->> 'name', _cg_id);\n        END LOOP;\n    END IF;\nEND;\n$function$\n"
+        },
+        {
+          "name": "preference_get",
+          "definition": "CREATE OR REPLACE FUNCTION customers.preference_get(_user_struct_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check preference exists for user\n    IF NOT EXISTS (SELECT * FROM preference WHERE user_struct_id = _user_struct_id) THEN\n        RAISE EXCEPTION 'Preference not found for for user %', _user_struct_id USING ERRCODE = 'T6AZ0';\n    end if;\n\n    RETURN json_agg(x) -> 0 FROM (\n        SELECT preference.*, us.language FROM preference INNER JOIN user_struct us ON us.id = preference.user_struct_id WHERE user_struct_id = _user_struct_id LIMIT 1\n    ) x;\nEND;\n$function$\n"
+        },
+        {
+          "name": "preference_new",
+          "definition": "CREATE OR REPLACE FUNCTION customers.preference_new(json_data json, _user_struct_id bigint)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _preference_id bigint;\nBEGIN\n\n    -- check user_struct is valid\n    IF NOT EXISTS(SELECT * FROM user_struct WHERE id = _user_struct_id) THEN\n        RAISE EXCEPTION 'No user found for id %', _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- check does not already exist preference for user\n    IF EXISTS (SELECT * FROM preference WHERE user_struct_id = _user_struct_id) THEN\n        RAISE EXCEPTION 'Preference already exists for user %', _user_struct_id USING ERRCODE = 'T6AZ1';\n    end if;\n\n    UPDATE user_struct SET language = json_data ->> 'language' WHERE id = _user_struct_id;\n\n    -- create preference\n    INSERT INTO preference (user_struct_id, avatar_link, json_preferences) values (_user_struct_id, json_data ->> 'avatar_link', (json_data ->> 'json_preferences')::json) RETURNING id INTO _preference_id;\n\n    RETURN _preference_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "preference_update",
+          "definition": "CREATE OR REPLACE FUNCTION customers.preference_update(json_data json, _user_struct_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check user_struct is valid\n    IF NOT EXISTS(SELECT * FROM user_struct WHERE id = _user_struct_id) THEN\n        RAISE EXCEPTION 'No user_struct found for id %', _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- check preference exists for user\n    IF NOT EXISTS (SELECT * FROM preference WHERE user_struct_id = _user_struct_id) THEN\n        RAISE EXCEPTION 'Preference not found for for user %', _user_struct_id USING ERRCODE = 'T6AZ0';\n    end if;\n\n    -- update language\n    IF json_data ->> 'language' IS NOT NULL THEN\n        UPDATE user_struct SET language = json_data ->> 'language' WHERE id = _user_struct_id;\n    END IF;\n\n    -- update avatar_link\n    IF json_data ->> 'avatar_link' IS NOT NULL THEN\n        UPDATE preference SET avatar_link = json_data ->> 'avatar_link' WHERE user_struct_id = _user_struct_id;\n    END IF;\n\n    -- update json_preferences\n    IF json_data ->> 'json_preferences' IS NOT NULL THEN\n        UPDATE preference SET json_preferences = (json_data ->> 'json_preferences')::json WHERE user_struct_id = _user_struct_id;\n    END IF;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "preference_upsert",
+          "definition": "CREATE OR REPLACE FUNCTION customers.preference_upsert(json_data json, _user_struct_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check preference exists for user\n    IF NOT EXISTS (SELECT * FROM preference WHERE user_struct_id = _user_struct_id) THEN\n\n        -- if not exists -> create\n        PERFORM preference_new(json_data, _user_struct_id);\n    ELSE\n\n        -- else update it\n        PERFORM preference_update(json_data, _user_struct_id);\n    end if;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_add_page_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_add_page_ext(_role_id bigint, _page_name character varying, _caller_customer_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _page customers.page%rowtype;\n    _role customers.role%rowtype;\n    _customer_group_id bigint;\n    _customer json;\nBEGIN\n\n    SELECT customers.get_customer_by_id(_caller_customer_id) INTO _customer;\n    _customer_group_id = (((_customer->>'customer_group')::json)->>'id')::bigint;\n\n    RAISE NOTICE 'SELECT * FROM customers.page p LEFT JOIN customers.page_customer_group pcg on p.name = pcg.page_name WHERE p.name = % AND only_selectable_by_cdlan = false AND pcg.customer_group_id = %', _page_name, _customer_group_id;\n\n    -- check page exists and user can see it\n    IF NOT EXISTS (SELECT * FROM customers.page p LEFT JOIN customers.page_customer_group pcg on p.name = pcg.page_name WHERE p.name = _page_name AND only_selectable_by_cdlan = false AND pcg.customer_group_id = _customer_group_id) THEN\n        RAISE EXCEPTION 'No page with name % found', _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- check role exists and caller can access\n    IF NOT EXISTS (SELECT * FROM customers.role WHERE id = _role_id AND customer_id = _caller_customer_id) THEN\n        RAISE EXCEPTION 'No role with id % found', _role_id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- check mapping does not already exist\n    IF EXISTS (SELECT * FROM customers.role_page rp WHERE rp.page_name = _page_name AND rp.role_id = _role_id) THEN\n        RAISE EXCEPTION 'Page with name % already exist for role %', _page_name, _role_id USING ERRCODE = 'T1AZ1';\n    end if;\n\n    -- check if page is protected and role is default\n    SELECT * FROM customers.page p WHERE p.name = _page_name INTO _page;\n    SELECT * FROM customers.role WHERE id = _role_id INTO _role;\n\n    IF (_page.only_selectable_by_cdlan = true OR NOT EXISTS (SELECT * FROM customers.page_customer_group WHERE page_name = _page_name AND customer_group_id = _customer_group_id)) THEN\n        RAISE EXCEPTION 'Page with name % is protected and cannot be assigned to customer role %', _page_name, _role_id USING ERRCODE = 'T1AZ2';\n    end if;\n\n    -- insert mapping\n    INSERT INTO customers.role_page (role_id, page_name) VALUES (_role_id, _page_name);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_add_page_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_add_page_sudo(_role_id bigint, _page_name character varying)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check page exists and user can see it\n    IF NOT EXISTS (SELECT * FROM customers.page p WHERE p.name = _page_name ) THEN\n        RAISE EXCEPTION '[role_add_page_sudo] No page with name % found', _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- check role exists\n    IF NOT EXISTS (SELECT * FROM customers.role WHERE id = _role_id) THEN\n        RAISE EXCEPTION '[role_add_page_sudo] No role with id % found', _role_id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- check mapping does not already exist\n    IF EXISTS (SELECT * FROM customers.role_page rp WHERE rp.page_name = _page_name AND rp.role_id = _role_id) THEN\n        RAISE EXCEPTION '[role_add_page_sudo] Page with name % already exist for role %', _page_name, _role_id USING ERRCODE = 'T1AZ1';\n    end if;\n\n    -- insert mapping\n    INSERT INTO customers.role_page (role_id, page_name) VALUES (_role_id, _page_name);\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_build_json_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_build_json_ext(_id bigint, _caller_customer_id bigint, _disabled boolean)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    pages json[];\n    _user_count int;\n    _customer_group_id bigint;\n    _customer json;\n    result json;\nBEGIN\n\n    SELECT customers.get_customer_by_id(_caller_customer_id) INTO _customer;\n    _customer_group_id = (((_customer->>'customer_group')::json)->>'id')::bigint;\n\n    IF NOT _disabled THEN\n        -- get pages as json array\n        SELECT array(\n                       SELECT customers.page_get_ext(p.name, _customer_group_id)\n                       FROM customers.role_page rp\n                                LEFT JOIN customers.page p ON rp.page_name = p.name\n                                LEFT JOIN customers.page_customer_group pcg ON p.name = pcg.page_name\n                       WHERE rp.role_id = _id\n                         -- AND p.only_selectable_by_cdlan = false\n                         AND pcg.customer_group_id = _customer_group_id\n               ) into pages;\n    END IF;\n\n    SELECT COUNT(*) FROM customers.user_struct WHERE role_id = _id AND customer_id = _caller_customer_id INTO _user_count;\n\n    -- compose global json\n    SELECT INTO result json_agg(x) -> 0 FROM (\n        SELECT id, name, customer_id, color, pages, _user_count as user_count FROM customers.role WHERE id = _id LIMIT 1\n    ) x;\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_build_json_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_build_json_sudo(_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _pages json[];\n    _result json;\n    _user_count int;\nBEGIN\n\n    -- get pages as json array\n    SELECT array(\n        SELECT customers.page_get_sudo(p.name)\n        FROM customers.role_page rp\n        LEFT JOIN customers.page p ON rp.page_name = p.name\n        WHERE rp.role_id = _id\n    ) into _pages;\n\n    -- compute count\n    _user_count = (SELECT count(*) FROM customers.user_struct WHERE role_id = _id);\n\n    -- compose global json\n    SELECT INTO _result json_agg(x) -> 0 FROM (\n        SELECT id, name, customer_id, color, _pages as pages, _user_count as user_count FROM customers.role WHERE id = _id LIMIT 1\n    ) x;\n\n    RETURN _result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_delete_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_delete_ext(_id bigint, _caller_customer_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM customers.role WHERE id = _id AND customer_id = _caller_customer_id) THEN\n        RAISE EXCEPTION 'No role with id % found', _id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- check if the role has customers\n    IF EXISTS(SELECT * FROM customers.user_struct WHERE role_id = _id) THEN\n        RAISE EXCEPTION 'Cannot delete role % bc customers are tied to it', _id;\n    end if;\n\n    -- delete page\n    DELETE FROM customers.role WHERE id = _id;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_delete_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_delete_sudo(_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM customers.role WHERE id = _id) THEN\n        RAISE EXCEPTION 'No role with id % found', _id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- check if the role has customers\n    IF EXISTS(SELECT * FROM customers.user_struct WHERE role_id = _id) THEN\n        RAISE EXCEPTION 'Cannot delete role % bc customers are tied to it', _id;\n    end if;\n\n    -- delete page\n    DELETE FROM customers.role WHERE id = _id;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_get_all_by_customer_id_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_get_all_by_customer_id_ext(_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    roles json[];\nBEGIN\n\n    -- get all roles\n    SELECT array(\n                   SELECT customers.role_build_json_ext(id, _customer_id, false)\n                   FROM customers.role\n                   WHERE customer_id = _customer_id\n           ORDER BY name\n           ) into roles;\n\n    -- delete page\n    RETURN to_json(roles);\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_get_all_by_customer_id_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_get_all_by_customer_id_sudo(_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    roles json[];\nBEGIN\n\n    -- get all roles\n    SELECT array(\n        SELECT customers.role_build_json_sudo(id)\n        FROM customers.role\n        WHERE customer_id = _customer_id\n           ORDER BY name\n    ) into roles;\n\n    -- delete page\n    RETURN to_json(roles);\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_get_all_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_get_all_ext(_customer_id bigint, _search_string character varying, _only_customer_created boolean)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    roles json[];\n    _search_pattern varchar;\nBEGIN\n\n    SELECT concat('%', _search_string, '%') INTO _search_pattern;\n\n    SELECT array(\n        SELECT customers.role_build_json_ext(id, _customer_id, false)\n        FROM customers.role\n        WHERE name LIKE _search_pattern\n          AND (\n            (_only_customer_created AND customer_id = _customer_id)\n            OR\n            (NOT _only_customer_created AND (customer_id = _customer_id OR customer_id IS NULL))\n          )\n        ORDER BY name\n    ) into roles;\n\n    -- return\n    RETURN to_json(roles);\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_get_all_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_get_all_sudo(_search_struct json)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    roles json[];\nBEGIN\n\n    -- get all roles\n    SELECT array(\n        SELECT customers.role_build_json_sudo(id)\n        FROM customers.role\n        WHERE (_search_struct->>'customer_id' IS NULL OR customer_id IS NULL OR customer_id = (_search_struct->>'customer_id')::bigint)\n          AND name LIKE concat('%', _search_struct->>'search_string', '%')\n           ORDER BY name\n    ) into roles;\n\n    -- return\n    RETURN to_json(roles);\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_get_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_get_ext(_id bigint, _caller_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    result json;\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM customers.role WHERE id = _id AND (customer_id = _caller_customer_id OR customer_id IS NULL)) THEN\n        RAISE EXCEPTION 'No role with id % found', _id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- get role json\n    SELECT INTO result customers.role_build_json_ext(_id, _caller_customer_id, false);\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_get_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_get_sudo(_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    result json;\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM customers.role WHERE id = _id) THEN\n        RAISE EXCEPTION 'No role with id % found', _id USING ERRCODE = 'T3AZ0';\n    END IF;\n\n    -- get role json\n    SELECT INTO result customers.role_build_json_sudo(_id);\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_new_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_new_ext(json_data json, _caller_customer_id bigint)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _role_id bigint;\n    _page_name varchar;\nBEGIN\n\n    -- check does not shadow default\n    IF EXISTS (SELECT * FROM customers.role r WHERE r.name = json_data ->> 'name' AND r.customer_id IS NULL) THEN\n        RAISE EXCEPTION 'Name % is already used by default role', json_data ->> 'name' USING ERRCODE = 'T3AZ1';\n    end if;\n\n    -- check already exists one with same (name, customer_id)\n    IF EXISTS (SELECT * FROM customers.role r WHERE r.name = json_data ->> 'name' AND r.customer_id = _caller_customer_id ) THEN\n        RAISE EXCEPTION 'Page with name % already exists', json_data ->> 'name' USING ERRCODE = 'T3AZ1';\n    end if;\n\n    -- Check if the color is NULL or an empty string\n    IF json_data ->> 'color' IS NULL OR trim(json_data ->> 'color') = '' THEN\n        RAISE EXCEPTION 'Color cannot be NULL or an empty string' USING ERRCODE = 'T3AZ3';\n    END IF;\n\n    -- create role\n    INSERT INTO customers.role (name, customer_id, color) values (json_data ->> 'name', _caller_customer_id, json_data ->> 'color') RETURNING id INTO _role_id;\n\n    -- add pages\n    if (json_data->'pages') IS NOT NULL THEN\n\n        for _page_name in select * from json_array_elements_text(json_data -> 'pages')\n            loop\n\n                PERFORM customers.role_add_page_ext(_role_id, _page_name, _caller_customer_id);\n            end loop;\n    END IF;\n\n    RETURN _role_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_new_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_new_sudo(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _role_id bigint;\n    _page_name varchar;\nBEGIN\n\n    -- check does not shadow default\n    IF EXISTS (SELECT * FROM customers.role r WHERE r.name = json_data ->> 'name' AND r.customer_id IS NULL) THEN\n        RAISE EXCEPTION 'Name % is already used by default role', json_data ->> 'name' USING ERRCODE = 'T3AZ1';\n    end if;\n\n    -- check already exists one with same (name, customer_id)\n    IF EXISTS (SELECT * FROM customers.role r WHERE r.name = json_data ->> 'name' AND r.customer_id = (json_data ->> 'customer_id')::bigint ) THEN\n        RAISE EXCEPTION 'Page with name % already exists', json_data ->> 'name' USING ERRCODE = 'T3AZ1';\n    end if;\n\n    -- Check if the color is NULL or an empty string\n    IF json_data ->> 'color' IS NULL OR trim(json_data ->> 'color') = '' THEN\n        RAISE EXCEPTION 'Color cannot be NULL or an empty string' USING ERRCODE = 'T3AZ3';\n    END IF;\n\n    -- create role\n    IF json_data->>'id' IS NOT NULL THEN\n\n        -- if user provided also ID -> force ID\n        INSERT INTO customers.role (id, name, customer_id, color) values ((role_new_sudo.json_data->>'id')::bigint, json_data ->> 'name', (json_data ->> 'customer_id')::bigint, json_data ->> 'color') RETURNING id INTO _role_id;\n    ELSE\n\n        INSERT INTO customers.role (name, customer_id, color) values (json_data ->> 'name', (json_data ->> 'customer_id')::bigint, json_data ->> 'color') RETURNING id INTO _role_id;\n    end if;\n\n\n    -- add pages\n    if (json_data->'pages') IS NOT NULL THEN\n\n        for _page_name in select * from json_array_elements_text(json_data -> 'pages')\n            loop\n\n                PERFORM customers.role_add_page_sudo(_role_id, _page_name);\n            end loop;\n    END IF;\n\n    RETURN _role_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_rm_page_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_rm_page_ext(_role_id bigint, _page_name character varying, _caller_customer_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check page exists\n    IF NOT EXISTS (SELECT * FROM customers.page p WHERE p.name = _page_name) THEN\n        RAISE EXCEPTION 'No page with name % found', _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- check mapping exist\n    IF NOT EXISTS (SELECT * FROM customers.role_page rp INNER JOIN customers.role r on r.id = rp.role_id WHERE rp.page_name = _page_name AND rp.role_id = _role_id AND r.customer_id = _caller_customer_id) THEN\n        RAISE EXCEPTION 'Page with name % not bound to role %', _page_name, _role_id USING ERRCODE = 'T1AZ1';\n    end if;\n\n    -- delete page\n    DELETE FROM customers.role_page rp WHERE rp.page_name = _page_name AND rp.role_id = _role_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_rm_page_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_rm_page_sudo(_role_id bigint, _page_name character varying)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check page exists\n    IF NOT EXISTS (SELECT * FROM customers.page p WHERE p.name = _page_name) THEN\n        RAISE EXCEPTION 'No page with name % found', _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- check mapping exist\n    IF NOT EXISTS (SELECT * FROM customers.role_page rp WHERE rp.page_name = _page_name AND rp.role_id = _role_id) THEN\n        RAISE EXCEPTION 'Page with name % not bound to role %', _page_name, _role_id USING ERRCODE = 'T1AZ1';\n    end if;\n\n    -- delete page\n    DELETE FROM customers.role_page rp WHERE rp.page_name = _page_name AND rp.role_id = _role_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_update_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_update_ext(json_data json, _caller_customer_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _page varchar;\nBEGIN\n\n    -- check if exist and user can edit\n    IF NOT EXISTS (SELECT * FROM customers.role WHERE id = (json_data ->> 'id')::bigint AND customer_id = _caller_customer_id) THEN\n        RAISE EXCEPTION 'No role with id % found', (json_data ->> 'id')::bigint USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- update name\n    IF json_data ->> 'name' IS NOT NULL THEN\n        UPDATE customers.role SET name = json_data ->> 'name' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update color\n    IF json_data ->> 'color' IS NOT NULL THEN\n        UPDATE customers.role SET color = json_data ->> 'color' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- delete and replace pages if specified\n    IF (json_data->'pages') IS NOT NULL THEN\n\n        -- delete old\n        DELETE FROM customers.role_page WHERE role_id = (json_data ->> 'id')::bigint;\n\n        -- insert new\n        for _page in select * from json_array_elements_text(json_data -> 'pages')\n        loop\n\n            PERFORM customers.role_add_page_ext((json_data ->> 'id')::bigint, _page, _caller_customer_id);\n        end loop;\n\n        -- insert autoadd\n        for _page in select name from customers.page where auto_add is true\n        loop\n            INSERT INTO customers.role_page (role_id, page_name) VALUES ((json_data ->> 'id')::bigint, _page);\n        end loop;\n    END IF;\nEND;\n$function$\n"
+        },
+        {
+          "name": "role_update_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.role_update_sudo(json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _page varchar;\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM customers.role WHERE id = (json_data ->> 'id')::bigint) THEN\n        RAISE EXCEPTION 'No role with id % found', (json_data ->> 'id')::bigint USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- update name\n    IF json_data ->> 'name' IS NOT NULL THEN\n        UPDATE customers.role SET name = json_data ->> 'name' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update color\n    IF json_data ->> 'color' IS NOT NULL THEN\n        UPDATE customers.role SET color = json_data ->> 'color' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update customer_id\n    IF json_data -> 'customer_id' IS NOT NULL THEN\n        UPDATE customers.role SET customer_id = (json_data ->> 'customer_id')::bigint WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- delete and replace pages if specified\n    IF (json_data->'pages') IS NOT NULL THEN\n\n        -- delete old\n        DELETE FROM customers.role_page WHERE role_id = (json_data ->> 'id')::bigint;\n\n        -- insert new\n        for _page in select * from json_array_elements_text(json_data -> 'pages')\n        loop\n\n            PERFORM customers.role_add_page_sudo((json_data ->> 'id')::bigint, _page);\n        end loop;\n\n        -- insert autoadd\n        for _page in select name from customers.page where auto_add is true\n        loop\n            INSERT INTO customers.role_page (role_id, page_name) VALUES ((json_data ->> 'id')::bigint, _page);\n        end loop;\n\n    END IF;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_biometric_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION customers.update_biometric_user_struct()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    UPDATE customers.biometric_request\n    SET user_struct_id = NEW.id\n    WHERE user_struct_id = OLD.id;\n\n    UPDATE customers.biometric_request\n    SET admin_user_struct_id = NEW.id\n    WHERE admin_user_struct_id = OLD.id;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_customer_credit",
+          "definition": "CREATE OR REPLACE FUNCTION customers.update_customer_credit()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    -- First check if customer_credits record exists, if not create it\n    IF NOT EXISTS (SELECT 1 FROM customers.customer_credits WHERE customer_id = NEW.customer_id) THEN\n        INSERT INTO customers.customer_credits (customer_id, credit) VALUES (NEW.customer_id, 0);\n    END IF;\n\n    -- Then proceed with the credit update\n    IF NEW.operation_sign = '+' THEN\n        UPDATE customers.customer_credits\n        SET credit = credit + NEW.amount\n        WHERE customer_id = NEW.customer_id;\n    ELSE\n        UPDATE customers.customer_credits\n        SET credit = credit - NEW.amount\n        WHERE customer_id = NEW.customer_id;\n    END IF;\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_check",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_check(_email character varying)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_struct_id bigint;\nBEGIN\n\n    RAISE NOTICE 'check_user';\n\n    -- check if user exists\n    IF NOT EXISTS(SELECT * FROM customers.\"user\" WHERE email = _email) THEN\n\n        RAISE NOTICE 'no user found in user table with email: %', _email;\n        RETURN false;\n    end if;\n\n    -- if exist active_user_struct\n    IF EXISTS(SELECT * FROM customers.\"user\" u INNER JOIN customers.user_struct us ON u.active_user_struct_id = us.id WHERE email = _email AND us.primary_email = u.email) THEN\n\n        RAISE NOTICE 'user has active user struct: %', (SELECT us.id FROM customers.\"user\" u INNER JOIN customers.user_struct us ON u.active_user_struct_id = us.id WHERE email = _email);\n        RETURN false; -- user has not been deleted\n    end if;\n\n    -- if user has no user_structs available -> delete user\n    IF NOT EXISTS(SELECT id FROM customers.user_struct WHERE primary_email = _email) THEN\n\n        RAISE NOTICE 'user has no available user_struct, deleting...' ;\n\n        -- delete user bc it has no user_structs\n        DELETE from customers.\"user\" WHERE email = _email;\n\n        RETURN true; --user has been deleted\n    end if;\n\n    -- if user has only soft deleted -> leave NULL\n--     IF NOT EXISTS(SELECT id FROM customers.user_struct WHERE primary_email = _email AND state_id = 1) THEN\n--\n--         RAISE NOTICE 'user has only soft deleted user_structs, deleting...' ;\n--\n--         UPDATE customers.\"user\" SET active_user_struct_id = NULL WHERE email = _email;\n--         RETURN false; -- user has not been deleted\n--     end if;\n\n    -- choose first user_structs available\n    SELECT id FROM customers.user_struct WHERE primary_email = _email LIMIT 1 INTO _user_struct_id;\n\n    -- update\n    UPDATE customers.\"user\" SET active_user_struct_id = _user_struct_id WHERE email = _email;\n\n    RETURN false; --user was not deleted\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_create_if_not_exists",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_create_if_not_exists(_email character varying)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- create if not exist\n    IF NOT EXISTS (SELECT * FROM customers.\"user\" WHERE email = _email) THEN\n\n        INSERT INTO customers.\"user\" (email) VALUES (_email);\n    end if;\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_add_contact",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_add_contact(_user_struct_id bigint, _contact json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _type_id bigint;\n    _contact_id bigint;\nBEGIN\n\n    -- check if type exists\n    IF NOT EXISTS(SELECT * FROM customers.contact_type WHERE name = _contact ->> 'type') THEN\n        RAISE EXCEPTION 'No contact_type with name % found', _contact ->> 'type' USING ERRCODE = 'T8AZ0';\n    end if;\n\n    -- get type id\n    SELECT * FROM customers.contact_type WHERE name = _contact ->> 'type' LIMIT 1 INTO _type_id;\n\n    -- check contact not already exists\n    IF EXISTS(SELECT * FROM customers.contact WHERE value = _contact ->> 'value' AND type_id = _type_id AND user_struct_id = _user_struct_id) THEN\n        RAISE EXCEPTION 'contact already exists with name %', _contact ->> 'name' USING ERRCODE = 'T9AZ1';\n    end if;\n\n    -- create contact\n    INSERT INTO customers.contact (type_id, name, user_struct_id, value, maintenance_notification, marketing_notification) VALUES (\n        _type_id,\n        _contact ->> 'name',\n        _user_struct_id,\n        _contact ->> 'value',\n        (_contact ->> 'maintenance_notification')::bool,\n        (_contact ->> 'marketing_notification')::bool\n    ) RETURNING id INTO _contact_id;\n\n    RETURN _contact_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_build_json_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_build_json_ext(_user_struct_id bigint, _caller_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n_role json;\n    _contacts json[];\n    _res json;\n    _state json;\n    _enabled bool;\n    _is_biometric bool;\n    _latest_biometric_request jsonb;\n    _biometric_info json;\nBEGIN\n\n    -- check if user_struct exists\n    IF NOT EXISTS(\n        SELECT *\n        FROM customers.user_struct_view_ext(_caller_customer_id)\n        WHERE id = _user_struct_id\n    ) OR customers.is_user_deleted(_user_struct_id) THEN\n        RAISE EXCEPTION 'No user_struct with id % found', _user_struct_id USING ERRCODE = 'T5AZ0';\n    END IF;\n\n        -- get enabled status\n    SELECT customers.is_user_active(_user_struct_id) INTO _enabled;\n    RAISE NOTICE 'enabled: %', _enabled;\n\n        -- get role\n    SELECT customers.role_build_json_ext(role_id, _caller_customer_id, NOT(_enabled))\n    FROM customers.user_struct\n    WHERE id = _user_struct_id\n        INTO _role;\n\n    -- get contacts\n    SELECT ARRAY(\n               SELECT customers.contact_get(id)\n            FROM customers.contact\n            WHERE user_struct_id = _user_struct_id\n        ) INTO _contacts;\n\n    -- get state\n    SELECT INTO _state json_agg(x) -> 0 FROM (\n        SELECT s.enabled, s.id, s.name\n        FROM customers.user_state s\n        INNER JOIN customers.user_struct u ON s.id = u.state_id\n        WHERE u.id = _user_struct_id\n        ) x;\n\n    -- get biometric flag\n    _is_biometric := customers.get_is_biometric(_user_struct_id);\n\n        -- get latest biometric request (optional, can be null)\n    BEGIN\n            _latest_biometric_request := customers.get_latest_biometric_request(_user_struct_id);\n    EXCEPTION WHEN OTHERS THEN\n            _latest_biometric_request := NULL; -- if no request exists\n    END;\n\n        -- combine into single biometric_info object\n        _biometric_info := json_build_object(\n            'is_biometric', _is_biometric,\n            'biometric_request', _latest_biometric_request\n        );\n\n        -- join in JSON\n    SELECT INTO _res json_agg(x) -> 0 FROM (\n        SELECT us.*,\n        _role AS role,\n        _contacts AS contacts,\n        _state AS state,\n        _biometric_info AS biometric\n        FROM customers.user_struct us\n        WHERE id = _user_struct_id\n        LIMIT 1\n        ) x;\n\n    RETURN _res;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_build_json_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_build_json_sudo(_user_struct_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _role json;\n    _contacts json[];\n    _res json;\n    _state json;\nBEGIN\n\n    -- get role\n    SELECT customers.role_build_json_sudo(role_id) FROM customers.user_struct WHERE id = _user_struct_id INTO _role;\n\n    -- get contacts\n    SELECT ARRAY(\n        SELECT customers.contact_get(id) FROM customers.contact WHERE user_struct_id = _user_struct_id\n    ) INTO _contacts;\n\n    -- state\n    SELECT INTO _state json_agg(x) -> 0 FROM (\n        SELECT s.enabled, s.id, s.name FROM customers.user_state s INNER JOIN customers.user_struct u ON s.id = u.state_id WHERE u.id = _user_struct_id\n    )x;\n\n    -- join in json\n    SELECT INTO _res json_agg(x) -> 0 FROM (\n        SELECT us.*, _role as role, _contacts as contacts, _state as state FROM customers.user_struct us WHERE id = _user_struct_id LIMIT 1\n    ) x;\n\n    RETURN _res;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_company_disable_by_afc",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_company_disable_by_afc(_customer_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- STATE 3 is disabled from cdlan\n    UPDATE customers.user_struct SET state_id = 3 WHERE customer_id = _customer_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_delete_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_delete_ext(_user_struct_id bigint, _caller_customer_id bigint)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _email varchar;\nBEGIN\n\n    -- check if user_struct exists\n    IF (NOT EXISTS(SELECT * FROM customers.user_struct_view_ext(_caller_customer_id) WHERE id = _user_struct_id)) OR ( customers.is_user_deleted(_user_struct_id)) THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- _email\n    SELECT primary_email FROM customers.user_struct_view_ext(_caller_customer_id) WHERE id = _user_struct_id INTO _email;\n\n    -- soft delete\n    UPDATE customers.user_struct SET state_id = 4 WHERE id = _user_struct_id;\n\n    PERFORM customers.anonymize_user_struct(_user_struct_id);\n\n    -- check user (set new user_struct as active or delete user)\n    RETURN customers.user_check(_email);\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_delete_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_delete_sudo(_user_struct_id bigint)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _email varchar;\nBEGIN\n\n    -- check if user_struct exists\n    IF customers.is_user_deleted(_user_struct_id) THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- _email\n    SELECT primary_email FROM customers.user_struct WHERE id = _user_struct_id INTO _email;\n\n    -- soft delete\n    UPDATE customers.user_struct SET state_id = 4 WHERE id = _user_struct_id;\n\n    PERFORM customers.anonymize_user_struct(_user_struct_id);\n\n    -- check user (set new user_struct as active or delete user)\n    RETURN customers.user_check(_email);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_all_by_customer_id_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_all_by_customer_id_ext(_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\nBEGIN\n\n    -- get all user_structs\n    SELECT ARRAY (\n        SELECT customers.user_struct_build_json_ext(id, _customer_id)\n        FROM customers.user_struct_view_ext(_customer_id)\n        ORDER BY last_name\n    ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_all_by_customer_id_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_all_by_customer_id_sudo(_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\nBEGIN\n\n    -- get all user_structs\n    SELECT ARRAY (\n        SELECT customers.user_struct_build_json_sudo(id)\n        FROM customers.user_struct_view_cdlan()\n        WHERE customer_id = _customer_id\n        ORDER BY last_name\n    ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_all_by_email_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_all_by_email_ext(_email character varying, _caller_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\nBEGIN\n\n    -- get all user_structs\n    SELECT ARRAY (\n        SELECT customers.user_struct_build_json_sudo(id)\n        FROM customers.user_struct_view_ext(_caller_customer_id)\n        WHERE primary_email = _email\n    ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_all_by_email_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_all_by_email_sudo(_email character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\nBEGIN\n\n    -- get all user_structs\n    SELECT ARRAY (\n        SELECT customers.user_struct_build_json_sudo(id)\n        FROM customers.user_struct_view_cdlan()\n        WHERE primary_email = _email\n    ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_all_by_role_id_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_all_by_role_id_ext(_role_id bigint, _caller_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\nBEGIN\n\n    -- get all user_structs\n    SELECT ARRAY (\n        SELECT customers.user_struct_build_json_ext(us.id, _caller_customer_id)\n        FROM customers.user_struct_view_ext(_caller_customer_id) us\n            LEFT JOIN customers.role r ON us.role_id = r.id\n        WHERE role_id = _role_id AND us.customer_id = _caller_customer_id\n        ORDER BY us.last_name\n    ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_all_by_role_id_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_all_by_role_id_sudo(_role_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\nBEGIN\n\n    -- get all user_structs\n    SELECT ARRAY (\n        SELECT customers.user_struct_build_json_sudo(id)\n        FROM customers.user_struct_view_cdlan()\n        WHERE role_id = _role_id\n        ORDER BY last_name\n    ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_all_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_all_ext(_caller_customer_id bigint, _search_string character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\n    _search_pattern varchar;\nBEGIN\n\n    SELECT concat('%', _search_string, '%') INTO _search_pattern;\n\n    -- get all user_structs\n    SELECT ARRAY(\n                   SELECT customers.user_struct_build_json_ext(id, _caller_customer_id)\n                   FROM customers.user_struct_view_ext(_caller_customer_id)\n                   WHERE primary_email LIKE _search_pattern\n                      OR first_name LIKE _search_pattern\n                      OR last_name LIKE _search_pattern\n                   ORDER BY last_name\n           )\n    INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_all_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_all_sudo(_search_struct json)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\n    _search_pattern varchar;\nBEGIN\n\n    SELECT concat('%', _search_struct->>'search_string', '%') INTO _search_pattern;\n\n    -- get all user_structs\n    SELECT ARRAY (\n        SELECT customers.user_struct_build_json_sudo(id) FROM customers.user_struct_view_cdlan()\n        WHERE (primary_email LIKE _search_pattern\n            OR first_name LIKE _search_pattern\n            OR last_name LIKE _search_pattern)\n        AND (_search_struct->>'customer_id' IS NULL OR customer_id = (_search_struct->>'customer_id')::bigint)\n        AND (_search_struct->>'role_id' IS NULL OR role_id = (_search_struct->>'role_id')::bigint)\n           ORDER BY last_name\n    ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_current",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_current(_email character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_struct_id bigint;\n    _user_struct_customer_id bigint;\nBEGIN\n\n    -- check user -> if true -> user has no user_structs and is deleted\n    -- this should never happen, but better safe than sorry\n    IF customers.user_check(_email) THEN\n        RETURN '';\n    end if;\n\n    -- check if user exists\n    IF NOT EXISTS (SELECT * FROM customers.\"user\" WHERE email = _email) THEN\n        RAISE EXCEPTION 'No user_struct with email % found', _email USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- check if any visible userstruct\n    IF NOT EXISTS(SELECT * FROM customers.user_struct u INNER JOIN customers.user_state s on s.id = u.state_id WHERE s.visible_ext = true) THEN\n        RAISE EXCEPTION 'No user_struct with email % found', _email USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- get active user struct id\n    SELECT id FROM customers.\"user\" u INNER JOIN customers.user_struct us ON u.active_user_struct_id = us.id WHERE email = _email INTO _user_struct_id;\n\n    SELECT customer_id from customers.user_struct WHERE id = _user_struct_id INTO _user_struct_customer_id;\n\n    -- return user_struct\n    RETURN customers.user_struct_build_json_ext(_user_struct_id, _user_struct_customer_id);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_ext(_user_struct_id bigint, _caller_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    RETURN customers.user_struct_build_json_ext(_user_struct_id, _caller_customer_id);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_get_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_get_sudo(_user_struct_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if user_struct exists\n    IF NOT EXISTS(SELECT * FROM customers.user_struct WHERE id = _user_struct_id) THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    RETURN customers.user_struct_build_json_sudo(_user_struct_id);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_hard_delete_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_hard_delete_sudo(_user_struct_id bigint)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _email varchar;\n    _count int;\n    _next bigint;\nBEGIN\n\n    -- check if user_struct exists\n    IF NOT EXISTS(SELECT * FROM customers.user_struct WHERE id = _user_struct_id) THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- get email\n    SELECT primary_email from customers.user_struct WHERE id = _user_struct_id INTO _email;\n\n\n    IF EXISTS(SELECT * FROM \"user\" WHERE active_user_struct_id = _user_struct_id) THEN\n\n        -- count\n        SELECT INTO _count count(*) FROM customers.user_struct WHERE primary_email = _email;\n\n        IF _count > 1 THEN\n\n            -- get next\n            SELECT INTO _next id FROM customers.user_struct WHERE primary_email = _email AND id <> _user_struct_id LIMIT 1;\n\n            -- update\n            UPDATE customers.\"user\" SET active_user_struct_id = _next WHERE email = _email;\n\n        ELSE\n\n            -- update\n            UPDATE customers.\"user\" SET active_user_struct_id = NULL WHERE email = _email;\n        END IF;\n\n    END IF;\n\n    -- delete contacts\n    DELETE FROM customers.contact WHERE user_struct_id = _user_struct_id;\n\n    -- delete\n    DELETE FROM customers.user_struct WHERE id = _user_struct_id;\n\n    -- check user (set new user_struct as active or delete user)\n    RETURN customers.user_check(_email);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_new_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_new_ext(json_data json, _caller_customer_id bigint)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_struct_id bigint;\n    _active_user_struct_id bigint;\n    _contact json;\n    _state_id bigint;\nBEGIN\n\n    -- check user_struct already exists\n    IF EXISTS (SELECT * FROM customers.user_struct us WHERE primary_email = json_data ->> 'email' AND customer_id = _caller_customer_id) THEN\n        RAISE EXCEPTION 'user_struct [% , %] already exists', json_data ->> 'email', json_data->>'customer_id' USING ERRCODE = 'T5AZ1';\n    end if;\n\n    -- check role exists\n    IF NOT EXISTS (SELECT * FROM customers.role r WHERE id = (json_data ->> 'role_id')::bigint AND (customer_id = _caller_customer_id OR customer_id IS NULL)) THEN\n        RAISE EXCEPTION 'No role with id % found', (json_data ->> 'role_id')::bigint USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- create user if not exists\n    PERFORM customers.user_create_if_not_exists(json_data->>'email');\n\n    IF json_data->>'state' IS NULL THEN\n        _state_id = 1;\n    else\n        _state_id = (json_data->>'state')::bigint;\n    end if;\n\n    -- create user_struct\n    INSERT INTO customers.user_struct (customer_id, primary_email, first_name, last_name, role_id, marketing_on_primary_email, maintenance_on_primary_email, state_id, phone) VALUES (\n        _caller_customer_id, -- fixed to caller customer_id\n        json_data->>'email',\n        json_data->>'first_name',\n        json_data->>'last_name',\n        (json_data->> 'role_id')::bigint,\n        (json_data->>'marketing_on_primary_email')::bool,\n        (json_data->>'maintenance_on_primary_email')::bool,\n        _state_id,\n        json_data->>'phone'\n    ) RETURNING id INTO _user_struct_id;\n\n    -- update pointer to active struct if null\n    SELECT active_user_struct_id FROM customers.\"user\" WHERE email = json_data->>'email' INTO _active_user_struct_id;\n    IF _active_user_struct_id IS NULL THEN\n        UPDATE customers.\"user\" SET active_user_struct_id = _user_struct_id WHERE email = json_data->>'email';\n    end if;\n\n    -- create contacts\n    if (json_data ->> 'contacts') IS NOT NULL THEN\n\n        for _contact in select * from json_array_elements(json_data -> 'contacts')\n            loop\n\n                PERFORM customers.user_struct_add_contact(_user_struct_id, _contact);\n            end loop;\n    END IF;\n\n    RETURN _user_struct_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_new_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_new_sudo(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_struct_id bigint;\n    _active_user_struct_id bigint;\n    _contact json;\n    _state_id bigint;\nBEGIN\n\n    -- check user_struct already exists\n    IF EXISTS (SELECT * FROM customers.user_struct us WHERE primary_email = json_data ->> 'email' AND customer_id = (json_data->>'customer_id')::bigint) THEN\n        RAISE EXCEPTION 'user_struct [% , %] already exists', json_data ->> 'email', json_data->>'customer_id' USING ERRCODE = 'T5AZ1';\n    end if;\n\n    -- check role exists\n    IF NOT EXISTS (SELECT * FROM customers.role r WHERE id = (json_data ->> 'role_id')::bigint) THEN\n        RAISE EXCEPTION 'No role with id %d found', (json_data ->> 'role_id')::bigint USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- check customer_id exists\n    IF NOT EXISTS (SELECT * FROM customers.customer c WHERE c.id = (json_data ->> 'customer_id')::bigint) THEN\n        RAISE EXCEPTION 'No customer with id % found', (json_data ->> 'customer_id')::bigint USING ERRCODE = 'T1BZ0';\n    end if;\n\n    -- create user if not exists\n    PERFORM customers.user_create_if_not_exists(json_data->>'email');\n\n    IF json_data->>'state' IS NULL THEN\n        _state_id = 1;\n    else\n        _state_id = (json_data->>'state')::bigint;\n    end if;\n\n    IF json_data->>'id' IS NOT NULL THEN\n        -- create user_struct forcing id\n        INSERT INTO customers.user_struct (id, customer_id, primary_email, first_name, last_name, role_id, marketing_on_primary_email, maintenance_on_primary_email, state_id, phone) VALUES (\n            (json_data->>'id')::bigint,\n            (json_data->>'customer_id')::bigint,\n            json_data->>'email',\n            json_data->>'first_name',\n            json_data->>'last_name',\n            (json_data->> 'role_id')::bigint,\n            (json_data->>'marketing_on_primary_email')::bool,\n            (json_data->>'maintenance_on_primary_email')::bool,\n            _state_id,\n            json_data->>'phone'\n        ) RETURNING id INTO _user_struct_id;\n\n    ELSE\n        -- create user_struct\n        INSERT INTO customers.user_struct (customer_id, primary_email, first_name, last_name, role_id, marketing_on_primary_email, maintenance_on_primary_email, state_id, phone) VALUES (\n            (json_data->>'customer_id')::bigint,\n            json_data->>'email',\n            json_data->>'first_name',\n            json_data->>'last_name',\n            (json_data->> 'role_id')::bigint,\n            (json_data->>'marketing_on_primary_email')::bool,\n            (json_data->>'maintenance_on_primary_email')::bool,\n            _state_id,\n            json_data->>'phone'\n        ) RETURNING id INTO _user_struct_id;\n    end if;\n\n    -- update pointer to active struct if null\n    SELECT active_user_struct_id FROM customers.\"user\" WHERE email = json_data->>'email' INTO _active_user_struct_id;\n    IF _active_user_struct_id IS NULL THEN\n        UPDATE customers.\"user\" SET active_user_struct_id = _user_struct_id WHERE email = json_data->>'email';\n    end if;\n\n    -- create contacts\n    if (json_data ->> 'contacts') IS NOT NULL THEN\n\n        for _contact in select * from json_array_elements(json_data -> 'contacts')\n            loop\n\n                PERFORM customers.user_struct_add_contact(_user_struct_id, _contact);\n            end loop;\n    END IF;\n\n    RETURN _user_struct_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_set_current",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_set_current(_email character varying, _customer_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_struct_id bigint;\nBEGIN\n\n    -- check if user exists\n    IF NOT EXISTS (SELECT * FROM customers.\"user\" WHERE email = _email) THEN\n        RAISE EXCEPTION 'No user_struct with email % found', _email USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- check if user_struct exists\n    IF NOT EXISTS (SELECT * FROM customers.user_struct_view_ext(_customer_id) WHERE primary_email = _email) THEN\n        RAISE EXCEPTION 'No user_struct with email= % and customer_id= % found', _email, _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- get user struct id\n    SELECT INTO _user_struct_id id FROM customers.user_struct WHERE primary_email = _email AND customer_id = _customer_id LIMIT 1;\n\n    -- update\n    UPDATE customers.\"user\" SET active_user_struct_id = _user_struct_id WHERE email = _email;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_update_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_update_ext(json_data json, _caller_customer_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM customers.user_struct_view_ext(_caller_customer_id) WHERE id = (json_data ->> 'id')::bigint) THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', (json_data ->> 'id')::bigint USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- update role_id\n    IF json_data ->> 'role_id' IS NOT NULL THEN\n\n        IF NOT EXISTS(SELECT * FROM customers.role WHERE id = (json_data ->> 'role_id')::bigint AND (customer_id IS NULL or customer_id = _caller_customer_id)) THEN\n            RAISE EXCEPTION 'No role with id %d found', (json_data ->> 'role_id')::bigint USING ERRCODE = 'T3AZ0';\n        end if;\n    END IF;\n\n    PERFORM customers.user_struct_update_sudo(json_data);\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_update_sudo",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_update_sudo(json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _contact json;\n    _user_struct customers.user_struct%rowtype;\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM customers.user_struct_view_cdlan() WHERE id = (json_data ->> 'id')::bigint) THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', (json_data ->> 'id')::bigint USING ERRCODE = 'T5AZ0';\n    end if;\n\n    SELECT * FROM customers.user_struct WHERE id = (json_data ->> 'id')::bigint INTO _user_struct;\n\n    -- update updated field\n    UPDATE customers.user_struct SET updated = NOW() WHERE id = (json_data ->> 'id')::bigint;\n\n    -- update first_name\n    IF json_data ->> 'first_name' IS NOT NULL THEN\n        UPDATE customers.user_struct SET first_name = json_data ->> 'first_name' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update language\n    IF json_data ->> 'language' IS NOT NULL THEN\n        UPDATE customers.user_struct SET language = json_data ->> 'language' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update last_name\n    IF json_data ->> 'last_name' IS NOT NULL THEN\n        UPDATE customers.user_struct SET last_name = json_data ->> 'last_name' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update state\n    IF json_data ->> 'state' IS NOT NULL THEN\n        UPDATE customers.user_struct SET state_id = (json_data ->> 'state')::bigint WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update phone\n    IF json_data ->> 'phone' IS NOT NULL THEN\n        UPDATE customers.user_struct SET phone = json_data ->> 'phone' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update marketing_on_primary_email\n    IF json_data ->> 'marketing_on_primary_email' IS NOT NULL THEN\n        UPDATE customers.user_struct SET marketing_on_primary_email = (json_data ->> 'marketing_on_primary_email')::bool WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update maintenance_on_primary_email\n    IF json_data ->> 'maintenance_on_primary_email' IS NOT NULL THEN\n        UPDATE customers.user_struct SET maintenance_on_primary_email = (json_data ->> 'maintenance_on_primary_email')::bool WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update role_id\n    IF json_data ->> 'role_id' IS NOT NULL THEN\n\n        IF NOT EXISTS(SELECT * FROM customers.role WHERE id = (json_data ->> 'role_id')::bigint) THEN\n            RAISE EXCEPTION 'No role with id % found', (json_data ->> 'role_id')::bigint USING ERRCODE = 'T3AZ0';\n        end if;\n\n        IF NOT EXISTS(SELECT * FROM customers.role WHERE id = (json_data ->> 'role_id')::bigint AND (customer_id IS NULL or customer_id = _user_struct.customer_id)) THEN\n            RAISE EXCEPTION 'role with id % cannot be assigned as it is not visible by user', (json_data ->> 'role_id')::bigint USING ERRCODE = 'T3AZ0';\n        end if;\n\n        UPDATE customers.user_struct SET role_id = (json_data ->> 'role_id')::bigint WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- delete and replace contacts if specified\n    if (json_data ->> 'contacts') IS NOT NULL THEN\n\n        -- delete old\n        DELETE FROM customers.contact WHERE user_struct_id = (json_data ->> 'id')::bigint;\n\n        -- insert new\n        for _contact in select * from json_array_elements(json_data -> 'contacts')\n            loop\n\n                PERFORM customers.user_struct_add_contact((json_data ->> 'id')::bigint, _contact);\n            end loop;\n    END IF;\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_view_cdlan",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_view_cdlan()\n RETURNS SETOF customers.user_struct\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    RETURN QUERY SELECT u.* FROM customers.user_struct u INNER JOIN customers.user_state s ON u.state_id = s.id WHERE s.visible_cdlan = true;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "user_struct_view_ext",
+          "definition": "CREATE OR REPLACE FUNCTION customers.user_struct_view_ext(_customer_id bigint)\n RETURNS SETOF customers.user_struct\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    RETURN QUERY SELECT u.* FROM customers.user_struct u INNER JOIN customers.user_state s ON u.state_id = s.id WHERE s.visible_ext = true AND u.customer_id = _customer_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "variable_add_to_customer",
+          "definition": "CREATE OR REPLACE FUNCTION customers.variable_add_to_customer(_customer_id bigint, _variable json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n\nBEGIN\n    -- create var if not exists\n    IF NOT EXISTS(SELECT * FROM customers.variable WHERE resource = _variable->>'resource' AND action = _variable->>'action') THEN\n        INSERT INTO customers.variable (resource, action) VALUES (_variable->>'resource', _variable->>'action');\n    END IF;\n\n    -- check if association already exists\n    IF EXISTS(SELECT * FROM customers.customer_variable WHERE customer_id = _customer_id AND resource = _variable->>'resource' AND action = _variable->>'action') THEN\n        RAISE EXCEPTION 'variable (%,%) already tied to customer %', _variable->>'resource', _variable->>'action', _customer_id  USING ERRCODE = 'T7AZ1';\n    end if;\n\n    -- insert\n    INSERT INTO customers.customer_variable(customer_id, resource, action) VALUES (_customer_id, _variable->>'resource', _variable->>'action');\nEND;\n$function$\n"
+        },
+        {
+          "name": "variable_add_to_customer_group",
+          "definition": "CREATE OR REPLACE FUNCTION customers.variable_add_to_customer_group(_customer_group_id bigint, _variable json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n\nBEGIN\n    -- create var if not exists\n    IF NOT EXISTS(SELECT * FROM customers.variable WHERE resource = _variable->>'resource' AND action = _variable->>'action') THEN\n        INSERT INTO customers.variable (resource, action) VALUES (_variable->>'resource', _variable->>'action');\n    END IF;\n\n    -- check if association already exists\n    IF EXISTS(SELECT * FROM customers.customer_group_variable WHERE customer_group_id = _customer_group_id AND resource = _variable->>'resource' AND action = _variable->>'action') THEN\n        RAISE EXCEPTION 'variable (%,%) already tied to customer_group %', _variable->>'resource', _variable->>'action', _customer_group_id  USING ERRCODE = 'T7AZ1';\n    end if;\n\n    -- insert\n    INSERT INTO customers.customer_group_variable(customer_group_id, resource, action) VALUES (_customer_group_id, _variable->>'resource', _variable->>'action');\nEND;\n$function$\n"
+        },
+        {
+          "name": "variable_delete",
+          "definition": "CREATE OR REPLACE FUNCTION customers.variable_delete(_variable json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    IF NOT EXISTS(SELECT * FROM customers.variable WHERE action = _variable->>'action' AND resource = _variable->>'resource') THEN\n        RAISE EXCEPTION 'No variable with (%, %) found', _variable->'resource', _variable->>'action' USING ERRCODE = 'T7AZ0';\n    end if;\n\n    DELETE FROM customers.variable WHERE action = _variable->>'action' AND resource = _variable->>'resource';\nEND;\n$function$\n"
+        },
+        {
+          "name": "variable_get_all",
+          "definition": "CREATE OR REPLACE FUNCTION customers.variable_get_all()\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    RETURN coalesce((SELECT json_agg(x) FROM (SELECT * FROM customers.variable)x), '[]'::json);\nEND;\n$function$\n"
+        },
+        {
+          "name": "variable_get_by_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION customers.variable_get_by_user_struct(_user_struct_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _customer_id bigint;\n    _customer_group_id bigint;\nBEGIN\n\n    -- get customer id\n    SELECT customer_id FROM customers.user_struct WHERE id = _user_struct_id INTO _customer_id;\n\n    IF _customer_id IS NULL THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    IF (SELECT cs.enabled FROM customers.customer_state cs INNER JOIN customers.customer c on cs.id = c.state_id WHERE c.id = _customer_id) THEN\n\n        SELECT group_id FROM customers.customer WHERE id = _customer_id INTO _customer_group_id;\n\n        RETURN json_agg(x) FROM (\n            (SELECT resource, action FROM customers.customer_variable WHERE customer_id = _customer_id)\n            UNION\n            (SELECT resource, action FROM customers.customer_group_variable WHERE customer_group_id = _customer_group_id)\n        ) x;\n    ELSE\n\n        return NULL;\n    end if;\n\nEND;\n$function$\n"
+        }
+      ],
+      "sequences": [
+        {
+          "name": "api_path_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "biometric_request_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "contact_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "contact_type_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "customer_credit_transaction_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "customer_group_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "customer_state_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "page_tree_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "preference_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "role_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "user_state_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "user_struct_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        }
+      ],
+      "enumTypes": [
+        {
+          "name": "request_source_enum",
+          "values": [
+            "internal",
+            "external"
+          ],
+          "schema": "customers"
+        },
+        {
+          "name": "request_type_enum",
+          "values": [
+            "activation",
+            "deactivation"
+          ],
+          "schema": "customers"
+        }
+      ]
+    }
+  ]
+}

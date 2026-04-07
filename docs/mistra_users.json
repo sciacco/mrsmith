@@ -1,0 +1,1099 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "users",
+      "tables": [
+        {
+          "name": "contact",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('users.contact_id_seq'::regclass)"
+            },
+            {
+              "name": "type_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "name",
+              "position": 3,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "user_struct_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "value",
+              "position": 5,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_notification",
+              "position": 6,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "marketing_notification",
+              "position": 7,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "contact_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "contact_type_id_user_struct_id_value_key",
+              "type": "BTREE",
+              "expressions": [
+                "type_id",
+                "user_struct_id",
+                "value"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "contact_type_id_fkey",
+              "columns": [
+                "type_id"
+              ],
+              "referencedTable": "users.contact_type",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 204,
+          "dataSize": 32768,
+          "indexSize": 81920
+        },
+        {
+          "name": "contact_type",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('users.contact_type_id_seq'::regclass)"
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "contact_type_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "customer_group_resources",
+          "columns": [
+            {
+              "name": "customer_group_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "resource",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "access_type",
+              "position": 3,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "customer_group_resources_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "customer_group_id",
+                "resource",
+                "access_type"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "migrations",
+          "columns": [
+            {
+              "name": "filename",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "migrated_at",
+              "position": 2,
+              "type": "timestamp without time zone",
+              "nullable": false,
+              "default": "CURRENT_TIMESTAMP"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "migrations_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "filename"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 17,
+          "dataSize": 8192,
+          "indexSize": 57344
+        },
+        {
+          "name": "page",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "parent",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "protected",
+              "position": 3,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false",
+              "comment": "if true the page can only be assigned to role with customer_id = 0 (default roles)"
+            },
+            {
+              "name": "selectable",
+              "position": 4,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "page_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "page_parent_fkey",
+              "columns": [
+                "parent"
+              ],
+              "referencedTable": "users.page",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "after_delete_update_parent_selectable",
+              "event": "DELETE",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER after_delete_update_parent_selectable AFTER DELETE ON users.page FOR EACH ROW EXECUTE FUNCTION users.update_parent_selectable_on_delete()"
+            },
+            {
+              "name": "after_insert_update_parent_selectable",
+              "event": "INSERT",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER after_insert_update_parent_selectable AFTER INSERT ON users.page FOR EACH ROW EXECUTE FUNCTION users.update_parent_selectable_on_create()"
+            },
+            {
+              "name": "after_update_propagate_parent_selectable",
+              "event": "UPDATE",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER after_update_propagate_parent_selectable AFTER UPDATE ON users.page FOR EACH ROW EXECUTE FUNCTION users.propagate_parent_selectable_on_update()"
+            },
+            {
+              "name": "after_update_update_parent_selectable",
+              "event": "UPDATE",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER after_update_update_parent_selectable AFTER UPDATE ON users.page FOR EACH ROW EXECUTE FUNCTION users.update_parent_selectable_on_update()"
+            },
+            {
+              "name": "after_update_update_roles",
+              "event": "UPDATE",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER after_update_update_roles AFTER UPDATE ON users.page FOR EACH ROW EXECUTE FUNCTION users.update_roles_on_selectable_update()"
+            },
+            {
+              "name": "after_update_update_selectable",
+              "event": "UPDATE",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER after_update_update_selectable BEFORE UPDATE ON users.page FOR EACH ROW EXECUTE FUNCTION users.update_selectable_on_update()"
+            },
+            {
+              "name": "before_insert_set_selectable",
+              "event": "INSERT",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER before_insert_set_selectable BEFORE INSERT ON users.page FOR EACH ROW EXECUTE FUNCTION users.set_selectable_on_create()"
+            }
+          ],
+          "rowCount": 45,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "preference",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('users.preference_id_seq'::regclass)"
+            },
+            {
+              "name": "user_struct_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "language",
+              "position": 3,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "avatar_link",
+              "position": 4,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "json_preferences",
+              "position": 5,
+              "type": "json",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "preference_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "preference_user_struct_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "user_struct_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "preference_user_struct_id_fkey",
+              "columns": [
+                "user_struct_id"
+              ],
+              "referencedTable": "users.user_struct",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 436,
+          "dataSize": 32768,
+          "indexSize": 106496
+        },
+        {
+          "name": "resource_access",
+          "columns": [
+            {
+              "name": "page_name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "resource",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "access_type",
+              "position": 3,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "resource_access_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "page_name",
+                "resource",
+                "access_type"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "resource_access_page_name_fkey",
+              "columns": [
+                "page_name"
+              ],
+              "referencedTable": "users.page",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 65,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "role",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('users.role_id_seq'::regclass)"
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "customer_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "color",
+              "position": 4,
+              "type": "character varying(7)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "role_name_customer_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "name",
+                "customer_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "role_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 65,
+          "dataSize": 16384,
+          "indexSize": 65536
+        },
+        {
+          "name": "role_page",
+          "columns": [
+            {
+              "name": "role_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "page_name",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "role_page_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "role_id",
+                "page_name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "role_page_page_name_fkey",
+              "columns": [
+                "page_name"
+              ],
+              "referencedTable": "users.page",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "role_page_role_id_fkey",
+              "columns": [
+                "role_id"
+              ],
+              "referencedTable": "users.role",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 574,
+          "dataSize": 49152,
+          "indexSize": 81920
+        },
+        {
+          "name": "user",
+          "columns": [
+            {
+              "name": "email",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "active_user_struct_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": true,
+              "comment": "the active user struct for this user"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "user_active_user_struct_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "active_user_struct_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "user_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "email"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "user_active_user_struct_id_fkey",
+              "columns": [
+                "active_user_struct_id"
+              ],
+              "referencedTable": "users.user_struct",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "SET NULL",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": 810,
+          "dataSize": 73728,
+          "indexSize": 139264
+        },
+        {
+          "name": "user_struct",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('users.user_struct_id_seq'::regclass)"
+            },
+            {
+              "name": "customer_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "primary_email",
+              "position": 3,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "phone",
+              "position": 4,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "first_name",
+              "position": 5,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "last_name",
+              "position": 6,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "enabled",
+              "position": 7,
+              "type": "boolean",
+              "nullable": true,
+              "default": "true"
+            },
+            {
+              "name": "role_id",
+              "position": 8,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "marketing_on_primary_email",
+              "position": 9,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false",
+              "comment": "if true the user can receive marketing notification on primary email"
+            },
+            {
+              "name": "maintenance_on_primary_email",
+              "position": 10,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false",
+              "comment": "if true the user can receive maintenance notification on primary email"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "user_struct_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "user_struct_role_id_fkey",
+              "columns": [
+                "role_id"
+              ],
+              "referencedTable": "users.role",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "check_min_length_email",
+              "expression": "(length((primary_email)::text) > 0)"
+            },
+            {
+              "name": "check_min_length_phone",
+              "expression": "(length((phone)::text) > 0)"
+            }
+          ],
+          "rowCount": 879,
+          "dataSize": 131072,
+          "indexSize": 81920
+        }
+      ],
+      "views": [
+        {
+          "name": "page_protected",
+          "definition": " SELECT name,\n    parent,\n    protected\n   FROM users.page\n  WHERE (selectable = false);",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "parent",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "protected",
+              "position": 3,
+              "type": "boolean",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "page_unprotected",
+          "definition": " SELECT name,\n    parent,\n    protected\n   FROM users.page\n  WHERE (selectable = true);",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "parent",
+              "position": 2,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "protected",
+              "position": 3,
+              "type": "boolean",
+              "nullable": true
+            }
+          ]
+        }
+      ],
+      "functions": [
+        {
+          "name": "add_contact_to_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.add_contact_to_user_struct(_user_struct_id bigint, _contact json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _type_id bigint;\n    _contact_id bigint;\nBEGIN\n\n    RAISE NOTICE 'add_contact_to_user_struct';\n\n    -- check if type exists\n    IF NOT EXISTS(SELECT * FROM contact_type WHERE name = _contact ->> 'type') THEN\n        RAISE EXCEPTION 'No contact_type with name % found', _contact ->> 'type' USING ERRCODE = 'T8AZ0';\n    end if;\n\n    -- get type id\n    SELECT * FROM contact_type WHERE name = _contact ->> 'type' LIMIT 1 INTO _type_id;\n\n    -- check contact not already exists\n    IF EXISTS(SELECT * FROM contact WHERE value = _contact ->> 'value' AND type_id = _type_id AND user_struct_id = _user_struct_id) THEN\n        RAISE EXCEPTION 'contact already exists with name %', _contact ->> 'name' USING ERRCODE = 'T9AZ1';\n    end if;\n\n    -- create contact\n    INSERT INTO contact (type_id, name, user_struct_id, value, maintenance_notification, marketing_notification) VALUES (\n        _type_id,\n        _contact ->> 'name',\n        _user_struct_id,\n        _contact ->> 'value',\n        (_contact ->> 'maintenance_notification')::bool,\n        (_contact ->> 'marketing_notification')::bool\n    ) RETURNING id INTO _contact_id;\n\n    RETURN _contact_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "add_page_to_role",
+          "definition": "CREATE OR REPLACE FUNCTION users.add_page_to_role(_role_id bigint, _page_name character varying)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _page page%rowtype;\n    _role role%rowtype;\nBEGIN\n\n    -- check page exists\n    IF NOT EXISTS (SELECT * FROM page p WHERE p.name = _page_name) THEN\n        RAISE EXCEPTION 'No page with name % found', _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- check role exists\n    IF NOT EXISTS (SELECT * FROM role WHERE id = _role_id) THEN\n        RAISE EXCEPTION 'No role with id % found', _role_id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- check mapping does not already exist\n    IF EXISTS (SELECT * FROM role_page rp WHERE rp.page_name = _page_name AND rp.role_id = _role_id) THEN\n        RAISE EXCEPTION 'Page with name % already exist for role %', _page_name, _role_id USING ERRCODE = 'T1AZ1';\n    end if;\n\n    -- check if page is protected and role is default\n    SELECT * FROM page p WHERE p.name = _page_name INTO _page;\n    SELECT * FROM role WHERE id = _role_id INTO _role;\n    IF NOT (_role.customer_id IS NULL OR (_page.selectable = true AND _page.protected = false)) THEN\n        RAISE EXCEPTION 'Page with name % is protected and cannot be assigned to customer role %', _page_name, _role_id USING ERRCODE = 'T1AZ2';\n    end if;\n\n    -- check if not already entailed\n    IF NOT EXISTS( SELECT e.name FROM get_page_table_by_role(_role_id) e WHERE e.name = _page_name) THEN\n\n        -- insert mapping\n        INSERT INTO role_page (role_id, page_name) VALUES (_role_id, _page_name);\n    end if;\n\n    -- delete pages entailed by this one\n    DELETE from role_page rp WHERE rp.role_id = _role_id AND rp.page_name IN (\n        SELECT child FROM get_entailed_pages(_page_name)\n    );\nEND;\n$function$\n"
+        },
+        {
+          "name": "add_resource_access_to_customer_group",
+          "definition": "CREATE OR REPLACE FUNCTION users.add_resource_access_to_customer_group(_resource json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check already exists\n    IF EXISTS (SELECT * FROM customer_group_resources WHERE customer_group_id = (_resource ->> 'customer_group_id')::bigint AND resource = _resource ->> 'resource' AND access_type = _resource ->> 'access_type') THEN\n        RAISE EXCEPTION 'CustomerGroupResource (% % %) already exists', _resource ->> 'customer_group_id', _resource ->> 'resource', _resource ->> 'access_type' USING ERRCODE = 'T7AZ1';\n    end if;\n\n    INSERT INTO customer_group_resources (customer_group_id, resource, access_type) VALUES ((_resource ->> 'customer_group_id')::bigint, _resource ->> 'resource', _resource ->> 'access_type');\nEND;\n$function$\n"
+        },
+        {
+          "name": "add_resource_access_to_page",
+          "definition": "CREATE OR REPLACE FUNCTION users.add_resource_access_to_page(_page_name character varying, _resource json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if page exists\n    IF NOT EXISTS (SELECT * FROM page WHERE name = _page_name) THEN\n        RAISE EXCEPTION 'No page with name % found', _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- check already exists\n    IF EXISTS (SELECT * FROM resource_access WHERE page_name = _page_name AND resource = _resource ->> 'resource' AND access_type = _resource ->> 'access_type') THEN\n        RAISE EXCEPTION 'ResourceAccess (% % %) already exists', _page_name, _resource ->> 'resource', _resource ->> 'access_type' USING ERRCODE = 'T1AZ1';\n    end if;\n\n    INSERT INTO resource_access (page_name, resource, access_type) VALUES (_page_name, _resource ->> 'resource', _resource ->> 'access_type');\nEND;\n$function$\n"
+        },
+        {
+          "name": "build_role",
+          "definition": "CREATE OR REPLACE FUNCTION users.build_role(_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    pages json[];\n    result json;\nBEGIN\n\n    -- get pages as json array\n    SELECT array(\n        SELECT get_page(p.name)\n        FROM role_page rp\n        LEFT JOIN page p ON rp.page_name = p.name\n        WHERE rp.role_id = _id\n    ) into pages;\n\n    -- compose global json\n    SELECT INTO result json_agg(x) -> 0 FROM (\n        SELECT id, name, customer_id, color, pages FROM role WHERE id = _id LIMIT 1\n    ) x;\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "check_user",
+          "definition": "CREATE OR REPLACE FUNCTION users.check_user(_email character varying)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_struct_id bigint;\nBEGIN\n\n    RAISE NOTICE 'check_user';\n\n    -- check if user exists\n    IF NOT EXISTS(SELECT * FROM \"user\" WHERE email = _email) THEN\n        RETURN false;\n    end if;\n\n    -- if exist active_user_struct\n    IF EXISTS(SELECT * FROM \"user\" u INNER JOIN user_struct us ON u.active_user_struct_id = us.id WHERE email = _email) THEN\n        RETURN false;\n    end if;\n\n    -- check if has user_structs available\n    IF NOT EXISTS(SELECT id FROM user_struct WHERE primary_email = _email) THEN\n\n        -- delete user bc it has no user_structs\n        DELETE from \"user\" WHERE email = _email;\n\n        RETURN true; --user has been deleted\n    end if;\n\n    -- choose first user_structs available\n    SELECT id FROM user_struct WHERE primary_email = _email LIMIT 1 INTO _user_struct_id;\n\n    -- update\n    UPDATE \"user\" SET active_user_struct_id = _user_struct_id WHERE email = _email;\n\n    RETURN false; --user was not deleted\nEND;\n$function$\n"
+        },
+        {
+          "name": "create_or_update_preference",
+          "definition": "CREATE OR REPLACE FUNCTION users.create_or_update_preference(json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check preference exists for user\n    IF NOT EXISTS (SELECT * FROM preference WHERE user_struct_id = (json_data ->> 'user_struct_id')::bigint) THEN\n\n        -- if not exists -> create\n        PERFORM new_preference(json_data);\n    ELSE\n\n        -- else update it\n        PERFORM update_preference(json_data);\n    end if;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "create_user_if_not_exists",
+          "definition": "CREATE OR REPLACE FUNCTION users.create_user_if_not_exists(_email character varying)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- create if not exist\n    IF NOT EXISTS (SELECT * FROM \"user\" WHERE email = _email) THEN\n\n        INSERT INTO \"user\" (email) VALUES (_email);\n    end if;\nEND;\n$function$\n"
+        },
+        {
+          "name": "delete_page",
+          "definition": "CREATE OR REPLACE FUNCTION users.delete_page(_name character varying)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM page WHERE name = _name) THEN\n        RAISE EXCEPTION 'No page with name % found', _name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- delete res access\n    DELETE FROM resource_access WHERE page_name = _name;\n\n    -- delete page\n    DELETE FROM page WHERE name = _name;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "delete_resource_access",
+          "definition": "CREATE OR REPLACE FUNCTION users.delete_resource_access(_resource character varying, _access_type character varying)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (\n        (\n            SELECT resource, access_type\n            FROM resource_access\n            WHERE resource = _resource\n            AND access_type = _access_type\n        )\n        UNION\n        (\n            SELECT resource, access_type\n            FROM customer_group_resources\n            WHERE resource = _resource AND access_type = _access_type\n        )\n    ) THEN\n        RAISE EXCEPTION 'No resource_access with (resource, access_type) = (%,%) found', _resource, _access_type USING ERRCODE = 'T1AZ0';\n    end if;\n\n    -- delete resource_access\n    DELETE FROM resource_access WHERE resource = _resource AND access_type = _access_type;\n\n    -- delete customer_group_resources\n    DELETE FROM customer_group_resources WHERE resource = _resource AND access_type = _access_type;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "delete_role",
+          "definition": "CREATE OR REPLACE FUNCTION users.delete_role(_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM role WHERE id = _id) THEN\n        RAISE EXCEPTION 'No role with id % found', _id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- delete page\n    DELETE FROM role WHERE id = _id;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "delete_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.delete_user_struct(_user_struct_id bigint)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _email varchar;\n    _count int;\n    _next bigint;\nBEGIN\n\n    RAISE NOTICE 'delete_user_struct %', _user_struct_id ;\n\n    -- check if user_struct exists\n    IF NOT EXISTS(SELECT * FROM user_struct WHERE id = _user_struct_id) THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- get email\n    SELECT primary_email From user_struct WHERE id = _user_struct_id INTO _email;\n\n\n    IF EXISTS(SELECT * FROM \"user\" WHERE active_user_struct_id = _user_struct_id) THEN\n\n        -- count\n        SELECT INTO _count count(*) FROM user_struct WHERE primary_email = _email;\n\n        IF _count > 1 THEN\n\n            -- get next\n            SELECT INTO _next id FROM user_struct WHERE primary_email = _email AND id <> _user_struct_id LIMIT 1;\n\n            -- update\n            UPDATE \"user\" SET active_user_struct_id = _next WHERE email = _email;\n\n        ELSE\n\n            -- update\n            UPDATE \"user\" SET active_user_struct_id = NULL WHERE email = _email;\n\n        END IF;\n\n    END IF;\n\n    -- delete\n    DELETE FROM user_struct WHERE id = _user_struct_id;\n\n    -- check user (set new user_struct as active or delete user)\n    RETURN check_user(_email);\n    RETURN false;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_entailed_pages",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_entailed_pages()\n RETURNS TABLE(parent character varying, child character varying)\n LANGUAGE plpgsql\nAS $function$\nbegin\n    RETURN QUERY SELECT page.name as parent, f.child\n                 FROM page\n                          LEFT JOIN get_entailed_pages(page.name) f ON page.name = f.parent;\nend;\n$function$\n"
+        },
+        {
+          "name": "get_all_pages",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_pages()\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\nBEGIN\n\n    SELECT array (SELECT get_page(p.name) FROM page p WHERE p.parent IS NULL) into tmp;\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_pages_by_protected",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_pages_by_protected(_protected boolean)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\nBEGIN\n\n    IF _protected = true THEN\n\n        SELECT array (\n            SELECT get_page_protected(name) FROM (\n                SELECT name FROM page_protected where parent IS NULL\n            ) as pages\n        ) into tmp;\n\n    ELSE\n\n        SELECT array (\n            SELECT get_page_unprotected(name) FROM (\n                SELECT name FROM page_unprotected where parent IS NULL\n            ) as pages\n        ) into tmp;\n\n    END IF;\n\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_pages_by_role_id",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_pages_by_role_id(_role_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\nBEGIN\n\n    SELECT array (\n        SELECT get_page(name) FROM get_pages_by_role(_role_id)\n    ) into tmp;\n\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_pages_by_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_pages_by_user_struct(_user_struct_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\nBEGIN\n\n    SELECT array (\n        SELECT get_page(name) FROM get_pages_by_user_struct(_user_struct_id)\n    ) into tmp;\n\n    RETURN to_json(tmp);\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_resource_access",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_resource_access()\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\n    result json;\nBEGIN\n\n    -- select all resource_access\n    SELECT array (\n        SELECT json_build_object('resource', resource, 'access_type', access_type)\n        FROM (\n            (SELECT resource, access_type FROM resource_access)\n            UNION\n            (SELECT resource, access_type FROM customer_group_resources)\n        ) x\n   ) into tmp;\n\n    -- get global json\n    SELECT INTO result to_json(tmp);\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_resource_access_by_customer_group_id",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_resource_access_by_customer_group_id(_customer_group_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\n    result json;\nBEGIN\n\n    -- cannot check if customer_group exists bc info is managed by customers ms\n\n\n    SELECT array (\n        SELECT json_build_object('resource', resource, 'access_type', access_type)\n        FROM customer_group_resources cgr\n        WHERE cgr.customer_group_id = _customer_group_id\n    ) into tmp;\n\n\n    -- get global json\n    SELECT INTO result to_json(tmp);\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_resource_access_by_page",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_resource_access_by_page(_name character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\n    result json;\nBEGIN\n\n    -- check if page exists\n    IF NOT EXISTS (SELECT * FROM page WHERE name = _name) THEN\n        RAISE EXCEPTION 'No page with name % found', _name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- select resource_access of specified page + all entailed pages\n    SELECT array( SELECT json_build_object('resource', resource, 'access_type', access_type) FROM\n        (\n            (\n                SELECT resource, access_type\n                FROM get_entailed_pages(_name) ep\n                INNER JOIN resource_access ra ON ep.child = ra.page_name\n            )\n            UNION\n            (\n                SELECT resource, access_type\n                FROM resource_access\n                WHERE page_name = _name\n            )\n        ) x\n    ) into tmp;\n\n    -- get global json\n    SELECT INTO result to_json(tmp);\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_resource_access_by_role_id",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_resource_access_by_role_id(_role_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    tmp json[];\n    result json;\nBEGIN\n\n    -- check if role exist is done in subfunction\n\n    -- get all pages tied to role\n    SELECT array(\n        SELECT json_build_object('resource', ra.resource, 'access_type', ra.access_type)\n        FROM get_page_table_by_role(_role_id) p\n        INNER JOIN resource_access ra ON p.name = ra.page_name\n    ) into tmp;\n\n    -- generate json\n    SELECT INTO result to_json(tmp);\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_resource_access_by_user_struct_id",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_resource_access_by_user_struct_id(_user_struct_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _enabled bool;\n    tmp json[];\n    result json;\nBEGIN\n\n    -- if user is disabled -> null\n    SELECT enabled FROM user_struct WHERE id = _user_struct_id INTO _enabled;\n\n    IF NOT _enabled THEN\n        RETURN NULL;\n    end if;\n\n    -- check if user_struct exist is done in subfunction\n    SELECT array(\n        SELECT json_build_object('resource', resource, 'access_type', access_type)\n        FROM get_page_table_by_user_struct(_user_struct_id) p\n        INNER JOIN resource_access ra ON p.name = ra.page_name\n    ) into tmp;\n\n    -- generate json\n    SELECT INTO result to_json(tmp);\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_roles",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_roles()\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    roles json[];\nBEGIN\n\n    -- get all roles\n    SELECT array(\n        SELECT build_role(id)\n        FROM role\n    ) into roles;\n\n    -- return\n    RETURN to_json(roles);\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_roles_by_customer_id",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_roles_by_customer_id(_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    roles json[];\nBEGIN\n\n    -- get all roles\n    SELECT array(\n        SELECT build_role(id)\n        FROM role\n        WHERE customer_id = _customer_id\n    ) into roles;\n\n    -- delete page\n    RETURN to_json(roles);\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_user_struct()\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\nBEGIN\n\n    -- get all user_structs\n    SELECT ARRAY (\n        SELECT get_user_struct(id) FROM user_struct\n    ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_user_struct_by_customer_id",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_user_struct_by_customer_id(_customer_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\nBEGIN\n\n    -- get all user_structs\n    SELECT ARRAY (\n        SELECT get_user_struct(id) FROM user_struct WHERE customer_id = _customer_id\n    ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_user_struct_by_email",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_user_struct_by_email(_email character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\nBEGIN\n\n    -- get all user_structs\n    SELECT ARRAY (\n                   SELECT get_user_struct(id) FROM user_struct WHERE primary_email = _email\n           ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_all_user_struct_by_role_id",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_all_user_struct_by_role_id(_role_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_structs json[];\nBEGIN\n\n    -- get all user_structs\n    SELECT ARRAY (\n                   SELECT get_user_struct(id) FROM user_struct WHERE role_id = _role_id\n           ) INTO _user_structs;\n\n    -- return\n    RETURN to_json(_user_structs);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_contact",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_contact(_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _contact json;\nBEGIN\n\n    -- raise exception if not found\n    IF NOT EXISTS(SELECT * FROM contact WHERE id = _id) THEN\n        RAISE EXCEPTION 'No contact with id % found', _id USING ERRCODE = 'T9AZ0';\n    end if;\n\n    -- get contact\n    SELECT INTO _contact json_agg(x) -> 0 FROM (\n        SELECT c.id, ct.name as type, c.name, c.maintenance_notification, c.marketing_notification, c.value, c.user_struct_id FROM contact c LEFT JOIN contact_type ct ON c.type_id = ct.id WHERE c.id = _id LIMIT 1\n    ) x;\n\n    -- return json\n    RETURN _contact;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_current_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_current_user_struct(_email character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_struct_id bigint;\nBEGIN\n\n    RAISE NOTICE 'get_current_user_struct';\n\n    -- check user\n    PERFORM check_user(_email);\n\n    -- check if user exists\n    IF NOT EXISTS (SELECT * FROM \"user\" WHERE email = _email) THEN\n        RAISE EXCEPTION 'No user_struct with email % found', _email USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- get active user struct id\n    SELECT id FROM \"user\" u INNER JOIN user_struct us ON u.active_user_struct_id = us.id WHERE email = _email INTO _user_struct_id;\n\n    -- return user_struct\n    RETURN get_user_struct(_user_struct_id);\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_entailed_pages",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_entailed_pages(input_name character varying)\n RETURNS TABLE(parent character varying, child character varying, protected boolean)\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    RETURN QUERY WITH RECURSIVE children_cte AS (\n        SELECT page.name, page.parent, page.protected\n        FROM page\n        WHERE page.parent = input_name\n        UNION ALL\n        SELECT p.name, p.parent, p.protected\n        FROM page p\n                 INNER JOIN children_cte c ON p.parent = c.name\n    )\n                 SELECT input_name as parent, children_cte.name, children_cte.protected as child FROM children_cte;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_full_pages_subtrees",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_full_pages_subtrees(pages character varying[])\n RETURNS TABLE(name character varying, parent character varying, protected boolean, selectable boolean)\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    assigned_page varchar;\n    entailed_page varchar;\n    next_page RECORD;\nBEGIN\n\n    FOREACH assigned_page IN ARRAY pages\n        LOOP\n\n            -- return page itself\n            SELECT * FROM page p WHERE p.name = assigned_page INTO next_page;\n            name := next_page.name;\n            parent := next_page.parent;\n            protected := next_page.protected;\n            selectable := next_page.selectable;\n            RETURN NEXT;\n\n            -- select all pages that are entailed\n            FOR entailed_page IN (\n                SELECT child FROM get_entailed_pages(assigned_page)\n            )\n                LOOP\n\n                    -- get page\n                    SELECT * FROM page p WHERE p.name = entailed_page INTO next_page;\n                    name := next_page.name;\n                    parent := next_page.parent;\n                    protected := next_page.protected;\n                    selectable := next_page.selectable;\n\n                    -- return entry\n                    RETURN NEXT;\n                end loop;\n        END LOOP;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_leaf_pages",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_leaf_pages(pages character varying[])\n RETURNS TABLE(name character varying, parent character varying, protected boolean, selectable boolean)\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    assigned_page varchar;\n    entailed_page varchar;\n    next_page RECORD;\nBEGIN\n\n    FOREACH assigned_page IN ARRAY pages\n    LOOP\n\n        -- select all pages that are entailed and are leaves\n        FOR entailed_page IN (\n            SELECT child FROM get_entailed_pages(assigned_page)\n            WHERE is_page_leaf(child)\n        )\n        LOOP\n\n            -- get page\n            SELECT * FROM page p WHERE p.name = entailed_page INTO next_page;\n            name := next_page.name;\n            parent := next_page.parent;\n            protected := next_page.protected;\n            selectable := next_page.selectable;\n\n            -- return entry\n            RETURN NEXT;\n        end loop;\n    END LOOP;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_leaf_pages_by_role",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_leaf_pages_by_role(_role_id bigint)\n RETURNS TABLE(name character varying, parent character varying, protected boolean, selectable boolean)\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    pages varchar[];\nBEGIN\n\n    SELECT ARRAY (SELECT name FROM get_pages_by_role(_role_id)) INTO pages;\n    RETURN QUERY (SELECT * FROM get_leaf_pages(pages));\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_leaf_pages_by_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_leaf_pages_by_user_struct(user_struct_id bigint)\n RETURNS TABLE(name character varying, parent character varying)\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    pages varchar[];\nBEGIN\n\n    SELECT ARRAY (SELECT name FROM get_pages_by_user_struct(user_struct_id)) INTO pages;\n    RETURN QUERY (SELECT * FROM get_leaf_pages(pages));\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_maintenance_email_for_customer",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_maintenance_email_for_customer(_customer_id bigint)\n RETURNS TABLE(email character varying, first_name character varying, last_name character varying, customer_name character varying, language character varying)\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\nRETURN QUERY (\n\n    SELECT maintenance_email.email , maintenance_email.first_name, maintenance_email.last_name, c.name, maintenance_email.language\n            FROM (SELECT u.email, us.first_name, us.last_name, us.customer_id, COALESCE(p.language, 'it') AS language\n              FROM users.\"user\" u\n                       INNER JOIN users.user_struct us on us.primary_email = u.email\n                       LEFT JOIN users.preference p on us.id = p.user_struct_id\n              WHERE maintenance_on_primary_email = true\n              UNION\n              SELECT c.value as email, us.first_name, us.last_name, us.customer_id, COALESCE(p.language, 'it') AS language\n              FROM users.contact c\n                       INNER JOIN users.user_struct us on c.user_struct_id = us.id\n                       LEFT JOIN users.preference p on us.id = p.user_struct_id\n              WHERE c.type_id = (SELECT id FROM contact_type WHERE name = 'secondary_email')\n                AND maintenance_notification = true) as maintenance_email\n                 LEFT JOIN customers.customer c ON maintenance_email.customer_id = c.id\n        WHERE maintenance_email.customer_id = _customer_id\n       );\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_page",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_page(_name character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    resources json;\n    children json[];\n    result json;\nBEGIN\n\n    -- if page not found -> error\n    IF NOT EXISTS (SELECT * FROM page WHERE name = _name) THEN\n        RAISE EXCEPTION 'No page with name % found', _name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- get resources as json array\n    SELECT into resources json_agg(x) FROM (\n        SELECT resource, access_type from resource_access WHERE page_name = _name\n    ) x;\n\n    -- get pages as array\n    -- recursive call to create tree from page\n    SELECT array(\n        SELECT get_page(p.name) FROM page p WHERE p.parent = _name\n    ) into children;\n\n    -- get global json\n    SELECT INTO result json_agg(x) -> 0 FROM (\n        SELECT page.*, resources, children FROM page WHERE name = _name LIMIT 1\n    ) x;\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_page_protected",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_page_protected(_name character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    resources json;\n    children json[];\n    result json;\nBEGIN\n\n    -- if page not found -> error\n    IF NOT EXISTS (SELECT * FROM page_protected WHERE name = _name ) THEN\n        RAISE EXCEPTION 'No page with name % found', _name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- get resources as json array\n    SELECT into resources json_agg(x) FROM (\n        SELECT resource, access_type from resource_access WHERE page_name = _name\n    ) x;\n\n    -- get all children that have protected children or are protected\n    -- recursive call to create tree from page\n    SELECT array(\n        SELECT get_page_protected(p.name) FROM page_protected p WHERE p.parent = _name\n    ) into children;\n\n    -- get global json\n    SELECT INTO result json_agg(x) -> 0 FROM (\n        SELECT page.*, resources, children FROM page WHERE name = _name LIMIT 1\n    ) x;\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_page_table_by_role",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_page_table_by_role(_role_id bigint)\n RETURNS TABLE(name character varying, parent character varying, protected boolean, selectable boolean)\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    pages varchar[];\nBEGIN\n\n    SELECT ARRAY (SELECT pbr.name FROM get_pages_by_role(_role_id) pbr) INTO pages;\n    RETURN QUERY (\n        SELECT *\n        FROM get_full_pages_subtrees(pages)\n    );\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_page_table_by_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_page_table_by_user_struct(_role_id bigint)\n RETURNS TABLE(name character varying, parent character varying, protected boolean, selectable boolean)\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    pages varchar[];\nBEGIN\n\n    SELECT ARRAY (SELECT x.name FROM get_pages_by_user_struct(_role_id)x ) INTO pages;\n    RETURN QUERY (\n        SELECT *\n        FROM get_full_pages_subtrees(pages)\n    );\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_page_unprotected",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_page_unprotected(_name character varying)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    resources json;\n    children json[];\n    result json;\nBEGIN\n\n    -- if page not found -> error\n    IF NOT EXISTS (SELECT * FROM page_unprotected WHERE name = _name) THEN\n        RAISE EXCEPTION 'No page with name % found', _name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- get resources as json array\n    SELECT into resources json_agg(x) FROM (\n        SELECT resource, access_type from resource_access WHERE page_name = _name\n    ) x;\n\n    -- get all children that do not have protected children and are not protected\n    -- recursive call to create tree from page\n    SELECT array(\n        SELECT get_page_protected(p.name) FROM page_unprotected p WHERE p.parent = _name\n    ) into children;\n\n    -- get global json\n    SELECT INTO result json_agg(x) -> 0 FROM (\n        SELECT page.*, resources, children FROM page WHERE name = _name LIMIT 1\n    ) x;\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_pages_by_role",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_pages_by_role(_role_id bigint)\n RETURNS TABLE(name character varying, parent character varying, protected boolean, selectable boolean)\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if role exists\n    IF NOT EXISTS (SELECT * FROM role WHERE id = _role_id) THEN\n        RAISE EXCEPTION 'No role with id %d found', _role_id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    RETURN QUERY (\n        SELECT p.*\n        FROM role r\n        LEFT JOIN role_page rp on r.id = rp.role_id\n        LEFT JOIN page p on rp.page_name = p.name\n        WHERE r.id = _role_id\n    );\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_pages_by_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_pages_by_user_struct(user_struct_id bigint)\n RETURNS TABLE(name character varying, parent character varying, protected boolean, selectable boolean)\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if user_struct exists\n    IF NOT EXISTS (SELECT * FROM user_struct WHERE id = user_struct_id) THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    RETURN QUERY (\n            SELECT p.*\n            FROM user_struct us\n            LEFT JOIN role r on us.role_id = r.id\n            LEFT JOIN role_page rp on r.id = rp.role_id\n            LEFT JOIN page p on rp.page_name = p.name\n            WHERE us.id = user_struct_id AND us.enabled = true\n    );\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_preference",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_preference(_user_struct_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n\n    _result json;\nBEGIN\n\n    -- check preference exists for user\n    IF NOT EXISTS (SELECT * FROM preference WHERE user_struct_id = _user_struct_id) THEN\n        RAISE EXCEPTION 'Preference not found for for user %', _user_struct_id USING ERRCODE = 'T6AZ0';\n    end if;\n\n    SELECT INTO _result json_agg(x) -> 0 FROM (\n        SELECT * FROM preference WHERE user_struct_id = _user_struct_id LIMIT 1\n    ) x;\n\n    RETURN _result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_role",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_role(_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    result json;\nBEGIN\n\n    RAISE NOTICE 'get_role';\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM role WHERE id = _id) THEN\n        RAISE EXCEPTION 'No role with id % found', _id USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- get role json\n    SELECT INTO result build_role(_id);\n\n    RETURN result;\nEND;\n$function$\n"
+        },
+        {
+          "name": "get_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.get_user_struct(_user_struct_id bigint)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _role json;\n    _contacts json[];\n    _res json;\nBEGIN\n\n    -- check if user_struct exists\n    IF NOT EXISTS(SELECT * FROM user_struct WHERE id = _user_struct_id) THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- get role\n    SELECT get_role(role_id) FROM user_struct WHERE id = _user_struct_id INTO _role;\n\n    -- get contacts\n    SELECT ARRAY(\n       SELECT get_contact(id) FROM contact WHERE user_struct_id = _user_struct_id\n    ) INTO _contacts;\n\n    -- join in json\n    SELECT INTO _res json_agg(x) -> 0 FROM (\n        SELECT us.*, _role as role, _contacts as contacts FROM user_struct us WHERE id = _user_struct_id LIMIT 1\n    ) x;\n\n    RETURN _res;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "has_protected_children",
+          "definition": "CREATE OR REPLACE FUNCTION users.has_protected_children(_page_name character varying)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    IF NOT EXISTS (SELECT * FROM get_entailed_pages(_page_name) WHERE protected = true)\n    THEN\n\n        return false;\n    ELSE\n\n        return true;\n    END IF;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "is_page_leaf",
+          "definition": "CREATE OR REPLACE FUNCTION users.is_page_leaf(page_name character varying)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\ndeclare\n-- variable declaration\n    page_arr page%rowtype;\nbegin\n\n    SELECT name FROM page WHERE parent = page_name into page_arr;\n\n    -- if not found return true (page is leaf)\n    if not found then\n        return true;\n    end if;\n\n    return false;\nend;\n$function$\n"
+        },
+        {
+          "name": "new_page",
+          "definition": "CREATE OR REPLACE FUNCTION users.new_page(json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    res json;\nBEGIN\n\n    -- check already exists\n    IF EXISTS (SELECT * FROM page WHERE name = json_data ->> 'name') THEN\n        RAISE EXCEPTION 'Page with name % already exists', json_data ->> 'name' USING ERRCODE = 'T2AZ1';\n    end if;\n\n\n    -- create page\n    IF json_data ->> 'protected' IS NOT NULL THEN\n\n        INSERT INTO page (name, parent, protected) values (json_data ->> 'name', json_data ->> 'parent', (json_data ->> 'protected')::bool);\n    ELSE\n\n        INSERT INTO page (name, parent) values (json_data ->> 'name', json_data ->> 'parent');\n    end if;\n\n\n    -- create res access\n    if (json_data->'resources') IS NOT NULL THEN\n\n        for res in select * from json_array_elements(json_data -> 'resources')\n            loop\n                PERFORM add_resource_access_to_page(json_data ->> 'name', res);\n            end loop;\n    END IF;\nEND;\n$function$\n"
+        },
+        {
+          "name": "new_preference",
+          "definition": "CREATE OR REPLACE FUNCTION users.new_preference(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _preference_id bigint;\nBEGIN\n\n    -- check does not already exist preference for user\n    IF EXISTS (SELECT * FROM preference WHERE user_struct_id = (json_data ->> 'user_struct_id')::bigint) THEN\n        RAISE EXCEPTION 'Preference already exists for user %', (json_data ->> 'user_struct_id')::bigint USING ERRCODE = 'T6AZ1';\n    end if;\n\n    -- create preference\n    INSERT INTO preference (user_struct_id, language, avatar_link, json_preferences) values ((json_data ->> 'user_struct_id')::bigint, json_data ->> 'language', json_data ->> 'avatar_link', (json_data ->> 'json_preferences')::json) RETURNING id INTO _preference_id;\n\n    RETURN _preference_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "new_role",
+          "definition": "CREATE OR REPLACE FUNCTION users.new_role(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _role_id bigint;\n    _page_name varchar;\nBEGIN\n\n    -- check does not shadow default\n    IF EXISTS (SELECT * FROM role r WHERE r.name = json_data ->> 'name' AND r.customer_id IS NULL) THEN\n        RAISE EXCEPTION 'Name % is already used by default role', json_data ->> 'name' USING ERRCODE = 'T3AZ1';\n    end if;\n\n    -- check already exists one with same (name, customer_id)\n    IF EXISTS (SELECT * FROM role r WHERE r.name = json_data ->> 'name' AND r.customer_id = (json_data ->> 'customer_id')::bigint ) THEN\n        RAISE EXCEPTION 'Page with name % already exists', json_data ->> 'name' USING ERRCODE = 'T3AZ1';\n    end if;\n\n    -- create role\n    INSERT INTO role (name, customer_id, color) values (json_data ->> 'name', (json_data ->> 'customer_id')::bigint, json_data ->> 'color') RETURNING id INTO _role_id;\n\n    -- add pages\n    if (json_data->'pages') IS NOT NULL THEN\n\n        for _page_name in select * from json_array_elements_text(json_data -> 'pages')\n            loop\n\n                PERFORM add_page_to_role(_role_id, _page_name);\n            end loop;\n    END IF;\n\n    RETURN _role_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "new_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.new_user_struct(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_struct_id bigint;\n    _active_user_struct_id bigint;\n    _contact json;\n    _enabled bool;\nBEGIN\n\n    -- check user_struct already exists\n    IF EXISTS (SELECT * FROM user_struct us WHERE primary_email = json_data ->> 'email' AND customer_id = (json_data->>'customer_id')::bigint) THEN\n        RAISE EXCEPTION 'user_struct [% , %] already exists', json_data ->> 'email', json_data->>'customer_id' USING ERRCODE = 'T5AZ1';\n    end if;\n\n    -- check role exists\n    IF NOT EXISTS (SELECT * FROM role r WHERE id = (json_data ->> 'role_id')::bigint) THEN\n        RAISE EXCEPTION 'No role with id %d found', (json_data ->> 'role_id')::bigint USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- create user if not exists\n    PERFORM create_user_if_not_exists(json_data->>'email');\n\n    IF json_data->>'enabled' IS NULL THEN\n        _enabled = true;\n    else\n        _enabled = (json_data->>'enabled')::bool;\n    end if;\n\n    -- create user_struct\n    INSERT INTO user_struct (customer_id, primary_email, first_name, last_name, role_id, marketing_on_primary_email, maintenance_on_primary_email, enabled, phone) VALUES (\n        (json_data->>'customer_id')::bigint,\n        json_data->>'email',\n        json_data->>'first_name',\n        json_data->>'last_name',\n        (json_data->> 'role_id')::bigint,\n        (json_data->>'marketing_on_primary_email')::bool,\n        (json_data->>'maintenance_on_primary_email')::bool,\n        _enabled,\n        json_data->>'phone'\n    ) RETURNING id INTO _user_struct_id;\n\n    -- update pointer to active struct if null\n    SELECT active_user_struct_id FROM \"user\" WHERE email = json_data->>'email' INTO _active_user_struct_id;\n    IF _active_user_struct_id IS NULL THEN\n        UPDATE \"user\" SET active_user_struct_id = _user_struct_id WHERE email = json_data->>'email';\n    end if;\n\n    -- create contacts\n    if (json_data ->> 'contacts') IS NOT NULL THEN\n\n        for _contact in select * from json_array_elements(json_data -> 'contacts')\n            loop\n\n                PERFORM add_contact_to_user_struct(_user_struct_id, _contact);\n            end loop;\n    END IF;\n\n    RETURN _user_struct_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "propagate_parent_selectable_on_update",
+          "definition": "CREATE OR REPLACE FUNCTION users.propagate_parent_selectable_on_update()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- set schema\n    PERFORM set_config('search_path', TG_TABLE_SCHEMA, true);\n\n    -- if changed parent => update both parents\n    IF OLD.selectable <> NEW.selectable THEN\n\n        UPDATE page\n        SET selectable = NOT has_protected_children(name)\n        WHERE name = NEW.parent;\n\n    END IF;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "rm_page_from_role",
+          "definition": "CREATE OR REPLACE FUNCTION users.rm_page_from_role(_role_id bigint, _page_name character varying)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check page exists\n    IF NOT EXISTS (SELECT * FROM page p WHERE p.name = _page_name) THEN\n        RAISE EXCEPTION 'No page with name % found', _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- check mapping exist\n    IF NOT EXISTS (SELECT * FROM role_page rp WHERE rp.page_name = _page_name AND rp.role_id = _role_id) THEN\n        RAISE EXCEPTION 'Page with name % not bound to role %', _page_name, _role_id USING ERRCODE = 'T1AZ1';\n    end if;\n\n    -- delete page\n    DELETE FROM role_page rp WHERE rp.page_name = _page_name AND rp.role_id = _role_id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "rm_resource_access_from_customer_group",
+          "definition": "CREATE OR REPLACE FUNCTION users.rm_resource_access_from_customer_group(_resource json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if exists\n    IF NOT EXISTS (SELECT * FROM customer_group_resources WHERE customer_group_id = (_resource ->> 'customer_group_id')::bigint AND resource = _resource ->> 'resource' AND access_type = _resource ->> 'access_type') THEN\n        RAISE EXCEPTION 'CustomerGroupResource (% % %) not found', (_resource ->> 'customer_group_id')::bigint, _resource ->> 'resource', _resource ->> 'access_type' USING ERRCODE = 'T7AZ0';\n    end if;\n\n    -- DELETE\n    DELETE FROM customer_group_resources WHERE customer_group_id = (_resource ->> 'customer_group_id')::bigint AND resource = _resource ->> 'resource' AND access_type = _resource ->> 'access_type';\nEND;\n$function$\n"
+        },
+        {
+          "name": "rm_resource_access_from_page",
+          "definition": "CREATE OR REPLACE FUNCTION users.rm_resource_access_from_page(_page_name character varying, _resource json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check if page exists\n    IF NOT EXISTS (SELECT * FROM page WHERE name = _page_name) THEN\n        RAISE EXCEPTION 'No page with name % found', _page_name USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- check if res exists\n    IF NOT EXISTS (SELECT * FROM resource_access WHERE page_name = _page_name AND resource = _resource ->> 'resource' AND access_type = _resource ->> 'access_type') THEN\n        RAISE EXCEPTION 'No resource_access with (page, resource, access_type) = (%,%,%) found', _page_name, _resource->> 'resource', _resource ->> 'access_type' USING ERRCODE = 'T1AZ0';\n    end if;\n\n    DELETE FROM resource_access WHERE page_name = _page_name AND resource = _resource ->> 'resource' AND access_type = _resource ->> 'access_type';\nEND;\n$function$\n"
+        },
+        {
+          "name": "set_current_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.set_current_user_struct(_email character varying, _customer_id bigint)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _user_struct_id bigint;\nBEGIN\n\n    -- check if user exists\n    IF NOT EXISTS (SELECT * FROM \"user\" WHERE email = _email) THEN\n        RAISE EXCEPTION 'No user_struct with email % found', _email USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- check if user_struct exists\n    IF NOT EXISTS (SELECT * FROM user_struct WHERE primary_email = _email AND customer_id = _customer_id) THEN\n        RAISE EXCEPTION 'No user_struct with email= % and customer_id= % found', _email, _user_struct_id USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- get user struct id\n    SELECT INTO _user_struct_id id FROM user_struct WHERE primary_email = _email AND customer_id = _customer_id LIMIT 1;\n\n    -- update\n    UPDATE \"user\" SET active_user_struct_id = _user_struct_id WHERE email = _email;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "set_selectable_on_create",
+          "definition": "CREATE OR REPLACE FUNCTION users.set_selectable_on_create()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    PERFORM set_config('search_path', TG_TABLE_SCHEMA, true);\n\n    IF NEW.protected = true THEN\n\n        -- set current selectable to false\n        NEW.selectable = false;\n\n    ELSE\n\n        -- set current selectable to true\n        NEW.selectable = true;\n\n    END IF;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_page",
+          "definition": "CREATE OR REPLACE FUNCTION users.update_page(json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    res json;\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM page WHERE name = json_data ->> 'name') THEN\n        RAISE EXCEPTION 'No page with name % found', json_data ->> 'name' USING ERRCODE = 'T2AZ0';\n    end if;\n\n    -- update parent\n    IF json_data ->> 'parent' IS NOT NULL THEN\n        UPDATE page SET parent = json_data ->> 'parent' WHERE name = json_data ->> 'name';\n\n    END IF;\n\n    -- update protected\n    IF json_data ->> 'protected' IS NOT NULL THEN\n        UPDATE page SET protected = (json_data ->> 'protected')::bool WHERE name = json_data ->> 'name';\n    END IF;\n\n    -- create res access if exists\n    IF (json_data->'resources') IS NOT NULL THEN\n\n        -- delete old\n        DELETE FROM resource_access WHERE page_name = json_data ->> 'name';\n\n        -- insert new\n        for res in select * from json_array_elements(json_data -> 'resources')\n        loop\n            INSERT INTO resource_access (page_name, resource, access_type) VALUES (json_data ->> 'name', res ->> 'resource', res ->> 'access_type');\n        end loop;\n    END IF;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_parent_selectable_on_create",
+          "definition": "CREATE OR REPLACE FUNCTION users.update_parent_selectable_on_create()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    PERFORM set_config('search_path', TG_TABLE_SCHEMA, true);\n\n    IF NEW.protected = true THEN\n\n        -- set parent selectable = false\n        UPDATE page SET selectable = false WHERE name = NEW.parent;\n\n    END IF;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_parent_selectable_on_delete",
+          "definition": "CREATE OR REPLACE FUNCTION users.update_parent_selectable_on_delete()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- set schema\n    PERFORM set_config('search_path', TG_TABLE_SCHEMA, true);\n\n    IF OLD.protected = true AND OLD.parent IS NOT NULL\n    THEN\n\n        UPDATE page SET selectable = NOT has_protected_children(OLD.parent) WHERE name = OLD.parent;\n\n    END IF;\n\n    RETURN OLD;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_parent_selectable_on_update",
+          "definition": "CREATE OR REPLACE FUNCTION users.update_parent_selectable_on_update()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- set schema\n    PERFORM set_config('search_path', TG_TABLE_SCHEMA, true);\n\n    -- if changed parent => update both parents\n    IF OLD.parent <> NEW.parent THEN\n\n        UPDATE page\n        SET selectable = NOT has_protected_children(name)\n        WHERE name = OLD.parent OR name = NEW.parent;\n\n    END IF;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_preference",
+          "definition": "CREATE OR REPLACE FUNCTION users.update_preference(json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- check preference exists for user\n    IF NOT EXISTS (SELECT * FROM preference WHERE user_struct_id = (json_data ->> 'user_struct_id')::bigint) THEN\n        RAISE EXCEPTION 'Preference not found for for user %', (json_data ->> 'user_struct_id')::bigint USING ERRCODE = 'T6AZ0';\n    end if;\n\n    -- update language\n    IF json_data ->> 'language' IS NOT NULL THEN\n        UPDATE preference SET language = json_data ->> 'language' WHERE user_struct_id = (json_data ->> 'user_struct_id')::bigint;\n    END IF;\n\n    -- update avatar_link\n    IF json_data ->> 'avatar_link' IS NOT NULL THEN\n        UPDATE preference SET avatar_link = json_data ->> 'avatar_link' WHERE user_struct_id = (json_data ->> 'user_struct_id')::bigint;\n    END IF;\n\n    -- update json_preferences\n    IF json_data ->> 'json_preferences' IS NOT NULL THEN\n        UPDATE preference SET json_preferences = (json_data ->> 'json_preferences')::json WHERE user_struct_id = (json_data ->> 'user_struct_id')::bigint;\n    END IF;\n\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_role",
+          "definition": "CREATE OR REPLACE FUNCTION users.update_role(json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _page varchar;\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM role WHERE id = (json_data ->> 'id')::bigint) THEN\n        RAISE EXCEPTION 'No role with id % found', (json_data ->> 'id')::bigint USING ERRCODE = 'T3AZ0';\n    end if;\n\n    -- update name\n    IF json_data ->> 'name' IS NOT NULL THEN\n        UPDATE role SET name = json_data ->> 'name' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update color\n    IF json_data ->> 'color' IS NOT NULL THEN\n        UPDATE role SET color = json_data ->> 'color' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update customer_id\n    IF json_data -> 'customer_id' IS NOT NULL THEN\n        UPDATE role SET customer_id = (json_data ->> 'customer_id')::bigint WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- delete and replace pages if specified\n    IF (json_data->'pages') IS NOT NULL THEN\n\n        -- delete old\n        DELETE FROM role_page WHERE role_id = (json_data ->> 'id')::bigint;\n\n        -- insert new\n        for _page in select * from json_array_elements_text(json_data -> 'pages')\n            loop\n\n                PERFORM add_page_to_role((json_data ->> 'id')::bigint, _page);\n            end loop;\n    END IF;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_roles_on_selectable_update",
+          "definition": "CREATE OR REPLACE FUNCTION users.update_roles_on_selectable_update()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- set schema\n    PERFORM set_config('search_path', TG_TABLE_SCHEMA, true);\n\n    -- if changed parent => update both parents\n    IF OLD.selectable = true AND NEW.selectable = false THEN\n\n        -- delete association between this page an any role that is not default\n        DELETE FROM role_page WHERE page_name = NEW.name AND role_id IN (\n            SELECT id FROM role WHERE customer_id IS NOT NULL\n        );\n\n    END IF;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_selectable_on_update",
+          "definition": "CREATE OR REPLACE FUNCTION users.update_selectable_on_update()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n\n    -- set schema\n    PERFORM set_config('search_path', TG_TABLE_SCHEMA, true);\n\n    -- set selectable to not protected\n    IF NEW.protected <> OLD.protected THEN\n\n        IF NEW.protected= true THEN\n\n            -- set current selectable=false\n            NEW.selectable = false;\n        ELSE\n\n            -- compute current selectable value\n            NEW.selectable = NOT has_protected_children(NEW.name);\n        END IF;\n    END IF;\n\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_user_struct",
+          "definition": "CREATE OR REPLACE FUNCTION users.update_user_struct(json_data json)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _contact json;\nBEGIN\n\n    -- check if exist\n    IF NOT EXISTS (SELECT * FROM user_struct WHERE id = (json_data ->> 'id')::bigint) THEN\n        RAISE EXCEPTION 'No user_struct with id %d found', (json_data ->> 'id')::bigint USING ERRCODE = 'T5AZ0';\n    end if;\n\n    -- update first_name\n    IF json_data ->> 'first_name' IS NOT NULL THEN\n        UPDATE user_struct SET first_name = json_data ->> 'first_name' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update last_name\n    IF json_data ->> 'last_name' IS NOT NULL THEN\n        UPDATE user_struct SET last_name = json_data ->> 'last_name' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update enabled\n    IF json_data ->> 'enabled' IS NOT NULL THEN\n        UPDATE user_struct SET enabled = (json_data ->> 'enabled')::bool WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update phone\n    IF json_data ->> 'phone' IS NOT NULL THEN\n        UPDATE user_struct SET phone = json_data ->> 'phone' WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update marketing_on_primary_email\n    IF json_data ->> 'marketing_on_primary_email' IS NOT NULL THEN\n        UPDATE user_struct SET marketing_on_primary_email = (json_data ->> 'marketing_on_primary_email')::bool WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update maintenance_on_primary_email\n    IF json_data ->> 'maintenance_on_primary_email' IS NOT NULL THEN\n        UPDATE user_struct SET maintenance_on_primary_email = (json_data ->> 'maintenance_on_primary_email')::bool WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- update role_id\n    IF json_data ->> 'role_id' IS NOT NULL THEN\n\n        IF NOT EXISTS(SELECT * FROM role WHERE id = (json_data ->> 'role_id')::bigint) THEN\n            RAISE EXCEPTION 'No role with id %d found', (json_data ->> 'role_id')::bigint USING ERRCODE = 'T3AZ0';\n        end if;\n\n        UPDATE user_struct SET role_id = (json_data ->> 'role_id')::bigint WHERE id = (json_data ->> 'id')::bigint;\n    END IF;\n\n    -- delete and replace contacts if specified\n    if (json_data ->> 'contacts') IS NOT NULL THEN\n\n        -- delete old\n        DELETE FROM contact WHERE user_struct_id = (json_data ->> 'id')::bigint;\n\n        -- insert new\n        for _contact in select * from json_array_elements(json_data -> 'contacts')\n            loop\n\n                PERFORM add_contact_to_user_struct((json_data ->> 'id')::bigint, _contact);\n            end loop;\n    END IF;\nEND;\n$function$\n"
+        }
+      ],
+      "sequences": [
+        {
+          "name": "contact_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "contact_type_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "preference_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "role_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "user_struct_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    }
+  ]
+}

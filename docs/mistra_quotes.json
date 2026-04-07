@@ -1,0 +1,939 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "quotes",
+      "tables": [
+        {
+          "name": "quote",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "quote_number",
+              "position": 2,
+              "type": "character varying(32)",
+              "nullable": false,
+              "default": "((('SP-'::text || (nextval('quotes.quote_number_seq'::regclass))::text) || '/'::text) || to_char(now(), 'YYYY'::text))"
+            },
+            {
+              "name": "customer_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "ragione_sociale",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "deal_number",
+              "position": 5,
+              "type": "character varying(32)",
+              "nullable": true
+            },
+            {
+              "name": "owner",
+              "position": 6,
+              "type": "character varying(100)",
+              "nullable": true
+            },
+            {
+              "name": "document_date",
+              "position": 7,
+              "type": "date",
+              "nullable": true,
+              "default": "now()"
+            },
+            {
+              "name": "document_type",
+              "position": 8,
+              "type": "character varying(32)",
+              "nullable": true,
+              "default": "'TSC-ORDINE-RIC'::character varying"
+            },
+            {
+              "name": "replace_orders",
+              "position": 9,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "template",
+              "position": 10,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "services",
+              "position": 11,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "proposal_type",
+              "position": 12,
+              "type": "character varying(32)",
+              "nullable": true,
+              "default": "'NUOVO'::character varying"
+            },
+            {
+              "name": "initial_term_months",
+              "position": 13,
+              "type": "smallint",
+              "nullable": false,
+              "default": "12"
+            },
+            {
+              "name": "next_term_months",
+              "position": 14,
+              "type": "smallint",
+              "nullable": false,
+              "default": "12"
+            },
+            {
+              "name": "bill_months",
+              "position": 15,
+              "type": "smallint",
+              "nullable": false,
+              "default": "2"
+            },
+            {
+              "name": "delivered_in_days",
+              "position": 16,
+              "type": "integer",
+              "nullable": false,
+              "default": "60"
+            },
+            {
+              "name": "date_sent",
+              "position": 17,
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "name": "status",
+              "position": 18,
+              "type": "character varying(32)",
+              "nullable": false,
+              "default": "'DRAFT'::character varying"
+            },
+            {
+              "name": "notes",
+              "position": 19,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "nrc_charge_time",
+              "position": 20,
+              "type": "smallint",
+              "nullable": false,
+              "default": "2",
+              "comment": "1. all'ordine 2. all'attivazione"
+            },
+            {
+              "name": "created_at",
+              "position": 21,
+              "type": "timestamp without time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "updated_at",
+              "position": 22,
+              "type": "timestamp without time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "description",
+              "position": 23,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "hs_deal_id",
+              "position": 24,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "hs_quote_id",
+              "position": 25,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "payment_method",
+              "position": 26,
+              "type": "character(6)",
+              "nullable": true
+            },
+            {
+              "name": "hs_esign_enabled",
+              "position": 27,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "hs_esign_contacts",
+              "position": 28,
+              "type": "jsonb",
+              "nullable": true
+            },
+            {
+              "name": "hs_sign_status",
+              "position": 29,
+              "type": "character varying(20)",
+              "nullable": true
+            },
+            {
+              "name": "hs_esign_date",
+              "position": 30,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "rif_ordcli",
+              "position": 31,
+              "type": "character varying(240)",
+              "nullable": true
+            },
+            {
+              "name": "rif_tech_nom",
+              "position": 32,
+              "type": "character varying(240)",
+              "nullable": true
+            },
+            {
+              "name": "rif_tech_tel",
+              "position": 33,
+              "type": "character varying(240)",
+              "nullable": true
+            },
+            {
+              "name": "rif_tech_email",
+              "position": 34,
+              "type": "character varying(240)",
+              "nullable": true
+            },
+            {
+              "name": "rif_altro_tech_nom",
+              "position": 35,
+              "type": "character varying(240)",
+              "nullable": true
+            },
+            {
+              "name": "rif_altro_tech_tel",
+              "position": 36,
+              "type": "character varying(240)",
+              "nullable": true
+            },
+            {
+              "name": "rif_altro_tech_email",
+              "position": 37,
+              "type": "character varying(240)",
+              "nullable": true
+            },
+            {
+              "name": "rif_adm_nom",
+              "position": 38,
+              "type": "character varying(240)",
+              "nullable": true
+            },
+            {
+              "name": "rif_adm_tech_tel",
+              "position": 39,
+              "type": "character varying(240)",
+              "nullable": true
+            },
+            {
+              "name": "rif_adm_tech_email",
+              "position": 40,
+              "type": "character varying(240)",
+              "nullable": true
+            },
+            {
+              "name": "trial",
+              "position": 41,
+              "type": "character varying(255)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "quote_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "quote_quote_number_key",
+              "type": "BTREE",
+              "expressions": [
+                "quote_number"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "triggers": [
+            {
+              "name": "set_timestamp",
+              "event": "UPDATE",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER set_timestamp BEFORE UPDATE ON quotes.quote FOR EACH ROW EXECUTE FUNCTION common.trigger_set_timestamp()"
+            }
+          ],
+          "rowCount": 976,
+          "dataSize": 483328,
+          "indexSize": 270336
+        },
+        {
+          "name": "quote_customer",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false,
+              "default": "nextval('quotes.quote_customer_id_seq'::regclass)"
+            },
+            {
+              "name": "quote_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "codice_fiscale",
+              "position": 3,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "partita_iva",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "lingua",
+              "position": 5,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "codice_sdi",
+              "position": 6,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "indirizzo_fatturazione",
+              "position": 7,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "citta_fatturazione",
+              "position": 8,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "provincia_fatturazione",
+              "position": 9,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "cap_fatturazione",
+              "position": 10,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "paese_fatturazione",
+              "position": 11,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "metodo_pagamento",
+              "position": 12,
+              "type": "character varying(255)",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "quote_customer_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "quote_customer_quote_id_fkey",
+              "columns": [
+                "quote_id"
+              ],
+              "referencedTable": "quotes.quote",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": -1,
+          "indexSize": 16384
+        },
+        {
+          "name": "quote_rows",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "quote_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "kit_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "internal_name",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true,
+              "default": "''::character varying"
+            },
+            {
+              "name": "nrc_row",
+              "position": 5,
+              "type": "numeric(14,4)",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "mrc_row",
+              "position": 6,
+              "type": "numeric(14,4)",
+              "nullable": true,
+              "default": "0"
+            },
+            {
+              "name": "bundle_prefix_row",
+              "position": 7,
+              "type": "character varying(64)",
+              "nullable": true,
+              "default": "''::character varying"
+            },
+            {
+              "name": "hs_line_item_id",
+              "position": 8,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "hs_line_item_nrc",
+              "position": 9,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "position",
+              "position": 10,
+              "type": "integer",
+              "nullable": true,
+              "default": "9000"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "quote_rows_pk",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "quote_rows_kit_id_fk",
+              "columns": [
+                "kit_id"
+              ],
+              "referencedTable": "products.kit",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "quote_rows_quote_id_fk",
+              "columns": [
+                "quote_id"
+              ],
+              "referencedTable": "quotes.quote",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "insert_product_rows_trigger",
+              "event": "INSERT",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER insert_product_rows_trigger AFTER INSERT ON quotes.quote_rows FOR EACH ROW EXECUTE FUNCTION quotes.update_kit_product_rows()"
+            },
+            {
+              "name": "update_kit_product_rows_trigger",
+              "event": "UPDATE",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER update_kit_product_rows_trigger AFTER UPDATE OF kit_id ON quotes.quote_rows FOR EACH ROW WHEN ((old.kit_id IS DISTINCT FROM new.kit_id)) EXECUTE FUNCTION quotes.update_kit_product_rows()"
+            }
+          ],
+          "rowCount": 1910,
+          "dataSize": 237568,
+          "indexSize": 98304
+        },
+        {
+          "name": "quote_rows_products",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": false,
+              "default": "nextval('quotes.quote_rows_products_id_seq'::regclass)"
+            },
+            {
+              "name": "quote_row_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "product_code",
+              "position": 3,
+              "type": "character varying(32)",
+              "nullable": false
+            },
+            {
+              "name": "minimum",
+              "position": 4,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "maximum",
+              "position": 5,
+              "type": "integer",
+              "nullable": false,
+              "default": "'-1'::integer"
+            },
+            {
+              "name": "required",
+              "position": 6,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "nrc",
+              "position": 7,
+              "type": "numeric(14,5)",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "mrc",
+              "position": 8,
+              "type": "numeric(14,5)",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "position",
+              "position": 9,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "group_name",
+              "position": 10,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "included",
+              "position": 11,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "quantity",
+              "position": 12,
+              "type": "numeric",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "extended_description",
+              "position": 13,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "main_product",
+              "position": 14,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "quote_rows_products_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "quote_rows_products_product_code_fkey",
+              "columns": [
+                "product_code"
+              ],
+              "referencedTable": "products.product",
+              "referencedColumns": [
+                "code"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "quote_rows_products_quote_row_id_fkey",
+              "columns": [
+                "quote_row_id"
+              ],
+              "referencedTable": "quotes.quote_rows",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "trigger_update_quote_row_totals",
+              "event": "INSERT",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER trigger_update_quote_row_totals AFTER INSERT OR DELETE OR UPDATE ON quotes.quote_rows_products FOR EACH ROW EXECUTE FUNCTION quotes.update_quote_row_totals()"
+            }
+          ],
+          "rowCount": 24183,
+          "dataSize": 2859008,
+          "indexSize": 745472
+        },
+        {
+          "name": "template",
+          "columns": [
+            {
+              "name": "template_id",
+              "position": 1,
+              "type": "character varying(255)",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true,
+              "default": "''::character varying"
+            },
+            {
+              "name": "lang",
+              "position": 3,
+              "type": "character varying(2)",
+              "nullable": true,
+              "default": "''::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "template_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "template_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": 5,
+          "dataSize": 8192,
+          "indexSize": 24576
+        }
+      ],
+      "views": [
+        {
+          "name": "v_quote_rows_for_hs",
+          "definition": " SELECT qr.id,\n    qr.quote_id,\n    qr.kit_id,\n    COALESCE(common.get_short_translation(k.translation_uuid, 'it'::character varying), k.internal_name) AS translation_it,\n    COALESCE(common.get_short_translation(k.translation_uuid, 'en'::character varying), k.internal_name) AS translation_en,\n    qr.internal_name,\n    qr.nrc_row,\n    qr.mrc_row,\n    qr.bundle_prefix_row,\n    qr.hs_line_item_id,\n    ( SELECT string_agg(((((('[n. '::text || (x.quantity)::text) || ']  <strong>'::text) || (x.translation_it)::text) || '</strong>'::text) || x.extended_description), ('<br/>'::character varying)::text) AS string_agg\n           FROM ( SELECT COALESCE(common.get_short_translation(p.translation_uuid, 'it'::character varying), p.internal_name) AS translation_it,\n                    qrp.quantity,\n                    qrp.extended_description\n                   FROM (quotes.quote_rows_products qrp\n                     JOIN products.product p ON (((qrp.product_code)::text = (p.code)::text)))\n                  WHERE ((qrp.quote_row_id = qr.id) AND (qrp.included = true))\n                  ORDER BY qrp.quote_row_id, qrp.main_product DESC, qrp.\"position\") x) AS descrizione_estesa,\n    ( SELECT string_agg(((((('[n. '::text || (x.quantity)::text) || ']  <strong>'::text) || (x.translation_en)::text) || '</strong>'::text) || x.extended_description), ('<br/>'::character varying)::text) AS string_agg\n           FROM ( SELECT COALESCE(common.get_short_translation(p.translation_uuid, 'en'::character varying), p.internal_name) AS translation_en,\n                    qrp.quantity,\n                    qrp.extended_description\n                   FROM (quotes.quote_rows_products qrp\n                     JOIN products.product p ON (((qrp.product_code)::text = (p.code)::text)))\n                  WHERE ((qrp.quote_row_id = qr.id) AND (qrp.included = true))\n                  ORDER BY qrp.quote_row_id, qrp.main_product DESC, qrp.\"position\") x) AS descrizione_estesa_en\n   FROM (quotes.quote_rows qr\n     JOIN products.kit k ON ((qr.kit_id = k.id)));",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "quote_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "kit_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "translation_it",
+              "position": 4,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "translation_en",
+              "position": 5,
+              "type": "character varying",
+              "nullable": true
+            },
+            {
+              "name": "internal_name",
+              "position": 6,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "nrc_row",
+              "position": 7,
+              "type": "numeric(14,4)",
+              "nullable": true
+            },
+            {
+              "name": "mrc_row",
+              "position": 8,
+              "type": "numeric(14,4)",
+              "nullable": true
+            },
+            {
+              "name": "bundle_prefix_row",
+              "position": 9,
+              "type": "character varying(64)",
+              "nullable": true
+            },
+            {
+              "name": "hs_line_item_id",
+              "position": 10,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_estesa",
+              "position": 11,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "descrizione_estesa_en",
+              "position": 12,
+              "type": "text",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "v_quote_rows_products",
+          "definition": " WITH list_of_rows AS (\n         SELECT qrp.id,\n            qrp.product_code,\n            p.internal_name,\n            qrp.minimum,\n            qrp.maximum,\n            qrp.required,\n            qrp.nrc,\n            qrp.mrc,\n            qrp.\"position\",\n            qrp.group_name,\n            qrp.included,\n            qrp.main_product,\n            qrp.quantity,\n            qrp.extended_description,\n            qrp.quote_row_id\n           FROM (quotes.quote_rows_products qrp\n             JOIN products.product p ON (((qrp.product_code)::text = (p.code)::text)))\n          ORDER BY qrp.quote_row_id, qrp.main_product DESC, qrp.\"position\"\n        )\n SELECT COALESCE(NULLIF((group_name)::text, ''::text), (internal_name)::text) AS group_name,\n    quote_row_id,\n    json_agg(json_build_object('id', id, 'product_code', product_code, 'product_name', internal_name, 'minimum', minimum, 'maximum', maximum, 'required', required, 'nrc', nrc, 'mrc', mrc, 'position', \"position\", 'group_name', group_name, 'included', included, 'main_product', main_product, 'quantity', quantity, 'extended_description', extended_description)) AS riga,\n    count(0) AS conta,\n    max((required)::integer) AS required,\n    max((main_product)::integer) AS main_product,\n    max(\"position\") AS \"position\"\n   FROM list_of_rows\n  GROUP BY COALESCE(NULLIF((group_name)::text, ''::text), (internal_name)::text), quote_row_id\n  ORDER BY quote_row_id, (max((main_product)::integer)) DESC, (max(\"position\"));",
+          "columns": [
+            {
+              "name": "group_name",
+              "position": 1,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "quote_row_id",
+              "position": 2,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "riga",
+              "position": 3,
+              "type": "json",
+              "nullable": true
+            },
+            {
+              "name": "conta",
+              "position": 4,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "required",
+              "position": 5,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "main_product",
+              "position": 6,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "position",
+              "position": 7,
+              "type": "integer",
+              "nullable": true
+            }
+          ]
+        }
+      ],
+      "functions": [
+        {
+          "name": "ins_quote_head",
+          "definition": "CREATE OR REPLACE FUNCTION quotes.ins_quote_head(json_data json)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    v_updated json;\n    v_id integer;\nBEGIN\n\n    -- insert a new record into the quote table\n    INSERT INTO quotes.quote (quote_number, customer_id, ragione_sociale, deal_number, owner, document_date,\n                              document_type, replace_orders, template, services, proposal_type, initial_term_months,\n                              next_term_months, bill_months, delivered_in_days, date_sent, status, notes,\n                              nrc_charge_time,hs_deal_id, description, hs_quote_id, payment_method, trial)\n    VALUES (json_data ->> 'quote_number', (json_data ->> 'customer_id')::bigint, json_data ->> 'ragione_sociale',\n            json_data ->> 'deal_number', json_data ->> 'owner', (json_data ->> 'document_date')::date,\n            json_data ->> 'document_type', json_data ->> 'replace_orders', json_data ->> 'template',\n            json_data ->> 'services', json_data ->> 'proposal_type', (json_data ->> 'initial_term_months')::integer,\n            (json_data ->> 'next_term_months')::integer, (json_data ->> 'bill_months')::integer,\n            (json_data ->> 'delivered_in_days')::smallint, (json_data ->> 'date_sent')::date, json_data ->> 'status',\n            json_data ->> 'notes', (json_data ->> 'nrc_charge_time')::integer, (json_data ->> 'hs_deal_id')::bigint,\n            json_data ->> 'description', (json_data ->> 'hs_quote_id')::bigint, json_data ->> 'payment_method', json_data ->> 'trial')\n    RETURNING id INTO v_id;\n\n    -- Check if the insert was successful\n    IF NOT FOUND THEN\n        v_updated = json_build_object('id', -1,'status', 'ERROR', 'message', 'Insert failed')::json;\n        RETURN v_updated;\n    END IF;\n\n    v_updated = json_build_object('id', v_id, 'status', 'OK', 'message', 'Update successful')::json;\n    RETURN v_updated;\nEXCEPTION\n    WHEN OTHERS THEN\n        -- Handle any other exceptions\n        v_updated = json_build_object('id', -1, 'status', 'ERROR', 'message', SQLERRM)::json;\n        RETURN v_updated;\nEND;\n$function$\n"
+        },
+        {
+          "name": "upd_quote_head",
+          "definition": "CREATE OR REPLACE FUNCTION quotes.upd_quote_head(json_data json)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    v_updated json;\n    v_id integer;\n\t\tv_contacts json;\nBEGIN\n    IF json_data ->> 'id' IS NULL THEN\n        RAISE EXCEPTION 'Missing required field: id';\n    END IF;\n\n    v_id = (json_data ->> 'id')::integer;\n\n/*    -- Verify that v_id is valued and the quote exists, otherwise raise an exception\n    IF NOT EXISTS (SELECT 1 FROM quotes.quote WHERE id = v_id) THEN\n        RAISE EXCEPTION 'Quote with id % does not exist', v_id;\n    END IF;\n*/\n\n    IF json_data ->> 'hs_esign_contacts' IS NOT NULL THEN\n        v_contacts = json_data ->> 'hs_esign_contacts';\n    END IF;\n\n    /*\n    add rif_ordcli varchar(240)\n        , add rif_tech_nom varchar(240)\n        , add rif_tech_tel varchar(240)\n        , add rif_tech_email varchar(240)\n        , add rif_altro_tech_nom varchar(240)\n        , add rif_altro_tech_tel varchar(240)\n        , add rif_altro_tech_email varchar(240)\n        , add rif_adm_nom varchar(240)\n        , add rif_adm_tech_tel varchar(240)\n        , add rif_adm_tech_email varchar(240);\n            \n     */\n\n    UPDATE quotes.quote SET\n                            quote_number = json_data ->> 'quote_number',\n                            customer_id = (json_data ->> 'customer_id')::bigint,\n                            ragione_sociale = json_data ->> 'ragione_sociale',\n                            deal_number = json_data ->> 'deal_number',\n                            owner = json_data ->> 'owner',\n                            document_date = (json_data ->> 'document_date')::date,\n                            document_type = json_data ->> 'document_type',\n                            replace_orders = json_data ->> 'replace_orders',\n                            template = json_data ->> 'template',\n                            services = json_data ->> 'services',\n                            proposal_type = json_data ->> 'proposal_type',\n                            initial_term_months = (json_data ->> 'initial_term_months')::integer,\n                            next_term_months = (json_data ->> 'next_term_months')::integer,\n                            bill_months = (json_data ->> 'bill_months')::integer,\n                            delivered_in_days = (json_data ->> 'delivered_in_days')::smallint,\n                            date_sent = (json_data ->> 'date_sent')::date,\n                            status = json_data ->> 'status',\n                            notes = json_data ->> 'notes',\n                            nrc_charge_time = (json_data ->> 'nrc_charge_time')::integer,\n                            description = json_data ->> 'description',\n                            payment_method = json_data ->> 'payment_method',\n                            hs_esign_enabled = (json_data ->> 'hs_esign_enabled')::boolean,\n                            hs_esign_contacts = v_contacts,\n                            rif_ordcli = json_data ->> 'rif_ordcli',\n                            rif_tech_nom = json_data ->> 'rif_tech_nom',\n                            rif_tech_tel = json_data ->> 'rif_tech_tel',\n                            rif_tech_email = json_data ->> 'rif_tech_email',\n                            rif_altro_tech_nom = json_data ->> 'rif_altro_tech_nom',\n                            rif_altro_tech_tel = json_data ->> 'rif_altro_tech_tel',\n                            rif_altro_tech_email = json_data ->> 'rif_altro_tech_email',\n                            rif_adm_nom = json_data ->> 'rif_adm_nom',\n                            rif_adm_tech_tel = json_data ->> 'rif_adm_tech_tel',\n                            rif_adm_tech_email = json_data ->> 'rif_adm_tech_email'\n                        \n\n    WHERE id = v_id;\n\n    -- Check if the update was successful\n    IF NOT FOUND THEN\n        v_updated = json_build_object('status', 'ERROR', 'message', 'Update failed')::json;\n        RETURN v_updated;\n    END IF;\n\n    v_updated = json_build_object('status', 'OK', 'message', 'Update successful')::json;\n    RETURN v_updated;\nEXCEPTION\n    WHEN OTHERS THEN\n        -- Handle any other exceptions\n        v_updated = json_build_object('status', 'ERROR', 'message', SQLERRM)::json;\n        RETURN v_updated;\nEND;\n$function$\n"
+        },
+        {
+          "name": "upd_quote_row_product",
+          "definition": "CREATE OR REPLACE FUNCTION quotes.upd_quote_row_product(json_data json)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\ndeclare\n    v_updated                    bool;\n    v_id                         integer;\n    v_quote_row_id               integer;\n    v_group_name                 text;\nbegin\n\n\n    v_id = (json_data ->> 'id')::integer;\n\n    -- recupero quote_row_id\n    select quote_row_id, group_name from quotes.quote_rows_products where id = v_id into v_quote_row_id, v_group_name;\n\n    -- verifico che v_quote_row_id sia valorizzato\n    if v_quote_row_id is null then\n        raise exception 'quote_row_id non valorizzato';\n    end if;\n\n    -- se questa riga ha included = true rimuovo l'included precedente (va fatto per group name)\n    update quotes.quote_rows_products set included = false\n    where quote_row_id = v_quote_row_id and group_name = v_group_name and included = true;\n\n    -- aggiorno il nuovo prodotto\n    update quotes.quote_rows_products set\n        included = json_data ->> 'included' = 'true',\n        extended_description = json_data ->> 'extended_description',\n        nrc = (json_data ->> 'nrc')::numeric,\n        mrc = (json_data ->> 'mrc')::numeric,\n        quantity = (json_data ->> 'quantity')::smallint\n    where id = v_id;\n\n    -- aggiorno i totali della riga (spostato in un trigger)\n--     update quotes.quote_rows set\n--         nrc_row = (select sum(nrc*quantity) from quotes.quote_rows_products where quote_row_id = v_quote_row_id),\n--         mrc_row = (select sum(mrc*quantity) from quotes.quote_rows_products where quote_row_id = v_quote_row_id)\n--     where id = v_quote_row_id;\n\n    v_updated = true;\n    return v_updated;\nend;\n\n$function$\n"
+        },
+        {
+          "name": "update_kit_product_rows",
+          "definition": "CREATE OR REPLACE FUNCTION quotes.update_kit_product_rows()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    v_kit products.kit%ROWTYPE;\n    v_lang character varying(2);\n    v_main_product_internal_name character varying(255);\n    v_main_product_translation_uuid uuid;\n    v_legal_note text;\n    v_extended_description text;\nBEGIN\n    select id, internal_name, main_product_code, initial_subscription_months, next_subscription_months, activation_time_days, nrc, mrc, translation_uuid, bundle_prefix, ecommerce, category_id, is_main_prd_sellable, is_active\n    into v_kit\n    from products.kit\n    where id= NEW.kit_id;\n\n    -- recupero la lingua della quote basandomi sul template\n    select coalesce(template.lang,'it') from quotes.quote\n    left join quotes.template on template.template_id = quote.template\n    where quote.id = NEW.quote_id into v_lang;\n\n    -- Elimina le righe esistenti in quote_rows_products per il kit_id modificato\n    DELETE FROM quotes.quote_rows_products\n    WHERE quote_row_id = OLD.id;\n\n\n    -- se kit.is_main_product_sellable is true Inserisco una riga con il main product del kit\n    IF v_kit.is_main_prd_sellable THEN\n        select REPLACE(coalesce(common.get_long_translation(v_main_product_translation_uuid, v_lang),'') ||\n                coalesce(common.get_long_translation(v_kit.translation_uuid, v_lang),''), E'\\n', '<br>') into v_extended_description;\n        if v_extended_description <> '' then\n            v_extended_description := '<p>' || v_extended_description || '</p>';\n        end if;\n        select internal_name, translation_uuid\n        from products.product\n        where code = v_kit.main_product_code\n        into v_main_product_internal_name, v_main_product_translation_uuid;\n        INSERT INTO quotes.quote_rows_products (quote_row_id, product_code, minimum, maximum, required, nrc, mrc, position, group_name,main_product,included,quantity, extended_description)\n        VALUES\n            (NEW.id ,  v_kit.main_product_code,  1, -1, true, v_kit.nrc, v_kit.mrc, 0, v_main_product_internal_name ,true,true,1,\n             v_extended_description)\n        ;\n    END IF;\n\n    -- Inserisci le nuove righe da products.kit_product per il kit_id aggiornato\n    INSERT INTO quotes.quote_rows_products (quote_row_id, product_code, minimum, maximum, required, nrc, mrc, position,\n           group_name,quantity, extended_description)\n    SELECT NEW.id as quote_row_id,  kp.product_code,  kp.minimum, kp.maximum, kp.required, kp.nrc, kp.mrc, kp.position,\n           coalesce( nullif(kp.group_name,''),p.internal_name), case when kp.required = true then greatest(1,kp.minimum) else 0 end,\n              REPLACE(common.get_long_translation(p.translation_uuid, v_lang), E'\\n', '<br>')\n    FROM products.kit_product kp join products.product p on p.code = kp.product_code\n    WHERE kp.kit_id = NEW.kit_id;\n\n    -- Update the corresponding fields in quotes.quote_rows\n    UPDATE quotes.quote_rows\n    SET\n        internal_name = v_kit.internal_name,\n        nrc_row = v_kit.nrc,\n        mrc_row = v_kit.mrc,\n        bundle_prefix_row = v_kit.bundle_prefix\n    WHERE id = NEW.id;\n\n    -- recupero il custom value legal_notes del kit se presente\n    select coalesce( cv.value->>v_lang, '') as legal_note\n    from products.kit_custom_value cv join products.kit k on cv.kit_id = k.id\n    where k.id = NEW.kit_id and  key_name = 'legal_notes' into v_legal_note;\n\n    if v_legal_note <> '' then\n        update quotes.quote\n        set notes = notes || '<br>' || v_legal_note\n        where id = NEW.quote_id;\n    end if;\n\n\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_quote_customer_from_erp",
+          "definition": "CREATE OR REPLACE FUNCTION quotes.update_quote_customer_from_erp()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    erp_client loader.erp_anagrafiche_clienti%ROWTYPE;\nBEGIN\n    -- Recupera i dati dal record corrispondente in erp_anagrafiche_clienti\n    SELECT * INTO erp_client\n    FROM loader.erp_anagrafiche_clienti\n    WHERE numero_azienda = NEW.customer_id;\n\n    -- Controlla se esiste già un record in quote_customer per questa quote\n    IF EXISTS (SELECT 1 FROM quotes.quote_customer WHERE quote_id = NEW.id) THEN\n        -- Aggiorna il record esistente in quote_customer usando i dati da erp_anagrafiche_clienti\n        UPDATE quotes.quote_customer\n        SET\n            codice_fiscale = erp_client.codice_fiscale,\n            partita_iva = erp_client.partita_iva,\n            lingua = erp_client.lingua,\n            codice_sdi = erp_client.codice_sdi,\n            indirizzo_fatturazione = erp_client.indirizzo_fatturazione,\n            citta_fatturazione = erp_client.citta_fatturazione,\n            provincia_fatturazione = erp_client.provincia_fatturazione,\n            cap_fatturazione = erp_client.cap_fatturazione,\n            paese_fatturazione = erp_client.paese_fatturazione,\n            metodo_pagamento = erp_client.metodo_pagamento\n        WHERE quote_id = NEW.id;\n    ELSE\n        -- Inserisce un nuovo record in quote_customer usando i dati da erp_anagrafiche_clienti\n        INSERT INTO quotes.quote_customer (\n            quote_id,\n            codice_fiscale,\n            partita_iva,\n            lingua,\n            codice_sdi,\n            indirizzo_fatturazione,\n            citta_fatturazione,\n            provincia_fatturazione,\n            cap_fatturazione,\n            paese_fatturazione,\n            metodo_pagamento\n        ) VALUES (\n                     NEW.id,\n                     erp_client.codice_fiscale,\n                     erp_client.partita_iva,\n                     erp_client.lingua,\n                     erp_client.codice_sdi,\n                     erp_client.indirizzo_fatturazione,\n                     erp_client.citta_fatturazione,\n                     erp_client.provincia_fatturazione,\n                     erp_client.cap_fatturazione,\n                     erp_client.paese_fatturazione,\n                     erp_client.metodo_pagamento\n                 );\n    END IF;\n\n    -- Ritorna il record modificato\n    RETURN NEW;\nEND;\n$function$\n"
+        },
+        {
+          "name": "update_quote_row_totals",
+          "definition": "CREATE OR REPLACE FUNCTION quotes.update_quote_row_totals()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    -- Determinare l'ID della quote_row interessata (diverso a seconda dell'evento)\n    DECLARE\nv_quote_row_id INT;\nBEGIN\n        IF TG_OP = 'DELETE' THEN\n            v_quote_row_id := OLD.quote_row_id;\nELSE\n            v_quote_row_id := NEW.quote_row_id;\nEND IF;\n\n        -- Aggiornamento dei totali nella tabella quote_rows\nUPDATE quotes.quote_rows\nSET nrc_row = (SELECT COALESCE(SUM(nrc * quantity), 0)\n               FROM quotes.quote_rows_products\n               WHERE quote_row_id = v_quote_row_id and included = true),\n    mrc_row = (SELECT COALESCE(SUM(mrc * quantity), 0)\n               FROM quotes.quote_rows_products\n               WHERE quote_row_id = v_quote_row_id and included = true)\nWHERE id = v_quote_row_id;\n\nRETURN NEW;\nEND;\nEND;\n$function$\n"
+        }
+      ],
+      "sequences": [
+        {
+          "name": "quote_customer_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "quote_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "quote_number_seq",
+          "dataType": "integer",
+          "start": 1101,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "quote_rows_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "quote_rows_products_id_seq",
+          "dataType": "integer",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    }
+  ]
+}
