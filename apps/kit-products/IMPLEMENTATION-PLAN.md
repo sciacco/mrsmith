@@ -2,7 +2,7 @@
 
 > **Spec source:** `apps/kit-products/kit-products-migspec-E.md`
 > **Date:** 2026-04-07
-> **Status:** Draft — awaiting approval
+> **Status:** Rev 2 — post-review (findings from IMPLEMENTATION-FB.md resolved)
 
 ---
 
@@ -68,6 +68,166 @@
 
 ---
 
+## Review Findings Resolution
+
+### Finding 1 (Blocker) — DB/ERP runtime contract
+
+The plan introduces two new external dependencies (`MISTRA_DSN`, `ALYANTE_DSN`) that must be wired through the full deployment chain, not just `config.go`.
+
+**Runtime strategy: external shared DSNs**
+
+Both Mistra (Postgres) and Alyante (MSSQL) are existing shared databases managed by infrastructure. The app does NOT own these databases and does NOT run migrations (coexistence constraint). The Go backend connects to them the same way it connects to Anisetta: DSN provided via env var, connection optional (graceful degradation if not set).
+
+**Concrete repo changes required:**
+
+| File | Change |
+|------|--------|
+| `backend/internal/platform/config/config.go` | Add `MistraDSN` (env: `MISTRA_DSN`), `AlyanteDSN` (env: `ALYANTE_DSN`) |
+| `.env.preprod.example` | Add `MISTRA_DSN=` and `ALYANTE_DSN=` with comments |
+| `deploy/k8s/deployment.yaml` | Add `MISTRA_DSN` and `ALYANTE_DSN` secret refs (optional: true, same pattern as ANISETTA_DSN) |
+| `docker-compose.dev.yaml` | Add env vars to backend service, pointing to dev Mistra/Alyante instances |
+| `backend/cmd/server/main.go` | Open `mistraDB` via `database.New` if `MistraDSN` set. Open `alyanteDB` via MSSQL driver if `AlyanteDSN` set. Pass both to `kitproducts.RegisterRoutes`. |
+
+**Backend verification strategy:**
+
+| Level | Scope | Method |
+|-------|-------|--------|
+| **Unit** | Handler logic, request parsing, error paths | Fake `database/sql` driver (compliance pattern from `handler_logging_test.go`) |
+| **Integration** | Stored procedure calls, transactions, ownership checks | Tests against a reachable Mistra Postgres (gated by `MISTRA_DSN` env var — skipped in CI if not set) |
+| **ERP failure path** | Alyante best-effort warning response | Handler test with nil `alyanteDB` — verifies 200 + warning JSON returned |
+| **Role gates** | ACL middleware for `app_kitproducts_access` | Unit test with mock JWT claims (existing compliance pattern) |
+| **Transaction rollback** | Batch update failures | Integration test: begin tx, fail mid-batch, verify no partial writes |
+
+Tests are organized as:
+- `backend/internal/kitproducts/handler_test.go` — unit tests (fake driver, always run)
+- `backend/internal/kitproducts/integration_test.go` — build-tagged `//go:build integration`, require `MISTRA_DSN`
+
+---
+
+### Finding 2 (High) — Root dev script must include kit-products
+
+The root `pnpm dev` script (`package.json` line 6) currently runs only backend, portal, budget, compliance. The plan's Phase 1 verification says `make dev` starts all apps — this is false unless the script is updated.
+
+**Fix:** The root `scripts.dev` command must be updated to include kit-products:
+
+```json
+"dev": "concurrently --names backend,portal,budget,compliance,kit-products --prefix-colors blue,green,magenta,cyan,yellow \"cd backend && air\" \"pnpm --filter mrsmith-portal dev\" \"pnpm --filter mrsmith-budget dev\" \"pnpm --filter mrsmith-compliance dev\" \"pnpm --filter mrsmith-kit-products dev\""
+```
+
+Also add the standalone script:
+```json
+"dev:kit-products": "pnpm --filter mrsmith-kit-products dev"
+```
+
+This is part of Phase 1 scaffolding, not a later step.
+
+---
+
+### Finding 3 (High) — Mistra proxy contract fully specified
+
+The upstream Mistra API uses paginated envelopes: `{ total_pages: int, items: [...] }` with required `page_number` query param on all list endpoints.
+
+**Decision: pass-through proxy.** The Go backend proxies requests as-is (same as budget pattern). The frontend is responsible for sending required query params and consuming the paginated envelope.
+
+**Proxy contract per route:**
+
+| Local Path | Upstream | Required Query Params | Response Shape |
+|-----------|---------|----------------------|---------------|
+| `GET /kit-products/v1/mistra/kit` | `GET /products/v2/kit` | `page_number` (required), `disable_pagination`, `category_id`, `customer_group_id`, `commercial_profile_ids`, `only_ecommerce` | `{ total_pages: int, items: kit-brief[] }` |
+| `GET /kit-products/v1/mistra/kit-discount` | `GET /products/v2/kit-discount` | `page_number` (required), `disable_pagination`, `customer_group_id`, `kit_id` | `{ total_pages: int, items: kit-discount[] }` |
+| `POST /kit-products/v1/mistra/kit-discount` | `POST /products/v2/kit-discount` | — (body: `kit-discount-new`) | `{ message: string }` |
+| `GET /kit-products/v1/mistra/discounted-kit` | `GET /products/v2/discounted-kit` | `page_number` (required), `disable_pagination`, `customer_id` (required), `category_id`, `only_ecommerce` | `{ total_pages: int, items: discounted-kit[] }` |
+| `GET /kit-products/v1/mistra/discounted-kit/{id}` | `GET /products/v2/discounted-kit/{id}` | `customer_id` (required) | `discounted-kit-detail` (single object, not paginated) |
+| `GET /kit-products/v1/mistra/customer` | `GET /customers/v2/customer` | `page_number` (required), `disable_pagination`, `search_string`, `customer_group_id`, `state_id` | `{ total_pages: int, items: customer[] }` |
+
+**Frontend contract:**
+- All list calls send `page_number=1&disable_pagination=true` to get full datasets (matching current Appsmith behavior)
+- Response is always `{ total_pages, items }` — frontend reads `.items` array
+- The `customer_id` param for discounted-kit endpoints comes from the customer dropdown selection
+- The `kit_id` param for kit-discount comes from the selected kit row
+
+---
+
+### Finding 4 (Medium) — Dependency injection shape and asset_flow type corrected
+
+**Handler struct (corrected):**
+
+```go
+type Handler struct {
+    mistraDB *sql.DB          // Mistra Postgres (products, common, customers schemas)
+    alyante  *AlyanteAdapter  // Alyante ERP (nil if not configured)
+    arak     *arak.Client     // Mistra REST API proxy (nil if not configured)
+}
+```
+
+**Constructor:**
+
+```go
+func RegisterRoutes(mux *http.ServeMux, mistraDB *sql.DB, alyante *AlyanteAdapter, arakCli *arak.Client) {
+    h := &Handler{mistraDB: mistraDB, alyante: alyante, arak: arakCli}
+    // ...
+}
+```
+
+The `AlyanteAdapter` is constructed in `main.go` from the MSSQL `*sql.DB`:
+
+```go
+var alyanteAdapter *kitproducts.AlyanteAdapter
+if alyanteDB != nil {
+    alyanteAdapter = kitproducts.NewAlyanteAdapter(alyanteDB)
+}
+kitproducts.RegisterRoutes(api, mistraDB, alyanteAdapter, arakCli)
+```
+
+**Product update field types (corrected):**
+
+```go
+type ProductUpdateRequest struct {
+    InternalName string  `json:"internal_name"`
+    CategoryID   int     `json:"category_id"`    // integer FK
+    NRC          float64 `json:"nrc"`
+    MRC          float64 `json:"mrc"`
+    ImgURL       *string `json:"img_url"`
+    ERPSync      *bool   `json:"erp_sync"`
+    AssetFlow    *string `json:"asset_flow"`     // string FK (varchar name key), NOT integer
+}
+```
+
+`asset_flow` is a `varchar(50)` FK by name (e.g. `"activation"`, `"deactivation"`). The frontend sends the name string directly from the select dropdown value. The backend binds it as `$N` string parameter. No ID resolution needed.
+
+---
+
+### Finding 5 (Medium) — Warning toast variant
+
+The current `ToastProvider` supports only `success` and `error`. The ERP best-effort path needs a warning state.
+
+**Decision: extend the shared `ToastProvider`** with a `warning` type.
+
+Changes to `packages/ui/src/components/Toast/`:
+
+**`ToastProvider.tsx`** — add `'warning'` to `ToastType`:
+```typescript
+type ToastType = 'success' | 'error' | 'warning';
+```
+
+Add warning icon (triangle with exclamation) to the render switch.
+
+**`Toast.module.css`** — add `.warning` class:
+```css
+.warning {
+  background: rgba(245, 158, 11, 0.92);   /* amber, matches --color-warning */
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3),
+              0 2px 4px rgba(245, 158, 11, 0.2);
+}
+```
+
+This is a minimal, non-breaking change. All existing `toast('message', 'success')` and `toast('message', 'error')` calls continue to work. The new `toast('message', 'warning')` is used only by kit-products for ERP sync failures.
+
+This change is part of **Phase 1 scaffolding** so it's available from the start.
+
+---
+
 ## Implementation Sequence
 
 ### Phase 1 — Scaffolding (foundation)
@@ -87,24 +247,36 @@ Create `apps/kit-products/` with:
 **1.2 Backend module scaffold**
 
 Create `backend/internal/kitproducts/`:
-- `handler.go` — `Handler` struct with `db *sql.DB` + `arak *arak.Client`, `RegisterRoutes(mux, db, arakCli)`, shared helpers (`requireDB`, `dbFailure`, `rowError`, `rowsDone`, `rollbackTx`)
+- `handler.go` — `Handler` struct with `mistraDB *sql.DB` + `alyante *AlyanteAdapter` + `arak *arak.Client`. `RegisterRoutes(mux, mistraDB, alyante, arakCli)`. Shared helpers: `requireDB`, `dbFailure`, `rowError`, `rowsDone`, `rollbackTx`.
+- `alyante.go` — `AlyanteAdapter` struct with `db *sql.DB`. `NewAlyanteAdapter(db)` constructor. `SyncTranslation(ctx, code, lang, short) error` method.
 - Empty handler files per domain area
+- `handler_test.go` — initial test with fake driver verifying `requireDB` returns 503 when nil
 
 **1.3 Infra wiring**
 
 | File | Changes |
 |------|---------|
 | `backend/internal/platform/config/config.go` | Add `MistraDSN`, `AlyanteDSN`, `KitProductsAppURL` fields |
-| `backend/cmd/server/main.go` | Open mistraDB if `MistraDSN` set. Open alyante MSSQL if `AlyanteDSN` set. Call `kitproducts.RegisterRoutes(api, mistraDB, alyantDB, arakCli)`. Add href override for kit-products. |
+| `backend/cmd/server/main.go` | Open mistraDB if `MistraDSN` set. Open alyanteDB via MSSQL driver if `AlyanteDSN` set. Construct `AlyanteAdapter`. Call `kitproducts.RegisterRoutes(api, mistraDB, alyanteAdapter, arakCli)`. Add href override for kit-products. |
 | `backend/internal/platform/applaunch/catalog.go` | Add `KitProductsAppID = "kit-e-prodotti"`, `kitProductsAccessRoles`, `KitProductsAccessRoles()`. Update catalog entry: href → `/apps/kit-products/`, AccessRoles → dedicated. |
-| `backend/internal/platform/config/config.go` | Add port 5176 to CORS origins default |
+| `backend/internal/platform/config/config.go` | Add `MistraDSN`, `AlyanteDSN`, `KitProductsAppURL`. Add port 5176 to CORS origins default. |
+| `.env.preprod.example` | Add `MISTRA_DSN=` and `ALYANTE_DSN=` with comments |
+| `deploy/k8s/deployment.yaml` | Add `MISTRA_DSN` and `ALYANTE_DSN` secret refs (optional: true) |
+| Root `package.json` | Update `scripts.dev` to include `mrsmith-kit-products`. Add `dev:kit-products`. |
+| `packages/ui/src/components/Toast/ToastProvider.tsx` | Add `'warning'` to `ToastType` union + amber warning icon |
+| `packages/ui/src/components/Toast/Toast.module.css` | Add `.warning` class (amber background) |
 | `deploy/Dockerfile` | Add COPY line for kit-products dist |
 | `docker-compose.dev.yaml` | Add kit-products service (port 5176) + volume |
 | Root `package.json` | Add `dev:kit-products` script |
 | `Makefile` | Add `dev-kit-products` target, update `.PHONY` |
 | `go.mod` | Add MSSQL driver dependency |
 
-**Verification:** `make dev` starts all apps. Navigating to `http://localhost:5176` shows empty app shell with auth. Portal card for "Kit e Prodotti" links to `/apps/kit-products/`.
+**Verification:**
+- `make dev` starts all apps **including kit-products** (root `scripts.dev` updated)
+- `http://localhost:5176` shows empty app shell with auth working
+- Portal card for "Kit e Prodotti" links to `/apps/kit-products/`
+- `go test ./internal/kitproducts/...` passes (handler_test.go: requireDB returns 503 when nil)
+- Warning toast variant renders correctly (can be verified in browser console: `toast('test', 'warning')`)
 
 ---
 
@@ -230,18 +402,20 @@ Create `backend/internal/kitproducts/alyante.go`:
 
 ### Phase 6 — Kit Discounts + Price Simulator (Mistra API proxy)
 
-**6.1 Backend: Arak proxy endpoints**
+**6.1 Backend: Arak proxy endpoints (pass-through)**
 
-| Local Path | Proxies To |
-|-----------|-----------|
-| `GET /kit-products/v1/mistra/kit` | `GET /products/v2/kit` |
-| `GET /kit-products/v1/mistra/kit-discount` | `GET /products/v2/kit-discount` |
-| `POST /kit-products/v1/mistra/kit-discount` | `POST /products/v2/kit-discount` |
-| `GET /kit-products/v1/mistra/discounted-kit` | `GET /products/v2/discounted-kit` |
-| `GET /kit-products/v1/mistra/discounted-kit/{id}` | `GET /products/v2/discounted-kit/{id}` |
-| `GET /kit-products/v1/mistra/customer` | `GET /customers/v2/customer` |
+All proxied endpoints forward query params and body as-is. Frontend is responsible for sending required upstream params. Responses are forwarded verbatim (paginated envelope: `{ total_pages, items }` for list endpoints).
 
-Follow budget proxy pattern: `arakCli.Do(method, path, query, body)` → forward response.
+| Local Path | Upstream | Frontend Must Send |
+|-----------|---------|-------------------|
+| `GET /kit-products/v1/mistra/kit` | `GET /products/v2/kit` | `page_number=1&disable_pagination=true` |
+| `GET /kit-products/v1/mistra/kit-discount` | `GET /products/v2/kit-discount` | `page_number=1&disable_pagination=true&kit_id={id}` |
+| `POST /kit-products/v1/mistra/kit-discount` | `POST /products/v2/kit-discount` | Body: `kit-discount-new` JSON |
+| `GET /kit-products/v1/mistra/discounted-kit` | `GET /products/v2/discounted-kit` | `page_number=1&disable_pagination=true&customer_id={id}` |
+| `GET /kit-products/v1/mistra/discounted-kit/{id}` | `GET /products/v2/discounted-kit/{id}` | `customer_id={id}` |
+| `GET /kit-products/v1/mistra/customer` | `GET /customers/v2/customer` | `page_number=1&disable_pagination=true` |
+
+Implementation: `arakCli.Do(method, path, r.URL.RawQuery, body)` → write response to `w`. Follow budget proxy pattern.
 
 **6.2 Frontend: Kit Discounts view**
 
@@ -331,9 +505,11 @@ backend/internal/kitproducts/
 ├── handler_category.go         # Category CRUD
 ├── handler_customer_group.go   # CustomerGroup CRUD + batch
 ├── handler_lookup.go           # Lookup endpoints (asset_flow, custom_field_key, vocabulary)
-├── handler_proxy.go            # Mistra API proxy (kit-discount, discounted-kit, customer)
-├── alyante.go                  # Alyante ERP adapter
-└── models.go                   # Request/response structs
+├── handler_proxy.go            # Mistra API proxy (pass-through, kit-discount, discounted-kit, customer)
+├── alyante.go                  # AlyanteAdapter struct + SyncTranslation method
+├── models.go                   # Request/response structs
+├── handler_test.go             # Unit tests (fake driver, role gates, error paths, ERP nil warning)
+└── integration_test.go         # Integration tests (//go:build integration, requires MISTRA_DSN)
 ```
 
 ---
