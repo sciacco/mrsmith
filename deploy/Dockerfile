@@ -9,7 +9,7 @@ COPY apps/ apps/
 RUN pnpm install --frozen-lockfile && pnpm -r build
 
 # Stage 2: Build backend
-FROM golang:1.23 AS backend
+FROM golang:1.25 AS backend
 WORKDIR /app
 COPY backend/ ./
 RUN go mod download && CGO_ENABLED=0 go build -o server ./cmd/server
