@@ -2,7 +2,7 @@
 
 > **Spec source:** `apps/kit-products/kit-products-migspec-E.md`
 > **Date:** 2026-04-07
-> **Status:** Rev 2 — post-review (findings from IMPLEMENTATION-FB.md resolved)
+> **Status:** Rev 3 — all review findings resolved
 
 ---
 
@@ -76,7 +76,25 @@ The plan introduces two new external dependencies (`MISTRA_DSN`, `ALYANTE_DSN`) 
 
 **Runtime strategy: external shared DSNs**
 
-Both Mistra (Postgres) and Alyante (MSSQL) are existing shared databases managed by infrastructure. The app does NOT own these databases and does NOT run migrations (coexistence constraint). The Go backend connects to them the same way it connects to Anisetta: DSN provided via env var, connection optional (graceful degradation if not set).
+Both Mistra (Postgres) and Alyante (MSSQL) are existing shared databases managed by infrastructure. The app does NOT own these databases and does NOT run migrations (coexistence constraint).
+
+**Dependency requirements:**
+
+| Env Var | Required? | Behavior when absent |
+|---------|-----------|---------------------|
+| `MISTRA_DSN` | **Required for kit-products to be functional.** | The kit-products catalog entry is marked **hidden** (not `ready`) when the DSN is absent. All `/kit-products/v1/*` DB-backed endpoints return 503. The app is effectively unavailable. Arak proxy endpoints still work if `ARAK_BASE_URL` is set. |
+| `ALYANTE_DSN` | Optional. | ERP sync is silently skipped. No warning to user. Logged at startup (Info level). All other functionality works normally. |
+
+In `main.go`, the catalog entry's visibility is conditional:
+```go
+if cfg.MistraDSN != "" {
+    // kit-products is ready — register with ready status
+} else {
+    // kit-products hidden — DB not configured
+}
+```
+
+In K8s `deployment.yaml`, `MISTRA_DSN` uses `optional: false` (unlike ANISETTA_DSN). `ALYANTE_DSN` uses `optional: true`.
 
 **Concrete repo changes required:**
 
@@ -84,7 +102,7 @@ Both Mistra (Postgres) and Alyante (MSSQL) are existing shared databases managed
 |------|--------|
 | `backend/internal/platform/config/config.go` | Add `MistraDSN` (env: `MISTRA_DSN`), `AlyanteDSN` (env: `ALYANTE_DSN`) |
 | `.env.preprod.example` | Add `MISTRA_DSN=` and `ALYANTE_DSN=` with comments |
-| `deploy/k8s/deployment.yaml` | Add `MISTRA_DSN` and `ALYANTE_DSN` secret refs (optional: true, same pattern as ANISETTA_DSN) |
+| `deploy/k8s/deployment.yaml` | Add `MISTRA_DSN` secret ref (`optional: false`) and `ALYANTE_DSN` secret ref (`optional: true`) |
 | `docker-compose.dev.yaml` | Add env vars to backend service, pointing to dev Mistra/Alyante instances |
 | `backend/cmd/server/main.go` | Open `mistraDB` via `database.New` if `MistraDSN` set. Open `alyanteDB` via MSSQL driver if `AlyanteDSN` set. Pass both to `kitproducts.RegisterRoutes`. |
 
@@ -94,7 +112,8 @@ Both Mistra (Postgres) and Alyante (MSSQL) are existing shared databases managed
 |-------|-------|--------|
 | **Unit** | Handler logic, request parsing, error paths | Fake `database/sql` driver (compliance pattern from `handler_logging_test.go`) |
 | **Integration** | Stored procedure calls, transactions, ownership checks | Tests against a reachable Mistra Postgres (gated by `MISTRA_DSN` env var — skipped in CI if not set) |
-| **ERP failure path** | Alyante best-effort warning response | Handler test with nil `alyanteDB` — verifies 200 + warning JSON returned |
+| **ERP not configured** | `ALYANTE_DSN` absent — adapter is nil | Handler test: nil adapter → 200 success, **no warning** (silent no-op, logged at startup as Info) |
+| **ERP sync failure** | `ALYANTE_DSN` configured but sync fails | Handler test with failing `AlyanteAdapter` test double (returns error) → 200 + `{ "warning": "erp_sync_failed" }` |
 | **Role gates** | ACL middleware for `app_kitproducts_access` | Unit test with mock JWT claims (existing compliance pattern) |
 | **Transaction rollback** | Batch update failures | Integration test: begin tx, fail mid-batch, verify no partial writes |
 
@@ -133,16 +152,29 @@ The upstream Mistra API uses paginated envelopes: `{ total_pages: int, items: [.
 
 | Local Path | Upstream | Required Query Params | Response Shape |
 |-----------|---------|----------------------|---------------|
-| `GET /kit-products/v1/mistra/kit` | `GET /products/v2/kit` | `page_number` (required), `disable_pagination`, `category_id`, `customer_group_id`, `commercial_profile_ids`, `only_ecommerce` | `{ total_pages: int, items: kit-brief[] }` |
-| `GET /kit-products/v1/mistra/kit-discount` | `GET /products/v2/kit-discount` | `page_number` (required), `disable_pagination`, `customer_group_id`, `kit_id` | `{ total_pages: int, items: kit-discount[] }` |
+| `GET /kit-products/v1/mistra/kit` | `GET /products/v2/kit` | `page_number` (required), `disable_pagination`, `category_id`, `customer_group_id`, `commercial_profile_ids`, `only_ecommerce` | `PaginatedResponse<kit-brief>` |
+| `GET /kit-products/v1/mistra/kit-discount` | `GET /products/v2/kit-discount` | `page_number` (required), `disable_pagination`, `customer_group_id`, `kit_id` | `PaginatedResponse<kit-discount>` |
 | `POST /kit-products/v1/mistra/kit-discount` | `POST /products/v2/kit-discount` | — (body: `kit-discount-new`) | `{ message: string }` |
-| `GET /kit-products/v1/mistra/discounted-kit` | `GET /products/v2/discounted-kit` | `page_number` (required), `disable_pagination`, `customer_id` (required), `category_id`, `only_ecommerce` | `{ total_pages: int, items: discounted-kit[] }` |
+| `GET /kit-products/v1/mistra/discounted-kit` | `GET /products/v2/discounted-kit` | `page_number` (required), `disable_pagination`, `customer_id` (required), `category_id`, `only_ecommerce` | `PaginatedResponse<discounted-kit>` |
 | `GET /kit-products/v1/mistra/discounted-kit/{id}` | `GET /products/v2/discounted-kit/{id}` | `customer_id` (required) | `discounted-kit-detail` (single object, not paginated) |
-| `GET /kit-products/v1/mistra/customer` | `GET /customers/v2/customer` | `page_number` (required), `disable_pagination`, `search_string`, `customer_group_id`, `state_id` | `{ total_pages: int, items: customer[] }` |
+| `GET /kit-products/v1/mistra/customer` | `GET /customers/v2/customer` | `page_number` (required), `disable_pagination`, `search_string`, `customer_group_id`, `state_id` | `PaginatedResponse<customer>` |
+
+**Upstream paginated envelope (forwarded verbatim):**
+
+```typescript
+interface PaginatedResponse<T> {
+  total_number: number;   // total item count across all pages
+  current_page: number;   // 1-based current page index
+  total_pages: number;    // total page count
+  items: T[];             // data array
+}
+```
+
+All four fields are present in every list response from the Mistra API. The proxy forwards them unchanged.
 
 **Frontend contract:**
 - All list calls send `page_number=1&disable_pagination=true` to get full datasets (matching current Appsmith behavior)
-- Response is always `{ total_pages, items }` — frontend reads `.items` array
+- Response is always `PaginatedResponse<T>` — frontend reads `.items` array
 - The `customer_id` param for discounted-kit endpoints comes from the customer dropdown selection
 - The `kit_id` param for kit-discount comes from the selected kit row
 
@@ -260,8 +292,8 @@ Create `backend/internal/kitproducts/`:
 | `backend/cmd/server/main.go` | Open mistraDB if `MistraDSN` set. Open alyanteDB via MSSQL driver if `AlyanteDSN` set. Construct `AlyanteAdapter`. Call `kitproducts.RegisterRoutes(api, mistraDB, alyanteAdapter, arakCli)`. Add href override for kit-products. |
 | `backend/internal/platform/applaunch/catalog.go` | Add `KitProductsAppID = "kit-e-prodotti"`, `kitProductsAccessRoles`, `KitProductsAccessRoles()`. Update catalog entry: href → `/apps/kit-products/`, AccessRoles → dedicated. |
 | `backend/internal/platform/config/config.go` | Add `MistraDSN`, `AlyanteDSN`, `KitProductsAppURL`. Add port 5176 to CORS origins default. |
-| `.env.preprod.example` | Add `MISTRA_DSN=` and `ALYANTE_DSN=` with comments |
-| `deploy/k8s/deployment.yaml` | Add `MISTRA_DSN` and `ALYANTE_DSN` secret refs (optional: true) |
+| `.env.preprod.example` | Add `MISTRA_DSN=` (required) and `ALYANTE_DSN=` (optional) with comments |
+| `deploy/k8s/deployment.yaml` | Add `MISTRA_DSN` secret ref (`optional: false`) and `ALYANTE_DSN` secret ref (`optional: true`) |
 | Root `package.json` | Update `scripts.dev` to include `mrsmith-kit-products`. Add `dev:kit-products`. |
 | `packages/ui/src/components/Toast/ToastProvider.tsx` | Add `'warning'` to `ToastType` union + amber warning icon |
 | `packages/ui/src/components/Toast/Toast.module.css` | Add `.warning` class (amber background) |
@@ -319,10 +351,17 @@ Create `backend/internal/kitproducts/`:
 
 **3.1 Backend: Alyante ERP adapter**
 
-Create `backend/internal/kitproducts/alyante.go`:
-- `type AlyanteAdapter struct { db *sql.DB }`
+Already scaffolded in Phase 1 (`alyante.go`). Phase 3 implements the real SQL:
 - `SyncTranslation(ctx, code, lang, shortDescription) error` — UPDATE MG87_ARTDESC with code padding (25 chars) and language mapping (it→ITA, en→ING)
-- Graceful nil handling: if `db == nil`, log warning and return nil (ERP not configured)
+- Returns non-nil error on MSSQL failure (caller decides how to surface it)
+
+**ERP behavior contract (two distinct cases):**
+
+| Case | Adapter State | Handler Behavior | Response | Log |
+|------|--------------|-----------------|----------|-----|
+| `ALYANTE_DSN` not set | `h.alyante == nil` | Skip ERP sync entirely | 200 success, **no warning** | Info at startup: "Alyante ERP adapter not configured" |
+| `ALYANTE_DSN` set, sync fails | `h.alyante.SyncTranslation()` returns error | Postgres already committed, ERP failed | 200 success + `{ "warning": "erp_sync_failed", "message": "Salvato, ma sincronizzazione ERP fallita" }` | Error: full MSSQL error details |
+| `ALYANTE_DSN` set, sync succeeds | `h.alyante.SyncTranslation()` returns nil | Normal success | 200 success, no warning | — |
 
 **3.2 Backend: Product endpoints**
 
@@ -330,7 +369,7 @@ Create `backend/internal/kitproducts/alyante.go`:
 |----------|---------------|
 | `GET /kit-products/v1/product` | SELECT with category join + `common.get_translations(uuid)` |
 | `POST /kit-products/v1/product` | INSERT product + INSERT IT/EN translations (empty). No Alyante write. |
-| `PUT /kit-products/v1/product/{code}` | UPDATE product fields. Accepts category_id and asset_flow as IDs. |
+| `PUT /kit-products/v1/product/{code}` | UPDATE product fields. `category_id` is integer FK. `asset_flow` is string name key (varchar FK, e.g. `"activation"`). |
 | `PUT /kit-products/v1/product/{code}/translations` | Transaction: UPSERT IT + EN in common.translation. Then best-effort Alyante sync for short descriptions. Return warning on ERP failure. |
 
 **3.3 Frontend: Product List view**
@@ -352,7 +391,7 @@ Create `backend/internal/kitproducts/alyante.go`:
 |----------|---------------|
 | `GET /kit-products/v1/kit` | SELECT * with category name/color resolution, ORDER BY is_active desc, internal_name |
 | `POST /kit-products/v1/kit` | Call `products.new_kit(json)`. Map form fields to stored procedure JSON keys (f_internal_name, s_main_product, etc.). Return new kit ID. |
-| `DELETE /kit-products/v1/kit/{id}` | UPDATE is_active = false |
+| `DELETE /kit-products/v1/kit/{id}` | Soft-delete: `UPDATE products.kit SET is_active = false WHERE id = $1`. **No order-reference check** — soft-delete is safe because it only hides the kit from active lists; existing orders retain their `kit_id` reference and the row is not removed. The kit can be re-activated by setting `is_active = true` via the normal update endpoint. |
 | `POST /kit-products/v1/kit/{id}/clone` | Call `products.clone_kit(id, name)`. Return new kit ID. |
 
 **4.2 Frontend: Kit List view**
@@ -404,7 +443,7 @@ Create `backend/internal/kitproducts/alyante.go`:
 
 **6.1 Backend: Arak proxy endpoints (pass-through)**
 
-All proxied endpoints forward query params and body as-is. Frontend is responsible for sending required upstream params. Responses are forwarded verbatim (paginated envelope: `{ total_pages, items }` for list endpoints).
+All proxied endpoints forward query params and body as-is. Frontend is responsible for sending required upstream params. Responses are forwarded verbatim as `PaginatedResponse<T>` (see envelope definition in Finding 3 resolution) for list endpoints.
 
 | Local Path | Upstream | Frontend Must Send |
 |-----------|---------|-------------------|
@@ -451,7 +490,11 @@ Implementation: `arakCli.Do(method, path, r.URL.RawQuery, body)` → write respo
 
 To be defined in `apps/kit-products/src/types/` or generated from API:
 
-```
+```typescript
+// Shared paginated envelope (matches upstream Mistra API verbatim)
+PaginatedResponse<T> { total_number, current_page, total_pages, items: T[] }
+
+// Entities
 Kit, KitCreateRequest, KitUpdateRequest
 KitProduct, KitProductCreateRequest, KitProductUpdateRequest
 Product, ProductCreateRequest, ProductUpdateRequest, TranslationUpdateRequest
@@ -459,9 +502,15 @@ ProductCategory, ProductCategoryCreateRequest
 CustomerGroup, CustomerGroupCreateRequest, CustomerGroupBatchUpdateRequest
 KitCustomValue, KitCustomValueCreateRequest
 AssetFlow, CustomFieldKey, VocabularyItem
-DiscountedKit, DiscountedKitDetail, RelatedProduct
-KitDiscount, KitDiscountCreateRequest
-Customer
+
+// Proxied types (match upstream Mistra API shapes)
+KitBrief                          // from GET /products/v2/kit
+DiscountedKit, DiscountedKitDetail, RelatedProduct  // from GET /products/v2/discounted-kit
+KitDiscountEntry, KitDiscountCreateRequest          // from GET/POST /products/v2/kit-discount
+CustomerBrief                     // from GET /customers/v2/customer
+
+// API response with optional warning
+ApiResponse<T> { data: T; warning?: { code: string; message: string } }
 ```
 
 ---
@@ -518,7 +567,7 @@ backend/internal/kitproducts/
 
 | Item | Status |
 |------|--------|
-| Q35: Order reference check on kit soft-delete | Deferred to implementation |
+| Q35: Order reference check on kit soft-delete | **Resolved:** No check needed. Soft-delete only sets `is_active=false` — row stays, FK references intact. Re-activation possible via update. |
 | Alyante retry mechanism for failed syncs | Post-MVP |
 | Product list pagination (836 rows now, may grow) | Post-MVP if needed |
 | MSSQL driver choice (`denisenkom` vs `microsoft`) | Resolve at Phase 3 |
