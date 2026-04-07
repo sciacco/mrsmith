@@ -2,7 +2,7 @@
 
 > **Spec source:** `apps/kit-products/kit-products-migspec-E.md`
 > **Date:** 2026-04-07
-> **Status:** Rev 3 — all review findings resolved
+> **Status:** Rev 3.1 — approved (minor doc nits fixed)
 
 ---
 
@@ -509,7 +509,7 @@ DiscountedKit, DiscountedKitDetail, RelatedProduct  // from GET /products/v2/dis
 KitDiscountEntry, KitDiscountCreateRequest          // from GET/POST /products/v2/kit-discount
 CustomerBrief                     // from GET /customers/v2/customer
 
-// API response with optional warning
+// Frontend client wrapper (maps raw server responses, not a backend contract)
 ApiResponse<T> { data: T; warning?: { code: string; message: string } }
 ```
 
@@ -557,7 +557,7 @@ backend/internal/kitproducts/
 ├── handler_proxy.go            # Mistra API proxy (pass-through, kit-discount, discounted-kit, customer)
 ├── alyante.go                  # AlyanteAdapter struct + SyncTranslation method
 ├── models.go                   # Request/response structs
-├── handler_test.go             # Unit tests (fake driver, role gates, error paths, ERP nil warning)
+├── handler_test.go             # Unit tests (fake driver, role gates, error paths, ERP nil no-op, ERP failure warning)
 └── integration_test.go         # Integration tests (//go:build integration, requires MISTRA_DSN)
 ```
 
