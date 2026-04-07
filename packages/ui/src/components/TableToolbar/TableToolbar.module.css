@@ -1,6 +1,81 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 10;
+}
+
+.wrapperOpen {
+  gap: var(--space-3, 12px);
+}
+
 .toolbar {
   display: flex;
   align-items: center;
   gap: var(--space-3, 12px);
+}
+
+/* ═══ Filter toggle button ═══ */
+.filterToggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-bg, #fafbfd);
+  color: var(--color-text-muted, #94a3b8);
+  cursor: pointer;
+  transition: all var(--duration-normal, 250ms) var(--ease-out);
+}
+
+.filterToggle:hover {
+  border-color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-secondary, #334155);
+}
+
+.filterToggleOpen {
+  border-color: var(--color-accent, #635bff);
+  color: var(--color-accent, #635bff);
+  background: var(--color-accent-subtle, rgba(99, 91, 255, 0.08));
+}
+
+/* ═══ Active filter badge ═══ */
+.filterBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 10px;
+  background: var(--color-accent, #635bff);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ═══ Filter row ═══ */
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
   flex-wrap: wrap;
+  animation: filterEnter 0.25s var(--ease-out) both;
+}
+
+.filterRow > * {
+  max-width: 240px;
+}
+
+@keyframes filterEnter {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }

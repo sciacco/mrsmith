@@ -60,15 +60,19 @@ export function BlocksPage() {
           </button>
         </div>
 
-        <TableToolbar>
+        <TableToolbar
+          activeFilterCount={provenienzaFilter !== null ? 1 : 0}
+          filters={
+            <SingleSelect
+              options={provenienzaOptions}
+              selected={provenienzaFilter}
+              onChange={setProvenienzaFilter}
+              placeholder="Provenienza"
+              allowClear
+            />
+          }
+        >
           <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Cerca blocchi..." />
-          <SingleSelect
-            options={provenienzaOptions}
-            selected={provenienzaFilter}
-            onChange={setProvenienzaFilter}
-            placeholder="Provenienza"
-            allowClear
-          />
         </TableToolbar>
 
         {isFiltered && blocks && blocks.length > 0 && (
