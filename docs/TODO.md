@@ -1,5 +1,10 @@
 # Project TODOs
 
+## Developer Experience
+
+### Single-Origin Dev Gateway
+Future implementation plan is tracked in [docs/DEV-GATEWAY-IMPLEMENTATION-PLAN.md](DEV-GATEWAY-IMPLEMENTATION-PLAN.md). This work would replace browser-visible per-app localhost ports with a backend-owned single-origin dev gateway while preserving independent app Vite servers as opt-in processes.
+
 ## Budget Management App
 
 ### Audit Logging
