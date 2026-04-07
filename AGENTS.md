@@ -10,12 +10,16 @@
 
 ## Important Reference
 - `docs/mistra-dist.yaml` — authoritative Mistra NG Internal API spec; most mini-apps will integrate with these APIs, so use this file as the primary reference for backend contracts, client generation, and shared types.
+- [`docs/IMPLEMENTATION-PLANNING.md`](docs/IMPLEMENTATION-PLANNING.md) — before approving an implementation plan, run the repo-fit checklist so hosting, auth, dev wiring, data contracts, and verification strategy are validated against the actual codebase.
 
 ## Dev
 - `make dev` — runs air (Go hot reload) + Vite concurrently
 - `make dev-docker` — same via docker-compose
 - Backend proxy: Vite proxies `/api` → `localhost:8080`
 - Auth: OAuth2/OIDC with remote Keycloak (no local instance)
+
+## UI/UX
+- [`docs/UI-UX.md`](docs/UI-UX.md) — Reference document for all UI/UX decisions implemented in the codebase. Use this as the foundation when building new mini-apps.
 
 ## TODOs
 - [`docs/TODO.md`](docs/TODO.md) — project-wide open items, deferred decisions, and out-of-scope work tracked for future implementation
