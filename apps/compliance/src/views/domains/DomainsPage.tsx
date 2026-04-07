@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Skeleton } from '@mrsmith/ui';
+import { Skeleton, SearchInput, TableToolbar, useTableFilter } from '@mrsmith/ui';
 import { isUpstreamAuthFailed } from '../../api/errors';
 import { useDomainStatus } from '../../api/queries';
 import { DomainStatusTable } from './DomainStatusTable';
@@ -26,15 +26,18 @@ export function DomainsPage() {
     if (el) setIndicatorStyle({ left: el.offsetLeft, width: el.offsetWidth });
   }, [activeTab]);
 
-  const filteredDomains = useMemo(() => {
-    if (!domains) return [];
-    const filtered = domains.filter((d) =>
+  const tabFiltered = useMemo(() => {
+    if (!domains) return undefined;
+    return domains.filter((d) =>
       activeTab === 'blocked' ? d.block_count > d.release_count : d.block_count <= d.release_count,
     );
-    if (!searchQuery) return filtered;
-    const q = searchQuery.toLowerCase();
-    return filtered.filter((d) => d.domain.toLowerCase().includes(q));
-  }, [domains, activeTab, searchQuery]);
+  }, [domains, activeTab]);
+
+  const { filtered: filteredDomains } = useTableFilter({
+    data: tabFiltered,
+    searchQuery,
+    searchFields: ['domain'],
+  });
 
   return (
     <div className={styles.page}>
@@ -45,23 +48,10 @@ export function DomainsPage() {
         </div>
       </div>
 
-      <div className={styles.searchRow}>
-        <div className={styles.searchWrap}>
-          <input
-            className={styles.searchInput}
-            type="text"
-            placeholder="Cerca dominio..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button className={styles.clearBtn} onClick={() => setSearchQuery('')} aria-label="Cancella ricerca">
-              ✕
-            </button>
-          )}
-        </div>
+      <TableToolbar>
+        <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Cerca dominio..." />
         <ExportButtons basePath="/compliance/domains" params={{ status: activeTab, search: searchQuery }} />
-      </div>
+      </TableToolbar>
 
       <div className={styles.tabBar}>
         {TABS.map((tab) => (

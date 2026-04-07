@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Skeleton } from '@mrsmith/ui';
+import { useState, useMemo } from 'react';
+import { Skeleton, SearchInput, TableToolbar, SingleSelect, useTableFilter } from '@mrsmith/ui';
 import { useToast } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { isUpstreamAuthFailed } from '../../api/errors';
@@ -18,6 +18,8 @@ export function BlocksPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showAddDomains, setShowAddDomains] = useState(false);
   const [editingDomain, setEditingDomain] = useState<{ id: number; domain: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [provenienzaFilter, setProvenienzaFilter] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: blocks, isLoading: blocksLoading, error: blocksError } = useBlocks();
@@ -25,6 +27,20 @@ export function BlocksPage() {
   const addBlockDomains = useAddBlockDomains();
   const updateBlockDomain = useUpdateBlockDomain();
 
+  const provenienzaOptions = useMemo(() => {
+    if (!blocks) return [];
+    const unique = [...new Set(blocks.map((b) => b.method_description))];
+    return unique.sort().map((d) => ({ value: d, label: d }));
+  }, [blocks]);
+
+  const { filtered: filteredBlocks, totalCount, filteredCount } = useTableFilter({
+    data: blocks,
+    searchQuery,
+    searchFields: ['request_date', 'reference', 'method_description'],
+    filters: { provenienza: { field: 'method_description', value: provenienzaFilter } },
+  });
+
+  const isFiltered = searchQuery || provenienzaFilter !== null;
   const selectedBlock = blocks?.find((b) => b.id === selectedBlockId);
 
   return (
@@ -43,6 +59,21 @@ export function BlocksPage() {
             Nuova richiesta
           </button>
         </div>
+
+        <TableToolbar>
+          <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Cerca blocchi..." />
+          <SingleSelect
+            options={provenienzaOptions}
+            selected={provenienzaFilter}
+            onChange={setProvenienzaFilter}
+            placeholder="Provenienza"
+            allowClear
+          />
+        </TableToolbar>
+
+        {isFiltered && blocks && blocks.length > 0 && (
+          <p className={styles.filterHint}>{filteredCount} di {totalCount} risultati</p>
+        )}
 
         <div className={styles.tableCard}>
           {blocksLoading ? (
@@ -63,8 +94,19 @@ export function BlocksPage() {
               <p className={styles.emptyTitle}>Nessuna richiesta di blocco</p>
               <p className={styles.emptyText}>Crea la tua prima richiesta di blocco per iniziare</p>
             </div>
+          ) : isFiltered && filteredBlocks.length === 0 ? (
+            <div className={styles.emptyState}>
+              <p className={styles.emptyTitle}>Nessun risultato</p>
+              <p className={styles.emptyText}>Nessun blocco corrisponde ai filtri selezionati</p>
+              <button
+                className={styles.clearFiltersBtn}
+                onClick={() => { setSearchQuery(''); setProvenienzaFilter(null); }}
+              >
+                Cancella filtri
+              </button>
+            </div>
           ) : (
-            <BlocksTable blocks={blocks} selectedId={selectedBlockId} onSelect={setSelectedBlockId} />
+            <BlocksTable blocks={filteredBlocks} selectedId={selectedBlockId} onSelect={setSelectedBlockId} />
           )}
         </div>
       </div>

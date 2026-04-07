@@ -5,5 +5,8 @@ export type { TabNavItem } from './components/TabNav/TabNav';
 export { Modal } from './components/Modal/Modal';
 export { MultiSelect } from './components/MultiSelect/MultiSelect';
 export { SingleSelect } from './components/SingleSelect/SingleSelect';
+export { SearchInput } from './components/SearchInput/SearchInput';
+export { TableToolbar } from './components/TableToolbar/TableToolbar';
 export { Skeleton } from './components/Skeleton/Skeleton';
 export { ToastProvider, useToast } from './components/Toast/ToastProvider';
+export { useTableFilter } from './hooks/useTableFilter';

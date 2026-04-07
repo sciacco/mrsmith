@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef } from 'react';
-import { Skeleton } from '@mrsmith/ui';
+import { useState, useRef } from 'react';
+import { Skeleton, SearchInput, TableToolbar, useTableFilter } from '@mrsmith/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { isUpstreamAuthFailed } from '../../api/errors';
 import { useHistory } from '../../api/queries';
@@ -16,12 +16,11 @@ export function HistoryPage() {
   const { data: entries, isLoading, error } = useHistory();
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const filteredEntries = useMemo(() => {
-    if (!entries) return [];
-    if (!searchQuery) return entries;
-    const q = searchQuery.toLowerCase();
-    return entries.filter((e) => e.domain.toLowerCase().includes(q));
-  }, [entries, searchQuery]);
+  const { filtered: filteredEntries } = useTableFilter({
+    data: entries,
+    searchQuery,
+    searchFields: ['domain'],
+  });
 
   const virtualizer = useVirtualizer({
     count: filteredEntries.length,
@@ -39,23 +38,10 @@ export function HistoryPage() {
         </div>
       </div>
 
-      <div className={styles.searchRow}>
-        <div className={styles.searchWrap}>
-          <input
-            className={styles.searchInput}
-            type="text"
-            placeholder="Cerca dominio..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button className={styles.clearBtn} onClick={() => setSearchQuery('')} aria-label="Cancella ricerca">
-              ✕
-            </button>
-          )}
-        </div>
+      <TableToolbar>
+        <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Cerca dominio..." />
         <ExportButtons basePath="/compliance/domains/history" params={{ search: searchQuery }} />
-      </div>
+      </TableToolbar>
 
       <div className={styles.tableCard}>
         {isLoading ? (
