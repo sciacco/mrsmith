@@ -459,7 +459,7 @@ No delete — FK-referenced by KitDiscount and Customer.
   - Discount validation (DB trigger exists; backend should also validate)
 - Product code validation (max 25 chars for Alyante compatibility)
 - Translation auto-creation on product/kit creation
-- Alyante data contract: code padded to 25 chars, language mapping it→ITA / en→ING, 20-space MG87_OPZIONE, MG87_DITTA=1
+- Alyante data contract: code padded to 25 chars, language mapping it→ITA / en→ING, `SET MG87_DESCART = short`, `MG87_DITTA_CG18 = 1`, `MG87_OPZIONE_MG5E = '                    '`, `MG87_LINGUA_MG52 = 'ITA'/'ING'`, `MG87_CODART_MG66 = code.padEnd(25, ' ')`
 
 ### Frontend (React) Responsibilities
 

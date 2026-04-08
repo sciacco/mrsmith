@@ -72,3 +72,5 @@
 - Moved the per-schema Mistra PostgreSQL dump files from `docs/` into `docs/mistradb/` to keep the database documentation grouped under one dedicated directory.
 - Added [docs/mistradb/MISTRA.md](docs/mistradb/MISTRA.md) as the Mistra database index, modeled after the existing Grappa documentation and summarizing schemas, object counts, and each schema's functional area.
 - [AGENTS.md](AGENTS.md) now has a compact `Databases` section pointing contributors to `docs/grappa/GRAPPA.md` and `docs/mistradb/MISTRA.md` as the entry points for schema documentation.
+- Alyante ERP product translation writes in `backend/internal/kitproducts/alyante.go` must match the verified Appsmith contract for `MG87_ARTDESC`: `SET MG87_DESCART`, filter on `MG87_DITTA_CG18 = 1`, `MG87_OPZIONE_MG5E = 20 spaces`, `MG87_LINGUA_MG52`, and `MG87_CODART_MG66`; older unsuffixed names like `MG87_DITTA` and `MG87_DESCRIZIONE` are wrong for this environment.
+- `backend/internal/kitproducts/alyante_test.go` locks the Alyante SQL shape and parameter order with an injected `execFn`, so future edits can verify the exact ERP contract without a live MSSQL connection.

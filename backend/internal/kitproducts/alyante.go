@@ -7,9 +7,19 @@ import (
 	"strings"
 )
 
+const alyanteSyncTranslationSQL = `
+UPDATE MG87_ARTDESC
+SET MG87_DESCART = @p1
+WHERE MG87_DITTA_CG18 = 1
+  AND MG87_OPZIONE_MG5E = '                    '
+  AND MG87_LINGUA_MG52 = @p3
+  AND MG87_CODART_MG66 = @p2
+`
+
 type AlyanteAdapter struct {
 	db     *sql.DB
 	syncFn func(context.Context, string, string, string) error
+	execFn func(context.Context, string, ...any) (sql.Result, error)
 }
 
 func NewAlyanteAdapter(db *sql.DB) *AlyanteAdapter {
@@ -20,7 +30,7 @@ func (a *AlyanteAdapter) SyncTranslation(ctx context.Context, code, lang, short 
 	if a != nil && a.syncFn != nil {
 		return a.syncFn(ctx, code, lang, short)
 	}
-	if a == nil || a.db == nil {
+	if a == nil || (a.db == nil && a.execFn == nil) {
 		return nil
 	}
 
@@ -33,14 +43,11 @@ func (a *AlyanteAdapter) SyncTranslation(ctx context.Context, code, lang, short 
 	}
 
 	paddedCode := fmt.Sprintf("%-25s", code)
-	_, err := a.db.ExecContext(ctx, `
-UPDATE MG87_ARTDESC
-SET MG87_DESCRIZIONE = @p1
-WHERE MG87_CODART = @p2
-  AND MG87_LINGUA = @p3
-  AND MG87_OPZIONE = '                    '
-  AND MG87_DITTA = 1
-`, short, paddedCode, erpLang)
+	execFn := a.db.ExecContext
+	if a.execFn != nil {
+		execFn = a.execFn
+	}
+	_, err := execFn(ctx, alyanteSyncTranslationSQL, short, paddedCode, erpLang)
 	if err != nil {
 		return fmt.Errorf("sync alyante translation: %w", err)
 	}
