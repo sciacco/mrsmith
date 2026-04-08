@@ -87,8 +87,7 @@ This app introduces the **first MySQL connection** in the codebase. No other app
 
 1. Add Go MySQL driver: `github.com/go-sql-driver/mysql`
 2. Add `GRAPPA_DSN` to `config.go` and wire through `main.go`
-3. Open `grappaDB` via `database.New(database.Config{Driver: "mysql", DSN: cfg.GrappaDSN})`
-4. Verify `database.New` supports `"mysql"` driver string — if not, use `sql.Open("mysql", dsn)` directly
+3. Open `grappaDB` via `database.New(database.Config{Driver: "mysql", DSN: cfg.GrappaDSN})` — the shared helper already supports MySQL (`backend/internal/platform/database/database.go:13-28`) and verifies connectivity with `Ping` at startup
 
 **DSN format:** Standard MySQL DSN: `user:password@tcp(host:3306)/grappa?parseTime=true&charset=utf8mb4`
 
@@ -387,11 +386,11 @@ type Handler struct {
 ```go
 func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB *sql.DB, hubspot *HubSpotService, carbone *CarboneService) {
     h := &Handler{mistraDB: mistraDB, grappaDB: grappaDB, hubspot: hubspot, carbone: carbone}
-    protect := acl.RequireRole(ListiniAccessRoles()...)
+    protect := acl.RequireRole(applaunch.ListiniAccessRoles()...)
     handle := func(pattern string, handler http.HandlerFunc) {
         mux.Handle(pattern, protect(http.HandlerFunc(handler)))
     }
-    // ... register all 22 endpoints
+    // ... register all 23 endpoints
 }
 ```
 
@@ -402,7 +401,7 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB *sql.DB, hubspot *Hub
 var grappaDB *sql.DB
 if cfg.GrappaDSN != "" {
     var err error
-    grappaDB, err = sql.Open("mysql", cfg.GrappaDSN)
+    grappaDB, err = database.New(database.Config{Driver: "mysql", DSN: cfg.GrappaDSN})
     if err != nil {
         logger.Error("failed to connect to grappa", "component", "listini", "error", err)
         os.Exit(1)
@@ -431,7 +430,7 @@ listini.RegisterRoutes(api, mistraDB, grappaDB, hubspotSvc, carboneSvc)
 
 ---
 
-### Finding 6 (Medium) — Verification strategy
+### Finding 7 (Medium) — Verification strategy
 
 | Level | Scope | Method |
 |-------|-------|--------|
@@ -561,7 +560,7 @@ Create `backend/internal/listini/`:
 | `models.go` | Request/response structs (empty, filled per phase) |
 | `handler_test.go` | Initial test: `requireMistra` returns 503 when nil, `requireGrappa` returns 503 when nil |
 
-**`handler.go` route registration (all 22 endpoints):**
+**`handler.go` route registration (all 23 endpoints):**
 
 ```go
 func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB *sql.DB, hubspot *HubSpotService, carbone *CarboneService) {
@@ -608,6 +607,7 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB *sql.DB, hubspot *Hub
     handle("PATCH /listini/v1/grappa/iaas-accounts/credits", h.handleBatchUpdateIaaSCredits)
 
     // ── Grappa: Racks ──
+    handle("GET /listini/v1/grappa/rack-customers", h.handleListRackCustomers)
     handle("GET /listini/v1/grappa/customers/{id}/racks", h.handleListCustomerRacks)
     handle("PATCH /listini/v1/grappa/racks/discounts", h.handleBatchUpdateRackDiscounts)
 }
@@ -650,7 +650,7 @@ Add `listini_node_modules:` to the `volumes:` section at the bottom.
 - `make dev` starts all apps including listini-e-sconti
 - `http://localhost:5177` shows empty app shell with auth working and TabNavGroup rendering
 - Portal card for "Listini e Sconti" links to `/apps/listini-e-sconti/`
-- `go test ./internal/listini/...` passes (requireMistra/requireGrappa returns 503 when nil)
+- `cd backend && go test ./internal/listini/...` passes (requireMistra/requireGrappa returns 503 when nil)
 - TabNavGroup renders groups correctly with dropdown behavior
 - Backend compiles with MySQL driver imported
 
@@ -982,10 +982,10 @@ No min/max validation. No HubSpot audit (intentional per spec).
 
 **Behavior:**
 - Page load → fetch Grappa customer list (exclude=385)
-- Customer select → `GET /grappa/customers/:id/iaas-pricing` → populate form
+- Customer select → `GET /listini/v1/grappa/customers/:id/iaas-pricing` → populate form
 - Form shows min/max as `input[type=number]` with `min`/`max`/`step` attributes
 - If showing defaults, display info badge: "Valori predefiniti — nessun prezzo personalizzato"
-- Save → `POST /grappa/customers/:id/iaas-pricing` → toast success
+- Save → `POST /listini/v1/grappa/customers/:id/iaas-pricing` → toast success
 - `charge_prefix24` NOT shown in UI (hidden field, sent as-is if present)
 
 #### 3.5 Frontend: Timoo Prezzi Partner page
@@ -1006,10 +1006,10 @@ No min/max validation. No HubSpot audit (intentional per spec).
 
 **Behavior:**
 - Page load → fetch Mistra customer list
-- Customer select → `GET /customers/:id/pricing/timoo` → populate form
+- Customer select → `GET /listini/v1/customers/:id/pricing/timoo` → populate form
 - No min/max validation
 - If showing defaults, display info badge
-- Save → `PUT /customers/:id/pricing/timoo` → toast success
+- Save → `PUT /listini/v1/customers/:id/pricing/timoo` → toast success
 
 **Verification:**
 - IaaS Prezzi: select customer, see prices (or defaults), edit within min/max, save, toast
@@ -1160,11 +1160,11 @@ if err == nil {
 ```
 
 **Behavior:**
-- Page load → `GET /grappa/iaas-accounts` → populate table
+- Page load → `GET /listini/v1/grappa/iaas-accounts` → populate table
 - Non-CloudStack rows: `credito` cell is read-only, row has `opacity: 0.5`
 - CloudStack rows: `credito` cell is `input[type=number]`
 - Dirty-row tracking: when a value changes, mark row as dirty, enable save button
-- Save → `PATCH /grappa/iaas-accounts/credits` with only changed rows → toast success
+- Save → `PATCH /listini/v1/grappa/iaas-accounts/credits` with only changed rows → toast success
 
 #### 4.4 Frontend: Sconti variabile energia page
 
@@ -1184,11 +1184,11 @@ if err == nil {
 ```
 
 **Behavior:**
-- Page load → fetch rack customer list (`GET /grappa/rack-customers`). **No rack query until customer selected.**
-- Customer select → `GET /grappa/customers/:id/racks` → populate table
+- Page load → fetch rack customer list (`GET /listini/v1/grappa/rack-customers`). **No rack query until customer selected.**
+- Customer select → `GET /listini/v1/grappa/customers/:id/racks` → populate table
 - Discount input: `input[type=number]` with `min=0` `max=20` `step=0.01`
 - Dirty-row tracking, batch save
-- Save → `PATCH /grappa/racks/discounts` → toast success
+- Save → `PATCH /listini/v1/grappa/racks/discounts` → toast success
 
 **Verification:**
 - IaaS Crediti: all accounts load, CloudStack rows editable, others muted, batch save works
@@ -1356,10 +1356,10 @@ if operatedBy == "" {
 **Modal — "Associa gruppi":**
 - Opens `MultiSelect` with all available groups
 - Pre-selected: customer's current groups
-- Save → `PATCH /customers/:id/groups` with `{groupIds: [...]}` → toast, refresh
+- Save → `PATCH /listini/v1/customers/:id/groups` with `{groupIds: [...]}` → toast, refresh
 
 **Kit discounts panel:**
-- Clicking a group in the middle column → `GET /customer-groups/:id/kit-discounts` → show right panel
+- Clicking a group in the middle column → `GET /listini/v1/customer-groups/:id/kit-discounts` → show right panel
 - Read-only table: Kit name, MRC discount %, NRC discount %
 
 #### 5.4 Frontend: Gestione credito cliente page
@@ -1401,8 +1401,8 @@ if operatedBy == "" {
 
 **Behavior:**
 - Page load → fetch Mistra customer list. **No query until customer selected.**
-- Customer select → `GET /customers/:id/credit` + `GET /customers/:id/transactions`
-- "Nuova transazione" → modal → `POST /customers/:id/transactions` → toast, refresh list + balance
+- Customer select → `GET /listini/v1/customers/:id/credit` + `GET /listini/v1/customers/:id/transactions`
+- "Nuova transazione" → modal → `POST /listini/v1/customers/:id/transactions` → toast, refresh list + balance
 - No edit/delete on transactions (immutable ledger)
 - `operated_by` not shown in modal — captured server-side from JWT
 
@@ -1734,5 +1734,5 @@ backend/internal/listini/
 | Kit price versioning | Not versioned. Tracked in `docs/TODO.md`. |
 | Discount approval workflow | No approval. Tracked in `docs/TODO.md`. |
 | Rack customer filter tightening | Current query matches audited Appsmith behavior (no `rack_sockets.status` or `cli_fatturazione.stato` filter). If tighter filtering is needed, verify against live data and update spec. |
-| `database.New` MySQL support | Verify the existing `database.New` helper accepts `"mysql"` driver string. If not, use `sql.Open("mysql", dsn)` directly in `main.go`. |
+| `database.New` MySQL support | Verified: the shared helper already supports MySQL (`database.go:13-28`). No action needed. |
 | `group_association.active` cleanup | Column is deprecated. Currently preserved for Appsmith coexistence (writes `true`, reads ignore). Remove after Appsmith decommission. |
