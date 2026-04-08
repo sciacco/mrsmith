@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import styles from './Toast.module.css';
 
-type ToastType = 'success' | 'error';
+type ToastType = 'success' | 'error' | 'warning';
 
 interface Toast {
   id: number;
@@ -42,6 +42,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                 <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5" />
                 <path d="M6 9l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : t.type === 'warning' ? (
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path d="M8.136 3.5a1 1 0 0 1 1.728 0l5.17 9A1 1 0 0 1 14.17 14H3.83a1 1 0 0 1-.864-1.5l5.17-9Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                <path d="M9 6.8v3.3M9 12.2h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             ) : (
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">

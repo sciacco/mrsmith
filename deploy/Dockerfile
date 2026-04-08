@@ -20,6 +20,7 @@ COPY --from=backend /app/server /server
 COPY --from=frontend /app/apps/portal/dist /static
 COPY --from=frontend /app/apps/budget/dist /static/apps/budget
 COPY --from=frontend /app/apps/compliance/dist /static/apps/compliance
+COPY --from=frontend /app/apps/kit-products/dist /static/apps/kit-products
 EXPOSE 8080
 USER nonroot:nonroot
 CMD ["/server"]

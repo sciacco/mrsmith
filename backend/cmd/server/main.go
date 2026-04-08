@@ -11,10 +11,12 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/microsoft/go-mssqldb"
 
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/budget"
 	"github.com/sciacco/mrsmith/internal/compliance"
+	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/config"
@@ -84,6 +86,32 @@ func main() {
 		logger.Info("anisetta database connected", "component", "compliance")
 	}
 
+	// Mistra DB (kit products)
+	var mistraDB *sql.DB
+	if cfg.MistraDSN != "" {
+		var err error
+		mistraDB, err = database.New(database.Config{Driver: "postgres", DSN: cfg.MistraDSN})
+		if err != nil {
+			logger.Error("failed to connect to mistra", "component", "kitproducts", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("mistra database connected", "component", "kitproducts")
+	}
+
+	// Alyante ERP (optional)
+	var alyanteDB *sql.DB
+	if cfg.AlyanteDSN != "" {
+		var err error
+		alyanteDB, err = database.New(database.Config{Driver: "mssql", DSN: cfg.AlyanteDSN})
+		if err != nil {
+			logger.Error("failed to connect to alyante", "component", "kitproducts", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("alyante database connected", "component", "kitproducts")
+	} else {
+		logger.Info("Alyante ERP adapter not configured", "component", "kitproducts")
+	}
+
 	// API routes (with auth)
 	api := http.NewServeMux()
 	hrefOverrides := map[string]string{}
@@ -98,10 +126,30 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.ComplianceAppID] = "http://localhost:5175"
 	}
+	if cfg.KitProductsAppURL != "" {
+		hrefOverrides[applaunch.KitProductsAppID] = cfg.KitProductsAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.KitProductsAppID] = "http://localhost:5176"
+	}
 	appCatalog := applaunch.Catalog(hrefOverrides)
+	if cfg.MistraDSN == "" {
+		filtered := make([]applaunch.Definition, 0, len(appCatalog))
+		for _, definition := range appCatalog {
+			if definition.ID == applaunch.KitProductsAppID {
+				continue
+			}
+			filtered = append(filtered, definition)
+		}
+		appCatalog = filtered
+	}
 	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
 	compliance.RegisterRoutes(api, anisettaDB)
+	var alyanteAdapter *kitproducts.AlyanteAdapter
+	if alyanteDB != nil {
+		alyanteAdapter = kitproducts.NewAlyanteAdapter(alyanteDB)
+	}
+	kitproducts.RegisterRoutes(api, mistraDB, alyanteAdapter, arakCli)
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),

@@ -29,6 +29,18 @@ spec:
                   name: mrsmith-secrets
                   key: ANISETTA_DSN
                   optional: true
+            - name: MISTRA_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: MISTRA_DSN
+                  optional: false
+            - name: ALYANTE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: ALYANTE_DSN
+                  optional: true
           livenessProbe:
             httpGet:
               path: /healthz

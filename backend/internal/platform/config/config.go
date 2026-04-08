@@ -10,11 +10,18 @@ type Config struct {
 	StaticDir         string
 
 	// Optional launcher override for split-server local development.
-	BudgetAppURL     string
-	ComplianceAppURL string
+	BudgetAppURL      string
+	ComplianceAppURL  string
+	KitProductsAppURL string
 
 	// Anisetta PostgreSQL (compliance module)
 	AnisettaDSN string
+
+	// Mistra / Kit Products PostgreSQL
+	MistraDSN string
+
+	// Alyante ERP MSSQL
+	AlyanteDSN string
 
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
@@ -33,11 +40,14 @@ func Load() Config {
 		Port:              envOr("PORT", "8080"),
 		LogLevel:          envOr("LOG_LEVEL", "info"),
 		KeycloakIssuerURL: envOr("KEYCLOAK_ISSUER_URL", ""),
-		CORSOrigins:       envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175"),
+		CORSOrigins:       envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176"),
 		StaticDir:         envOr("STATIC_DIR", ""),
 		BudgetAppURL:      envOr("BUDGET_APP_URL", ""),
 		ComplianceAppURL:  envOr("COMPLIANCE_APP_URL", ""),
+		KitProductsAppURL: envOr("KIT_PRODUCTS_APP_URL", ""),
 		AnisettaDSN:       envOr("ANISETTA_DSN", ""),
+		MistraDSN:         envOr("MISTRA_DSN", ""),
+		AlyanteDSN:        envOr("ALYANTE_DSN", ""),
 
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),

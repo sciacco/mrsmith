@@ -1,0 +1,214 @@
+.page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+  padding: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.92));
+  color: white;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.lead {
+  max-width: 62ch;
+  margin-top: 0.5rem;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.heroActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.35fr);
+  gap: 1rem;
+}
+
+.panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 24px;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.tableWrap {
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 0.85rem 0.9rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.table tbody tr:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.rowSelected {
+  background: rgba(37, 99, 235, 0.11);
+}
+
+.table strong,
+.table small {
+  display: block;
+}
+
+.table small {
+  color: var(--color-text-muted);
+}
+
+.modalBody {
+  display: grid;
+  gap: 1rem;
+}
+
+.formGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.field,
+.checkboxField {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field select,
+.field input,
+.discountRow select,
+.discountRow input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  background: white;
+}
+
+.checkboxField {
+  grid-auto-flow: column;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.discountBlock {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.discountBlock header p {
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+.discountRow {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.emptyState {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1.25rem;
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.emptyTitle {
+  font-weight: 700;
+}
+
+.emptyText {
+  color: var(--color-text-muted);
+}
+
+.primaryButton,
+.secondaryButton {
+  border-radius: 999px;
+  padding: 0.72rem 1.1rem;
+  border: 1px solid transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.primaryButton {
+  background: white;
+  color: #0f172a;
+}
+
+.secondaryButton {
+  background: rgba(255, 255, 255, 0.14);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.panel .secondaryButton {
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--color-text);
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.panel .primaryButton {
+  background: #0f172a;
+  color: white;
+}
+
+@media (max-width: 1000px) {
+  .hero {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

@@ -11,12 +11,16 @@ const (
 
 	ComplianceAppID   = "compliance"
 	ComplianceAppHref = "/apps/compliance/"
+
+	KitProductsAppID   = "kit-e-prodotti"
+	KitProductsAppHref = "/apps/kit-products/"
 )
 
 var (
-	budgetAccessRoles     = []string{"app_budget_access"}
-	complianceAccessRoles = []string{"app_compliance_access"}
-	defaultAccessRoles    = []string{"default-roles-cdlan"}
+	budgetAccessRoles      = []string{"app_budget_access"}
+	complianceAccessRoles  = []string{"app_compliance_access"}
+	kitProductsAccessRoles = []string{"app_kitproducts_access"}
+	defaultAccessRoles     = []string{"default-roles-cdlan"}
 )
 
 type Definition struct {
@@ -92,13 +96,14 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		},
 		// ── MKT&Sales ──
 		{
-			ID:            "kit-e-prodotti",
+			ID:            KitProductsAppID,
 			Name:          "Kit e Prodotti",
 			Icon:          "package",
-			Href:          "/apps/mkt-sales/kit-e-prodotti",
+			Href:          KitProductsAppHref,
+			Status:        "ready",
 			CategoryID:    "mkt-sales",
 			CategoryTitle: "MKT&Sales",
-			AccessRoles:   defaultRoles,
+			AccessRoles:   KitProductsAccessRoles(),
 		},
 		{
 			ID:            "proposte",
@@ -295,6 +300,10 @@ func BudgetAccessRoles() []string {
 
 func ComplianceAccessRoles() []string {
 	return slices.Clone(complianceAccessRoles)
+}
+
+func KitProductsAccessRoles() []string {
+	return slices.Clone(kitProductsAccessRoles)
 }
 
 func DefaultAccessRoles() []string {

@@ -36,21 +36,21 @@ func TestVisibleCategoriesDefaultRoleSeesAllPlaceholders(t *testing.T) {
 	for _, cat := range categories {
 		total += len(cat.Apps)
 	}
-	// All placeholder apps (excludes budget and compliance which require specific roles)
-	if total != 18 {
-		t.Fatalf("expected 18 placeholder apps, got %d", total)
+	// All placeholder apps (excludes budget, compliance, and kit-products which require specific roles)
+	if total != 17 {
+		t.Fatalf("expected 17 placeholder apps, got %d", total)
 	}
 }
 
 func TestVisibleCategoriesBothRolesSeesEverything(t *testing.T) {
 	catalog := Catalog(nil)
-	categories := VisibleCategories(catalog, []string{"default-roles-cdlan", "app_budget_access", "app_compliance_access"})
+	categories := VisibleCategories(catalog, []string{"default-roles-cdlan", "app_budget_access", "app_compliance_access", "app_kitproducts_access"})
 
 	total := 0
 	for _, cat := range categories {
 		total += len(cat.Apps)
 	}
-	// All 20 apps (18 placeholders + 1 budget + 1 compliance)
+	// All 20 apps (17 placeholders + 1 budget + 1 compliance + 1 kit-products)
 	if total != 20 {
 		t.Fatalf("expected 20 total apps, got %d", total)
 	}
@@ -112,4 +112,23 @@ func TestCatalogAppliesHrefOverrides(t *testing.T) {
 	}
 
 	t.Fatal("expected budget definition in catalog")
+}
+
+func TestVisibleCategoriesFiltersByKitProductsRole(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"app_kitproducts_access"})
+	if len(categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(categories))
+	}
+	if categories[0].ID != "mkt-sales" {
+		t.Fatalf("expected mkt-sales category, got %q", categories[0].ID)
+	}
+	if len(categories[0].Apps) != 1 {
+		t.Fatalf("expected 1 app, got %d", len(categories[0].Apps))
+	}
+	if categories[0].Apps[0].ID != KitProductsAppID {
+		t.Fatalf("expected kit-products app, got %q", categories[0].Apps[0].ID)
+	}
+	if categories[0].Apps[0].Href != KitProductsAppHref {
+		t.Fatalf("expected kit-products href %q, got %q", KitProductsAppHref, categories[0].Apps[0].Href)
+	}
 }
