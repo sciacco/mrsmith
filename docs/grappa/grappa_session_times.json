@@ -1,0 +1,226 @@
+{
+  "table": "session_times",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "access_id",
+      "position": 2,
+      "type": "int",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "serial_id",
+      "position": 3,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "customer",
+      "position": 4,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "assigned_to",
+      "position": 5,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "radius_user",
+      "position": 6,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "adslacct_starting_from",
+      "position": 7,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "adslacct_total_time",
+      "position": 8,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "adslacct_uptime_percentage",
+      "position": 9,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "radacct_starting_from",
+      "position": 10,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "radacct_total_time",
+      "position": 11,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "radacct_uptime_percentage",
+      "position": 12,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "storico_adsl_starting_from",
+      "position": 13,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "storico_adsl_total_time",
+      "position": 14,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "storico_adsl_uptime_percentage",
+      "position": 15,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "storico_starting_from",
+      "position": 16,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "storico_total_time",
+      "position": 17,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "storico_uptime_percentage",
+      "position": 18,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "total_percentage",
+      "position": 19,
+      "type": "varchar(150)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "updated_at",
+      "position": 20,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "access_id",
+      "type": "BTREE",
+      "expressions": [
+        "access_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "serial_id",
+      "type": "BTREE",
+      "expressions": [
+        "serial_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 666,
+  "charset": "latin1"
+}

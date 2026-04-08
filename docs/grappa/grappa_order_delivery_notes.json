@@ -1,0 +1,65 @@
+{
+  "table": "order_delivery_notes",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "order_delivery_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "description",
+      "position": 3,
+      "type": "varchar(500)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "created_by",
+      "position": 4,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "created_at",
+      "position": 5,
+      "type": "timestamp",
+      "nullable": false,
+      "default": "CURRENT_TIMESTAMP",
+      "onUpdate": "CURRENT_TIMESTAMP"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": null,
+  "charset": "latin1"
+}

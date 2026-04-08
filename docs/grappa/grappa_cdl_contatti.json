@@ -1,0 +1,73 @@
+{
+  "table": "cdl_contatti",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "domainid",
+      "position": 2,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "nome",
+      "position": 3,
+      "type": "varchar(40)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cognome",
+      "position": 4,
+      "type": "varchar(40)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "email",
+      "position": 5,
+      "type": "varchar(100)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cloudstack",
+      "position": 6,
+      "type": "int",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 60,
+  "charset": "latin1"
+}

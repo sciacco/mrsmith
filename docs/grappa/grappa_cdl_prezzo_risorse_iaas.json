@@ -1,0 +1,107 @@
+{
+  "table": "cdl_prezzo_risorse_iaas",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_anagrafica",
+      "position": 2,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "charge_cpu",
+      "position": 3,
+      "type": "decimal(14,4)",
+      "nullable": true,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "charge_ram_kvm",
+      "position": 4,
+      "type": "decimal(14,4)",
+      "nullable": true,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "charge_ram_vmware",
+      "position": 5,
+      "type": "decimal(14,4)",
+      "nullable": true,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "charge_pstor",
+      "position": 6,
+      "type": "decimal(14,4)",
+      "nullable": true,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "charge_sstor",
+      "position": 7,
+      "type": "decimal(14,4)",
+      "nullable": true,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "charge_ip",
+      "position": 8,
+      "type": "decimal(14,4)",
+      "nullable": true,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "charge_prefix24",
+      "position": 9,
+      "type": "decimal(14,4)",
+      "nullable": true,
+      "default": "'0.0000'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "cdl_prezzo_risorse_iaas_pk",
+      "type": "BTREE",
+      "expressions": [
+        "id_anagrafica"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 33,
+  "charset": "latin1"
+}

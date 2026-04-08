@@ -1,0 +1,42 @@
+{
+  "table": "anagrafiche_fornitori",
+  "columns": [
+    {
+      "name": "id_cliente",
+      "position": 1,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "denominazione",
+      "position": 2,
+      "type": "varchar(200)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "id_cliente",
+      "type": "BTREE",
+      "expressions": [
+        "id_cliente"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 1957,
+  "charset": "latin1"
+}

@@ -1,0 +1,100 @@
+{
+  "table": "mor_calls",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "username",
+      "position": 2,
+      "type": "varchar(40)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "chiamante",
+      "position": 3,
+      "type": "varchar(35)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "chiamato",
+      "position": 4,
+      "type": "varchar(35)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_ora",
+      "position": 5,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "durata",
+      "position": 6,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "costo",
+      "position": 7,
+      "type": "decimal(30,15) unsigned",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "destinazione",
+      "position": 8,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "valuta",
+      "position": 9,
+      "type": "varchar(3)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 4580566,
+  "charset": "latin1"
+}

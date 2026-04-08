@@ -1,0 +1,59 @@
+{
+  "table": "prefissi_distretti_regioni",
+  "columns": [
+    {
+      "name": "prefisso",
+      "position": 1,
+      "type": "varchar(4)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "distretto",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "id_regione",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "'0'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "prefisso",
+        "distretto",
+        "id_regione"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 232,
+  "charset": "latin1"
+}

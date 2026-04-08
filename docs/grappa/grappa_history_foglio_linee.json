@@ -1,0 +1,419 @@
+{
+  "table": "history_foglio_linee",
+  "columns": [
+    {
+      "name": "id_hfl",
+      "position": 1,
+      "type": "int(24)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id",
+      "position": 2,
+      "type": "int(24)",
+      "nullable": false
+    },
+    {
+      "name": "utente",
+      "position": 3,
+      "type": "varchar(25)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_variazione",
+      "position": 4,
+      "type": "datetime",
+      "nullable": false,
+      "default": "'0000-00-00 00:00:00'"
+    },
+    {
+      "name": "codice_ordine",
+      "position": 5,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "tipo_conn",
+      "position": 6,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "fornitore",
+      "position": 7,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "unione_linee",
+      "position": 8,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "modulazione",
+      "position": 9,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "mod_accesso",
+      "position": 10,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "stato",
+      "position": 11,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "att_trasf",
+      "position": 12,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_att_telecom",
+      "position": 13,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "data_att_cdlan",
+      "position": 14,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "data_cess_telecom",
+      "position": 15,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "data_cess_cdlan",
+      "position": 16,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "cod_ordine_sp",
+      "position": 17,
+      "type": "varchar(32)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "nome_int_linea",
+      "position": 18,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cogn_rsoc_intest_linea",
+      "position": 19,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "piva",
+      "position": 20,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codfisc",
+      "position": 21,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "tipologia_linea",
+      "position": 22,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "utenza_num_pilota",
+      "position": 23,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "td_linea_telecom",
+      "position": 24,
+      "type": "varchar(32)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "td_linea_telecom2",
+      "position": 25,
+      "type": "varchar(32)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "prefisso_zona",
+      "position": 26,
+      "type": "varchar(6)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "particella",
+      "position": 27,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "indirizzo",
+      "position": 28,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "civico",
+      "position": 29,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cap",
+      "position": 30,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "comune",
+      "position": 31,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "provincia",
+      "position": 32,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "referente",
+      "position": 33,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "splitter_telecom",
+      "position": 34,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "modem_telecom",
+      "position": 35,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cow_mig",
+      "position": 36,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cor_mig",
+      "position": 37,
+      "type": "varchar(64)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cos_mig",
+      "position": 38,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "note",
+      "position": 39,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "id_anagrafica",
+      "position": 40,
+      "type": "int(24)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "id_profilo",
+      "position": 41,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "id_profilo_commerciale",
+      "position": 42,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "monitoraggio",
+      "position": 43,
+      "type": "char",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "serialnumber",
+      "position": 44,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "id",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_hfl"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 13785,
+  "charset": "latin1"
+}

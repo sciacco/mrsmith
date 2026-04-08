@@ -1,0 +1,43 @@
+{
+  "table": "dids_colt",
+  "columns": [
+    {
+      "name": "id_dids_colt",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "dids_colt",
+      "position": 2,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_dids_colt"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 588,
+  "charset": "latin1"
+}

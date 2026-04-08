@@ -1,0 +1,100 @@
+{
+  "table": "fornitori",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "codice",
+      "position": 2,
+      "type": "varchar(100)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "id_cliente",
+      "position": 3,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "intestazione",
+      "position": 4,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "kit_ref",
+      "position": 5,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "codice_UNIQUE",
+      "type": "BTREE",
+      "expressions": [
+        "codice"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "id_cliente_idx",
+      "type": "BTREE",
+      "expressions": [
+        "id_cliente"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 21,
+  "charset": "latin1"
+}

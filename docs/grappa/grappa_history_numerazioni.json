@@ -1,0 +1,194 @@
+{
+  "table": "history_numerazioni",
+  "columns": [
+    {
+      "name": "id_hn",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "utente",
+      "position": 2,
+      "type": "varchar(25)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_variazione",
+      "position": 3,
+      "type": "datetime",
+      "nullable": false,
+      "default": "'0000-00-00 00:00:00'"
+    },
+    {
+      "name": "id_numerazione",
+      "position": 4,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "id_gnr",
+      "position": 5,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "numero",
+      "position": 6,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "particella",
+      "position": 7,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "indirizzo",
+      "position": 8,
+      "type": "varchar(120)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "civico",
+      "position": 9,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "comune",
+      "position": 10,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "provincia",
+      "position": 11,
+      "type": "varchar(2)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cap",
+      "position": 12,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "id_anagrafica",
+      "position": 13,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "nome",
+      "position": 14,
+      "type": "varchar(80)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cogn_rsoc_intest_numerazione",
+      "position": 15,
+      "type": "varchar(120)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "stato",
+      "position": 16,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_attivazione",
+      "position": 17,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "data_cessazione",
+      "position": 18,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "destinazione",
+      "position": 19,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "note",
+      "position": 20,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_hn"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 11934,
+  "charset": "latin1"
+}

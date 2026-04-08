@@ -1,0 +1,47 @@
+{
+  "table": "sicurezza_apparati",
+  "columns": [
+    {
+      "name": "id_sicurezza_apparati",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_sicurezza",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "id_apparato",
+      "position": 3,
+      "type": "int",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_sicurezza_apparati"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 6,
+  "charset": "latin1"
+}

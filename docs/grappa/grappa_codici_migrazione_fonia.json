@@ -1,0 +1,47 @@
+{
+  "table": "codici_migrazione_fonia",
+  "columns": [
+    {
+      "name": "id_cliente",
+      "position": 1,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "numero",
+      "position": 2,
+      "type": "varchar(40)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice",
+      "position": 3,
+      "type": "varchar(60)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "trovato",
+      "position": 4,
+      "type": "varchar(2)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "update_date",
+      "position": 5,
+      "type": "date",
+      "nullable": false
+    }
+  ],
+  "indexes": null,
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 17359,
+  "charset": "latin1"
+}

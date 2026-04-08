@@ -1,0 +1,209 @@
+{
+  "table": "cloud_bundle",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "cust_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "codice_ordine",
+      "position": 3,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "serial_number",
+      "position": 4,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "v_cpu",
+      "position": 5,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ram",
+      "position": 6,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "storage_primary",
+      "position": 7,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "storage_secondary",
+      "position": 8,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "cloud_platform",
+      "position": 9,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "domain_uuid",
+      "position": 10,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "resource_pool",
+      "position": 11,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "hypervisor",
+      "position": 12,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "created_at",
+      "position": 13,
+      "type": "timestamp",
+      "nullable": false,
+      "default": "CURRENT_TIMESTAMP",
+      "onUpdate": "CURRENT_TIMESTAMP"
+    },
+    {
+      "name": "updated_at",
+      "position": 14,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "app",
+      "position": 15,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "app_item_id",
+      "position": 16,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "service_id",
+      "position": 17,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "codice_ordine",
+      "type": "BTREE",
+      "expressions": [
+        "codice_ordine"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "cust_id",
+      "type": "BTREE",
+      "expressions": [
+        "cust_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "serial_number",
+      "type": "BTREE",
+      "expressions": [
+        "serial_number"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": null,
+  "charset": "latin1"
+}

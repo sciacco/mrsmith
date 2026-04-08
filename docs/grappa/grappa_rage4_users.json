@@ -1,0 +1,74 @@
+{
+  "table": "rage4_users",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_anagrafica",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "user_id",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "email",
+      "position": 4,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "password",
+      "position": 5,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "apikey",
+      "position": 6,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 23,
+  "charset": "latin1"
+}

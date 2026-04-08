@@ -1,0 +1,68 @@
+{
+  "table": "vlan",
+  "columns": [
+    {
+      "name": "id_vlan",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "vlanid",
+      "position": 2,
+      "type": "varchar(250)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "name",
+      "position": 3,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "indirizzo_di_rete",
+      "position": 4,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "id_subnetmask",
+      "position": 5,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_vlan"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 128,
+  "charset": "latin1"
+}

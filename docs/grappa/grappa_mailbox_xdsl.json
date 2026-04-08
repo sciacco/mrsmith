@@ -1,0 +1,85 @@
+{
+  "table": "mailbox_xdsl",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "mfrom",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "mto",
+      "position": 3,
+      "type": "varchar(512)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "mbody",
+      "position": 4,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "stato",
+      "position": 5,
+      "type": "int",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "msubject",
+      "position": 6,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "mdate",
+      "position": 7,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 95075,
+  "charset": "latin1"
+}

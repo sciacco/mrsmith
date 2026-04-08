@@ -1,0 +1,151 @@
+{
+  "table": "user",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "username",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "auth_key",
+      "position": 3,
+      "type": "varchar(32)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "password_hash",
+      "position": 4,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "password_reset_token",
+      "position": 5,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "email",
+      "position": 6,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "status",
+      "position": 7,
+      "type": "smallint",
+      "nullable": false,
+      "default": "'10'"
+    },
+    {
+      "name": "created_at",
+      "position": 8,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "updated_at",
+      "position": 9,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "nome",
+      "position": 10,
+      "type": "varchar(70)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "cognome",
+      "position": 11,
+      "type": "varchar(70)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "avatar",
+      "position": 12,
+      "type": "varchar(70)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "username",
+      "type": "BTREE",
+      "expressions": [
+        "username"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "password_reset_token",
+      "type": "BTREE",
+      "expressions": [
+        "password_reset_token"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "utf8_unicode_ci",
+  "rowCount": 171,
+  "charset": "utf8"
+}

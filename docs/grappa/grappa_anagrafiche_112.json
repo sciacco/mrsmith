@@ -1,0 +1,83 @@
+{
+  "table": "anagrafiche_112",
+  "columns": [
+    {
+      "name": "cli",
+      "position": 1,
+      "type": "varchar(70)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "nome",
+      "position": 2,
+      "type": "varchar(200)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cognome",
+      "position": 3,
+      "type": "varchar(200)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "particella",
+      "position": 4,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "indirizzo",
+      "position": 5,
+      "type": "varchar(200)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "numero",
+      "position": 6,
+      "type": "varchar(10)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "comune",
+      "position": 7,
+      "type": "varchar(200)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "provincia",
+      "position": 8,
+      "type": "varchar(10)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cap",
+      "position": 9,
+      "type": "varchar(10)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": null,
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 17745,
+  "charset": "latin1"
+}

@@ -1,0 +1,83 @@
+{
+  "table": "importi_mail2fax",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_cliente",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "periodo_inizio",
+      "position": 3,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "periodo_fine",
+      "position": 4,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "importo",
+      "position": 5,
+      "type": "decimal(15,5)",
+      "nullable": false,
+      "default": "'0.00000'"
+    },
+    {
+      "name": "stato",
+      "position": 6,
+      "type": "smallint",
+      "nullable": false,
+      "default": "'17'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "id_cliente",
+      "type": "BTREE",
+      "expressions": [
+        "id_cliente"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "utf8_general_ci",
+  "rowCount": 427,
+  "charset": "utf8"
+}

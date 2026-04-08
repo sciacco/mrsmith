@@ -1,0 +1,48 @@
+{
+  "table": "bw_accounting",
+  "columns": [
+    {
+      "name": "id_cliente",
+      "position": 1,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "giorno",
+      "position": 2,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "banda",
+      "position": 3,
+      "type": "float",
+      "nullable": false,
+      "default": "'0'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "id_cliente",
+      "type": "BTREE",
+      "expressions": [
+        "id_cliente"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 703,
+  "charset": "latin1"
+}

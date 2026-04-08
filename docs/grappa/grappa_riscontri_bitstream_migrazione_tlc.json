@@ -1,0 +1,313 @@
+{
+  "table": "riscontri_bitstream_migrazione_tlc",
+  "columns": [
+    {
+      "name": "id_riscontro_mig",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_riscontro",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tipo_comunicazione",
+      "position": 3,
+      "type": "varchar(2)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_operatore_recipient",
+      "position": 4,
+      "type": "varchar(3)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_operatore_donating",
+      "position": 5,
+      "type": "varchar(3)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_ordine_recipient",
+      "position": 6,
+      "type": "varchar(30)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_ordine_ti_wh",
+      "position": 7,
+      "type": "varchar(31)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_risorsa_1",
+      "position": 8,
+      "type": "varchar(16)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_sessione_1",
+      "position": 9,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_risorsa_2",
+      "position": 10,
+      "type": "varchar(16)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_sessione_2",
+      "position": 11,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "stato",
+      "position": 12,
+      "type": "varchar(2)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "causale_rifiuto",
+      "position": 13,
+      "type": "varchar(2)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_motivo_rifiuto",
+      "position": 14,
+      "type": "varchar(4)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "motivo_rifiuto",
+      "position": 15,
+      "type": "varchar(80)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "directory_number_1",
+      "position": 16,
+      "type": "varchar(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "directory_number_2",
+      "position": 17,
+      "type": "varchar(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "directory_number_3",
+      "position": 18,
+      "type": "varchar(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "directory_number_4",
+      "position": 19,
+      "type": "varchar(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "directory_number_5",
+      "position": 20,
+      "type": "varchar(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "directory_number_6",
+      "position": 21,
+      "type": "varchar(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "directory_number_7",
+      "position": 22,
+      "type": "varchar(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "directory_number_8",
+      "position": 23,
+      "type": "varchar(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "directory_number_9",
+      "position": 24,
+      "type": "varchar(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "directory_number_10",
+      "position": 25,
+      "type": "varchar(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "routing_number_recipient",
+      "position": 26,
+      "type": "varchar(18)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_espletamento_ordine",
+      "position": 27,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "codice_ordine_pitagora",
+      "position": 28,
+      "type": "varchar(31)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "dac",
+      "position": 29,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "data_notifica",
+      "position": 30,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "data_ricezione_ordine",
+      "position": 31,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "codice_causale_rimodulazione",
+      "position": 32,
+      "type": "varchar(3)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "descrizione_causale_rimodulazione",
+      "position": 33,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_riscontro_mig"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 5702,
+  "charset": "latin1"
+}

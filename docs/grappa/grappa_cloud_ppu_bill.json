@@ -1,0 +1,129 @@
+{
+  "table": "cloud_ppu_bill",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "bigint",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "domain_uuid",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "start_date",
+      "position": 3,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "end_date",
+      "position": 4,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "total",
+      "position": 5,
+      "type": "decimal(15,2)",
+      "nullable": false,
+      "default": "'0.00'"
+    },
+    {
+      "name": "infrastructure_platform",
+      "position": 6,
+      "type": "varchar(40)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "fk_domain_uuid",
+      "type": "BTREE",
+      "expressions": [
+        "domain_uuid"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "fk_infra_platform",
+      "type": "BTREE",
+      "expressions": [
+        "infrastructure_platform"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_infra_platform",
+      "columns": [
+        "infrastructure_platform"
+      ],
+      "referencedTable": "cloud_infrastructure_platform",
+      "referencedColumns": [
+        "name"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    },
+    {
+      "name": "fk_domain_uuid",
+      "columns": [
+        "domain_uuid"
+      ],
+      "referencedTable": "cdl_accounts",
+      "referencedColumns": [
+        "domainuuid"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 9,
+  "charset": "latin1"
+}

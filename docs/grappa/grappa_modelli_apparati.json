@@ -1,0 +1,112 @@
+{
+  "table": "modelli_apparati",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_vendor",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "id_tipologia_apparato",
+      "position": 3,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "descrizione",
+      "position": 4,
+      "type": "varchar(60)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "note",
+      "position": 5,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "descrizione",
+      "type": "BTREE",
+      "expressions": [
+        "descrizione"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "id_tipologia_apparato",
+      "type": "BTREE",
+      "expressions": [
+        "id_tipologia_apparato"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "id_vendor",
+      "type": "BTREE",
+      "expressions": [
+        "id_vendor"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 91,
+  "charset": "latin1"
+}

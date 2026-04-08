@@ -1,0 +1,55 @@
+{
+  "table": "voce_numerazioni",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_voce",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "id_gnr",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "id_numerazione",
+      "position": 4,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 78,
+  "charset": "latin1"
+}

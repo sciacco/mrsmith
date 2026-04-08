@@ -1,0 +1,49 @@
+{
+  "table": "vlan_ethernet_costi_telecom",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "costo_attivazione",
+      "position": 2,
+      "type": "decimal(12,4)",
+      "nullable": false,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "costo_cessazione",
+      "position": 3,
+      "type": "decimal(12,4)",
+      "nullable": false,
+      "default": "'0.0000'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": null,
+  "charset": "latin1"
+}

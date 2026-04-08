@@ -1,0 +1,111 @@
+{
+  "table": "telegrammi",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "conto",
+      "position": 2,
+      "type": "varchar(45)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "id_cliente",
+      "position": 3,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "data",
+      "position": 4,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "mittente",
+      "position": 5,
+      "type": "varchar(45)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "destinatario",
+      "position": 6,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "importo",
+      "position": 7,
+      "type": "decimal(6,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "gamma",
+      "position": 8,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "copie",
+      "position": 9,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "parole",
+      "position": 10,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "servizio",
+      "position": 11,
+      "type": "decimal(6,2)",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 131,
+  "charset": "latin1"
+}

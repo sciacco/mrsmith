@@ -1,0 +1,121 @@
+{
+  "table": "ordini_scadenza",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "DO11_NUMREG_CO99",
+      "position": 2,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "CG16_RAGSOANAG",
+      "position": 3,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO11_NUMDOC",
+      "position": 4,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO17_NUMPERS1",
+      "position": 5,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "DO30_CODART_MG66",
+      "position": 6,
+      "type": "varchar(45)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO30_DESCART",
+      "position": 7,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO52_CODLOTTO_MG4G",
+      "position": 8,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO31_DATACONS",
+      "position": 9,
+      "type": "datetime",
+      "nullable": false
+    },
+    {
+      "name": "DATA_SCAD",
+      "position": 10,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "stato",
+      "position": 11,
+      "type": "varchar(45)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_evaso",
+      "position": 12,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 514,
+  "charset": "latin1"
+}

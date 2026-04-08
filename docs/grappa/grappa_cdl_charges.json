@@ -1,0 +1,141 @@
+{
+  "table": "cdl_charges",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "bigint(20) unsigned",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "domainid",
+      "position": 2,
+      "type": "varchar(40)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "charge_day",
+      "position": 3,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "usage_type",
+      "position": 4,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "description",
+      "position": 5,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "usage_hours",
+      "position": 6,
+      "type": "double unsigned",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "usage_pph",
+      "position": 7,
+      "type": "double",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "usage_charge",
+      "position": 8,
+      "type": "double",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "project_name",
+      "position": 9,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "original_domainid",
+      "position": 10,
+      "type": "varchar(40)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "charge_day",
+      "type": "BTREE",
+      "expressions": [
+        "charge_day",
+        "domainid"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    },
+    {
+      "name": "domainid",
+      "type": "BTREE",
+      "expressions": [
+        "domainid",
+        "charge_day"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 2910789,
+  "charset": "latin1"
+}

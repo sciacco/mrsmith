@@ -1,0 +1,99 @@
+{
+  "table": "rack_power_readings",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "oid",
+      "position": 2,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "date",
+      "position": 3,
+      "type": "timestamp",
+      "nullable": false,
+      "default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "name": "ampere",
+      "position": 4,
+      "type": "decimal(20,2)",
+      "nullable": false
+    },
+    {
+      "name": "rack_socket_id",
+      "position": 5,
+      "type": "int",
+      "nullable": false,
+      "default": "'0'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "idx_sock_amp",
+      "type": "BTREE",
+      "expressions": [
+        "rack_socket_id",
+        "date",
+        "ampere"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "rack_socket_fk",
+      "columns": [
+        "rack_socket_id"
+      ],
+      "referencedTable": "rack_sockets",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "NO ACTION",
+      "onUpdate": "NO ACTION",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 31435960,
+  "charset": "latin1"
+}

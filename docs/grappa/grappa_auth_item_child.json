@@ -1,0 +1,90 @@
+{
+  "table": "auth_item_child",
+  "columns": [
+    {
+      "name": "parent",
+      "position": 1,
+      "type": "varchar(64)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "child",
+      "position": 2,
+      "type": "varchar(64)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "child",
+      "type": "BTREE",
+      "expressions": [
+        "child"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "parent",
+        "child"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "auth_item_child_ibfk_1",
+      "columns": [
+        "parent"
+      ],
+      "referencedTable": "auth_item",
+      "referencedColumns": [
+        "name"
+      ],
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    },
+    {
+      "name": "auth_item_child_ibfk_2",
+      "columns": [
+        "child"
+      ],
+      "referencedTable": "auth_item",
+      "referencedColumns": [
+        "name"
+      ],
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "utf8_unicode_ci",
+  "rowCount": 5275,
+  "charset": "utf8"
+}

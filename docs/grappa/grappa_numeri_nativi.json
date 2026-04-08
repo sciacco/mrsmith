@@ -1,0 +1,97 @@
+{
+  "table": "numeri_nativi",
+  "columns": [
+    {
+      "name": "distretto",
+      "position": 1,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "area_locale",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "decamigliaio",
+      "position": 3,
+      "type": "varchar(1)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "f4",
+      "position": 4,
+      "type": "varchar(3)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "f5",
+      "position": 5,
+      "type": "varchar(4)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "operatore",
+      "position": 6,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "stato_arco",
+      "position": 7,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "decamigliaio",
+        "f4",
+        "f5"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 49039,
+  "charset": "latin1"
+}

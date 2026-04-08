@@ -1,0 +1,176 @@
+{
+  "table": "cdl_charges_vcd",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "bigint",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "domain_uuid",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "bill_uuid",
+      "position": 3,
+      "type": "varchar(40)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "date",
+      "position": 4,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "start_date",
+      "position": 5,
+      "type": "datetime",
+      "nullable": false
+    },
+    {
+      "name": "end_date",
+      "position": 6,
+      "type": "datetime",
+      "nullable": false
+    },
+    {
+      "name": "tot_cpu_usage",
+      "position": 7,
+      "type": "decimal(20,6)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_vcpu_count",
+      "position": 8,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_cpu_price",
+      "position": 9,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_mem_usage",
+      "position": 10,
+      "type": "decimal(20,6)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_mem_price",
+      "position": 11,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_storage_usage",
+      "position": 12,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_storage_price",
+      "position": 13,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_metadata_price",
+      "position": 14,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_tag_price",
+      "position": 15,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_additional_price",
+      "position": 16,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "total",
+      "position": 17,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "fk_cdl_charges_vcd_domain",
+      "type": "BTREE",
+      "expressions": [
+        "domain_uuid"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_cdl_charges_vcd_domain",
+      "columns": [
+        "domain_uuid"
+      ],
+      "referencedTable": "cdl_accounts",
+      "referencedColumns": [
+        "domainuuid"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 289,
+  "charset": "latin1"
+}

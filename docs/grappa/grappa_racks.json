@@ -1,0 +1,308 @@
+{
+  "table": "racks",
+  "columns": [
+    {
+      "name": "id_rack",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "name",
+      "position": 2,
+      "type": "varchar(250)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "unit",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "id_anagrafica",
+      "position": 4,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "id_datacenter",
+      "position": 5,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "stato",
+      "position": 6,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "magnetotermico",
+      "position": 7,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "ampere",
+      "position": 8,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "floor",
+      "position": 9,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "island",
+      "position": 10,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "type",
+      "position": 11,
+      "type": "varchar(8)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "pos",
+      "position": 12,
+      "type": "varchar(8)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "racknum",
+      "position": 13,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "positions_id",
+      "position": 14,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "shared",
+      "position": 15,
+      "type": "varchar(2)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "reserved",
+      "position": 16,
+      "type": "varchar(2)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "note",
+      "position": 17,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_attivazione",
+      "position": 18,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "data_cessazione",
+      "position": 19,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "codice_ordine",
+      "position": 20,
+      "type": "varchar(30)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "sold_power",
+      "position": 21,
+      "type": "float",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "serialnumber",
+      "position": 22,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "committed_power",
+      "position": 23,
+      "type": "float",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "variable_billing",
+      "position": 24,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "billing_start_date",
+      "position": 25,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "billing_end_date",
+      "position": 26,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "magnetotermico2",
+      "position": 27,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "ampere2",
+      "position": 28,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "circuitnum1",
+      "position": 29,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "circuitnum2",
+      "position": 30,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "last_update",
+      "position": 31,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "islet_id",
+      "position": 32,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "sconto",
+      "position": 33,
+      "type": "decimal(6,2)",
+      "nullable": true,
+      "default": "'0.00'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_rack"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "racks_islets_id_fk",
+      "type": "BTREE",
+      "expressions": [
+        "islet_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "racks_islets_id_fk",
+      "columns": [
+        "islet_id"
+      ],
+      "referencedTable": "islets",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 489,
+  "charset": "latin1"
+}

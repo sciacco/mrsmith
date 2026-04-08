@@ -1,0 +1,55 @@
+{
+  "table": "numerazioni_gdf",
+  "columns": [
+    {
+      "name": "id_num_gdf",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "numero",
+      "position": 2,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "trovato",
+      "position": 3,
+      "type": "varchar(5)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_num_gdf",
+        "numero"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 113,
+  "charset": "latin1"
+}

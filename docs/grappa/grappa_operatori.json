@@ -1,0 +1,36 @@
+{
+  "table": "operatori",
+  "columns": [
+    {
+      "name": "ragione_sociale",
+      "position": 1,
+      "type": "varchar(250)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "ragione_sociale",
+      "type": "BTREE",
+      "expressions": [
+        "ragione_sociale"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 4,
+  "charset": "latin1"
+}

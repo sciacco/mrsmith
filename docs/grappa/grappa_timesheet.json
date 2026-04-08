@@ -1,0 +1,70 @@
+{
+  "table": "timesheet",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "support_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "admin_id",
+      "position": 3,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "time_bt",
+      "position": 4,
+      "type": "time",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "time_extbt",
+      "position": 5,
+      "type": "time",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "descrizione",
+      "position": 6,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": null,
+  "charset": "latin1"
+}

@@ -1,0 +1,345 @@
+{
+  "table": "xcon",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "ticket",
+      "position": 2,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "pa",
+      "position": 3,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cliente",
+      "position": 4,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "stato",
+      "position": 5,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "num_ordine",
+      "position": 6,
+      "type": "varchar(32)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "riga_ordine",
+      "position": 7,
+      "type": "varchar(32)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "tipo",
+      "position": 8,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_attivazione",
+      "position": 9,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "data_cessazione",
+      "position": 10,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "aend_unita_app",
+      "position": 11,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "aend_slot",
+      "position": 12,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "aend_fibre",
+      "position": 13,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "aend_apparato",
+      "position": 14,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "zend_unita_app",
+      "position": 15,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "zend_slot",
+      "position": 16,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "zend_fibre",
+      "position": 17,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "zend_apparato",
+      "position": 18,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "note",
+      "position": 19,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "ticket_esteso",
+      "position": 20,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "note_cliente",
+      "position": 21,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "sorgente",
+      "position": 22,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "created_at",
+      "position": 23,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "aend_rack_id",
+      "position": 24,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "zend_rack_id",
+      "position": 25,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "loa_name",
+      "position": 26,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "loa_id",
+      "position": 27,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "mmr_port",
+      "position": 28,
+      "type": "varchar(512)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "FK_xcon_racks",
+      "type": "BTREE",
+      "expressions": [
+        "aend_rack_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "FK_xcon_racks_2",
+      "type": "BTREE",
+      "expressions": [
+        "zend_rack_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "num_ordine",
+      "type": "BTREE",
+      "expressions": [
+        "num_ordine"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "ticket",
+      "type": "BTREE",
+      "expressions": [
+        "ticket"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "FK_xcon_racks",
+      "columns": [
+        "aend_rack_id"
+      ],
+      "referencedTable": "racks",
+      "referencedColumns": [
+        "id_rack"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    },
+    {
+      "name": "FK_xcon_racks_2",
+      "columns": [
+        "zend_rack_id"
+      ],
+      "referencedTable": "racks",
+      "referencedColumns": [
+        "id_rack"
+      ],
+      "onDelete": "NO ACTION",
+      "onUpdate": "NO ACTION",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 829,
+  "charset": "latin1"
+}

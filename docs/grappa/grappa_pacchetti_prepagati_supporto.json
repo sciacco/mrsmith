@@ -1,0 +1,40 @@
+{
+  "table": "pacchetti_prepagati_supporto",
+  "columns": [
+    {
+      "name": "id_pacchetto",
+      "position": 1,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "tbl_origine",
+      "position": 2,
+      "type": "varchar(150)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "id_collegamento",
+      "position": 3,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "valore",
+      "position": 4,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "'0.00'"
+    }
+  ],
+  "indexes": null,
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 186,
+  "charset": "latin1"
+}

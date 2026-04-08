@@ -1,0 +1,156 @@
+{
+  "table": "collect_devices",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "device_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "term_order",
+      "position": 3,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "status",
+      "position": 4,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "checkop",
+      "position": 5,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "cost",
+      "position": 6,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "note",
+      "position": 7,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "check_note",
+      "position": 8,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "created_at",
+      "position": 9,
+      "type": "timestamp",
+      "nullable": false,
+      "default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "name": "expected_at",
+      "position": 10,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "arrived_at",
+      "position": 11,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "closed_at",
+      "position": 12,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "solicited_at",
+      "position": 13,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "checked_at",
+      "position": 14,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "order_type",
+      "position": 15,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "device_id",
+      "type": "BTREE",
+      "expressions": [
+        "device_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 124,
+  "charset": "latin1"
+}

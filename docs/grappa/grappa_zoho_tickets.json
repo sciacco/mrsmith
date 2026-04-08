@@ -1,0 +1,622 @@
+{
+  "table": "zoho_tickets",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "bigint(20) unsigned",
+      "nullable": false
+    },
+    {
+      "name": "subject",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "status",
+      "position": 3,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "ticket_number",
+      "position": 4,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "description",
+      "position": 5,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "created_time",
+      "position": 6,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "modified_time",
+      "position": 7,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "closed_time",
+      "position": 8,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "assignee_first_name",
+      "position": 9,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "assignee_last_name",
+      "position": 10,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "assignee_email",
+      "position": 11,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "contact_first_name",
+      "position": 12,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "contact_last_name",
+      "position": 13,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "contact_email",
+      "position": 14,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_competenza",
+      "position": 15,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_intervento_iav",
+      "position": 16,
+      "type": "tinyint(1)",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "cf_ref_ticket",
+      "position": 17,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_inizio_attivita",
+      "position": 18,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "cf_from",
+      "position": 19,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_xcon_activation",
+      "position": 20,
+      "type": "tinyint(1)",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "cf_test_picklist",
+      "position": 21,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_stato_richiesta",
+      "position": 22,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_incident_category",
+      "position": 23,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_tipologia_linea",
+      "position": 24,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_short_title",
+      "position": 25,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_altre_info",
+      "position": 26,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_data_di_arrivo",
+      "position": 27,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "cf_usn_account",
+      "position": 28,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_severity_level",
+      "position": 29,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_sala",
+      "position": 30,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_numero_colli",
+      "position": 31,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_account_title",
+      "position": 32,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_in_attesa_fino_a",
+      "position": 33,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "cf_activity_group",
+      "position": 34,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_sold_solution",
+      "position": 35,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_timing",
+      "position": 36,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_sommario",
+      "position": 37,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_rack",
+      "position": 38,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_codice_spedizione",
+      "position": 39,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_trasportatore",
+      "position": 40,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_asset_url",
+      "position": 41,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_datacenter",
+      "position": 42,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_numero_bancali",
+      "position": 43,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_volume",
+      "position": 44,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_nome_referente",
+      "position": 45,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_ordine",
+      "position": 46,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_asset_type",
+      "position": 47,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_servizio",
+      "position": 48,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_severity_level_picklist",
+      "position": 49,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_email_referente",
+      "position": 50,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_sla_category",
+      "position": 51,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_a_end",
+      "position": 52,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_technical_level",
+      "position": 53,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_product_code",
+      "position": 54,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_tipo_attivita",
+      "position": 55,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_servizi",
+      "position": 56,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_b_end",
+      "position": 57,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_tipo_di_intervento",
+      "position": 58,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_data_arrivo_pacco",
+      "position": 59,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "cf_peso",
+      "position": 60,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_reclamo_accolto",
+      "position": 61,
+      "type": "tinyint(1)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "cf_old_case_number",
+      "position": 62,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_telefono_referente",
+      "position": 63,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_to",
+      "position": 64,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_tipologia_di_servizio_legata_al_reclamo",
+      "position": 65,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "cf_chiusura_per_fatturazione",
+      "position": 66,
+      "type": "tinyint(1)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "cf_asset_id",
+      "position": 67,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "dashboard_type",
+      "position": 68,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    },
+    {
+      "name": "profile_id",
+      "position": 69,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "utf8mb4_unicode_ci",
+  "rowCount": 545,
+  "charset": "utf8mb4"
+}

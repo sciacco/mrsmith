@@ -1,0 +1,63 @@
+{
+  "table": "migra_vlan",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "vlanold",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "vlannew",
+      "position": 3,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "clli",
+      "position": 4,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "fatto",
+      "position": 5,
+      "type": "enum('no','si')",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "utf8_unicode_ci",
+  "rowCount": 230,
+  "charset": "utf8"
+}

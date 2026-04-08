@@ -1,0 +1,78 @@
+{
+  "table": "ritiro_apparati",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "ordine_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "linea_id",
+      "position": 3,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "data_apertura",
+      "position": 4,
+      "type": "datetime",
+      "nullable": false
+    },
+    {
+      "name": "data_scadenza",
+      "position": 5,
+      "type": "datetime",
+      "nullable": false
+    },
+    {
+      "name": "data_chiusura",
+      "position": 6,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "costo",
+      "position": 7,
+      "type": "decimal(10,2)",
+      "nullable": false
+    },
+    {
+      "name": "addebito",
+      "position": 8,
+      "type": "int",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 1431,
+  "charset": "latin1"
+}

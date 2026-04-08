@@ -1,0 +1,35 @@
+{
+  "table": "temp_id",
+  "columns": [
+    {
+      "name": "id_linea",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "'0'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_linea"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 133,
+  "charset": "latin1"
+}

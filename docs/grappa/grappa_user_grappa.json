@@ -1,0 +1,85 @@
+{
+  "table": "user_grappa",
+  "columns": [
+    {
+      "name": "user_id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "login",
+      "position": 2,
+      "type": "varchar(25)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "name",
+      "position": 3,
+      "type": "varchar(50)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "password",
+      "position": 4,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "profile_id",
+      "position": 5,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "login",
+      "type": "BTREE",
+      "expressions": [
+        "login"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "user_id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 47,
+  "charset": "latin1"
+}

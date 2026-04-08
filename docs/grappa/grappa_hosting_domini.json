@@ -1,0 +1,45 @@
+{
+  "table": "hosting_domini",
+  "columns": [
+    {
+      "name": "id_hosting",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "dominio",
+      "position": 2,
+      "type": "varchar(128)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_hosting",
+        "dominio"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 59,
+  "charset": "latin1"
+}

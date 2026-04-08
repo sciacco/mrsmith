@@ -1,0 +1,65 @@
+{
+  "table": "tratte_canali_fibra",
+  "columns": [
+    {
+      "name": "id_canale",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_tratta",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "descrizione",
+      "position": 3,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "attenuazione_db",
+      "position": 4,
+      "type": "float(12,4)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "lunghezza_onda_nm",
+      "position": 5,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_canale"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 148,
+  "charset": "latin1"
+}

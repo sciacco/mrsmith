@@ -1,0 +1,102 @@
+{
+  "table": "allegati",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "customer_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "data",
+      "position": 3,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "tipo",
+      "position": 4,
+      "type": "varchar(50)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "url",
+      "position": 5,
+      "type": "varchar(255)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "uploaded",
+      "position": 6,
+      "type": "tinyint(1)",
+      "nullable": true,
+      "default": "'0'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "customer_fk",
+      "type": "BTREE",
+      "expressions": [
+        "customer_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "allegati_customer_fk",
+      "columns": [
+        "customer_id"
+      ],
+      "referencedTable": "cli_fatturazione",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 2906,
+  "charset": "latin1"
+}

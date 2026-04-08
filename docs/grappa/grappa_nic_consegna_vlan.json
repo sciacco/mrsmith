@@ -1,0 +1,43 @@
+{
+  "table": "nic_consegna_vlan",
+  "columns": [
+    {
+      "name": "id_vlan",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "id_nic_consegna",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "id_vlan_consegna",
+      "type": "BTREE",
+      "expressions": [
+        "id_vlan",
+        "id_nic_consegna"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 3,
+  "charset": "latin1"
+}

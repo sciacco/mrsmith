@@ -1,0 +1,57 @@
+{
+  "table": "codici_cow_olo",
+  "columns": [
+    {
+      "name": "operatore",
+      "position": 1,
+      "type": "varchar(250)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cow_origine",
+      "position": 2,
+      "type": "varchar(3)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_cow",
+      "position": 3,
+      "type": "varchar(3)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "cow_origine",
+      "type": "BTREE",
+      "expressions": [
+        "cow_origine",
+        "codice_cow"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 30737,
+  "charset": "latin1"
+}

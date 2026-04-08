@@ -1,0 +1,106 @@
+{
+  "table": "apparati_accessi",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "accesso_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "apparato_id",
+      "position": 3,
+      "type": "int",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "accesso_id",
+      "type": "BTREE",
+      "expressions": [
+        "accesso_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "apparato_id",
+      "type": "BTREE",
+      "expressions": [
+        "apparato_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_accesso",
+      "columns": [
+        "accesso_id"
+      ],
+      "referencedTable": "foglio_linee",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    },
+    {
+      "name": "fk_apparato",
+      "columns": [
+        "apparato_id"
+      ],
+      "referencedTable": "apparati",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 18,
+  "charset": "latin1"
+}

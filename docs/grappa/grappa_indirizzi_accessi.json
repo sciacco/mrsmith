@@ -1,0 +1,80 @@
+{
+  "table": "indirizzi_accessi",
+  "columns": [
+    {
+      "name": "entry",
+      "position": 1,
+      "type": "longtext",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "ip",
+      "position": 2,
+      "type": "varchar(40)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "nome",
+      "position": 3,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "subnet",
+      "position": 4,
+      "type": "varchar(3)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "descrizione",
+      "position": 5,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "red_num",
+      "position": 6,
+      "type": "smallint",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "commento",
+      "position": 7,
+      "type": "varchar(500)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "versione",
+      "position": 8,
+      "type": "varchar(2)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    }
+  ],
+  "indexes": null,
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 766,
+  "charset": "latin1"
+}

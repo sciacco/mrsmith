@@ -1,0 +1,54 @@
+{
+  "table": "vlan_ethernet_7200",
+  "columns": [
+    {
+      "name": "idvlanolo",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "ifindex",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "router",
+      "position": 3,
+      "type": "varchar(1)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "idvlanolo",
+        "ifindex"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 839,
+  "charset": "latin1"
+}

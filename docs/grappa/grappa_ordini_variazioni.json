@@ -1,0 +1,319 @@
+{
+  "table": "ordini_variazioni",
+  "columns": [
+    {
+      "name": "ID",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "CLIENTE",
+      "position": 2,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO11_NUMREG_CO99",
+      "position": 3,
+      "type": "char(12)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO11_NUMDOC",
+      "position": 4,
+      "type": "decimal(7,0)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "DO11_NUMDOCORIG",
+      "position": 5,
+      "type": "varchar(15)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO11_NOTEDOCUM",
+      "position": 6,
+      "type": "varchar(240)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "TIPO_ORDINE",
+      "position": 7,
+      "type": "varchar(1)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO11_DATADOC",
+      "position": 8,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "DO12_DATAVSCONF",
+      "position": 9,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "DATA_PREV_CONSEGNA",
+      "position": 10,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "TEMPO_RILASCIO",
+      "position": 11,
+      "type": "decimal(17,6)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "DO12_RIFVSDOC",
+      "position": 12,
+      "type": "varchar(72)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "COMMERCIALE",
+      "position": 13,
+      "type": "varchar(60)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "COMMERCIALE_EMAIL",
+      "position": 14,
+      "type": "varchar(128)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "REF_TEC_NAME",
+      "position": 15,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "REF_TEC_PHONE",
+      "position": 16,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "REF_TEC_MAIL",
+      "position": 17,
+      "type": "varchar(128)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "REF_OTHER_TEC_NAME",
+      "position": 18,
+      "type": "varchar(72)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "REF_OTHER_TEC_PHONE",
+      "position": 19,
+      "type": "varchar(72)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "REF_OTHER_TEC_MAIL",
+      "position": 20,
+      "type": "varchar(72)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "REF_ADMIN_NAME",
+      "position": 21,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "REF_ADMIN_PHONE",
+      "position": 22,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "REF_ADMIN_MAIL",
+      "position": 23,
+      "type": "varchar(128)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO30_PROGRIGA",
+      "position": 24,
+      "type": "decimal(6,0)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "QTA",
+      "position": 25,
+      "type": "decimal(14,3)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "SERVIZIO",
+      "position": 26,
+      "type": "varchar(1672)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO52_CODLOTTO_MG4G",
+      "position": 27,
+      "type": "char(25)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DATA_CESSAZIONE",
+      "position": 28,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "SUBJECT",
+      "position": 29,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "TESTO",
+      "position": 30,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "NUM_TICKET",
+      "position": 31,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DO11_NUMREG_CO99S",
+      "position": 32,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "COSTO_ATTIVAZIONE",
+      "position": 33,
+      "type": "decimal(17,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "COSTO_CESSAZIONE",
+      "position": 34,
+      "type": "decimal(17,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "CANONE_MESE",
+      "position": 35,
+      "type": "decimal(17,2)",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "ID"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 396,
+  "charset": "latin1"
+}

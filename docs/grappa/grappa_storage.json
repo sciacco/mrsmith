@@ -1,0 +1,186 @@
+{
+  "table": "storage",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "access_protocol",
+      "position": 2,
+      "type": "varchar(45)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "size",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "cli_fatturazione_id",
+      "position": 4,
+      "type": "int(24)",
+      "nullable": false
+    },
+    {
+      "name": "apparato_id_apparato",
+      "position": 5,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "note",
+      "position": 6,
+      "type": "varchar(45)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "size_type",
+      "position": 7,
+      "type": "varchar(2)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "status",
+      "position": 8,
+      "type": "varchar(8)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "created_at",
+      "position": 9,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "closed_at",
+      "position": 10,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "codice_ordine",
+      "position": 11,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "serial_number",
+      "position": 12,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "fk_storage_apparato1_idx",
+      "type": "BTREE",
+      "expressions": [
+        "apparato_id_apparato"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "fk_storage_cli_fatturazione1_idx",
+      "type": "BTREE",
+      "expressions": [
+        "cli_fatturazione_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id",
+        "cli_fatturazione_id",
+        "apparato_id_apparato"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_storage_apparato1",
+      "columns": [
+        "apparato_id_apparato"
+      ],
+      "referencedTable": "apparato",
+      "referencedColumns": [
+        "id_apparato"
+      ],
+      "onDelete": "NO ACTION",
+      "onUpdate": "NO ACTION",
+      "matchType": "NONE"
+    },
+    {
+      "name": "fk_storage_cli_fatturazione1",
+      "columns": [
+        "cli_fatturazione_id"
+      ],
+      "referencedTable": "cli_fatturazione",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "NO ACTION",
+      "onUpdate": "NO ACTION",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 61,
+  "charset": "latin1"
+}

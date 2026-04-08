@@ -1,0 +1,47 @@
+{
+  "table": "nic_vlan",
+  "columns": [
+    {
+      "name": "id_vlan",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "id_nic",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "id_nic_vlan",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_nic_vlan"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 56,
+  "charset": "latin1"
+}

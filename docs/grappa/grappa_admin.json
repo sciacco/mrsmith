@@ -1,0 +1,100 @@
+{
+  "table": "admin",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "useradmin",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "auth_key",
+      "position": 3,
+      "type": "varchar(32)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "password_hash",
+      "position": 4,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "password_reset_token",
+      "position": 5,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "nome",
+      "position": 6,
+      "type": "varchar(70)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "cognome",
+      "position": 7,
+      "type": "varchar(70)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "email",
+      "position": 8,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "status_id",
+      "position": 9,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "created_at",
+      "position": 10,
+      "type": "datetime",
+      "nullable": false
+    },
+    {
+      "name": "updated_at",
+      "position": 11,
+      "type": "datetime",
+      "nullable": false
+    },
+    {
+      "name": "gruppo",
+      "position": 12,
+      "type": "varchar(70)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": null,
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 43,
+  "charset": "latin1"
+}

@@ -1,0 +1,194 @@
+{
+  "table": "history_vc",
+  "columns": [
+    {
+      "name": "id_hvc",
+      "position": 1,
+      "type": "int(24)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id",
+      "position": 2,
+      "type": "int(24)",
+      "nullable": false
+    },
+    {
+      "name": "utente",
+      "position": 3,
+      "type": "varchar(25)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_variazione",
+      "position": 4,
+      "type": "datetime",
+      "nullable": false,
+      "default": "'0000-00-00 00:00:00'"
+    },
+    {
+      "name": "id_linea",
+      "position": 5,
+      "type": "int(24)",
+      "nullable": false
+    },
+    {
+      "name": "id_vp",
+      "position": 6,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "id_vlan_eth",
+      "position": 7,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "vpi_cliente",
+      "position": 8,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "vci_cliente",
+      "position": 9,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "vci_ti",
+      "position": 10,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "dlci",
+      "position": 11,
+      "type": "varchar(5)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "tipologia_vc",
+      "position": 12,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "pcr_down",
+      "position": 13,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "pcr_up",
+      "position": 14,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "mcr_down",
+      "position": 15,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "mcr_up",
+      "position": 16,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ip",
+      "position": 17,
+      "type": "varchar(40)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "utente_radius",
+      "position": 18,
+      "type": "varchar(40)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "vrf",
+      "position": 19,
+      "type": "varchar(40)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "pcr_radius",
+      "position": 20,
+      "type": "int",
+      "nullable": true,
+      "default": "'0'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "id",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_hvc"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 3110,
+  "charset": "latin1"
+}

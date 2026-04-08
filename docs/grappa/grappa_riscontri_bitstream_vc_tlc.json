@@ -1,0 +1,138 @@
+{
+  "table": "riscontri_bitstream_vc_tlc",
+  "columns": [
+    {
+      "name": "id_riscontro_vc",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_riscontro",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "vpi_cliente",
+      "position": 3,
+      "type": "int(5)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "vci_cliente",
+      "position": 4,
+      "type": "int(5)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "vpi_rete",
+      "position": 5,
+      "type": "int(5)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "vci_rete",
+      "position": 6,
+      "type": "int(5)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "dlci_cliente",
+      "position": 7,
+      "type": "int(5)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "code_vp",
+      "position": 8,
+      "type": "varchar(16)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "kit_consegna",
+      "position": 9,
+      "type": "varchar(9)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "intermediate_agent",
+      "position": 10,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "code_vlan_single_tag",
+      "position": 11,
+      "type": "varchar(16)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "classe_servizio",
+      "position": 12,
+      "type": "varchar(2)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "s_vlan_code",
+      "position": 13,
+      "type": "varchar(16)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "c_vlan_code",
+      "position": 14,
+      "type": "int(4)",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_riscontro_vc"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 26030,
+  "charset": "latin1"
+}

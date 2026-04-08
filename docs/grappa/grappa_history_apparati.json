@@ -1,0 +1,66 @@
+{
+  "table": "history_apparati",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "device_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "write_at",
+      "position": 3,
+      "type": "timestamp",
+      "nullable": false,
+      "default": "CURRENT_TIMESTAMP",
+      "onUpdate": "CURRENT_TIMESTAMP"
+    },
+    {
+      "name": "device_status",
+      "position": 4,
+      "type": "varchar(80)",
+      "nullable": false,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cust_id",
+      "position": 5,
+      "type": "int",
+      "nullable": true,
+      "default": "'0'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 1171,
+  "charset": "latin1"
+}

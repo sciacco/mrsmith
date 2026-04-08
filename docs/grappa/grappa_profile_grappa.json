@@ -1,0 +1,44 @@
+{
+  "table": "profile_grappa",
+  "columns": [
+    {
+      "name": "profile_id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "name",
+      "position": 2,
+      "type": "varchar(100)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "profile_id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 6,
+  "charset": "latin1"
+}

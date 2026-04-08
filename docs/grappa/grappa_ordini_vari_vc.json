@@ -1,0 +1,204 @@
+{
+  "table": "ordini_vari_vc",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_ordine",
+      "position": 2,
+      "type": "int(24)",
+      "nullable": false
+    },
+    {
+      "name": "id_linea",
+      "position": 3,
+      "type": "int(24)",
+      "nullable": false
+    },
+    {
+      "name": "id_vp",
+      "position": 4,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "id_vlan_eth",
+      "position": 5,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "vpi_cliente",
+      "position": 6,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "vci_cliente",
+      "position": 7,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "vci_ti",
+      "position": 8,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "dlci",
+      "position": 9,
+      "type": "varchar(5)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "tipologia_vc",
+      "position": 10,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "pcr_down",
+      "position": 11,
+      "type": "decimal(11,1)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "pcr_up",
+      "position": 12,
+      "type": "decimal(11,1)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "mcr_down",
+      "position": 13,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "mcr_up",
+      "position": 14,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ip",
+      "position": 15,
+      "type": "varchar(40)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "utente_radius",
+      "position": 16,
+      "type": "varchar(40)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "vrf",
+      "position": 17,
+      "type": "varchar(40)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "pcr_radius",
+      "position": 18,
+      "type": "int",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "var_azione",
+      "position": 19,
+      "type": "varchar(1)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cvlancode",
+      "position": 20,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "uservlan",
+      "position": 21,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "id_vc_001",
+      "type": "BTREE",
+      "expressions": [
+        "id_ordine",
+        "id"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 518,
+  "charset": "latin1"
+}

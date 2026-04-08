@@ -1,0 +1,50 @@
+{
+  "table": "banda",
+  "columns": [
+    {
+      "name": "velocita",
+      "position": 1,
+      "type": "decimal(12,3)",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "velocita"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "velocita",
+      "type": "BTREE",
+      "expressions": [
+        "velocita"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 25,
+  "charset": "latin1"
+}

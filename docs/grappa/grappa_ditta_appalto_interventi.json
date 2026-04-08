@@ -1,0 +1,258 @@
+{
+  "table": "ditta_appalto_interventi",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "ditta_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "tariffa_id",
+      "position": 3,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "cliente_id",
+      "position": 4,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "linea_id",
+      "position": 5,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ordine_id",
+      "position": 6,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ordine_vari_id",
+      "position": 7,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "descrizione",
+      "position": 8,
+      "type": "text",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "iav",
+      "position": 9,
+      "type": "varchar(2)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "addebito",
+      "position": 10,
+      "type": "varchar(2)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data",
+      "position": 11,
+      "type": "datetime",
+      "nullable": false
+    },
+    {
+      "name": "numero_ticket",
+      "position": 12,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "numero_ticket_tlc",
+      "position": 13,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_chiusura",
+      "position": 14,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "invia_otrs",
+      "position": 15,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "invia_fornitore",
+      "position": 16,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "contatto_id",
+      "position": 17,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "costo",
+      "position": 18,
+      "type": "decimal(10,2)",
+      "nullable": false
+    },
+    {
+      "name": "costo_extra",
+      "position": 19,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ref_cliente",
+      "position": 20,
+      "type": "varchar(200)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "attrezzatura",
+      "position": 21,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "sede",
+      "position": 22,
+      "type": "varchar(200)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "citta",
+      "position": 23,
+      "type": "varchar(200)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "delivery_cdlan",
+      "position": 24,
+      "type": "varchar(100)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "network_cdlan",
+      "position": 25,
+      "type": "varchar(100)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_inserimento",
+      "position": 26,
+      "type": "datetime",
+      "nullable": false
+    },
+    {
+      "name": "destinatari",
+      "position": 27,
+      "type": "text",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "annulla_sostituisce",
+      "position": 28,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "fattura_fornitore",
+      "position": 29,
+      "type": "varchar(70)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "rapporti_intervento",
+      "position": 30,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cogn_ragione_sociale",
+      "position": 31,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 990,
+  "charset": "latin1"
+}

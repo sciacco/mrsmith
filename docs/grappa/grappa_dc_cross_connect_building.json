@@ -1,0 +1,60 @@
+{
+  "table": "dc_cross_connect_building",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "name",
+      "position": 2,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_general_ci"
+    },
+    {
+      "name": "type",
+      "position": 3,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_general_ci"
+    },
+    {
+      "name": "status",
+      "position": 4,
+      "type": "int(1)",
+      "nullable": true,
+      "default": "'1'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "utf8mb4_general_ci",
+  "rowCount": 8,
+  "charset": "utf8mb4"
+}

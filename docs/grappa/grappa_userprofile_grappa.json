@@ -1,0 +1,43 @@
+{
+  "table": "userprofile_grappa",
+  "columns": [
+    {
+      "name": "user_id",
+      "position": 1,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "profile_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "user_id",
+        "profile_id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 29,
+  "charset": "latin1"
+}

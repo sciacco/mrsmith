@@ -1,0 +1,96 @@
+{
+  "table": "positions",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "status",
+      "position": 2,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "type",
+      "position": 3,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "num",
+      "position": 4,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "islets_id",
+      "position": 5,
+      "type": "int",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "fk_positions_islets1_idx",
+      "type": "BTREE",
+      "expressions": [
+        "islets_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id",
+        "islets_id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_positions_islets1",
+      "columns": [
+        "islets_id"
+      ],
+      "referencedTable": "islets",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "NO ACTION",
+      "onUpdate": "NO ACTION",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 430,
+  "charset": "latin1"
+}

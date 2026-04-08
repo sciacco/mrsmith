@@ -1,0 +1,111 @@
+{
+  "table": "cdl_accounts_vcd_detail",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "domain_uuid",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "domain_label",
+      "position": 3,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "policy_uuid",
+      "position": 4,
+      "type": "varchar(40)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "policy_applied",
+      "position": 5,
+      "type": "tinyint(1)",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "one_time_discount",
+      "position": 6,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "one_time_discount_left",
+      "position": 7,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "unique_domain_uuid",
+      "type": "BTREE",
+      "expressions": [
+        "domain_uuid"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_accounts_vcd_domain",
+      "columns": [
+        "domain_uuid"
+      ],
+      "referencedTable": "cdl_accounts",
+      "referencedColumns": [
+        "domainuuid"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 3,
+  "charset": "latin1"
+}

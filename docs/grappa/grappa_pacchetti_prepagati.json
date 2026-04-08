@@ -1,0 +1,119 @@
+{
+  "table": "pacchetti_prepagati",
+  "columns": [
+    {
+      "name": "id_pacchetto",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "nome",
+      "position": 2,
+      "type": "varchar(250)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "id_anagrafica",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "data_inizio",
+      "position": 4,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "data_fine",
+      "position": 5,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "servizio",
+      "position": 6,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "elementi",
+      "position": 7,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "residuo",
+      "position": 8,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "prezzo",
+      "position": 9,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "codice_ordine",
+      "position": 10,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "unita",
+      "position": 11,
+      "type": "enum('numero','importo','ore')",
+      "nullable": true,
+      "default": "'numero'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "serialnumber",
+      "position": 12,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_pacchetto"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 44,
+  "charset": "latin1"
+}

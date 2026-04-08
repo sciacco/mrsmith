@@ -1,0 +1,52 @@
+{
+  "table": "housing_apparati",
+  "columns": [
+    {
+      "name": "id_housing",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "id_rack",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "id_apparato",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_housing",
+        "id_rack",
+        "id_apparato"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 63,
+  "charset": "latin1"
+}

@@ -1,0 +1,48 @@
+{
+  "table": "progressivi_TLC",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "data_invio",
+      "position": 2,
+      "type": "datetime",
+      "nullable": false,
+      "default": "'0000-00-00 00:00:00'"
+    },
+    {
+      "name": "indice",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 1780,
+  "charset": "latin1"
+}

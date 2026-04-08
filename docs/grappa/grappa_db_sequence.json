@@ -1,0 +1,44 @@
+{
+  "table": "db_sequence",
+  "columns": [
+    {
+      "name": "seq_name",
+      "position": 1,
+      "type": "varchar(100)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "nextid",
+      "position": 2,
+      "type": "int(10) unsigned",
+      "nullable": false,
+      "default": "'0'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "seq_name"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 13,
+  "charset": "latin1"
+}

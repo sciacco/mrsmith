@@ -1,0 +1,127 @@
+{
+  "table": "islets",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "datacenter_id",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "name",
+      "position": 3,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "rack_num",
+      "position": 4,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "type",
+      "position": 5,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "floor",
+      "position": 6,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "serial",
+      "position": 7,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "order",
+      "position": 8,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "clifat_id",
+      "position": 9,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "fk_islets_datacenter1_idx",
+      "type": "BTREE",
+      "expressions": [
+        "datacenter_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id",
+        "datacenter_id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_islets_datacenter1",
+      "columns": [
+        "datacenter_id"
+      ],
+      "referencedTable": "datacenter",
+      "referencedColumns": [
+        "id_datacenter"
+      ],
+      "onDelete": "NO ACTION",
+      "onUpdate": "NO ACTION",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 39,
+  "charset": "latin1"
+}

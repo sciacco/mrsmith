@@ -1,0 +1,118 @@
+{
+  "table": "cdl_services",
+  "columns": [
+    {
+      "name": "name",
+      "position": 1,
+      "type": "varchar(40)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "apiurl",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "apisecret",
+      "position": 3,
+      "type": "varchar(255)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "apikey",
+      "position": 4,
+      "type": "varchar(255)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "chargeby",
+      "position": 5,
+      "type": "varchar(20)",
+      "nullable": false,
+      "default": "'risorse'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "active",
+      "position": 6,
+      "type": "tinyint(1)",
+      "nullable": true,
+      "default": "'1'"
+    },
+    {
+      "name": "infrastructure_platform",
+      "position": 7,
+      "type": "varchar(40)",
+      "nullable": false,
+      "default": "'cloudstack'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "fk_infrastructure_platform",
+      "type": "BTREE",
+      "expressions": [
+        "infrastructure_platform"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "name"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_infrastructure_platform",
+      "columns": [
+        "infrastructure_platform"
+      ],
+      "referencedTable": "cloud_infrastructure_platform",
+      "referencedColumns": [
+        "name"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 4,
+  "charset": "latin1"
+}

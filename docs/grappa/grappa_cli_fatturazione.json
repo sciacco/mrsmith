@@ -1,0 +1,280 @@
+{
+  "table": "cli_fatturazione",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int(24)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "intestazione",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "raggruppamento",
+      "position": 3,
+      "type": "int(24)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "codice_aggancio_gest",
+      "position": 4,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "codice_cow",
+      "position": 5,
+      "type": "varchar(3)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "accesso_portale",
+      "position": 6,
+      "type": "char",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "lingua",
+      "position": 7,
+      "type": "varchar(2)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "escludi_controlli",
+      "position": 8,
+      "type": "char",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "codice_aggancio_portale",
+      "position": 9,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "rh_listino",
+      "position": 10,
+      "type": "enum('vecchio','nuovo')",
+      "nullable": false,
+      "default": "'vecchio'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "un_min_rh_bt",
+      "position": 11,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "un_min_rh_exbt",
+      "position": 12,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "rh_illimitate",
+      "position": 13,
+      "type": "char",
+      "nullable": false,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "rh_free_bt",
+      "position": 14,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "rh_free_exbt",
+      "position": 15,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "bulk_cable",
+      "position": 16,
+      "type": "char",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "un_min_ho_bt",
+      "position": 17,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "un_min_ho_exbt",
+      "position": 18,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "supporto_sistemistico",
+      "position": 19,
+      "type": "char",
+      "nullable": false,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "c4b",
+      "position": 20,
+      "type": "int",
+      "nullable": true,
+      "default": "'0'"
+    },
+    {
+      "name": "stato",
+      "position": 21,
+      "type": "enum('attivo','disattivato')",
+      "nullable": true,
+      "default": "'attivo'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "localxcon",
+      "position": 22,
+      "type": "int",
+      "nullable": true,
+      "default": "'1'"
+    },
+    {
+      "name": "mixxcon",
+      "position": 23,
+      "type": "int",
+      "nullable": true,
+      "default": "'1'"
+    },
+    {
+      "name": "irideosxcon",
+      "position": 24,
+      "type": "int",
+      "nullable": true,
+      "default": "'1'"
+    },
+    {
+      "name": "seewebxcon",
+      "position": 25,
+      "type": "int",
+      "nullable": true,
+      "default": "'1'"
+    },
+    {
+      "name": "email_commerciale",
+      "position": 26,
+      "type": "varchar(128)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "codice_aggancio_gest",
+      "type": "BTREE",
+      "expressions": [
+        "codice_aggancio_gest"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "codice_cow",
+      "type": "BTREE",
+      "expressions": [
+        "codice_cow"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "idx_clifatt_intestazione",
+      "type": "BTREE",
+      "expressions": [
+        "intestazione"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 1462,
+  "charset": "latin1"
+}

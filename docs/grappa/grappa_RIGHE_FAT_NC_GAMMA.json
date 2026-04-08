@@ -1,0 +1,312 @@
+{
+  "table": "RIGHE_FAT_NC_GAMMA",
+  "columns": [
+    {
+      "name": "ID",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "CLIENTE",
+      "position": 2,
+      "type": "varchar(60)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "NUM_DOCUMENTO",
+      "position": 3,
+      "type": "decimal(7,0)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ANNO_DOCUMENTO",
+      "position": 4,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "DATA_DOCUMENTO",
+      "position": 5,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "TIPO_DOCUMENTO",
+      "position": 6,
+      "type": "varchar(15)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "CODICE_ARTICOLO",
+      "position": 7,
+      "type": "varchar(25)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "SERIALNUMBER",
+      "position": 8,
+      "type": "varchar(72)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "INDIRIZZO",
+      "position": 9,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DATA_INIZIO_COMPETENZA",
+      "position": 10,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DATA_FINE_COMPETENZA",
+      "position": 11,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "QTA",
+      "position": 12,
+      "type": "decimal(14,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "PREZZO_UNITARIO",
+      "position": 13,
+      "type": "varchar(30)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "IVA",
+      "position": 14,
+      "type": "char(4)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "PREZZO_TOTALE_NETTO",
+      "position": 15,
+      "type": "varchar(30)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "VALUTA",
+      "position": 16,
+      "type": "char(4)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "CENTRO_ADDEBITO",
+      "position": 17,
+      "type": "varchar(72)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DESCRIZIONE_RIGA",
+      "position": 18,
+      "type": "varchar(1600)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "RIFERIMENTO_ORDINE_CLIENTE",
+      "position": 19,
+      "type": "varchar(72)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "TIPO_ADDEBITO",
+      "position": 20,
+      "type": "varchar(72)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "PROFILO",
+      "position": 21,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "ID_CLIENTE",
+      "position": 22,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PREZZO_TOTALE_NETTO",
+      "type": "BTREE",
+      "expressions": [
+        "PREZZO_TOTALE_NETTO"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "ID"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "TIPO_ADDEBITO",
+      "type": "BTREE",
+      "expressions": [
+        "TIPO_ADDEBITO"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "TIPO_DOCUMENTO",
+      "type": "BTREE",
+      "expressions": [
+        "TIPO_DOCUMENTO"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "DATA_DOCUMENTO",
+      "type": "BTREE",
+      "expressions": [
+        "DATA_DOCUMENTO"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "DESCRIZIONE_RIGA",
+      "type": "BTREE",
+      "expressions": [
+        "DESCRIZIONE_RIGA"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        767
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "NUM_DOCUMENTO",
+      "type": "BTREE",
+      "expressions": [
+        "NUM_DOCUMENTO"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 131927,
+  "charset": "latin1"
+}

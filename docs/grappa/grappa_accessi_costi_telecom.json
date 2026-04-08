@@ -1,0 +1,83 @@
+{
+  "table": "accessi_costi_telecom",
+  "columns": [
+    {
+      "name": "id_profilo",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "attivazione_condivisa",
+      "position": 2,
+      "type": "decimal(12,3)",
+      "nullable": false,
+      "default": "'0.000'"
+    },
+    {
+      "name": "attivazione_naked",
+      "position": 3,
+      "type": "decimal(12,3)",
+      "nullable": false,
+      "default": "'0.000'"
+    },
+    {
+      "name": "canone_mensile_base",
+      "position": 4,
+      "type": "decimal(12,3)",
+      "nullable": false,
+      "default": "'0.000'"
+    },
+    {
+      "name": "canone_mensile_naked",
+      "position": 5,
+      "type": "decimal(12,3)",
+      "nullable": false,
+      "default": "'0.000'"
+    },
+    {
+      "name": "canone_mensile_modem",
+      "position": 6,
+      "type": "decimal(12,3)",
+      "nullable": false,
+      "default": "'0.000'"
+    },
+    {
+      "name": "costo_cessazione_base",
+      "position": 7,
+      "type": "decimal(12,3)",
+      "nullable": false,
+      "default": "'0.000'"
+    },
+    {
+      "name": "costo_cessazione_naked",
+      "position": 8,
+      "type": "decimal(12,3)",
+      "nullable": false,
+      "default": "'0.000'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_profilo"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 194,
+  "charset": "latin1"
+}

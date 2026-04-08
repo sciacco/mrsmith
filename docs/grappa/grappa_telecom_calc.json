@@ -1,0 +1,431 @@
+{
+  "table": "telecom_calc",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "Account",
+      "position": 2,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Centrale_di_Origine",
+      "position": 3,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Macro-Area",
+      "position": 4,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Descrizione_Macro-Area",
+      "position": 5,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Area_di_Raccolta",
+      "position": 6,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Descrizione_Area_Racc",
+      "position": 7,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "N_TD",
+      "position": 8,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Id_Vlan",
+      "position": 9,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Tipologia_Vlan_CAR",
+      "position": 10,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Id_Accesso",
+      "position": 11,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Id_User_Vlan",
+      "position": 12,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Id_C_Vlan",
+      "position": 13,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Id_Risorsa",
+      "position": 14,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Ultimo_ordine_espletato",
+      "position": 15,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Utenza_di_riferimento",
+      "position": 16,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Codice Progetto",
+      "position": 17,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Id_CAR",
+      "position": 18,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Classe_Servizio",
+      "position": 19,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Banda_Precedente_Mbits",
+      "position": 20,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Banda_Mbits",
+      "position": 21,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Tipo_Trasporto",
+      "position": 22,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "PCR_DOWN",
+      "position": 23,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "PCR_UP",
+      "position": 24,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Descrizione_PS",
+      "position": 25,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Tipo_variazione",
+      "position": 26,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Data_Ricezione_Ordine",
+      "position": 27,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Data_Attivazione",
+      "position": 28,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Data_Variazione",
+      "position": 29,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Data_Espletamento Cessazione",
+      "position": 30,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Data_Fine_Fatturazione",
+      "position": 31,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Data_Inizio_Noleggio",
+      "position": 32,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Data_Fine_Primo_Noleggio",
+      "position": 33,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Da",
+      "position": 34,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "A",
+      "position": 35,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Oggetto_di_Fatturazione",
+      "position": 36,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Contributi",
+      "position": 37,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Canoni_Precedenti",
+      "position": 38,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Canoni_Correnti",
+      "position": 39,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Canoni_Anticipati",
+      "position": 40,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Canone_A_Scadere",
+      "position": 41,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Totale_Canoni",
+      "position": 42,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Totale",
+      "position": 43,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Listino_Applicato",
+      "position": 44,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "Prezzo_Unitario",
+      "position": 45,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": null,
+  "charset": "latin1"
+}

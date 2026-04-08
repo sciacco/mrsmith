@@ -1,0 +1,47 @@
+{
+  "table": "vlan_ethernet_configurate",
+  "columns": [
+    {
+      "name": "vlan",
+      "position": 1,
+      "type": "varchar(10)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "router",
+      "position": 2,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "vlan",
+      "type": "BTREE",
+      "expressions": [
+        "vlan",
+        "router"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 113,
+  "charset": "latin1"
+}

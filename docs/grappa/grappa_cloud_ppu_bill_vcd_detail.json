@@ -1,0 +1,120 @@
+{
+  "table": "cloud_ppu_bill_vcd_detail",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "bigint",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "cloud_ppu_bill_id",
+      "position": 2,
+      "type": "bigint",
+      "nullable": false
+    },
+    {
+      "name": "tot_cpu_price",
+      "position": 3,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_mem_price",
+      "position": 4,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_storage_price",
+      "position": 5,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_metadata_price",
+      "position": 6,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_tag_price",
+      "position": 7,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_additional_price",
+      "position": 8,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "tot_discount",
+      "position": 9,
+      "type": "decimal(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "fk_vcd_bill_to_master",
+      "type": "BTREE",
+      "expressions": [
+        "cloud_ppu_bill_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_vcd_bill_to_master",
+      "columns": [
+        "cloud_ppu_bill_id"
+      ],
+      "referencedTable": "cloud_ppu_bill",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 9,
+  "charset": "latin1"
+}

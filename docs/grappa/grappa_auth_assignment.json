@@ -1,0 +1,84 @@
+{
+  "table": "auth_assignment",
+  "columns": [
+    {
+      "name": "item_name",
+      "position": 1,
+      "type": "varchar(64)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "user_id",
+      "position": 2,
+      "type": "varchar(64)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "created_at",
+      "position": 3,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "auth_assignment_user_id_idx",
+      "type": "BTREE",
+      "expressions": [
+        "user_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "item_name",
+        "user_id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "auth_assignment_ibfk_1",
+      "columns": [
+        "item_name"
+      ],
+      "referencedTable": "auth_item",
+      "referencedColumns": [
+        "name"
+      ],
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "utf8_unicode_ci",
+  "rowCount": 451,
+  "charset": "utf8"
+}

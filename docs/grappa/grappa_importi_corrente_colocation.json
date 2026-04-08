@@ -1,0 +1,164 @@
+{
+  "table": "importi_corrente_colocation",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "customer_id",
+      "position": 2,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "start_period",
+      "position": 3,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "end_period",
+      "position": 4,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "amount",
+      "position": 5,
+      "type": "decimal(20,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "uuid",
+      "position": 6,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "pun",
+      "position": 7,
+      "type": "float",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "coefficiente",
+      "position": 8,
+      "type": "float",
+      "nullable": false
+    },
+    {
+      "name": "ampere",
+      "position": 9,
+      "type": "float",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "fisso_cu",
+      "position": 10,
+      "type": "float",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "eccedenti",
+      "position": 11,
+      "type": "float",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "importo_eccedenti",
+      "position": 12,
+      "type": "float",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "pue",
+      "position": 13,
+      "type": "float",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "kw",
+      "position": 14,
+      "type": "float",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "tipo_variabile",
+      "position": 15,
+      "type": "int",
+      "nullable": true,
+      "default": "'1'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "cust_fk",
+      "type": "BTREE",
+      "expressions": [
+        "customer_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "cust_fk",
+      "columns": [
+        "customer_id"
+      ],
+      "referencedTable": "cli_fatturazione",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 1487,
+  "charset": "latin1"
+}

@@ -1,0 +1,92 @@
+{
+  "table": "cdl_prezzo_istanze",
+  "columns": [
+    {
+      "name": "offeringid",
+      "position": 1,
+      "type": "varchar(80)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "service_name",
+      "position": 2,
+      "type": "varchar(255)",
+      "nullable": false,
+      "default": "'clmaster'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "descrizione",
+      "position": 3,
+      "type": "varchar(255)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "pph",
+      "position": 4,
+      "type": "decimal(10,6)",
+      "nullable": false,
+      "default": "'0.000000'",
+      "comment": "price per hour"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "services_prezzo_istanze",
+      "type": "BTREE",
+      "expressions": [
+        "service_name"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "offeringid"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "services_prezzo_istanze",
+      "columns": [
+        "service_name"
+      ],
+      "referencedTable": "cdl_services",
+      "referencedColumns": [
+        "name"
+      ],
+      "onDelete": "NO ACTION",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 16,
+  "charset": "latin1"
+}

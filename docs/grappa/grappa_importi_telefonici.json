@@ -1,0 +1,94 @@
+{
+  "table": "importi_telefonici",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "conto",
+      "position": 2,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "periodo_inizio",
+      "position": 3,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "periodo_fine",
+      "position": 4,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "importo",
+      "position": 5,
+      "type": "decimal(15,5)",
+      "nullable": false,
+      "default": "'0.00000'"
+    },
+    {
+      "name": "stato",
+      "position": 6,
+      "type": "smallint",
+      "nullable": false,
+      "default": "'17'"
+    },
+    {
+      "name": "tipologia",
+      "position": 7,
+      "type": "enum('TRAFFICO','EXTRA','PREPAGATO')",
+      "nullable": true,
+      "default": "'TRAFFICO'",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "conto",
+      "type": "BTREE",
+      "expressions": [
+        "conto"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "utf8_general_ci",
+  "rowCount": 7570,
+  "charset": "utf8"
+}

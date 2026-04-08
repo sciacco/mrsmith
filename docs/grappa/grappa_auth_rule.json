@@ -1,0 +1,57 @@
+{
+  "table": "auth_rule",
+  "columns": [
+    {
+      "name": "name",
+      "position": 1,
+      "type": "varchar(64)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "data",
+      "position": 2,
+      "type": "blob",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "created_at",
+      "position": 3,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "updated_at",
+      "position": 4,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "name"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "utf8_unicode_ci",
+  "rowCount": null,
+  "charset": "utf8"
+}

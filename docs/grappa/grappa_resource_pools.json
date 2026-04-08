@@ -1,0 +1,213 @@
+{
+  "table": "resource_pools",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "customer_id",
+      "position": 2,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "order",
+      "position": 3,
+      "type": "varchar(50)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cpu",
+      "position": 4,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "ram_size",
+      "position": 5,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "storage_size",
+      "position": 6,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "activation_date",
+      "position": 7,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "termination_date",
+      "position": 8,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "status",
+      "position": 9,
+      "type": "varchar(10)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "notes",
+      "position": 10,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "cdl_service",
+      "position": 11,
+      "type": "varchar(40)",
+      "nullable": false,
+      "default": "'cloudstackmi02'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "infrastructure_dc_build_id",
+      "position": 12,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "solution_type",
+      "position": 13,
+      "type": "varchar(40)",
+      "nullable": false,
+      "default": "'IaaS'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "fk_resource_pools_solution_type",
+      "type": "BTREE",
+      "expressions": [
+        "solution_type"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "fk_resource_pools_cdl_service",
+      "type": "BTREE",
+      "expressions": [
+        "cdl_service"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "fk_resource_pools_dc_build",
+      "type": "BTREE",
+      "expressions": [
+        "infrastructure_dc_build_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_resource_pools_solution_type",
+      "columns": [
+        "solution_type"
+      ],
+      "referencedTable": "cloud_solution_type",
+      "referencedColumns": [
+        "name"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    },
+    {
+      "name": "fk_resource_pools_cdl_service",
+      "columns": [
+        "cdl_service"
+      ],
+      "referencedTable": "cdl_services",
+      "referencedColumns": [
+        "name"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    },
+    {
+      "name": "fk_resource_pools_dc_build",
+      "columns": [
+        "infrastructure_dc_build_id"
+      ],
+      "referencedTable": "dc_build",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 11,
+  "charset": "latin1"
+}

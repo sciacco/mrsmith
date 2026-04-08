@@ -1,0 +1,82 @@
+{
+  "table": "foglio_linee_egon",
+  "columns": [
+    {
+      "name": "foglio_linee_id",
+      "position": 1,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "egon_address",
+      "position": 2,
+      "type": "varchar(32)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "egon_code",
+      "position": 3,
+      "type": "varchar(32)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "foglio_linee_egon_egon_code_index",
+      "type": "BTREE",
+      "expressions": [
+        "egon_code"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "foglio_linee_egon_foglio_linee_id_fk",
+      "type": "BTREE",
+      "expressions": [
+        "foglio_linee_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "foglio_linee_egon_foglio_linee_id_fk",
+      "columns": [
+        "foglio_linee_id"
+      ],
+      "referencedTable": "foglio_linee",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 718,
+  "charset": "latin1"
+}

@@ -1,0 +1,41 @@
+{
+  "table": "pun_giornaliero",
+  "columns": [
+    {
+      "name": "giorno",
+      "position": 1,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "pun",
+      "position": 2,
+      "type": "decimal(12,6)",
+      "nullable": false,
+      "default": "'0.000000'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "giorno"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "tis620_thai_ci",
+  "rowCount": 55,
+  "charset": "tis620"
+}

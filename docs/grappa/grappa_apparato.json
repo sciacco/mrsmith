@@ -1,0 +1,399 @@
+{
+  "table": "apparato",
+  "columns": [
+    {
+      "name": "id_apparato",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "name",
+      "position": 2,
+      "type": "varchar(250)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "id_rack",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "unit_position",
+      "position": 4,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "unit",
+      "position": 5,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ip_management",
+      "position": 6,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "note",
+      "position": 7,
+      "type": "mediumtext",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "type",
+      "position": 8,
+      "type": "varchar(250)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "serial",
+      "position": 9,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "os",
+      "position": 10,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "model",
+      "position": 11,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "id_anagrafica",
+      "position": 12,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "stato",
+      "position": 13,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "td_kit",
+      "position": 14,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "banda",
+      "position": 15,
+      "type": "int(10)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ordine_view_kit_gea",
+      "position": 16,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "numero_porte",
+      "position": 17,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "nome_porte",
+      "position": 18,
+      "type": "varchar(70)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "tipo_porte",
+      "position": 19,
+      "type": "varchar(70)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "layer_porte",
+      "position": 20,
+      "type": "varchar(70)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "data_attivazione",
+      "position": 21,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "data_cessazione",
+      "position": 22,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "indirizzo_installazione",
+      "position": 23,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "indirizzo_spedizione",
+      "position": 24,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "proprieta_cdlan",
+      "position": 25,
+      "type": "char",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "cluster_name",
+      "position": 26,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "cliente_finale",
+      "position": 27,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "tipo_configurazione",
+      "position": 28,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "spedizione",
+      "position": 29,
+      "type": "varchar(1)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "installazione_onsite",
+      "position": 30,
+      "type": "varchar(1)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "monitoraggio_attivo",
+      "position": 31,
+      "type": "varchar(1)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "tipologia_firewall",
+      "position": 32,
+      "type": "varchar(20)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "serialnumber",
+      "position": 33,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "codice_ordine",
+      "position": 34,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "ultima_notifica",
+      "position": 35,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "serial",
+      "type": "BTREE",
+      "expressions": [
+        "serial"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "stato",
+      "type": "BTREE",
+      "expressions": [
+        "stato"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "type",
+      "type": "BTREE",
+      "expressions": [
+        "type"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "id_anagrafica",
+      "type": "BTREE",
+      "expressions": [
+        "id_anagrafica"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "id_rack",
+      "type": "BTREE",
+      "expressions": [
+        "id_rack"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_apparato"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "utf8_general_ci",
+  "rowCount": 1605,
+  "charset": "utf8"
+}

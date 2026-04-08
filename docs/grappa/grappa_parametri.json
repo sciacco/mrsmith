@@ -1,0 +1,53 @@
+{
+  "table": "parametri",
+  "columns": [
+    {
+      "name": "chiave",
+      "position": 1,
+      "type": "varchar(20)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "tipo",
+      "position": 2,
+      "type": "varchar(10)",
+      "nullable": false,
+      "default": "'string'",
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "valore",
+      "position": 3,
+      "type": "varchar(255)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "chiave"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "utf8_general_ci",
+  "rowCount": 14,
+  "charset": "utf8"
+}

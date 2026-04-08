@@ -1,0 +1,26 @@
+{
+  "table": "temp_importi",
+  "columns": [
+    {
+      "name": "conto",
+      "position": 1,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_general_ci"
+    },
+    {
+      "name": "importo",
+      "position": 2,
+      "type": "decimal(15,5)",
+      "nullable": false,
+      "default": "'0.00000'"
+    }
+  ],
+  "indexes": null,
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 78,
+  "charset": "latin1"
+}

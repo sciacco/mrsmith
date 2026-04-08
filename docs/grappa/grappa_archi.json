@@ -1,0 +1,114 @@
+{
+  "table": "archi",
+  "columns": [
+    {
+      "name": "id_arco",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_anello",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "id_nodo_da",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "id_nodo_a",
+      "position": 4,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "distanza",
+      "position": 5,
+      "type": "float(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "attenuazione",
+      "position": 6,
+      "type": "float(10,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "riferimento",
+      "position": 7,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "riferimento_metroweb",
+      "position": 8,
+      "type": "varchar(50)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_rilascio",
+      "position": 9,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "id_anello",
+      "type": "BTREE",
+      "expressions": [
+        "id_anello",
+        "id_nodo_da",
+        "id_nodo_a"
+      ],
+      "primary": false,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_arco"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 70,
+  "charset": "latin1"
+}

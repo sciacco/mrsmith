@@ -1,0 +1,75 @@
+{
+  "table": "notice",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "type",
+      "position": 2,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_general_ci"
+    },
+    {
+      "name": "text",
+      "position": 3,
+      "type": "text",
+      "nullable": false,
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_general_ci"
+    },
+    {
+      "name": "title",
+      "position": 4,
+      "type": "varchar(45)",
+      "nullable": false,
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_general_ci"
+    },
+    {
+      "name": "created_at",
+      "position": 5,
+      "type": "timestamp",
+      "nullable": true,
+      "default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "name": "document",
+      "position": 6,
+      "type": "varchar(250)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8mb4",
+      "collation": "utf8mb4_general_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "utf8mb4_general_ci",
+  "rowCount": 8,
+  "charset": "utf8mb4"
+}

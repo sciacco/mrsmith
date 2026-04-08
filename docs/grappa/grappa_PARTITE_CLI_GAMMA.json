@@ -1,0 +1,202 @@
+{
+  "table": "PARTITE_CLI_GAMMA",
+  "columns": [
+    {
+      "name": "ID",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "NUM_REG",
+      "position": 2,
+      "type": "char(12)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "LINGUA",
+      "position": 3,
+      "type": "varchar(3)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "COD_CLIENTE",
+      "position": 4,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "CLIENTE",
+      "position": 5,
+      "type": "varchar(60)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "COD_DOCUMENTO",
+      "position": 6,
+      "type": "varchar(14)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "TIPO_DOCUMENTO",
+      "position": 7,
+      "type": "varchar(40)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DATA_DOCUMENTO",
+      "position": 8,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "NUM_DOCUMENTO",
+      "position": 9,
+      "type": "decimal(7,0)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ANNO_DOCUMENTO",
+      "position": 10,
+      "type": "decimal(4,0)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "IMPORTO",
+      "position": 11,
+      "type": "decimal(13,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "VALUTA",
+      "position": 12,
+      "type": "varchar(4)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "EF01_FLGACCONTO",
+      "position": 13,
+      "type": "tinyint(1)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "EMAIL",
+      "position": 14,
+      "type": "varchar(128)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "PAGATA",
+      "position": 15,
+      "type": "varchar(1)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "PAGATA_IL",
+      "position": 16,
+      "type": "varchar(10)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "COD_CLIENTE",
+      "type": "BTREE",
+      "expressions": [
+        "COD_CLIENTE"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "NUM_DOCUMENTO",
+      "type": "BTREE",
+      "expressions": [
+        "NUM_DOCUMENTO"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "NUM_REG",
+      "type": "BTREE",
+      "expressions": [
+        "NUM_REG"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "ID"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 18204,
+  "charset": "latin1"
+}

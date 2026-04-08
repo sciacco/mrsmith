@@ -1,0 +1,77 @@
+{
+  "table": "vp_costi_telecom",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "costo_attivazione",
+      "position": 2,
+      "type": "decimal(12,4)",
+      "nullable": false,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "costo_cessazione",
+      "position": 3,
+      "type": "decimal(12,4)",
+      "nullable": false,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "costo_variazione_mcr_pcr",
+      "position": 4,
+      "type": "decimal(12,4)",
+      "nullable": false,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "costo_spostamento_vp_su_KIT",
+      "position": 5,
+      "type": "decimal(12,4)",
+      "nullable": false,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "costo_moltiplicatore_mcr",
+      "position": 6,
+      "type": "decimal(12,4)",
+      "nullable": false,
+      "default": "'0.0000'"
+    },
+    {
+      "name": "costo_moltiplicatore_pcr",
+      "position": 7,
+      "type": "decimal(12,4)",
+      "nullable": false,
+      "default": "'0.0000'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": null,
+  "charset": "latin1"
+}

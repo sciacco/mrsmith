@@ -1,0 +1,56 @@
+{
+  "table": "licenze_sw_type",
+  "columns": [
+    {
+      "name": "name",
+      "position": 1,
+      "type": "varchar(128)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "created_at",
+      "position": 2,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "deleted_at",
+      "position": 3,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "server_id_required",
+      "position": 4,
+      "type": "tinyint(1)",
+      "nullable": false,
+      "default": "'0'"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "name"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 3,
+  "charset": "latin1"
+}

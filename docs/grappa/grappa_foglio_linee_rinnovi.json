@@ -1,0 +1,84 @@
+{
+  "table": "foglio_linee_rinnovi",
+  "columns": [
+    {
+      "name": "id_rinnovo",
+      "position": 1,
+      "type": "int(10)",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "id_linea",
+      "position": 2,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "data_inizio",
+      "position": 3,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "data_fine",
+      "position": 4,
+      "type": "date",
+      "nullable": false
+    },
+    {
+      "name": "durata_rinnovo_mesi",
+      "position": 5,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "note",
+      "position": 6,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "id_linea",
+      "type": "BTREE",
+      "expressions": [
+        "id_linea"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id_rinnovo"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 123,
+  "charset": "latin1"
+}

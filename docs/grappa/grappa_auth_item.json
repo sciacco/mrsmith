@@ -1,0 +1,127 @@
+{
+  "table": "auth_item",
+  "columns": [
+    {
+      "name": "name",
+      "position": 1,
+      "type": "varchar(64)",
+      "nullable": false,
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "type",
+      "position": 2,
+      "type": "smallint",
+      "nullable": false
+    },
+    {
+      "name": "description",
+      "position": 3,
+      "type": "text",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "rule_name",
+      "position": 4,
+      "type": "varchar(64)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "utf8",
+      "collation": "utf8_unicode_ci"
+    },
+    {
+      "name": "data",
+      "position": 5,
+      "type": "blob",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "created_at",
+      "position": 6,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "updated_at",
+      "position": 7,
+      "type": "int",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "idx-auth_item-type",
+      "type": "BTREE",
+      "expressions": [
+        "type"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "name"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "rule_name",
+      "type": "BTREE",
+      "expressions": [
+        "rule_name"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "auth_item_ibfk_1",
+      "columns": [
+        "rule_name"
+      ],
+      "referencedTable": "auth_rule",
+      "referencedColumns": [
+        "name"
+      ],
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "utf8_unicode_ci",
+  "rowCount": 1489,
+  "charset": "utf8"
+}

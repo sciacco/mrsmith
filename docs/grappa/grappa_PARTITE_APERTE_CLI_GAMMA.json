@@ -1,0 +1,142 @@
+{
+  "table": "PARTITE_APERTE_CLI_GAMMA",
+  "columns": [
+    {
+      "name": "ID",
+      "position": 1,
+      "type": "int",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "LINGUA",
+      "position": 2,
+      "type": "varchar(3)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "COD_CLIENTE",
+      "position": 3,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "CLIENTE",
+      "position": 4,
+      "type": "varchar(60)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "COD_DOCUMENTO",
+      "position": 5,
+      "type": "varchar(14)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "TIPO_DOCUMENTO",
+      "position": 6,
+      "type": "varchar(40)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DATA_DOCUMENTO",
+      "position": 7,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "NUM_DOCUMENTO",
+      "position": 8,
+      "type": "decimal(7,0)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "ANNO_DOCUMENTO",
+      "position": 9,
+      "type": "decimal(4,0)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "IMPORTO",
+      "position": 10,
+      "type": "decimal(13,2)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "VALUTA",
+      "position": 11,
+      "type": "varchar(4)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "DATA_SCADENZA",
+      "position": 12,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "DATA_ALERT",
+      "position": 13,
+      "type": "datetime",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "EF01_FLGACCONTO",
+      "position": 14,
+      "type": "tinyint(1)",
+      "nullable": true,
+      "default": "NULL"
+    },
+    {
+      "name": "EMAIL",
+      "position": 15,
+      "type": "varchar(128)",
+      "nullable": true,
+      "default": "NULL",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "ID"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 335,
+  "charset": "latin1"
+}

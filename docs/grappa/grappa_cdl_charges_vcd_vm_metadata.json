@@ -1,0 +1,91 @@
+{
+  "table": "cdl_charges_vcd_vm_metadata",
+  "columns": [
+    {
+      "name": "id",
+      "position": 1,
+      "type": "bigint",
+      "nullable": false,
+      "default": "AUTO_INCREMENT"
+    },
+    {
+      "name": "cdl_charges_vcd_vm_id",
+      "position": 2,
+      "type": "bigint",
+      "nullable": false
+    },
+    {
+      "name": "metadata_name",
+      "position": 3,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "metadata_usage",
+      "position": 4,
+      "type": "int",
+      "nullable": false
+    },
+    {
+      "name": "metadata_price",
+      "position": 5,
+      "type": "decimal(10,2)",
+      "nullable": false
+    }
+  ],
+  "indexes": [
+    {
+      "name": "fk_cdl_charges_vcd_vm_metadata_charge",
+      "type": "BTREE",
+      "expressions": [
+        "cdl_charges_vcd_vm_id"
+      ],
+      "primary": false,
+      "unique": false,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    },
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "id"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1
+      ],
+      "descending": [
+        false
+      ]
+    }
+  ],
+  "foreignKeys": [
+    {
+      "name": "fk_cdl_charges_vcd_vm_metadata_charge",
+      "columns": [
+        "cdl_charges_vcd_vm_id"
+      ],
+      "referencedTable": "cdl_charges_vcd_vm",
+      "referencedColumns": [
+        "id"
+      ],
+      "onDelete": "RESTRICT",
+      "onUpdate": "RESTRICT",
+      "matchType": "NONE"
+    }
+  ],
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": null,
+  "charset": "latin1"
+}

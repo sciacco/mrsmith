@@ -1,0 +1,73 @@
+{
+  "table": "td_kit_idvlanolo",
+  "columns": [
+    {
+      "name": "td_kit_tlc",
+      "position": 1,
+      "type": "varchar(20)",
+      "nullable": false,
+      "default": "''",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "tipologia",
+      "position": 2,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "idvlanolo",
+      "position": 3,
+      "type": "int(10)",
+      "nullable": false
+    },
+    {
+      "name": "occupato",
+      "position": 4,
+      "type": "tinyint(1)",
+      "nullable": false,
+      "default": "'0'"
+    },
+    {
+      "name": "macro_area",
+      "position": 5,
+      "type": "varchar(100)",
+      "nullable": true,
+      "default": "'0'",
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PRIMARY",
+      "type": "BTREE",
+      "expressions": [
+        "td_kit_tlc",
+        "tipologia",
+        "idvlanolo"
+      ],
+      "primary": true,
+      "unique": true,
+      "visible": true,
+      "keyLength": [
+        -1,
+        -1,
+        -1
+      ],
+      "descending": [
+        false,
+        false,
+        false
+      ]
+    }
+  ],
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 9559,
+  "charset": "latin1"
+}

@@ -1,0 +1,26 @@
+{
+  "table": "centrali",
+  "columns": [
+    {
+      "name": "clli",
+      "position": 1,
+      "type": "varchar(50)",
+      "nullable": false,
+      "characterSet": "latin1",
+      "collation": "latin1_swedish_ci"
+    },
+    {
+      "name": "data_cess_telecom",
+      "position": 2,
+      "type": "date",
+      "nullable": true,
+      "default": "NULL"
+    }
+  ],
+  "indexes": null,
+  "foreignKeys": null,
+  "engine": "InnoDB",
+  "collation": "latin1_swedish_ci",
+  "rowCount": 92,
+  "charset": "latin1"
+}
