@@ -26,7 +26,7 @@
 | **Root scripts** | Add `dev:listini` to root `package.json`. Update `scripts.dev` to include `mrsmith-listini-e-sconti`. | Existing: `dev:budget`, `dev:compliance`, `dev:kit-products` |
 | **Makefile** | Add `dev-listini` target + `.PHONY` entry | Existing: `dev-kit-products` pattern |
 | **CORS** | Add port 5177 to `config.go` default CORS origins | `config.go:43` — currently has 5173,5174,5175,5176 |
-| **Docker compose** | No `docker-compose.dev.yaml` exists. Skip for now. | Verified: file does not exist |
+| **Docker compose** | Add `listini-e-sconti` service to `docker-compose.dev.yaml` (port 5177, `VITE_DEV_BACKEND_URL=http://backend:8080`) + named volume | `docker-compose.dev.yaml` — follow kit-products service pattern |
 
 ### 3. Auth Fit
 
@@ -36,7 +36,7 @@
 | **Bearer auth** | All `/listini/v1/*` endpoints wrapped in `acl.RequireRole()` | Compliance/kit-products pattern: `protect` closure in `RegisterRoutes` |
 | **401/403** | Handled by existing `authMiddleware.Handler` on `/api/` mount | `main.go` middleware chain |
 | **Frontend auth** | Same pattern as budget: fetch `/config` → init AuthProvider → Bearer on all API calls | `apps/budget/src/main.tsx` |
-| **User identity** | `operated_by` field in credit transactions extracted from Keycloak JWT claims (`email` or `preferred_username`) | Spec requirement: replaces `appsmith.user.email` |
+| **User identity** | `operated_by` field in credit transactions extracted via `auth.GetClaims(ctx)`. Fallback order: `claims.Email` → `claims.Name` → `claims.Subject`. | `backend/internal/auth/middleware.go:104-106` — `GetClaims` returns `Claims{Subject, Email, Name, Roles}`. `Name` is mapped from `preferred_username` at line 95. |
 
 ### 4. Data-Contract Fit
 
@@ -281,7 +281,93 @@ func (s *CarboneService) GeneratePDF(ctx context.Context, data any) ([]byte, str
 
 ---
 
-### Finding 5 (Medium) — Dual-database handler injection
+### Finding 5 (High) — Frontend API client: local wrapper required
+
+The shared `@mrsmith/api-client` (`packages/api-client/src/client.ts`) exposes only `get`, `post`, `put`, `delete`, and `getBlob` (GET-only). It is missing:
+- **`patch`** — needed by 3 endpoints (group sync, batch credits, batch discounts)
+- **`postBlob`** — needed for authenticated PDF download (POST that returns binary)
+
+**Decision: scaffold a local `src/api/client.ts`** following the kit-products pattern (`apps/kit-products/src/api/client.ts`). This is a thin hook (`useApiClient`) that wraps `fetch` with Bearer auth from `useOptionalAuth()` and exposes the full method set.
+
+**Local API client:**
+
+```typescript
+// apps/listini-e-sconti/src/api/client.ts
+import { ApiError } from '@mrsmith/api-client';
+import { useMemo } from 'react';
+import { useOptionalAuth } from '../hooks/useOptionalAuth';
+
+interface ApiClient {
+  get: <T>(path: string) => Promise<T>;
+  post: <T>(path: string, body: unknown) => Promise<T>;
+  put: <T>(path: string, body: unknown) => Promise<T>;
+  patch: <T>(path: string, body: unknown) => Promise<T>;
+  delete: <T>(path: string) => Promise<T>;
+  postBlob: (path: string, body: unknown) => Promise<Blob>;
+}
+
+export function useApiClient(): ApiClient {
+  const { getAccessToken } = useOptionalAuth();
+
+  return useMemo(() => {
+    async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+      const token = await getAccessToken();
+      const res = await fetch(`/api${path}`, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      if (!res.ok) {
+        let payload: unknown;
+        try { payload = await res.json(); } catch { payload = undefined; }
+        throw new ApiError(res.status, res.statusText, path, payload);
+      }
+
+      if (res.status === 204) return undefined as T;
+      return res.json() as Promise<T>;
+    }
+
+    async function postBlob(path: string, body: unknown): Promise<Blob> {
+      const token = await getAccessToken();
+      const res = await fetch(`/api${path}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      if (!res.ok) {
+        let payload: unknown;
+        try { payload = await res.json(); } catch { payload = undefined; }
+        throw new ApiError(res.status, res.statusText, path, payload);
+      }
+
+      return res.blob();
+    }
+
+    return {
+      get: <T>(path: string) => request<T>('GET', path),
+      post: <T>(path: string, body: unknown) => request<T>('POST', path, body),
+      put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
+      patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
+      delete: <T>(path: string) => request<T>('DELETE', path),
+      postBlob,
+    };
+  }, [getAccessToken]);
+}
+```
+
+This provides `patch` for all batch endpoints and `postBlob` for authenticated PDF download. The shared `@mrsmith/api-client` is still imported for `ApiError` only.
+
+---
+
+### Finding 6 (Medium) — Dual-database handler injection
 
 The listini handler needs **both** Mistra (PG) and Grappa (MySQL), plus two optional services.
 
@@ -540,6 +626,25 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB *sql.DB, hubspot *Hub
 | `deploy/Dockerfile` | Add `COPY --from=frontend /app/apps/listini-e-sconti/dist /static/apps/listini-e-sconti` |
 | Root `package.json` | Update `scripts.dev` to include `mrsmith-listini-e-sconti`. Add `"dev:listini"`. |
 | `Makefile` | Add `dev-listini` target, update `.PHONY` |
+| `docker-compose.dev.yaml` | Add `listini-e-sconti` service (port 5177, `VITE_DEV_BACKEND_URL=http://backend:8080`) + `listini_node_modules` named volume |
+
+**`docker-compose.dev.yaml` addition:**
+```yaml
+  listini-e-sconti:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter mrsmith-listini-e-sconti dev --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - listini_node_modules:/app/node_modules
+    environment:
+      - VITE_DEV_BACKEND_URL=http://backend:8080
+    ports:
+      - "5177:5177"
+    depends_on:
+      - backend
+```
+Add `listini_node_modules:` to the `volumes:` section at the bottom.
 
 **Verification:**
 - `make dev` starts all apps including listini-e-sconti
@@ -690,14 +795,15 @@ func (h *Handler) handleGenerateKitPDF(w http.ResponseWriter, r *http.Request) {
 
 **Boolean display:** `variable_billing`, `h24_assurance` → render as `SI` (green) / `NO` (muted) with semantic color.
 
-**PDF download auth:** POST request via API client (Bearer auth included), then create blob URL for download:
+**PDF download auth:** POST via `postBlob` from the local API client (Bearer auth included), then create blob URL for download:
 ```typescript
-const res = await apiClient.post(`/listini/v1/kits/${kitId}/pdf`, {}, { responseType: 'blob' });
-const url = URL.createObjectURL(res);
+const blob = await apiClient.postBlob(`/listini/v1/kits/${kitId}/pdf`, {});
+const url = URL.createObjectURL(blob);
 const a = document.createElement('a');
 a.href = url;
 a.download = `kit-${kitId}.pdf`;
 a.click();
+URL.revokeObjectURL(url);
 ```
 
 **Verification:**
@@ -982,20 +1088,25 @@ AND r.stato = 'attivo'
 ORDER BY db.name, dc.name, r.name
 ```
 
-**Customer dropdown filter — only customers with active rack sockets:**
+**Rack customer dropdown** — dedicated endpoint `GET /listini/v1/grappa/rack-customers`:
+
+This is a separate endpoint (not a query-param variant of the generic customer list) because its join logic is materially different: it filters to customers who have racks joined to `rack_sockets`, matching the audited Appsmith query (`AUDIT.md:205`).
+
 ```sql
 SELECT DISTINCT cf.id, cf.intestazione
 FROM cli_fatturazione cf
 JOIN racks r ON r.id_anagrafica = cf.id
 JOIN rack_sockets rs ON rs.rack_id = r.id_rack
-WHERE cf.stato = 'attivo'
-  AND cf.codice_aggancio_gest > 0
-  AND r.stato = 'attivo'
-  AND rs.status = 'attivo'
+WHERE r.stato = 'attivo'
 ORDER BY cf.intestazione
 ```
 
-Note: This is a specialized customer list — only customers with active rack sockets appear. The `GET /listini/v1/grappa/customers` endpoint uses the `context=racks` query param to select this variant.
+> **Note:** The audited Appsmith query does NOT filter on `rack_sockets.status` or `cli_fatturazione.stato`. This plan preserves that exact behavior. If a tighter filter is needed, it must be verified against live data first and promoted to a spec change.
+
+Add this endpoint to the route registration in `handler.go`:
+```go
+handle("GET /listini/v1/grappa/rack-customers", h.handleListRackCustomers)
+```
 
 **SQL — Batch update rack discounts:**
 ```go
@@ -1073,7 +1184,7 @@ if err == nil {
 ```
 
 **Behavior:**
-- Page load → fetch customer list (context=racks). **No rack query until customer selected.**
+- Page load → fetch rack customer list (`GET /grappa/rack-customers`). **No rack query until customer selected.**
 - Customer select → `GET /grappa/customers/:id/racks` → populate table
 - Discount input: `input[type=number]` with `min=0` `max=20` `step=0.01`
 - Dirty-row tracking, batch save
@@ -1106,22 +1217,30 @@ SELECT id, name FROM customers.customer_group ORDER BY name
 ```sql
 SELECT ga.group_id
 FROM customers.group_association ga
-WHERE ga.customer_id = $1 AND ga.active = true
+WHERE ga.customer_id = $1
 ```
+
+> **Compatibility note — `group_association.active` column:**
+> The schema marks `active` as `DEPRECATED, DO NOT USE !!!!` (see `mistra_customers.json:901`).
+> However, Appsmith currently writes `active = true` on INSERT. During coexistence, reads
+> must NOT filter on `active` (to see all rows regardless of flag state), and writes must
+> still set `active = true` on INSERT to avoid breaking Appsmith's view of the data.
+> Once Appsmith is decommissioned, the `active` column and the `active = true` write can
+> be removed in a cleanup pass.
 
 **SQL — Sync customer groups (transactional diff):**
 ```go
 func (h *Handler) handleSyncCustomerGroups(w http.ResponseWriter, r *http.Request) {
     customerID := // parse from path
-    var req struct { GroupIDs []int `json:"group_ids"` }
+    var req struct { GroupIDs []int `json:"groupIds"` }
     // decode body
 
     tx, _ := h.mistraDB.BeginTx(ctx, nil)
     defer tx.Rollback()
 
-    // Get current associations
+    // Get current associations (do NOT filter on deprecated `active` column)
     rows, _ := tx.QueryContext(ctx,
-        `SELECT group_id FROM customers.group_association WHERE customer_id = $1 AND active = true`,
+        `SELECT group_id FROM customers.group_association WHERE customer_id = $1`,
         customerID)
     var current []int
     // scan rows
@@ -1130,14 +1249,14 @@ func (h *Handler) handleSyncCustomerGroups(w http.ResponseWriter, r *http.Reques
     toAdd := diff(req.GroupIDs, current)     // in desired but not current
     toRemove := diff(current, req.GroupIDs)   // in current but not desired
 
-    // Remove
+    // Remove (hard delete — matches spec's diff-based sync)
     for _, gid := range toRemove {
         tx.ExecContext(ctx,
             `DELETE FROM customers.group_association WHERE customer_id = $1 AND group_id = $2`,
             customerID, gid)
     }
 
-    // Add
+    // Add (set active = true for Appsmith coexistence — see compatibility note above)
     for _, gid := range toAdd {
         tx.ExecContext(ctx,
             `INSERT INTO customers.group_association (customer_id, group_id, active)
@@ -1200,13 +1319,19 @@ type TransactionRequest struct {
 // amount: 0 < amount <= 10000
 // operation_sign: must be "+" or "-"
 // description: required, max 255 chars
-// operated_by: extracted from JWT claims (email or preferred_username)
+// operated_by: extracted from JWT via auth.GetClaims (fallback: Email → Name → Subject)
 ```
 
 **User identity extraction:**
 ```go
-claims := acl.ClaimsFromContext(r.Context())
-operatedBy := claims.Email  // from Keycloak JWT
+claims, _ := auth.GetClaims(r.Context())
+operatedBy := claims.Email
+if operatedBy == "" {
+    operatedBy = claims.Name  // preferred_username mapped to Name by middleware
+}
+if operatedBy == "" {
+    operatedBy = claims.Subject
+}
 ```
 
 #### 5.3 Frontend: Gruppi di sconto x clienti page
@@ -1231,7 +1356,7 @@ operatedBy := claims.Email  // from Keycloak JWT
 **Modal — "Associa gruppi":**
 - Opens `MultiSelect` with all available groups
 - Pre-selected: customer's current groups
-- Save → `PATCH /customers/:id/groups` with `{group_ids: [...]}` → toast, refresh
+- Save → `PATCH /customers/:id/groups` with `{groupIds: [...]}` → toast, refresh
 
 **Kit discounts panel:**
 - Clicking a group in the middle column → `GET /customer-groups/:id/kit-discounts` → show right panel
@@ -1523,7 +1648,7 @@ apps/listini-e-sconti/
 │   ├── types/
 │   │   └── index.ts
 │   ├── api/
-│   │   └── client.ts              # API client wrapper with typed methods
+│   │   └── client.ts              # Local API client hook (useApiClient) with get/post/put/patch/delete/postBlob
 │   ├── pages/
 │   │   ├── KitPage.tsx
 │   │   ├── IaaSPrezziPage.tsx
@@ -1554,6 +1679,7 @@ apps/listini-e-sconti/
 │   │   └── shared/
 │   │       └── CustomerDropdown.tsx  # Reusable customer selector (3 variants)
 │   └── hooks/
+│       ├── useOptionalAuth.ts      # Auth hook wrapping @mrsmith/auth-client (kit-products pattern)
 │       └── useApi.ts               # TanStack Query hooks per entity
 
 packages/ui/src/components/TabNavGroup/
@@ -1562,7 +1688,7 @@ packages/ui/src/components/TabNavGroup/
 
 backend/internal/listini/
 ├── handler.go                      # Handler struct, RegisterRoutes, shared helpers
-├── handler_customer.go             # Customer list endpoints (Mistra + Grappa)
+├── handler_customer.go             # Customer list endpoints (Mistra + Grappa + rack-customers)
 ├── handler_kit.go                  # Kit list, products, help URL, PDF
 ├── handler_iaas_pricing.go         # IaaS pricing GET/UPSERT
 ├── handler_iaas_accounts.go        # IaaS accounts list, batch credit update
@@ -1593,6 +1719,7 @@ backend/internal/listini/
 | `deploy/Dockerfile` | Add COPY line for listini-e-sconti dist |
 | `deploy/k8s/deployment.yaml` | Add `GRAPPA_DSN`, `HUBSPOT_API_KEY`, `CARBONE_API_KEY` secret refs |
 | `.env.preprod.example` | Add `GRAPPA_DSN=`, `HUBSPOT_API_KEY=`, `CARBONE_API_KEY=` |
+| `docker-compose.dev.yaml` | Add `listini-e-sconti` service (port 5177) + `listini_node_modules` volume |
 
 ---
 
@@ -1606,5 +1733,6 @@ backend/internal/listini/
 | Bulk Kit PDF export | Single kit only. Tracked in `docs/TODO.md`. |
 | Kit price versioning | Not versioned. Tracked in `docs/TODO.md`. |
 | Discount approval workflow | No approval. Tracked in `docs/TODO.md`. |
-| `rack_sockets.status` values | Assumed `'attivo'` for active filter. Verify against live data during Phase 4 integration testing. |
+| Rack customer filter tightening | Current query matches audited Appsmith behavior (no `rack_sockets.status` or `cli_fatturazione.stato` filter). If tighter filtering is needed, verify against live data and update spec. |
 | `database.New` MySQL support | Verify the existing `database.New` helper accepts `"mysql"` driver string. If not, use `sql.Open("mysql", dsn)` directly in `main.go`. |
+| `group_association.active` cleanup | Column is deprecated. Currently preserved for Appsmith coexistence (writes `true`, reads ignore). Remove after Appsmith decommission. |
