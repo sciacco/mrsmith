@@ -6,7 +6,10 @@
       "mcp__plugin_playwright_playwright__browser_take_screenshot",
       "mcp__plugin_playwright_playwright__browser_resize",
       "WebFetch(domain:proxy.golang.org)",
-      "Bash(pnpm:*)"
+      "Bash(pnpm:*)",
+      "Bash(GONOSUMCHECK=github.com/go-sql-driver/mysql GOFLAGS=-insecure go get github.com/go-sql-driver/mysql)",
+      "Bash(GOINSECURE=github.com/go-sql-driver/mysql go get github.com/go-sql-driver/mysql)",
+      "Bash(GOINSECURE=github.com/go-sql-driver/mysql go mod:*)"
     ]
   }
 }

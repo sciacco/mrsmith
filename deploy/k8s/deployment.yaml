@@ -41,6 +41,24 @@ spec:
                   name: mrsmith-secrets
                   key: ALYANTE_DSN
                   optional: true
+            - name: GRAPPA_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: GRAPPA_DSN
+                  optional: false
+            - name: HUBSPOT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: HUBSPOT_API_KEY
+                  optional: true
+            - name: CARBONE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: CARBONE_API_KEY
+                  optional: true
           livenessProbe:
             httpGet:
               path: /healthz

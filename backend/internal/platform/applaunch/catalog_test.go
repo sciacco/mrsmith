@@ -24,7 +24,7 @@ func TestVisibleCategoriesFiltersByBudgetRole(t *testing.T) {
 
 func TestVisibleCategoriesDefaultRoleSeesAllPlaceholders(t *testing.T) {
 	catalog := Catalog(nil)
-	categories := VisibleCategories(catalog, []string{"default-roles-cdlan"})
+	categories := VisibleCategories(catalog, []string{"no-default-roles-cdlan"})
 
 	// Should see all 4 categories (acquisti placeholders, mkt-sales, smart-apps, provisioning)
 	if len(categories) != 4 {
@@ -36,21 +36,21 @@ func TestVisibleCategoriesDefaultRoleSeesAllPlaceholders(t *testing.T) {
 	for _, cat := range categories {
 		total += len(cat.Apps)
 	}
-	// All placeholder apps (excludes budget, compliance, and kit-products which require specific roles)
-	if total != 17 {
-		t.Fatalf("expected 17 placeholder apps, got %d", total)
+	// All placeholder apps (excludes budget, compliance, kit-products, and listini which require specific roles)
+	if total != 16 {
+		t.Fatalf("expected 16 placeholder apps, got %d", total)
 	}
 }
 
 func TestVisibleCategoriesBothRolesSeesEverything(t *testing.T) {
 	catalog := Catalog(nil)
-	categories := VisibleCategories(catalog, []string{"default-roles-cdlan", "app_budget_access", "app_compliance_access", "app_kitproducts_access"})
+	categories := VisibleCategories(catalog, []string{"no-default-roles-cdlan", "app_budget_access", "app_compliance_access", "app_kitproducts_access", "app_listini_access"})
 
 	total := 0
 	for _, cat := range categories {
 		total += len(cat.Apps)
 	}
-	// All 20 apps (17 placeholders + 1 budget + 1 compliance + 1 kit-products)
+	// All 20 apps (16 placeholders + 1 budget + 1 compliance + 1 kit-products + 1 listini)
 	if total != 20 {
 		t.Fatalf("expected 20 total apps, got %d", total)
 	}
@@ -112,6 +112,25 @@ func TestCatalogAppliesHrefOverrides(t *testing.T) {
 	}
 
 	t.Fatal("expected budget definition in catalog")
+}
+
+func TestVisibleCategoriesFiltersByListiniRole(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"app_listini_access"})
+	if len(categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(categories))
+	}
+	if categories[0].ID != "mkt-sales" {
+		t.Fatalf("expected mkt-sales category, got %q", categories[0].ID)
+	}
+	if len(categories[0].Apps) != 1 {
+		t.Fatalf("expected 1 app, got %d", len(categories[0].Apps))
+	}
+	if categories[0].Apps[0].ID != ListiniAppID {
+		t.Fatalf("expected listini app, got %q", categories[0].Apps[0].ID)
+	}
+	if categories[0].Apps[0].Href != ListiniAppHref {
+		t.Fatalf("expected listini href %q, got %q", ListiniAppHref, categories[0].Apps[0].Href)
+	}
 }
 
 func TestVisibleCategoriesFiltersByKitProductsRole(t *testing.T) {

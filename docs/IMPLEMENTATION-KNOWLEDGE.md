@@ -111,3 +111,12 @@ Alyante ERP ID
 - Evidence: verified Appsmith query `update MG87_ARTDESC set MG87_DESCART = {{this.params.descr}} where MG87_DITTA_CG18 = 1 and MG87_OPZIONE_MG5E = '                    ' and MG87_LINGUA_MG52 = {{this.params.lang}} AND MG87_CODART_MG66 = {{this.params.code}}`; backend adapter in `backend/internal/kitproducts/alyante.go`.
 - Used by: `apps/kit-products` product translation sync.
 - Open questions: none for this environment; if another Alyante tenant exposes different column names, verify its datasource query before generalizing.
+
+### Grappa MySQL Charset: latin1 (NOT utf8mb4)
+
+- Context: Go MySQL driver DSN configuration for the Grappa database.
+- Discovery: all Grappa tables used by `listini-e-sconti` (`cli_fatturazione`, `cdl_prezzo_risorse_iaas`, `cdl_accounts`, `cdl_services`, `racks`, `rack_sockets`, `datacenter`, `dc_build`) are `latin1` / `latin1_swedish_ci` at both table and column level.
+- Practical rule: the `GRAPPA_DSN` must use `charset=latin1` — **not** `charset=utf8mb4`. Using utf8mb4 forces an implicit charset conversion on every query, risking mojibake on accented characters (common in Italian client names) and truncation errors when writing multi-byte characters to single-byte latin1 columns.
+- Evidence: schema dumps in `docs/grappa/grappa_cli_fatturazione.json`, `grappa_cdl_accounts.json`, `grappa_racks.json`, etc. — all report `"charset": "latin1"`.
+- Used by: `apps/listini-e-sconti` (all Grappa-backed endpoints).
+- Open questions: if Grappa tables are ever migrated to utf8mb4, update the DSN accordingly.

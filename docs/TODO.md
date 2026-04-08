@@ -22,6 +22,11 @@ Kit product prices are currently not versioned — the catalog always shows curr
 ### Discount Approval Workflow
 Currently rack energy discounts (0–20%) are saved immediately without approval. A future enhancement should add an approval workflow for discounts above a configurable threshold (e.g. >15%), requiring a manager or reviewer to approve before the discount takes effect. This could integrate with the HubSpot task system already in place.
 
+## Panoramica Cliente App
+
+### Dashboard Page
+The Dashboard page (revenue charts per client: revenue by account, historical billing in K EUR, active services) is a work in progress in Appsmith and is not included in the initial migration scope. It should be migrated once the Appsmith version is stabilized and the remaining pages are live. The audit is captured in `apps/panoramica-cliente/PANORAMICA-AUDIT.md` (page 1).
+
 ## Cross-App Infrastructure
 
 ### Async HubSpot Request Queue

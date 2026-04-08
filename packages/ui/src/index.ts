@@ -2,6 +2,8 @@ export { AppShell } from './components/AppShell/AppShell';
 export { UserMenu } from './components/UserMenu/UserMenu';
 export { TabNav } from './components/TabNav/TabNav';
 export type { TabNavItem } from './components/TabNav/TabNav';
+export { TabNavGroup } from './components/TabNavGroup/TabNavGroup';
+export type { TabGroup } from './components/TabNavGroup/TabNavGroup';
 export { Modal } from './components/Modal/Modal';
 export { MultiSelect } from './components/MultiSelect/MultiSelect';
 export { SingleSelect } from './components/SingleSelect/SingleSelect';

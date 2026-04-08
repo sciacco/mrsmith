@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/microsoft/go-mssqldb"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/budget"
 	"github.com/sciacco/mrsmith/internal/compliance"
 	"github.com/sciacco/mrsmith/internal/kitproducts"
+	"github.com/sciacco/mrsmith/internal/listini"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/config"
@@ -113,6 +115,34 @@ func main() {
 		logger.Info("Alyante ERP adapter not configured", "component", "kitproducts")
 	}
 
+	// Grappa DB (listini module — MySQL)
+	var grappaDB *sql.DB
+	if cfg.GrappaDSN != "" {
+		var err error
+		grappaDB, err = database.New(database.Config{Driver: "mysql", DSN: cfg.GrappaDSN})
+		if err != nil {
+			logger.Error("failed to connect to grappa", "component", "listini", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("grappa database connected", "component", "listini")
+	}
+
+	// HubSpot service (optional — listini module)
+	var hubspotSvc *listini.HubSpotService
+	if cfg.HubSpotAPIKey != "" && grappaDB != nil && mistraDB != nil {
+		hubspotSvc = listini.NewHubSpotService(grappaDB, mistraDB, cfg.HubSpotAPIKey)
+		logger.Info("hubspot service configured", "component", "listini")
+	} else {
+		logger.Info("hubspot service not configured", "component", "listini")
+	}
+
+	// Carbone service (optional — listini module)
+	var carboneSvc *listini.CarboneService
+	if cfg.CarboneAPIKey != "" {
+		carboneSvc = listini.NewCarboneService(cfg.CarboneAPIKey, listini.DefaultKitTemplateID)
+		logger.Info("carbone service configured", "component", "listini")
+	}
+
 	// API routes (with auth)
 	api := http.NewServeMux()
 	hrefOverrides := map[string]string{}
@@ -132,11 +162,19 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.KitProductsAppID] = "http://localhost:5176"
 	}
+	if cfg.ListiniAppURL != "" {
+		hrefOverrides[applaunch.ListiniAppID] = cfg.ListiniAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.ListiniAppID] = "http://localhost:5177"
+	}
 	appCatalog := applaunch.Catalog(hrefOverrides)
-	if cfg.MistraDSN == "" {
+	{
 		filtered := make([]applaunch.Definition, 0, len(appCatalog))
 		for _, definition := range appCatalog {
-			if definition.ID == applaunch.KitProductsAppID {
+			if definition.ID == applaunch.KitProductsAppID && cfg.MistraDSN == "" {
+				continue
+			}
+			if definition.ID == applaunch.ListiniAppID && (cfg.MistraDSN == "" || cfg.GrappaDSN == "") {
 				continue
 			}
 			filtered = append(filtered, definition)
@@ -151,6 +189,7 @@ func main() {
 		alyanteAdapter = kitproducts.NewAlyanteAdapter(alyanteDB)
 	}
 	kitproducts.RegisterRoutes(api, mistraDB, alyanteAdapter, arakCli)
+	listini.RegisterRoutes(api, mistraDB, grappaDB, hubspotSvc, carboneSvc)
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),

@@ -14,12 +14,16 @@ const (
 
 	KitProductsAppID   = "kit-e-prodotti"
 	KitProductsAppHref = "/apps/kit-products/"
+
+	ListiniAppID   = "listini-e-sconti"
+	ListiniAppHref = "/apps/listini-e-sconti/"
 )
 
 var (
 	budgetAccessRoles      = []string{"app_budget_access"}
 	complianceAccessRoles  = []string{"app_compliance_access"}
 	kitProductsAccessRoles = []string{"app_kitproducts_access"}
+	listiniAccessRoles     = []string{"app_listini_access"}
 	defaultAccessRoles     = []string{"no-default-roles-cdlan"}
 )
 
@@ -124,13 +128,14 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			AccessRoles:   defaultRoles,
 		},
 		{
-			ID:            "listini-e-sconti",
+			ID:            ListiniAppID,
 			Name:          "Listini e Sconti",
 			Icon:          "tag",
-			Href:          "/apps/mkt-sales/listini-e-sconti",
+			Href:          ListiniAppHref,
+			Status:        "ready",
 			CategoryID:    "mkt-sales",
 			CategoryTitle: "MKT&Sales",
-			AccessRoles:   defaultRoles,
+			AccessRoles:   ListiniAccessRoles(),
 		},
 		{
 			ID:            "ordini",
@@ -304,6 +309,10 @@ func ComplianceAccessRoles() []string {
 
 func KitProductsAccessRoles() []string {
 	return slices.Clone(kitProductsAccessRoles)
+}
+
+func ListiniAccessRoles() []string {
+	return slices.Clone(listiniAccessRoles)
 }
 
 func DefaultAccessRoles() []string {
