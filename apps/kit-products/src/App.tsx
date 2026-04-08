@@ -3,18 +3,23 @@ import { AppShell, TabNav } from '@mrsmith/ui';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 import { SettingsMenu } from './components/SettingsMenu';
+import { getRuntimeConfig } from './runtimeConfig';
 import styles from './App.module.css';
-
-const navItems = [
-  { label: 'Kit', path: '/kit' },
-  { label: 'Prodotti', path: '/products' },
-  { label: 'Sconti Kit', path: '/discounts' },
-  { label: 'Simulatore', path: '/simulator' },
-];
 
 export function App() {
   const { user, loading, logout, status } = useOptionalAuth();
   const element = useRoutes(routes);
+  const { arakEnabled } = getRuntimeConfig();
+  const navItems = [
+    { label: 'Kit', path: '/kit' },
+    { label: 'Prodotti', path: '/products' },
+    ...(arakEnabled
+      ? [
+          { label: 'Sconti Kit', path: '/discounts' },
+          { label: 'Simulatore', path: '/simulator' },
+        ]
+      : []),
+  ];
 
   if (loading) return null;
 

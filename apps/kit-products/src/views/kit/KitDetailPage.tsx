@@ -160,6 +160,7 @@ export function KitDetailPage() {
     setCustomNewDraft(emptyCustomValueFormState());
     setProductModalOpen(false);
     setProductDeleteId(null);
+    setProductEditingId(null);
     setCustomDeleteId(null);
   }, [kit]);
 
@@ -191,7 +192,7 @@ export function KitDetailPage() {
           nrc: productDrafts[row.id]!.nrc,
           mrc: productDrafts[row.id]!.mrc,
           position: productDrafts[row.id]!.position,
-          notes: row.notes ?? null,
+          notes: productDrafts[row.id]!.notes ?? null,
         })),
     [productDrafts, productRows],
   );
@@ -361,6 +362,7 @@ export function KitDetailPage() {
     try {
       await deleteKitProduct.mutateAsync(productDeleteId);
       setProductDeleteId(null);
+      setProductEditingId((current) => (current === productDeleteId ? null : current));
       setProductDrafts((current) => {
         const next = { ...current };
         delete next[productDeleteId];
@@ -843,7 +845,7 @@ export function KitDetailPage() {
                     return;
                   }
                   setProductModalMode('edit');
-                  setProductModalDraft(toProductFormState(row));
+                  setProductModalDraft(toProductFormState(row, productDrafts[row.id]));
                   setProductModalOpen(true);
                 }}
               >
@@ -925,7 +927,7 @@ export function KitDetailPage() {
                           <select
                             value={draft.group_name ?? ''}
                             onChange={(event) =>
-                              updateProductDraft(row.id, setProductDrafts, {
+                              updateProductDraft(row, setProductDrafts, {
                                 group_name: event.target.value || null,
                               })
                             }
@@ -943,7 +945,7 @@ export function KitDetailPage() {
                             type="number"
                             value={draft.minimum}
                             onChange={(event) =>
-                              updateProductDraft(row.id, setProductDrafts, { minimum: Number(event.target.value) })
+                              updateProductDraft(row, setProductDrafts, { minimum: Number(event.target.value) })
                             }
                           />
                         </td>
@@ -952,7 +954,7 @@ export function KitDetailPage() {
                             type="number"
                             value={draft.maximum}
                             onChange={(event) =>
-                              updateProductDraft(row.id, setProductDrafts, { maximum: Number(event.target.value) })
+                              updateProductDraft(row, setProductDrafts, { maximum: Number(event.target.value) })
                             }
                           />
                         </td>
@@ -962,7 +964,7 @@ export function KitDetailPage() {
                               type="checkbox"
                               checked={draft.required}
                               onChange={(event) =>
-                                updateProductDraft(row.id, setProductDrafts, { required: event.target.checked })
+                                updateProductDraft(row, setProductDrafts, { required: event.target.checked })
                               }
                             />
                             <span>{draft.required ? 'Si' : 'No'}</span>
@@ -974,7 +976,7 @@ export function KitDetailPage() {
                             step="0.01"
                             value={draft.nrc}
                             onChange={(event) =>
-                              updateProductDraft(row.id, setProductDrafts, { nrc: Number(event.target.value) })
+                              updateProductDraft(row, setProductDrafts, { nrc: Number(event.target.value) })
                             }
                           />
                         </td>
@@ -984,7 +986,7 @@ export function KitDetailPage() {
                             step="0.01"
                             value={draft.mrc}
                             onChange={(event) =>
-                              updateProductDraft(row.id, setProductDrafts, { mrc: Number(event.target.value) })
+                              updateProductDraft(row, setProductDrafts, { mrc: Number(event.target.value) })
                             }
                           />
                         </td>
@@ -993,7 +995,7 @@ export function KitDetailPage() {
                             type="number"
                             value={draft.position}
                             onChange={(event) =>
-                              updateProductDraft(row.id, setProductDrafts, { position: Number(event.target.value) })
+                              updateProductDraft(row, setProductDrafts, { position: Number(event.target.value) })
                             }
                           />
                         </td>
@@ -1017,7 +1019,7 @@ export function KitDetailPage() {
                               event.stopPropagation();
                               setProductEditingId(row.id);
                               setProductModalMode('edit');
-                              setProductModalDraft(toProductFormState(row));
+                              setProductModalDraft(toProductFormState(row, productDrafts[row.id]));
                               setProductModalOpen(true);
                             }}
                           >
@@ -1131,7 +1133,7 @@ export function KitDetailPage() {
                           <select
                             value={draft.key_name}
                             onChange={(event) =>
-                              updateCustomValueDraft(row.id, setCustomValueDrafts, { key_name: event.target.value })
+                              updateCustomValueDraft(row, setCustomValueDrafts, { key_name: event.target.value })
                             }
                           >
                             <option value="">Seleziona</option>
@@ -1147,7 +1149,7 @@ export function KitDetailPage() {
                             rows={4}
                             value={draft.valueText}
                             onChange={(event) =>
-                              updateCustomValueDraft(row.id, setCustomValueDrafts, { valueText: event.target.value })
+                              updateCustomValueDraft(row, setCustomValueDrafts, { valueText: event.target.value })
                             }
                           />
                         </td>
@@ -1350,28 +1352,30 @@ export function KitDetailPage() {
 }
 
 function updateProductDraft(
-  id: number,
+  row: KitProductItem,
   setDrafts: Dispatch<SetStateAction<Record<number, KitProductInlineDraft>>>,
   patch: Partial<KitProductInlineDraft>,
 ) {
   setDrafts((current) => ({
     ...current,
-    [id]: {
-      ...toProductInlineDraftFromCurrent(current[id]),
+    [row.id]: {
+      ...toProductInlineDraft(row),
+      ...current[row.id],
       ...patch,
     },
   }));
 }
 
 function updateCustomValueDraft(
-  id: number,
+  row: KitCustomValueItem,
   setDrafts: Dispatch<SetStateAction<Record<number, KitCustomValueInlineDraft>>>,
   patch: Partial<KitCustomValueInlineDraft>,
 ) {
   setDrafts((current) => ({
     ...current,
-    [id]: {
-      ...toCustomValueInlineDraftFromCurrent(current[id]),
+    [row.id]: {
+      ...toCustomValueInlineDraft(row),
+      ...current[row.id],
       ...patch,
     },
   }));
@@ -1391,24 +1395,11 @@ function toProductInlineDraft(row: KitProductItem): KitProductInlineDraft {
   };
 }
 
-function toProductInlineDraftFromCurrent(current: KitProductInlineDraft | undefined): KitProductInlineDraft {
-  return current ?? {
-    product_code: '',
-    group_name: null,
-    minimum: 0,
-    maximum: -1,
-    required: false,
-    nrc: 0,
-    mrc: 0,
-    position: 0,
-    notes: null,
-  };
-}
-
-function toProductFormState(row: KitProductItem): KitProductFormState {
+function toProductFormState(row: KitProductItem, draft?: KitProductInlineDraft): KitProductFormState {
+  const source = draft ?? toProductInlineDraft(row);
   return {
-    ...toProductInlineDraft(row),
-    notes: row.notes ?? '',
+    ...source,
+    notes: source.notes ?? '',
   };
 }
 
@@ -1451,12 +1442,6 @@ function toCustomValueInlineDraft(row: KitCustomValueItem): KitCustomValueInline
     key_name: row.key_name,
     valueText: stringifyJsonValue(row.value),
   };
-}
-
-function toCustomValueInlineDraftFromCurrent(
-  current: KitCustomValueInlineDraft | undefined,
-): KitCustomValueInlineDraft {
-  return current ?? { key_name: '', valueText: '' };
 }
 
 function isCustomValueDirty(row: KitCustomValueItem, draft: KitCustomValueInlineDraft) {
@@ -1622,7 +1607,7 @@ function resolveProductLabel(
   row: KitProductItem,
 ) {
   const match = products?.find((product) => product.code === row.product_code);
-  return match ? match.internal_name : row.product_internal_name ?? row.product_name ?? 'n/d';
+  return match ? match.internal_name : row.product_internal_name ?? row.product_name ?? row.name ?? 'n/d';
 }
 
 function emptyToNull(value: string | null | undefined) {

@@ -153,8 +153,26 @@ func (h *Handler) handleCreateKit(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "main_product_code is required")
 		return
 	}
+	if req.CategoryID <= 0 {
+		httputil.Error(w, http.StatusBadRequest, "category_id is required")
+		return
+	}
 	if req.BundlePrefix == "" {
 		httputil.Error(w, http.StatusBadRequest, "bundle_prefix is required")
+		return
+	}
+	if ok, err := h.categoryExists(r, req.CategoryID); err != nil {
+		h.dbFailure(w, r, "create_kit_category_lookup", err, "category_id", req.CategoryID)
+		return
+	} else if !ok {
+		httputil.Error(w, http.StatusBadRequest, "invalid category_id")
+		return
+	}
+	if ok, err := h.productExists(r, req.MainProductCode); err != nil {
+		h.dbFailure(w, r, "create_kit_product_lookup", err, "main_product_code", req.MainProductCode)
+		return
+	} else if !ok {
+		httputil.Error(w, http.StatusBadRequest, "invalid main_product_code")
 		return
 	}
 
@@ -302,6 +320,24 @@ func (h *Handler) handleUpdateKit(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.MainProductCode == "" {
 		httputil.Error(w, http.StatusBadRequest, "main_product_code is required")
+		return
+	}
+	if req.CategoryID <= 0 {
+		httputil.Error(w, http.StatusBadRequest, "category_id is required")
+		return
+	}
+	if ok, err := h.categoryExists(r, req.CategoryID); err != nil {
+		h.dbFailure(w, r, "update_kit_category_lookup", err, "category_id", req.CategoryID)
+		return
+	} else if !ok {
+		httputil.Error(w, http.StatusBadRequest, "invalid category_id")
+		return
+	}
+	if ok, err := h.productExists(r, req.MainProductCode); err != nil {
+		h.dbFailure(w, r, "update_kit_product_lookup", err, "main_product_code", req.MainProductCode)
+		return
+	} else if !ok {
+		httputil.Error(w, http.StatusBadRequest, "invalid main_product_code")
 		return
 	}
 

@@ -3,6 +3,7 @@ package kitproducts
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -135,6 +136,13 @@ func (h *Handler) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "category_id is required")
 		return
 	}
+	if ok, err := h.categoryExists(r, req.CategoryID); err != nil {
+		h.dbFailure(w, r, "create_product_category_lookup", err, "category_id", req.CategoryID)
+		return
+	} else if !ok {
+		httputil.Error(w, http.StatusBadRequest, "invalid category_id")
+		return
+	}
 
 	tx, err := h.mistraDB.BeginTx(r.Context(), nil)
 	if err != nil {
@@ -221,6 +229,13 @@ func (h *Handler) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "category_id is required")
 		return
 	}
+	if ok, err := h.categoryExists(r, req.CategoryID); err != nil {
+		h.dbFailure(w, r, "update_product_category_lookup", err, "category_id", req.CategoryID)
+		return
+	} else if !ok {
+		httputil.Error(w, http.StatusBadRequest, "invalid category_id")
+		return
+	}
 
 	var erpSync bool
 	if req.ERPSync == nil {
@@ -278,7 +293,11 @@ func (h *Handler) handleUpdateProductTranslations(w http.ResponseWriter, r *http
 		return
 	}
 
-	translations := normalizeTranslations(req.Translations)
+	translations, err := normalizeTranslationUpdate(req.Translations)
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	tx, err := h.mistraDB.BeginTx(r.Context(), nil)
 	if err != nil {
 		h.dbFailure(w, r, "update_product_translations_begin", err, "code", code)
@@ -425,6 +444,16 @@ func normalizeTranslations(input []Translation) []Translation {
 		}
 	}
 	return []Translation{defaults["it"], defaults["en"]}
+}
+
+func normalizeTranslationUpdate(input []Translation) ([]Translation, error) {
+	translations := normalizeTranslations(input)
+	for _, translation := range translations {
+		if strings.TrimSpace(translation.Short) == "" {
+			return nil, errors.New("short translation is required for it and en")
+		}
+	}
+	return translations, nil
 }
 
 func trimOptionalString(value *string) *string {

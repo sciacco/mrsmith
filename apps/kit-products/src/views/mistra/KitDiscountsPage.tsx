@@ -100,7 +100,7 @@ export function KitDiscountsPage() {
   function handleGroupSelect(groupId: number) {
     const group = customerGroups?.find((item) => item.id === groupId);
     const defaultPercentage =
-      group?.base_discount == null ? '0' : formatPercentage(group.base_discount);
+      group?.base_discount == null ? '0' : formatPercentage(group.base_discount * 100);
     setModalState((current) => ({
       ...current,
       customer_group_id: groupId,

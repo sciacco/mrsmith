@@ -6,6 +6,7 @@ import { ApiError } from '@mrsmith/api-client';
 import { BrowserRouter } from 'react-router-dom';
 import { ToastProvider } from '@mrsmith/ui';
 import { App } from './App';
+import { setRuntimeConfig, type RuntimeConfig } from './runtimeConfig';
 import './styles/global.css';
 
 const routerBasename =
@@ -34,10 +35,11 @@ async function bootstrap() {
     throw new Error(`Kit Products auth bootstrap failed with status ${res.status}.`);
   }
 
-  const config: { keycloakUrl: string; realm: string; clientId: string } = await res.json();
+  const config: RuntimeConfig = await res.json();
   if (!config.keycloakUrl || !config.realm || !config.clientId) {
     throw new Error('Kit Products auth bootstrap is missing Keycloak frontend configuration.');
   }
+  setRuntimeConfig(config);
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>

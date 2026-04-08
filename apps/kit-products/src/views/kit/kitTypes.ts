@@ -83,6 +83,7 @@ export interface KitProductItem {
   id: number;
   kit_id: number;
   product_code: string;
+  name?: string | null;
   product_internal_name?: string | null;
   product_name?: string | null;
   group_name: string | null;

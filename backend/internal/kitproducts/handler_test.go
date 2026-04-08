@@ -176,6 +176,22 @@ func TestHandleCreateProductRejectsInvalidCategoryID(t *testing.T) {
 	}
 }
 
+func TestHandleCreateProductRejectsUnknownCategoryID(t *testing.T) {
+	h := &Handler{mistraDB: openKitProductsTestDB(t, "invalid-category", nil)}
+
+	req := httptest.NewRequest(http.MethodPost, "/kit-products/v1/product", strings.NewReader(`{"code":"PRD001","internal_name":"Router","category_id":999,"nrc":10,"mrc":5}`))
+	rec := httptest.NewRecorder()
+
+	h.handleCreateProduct(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+	if strings.TrimSpace(rec.Body.String()) != `{"error":"invalid category_id"}` {
+		t.Fatalf("unexpected response body: %q", rec.Body.String())
+	}
+}
+
 func TestHandleUpdateProductReturnsNotFoundWhenMissing(t *testing.T) {
 	h := &Handler{mistraDB: openKitProductsTestDB(t, "update-missing", nil)}
 
@@ -190,6 +206,41 @@ func TestHandleUpdateProductReturnsNotFoundWhenMissing(t *testing.T) {
 	}
 	if strings.TrimSpace(rec.Body.String()) != `{"error":"not_found"}` {
 		t.Fatalf("unexpected response body: %q", rec.Body.String())
+	}
+}
+
+func TestHandleUpdateProductTranslationsRejectsMissingRequiredShortDescriptions(t *testing.T) {
+	h := &Handler{mistraDB: openKitProductsTestDB(t, "product-success", nil)}
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "empty array",
+			body: `{"translations":[]}`,
+		},
+		{
+			name: "unsupported language only",
+			body: `{"translations":[{"language":"fr","short":"Routeur","long":"Routeur FR"}]}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPut, "/kit-products/v1/product/PRD001/translations", strings.NewReader(tc.body))
+			req.SetPathValue("code", "PRD001")
+			rec := httptest.NewRecorder()
+
+			h.handleUpdateProductTranslations(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d", rec.Code)
+			}
+			if strings.TrimSpace(rec.Body.String()) != `{"error":"short translation is required for it and en"}` {
+				t.Fatalf("unexpected response body: %q", rec.Body.String())
+			}
+		})
 	}
 }
 
@@ -376,6 +427,26 @@ func (c *kitProductsTestConn) QueryContext(_ context.Context, query string, args
 			return &kitProductsTestRows{columns: []string{"exists"}, values: [][]driver.Value{{true}}}, nil
 		}
 	}
+	if strings.Contains(query, "SELECT EXISTS") && strings.Contains(query, "FROM products.product_category") {
+		switch c.mode {
+		case "invalid-category":
+			return &kitProductsTestRows{columns: []string{"exists"}, values: [][]driver.Value{{false}}}, nil
+		default:
+			return &kitProductsTestRows{columns: []string{"exists"}, values: [][]driver.Value{{true}}}, nil
+		}
+	}
+	if strings.Contains(query, "SELECT EXISTS") && strings.Contains(query, "FROM products.product") {
+		switch c.mode {
+		case "invalid-main-product":
+			return &kitProductsTestRows{columns: []string{"exists"}, values: [][]driver.Value{{false}}}, nil
+		default:
+			code := namedString(args[0])
+			if code == "" {
+				return &kitProductsTestRows{columns: []string{"exists"}, values: [][]driver.Value{{false}}}, nil
+			}
+			return &kitProductsTestRows{columns: []string{"exists"}, values: [][]driver.Value{{true}}}, nil
+		}
+	}
 	if strings.Contains(query, "SELECT bundle_prefix") && strings.Contains(query, "FROM products.kit") {
 		switch c.mode {
 		case "kit-update-empty-prefix":
@@ -484,11 +555,12 @@ func (c *kitProductsTestConn) QueryContext(_ context.Context, query string, args
 		productID := namedInt(args[0])
 		kitID := namedInt(args[1])
 		return &kitProductsTestRows{
-			columns: []string{"id", "kit_id", "product_code", "internal_name", "minimum", "maximum", "required", "nrc", "mrc", "position", "group_name", "notes", "img_url"},
+			columns: []string{"id", "kit_id", "product_code", "name", "product_internal_name", "minimum", "maximum", "required", "nrc", "mrc", "position", "group_name", "notes", "img_url"},
 			values: [][]driver.Value{{
 				productID,
 				kitID,
 				"PRD001",
+				"Router",
 				"Router",
 				int64(1),
 				int64(3),
@@ -503,15 +575,23 @@ func (c *kitProductsTestConn) QueryContext(_ context.Context, query string, args
 		}, nil
 	}
 	if strings.Contains(query, "SELECT kit_id") && strings.Contains(query, "FROM products.kit_product") && strings.Contains(query, "WHERE id = $1") {
-		return &kitProductsTestRows{columns: []string{"kit_id"}, values: [][]driver.Value{{int64(7)}}}, nil
+		switch c.mode {
+		case "kit-product-wrong-owner":
+			return &kitProductsTestRows{columns: []string{"kit_id"}, values: [][]driver.Value{{int64(8)}}}, nil
+		case "kit-product-missing-owner":
+			return &kitProductsTestRows{columns: []string{"kit_id"}}, nil
+		default:
+			return &kitProductsTestRows{columns: []string{"kit_id"}, values: [][]driver.Value{{int64(7)}}}, nil
+		}
 	}
 	if strings.Contains(query, "FROM products.kit_product kp") && strings.Contains(query, "WHERE kp.kit_id = $1") {
 		return &kitProductsTestRows{
-			columns: []string{"id", "kit_id", "product_code", "internal_name", "minimum", "maximum", "required", "nrc", "mrc", "position", "group_name", "notes", "img_url"},
+			columns: []string{"id", "kit_id", "product_code", "name", "product_internal_name", "minimum", "maximum", "required", "nrc", "mrc", "position", "group_name", "notes", "img_url"},
 			values: [][]driver.Value{{
 				int64(21),
 				int64(7),
 				"PRD001",
+				"Router",
 				"Router",
 				int64(1),
 				int64(3),
@@ -527,13 +607,14 @@ func (c *kitProductsTestConn) QueryContext(_ context.Context, query string, args
 				int64(7),
 				"PRD002",
 				"Switch",
+				"Switch",
 				int64(1),
 				int64(2),
 				false,
 				float64(20),
 				float64(7),
 				int64(2),
-				"",
+				nil,
 				"",
 				"",
 			}},
@@ -669,6 +750,13 @@ func namedInt(value driver.NamedValue) int64 {
 	default:
 		return 0
 	}
+}
+
+func namedString(value driver.NamedValue) string {
+	if v, ok := value.Value.(string); ok {
+		return v
+	}
+	return ""
 }
 
 var _ driver.QueryerContext = (*kitProductsTestConn)(nil)

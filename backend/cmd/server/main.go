@@ -49,21 +49,22 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	var arakCli *arak.Client
 
 	// Health probes (no auth)
 	health.Register(mux)
 
 	// Frontend config (no auth — needed before auth initializes)
 	mux.HandleFunc("GET /config", func(w http.ResponseWriter, _ *http.Request) {
-		httputil.JSON(w, http.StatusOK, map[string]string{
+		httputil.JSON(w, http.StatusOK, map[string]any{
 			"keycloakUrl": cfg.KeycloakFrontendURL,
 			"realm":       cfg.KeycloakFrontendRealm,
 			"clientId":    cfg.KeycloakFrontendClientId,
+			"arakEnabled": arakCli != nil,
 		})
 	})
 
 	// Arak API client (optional — when configured, report handlers proxy to real API)
-	var arakCli *arak.Client
 	if cfg.ArakBaseURL != "" && cfg.ArakServiceTokenURL != "" {
 		arakCli = arak.New(arak.Config{
 			BaseURL:      cfg.ArakBaseURL,

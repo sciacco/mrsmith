@@ -1,6 +1,8 @@
 package kitproducts
 
 import (
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -68,5 +70,62 @@ func TestHandleProxyMistraKitDiscountPassesThrough(t *testing.T) {
 	}
 	if strings.TrimSpace(rec.Body.String()) != `{"message":"ok"}` {
 		t.Fatalf("unexpected body: %s", rec.Body.String())
+	}
+}
+
+func TestHandleProxyMistraKitReturnsBadGatewayOnTransportFailure(t *testing.T) {
+	h := &Handler{
+		arak: &stubArakClient{
+			err: errors.New("dial tcp timeout"),
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/kit-products/v1/mistra/kit?page_number=1", nil)
+	rec := httptest.NewRecorder()
+
+	h.handleProxyMistraKit(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d", rec.Code)
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if body["code"] != upstreamUnavailableCode {
+		t.Fatalf("unexpected response body: %#v", body)
+	}
+}
+
+func TestHandleProxyMistraKitReturnsBadGatewayOnUpstreamAuthFailure(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			upstream := httptest.NewRecorder()
+			upstream.Header().Set("Content-Type", "application/json")
+			upstream.WriteHeader(status)
+			upstream.WriteString(`{"error":"auth failed"}`)
+
+			h := &Handler{
+				arak: &stubArakClient{
+					resp: upstream.Result(),
+				},
+			}
+			req := httptest.NewRequest(http.MethodGet, "/kit-products/v1/mistra/kit", nil)
+			rec := httptest.NewRecorder()
+
+			h.handleProxyMistraKit(rec, req)
+
+			if rec.Code != http.StatusBadGateway {
+				t.Fatalf("expected 502, got %d", rec.Code)
+			}
+
+			var body map[string]string
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+			if body["code"] != upstreamAuthFailedCode {
+				t.Fatalf("unexpected response body: %#v", body)
+			}
+		})
 	}
 }

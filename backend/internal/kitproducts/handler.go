@@ -131,3 +131,27 @@ func (h *Handler) rollbackTx(r *http.Request, tx *sql.Tx, operation string, attr
 		logging.FromContext(r.Context()).Warn("transaction rollback failed", args...)
 	}
 }
+
+func (h *Handler) categoryExists(r *http.Request, categoryID int) (bool, error) {
+	var exists bool
+	err := h.mistraDB.QueryRowContext(r.Context(), `
+SELECT EXISTS (
+  SELECT 1
+  FROM products.product_category
+  WHERE id = $1
+)
+`, categoryID).Scan(&exists)
+	return exists, err
+}
+
+func (h *Handler) productExists(r *http.Request, code string) (bool, error) {
+	var exists bool
+	err := h.mistraDB.QueryRowContext(r.Context(), `
+SELECT EXISTS (
+  SELECT 1
+  FROM products.product
+  WHERE code = $1
+)
+`, code).Scan(&exists)
+	return exists, err
+}

@@ -11,19 +11,20 @@ import (
 )
 
 type KitProduct struct {
-	ID          int64   `json:"id"`
-	KitID       int64   `json:"kit_id"`
-	ProductCode string  `json:"product_code"`
-	Name        string  `json:"name"`
-	Minimum     int     `json:"minimum"`
-	Maximum     int     `json:"maximum"`
-	Required    bool    `json:"required"`
-	NRC         float64 `json:"nrc"`
-	MRC         float64 `json:"mrc"`
-	Position    int     `json:"position"`
-	GroupName   string  `json:"group_name"`
-	Notes       string  `json:"notes"`
-	ImageURL    string  `json:"image_url,omitempty"`
+	ID                  int64   `json:"id"`
+	KitID               int64   `json:"kit_id"`
+	ProductCode         string  `json:"product_code"`
+	Name                string  `json:"name"`
+	ProductInternalName string  `json:"product_internal_name"`
+	Minimum             int     `json:"minimum"`
+	Maximum             int     `json:"maximum"`
+	Required            bool    `json:"required"`
+	NRC                 float64 `json:"nrc"`
+	MRC                 float64 `json:"mrc"`
+	Position            int     `json:"position"`
+	GroupName           *string `json:"group_name"`
+	Notes               string  `json:"notes"`
+	ImageURL            string  `json:"image_url,omitempty"`
 }
 
 type KitProductRequest struct {
@@ -71,13 +72,14 @@ SELECT
   kp.kit_id,
   kp.product_code,
   p.internal_name,
+  p.internal_name,
   kp.minimum,
   kp.maximum,
   kp.required,
   kp.nrc,
   kp.mrc,
   kp.position,
-  COALESCE(NULLIF(kp.group_name, ''), p.internal_name),
+  NULLIF(kp.group_name, ''),
   COALESCE(kp.notes, ''),
   COALESCE(p.img_url, '')
 FROM products.kit_product kp
@@ -397,13 +399,14 @@ SELECT
   kp.kit_id,
   kp.product_code,
   p.internal_name,
+  p.internal_name,
   kp.minimum,
   kp.maximum,
   kp.required,
   kp.nrc,
   kp.mrc,
   kp.position,
-  COALESCE(NULLIF(kp.group_name, ''), p.internal_name),
+  NULLIF(kp.group_name, ''),
   COALESCE(kp.notes, ''),
   COALESCE(p.img_url, '')
 FROM products.kit_product kp
@@ -414,23 +417,30 @@ WHERE kp.id = $1 AND kp.kit_id = $2
 }
 
 func scanKitProduct(scanner interface{ Scan(dest ...any) error }) (KitProduct, error) {
-	var product KitProduct
+	var (
+		product   KitProduct
+		groupName sql.NullString
+	)
 	if err := scanner.Scan(
 		&product.ID,
 		&product.KitID,
 		&product.ProductCode,
 		&product.Name,
+		&product.ProductInternalName,
 		&product.Minimum,
 		&product.Maximum,
 		&product.Required,
 		&product.NRC,
 		&product.MRC,
 		&product.Position,
-		&product.GroupName,
+		&groupName,
 		&product.Notes,
 		&product.ImageURL,
 	); err != nil {
 		return KitProduct{}, err
+	}
+	if groupName.Valid {
+		product.GroupName = &groupName.String
 	}
 	return product, nil
 }

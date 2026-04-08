@@ -58,6 +58,58 @@ func TestHandleKitLifecycle(t *testing.T) {
 		}
 	})
 
+	t.Run("create invalid category", func(t *testing.T) {
+		h := &Handler{mistraDB: openKitProductsTestDB(t, "invalid-category", nil)}
+		req := httptest.NewRequest(http.MethodPost, "/kit-products/v1/kit", strings.NewReader(`{
+			"internal_name":"Kit One",
+			"main_product_code":"MAIN001",
+			"initial_subscription_months":12,
+			"next_subscription_months":12,
+			"activation_time_days":30,
+			"nrc":99.5,
+			"mrc":19.5,
+			"bundle_prefix":"KIT",
+			"ecommerce":true,
+			"category_id":999
+		}`))
+		rec := httptest.NewRecorder()
+
+		h.handleCreateKit(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+		if strings.TrimSpace(rec.Body.String()) != `{"error":"invalid category_id"}` {
+			t.Fatalf("unexpected response body: %q", rec.Body.String())
+		}
+	})
+
+	t.Run("create invalid main product", func(t *testing.T) {
+		h := &Handler{mistraDB: openKitProductsTestDB(t, "invalid-main-product", nil)}
+		req := httptest.NewRequest(http.MethodPost, "/kit-products/v1/kit", strings.NewReader(`{
+			"internal_name":"Kit One",
+			"main_product_code":"MISSING001",
+			"initial_subscription_months":12,
+			"next_subscription_months":12,
+			"activation_time_days":30,
+			"nrc":99.5,
+			"mrc":19.5,
+			"bundle_prefix":"KIT",
+			"ecommerce":true,
+			"category_id":1
+		}`))
+		rec := httptest.NewRecorder()
+
+		h.handleCreateKit(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+		if strings.TrimSpace(rec.Body.String()) != `{"error":"invalid main_product_code"}` {
+			t.Fatalf("unexpected response body: %q", rec.Body.String())
+		}
+	})
+
 	t.Run("clone", func(t *testing.T) {
 		h := &Handler{mistraDB: openKitProductsTestDB(t, "kit-clone", nil)}
 		req := httptest.NewRequest(http.MethodPost, "/kit-products/v1/kit/7/clone", strings.NewReader(`{"name":"Kit Copy"}`))
@@ -166,6 +218,33 @@ func TestHandleKitDetailAndMetadataUpdates(t *testing.T) {
 		}
 	})
 
+	t.Run("update invalid main product", func(t *testing.T) {
+		h := &Handler{mistraDB: openKitProductsTestDB(t, "invalid-main-product", nil)}
+		req := httptest.NewRequest(http.MethodPut, "/kit-products/v1/kit/7", strings.NewReader(`{
+			"internal_name":"Kit Updated",
+			"main_product_code":"MISSING001",
+			"initial_subscription_months":6,
+			"next_subscription_months":12,
+			"activation_time_days":15,
+			"nrc":55.5,
+			"mrc":11.25,
+			"bundle_prefix":"KIT",
+			"ecommerce":false,
+			"category_id":1
+		}`))
+		req.SetPathValue("id", "7")
+		rec := httptest.NewRecorder()
+
+		h.handleUpdateKit(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+		if strings.TrimSpace(rec.Body.String()) != `{"error":"invalid main_product_code"}` {
+			t.Fatalf("unexpected response body: %q", rec.Body.String())
+		}
+	})
+
 	t.Run("help", func(t *testing.T) {
 		h := &Handler{mistraDB: openKitProductsTestDB(t, "kit-help", nil)}
 		req := httptest.NewRequest(http.MethodPut, "/kit-products/v1/kit/7/help", strings.NewReader(`{"help_url":"https://example.test/help"}`))
@@ -232,8 +311,11 @@ func TestHandleKitNestedResources(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &items); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if len(items) != 2 || items[0].Name != "Router" {
+		if len(items) != 2 || items[0].Name != "Router" || items[1].ProductInternalName != "Switch" {
 			t.Fatalf("unexpected kit products payload: %#v", items)
+		}
+		if items[1].GroupName != nil {
+			t.Fatalf("expected second row group_name to stay nil, got %#v", items[1].GroupName)
 		}
 	})
 
@@ -269,6 +351,20 @@ func TestHandleKitNestedResources(t *testing.T) {
 
 		if deleteRec.Code != http.StatusNoContent {
 			t.Fatalf("expected 204, got %d", deleteRec.Code)
+		}
+	})
+
+	t.Run("product update wrong owner", func(t *testing.T) {
+		h := &Handler{mistraDB: openKitProductsTestDB(t, "kit-product-wrong-owner", nil)}
+		req := httptest.NewRequest(http.MethodPut, "/kit-products/v1/kit/7/products/88", strings.NewReader(`{"product_code":"PRD001","minimum":2,"maximum":4,"required":false,"nrc":12,"mrc":6,"position":2,"group_name":"Access","notes":"updated"}`))
+		req.SetPathValue("id", "7")
+		req.SetPathValue("pid", "88")
+		rec := httptest.NewRecorder()
+
+		h.handleUpdateKitProduct(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", rec.Code)
 		}
 	})
 
@@ -314,6 +410,20 @@ func TestHandleKitNestedResources(t *testing.T) {
 
 		if deleteRec.Code != http.StatusNoContent {
 			t.Fatalf("expected 204, got %d", deleteRec.Code)
+		}
+	})
+
+	t.Run("custom value delete missing", func(t *testing.T) {
+		h := &Handler{mistraDB: openKitProductsTestDB(t, "kit-custom-delete-missing", nil)}
+		req := httptest.NewRequest(http.MethodDelete, "/kit-products/v1/kit/7/custom-values/31", nil)
+		req.SetPathValue("id", "7")
+		req.SetPathValue("cvid", "31")
+		rec := httptest.NewRecorder()
+
+		h.handleDeleteKitCustomValue(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", rec.Code)
 		}
 	})
 }

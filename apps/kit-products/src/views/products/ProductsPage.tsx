@@ -120,10 +120,15 @@ export function ProductsPage() {
     }
 
     const translations = translationDrafts[selectedProduct.code] ?? selectedProduct.translations;
+    const required = ensureRequiredTranslations(translations);
+    if (required.some((translation) => !translation.short.trim())) {
+      toast('Le short description IT ed EN sono obbligatorie', 'error');
+      return;
+    }
     try {
       const result = await updateTranslations.mutateAsync({
         code: selectedProduct.code,
-        translations,
+        translations: required,
       });
       setDescriptionOpen(false);
       if (result.warning) {
@@ -173,8 +178,8 @@ export function ProductsPage() {
               setTranslationDrafts((current) => ({
                 ...current,
                 [selectedProduct.code]: selectedProduct.translations.length > 0
-                  ? selectedProduct.translations
-                  : emptyTranslations,
+                  ? ensureRequiredTranslations(selectedProduct.translations)
+                  : ensureRequiredTranslations([]),
               }));
               setDescriptionOpen(true);
             }}
@@ -507,6 +512,16 @@ function TranslationFields({
 function updateTranslationsArray(translations: Translation[], language: 'it' | 'en', next: Translation) {
   const map = new Map(translations.map((translation) => [translation.language, translation]));
   map.set(language, next);
+  return ensureRequiredTranslations(Array.from(map.values()));
+}
+
+function ensureRequiredTranslations(translations: Translation[]) {
+  const map = new Map(
+    translations.map((translation) => [
+      translation.language,
+      { ...translation },
+    ]),
+  );
   return [
     map.get('it') ?? { language: 'it', short: '', long: '' },
     map.get('en') ?? { language: 'en', short: '', long: '' },

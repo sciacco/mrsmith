@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Navigate, type RouteObject } from 'react-router-dom';
 import { ProductsPage } from './views/products/ProductsPage';
 import { CategoriesPage } from './views/settings/CategoriesPage';
@@ -6,6 +7,24 @@ import { KitDetailPage } from './views/kit/KitDetailPage';
 import { KitListPage } from './views/kit/KitListPage';
 import { KitDiscountsPage } from './views/mistra/KitDiscountsPage';
 import { PriceSimulatorPage } from './views/mistra/PriceSimulatorPage';
+import { getRuntimeConfig } from './runtimeConfig';
+import { WorkspacePlaceholder } from './views/WorkspacePlaceholder';
+
+function ArakFeature({
+  children,
+  title,
+  description,
+}: {
+  children: ReactNode;
+  title: string;
+  description: string;
+}) {
+  return getRuntimeConfig().arakEnabled ? (
+    <>{children}</>
+  ) : (
+    <WorkspacePlaceholder eyebrow="Config" title={title} description={description} />
+  );
+}
 
 export const routes: RouteObject[] = [
   { index: true, element: <Navigate to="/kit" replace /> },
@@ -23,11 +42,25 @@ export const routes: RouteObject[] = [
   },
   {
     path: 'discounts',
-    element: <KitDiscountsPage />,
+    element: (
+      <ArakFeature
+        title="Sconti kit non disponibili"
+        description="La configurazione Arak non e presente in questo ambiente. Le viste proxy Mistra restano disabilitate."
+      >
+        <KitDiscountsPage />
+      </ArakFeature>
+    ),
   },
   {
     path: 'simulator',
-    element: <PriceSimulatorPage />,
+    element: (
+      <ArakFeature
+        title="Simulatore non disponibile"
+        description="La configurazione Arak non e presente in questo ambiente. Le viste proxy Mistra restano disabilitate."
+      >
+        <PriceSimulatorPage />
+      </ArakFeature>
+    ),
   },
   { path: 'settings', element: <Navigate to="/settings/categories" replace /> },
   {
@@ -38,4 +71,5 @@ export const routes: RouteObject[] = [
     path: 'settings/customer-groups',
     element: <CustomerGroupsPage />,
   },
+  { path: '*', element: <Navigate to="/kit" replace /> },
 ];
