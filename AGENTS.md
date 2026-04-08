@@ -11,6 +11,7 @@
 ## Important Reference
 - `docs/mistra-dist.yaml` — authoritative Mistra NG Internal API spec; most mini-apps will integrate with these APIs, so use this file as the primary reference for backend contracts, client generation, and shared types.
 - [`docs/IMPLEMENTATION-PLANNING.md`](docs/IMPLEMENTATION-PLANNING.md) — before approving an implementation plan, run the repo-fit checklist so hosting, auth, dev wiring, data contracts, and verification strategy are validated against the actual codebase.
+- [`docs/IMPLEMENTATION-KNOWLEDGE.md`](docs/IMPLEMENTATION-KNOWLEDGE.md) — canonical handbook for reusable implementation discoveries (cross-system mappings, hidden rules, exclusions, quirks). Read it during planning and update it when new reusable knowledge emerges.
 
 ## Databases
 - `docs/grappa/GRAPPA.md` — index for the Grappa MySQL schema dumps in `docs/grappa/`

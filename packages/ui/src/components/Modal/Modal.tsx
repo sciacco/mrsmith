@@ -6,9 +6,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  wide?: boolean;
 }
 
-export function Modal({ open, onClose, title, children }: ModalProps) {
+export function Modal({ open, onClose, title, children, wide }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
   return (
     <dialog
       ref={dialogRef}
-      className={styles.dialog}
+      className={`${styles.dialog} ${wide ? styles.wide : ''}`}
       onClose={onClose}
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();

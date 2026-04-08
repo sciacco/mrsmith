@@ -64,6 +64,10 @@
   transform: rotate(90deg);
 }
 
+.wide {
+  max-width: 860px;
+}
+
 @keyframes backdropIn {
   from { opacity: 0; }
   to { opacity: 1; }

@@ -168,9 +168,10 @@ All components in `packages/ui/` consume theme variables, making them theme-agno
 | `--radius-md` | `10px` | `6px` |
 | `--radius-lg` | `14px` | — |
 | `--radius-xl` | `20px` | — |
-| `--radius-full` | — | `50%` |
+| `--radius-2xl` | `24px` | — |
+| `--radius-full` | `999px` | `50%` |
 
-Design intent: clean theme uses generous rounding for a soft, modern feel. Matrix theme uses tighter corners for a technical, terminal look.
+Design intent: clean theme uses generous rounding for a soft, modern feel. Matrix theme uses tighter corners for a technical, terminal look. Use `--radius-2xl` for hero banners, large cards, and content panels. Use `--radius-full` (999px) for pill-shaped buttons and badges.
 
 ---
 
@@ -210,12 +211,37 @@ Matrix theme uses `box-shadow` glow effects with green tints instead of traditio
 | Dropdown open | 0.25s | ease-spring | scale(0.98→1), translateY(-6px→0) |
 | Toast | 0.5s | ease-spring | slide-in from right + scale |
 | Button hover | — | — | shadow increase, translateY(-1px) |
-| Button active | — | — | scale(0.98) |
+| Button active | — | — | scale(0.98), translateY(0) |
+| Table row click | — | — | scale(0.995) micro-feedback |
 | Detail panel | 0.4s | ease-out | opacity + translateX |
+| Section enter | 0.5s | ease-out | opacity 0→1, translateY(12px→0), staggered 0.1s |
 | Staggered children | +0.1s each | — | Sequential reveal |
 
+### Standard Keyframes (defined in each app's `global.css`)
+
+```css
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes rowEnter {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes sectionEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+```
+
+- **pageEnter:** Apply to `.page` wrapper: `animation: pageEnter 0.5s var(--ease-out) both`
+- **rowEnter:** Apply to table `<tr>` elements: `animation: rowEnter 0.4s var(--ease-out) both` with inline `animation-delay` for stagger
+- **sectionEnter:** Apply to content cards/sections: `animation: sectionEnter 0.5s var(--ease-out) both` with incremental `animation-delay: 0.1s`
+
 ### Accessibility
-- All animations respect `prefers-reduced-motion` media query
+- All animations respect `prefers-reduced-motion` media query (handled globally in `global.css`)
 - MatrixBackground canvas animation disables when reduced motion is preferred
 
 ---
@@ -242,7 +268,7 @@ Matrix theme uses `box-shadow` glow effects with green tints instead of traditio
 ### Modal
 - **Implementation:** Native `<dialog>` with `showModal()`
 - **Animation:** Scale + opacity enter (0.35s ease-spring), backdrop blur
-- **Max width:** 480px, responsive to `100vw - 48px`
+- **Max width:** 480px (default), 860px with `wide` prop. Responsive to `100vw - 48px`
 - **Close button:** 32x32px circle, rotates 90deg on hover
 
 ### Toast (via ToastProvider)
@@ -268,6 +294,17 @@ Matrix theme uses `box-shadow` glow effects with green tints instead of traditio
 - **Shimmer:** Gradient animation (2s infinite loop)
 - **Staggered rows:** FadeIn with 80ms delay increments
 - **Row height:** 48px, randomized widths (88%-100%)
+
+### ToggleSwitch
+- **Track:** 44x24px pill (`--radius-full`), 1.5px border
+- **Thumb:** 16px circle, white with subtle shadow, translates 20px on checked
+- **OFF state:** Track `--color-surface` with `--color-border` border
+- **ON state:** Track and border `--color-accent` (indigo)
+- **Animation:** Thumb uses `--ease-spring` (250ms) for satisfying bounce
+- **Focus:** `0 0 0 3px var(--color-accent-glow)` via `:focus-visible`
+- **Props:** `id` (required), `checked`, `onChange(boolean)`, optional `label` (text right of toggle), `disabled`
+- **A11y:** Hidden native `<input type="checkbox">` with `role="switch"`, `aria-checked`. `prefers-reduced-motion` disables transitions
+- **Usage:** Boolean settings in forms (e.g. ERP sync, ecommerce flags). Preferred over raw checkboxes for on/off toggles.
 
 ---
 
@@ -349,11 +386,12 @@ Grid gap: `0.65rem`
 ### Buttons
 | Variant | Style | Hover | Active |
 |---------|-------|-------|--------|
-| Primary | Indigo bg, white text, uppercase, weight 600 | Darker indigo, larger shadow, translateY(-1px) | scale(0.98) |
-| Secondary | Border, light bg | Tinted bg, darker border, shadow | — |
-| Danger | Red text, red border | Inverted (white on red) | — |
+| Primary | Indigo gradient (135deg, accent → #7c6cff), white text, weight 700, accent shadow | translateY(-1px) | scale(0.98), translateY(0) |
+| Secondary | Surface bg, border, dark text | translateY(-1px) | translateY(0) |
+| Danger | Red-tinted bg `rgba(220,38,38,0.08)`, red text `rgb(185,28,28)`, red border | translateY(-1px) | scale(0.98), translateY(0) |
+| Link | Transparent bg, accent text, compact padding | translateY(-1px) | — |
 
-All buttons: disabled state at `opacity: 0.5`, no pointer events.
+All buttons: `border-radius: 999px` (pill), `min-height: 2.75rem`, `font-weight: 700`, `inline-flex` centered. Disabled: `opacity: 0.5`, `cursor: not-allowed`, no transform/shadow. Transitions: `transform`, `box-shadow`, `background` at `--duration-fast` with `--ease-out`.
 
 ### Form Inputs
 - **Height:** 44px minimum (touch-friendly)
@@ -370,10 +408,11 @@ All buttons: disabled state at `opacity: 0.5`, no pointer events.
 - **Custom styled** track and thumb
 
 ### Table Rows
-- **Hover:** Background tint, accent bar height animation
-- **Selected:** Accent color styling, icon background change
-- **Click:** scale(0.995) micro-feedback
-- **Accent bar:** Left edge indicator, 4px default → 28px on hover/select
+- **Hover:** Background tint `rgba(99,91,255,0.04)`, accent bar height animation
+- **Selected:** Background `rgba(99,91,255,0.08)`, accent bar fully extended
+- **Click:** `scale(0.995)` micro-feedback via `:active` pseudo-class
+- **Accent bar:** Left-edge `<td>` containing a 4px-wide div, `border-radius: 4px`, `background: var(--color-accent)`. Height 0 at rest → 20px on hover → 28px when selected. Transition: `height var(--duration-normal) var(--ease-spring)`. Selected bar has `box-shadow: 0 0 8px var(--color-accent-glow)`.
+- **Row enter animation:** `rowEnter` keyframe (opacity 0→1, translateX -12px→0), 0.4s ease-out, staggered via inline `animation-delay`
 
 ---
 
@@ -397,8 +436,11 @@ All buttons: disabled state at `opacity: 0.5`, no pointer events.
 - Spring-animated slide from right
 
 ### Empty States
-- Centered layout with icon container (72x72px rounded)
-- Title (0.9375rem, weight 600) + description (0.8125rem, muted)
+- Centered `flex-direction: column` layout with generous padding (`--space-16` vertical, `--space-8` horizontal)
+- **Icon container:** 72x72px, `border-radius: var(--radius-xl)`, `background: var(--color-surface)`, `color: var(--color-text-faint)`, centered flex, `margin-bottom: var(--space-5)`. Contains a 32x32px SVG icon.
+- **Title:** 0.9375rem, weight 600, `color: var(--color-text-secondary)`, `letter-spacing: -0.01em`
+- **Description:** 0.8125rem, `color: var(--color-text-muted)`, `margin-top: var(--space-1)`
+- For error empty states, use the same pattern but with `--color-danger` tinted icon container
 
 ### Error/Status Panels (Portal)
 - Gradient border + ambient glow

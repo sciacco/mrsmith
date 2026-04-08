@@ -1,64 +1,98 @@
 .page {
   display: grid;
-  gap: 1.5rem;
+  gap: var(--space-5);
+  animation: pageEnter 0.5s var(--ease-out) both;
 }
 
 .hero {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-4);
   align-items: flex-end;
-  padding: 1.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 24px;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.92));
-  color: white;
+  padding: var(--space-6);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: var(--radius-2xl);
+  background:
+    radial-gradient(circle at top right, rgba(99, 91, 255, 0.18), transparent 36%),
+    linear-gradient(135deg, rgba(12, 18, 37, 0.96), rgba(23, 31, 55, 0.9));
+  color: #f8fafc;
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent 90%);
+  pointer-events: none;
+}
+
+.hero > * {
+  position: relative;
+  z-index: 1;
 }
 
 .eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
+  display: inline-flex;
+  margin-bottom: var(--space-3);
+  color: #93c5fd;
   font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.66);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
 }
 
 .lead {
   max-width: 62ch;
-  margin-top: 0.5rem;
-  color: rgba(255, 255, 255, 0.78);
+  margin-top: var(--space-3);
+  color: rgba(226, 232, 240, 0.84);
 }
 
 .heroActions {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .layout {
   display: grid;
   grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.35fr);
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .panel {
   display: grid;
-  gap: 1rem;
-  padding: 1.25rem;
-  border-radius: 24px;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-2xl);
   border: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+  animation: sectionEnter 0.5s var(--ease-out) 0.1s both;
 }
 
 .panelHeader {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-4);
   align-items: center;
 }
 
 .tableWrap {
-  overflow: auto;
+  overflow-x: auto;
 }
 
 .table {
@@ -66,25 +100,66 @@
   border-collapse: collapse;
 }
 
-.table th,
-.table td {
-  padding: 0.85rem 0.9rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-bottom: var(--space-3);
+  color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-align: left;
+  text-transform: uppercase;
+}
+
+.table td {
+  padding: 0.9rem 0.8rem 0.9rem 0;
+  border-top: 1px solid var(--color-border-subtle);
   vertical-align: middle;
 }
 
 .table tbody tr {
   cursor: pointer;
-  transition: background-color 120ms ease;
+  transition: background var(--duration-fast) var(--ease-out);
+  animation: rowEnter 0.4s var(--ease-out) both;
 }
 
 .table tbody tr:hover {
-  background: rgba(37, 99, 235, 0.06);
+  background: rgba(99, 91, 255, 0.04);
+}
+
+.table tbody tr:active {
+  transform: scale(0.995);
 }
 
 .rowSelected {
-  background: rgba(37, 99, 235, 0.11);
+  background: rgba(99, 91, 255, 0.08);
+}
+
+.accentCell {
+  width: 4px;
+  padding: 0 !important;
+  border-top: none !important;
+}
+
+.accentBar {
+  width: 4px;
+  height: 0;
+  border-radius: 4px;
+  background: var(--color-accent);
+  transition: height var(--duration-normal) var(--ease-spring);
+  margin: auto 0;
+}
+
+.table tbody tr:hover .accentBar {
+  height: 20px;
+}
+
+.rowSelected .accentBar {
+  height: 28px;
+  box-shadow: 0 0 8px var(--color-accent-glow);
 }
 
 .table strong,
@@ -98,18 +173,26 @@
 
 .modalBody {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .formGrid {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .field,
 .checkboxField {
   display: grid;
-  gap: 0.45rem;
+  gap: var(--space-2);
+}
+
+.field span {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .field select,
@@ -117,10 +200,22 @@
 .discountRow select,
 .discountRow input {
   width: 100%;
+  min-height: 2.8rem;
+  padding: 0.75rem 0.85rem;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 0.75rem 0.9rem;
-  background: white;
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.field select:focus,
+.field input:focus,
+.discountRow select:focus,
+.discountRow input:focus {
+  outline: none;
+  border-color: rgba(99, 91, 255, 0.4);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 
 .checkboxField {
@@ -131,11 +226,11 @@
 
 .discountBlock {
   display: grid;
-  gap: 0.75rem;
-  padding: 1rem;
-  border-radius: 16px;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
   background: rgba(248, 250, 252, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .discountBlock header p {
@@ -146,65 +241,122 @@
 .discountRow {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .modalActions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .emptyState {
-  display: grid;
-  gap: 0.35rem;
-  padding: 1.25rem;
-  border-radius: 18px;
-  background: rgba(248, 250, 252, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16) var(--space-8);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-faint);
+}
+
+.emptyIcon svg {
+  width: 32px;
+  height: 32px;
 }
 
 .emptyTitle {
-  font-weight: 700;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  letter-spacing: -0.01em;
 }
 
 .emptyText {
+  margin-top: var(--space-1);
   color: var(--color-text-muted);
+  font-size: 0.8125rem;
 }
 
 .primaryButton,
 .secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 1rem;
   border-radius: 999px;
-  padding: 0.72rem 1.1rem;
   border: 1px solid transparent;
   font: inherit;
+  font-weight: 700;
   cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 
 .primaryButton {
-  background: white;
-  color: #0f172a;
+  background: linear-gradient(135deg, var(--color-accent), #7c6cff);
+  color: #fff;
+  box-shadow: var(--shadow-accent);
 }
 
 .secondaryButton {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+/* Hero-context buttons: inverted for dark background */
+.hero .primaryButton {
+  background: #fff;
+  color: #0f172a;
+  box-shadow: var(--shadow-sm);
+}
+
+.hero .secondaryButton {
   background: rgba(255, 255, 255, 0.14);
-  color: white;
+  color: #f8fafc;
   border-color: rgba(255, 255, 255, 0.18);
 }
 
-.panel .secondaryButton {
-  background: rgba(15, 23, 42, 0.04);
-  color: var(--color-text);
-  border-color: rgba(148, 163, 184, 0.25);
+.primaryButton:hover,
+.secondaryButton:hover {
+  transform: translateY(-1px);
 }
 
-.panel .primaryButton {
-  background: #0f172a;
-  color: white;
+.primaryButton:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-sm);
+}
+
+.secondaryButton:active {
+  transform: translateY(0);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 @media (max-width: 1000px) {
   .hero {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     align-items: stretch;
   }
 

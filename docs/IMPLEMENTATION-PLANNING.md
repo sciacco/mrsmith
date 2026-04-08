@@ -5,11 +5,15 @@
 A plan can be strong on features and still fail at execution if it is not validated against the real repo, runtime, auth model, and deployment shape. The recurring mistake to avoid is feature-centric planning without enough integration-centric verification.
 
 Use this document when drafting or reviewing implementation plans for new apps, major features, or cross-cutting refactors.
+Before locking assumptions, also review [docs/IMPLEMENTATION-KNOWLEDGE.md](IMPLEMENTATION-KNOWLEDGE.md) for reusable discoveries that may already define identifiers, exclusions, or cross-system rules.
 
 ## Core Lessons
 
 - Validate against the real host environment first.
   Before locking routes, app base paths, output directories, or dev ports, verify how the current server serves SPAs, how local dev is orchestrated, and how production artifacts are mounted.
+
+- Reuse previously discovered implementation knowledge.
+  Before inventing a new rule for identifiers, eligibility, exclusions, or legacy integration behavior, check the implementation knowledge handbook and carry forward verified discoveries.
 
 - Treat "copy an existing app pattern" as a verification task, not a shortcut.
   Reuse only after checking the full chain: Vite base, proxies, auth bootstrap, root scripts, Docker copy paths, launcher overrides, and deep-link behavior.
@@ -43,6 +47,7 @@ Use this document when drafting or reviewing implementation plans for new apps, 
 
 ## Planning Heuristics
 
+- When a plan touches existing domains or legacy integrations, check `docs/IMPLEMENTATION-KNOWLEDGE.md` first and reuse established mappings or quirks instead of restating them from scratch.
 - When a plan introduces a new app, confirm the final URL shape, static hosting path, local Vite port, and split-server launch path before writing view work.
 - When a plan introduces a new backend integration, confirm the env contract, dependency wiring, migration story, and testability pattern before writing handler breakdowns.
 - When a plan introduces backend failure paths or cross-cutting middleware changes, confirm the observability contract: request IDs, structured logging fields, panic handling, and whether internal errors are sanitized for clients.
@@ -101,3 +106,5 @@ Every major implementation plan should be reviewed across four layers before exe
 4. Verification strategy
 
 If any of those layers is still implicit, the plan is not ready.
+
+Reusable discoveries that materially affect future work should be added to `docs/IMPLEMENTATION-KNOWLEDGE.md` as part of the implementation or planning follow-up.

@@ -85,6 +85,9 @@ export function KitListPage() {
     ecommerce: true,
   });
   const [cloneName, setCloneName] = useState('');
+  const [search, setSearch] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+  const [showEcommerce, setShowEcommerce] = useState(false);
 
   const sortedKits = useMemo(() => {
     const items = kits ?? [];
@@ -95,6 +98,28 @@ export function KitListPage() {
       return a.internal_name.localeCompare(b.internal_name, 'it');
     });
   }, [kits]);
+
+  const filteredKits = useMemo(() => {
+    let items = sortedKits;
+    if (!showInactive) {
+      items = items.filter((kit) => kit.is_active);
+    }
+    if (!showEcommerce) {
+      items = items.filter((kit) => !kit.ecommerce);
+    }
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((kit) => {
+      const categoryName = categories?.find((c) => c.id === kit.category_id)?.name ?? kit.category_name ?? '';
+      return (
+        kit.internal_name.toLowerCase().includes(q) ||
+        (kit.bundle_prefix ?? '').toLowerCase().includes(q) ||
+        (kit.main_product_code ?? '').toLowerCase().includes(q) ||
+        categoryName.toLowerCase().includes(q) ||
+        String(kit.id).includes(q)
+      );
+    });
+  }, [sortedKits, search, categories, showInactive, showEcommerce]);
 
   const selectedKit = useMemo(
     () => sortedKits.find((kit) => kit.id === selectedId) ?? null,
@@ -175,9 +200,6 @@ export function KitListPage() {
 
   const kitCount = sortedKits.length;
   const activeCount = sortedKits.filter((kit) => kit.is_active).length;
-  const selectedCategory = selectedKit
-    ? categories?.find((category) => category.id === selectedKit.category_id)
-    : null;
 
   if (isLoading) {
     return (
@@ -189,154 +211,179 @@ export function KitListPage() {
 
   return (
     <section className={styles.page}>
-      <header className={styles.hero}>
-        <div className={styles.heroCopy}>
-          <p className={styles.eyebrow}>Phase 4</p>
+      <header className={styles.pageHeader}>
+        <div>
           <h1>Kit e bundle</h1>
-          <p className={styles.lead}>
-            Catalogo operativo per creare, clonare e disattivare kit, con colonna attiva in testa e
-            categorie colorate come nel contratto Mistra.
+          <p className={styles.subtitle}>
+            {activeCount} attivi su {kitCount} totali
           </p>
         </div>
-        <div className={styles.heroStats}>
-          <div className={styles.statCard}>
-            <span>Kit attivi</span>
-            <strong>{activeCount}</strong>
-            <p>su {kitCount} totali</p>
-          </div>
-          <div className={styles.statCardAccent}>
-            <span>Kit selezionato</span>
-            <strong>{selectedKit ? `#${selectedKit.id}` : 'Nessuno'}</strong>
-            <p>{selectedCategory?.name ?? 'Seleziona una riga per operare'}</p>
-          </div>
-        </div>
+        <button type="button" className={styles.primaryButton} onClick={() => setCreateOpen(true)}>
+          Nuovo kit
+        </button>
       </header>
 
-      <section className={styles.toolbar}>
-        <div className={styles.toolbarGroup}>
-          <button type="button" className={styles.primaryButton} onClick={() => setCreateOpen(true)}>
-            New Kit
-          </button>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            disabled={!selectedKit}
-            onClick={() => {
-              if (!selectedKit) return;
-              navigate(`/kit/${selectedKit.id}`);
-            }}
-          >
-            Edit Kit
-          </button>
-        </div>
-        <div className={styles.toolbarGroup}>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            disabled={!selectedKit}
-            onClick={() => {
-              if (!selectedKit) return;
-              setCloneSource(selectedKit);
-              setCloneName(`${selectedKit.internal_name}-Copy`);
-              setCloneOpen(true);
-            }}
-          >
-            Clone
-          </button>
-          <button type="button" className={styles.secondaryButton} onClick={() => void refetch()}>
-            Refresh
-          </button>
-          <button
-            type="button"
-            className={styles.dangerButton}
-            disabled={!selectedKit}
-            onClick={() => setDeleteOpen(true)}
-          >
-            Soft Delete
-          </button>
-        </div>
-        <div className={styles.toolbarGroup}>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={() => setColumnPickerOpen((current) => !current)}
-          >
-            Columns
-          </button>
-        </div>
-      </section>
-
-      {columnPickerOpen ? (
-        <section className={styles.columnPicker}>
-          {kitColumnDefs.map((column) => {
-            const checked = selectedColumns.includes(column.key);
-            return (
-              <label key={column.key} className={styles.checkboxPill}>
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(event) => {
-                    setSelectedColumns((current) => {
-                      if (event.target.checked) {
-                        return current.includes(column.key) ? current : [...current, column.key];
-                      }
-                      return current.filter((key) => key !== column.key);
-                    });
-                  }}
-                />
-                <span>{column.label}</span>
-              </label>
-            );
-          })}
-        </section>
-      ) : null}
-
       <section className={styles.card}>
+        <div className={styles.cardToolbar}>
+          <div className={styles.toolbarGroup}>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              disabled={!selectedKit}
+              onClick={() => {
+                if (!selectedKit) return;
+                navigate(`/kit/${selectedKit.id}`);
+              }}
+            >
+              Modifica
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              disabled={!selectedKit}
+              onClick={() => {
+                if (!selectedKit) return;
+                setCloneSource(selectedKit);
+                setCloneName(`${selectedKit.internal_name}-Copy`);
+                setCloneOpen(true);
+              }}
+            >
+              Clona
+            </button>
+            <button
+              type="button"
+              className={styles.dangerButton}
+              disabled={!selectedKit}
+              onClick={() => setDeleteOpen(true)}
+            >
+              Disattiva
+            </button>
+          </div>
+          <div className={styles.searchWrap}>
+            <svg className={styles.searchIcon} viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+              <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
+            </svg>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Cerca kit..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className={styles.toolbarGroup}>
+            <button
+              type="button"
+              className={`${styles.iconButton} ${showInactive ? styles.iconButtonActive : ''}`}
+              onClick={() => setShowInactive((v) => !v)}
+              aria-label={showInactive ? 'Nascondi inattivi' : 'Mostra inattivi'}
+              title={showInactive ? 'Nascondi inattivi' : 'Mostra inattivi'}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="16" height="16">
+                {showInactive ? (
+                  <>
+                    <path d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                    <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                  </>
+                ) : (
+                  <path d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                )}
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`${styles.iconButton} ${showEcommerce ? styles.iconButtonActive : ''}`}
+              onClick={() => setShowEcommerce((v) => !v)}
+              aria-label={showEcommerce ? 'Nascondi ecommerce' : 'Mostra ecommerce'}
+              title={showEcommerce ? 'Nascondi ecommerce' : 'Mostra ecommerce'}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="16" height="16">
+                <path d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={() => setColumnPickerOpen((current) => !current)}
+              aria-label="Colonne"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                <path d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 10.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {columnPickerOpen ? (
+          <div className={styles.columnPicker}>
+            {kitColumnDefs.map((column) => {
+              const checked = selectedColumns.includes(column.key);
+              return (
+                <label key={column.key} className={styles.checkboxPill}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(event) => {
+                      setSelectedColumns((current) => {
+                        if (event.target.checked) {
+                          return current.includes(column.key) ? current : [...current, column.key];
+                        }
+                        return current.filter((key) => key !== column.key);
+                      });
+                    }}
+                  />
+                  <span>{column.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        ) : null}
         {error ? (
           <div className={styles.emptyState}>
+            <div className={styles.emptyIconDanger}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
+            </div>
             <p className={styles.emptyTitle}>Impossibile caricare i kit</p>
             <p className={styles.emptyText}>{getErrorMessage(error, 'Riprova tra poco.')}</p>
           </div>
-        ) : sortedKits.length === 0 ? (
+        ) : filteredKits.length === 0 ? (
           <div className={styles.emptyState}>
-            <p className={styles.emptyTitle}>Nessun kit disponibile</p>
-            <p className={styles.emptyText}>Crea il primo kit per iniziare il catalogo bundle.</p>
+            <div className={styles.emptyIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+              </svg>
+            </div>
+            <p className={styles.emptyTitle}>{search ? 'Nessun risultato' : 'Nessun kit disponibile'}</p>
+            <p className={styles.emptyText}>{search ? `Nessun kit corrisponde a "${search}".` : 'Crea il primo kit per iniziare il catalogo bundle.'}</p>
           </div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
                 <tr>
+                  <th className={styles.accentCell} />
                   {visibleColumns.map((column) => (
                     <th key={column.key}>{column.label}</th>
                   ))}
-                  <th className={styles.actionsCell}>Azioni</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedKits.map((kit) => {
+                {filteredKits.map((kit, index) => {
                   const category = categories?.find((item) => item.id === kit.category_id);
                   return (
                     <tr
                       key={kit.id}
-                      className={selectedId === kit.id ? styles.rowSelected : ''}
+                      className={`${selectedId === kit.id ? styles.rowSelected : ''} ${!kit.is_active ? styles.rowInactive : ''}`}
+                      style={{ animationDelay: `${index * 0.03}s` }}
                       onClick={() => setSelectedId(kit.id)}
+                      onDoubleClick={() => navigate(`/kit/${kit.id}`)}
                     >
+                      <td className={styles.accentCell}><div className={styles.accentBar} /></td>
                       {visibleColumns.map((column) => (
                         <td key={column.key}>{renderKitColumn(kit, column.key, category?.name ?? kit.category_name, category?.color ?? kit.category_color)}</td>
                       ))}
-                      <td className={styles.actionsCell}>
-                        <button
-                          type="button"
-                          className={styles.linkButton}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            navigate(`/kit/${kit.id}`);
-                          }}
-                        >
-                          Edit
-                        </button>
-                      </td>
                     </tr>
                   );
                 })}
@@ -546,7 +593,15 @@ function renderKitColumn(kit: KitSummary, key: KitColumnKey, categoryName: strin
     case 'internal_name':
       return (
         <div className={styles.nameCell}>
-          <strong>{kit.internal_name}</strong>
+          <div className={styles.nameLine}>
+            <strong>{kit.internal_name}</strong>
+            {kit.ecommerce ? (
+              <svg className={styles.ecommerceIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-label="Ecommerce" role="img">
+                <title>Ecommerce</title>
+                <path d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+              </svg>
+            ) : null}
+          </div>
           {kit.main_product_code ? <span>({kit.main_product_code})</span> : null}
         </div>
       );

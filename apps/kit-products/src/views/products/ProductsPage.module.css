@@ -1,49 +1,155 @@
 .page {
   display: grid;
   gap: var(--space-6);
+  animation: pageEnter 0.5s var(--ease-out) both;
 }
 
-.header {
+/* ── Page header ── */
+.pageHeader {
   display: flex;
-  align-items: end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
 }
 
-.eyebrow {
-  color: var(--color-accent);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.pageHeader h1 {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
 }
 
-.header h1 {
-  margin-top: var(--space-2);
-  font-size: 2.5rem;
-  line-height: 0.95;
-  letter-spacing: -0.06em;
+.subtitle {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
 }
 
-.lead {
-  max-width: 48rem;
-  margin-top: var(--space-4);
-  color: var(--color-text-secondary);
-}
-
-.toolbar {
-  display: flex;
-  gap: var(--space-3);
-}
-
+/* ── Card ── */
 .card {
-  padding: var(--space-6);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  animation: sectionEnter 0.5s var(--ease-out) 0.1s both;
 }
 
+/* ── Toolbar ── */
+.cardToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.toolbarGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── Search ── */
+.searchWrap {
+  position: relative;
+  flex: 1;
+  max-width: 320px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-faint);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: 2rem;
+  padding: 0 0.65rem 0 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  transition: border-color var(--duration-normal) var(--ease-out);
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-faint);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+/* ── Buttons ── */
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0 1.25rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-accent), #7c6cff);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-accent);
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.primaryButton:hover {
+  transform: translateY(-1px);
+}
+
+.primaryButton:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-sm);
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.secondaryButton:hover {
+  background: var(--color-surface-hover);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Table ── */
 .tableWrap {
   overflow-x: auto;
 }
@@ -54,132 +160,161 @@
 }
 
 .table th {
-  padding-bottom: var(--space-3);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-3) var(--space-4);
   color: var(--color-text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-align: left;
   text-transform: uppercase;
 }
 
 .table td {
-  padding: 0.85rem 0;
-  border-top: 1px solid var(--color-border-subtle);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
   vertical-align: middle;
+  font-size: 0.875rem;
 }
 
-.table tr {
+.table tbody tr {
+  cursor: pointer;
   transition: background var(--duration-fast) var(--ease-out);
+  animation: rowEnter 0.4s var(--ease-out) both;
+}
+
+.table tbody tr:hover {
+  background: var(--color-accent-subtle);
+}
+
+.table tbody tr:active {
+  transform: scale(0.995);
 }
 
 .rowSelected {
-  background: rgba(99, 91, 255, 0.05);
+  background: var(--color-accent-muted);
 }
 
 .code {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
 }
 
-.table input,
-.table select,
-.modalForm input,
-.modalForm select,
-.modalForm textarea {
-  width: 100%;
-  min-height: 2.7rem;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--color-border);
-  border-radius: 0.9rem;
-  background: #fff;
-  font: inherit;
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
 }
 
-.table input:focus,
-.table select:focus,
-.modalForm input:focus,
-.modalForm select:focus,
-.modalForm textarea:focus {
-  outline: none;
-  border-color: rgba(99, 91, 255, 0.4);
-  box-shadow: 0 0 0 4px rgba(99, 91, 255, 0.1);
-}
-
-.table select,
-.modalForm select {
-  appearance: none;
-}
-
-.actionsCell {
-  width: 8rem;
-  text-align: right;
-}
-
-.primaryButton,
-.secondaryButton {
+.categoryBadge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-height: 2.8rem;
-  padding: 0 1rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.primaryButton {
-  background: linear-gradient(135deg, var(--color-accent), #7c6cff);
-  color: #fff;
-  box-shadow: var(--shadow-accent);
-}
-
-.secondaryButton {
-  background: var(--color-surface);
-  color: var(--color-text);
-  border-color: var(--color-border);
-}
-
-.primaryButton:disabled,
-.secondaryButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.emptyState {
-  display: grid;
   gap: var(--space-2);
-  padding: var(--space-8);
-  text-align: center;
 }
 
-.emptyTitle {
-  font-size: 1.1rem;
-  font-weight: 700;
+.categoryDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.emptyText {
-  color: var(--color-text-secondary);
+.labelWithDot {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .checkboxInline {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  font-size: 0.875rem;
 }
 
 .checkboxInline input {
-  width: 1rem;
-  min-height: auto;
-  height: 1rem;
-  padding: 0;
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
+/* ── Empty state ── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16) var(--space-8);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-faint);
+}
+
+.emptyIconDanger {
+  composes: emptyIcon;
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.emptyIcon svg,
+.emptyIconDanger svg {
+  width: 32px;
+  height: 32px;
+}
+
+.emptyTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  letter-spacing: -0.01em;
+}
+
+.emptyText {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.formRowWide {
+  display: grid;
+  grid-template-columns: 4fr 1fr;
+  gap: var(--space-4);
+  align-items: end;
+}
+
+.toggleWrap {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+}
+
+/* ── Modals ── */
 .modalForm {
   display: grid;
   gap: var(--space-4);
+}
+
+.modalLead {
+  color: var(--color-text-secondary);
 }
 
 .field {
@@ -191,9 +326,31 @@
 .translationLabel {
   color: var(--color-text-muted);
   font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.modalForm input,
+.modalForm select,
+.modalForm textarea {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+  transition: border-color var(--duration-normal) var(--ease-out);
+}
+
+.modalForm input:focus,
+.modalForm select:focus,
+.modalForm textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 
 .numberGrid {
@@ -223,17 +380,13 @@
   gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: rgba(248, 250, 252, 0.9);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
 }
 
 .translationCard textarea {
   min-height: 7rem;
   resize: vertical;
-}
-
-.modalLead {
-  color: var(--color-text-secondary);
 }
 
 .modalActions {
@@ -242,8 +395,16 @@
   gap: var(--space-3);
 }
 
+.modalActions .primaryButton,
+.modalActions .secondaryButton {
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: var(--radius-md);
+}
+
+/* ── Responsive ── */
 @media (max-width: 1100px) {
-  .header {
+  .pageHeader {
     flex-direction: column;
     align-items: stretch;
   }
@@ -251,5 +412,12 @@
   .translationGrid,
   .numberGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .cardToolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

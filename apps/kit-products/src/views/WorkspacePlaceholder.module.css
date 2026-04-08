@@ -1,6 +1,7 @@
 .page {
   display: grid;
   gap: var(--space-8);
+  animation: pageEnter 0.5s var(--ease-out) both;
 }
 
 .hero {

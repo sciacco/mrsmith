@@ -158,17 +158,20 @@ export function KitDiscountsPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
+                    <th className={styles.accentCell} />
                     <th>Kit</th>
                     <th>Categoria</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {kits.map((kit) => (
+                  {kits.map((kit, index) => (
                     <tr
                       key={kit.id}
                       className={selectedKitId === kit.id ? styles.rowSelected : ''}
+                      style={{ animationDelay: `${index * 0.03}s` }}
                       onClick={() => setSelectedKitId(kit.id)}
                     >
+                      <td className={styles.accentCell}><div className={styles.accentBar} /></td>
                       <td>
                         <strong>{kit.internal_name}</strong>
                         <small>#{kit.id}</small>
@@ -215,8 +218,8 @@ export function KitDiscountsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {discounts.map((entry) => (
-                      <tr key={entry.customer_group.id} onClick={() => openEditModal(entry)}>
+                    {discounts.map((entry, index) => (
+                      <tr key={entry.customer_group.id} style={{ animationDelay: `${index * 0.03}s` }} onClick={() => openEditModal(entry)}>
                         <td>{entry.customer_group.name}</td>
                         <td>{entry.sellable ? 'Si' : 'No'}</td>
                         <td>{entry.use_int_rounding ? 'Si' : 'No'}</td>
@@ -376,6 +379,11 @@ function formatPercentage(value: number) {
 function EmptyState({ title, text }: { title: string; text: string }) {
   return (
     <div className={styles.emptyState}>
+      <div className={styles.emptyIcon}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+        </svg>
+      </div>
       <p className={styles.emptyTitle}>{title}</p>
       <p className={styles.emptyText}>{text}</p>
     </div>
