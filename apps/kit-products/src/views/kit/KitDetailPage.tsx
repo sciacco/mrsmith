@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
-import { Modal, MultiSelect, Skeleton, useToast } from '@mrsmith/ui';
+import { Modal, MultiSelect, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import {
   useCategories,
   useCustomFieldKeys,
@@ -407,7 +407,16 @@ export function KitDetailPage() {
             ) : null}
           </div>
         </div>
-        <div className={styles.headerActions}>
+      </header>
+
+      <nav className={styles.anchorRail} aria-label="Sezioni">
+        <div className={styles.anchorLinks}>
+          <a href="#identity" className={styles.anchorLink}>Dettagli</a>
+          <a href="#products" className={styles.anchorLink}>Prodotti ({productRows.length})</a>
+          <a href="#content" className={styles.anchorLink}>Note e traduzioni</a>
+          <a href="#custom-values" className={styles.anchorLink}>Custom ({customValueRows.length})</a>
+        </div>
+        <div className={styles.anchorActions}>
           {anyDirty ? <span className={styles.dirtyPill}>Modifiche non salvate</span> : null}
           <button
             type="button"
@@ -418,13 +427,6 @@ export function KitDetailPage() {
             Salva tutto
           </button>
         </div>
-      </header>
-
-      <nav className={styles.anchorRail} aria-label="Sezioni">
-        <a href="#identity" className={styles.anchorLink}>Dettagli</a>
-        <a href="#products" className={styles.anchorLink}>Prodotti ({productRows.length})</a>
-        <a href="#content" className={styles.anchorLink}>Note e traduzioni</a>
-        <a href="#custom-values" className={styles.anchorLink}>Custom ({customValueRows.length})</a>
       </nav>
 
       {/* ── Identity & Pricing ── */}
@@ -697,13 +699,15 @@ export function KitDetailPage() {
       >
         <div className={styles.modalBody}>
           <div className={styles.formGrid}>
-            <label className={styles.field}>
+            <div className={styles.field}>
               <span>Product</span>
-              <select value={productModalDraft.product_code} onChange={(e) => setProductModalDraft((c) => ({ ...c, product_code: e.target.value }))}>
-                <option value="">Seleziona</option>
-                {products?.map((p) => <option key={p.code} value={p.code}>{p.code} - {p.internal_name}</option>)}
-              </select>
-            </label>
+              <SingleSelect<string>
+                options={(products ?? []).map((p) => ({ value: p.code, label: `${p.code} - ${p.internal_name}` }))}
+                selected={productModalDraft.product_code || null}
+                onChange={(v) => setProductModalDraft((c) => ({ ...c, product_code: v ?? '' }))}
+                placeholder="Cerca prodotto..."
+              />
+            </div>
             <label className={styles.field}>
               <span>Group</span>
               <select value={productModalDraft.group_name ?? ''} onChange={(e) => setProductModalDraft((c) => ({ ...c, group_name: e.target.value || null }))}>
