@@ -20,7 +20,7 @@ var (
 	budgetAccessRoles      = []string{"app_budget_access"}
 	complianceAccessRoles  = []string{"app_compliance_access"}
 	kitProductsAccessRoles = []string{"app_kitproducts_access"}
-	defaultAccessRoles     = []string{"default-roles-cdlan"}
+	defaultAccessRoles     = []string{"no-default-roles-cdlan"}
 )
 
 type Definition struct {

@@ -5,6 +5,28 @@
 ### Single-Origin Dev Gateway
 Future implementation plan is tracked in [docs/DEV-GATEWAY-IMPLEMENTATION-PLAN.md](DEV-GATEWAY-IMPLEMENTATION-PLAN.md). This work would replace browser-visible per-app localhost ports with a backend-owned single-origin dev gateway while preserving independent app Vite servers as opt-in processes.
 
+## Listini e Sconti App
+
+### Portal Admin Module — Carbone Template Management
+Carbone PDF templates are currently referenced by hardcoded template IDs in individual apps (e.g. kit-products, listini-e-sconti). A portal-wide admin module should be developed to centralize template management (upload, versioning, assignment to apps). Once implemented, all apps using Carbone will be updated to fetch template IDs from the admin module instead of hardcoding them.
+
+### Bulk Kit PDF Export
+Currently the Kit di vendita page exports one kit PDF at a time via Carbone. A future enhancement should support bulk export — generating PDFs for all kits (or a filtered subset) in a single operation, either as a ZIP download or a merged multi-kit document. Useful for sales teams preparing full product catalogs.
+
+### Configurable HubSpot Task Assignee
+The "Sconti variabile energia" page creates a HubSpot task assigned to a hardcoded email (eva.grimaldi@cdlan.it) when rack energy discounts are changed. This should eventually be configurable — either per-role, per-team, or via an admin setting — rather than hardcoded. Kept as-is for now during Appsmith coexistence.
+
+### Kit Product Price Versioning
+Kit product prices are currently not versioned — the catalog always shows current prices. A future enhancement should support effective-dated pricing so that PDFs and historical quotes can reference the prices valid at a specific point in time. This affects both the Kit di vendita page (which prices does the PDF show?) and any future quoting workflows.
+
+### Discount Approval Workflow
+Currently rack energy discounts (0–20%) are saved immediately without approval. A future enhancement should add an approval workflow for discounts above a configurable threshold (e.g. >15%), requiring a manager or reviewer to approve before the discount takes effect. This could integrate with the HubSpot task system already in place.
+
+## Cross-App Infrastructure
+
+### Async HubSpot Request Queue
+Design and implement a shared async queue for submitting requests to HubSpot across all mrsmith apps. Current approach is fire-and-forget with failures tolerated. The queue should support: configurable expiry (TTL per message), exponential retry with backoff, notification channel on persistent failure (e.g. Slack, email), dead-letter handling for undeliverable messages, and per-app/per-entity configuration. This replaces the current pattern where each app calls HubSpot synchronously and silently ignores failures.
+
 ## Budget Management App
 
 ### Audit Logging

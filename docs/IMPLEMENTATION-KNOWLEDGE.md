@@ -74,6 +74,17 @@ Alyante ERP ID
 - Used by: customer list variants described in `apps/listini-e-sconti/listini-e-sconti-migspec-phaseA.md`.
 - Open questions: confirm with the domain team whether `fatgamma > 0` is the durable business rule or a current operational shortcut.
 
+### HubSpot Company Lookup from Grappa
+
+- Context: audit trail flows that create HubSpot notes/tasks after pricing, credit, or discount changes.
+- Discovery: the Grappa customer ID must be resolved to a HubSpot company ID via a two-step cross-database lookup:
+  1. Grappa → ERP ID: `SELECT codice_aggancio_gest FROM cli_fatturazione WHERE id = :grappa_id` (Grappa MySQL)
+  2. ERP ID → HubSpot ID: `SELECT id FROM loader.hubs_company WHERE numero_azienda = :erp_id::varchar` (Mistra PG)
+- Practical rule: backend services that need to write to HubSpot from a Grappa context must query both databases sequentially. Cache the mapping if performance is a concern — the mapping changes infrequently.
+- Evidence: Appsmith `HS_utils` module method `CompanyByGrappaId`, queries `get_erp_id` and `get_hubspot_id_by_erp_code`.
+- Used by: IaaS Prezzi risorse, IaaS Credito omaggio, Sconti variabile energia (all in `apps/listini-e-sconti`).
+- Open questions: none.
+
 ## Customer Eligibility and Exclusion Rules
 
 ### Known Grappa Customer Exclusions
@@ -89,3 +100,14 @@ Alyante ERP ID
 | --- | --- |
 | `385` | IaaS Prezzi risorse, IaaS Credito omaggio |
 | `485` | IaaS Credito omaggio |
+
+## Legacy Data Model Constraints
+
+### Alyante Product Translation Write Contract
+
+- Context: server-side sync of product short descriptions from kit-products into Alyante ERP table `MG87_ARTDESC`.
+- Discovery: the live Appsmith datasource query updates `MG87_DESCART` and filters with suffixed legacy column names: `MG87_DITTA_CG18`, `MG87_OPZIONE_MG5E`, `MG87_LINGUA_MG52`, `MG87_CODART_MG66`. Earlier backend assumptions using `MG87_DESCRIZIONE`, `MG87_DITTA`, `MG87_OPZIONE`, `MG87_LINGUA`, `MG87_CODART` do not match this environment.
+- Practical rule: when writing product short descriptions to Alyante, use `UPDATE MG87_ARTDESC SET MG87_DESCART = ?` with `MG87_DITTA_CG18 = 1`, `MG87_OPZIONE_MG5E = '                    '`, `MG87_LINGUA_MG52 = 'ITA'/'ING'`, and `MG87_CODART_MG66 = code.padEnd(25, ' ')`.
+- Evidence: verified Appsmith query `update MG87_ARTDESC set MG87_DESCART = {{this.params.descr}} where MG87_DITTA_CG18 = 1 and MG87_OPZIONE_MG5E = '                    ' and MG87_LINGUA_MG52 = {{this.params.lang}} AND MG87_CODART_MG66 = {{this.params.code}}`; backend adapter in `backend/internal/kitproducts/alyante.go`.
+- Used by: `apps/kit-products` product translation sync.
+- Open questions: none for this environment; if another Alyante tenant exposes different column names, verify its datasource query before generalizing.
