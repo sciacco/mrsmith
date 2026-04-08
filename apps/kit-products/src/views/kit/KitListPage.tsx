@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
-import { Modal, Skeleton, useToast } from '@mrsmith/ui';
+import { Modal, SearchInput, Skeleton, useToast } from '@mrsmith/ui';
 import { useCategories, useProducts } from '../../api/queries';
 import { useCloneKit, useCreateKit, useDeleteKit, useKits } from './kitQueries';
 import type { KitCreateRequest, KitCreateResponse, KitSummary } from './kitTypes';
@@ -259,18 +259,7 @@ export function KitListPage() {
               Disattiva
             </button>
           </div>
-          <div className={styles.searchWrap}>
-            <svg className={styles.searchIcon} viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-              <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
-            </svg>
-            <input
-              type="text"
-              className={styles.searchInput}
-              placeholder="Cerca kit..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+          <SearchInput value={search} onChange={setSearch} placeholder="Cerca kit..." className={styles.searchWrap} />
           <div className={styles.toolbarGroup}>
             <button
               type="button"

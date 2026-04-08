@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ApiError } from '@mrsmith/api-client';
-import { Skeleton, useToast } from '@mrsmith/ui';
+import { Modal, Skeleton, useToast } from '@mrsmith/ui';
 import {
   useCategories,
   useCreateCategory,
@@ -8,71 +8,53 @@ import {
 } from '../../api/queries';
 import styles from './SettingsPage.module.css';
 
-type Drafts = Record<number, { name: string; color: string }>;
-
 export function CategoriesPage() {
   const { toast } = useToast();
-  const [drafts, setDrafts] = useState<Drafts>({});
-  const [newRow, setNewRow] = useState({ name: '', color: '#231F20' });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [draft, setDraft] = useState({ name: '', color: '#231F20' });
 
   const { data, isLoading, error } = useCategories();
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
 
   const categories = data ?? [];
-  const dirtyIds = useMemo(
-    () =>
-      categories
-        .filter((category) => {
-          const draft = drafts[category.id];
-          return draft != null && (
-            draft.name.trim() !== category.name ||
-            draft.color !== category.color
-          );
-        })
-        .map((category) => category.id),
-    [categories, drafts],
-  );
 
-  async function handleSave(id: number) {
-    const category = categories.find((item) => item.id === id);
-    const draft = drafts[id];
-    if (!category || !draft) {
-      return;
-    }
-
-    try {
-      await updateCategory.mutateAsync({
-        id,
-        name: draft.name.trim(),
-        color: draft.color,
-      });
-      setDrafts((current) => {
-        const next = { ...current };
-        delete next[id];
-        return next;
-      });
-      toast('Categoria aggiornata', 'success');
-    } catch (err) {
-      toast(getErrorMessage(err, 'Impossibile aggiornare la categoria'), 'error');
-    }
+  function openCreate() {
+    setModalMode('create');
+    setDraft({ name: '', color: '#231F20' });
+    setEditingId(null);
+    setModalOpen(true);
   }
 
-  async function handleCreate() {
-    if (!newRow.name.trim()) {
+  function openEdit(id: number) {
+    const cat = categories.find((c) => c.id === id);
+    if (!cat) return;
+    setModalMode('edit');
+    setDraft({ name: cat.name, color: cat.color });
+    setEditingId(id);
+    setModalOpen(true);
+  }
+
+  async function handleSave() {
+    if (!draft.name.trim()) {
       toast('Il nome categoria e obbligatorio', 'error');
       return;
     }
 
     try {
-      await createCategory.mutateAsync({
-        name: newRow.name.trim(),
-        color: newRow.color,
-      });
-      setNewRow({ name: '', color: '#231F20' });
-      toast('Categoria creata', 'success');
+      if (modalMode === 'create') {
+        await createCategory.mutateAsync({ name: draft.name.trim(), color: draft.color });
+        toast('Categoria creata', 'success');
+      } else if (editingId != null) {
+        await updateCategory.mutateAsync({ id: editingId, name: draft.name.trim(), color: draft.color });
+        toast('Categoria aggiornata', 'success');
+      }
+      setModalOpen(false);
     } catch (err) {
-      toast(getErrorMessage(err, 'Impossibile creare la categoria'), 'error');
+      toast(getErrorMessage(err, 'Impossibile salvare la categoria'), 'error');
     }
   }
 
@@ -86,77 +68,47 @@ export function CategoriesPage() {
 
   return (
     <section className={styles.page}>
-      <header className={styles.header}>
+      <header className={styles.pageHeader}>
         <div>
-          <p className={styles.eyebrow}>Settings</p>
           <h1>Categorie</h1>
-          <p className={styles.lead}>
-            Mantieni allineate le categorie usate da kit e prodotti, con colore e naming coerenti.
-          </p>
+          <p className={styles.subtitle}>{categories.length} categorie</p>
         </div>
-        <div className={styles.highlight}>
-          <span>Lookup condiviso</span>
-          <strong>{categories.length}</strong>
-          <p>categorie attive disponibili nelle viste di editing.</p>
-        </div>
+        <button type="button" className={styles.primaryButton} onClick={openCreate}>
+          Nuova categoria
+        </button>
       </header>
 
       <section className={styles.card}>
-        <div className={styles.sectionHeader}>
-          <div>
-            <h2>Nuova categoria</h2>
-            <p>Crea la voce e riusala subito negli editor di kit e prodotti.</p>
-          </div>
-        </div>
-
-        <div className={styles.inlineForm}>
-          <label className={styles.field}>
-            <span>Nome</span>
-            <input
-              value={newRow.name}
-              onChange={(event) => setNewRow((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Nuova categoria"
-            />
-          </label>
-          <label className={styles.field}>
-            <span>Colore</span>
-            <div className={styles.colorField}>
-              <input
-                type="color"
-                value={newRow.color}
-                onChange={(event) => setNewRow((current) => ({ ...current, color: event.target.value }))}
-              />
-              <code>{newRow.color}</code>
-            </div>
-          </label>
+        <div className={styles.cardToolbar}>
           <button
             type="button"
-            className={styles.primaryButton}
-            onClick={() => void handleCreate()}
-            disabled={createCategory.isPending}
+            className={styles.secondaryButton}
+            disabled={selectedId == null}
+            onClick={() => { if (selectedId != null) openEdit(selectedId); }}
           >
-            Aggiungi
+            Modifica
           </button>
-        </div>
-      </section>
-
-      <section className={styles.card}>
-        <div className={styles.sectionHeader}>
-          <div>
-            <h2>Catalogo categorie</h2>
-            <p>Modifica nome e colore direttamente in tabella, con salvataggio per singola riga.</p>
-          </div>
-          <div className={styles.meta}>{dirtyIds.length} righe con modifiche locali</div>
         </div>
 
         {error ? (
           <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
+            </div>
             <p className={styles.emptyTitle}>Impossibile caricare le categorie</p>
             <p className={styles.emptyText}>{getErrorMessage(error, 'Riprova tra poco.')}</p>
           </div>
         ) : categories.length === 0 ? (
           <div className={styles.emptyState}>
-            <p className={styles.emptyTitle}>Nessuna categoria presente</p>
+            <div className={styles.emptyIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
+                <path d="M6 6h.008v.008H6V6Z" />
+              </svg>
+            </div>
+            <p className={styles.emptyTitle}>Nessuna categoria</p>
             <p className={styles.emptyText}>Crea la prima categoria per iniziare.</p>
           </div>
         ) : (
@@ -164,80 +116,57 @@ export function CategoriesPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Nome</th>
                   <th>Colore</th>
+                  <th>Nome</th>
                   <th>Preview</th>
-                  <th className={styles.actionsCell}>Azioni</th>
                 </tr>
               </thead>
               <tbody>
-                {categories.map((category) => {
-                  const draft = drafts[category.id] ?? category;
-                  const safeColor = toColorValue(draft.color);
-                  const dirty = dirtyIds.includes(category.id);
-
-                  return (
-                    <tr key={category.id}>
-                      <td>
-                        <input
-                          value={draft.name}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            setDrafts((current) => ({
-                              ...current,
-                              [category.id]: {
-                                name: value,
-                                color: current[category.id]?.color ?? category.color,
-                              },
-                            }));
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <div className={styles.colorField}>
-                          <input
-                            type="color"
-                            value={safeColor}
-                            onChange={(event) => {
-                              const value = event.target.value;
-                              setDrafts((current) => ({
-                                ...current,
-                                [category.id]: {
-                                  name: current[category.id]?.name ?? category.name,
-                                  color: value,
-                                },
-                              }));
-                            }}
-                          />
-                          <code>{draft.color}</code>
-                        </div>
-                      </td>
-                      <td>
-                        <span
-                          className={styles.colorChip}
-                          style={{ backgroundColor: safeColor }}
-                        >
-                          {draft.name || 'Preview'}
-                        </span>
-                      </td>
-                      <td className={styles.actionsCell}>
-                        <button
-                          type="button"
-                          className={styles.secondaryButton}
-                          disabled={!dirty || updateCategory.isPending}
-                          onClick={() => void handleSave(category.id)}
-                        >
-                          Salva
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {categories.map((category, index) => (
+                  <tr
+                    key={category.id}
+                    className={selectedId === category.id ? styles.rowSelected : ''}
+                    style={{ animationDelay: `${index * 0.03}s` }}
+                    onClick={() => setSelectedId(category.id)}
+                    onDoubleClick={() => openEdit(category.id)}
+                  >
+                    <td>
+                      <span className={styles.colorDot} style={{ background: toColorValue(category.color) }} />
+                    </td>
+                    <td>{category.name}</td>
+                    <td>
+                      <span className={styles.colorChip} style={{ backgroundColor: toColorValue(category.color) }}>
+                        {category.name}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
       </section>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={modalMode === 'create' ? 'Nuova categoria' : 'Modifica categoria'}>
+        <div className={styles.modalBody}>
+          <label className={styles.field}>
+            <span>Nome</span>
+            <input value={draft.name} onChange={(e) => setDraft((c) => ({ ...c, name: e.target.value }))} placeholder="Nome categoria" />
+          </label>
+          <label className={styles.field}>
+            <span>Colore</span>
+            <div className={styles.colorField}>
+              <input type="color" value={draft.color} onChange={(e) => setDraft((c) => ({ ...c, color: e.target.value }))} />
+              <code className={styles.mono}>{draft.color}</code>
+              <span className={styles.colorChip} style={{ backgroundColor: draft.color }}>{draft.name || 'Preview'}</span>
+            </div>
+          </label>
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.secondaryButton} onClick={() => setModalOpen(false)}>Annulla</button>
+            <button type="button" className={styles.primaryButton} onClick={() => void handleSave()} disabled={createCategory.isPending || updateCategory.isPending}>Salva</button>
+          </div>
+        </div>
+      </Modal>
     </section>
   );
 }
@@ -245,13 +174,9 @@ export function CategoriesPage() {
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError && typeof error.body === 'object' && error.body && 'error' in error.body) {
     const message = error.body.error;
-    if (typeof message === 'string') {
-      return message;
-    }
+    if (typeof message === 'string') return message;
   }
-  if (error instanceof Error) {
-    return error.message;
-  }
+  if (error instanceof Error) return error.message;
   return fallback;
 }
 

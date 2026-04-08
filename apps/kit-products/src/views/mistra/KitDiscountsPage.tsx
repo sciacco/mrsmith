@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '@mrsmith/api-client';
-import { Modal, Skeleton, useToast } from '@mrsmith/ui';
+import { Modal, SearchInput, Skeleton, ToggleSwitch, useToast } from '@mrsmith/ui';
 import { useCustomerGroups } from '../../api/queries';
 import {
   useMistraKitDiscounts,
@@ -29,6 +29,7 @@ export function KitDiscountsPage() {
   const [editingDiscount, setEditingDiscount] = useState<KitDiscountEntry | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalState, setModalState] = useState<DiscountModalState>(emptyDiscountModalState());
+  const [kitSearch, setKitSearch] = useState('');
 
   useEffect(() => {
     const firstKit = kits[0];
@@ -46,6 +47,16 @@ export function KitDiscountsPage() {
 
   const discounts = discountResponse?.items ?? [];
   const selectedKit = kits.find((kit) => kit.id === selectedKitId) ?? null;
+
+  const filteredKits = useMemo(() => {
+    const q = kitSearch.trim().toLowerCase();
+    if (!q) return kits;
+    return kits.filter((kit) =>
+      kit.internal_name.toLowerCase().includes(q) ||
+      kit.category.toLowerCase().includes(q) ||
+      String(kit.id).includes(q),
+    );
+  }, [kits, kitSearch]);
 
   const unassignedGroups = useMemo(() => {
     const assigned = new Set(discounts.map((item) => item.customer_group.id));
@@ -126,85 +137,76 @@ export function KitDiscountsPage() {
 
   return (
     <section className={styles.page}>
-      <header className={styles.hero}>
+      <header className={styles.pageHeader}>
         <div>
-          <p className={styles.eyebrow}>Phase 6</p>
           <h1>Sconti kit</h1>
-          <p className={styles.lead}>
-            Master-detail sui kit Mistra con upsert delle regole per customer group e auto-fill del
-            base discount.
-          </p>
+          <p className={styles.subtitle}>{kits.length} kit configurabili</p>
         </div>
-        <div className={styles.heroActions}>
-          <button type="button" className={styles.primaryButton} onClick={openCreateModal} disabled={selectedKitId == null}>
-            Nuovo sconto
-          </button>
-          <button type="button" className={styles.secondaryButton} onClick={() => void refetchDiscounts()} disabled={selectedKitId == null}>
-            Refresh
-          </button>
-        </div>
+        <button type="button" className={styles.primaryButton} onClick={openCreateModal} disabled={selectedKitId == null}>
+          Nuovo sconto
+        </button>
       </header>
 
       <section className={styles.layout}>
+        {/* Left panel — kit list */}
         <article className={styles.panel}>
-          <div className={styles.panelHeader}>
+          <div className={styles.panelToolbar}>
             <h2>Kit</h2>
-            <span>{kits.length} elementi</span>
+            <SearchInput value={kitSearch} onChange={setKitSearch} placeholder="Cerca..." className={styles.searchWrap} />
           </div>
           {isKitsLoading ? <Skeleton rows={8} /> : null}
           {kitsError ? <EmptyState title="Impossibile caricare i kit" text={getErrorMessage(kitsError, 'Riprova tra poco.')} /> : null}
           {!isKitsLoading && !kitsError ? (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th className={styles.accentCell} />
-                    <th>Kit</th>
-                    <th>Categoria</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {kits.map((kit, index) => (
-                    <tr
-                      key={kit.id}
-                      className={selectedKitId === kit.id ? styles.rowSelected : ''}
-                      style={{ animationDelay: `${index * 0.03}s` }}
-                      onClick={() => setSelectedKitId(kit.id)}
-                    >
-                      <td className={styles.accentCell}><div className={styles.accentBar} /></td>
-                      <td>
-                        <strong>{kit.internal_name}</strong>
-                        <small>#{kit.id}</small>
-                      </td>
-                      <td>{kit.category}</td>
+            filteredKits.length === 0 ? (
+              <EmptyState title={kitSearch ? 'Nessun risultato' : 'Nessun kit'} text={kitSearch ? `Nessun kit corrisponde a "${kitSearch}".` : ''} />
+            ) : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th className={styles.accentCell} />
+                      <th>Kit</th>
+                      <th>Categoria</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredKits.map((kit, index) => (
+                      <tr
+                        key={kit.id}
+                        className={selectedKitId === kit.id ? styles.rowSelected : ''}
+                        style={{ animationDelay: `${index * 0.03}s` }}
+                        onClick={() => setSelectedKitId(kit.id)}
+                      >
+                        <td className={styles.accentCell}><div className={styles.accentBar} /></td>
+                        <td>
+                          <strong>{kit.internal_name}</strong>
+                          <small>#{kit.id}</small>
+                        </td>
+                        <td>{kit.category}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           ) : null}
         </article>
 
+        {/* Right panel — discounts for selected kit */}
         <article className={styles.panel}>
-          <div className={styles.panelHeader}>
+          <div className={styles.panelToolbar}>
             <div>
               <h2>Gruppi cliente</h2>
-              <span>{selectedKit ? `Kit selezionato: ${selectedKit.internal_name}` : 'Seleziona un kit'}</span>
+              {selectedKit ? <small>{selectedKit.internal_name}</small> : null}
             </div>
           </div>
           {isDiscountsLoading ? <Skeleton rows={8} /> : null}
           {discountsError ? (
-            <EmptyState
-              title="Impossibile caricare gli sconti"
-              text={getErrorMessage(discountsError, 'Riprova tra poco.')}
-            />
+            <EmptyState title="Impossibile caricare gli sconti" text={getErrorMessage(discountsError, 'Riprova tra poco.')} />
           ) : null}
           {!isDiscountsLoading && !discountsError ? (
             discounts.length === 0 ? (
-              <EmptyState
-                title="Nessuna regola configurata"
-                text="Aggiungi il primo sconto per associare un customer group al kit."
-              />
+              <EmptyState title="Nessuna regola configurata" text="Aggiungi il primo sconto per questo kit." />
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
@@ -223,8 +225,8 @@ export function KitDiscountsPage() {
                         <td>{entry.customer_group.name}</td>
                         <td>{entry.sellable ? 'Si' : 'No'}</td>
                         <td>{entry.use_int_rounding ? 'Si' : 'No'}</td>
-                        <td>{entry.mrc.sign}{entry.mrc.percentage}%</td>
-                        <td>{entry.nrc.sign}{entry.nrc.percentage}%</td>
+                        <td className={styles.mono}>{entry.mrc.sign}{entry.mrc.percentage}%</td>
+                        <td className={styles.mono}>{entry.nrc.sign}{entry.nrc.percentage}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -241,51 +243,40 @@ export function KitDiscountsPage() {
         title={editingDiscount ? 'Modifica sconto kit' : 'Nuovo sconto kit'}
       >
         <div className={styles.modalBody}>
-          <div className={styles.formGrid}>
-            <label className={styles.field}>
-              <span>Gruppo cliente</span>
-              <select
-                value={modalState.customer_group_id}
-                disabled={editingDiscount != null}
-                onChange={(event) => handleGroupSelect(Number(event.target.value))}
-              >
-                <option value={0}>Seleziona</option>
-                {(editingDiscount ? customerGroups ?? [] : unassignedGroups).map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={styles.checkboxField}>
-              <input
-                type="checkbox"
-                checked={modalState.sellable}
-                onChange={(event) => setModalState((current) => ({ ...current, sellable: event.target.checked }))}
-              />
-              <span>Sellable</span>
-            </label>
-            <label className={styles.checkboxField}>
-              <input
-                type="checkbox"
-                checked={modalState.use_int_rounding}
-                onChange={(event) =>
-                  setModalState((current) => ({ ...current, use_int_rounding: event.target.checked }))
-                }
-              />
-              <span>Arrotondamento</span>
-            </label>
+          <label className={styles.field}>
+            <span>Gruppo cliente</span>
+            <select
+              value={modalState.customer_group_id}
+              disabled={editingDiscount != null}
+              onChange={(event) => handleGroupSelect(Number(event.target.value))}
+            >
+              <option value={0}>Seleziona</option>
+              {(editingDiscount ? customerGroups ?? [] : unassignedGroups).map((group) => (
+                <option key={group.id} value={group.id}>{group.name}</option>
+              ))}
+            </select>
+          </label>
 
+          <div className={styles.formRow}>
+            <ToggleSwitch
+              id="discount-sellable"
+              checked={modalState.sellable}
+              onChange={(v) => setModalState((c) => ({ ...c, sellable: v }))}
+              label="Sellable"
+            />
+            <ToggleSwitch
+              id="discount-rounding"
+              checked={modalState.use_int_rounding}
+              onChange={(v) => setModalState((c) => ({ ...c, use_int_rounding: v }))}
+              label="Arrotondamento"
+            />
+          </div>
+
+          <div className={styles.discountGrid}>
             <section className={styles.discountBlock}>
-              <header>
-                <h3>MRC</h3>
-                <p>Massimo 100% solo per segno negativo.</p>
-              </header>
+              <h3>MRC</h3>
               <div className={styles.discountRow}>
-                <select
-                  value={modalState.mrc.sign}
-                  onChange={(event) => handleMrcChange({ sign: event.target.value as '+' | '-' })}
-                >
+                <select value={modalState.mrc.sign} onChange={(e) => handleMrcChange({ sign: e.target.value as '+' | '-' })}>
                   <option value="-">-</option>
                   <option value="+">+</option>
                 </select>
@@ -295,25 +286,18 @@ export function KitDiscountsPage() {
                   max={modalState.mrc.sign === '-' ? 100 : undefined}
                   step="0.01"
                   value={modalState.mrc.percentage}
-                  onChange={(event) => handleMrcChange({ percentage: event.target.value })}
+                  onChange={(e) => handleMrcChange({ percentage: e.target.value })}
+                  placeholder="%"
                 />
               </div>
             </section>
 
             <section className={styles.discountBlock}>
-              <header>
-                <h3>NRC</h3>
-                <p>Di default segue l&apos;MRC in creazione.</p>
-              </header>
+              <h3>NRC</h3>
               <div className={styles.discountRow}>
                 <select
                   value={modalState.nrc.sign}
-                  onChange={(event) =>
-                    setModalState((current) => ({
-                      ...current,
-                      nrc: normalizeDiscount({ ...current.nrc, sign: event.target.value as '+' | '-' }),
-                    }))
-                  }
+                  onChange={(e) => setModalState((c) => ({ ...c, nrc: normalizeDiscount({ ...c.nrc, sign: e.target.value as '+' | '-' }) }))}
                 >
                   <option value="-">-</option>
                   <option value="+">+</option>
@@ -324,24 +308,16 @@ export function KitDiscountsPage() {
                   max={modalState.nrc.sign === '-' ? 100 : undefined}
                   step="0.01"
                   value={modalState.nrc.percentage}
-                  onChange={(event) =>
-                    setModalState((current) => ({
-                      ...current,
-                      nrc: normalizeDiscount({ ...current.nrc, percentage: event.target.value }),
-                    }))
-                  }
+                  onChange={(e) => setModalState((c) => ({ ...c, nrc: normalizeDiscount({ ...c.nrc, percentage: e.target.value }) }))}
+                  placeholder="%"
                 />
               </div>
             </section>
           </div>
 
           <div className={styles.modalActions}>
-            <button type="button" className={styles.secondaryButton} onClick={() => setModalOpen(false)}>
-              Annulla
-            </button>
-            <button type="button" className={styles.primaryButton} onClick={() => void handleSubmit()}>
-              Salva
-            </button>
+            <button type="button" className={styles.secondaryButton} onClick={() => setModalOpen(false)}>Annulla</button>
+            <button type="button" className={styles.primaryButton} onClick={() => void handleSubmit()} disabled={upsertDiscount.isPending}>Salva</button>
           </div>
         </div>
       </Modal>
@@ -393,12 +369,8 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError && typeof error.body === 'object' && error.body && 'error' in error.body) {
     const message = error.body.error;
-    if (typeof message === 'string') {
-      return message;
-    }
+    if (typeof message === 'string') return message;
   }
-  if (error instanceof Error) {
-    return error.message;
-  }
+  if (error instanceof Error) return error.message;
   return fallback;
 }

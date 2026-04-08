@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
 import { Modal, MultiSelect, Skeleton, useToast } from '@mrsmith/ui';
@@ -10,7 +10,6 @@ import {
   useVocabulary,
 } from '../../api/queries';
 import {
-  useBatchUpdateKitProducts,
   useCreateKitCustomValue,
   useCreateKitProduct,
   useDeleteKitCustomValue,
@@ -33,7 +32,6 @@ import type {
 } from './kitTypes';
 import styles from './KitDetailPage.module.css';
 
-type TabKey = 'details' | 'products' | 'custom-values';
 
 interface KitFormState extends KitWriteRequest {
   help_url: string;
@@ -70,12 +68,6 @@ type KitToggleKey =
   | 'is_main_prd_sellable'
   | 'variable_billing'
   | 'h24_assurance';
-
-const tabs: Array<{ key: TabKey; label: string }> = [
-  { key: 'details', label: 'Dettagli' },
-  { key: 'products', label: 'Prodotti' },
-  { key: 'custom-values', label: 'Valori custom' },
-];
 
 const billingPeriodOptions = [
   { value: 1, label: 'Mensile' },
@@ -124,17 +116,14 @@ export function KitDetailPage() {
   const updateTranslations = useUpdateKitTranslations(isValidId ? kitId : null);
   const createKitProduct = useCreateKitProduct(isValidId ? kitId : null);
   const updateKitProduct = useUpdateKitProduct(isValidId ? kitId : null);
-  const batchUpdateProducts = useBatchUpdateKitProducts(isValidId ? kitId : null);
   const deleteKitProduct = useDeleteKitProduct(isValidId ? kitId : null);
   const createCustomValue = useCreateKitCustomValue(isValidId ? kitId : null);
   const updateCustomValue = useUpdateKitCustomValue(isValidId ? kitId : null);
   const deleteCustomValue = useDeleteKitCustomValue(isValidId ? kitId : null);
 
-  const [activeTab, setActiveTab] = useState<TabKey>('details');
   const [kitDraft, setKitDraft] = useState<KitFormState>(emptyKitFormState());
   const [translationDrafts, setTranslationDrafts] = useState<TranslationDraftMap>(emptyTranslationDrafts());
   const [productDrafts, setProductDrafts] = useState<Record<number, KitProductInlineDraft>>({});
-  const [customValueDrafts, setCustomValueDrafts] = useState<Record<number, KitCustomValueInlineDraft>>({});
   const [helpUrlDraft, setHelpUrlDraft] = useState('');
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [productDeleteId, setProductDeleteId] = useState<number | null>(null);
@@ -143,6 +132,9 @@ export function KitDetailPage() {
   const [productEditingId, setProductEditingId] = useState<number | null>(null);
   const [customDeleteId, setCustomDeleteId] = useState<number | null>(null);
   const [customNewDraft, setCustomNewDraft] = useState<KitCustomValueFormState>(emptyCustomValueFormState());
+  const [customModalOpen, setCustomModalOpen] = useState(false);
+  const [customModalMode, setCustomModalMode] = useState<'create' | 'edit'>('create');
+  const [customEditingId, setCustomEditingId] = useState<number | null>(null);
 
   const initializedKitId = useRef<number | null>(null);
 
@@ -156,8 +148,8 @@ export function KitDetailPage() {
     setTranslationDrafts(toTranslationDraftMap(kit));
     setHelpUrlDraft(kit.help_url ?? '');
     setProductDrafts({});
-    setCustomValueDrafts({});
     setCustomNewDraft(emptyCustomValueFormState());
+    setCustomEditingId(null);
     setProductModalOpen(false);
     setProductDeleteId(null);
     setProductEditingId(null);
@@ -175,28 +167,6 @@ export function KitDetailPage() {
   const metadataDirty = kit ? isKitFormDirty(kit, kitDraft) : false;
   const helpDirty = kit ? normalizeUrl(kit.help_url) !== normalizeUrl(helpUrlDraft) : false;
   const translationDirty = kit ? isTranslationDirty(kit, translationDrafts) : false;
-  const changedProducts = useMemo(
-    () =>
-      productRows
-        .filter((row) => {
-          const draft = productDrafts[row.id];
-          return draft != null && isKitProductDirty(row, draft);
-        })
-      .map((row) => ({
-          id: row.id,
-          product_code: productDrafts[row.id]!.product_code,
-          group_name: productDrafts[row.id]!.group_name,
-          minimum: productDrafts[row.id]!.minimum,
-          maximum: productDrafts[row.id]!.maximum,
-          required: productDrafts[row.id]!.required,
-          nrc: productDrafts[row.id]!.nrc,
-          mrc: productDrafts[row.id]!.mrc,
-          position: productDrafts[row.id]!.position,
-          notes: productDrafts[row.id]!.notes ?? null,
-        })),
-    [productDrafts, productRows],
-  );
-
   const selectedProductRow = useMemo(
     () => productRows.find((row) => row.id === productEditingId) ?? null,
     [productEditingId, productRows],
@@ -273,53 +243,13 @@ export function KitDetailPage() {
     }
   }
 
-  async function handleBatchSaveProducts() {
-    if (changedProducts.length === 0) {
-      return;
-    }
+  const anyDirty = metadataDirty || helpDirty || translationDirty;
+  const anySaving = updateKit.isPending || updateHelp.isPending || updateTranslations.isPending;
 
-    try {
-      await batchUpdateProducts.mutateAsync({ items: changedProducts });
-      setProductDrafts((current) => {
-        const next = { ...current };
-        changedProducts.forEach((item) => {
-          delete next[item.id];
-        });
-        return next;
-      });
-      await refetchProducts();
-      toast('Prodotti aggiornati', 'success');
-    } catch (err) {
-      toast(getErrorMessage(err, 'Impossibile salvare i prodotti'), 'error');
-    }
-  }
-
-  async function handleSaveSingleProduct(row: KitProductItem) {
-    const draft = productDrafts[row.id] ?? toProductInlineDraft(row);
-
-    try {
-        await updateKitProduct.mutateAsync({
-          productId: row.id,
-          product_code: draft.product_code,
-          group_name: draft.group_name,
-          minimum: draft.minimum,
-          maximum: draft.maximum,
-          required: draft.required,
-          nrc: draft.nrc,
-          mrc: draft.mrc,
-          position: draft.position,
-          notes: draft.notes ?? row.notes ?? null,
-        });
-      setProductDrafts((current) => {
-        const next = { ...current };
-        delete next[row.id];
-        return next;
-      });
-      await refetchProducts();
-      toast('Prodotto salvato', 'success');
-    } catch (err) {
-      toast(getErrorMessage(err, 'Impossibile salvare il prodotto del kit'), 'error');
-    }
+  async function handleSaveAll() {
+    if (metadataDirty) await handleSaveKit();
+    if (helpDirty) await handleSaveHelp();
+    if (translationDirty) await handleSaveTranslations();
   }
 
   async function handleSaveProduct() {
@@ -375,46 +305,26 @@ export function KitDetailPage() {
     }
   }
 
-  async function handleSaveCustomValue(id: number) {
-    const draft = customValueDrafts[id];
-    if (!draft) {
-      return;
-    }
 
-    try {
-      const payload = {
-        key_name: draft.key_name,
-        value: parseJsonValue(draft.valueText),
-      };
-      await updateCustomValue.mutateAsync({ valueId: id, ...payload });
-      setCustomValueDrafts((current) => {
-        const next = { ...current };
-        delete next[id];
-        return next;
-      });
-      await refetchCustomValues();
-      toast('Valore custom aggiornato', 'success');
-    } catch (err) {
-      toast(getErrorMessage(err, 'Impossibile aggiornare il valore custom'), 'error');
-    }
-  }
-
-  async function handleCreateCustomValue() {
+  async function handleSaveCustomModal() {
     if (!customNewDraft.key_name.trim()) {
       toast('Seleziona una chiave custom', 'error');
       return;
     }
-
     try {
-      await createCustomValue.mutateAsync({
-        key_name: customNewDraft.key_name,
-        value: parseJsonValue(customNewDraft.valueText),
-      });
+      const payload = { key_name: customNewDraft.key_name, value: parseJsonValue(customNewDraft.valueText) };
+      if (customModalMode === 'create') {
+        await createCustomValue.mutateAsync(payload);
+      } else if (customEditingId != null) {
+        await updateCustomValue.mutateAsync({ valueId: customEditingId, ...payload });
+      }
+      setCustomModalOpen(false);
       setCustomNewDraft(emptyCustomValueFormState());
+      setCustomEditingId(null);
       await refetchCustomValues();
-      toast('Valore custom creato', 'success');
+      toast(customModalMode === 'create' ? 'Valore custom creato' : 'Valore custom aggiornato', 'success');
     } catch (err) {
-      toast(getErrorMessage(err, 'Impossibile creare il valore custom'), 'error');
+      toast(getErrorMessage(err, 'Impossibile salvare il valore custom'), 'error');
     }
   }
 
@@ -426,11 +336,7 @@ export function KitDetailPage() {
     try {
       await deleteCustomValue.mutateAsync(customDeleteId);
       setCustomDeleteId(null);
-      setCustomValueDrafts((current) => {
-        const next = { ...current };
-        delete next[customDeleteId];
-        return next;
-      });
+      setCustomEditingId((c) => (c === customDeleteId ? null : c));
       await refetchCustomValues();
       toast('Valore custom eliminato', 'success');
     } catch (err) {
@@ -480,412 +386,141 @@ export function KitDetailPage() {
 
   return (
     <section className={styles.page}>
-      <header className={styles.hero}>
-        <div className={styles.breadcrumbRow}>
-          <Link to="/kit" className={styles.backLink}>
-            <span aria-hidden="true">←</span> Tutti i Kit
-          </Link>
-          <span className={styles.crumbSeparator}>/</span>
-          <span className={styles.crumbCurrent}>KIT #{kit.id}</span>
-        </div>
-        <div className={styles.heroTop}>
-          <div>
-            <p className={styles.eyebrow}>Phase 5</p>
-            <h1>
-              KIT #{kit.id} - {kit.internal_name}
-            </h1>
-            <p className={styles.lead}>
-              Editor completo per metadati, traduzioni, prodotti associati e valori custom.
-            </p>
+      <header className={styles.pageHeader}>
+        <div>
+          <div className={styles.breadcrumbRow}>
+            <Link to="/kit" className={styles.backLink}>← Kit</Link>
+            <span className={styles.crumbSeparator}>/</span>
+            <span>#{kit.id}</span>
           </div>
-          <div className={styles.summaryCard}>
+          <h1>{kit.internal_name}</h1>
+          <div className={styles.metaRow}>
+            <span className={`${styles.statusDot} ${kit.is_active ? styles.statusActive : ''}`} />
+            <span>{kit.is_active ? 'Attivo' : 'Disattivo'}</span>
+            <span className={styles.metaSep}>·</span>
             <span>{selectedCategory?.name ?? kit.category_name}</span>
-            <strong>{kit.is_active ? 'Attivo' : 'Disattivo'}</strong>
-            <p>
-              {kit.main_product_code ? `Main product: ${kit.main_product_code}` : 'Main product non impostato'}
-            </p>
+            {kit.main_product_code ? (
+              <>
+                <span className={styles.metaSep}>·</span>
+                <code className={styles.mono}>{kit.main_product_code}</code>
+              </>
+            ) : null}
           </div>
+        </div>
+        <div className={styles.headerActions}>
+          {anyDirty ? <span className={styles.dirtyPill}>Modifiche non salvate</span> : null}
+          <button
+            type="button"
+            className={styles.primaryButton}
+            disabled={!anyDirty || anySaving}
+            onClick={() => void handleSaveAll()}
+          >
+            Salva tutto
+          </button>
         </div>
       </header>
 
-      <nav className={styles.tabRail} aria-label="Sezioni kit">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            className={`${styles.tabButton} ${activeTab === tab.key ? styles.tabButtonActive : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <nav className={styles.anchorRail} aria-label="Sezioni">
+        <a href="#identity" className={styles.anchorLink}>Dettagli</a>
+        <a href="#products" className={styles.anchorLink}>Prodotti ({productRows.length})</a>
+        <a href="#content" className={styles.anchorLink}>Note e traduzioni</a>
+        <a href="#custom-values" className={styles.anchorLink}>Custom ({customValueRows.length})</a>
       </nav>
 
-      {activeTab === 'details' ? (
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <h2>Dettagli</h2>
-              <p>Metadati, gruppi vendibili, help URL e traduzioni del kit.</p>
-            </div>
-            <div className={styles.panelActions}>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                disabled={!helpDirty || updateHelp.isPending}
-                onClick={() => void handleSaveHelp()}
-              >
-                Save help URL
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                disabled={!translationDirty || updateTranslations.isPending}
-                onClick={() => void handleSaveTranslations()}
-              >
-                Save translations
-              </button>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                disabled={!metadataDirty || updateKit.isPending}
-                onClick={() => void handleSaveKit()}
-              >
-                Save kit
-              </button>
-            </div>
+      {/* ── Identity & Pricing ── */}
+      <section id="identity" className={styles.card}>
+        <h3>Dettagli e pricing</h3>
+        <div className={styles.formGrid}>
+          <label className={styles.field}>
+            <span>Internal name</span>
+            <input value={kitDraft.internal_name} onChange={(e) => setKitDraft((c) => ({ ...c, internal_name: e.target.value }))} />
+          </label>
+          <label className={styles.field}>
+            <span>Main product</span>
+            <select value={kitDraft.main_product_code ?? ''} onChange={(e) => setKitDraft((c) => ({ ...c, main_product_code: e.target.value || null }))}>
+              <option value="">Seleziona</option>
+              {products?.map((p) => <option key={p.code} value={p.code}>{p.code} - {p.internal_name}</option>)}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span>Categoria</span>
+            <select value={kitDraft.category_id} onChange={(e) => setKitDraft((c) => ({ ...c, category_id: Number(e.target.value) }))}>
+              <option value={0}>Seleziona</option>
+              {categories?.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span>Bundle prefix</span>
+            <input value={kitDraft.bundle_prefix ?? ''} disabled />
+          </label>
+        </div>
+        <div className={styles.formGrid4}>
+          <label className={styles.field}>
+            <span>NRC</span>
+            <input type="number" step="0.01" value={kitDraft.nrc} onChange={(e) => setKitDraft((c) => ({ ...c, nrc: Number(e.target.value) }))} />
+          </label>
+          <label className={styles.field}>
+            <span>MRC</span>
+            <input type="number" step="0.01" value={kitDraft.mrc} onChange={(e) => setKitDraft((c) => ({ ...c, mrc: Number(e.target.value) }))} />
+          </label>
+          <label className={styles.field}>
+            <span>Sconto massimo</span>
+            <input type="number" step="0.01" value={kitDraft.sconto_massimo} onChange={(e) => setKitDraft((c) => ({ ...c, sconto_massimo: Number(e.target.value) }))} />
+          </label>
+          <label className={styles.field}>
+            <span>SLA ore</span>
+            <input type="number" value={kitDraft.sla_resolution_hours} onChange={(e) => setKitDraft((c) => ({ ...c, sla_resolution_hours: Number(e.target.value) }))} />
+          </label>
+        </div>
+        <div className={styles.toggleGrid}>
+          {kitToggleDefs.map((item) => (
+            <label key={item.key} className={styles.toggle}>
+              <input type="checkbox" checked={kitDraft[item.key]} onChange={(e) => setKitDraft((c) => ({ ...c, [item.key]: e.target.checked } as KitFormState))} />
+              <span>{item.label}</span>
+            </label>
+          ))}
+        </div>
+        <div className={styles.formGrid4}>
+          <label className={styles.field}>
+            <span>Billing period</span>
+            <select value={kitDraft.billing_period} onChange={(e) => setKitDraft((c) => ({ ...c, billing_period: Number(e.target.value) }))}>
+              {billingPeriodOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span>Activation days</span>
+            <input type="number" value={kitDraft.activation_time_days} onChange={(e) => setKitDraft((c) => ({ ...c, activation_time_days: Number(e.target.value) }))} />
+          </label>
+          <label className={styles.field}>
+            <span>Initial months</span>
+            <input type="number" value={kitDraft.initial_subscription_months} onChange={(e) => setKitDraft((c) => ({ ...c, initial_subscription_months: Number(e.target.value) }))} />
+          </label>
+          <label className={styles.field}>
+            <span>Next months</span>
+            <input type="number" value={kitDraft.next_subscription_months} onChange={(e) => setKitDraft((c) => ({ ...c, next_subscription_months: Number(e.target.value) }))} />
+          </label>
+        </div>
+        <label className={styles.field}>
+          <span>Sellable groups</span>
+          <MultiSelect<number>
+            options={(customerGroups ?? []).map((g) => ({ value: g.id, label: g.name }))}
+            selected={kitDraft.sellable_group_ids}
+            onChange={(values) => setKitDraft((c) => ({ ...c, sellable_group_ids: values }))}
+            placeholder="Seleziona gruppi"
+          />
+        </label>
+      </section>
+
+      {/* ── Products ── */}
+      <section id="products" className={styles.card}>
+        <div className={styles.panelHeader}>
+          <h3>Prodotti ({productRows.length})</h3>
+          <div className={styles.panelActions}>
+            <button type="button" className={styles.primaryButton} onClick={() => { setProductModalMode('create'); setProductEditingId(null); setProductModalDraft(emptyProductFormState()); setProductModalOpen(true); }}>Aggiungi</button>
+            <button type="button" className={styles.secondaryButton} disabled={productEditingId == null} onClick={() => { const row = selectedProductRow; if (!row) return; setProductModalMode('edit'); setProductModalDraft(toProductFormState(row, productDrafts[row.id])); setProductModalOpen(true); }}>Modifica</button>
+            <button type="button" className={styles.dangerButton} disabled={productEditingId == null} onClick={() => { if (productEditingId != null) setProductDeleteId(productEditingId); }}>Rimuovi</button>
           </div>
-
-          <div className={styles.detailGrid}>
-            <section className={styles.card}>
-              <div className={styles.sectionTitle}>
-                <h3>Metadati</h3>
-                <p>Le modifiche salvano il kit e la relazione con i gruppi cliente.</p>
-              </div>
-              <div className={styles.formGrid}>
-                <label className={styles.field}>
-                  <span>Internal name</span>
-                  <input
-                    value={kitDraft.internal_name}
-                    onChange={(event) => setKitDraft((current) => ({ ...current, internal_name: event.target.value }))}
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span>Main product</span>
-                  <select
-                    value={kitDraft.main_product_code ?? ''}
-                    onChange={(event) =>
-                      setKitDraft((current) => ({ ...current, main_product_code: event.target.value || null }))
-                    }
-                  >
-                    <option value="">Seleziona</option>
-                    {products?.map((product) => (
-                      <option key={product.code} value={product.code}>
-                        {product.code} - {product.internal_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={styles.field}>
-                  <span>Categoria</span>
-                  <select
-                    value={kitDraft.category_id}
-                    onChange={(event) =>
-                      setKitDraft((current) => ({ ...current, category_id: Number(event.target.value) }))
-                    }
-                  >
-                    <option value={0}>Seleziona</option>
-                    {categories?.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={styles.field}>
-                  <span>Bundle prefix</span>
-                  <input value={kitDraft.bundle_prefix ?? ''} disabled />
-                </label>
-                <label className={styles.field}>
-                  <span>Billing period</span>
-                  <select
-                    value={kitDraft.billing_period}
-                    onChange={(event) =>
-                      setKitDraft((current) => ({ ...current, billing_period: Number(event.target.value) }))
-                    }
-                  >
-                    {billingPeriodOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={styles.field}>
-                  <span>Sellable groups</span>
-                  <MultiSelect<number>
-                    options={(customerGroups ?? []).map((group) => ({ value: group.id, label: group.name }))}
-                    selected={kitDraft.sellable_group_ids}
-                    onChange={(values) => setKitDraft((current) => ({ ...current, sellable_group_ids: values }))}
-                    placeholder="Seleziona gruppi"
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span>Initial months</span>
-                  <input
-                    type="number"
-                    value={kitDraft.initial_subscription_months}
-                    onChange={(event) =>
-                      setKitDraft((current) => ({
-                        ...current,
-                        initial_subscription_months: Number(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span>Next months</span>
-                  <input
-                    type="number"
-                    value={kitDraft.next_subscription_months}
-                    onChange={(event) =>
-                      setKitDraft((current) => ({
-                        ...current,
-                        next_subscription_months: Number(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span>Activation days</span>
-                  <input
-                    type="number"
-                    value={kitDraft.activation_time_days}
-                    onChange={(event) =>
-                      setKitDraft((current) => ({
-                        ...current,
-                        activation_time_days: Number(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span>NRC</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={kitDraft.nrc}
-                    onChange={(event) => setKitDraft((current) => ({ ...current, nrc: Number(event.target.value) }))}
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span>MRC</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={kitDraft.mrc}
-                    onChange={(event) => setKitDraft((current) => ({ ...current, mrc: Number(event.target.value) }))}
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span>Sconto massimo</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={kitDraft.sconto_massimo}
-                    onChange={(event) =>
-                      setKitDraft((current) => ({ ...current, sconto_massimo: Number(event.target.value) }))
-                    }
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span>SLA resolution hours</span>
-                  <input
-                    type="number"
-                    value={kitDraft.sla_resolution_hours}
-                    onChange={(event) =>
-                      setKitDraft((current) => ({ ...current, sla_resolution_hours: Number(event.target.value) }))
-                    }
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span>Notes</span>
-                  <textarea
-                    value={kitDraft.notes ?? ''}
-                    onChange={(event) => setKitDraft((current) => ({ ...current, notes: event.target.value }))}
-                    rows={4}
-                  />
-                </label>
-              </div>
-              <div className={styles.toggleGrid}>
-                {kitToggleDefs.map((item) => (
-                  <label key={item.key} className={styles.toggle}>
-                    <input
-                      type="checkbox"
-                      checked={kitDraft[item.key]}
-                      onChange={(event) =>
-                        setKitDraft((current) => ({ ...current, [item.key]: event.target.checked } as KitFormState))
-                      }
-                    />
-                    <span>{item.label}</span>
-                  </label>
-                ))}
-              </div>
-            </section>
-
-            <section className={styles.card}>
-              <div className={styles.sectionTitle}>
-                <h3>Traduzioni</h3>
-                <p>Salvataggio indipendente dal blocco metadati.</p>
-              </div>
-              <div className={styles.translationGrid}>
-                {(['it', 'en'] as const).map((language) => (
-                  <article key={language} className={styles.translationCard}>
-                    <div className={styles.translationHeader}>
-                      <strong>{language.toUpperCase()}</strong>
-                      <span>Kit description</span>
-                    </div>
-                    <label className={styles.field}>
-                      <span>Short</span>
-                      <input
-                        value={translationDrafts[language].short}
-                        onChange={(event) =>
-                          setTranslationDrafts((current) => ({
-                            ...current,
-                            [language]: { ...current[language], short: event.target.value },
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className={styles.field}>
-                      <span>Long</span>
-                      <textarea
-                        value={translationDrafts[language].long}
-                        onChange={(event) =>
-                          setTranslationDrafts((current) => ({
-                            ...current,
-                            [language]: { ...current[language], long: event.target.value },
-                          }))
-                        }
-                        rows={6}
-                      />
-                    </label>
-                  </article>
-                ))}
-              </div>
-            </section>
-          </div>
-
-          <section className={styles.card}>
-            <div className={styles.sectionTitle}>
-              <h3>Context</h3>
-              <p>Informazioni utili per riconoscere la riga e verificare l&apos;allineamento con il contratto.</p>
-            </div>
-            <div className={styles.metaGrid}>
-              <div>
-                <span>ID</span>
-                <strong>#{kit.id}</strong>
-              </div>
-              <div>
-                <span>Translation UUID</span>
-                <strong className={styles.mono}>{kit.translation_uuid}</strong>
-              </div>
-              <div>
-                <span>Categoria</span>
-                <strong>{selectedCategory?.name ?? kit.category_name}</strong>
-              </div>
-              <div>
-                <span>Help URL</span>
-                <strong>{normalizeUrl(helpUrlDraft) || 'n/d'}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section className={styles.card}>
-            <div className={styles.sectionTitle}>
-              <h3>Help URL</h3>
-              <p>Salvataggio tramite endpoint dedicato.</p>
-            </div>
-            <div className={styles.helpRow}>
-              <input
-                value={helpUrlDraft}
-                onChange={(event) => setHelpUrlDraft(event.target.value)}
-                placeholder="https://"
-              />
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                disabled={!helpDirty || updateHelp.isPending}
-                onClick={() => void handleSaveHelp()}
-              >
-                Save help URL
-              </button>
-            </div>
-          </section>
-        </section>
-      ) : null}
-
-      {activeTab === 'products' ? (
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <h2>Prodotti</h2>
-              <p>Modifica i componenti del kit con salvataggio batch e dialog dedicato per create/edit.</p>
-            </div>
-            <div className={styles.panelActions}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                onClick={() => {
-                  setProductModalMode('create');
-                  setProductEditingId(null);
-                  setProductModalDraft(emptyProductFormState());
-                  setProductModalOpen(true);
-                }}
-              >
-                Add
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                disabled={productEditingId == null}
-                onClick={() => {
-                  const row = selectedProductRow;
-                  if (!row) {
-                    return;
-                  }
-                  setProductModalMode('edit');
-                  setProductModalDraft(toProductFormState(row, productDrafts[row.id]));
-                  setProductModalOpen(true);
-                }}
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                disabled={changedProducts.length === 0 || batchUpdateProducts.isPending}
-                onClick={() => void handleBatchSaveProducts()}
-              >
-                Save batch
-              </button>
-              <button type="button" className={styles.secondaryButton} onClick={() => void refetchProducts()}>
-                Refresh
-              </button>
-              <button
-                type="button"
-                className={styles.dangerButton}
-                disabled={productEditingId == null}
-                onClick={() => {
-                  if (productEditingId != null) {
-                    setProductDeleteId(productEditingId);
-                  }
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
+        </div>
 
           {isProductsLoading ? <Skeleton rows={6} /> : null}
 
@@ -918,18 +553,14 @@ export function KitDetailPage() {
                     <th>Group</th>
                     <th>Min</th>
                     <th>Max</th>
-                    <th>Required</th>
+                    <th>Req</th>
                     <th>NRC</th>
                     <th>MRC</th>
-                    <th>Position</th>
-                    <th>Notes</th>
-                    <th className={styles.actionsCell}>Azioni</th>
+                    <th>Pos</th>
                   </tr>
                 </thead>
                 <tbody>
                   {productRows.map((row, index) => {
-                    const draft = productDrafts[row.id] ?? toProductInlineDraft(row);
-                    const dirty = isKitProductDirty(row, draft);
                     const selected = productEditingId === row.id;
                     return (
                       <tr
@@ -937,6 +568,12 @@ export function KitDetailPage() {
                         className={selected ? styles.rowSelected : ''}
                         style={{ animationDelay: `${index * 0.03}s` }}
                         onClick={() => setProductEditingId(row.id)}
+                        onDoubleClick={() => {
+                          setProductEditingId(row.id);
+                          setProductModalMode('edit');
+                          setProductModalDraft(toProductFormState(row, productDrafts[row.id]));
+                          setProductModalOpen(true);
+                        }}
                       >
                         <td>
                           <span className={styles.codeCell}>
@@ -944,119 +581,13 @@ export function KitDetailPage() {
                             <small>{resolveProductLabel(products, row)}</small>
                           </span>
                         </td>
-                        <td>
-                          <select
-                            value={draft.group_name ?? ''}
-                            onChange={(event) =>
-                              updateProductDraft(row, setProductDrafts, {
-                                group_name: event.target.value || null,
-                              })
-                            }
-                          >
-                            <option value="">Nessuno</option>
-                            {productGroupOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            value={draft.minimum}
-                            onChange={(event) =>
-                              updateProductDraft(row, setProductDrafts, { minimum: Number(event.target.value) })
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            value={draft.maximum}
-                            onChange={(event) =>
-                              updateProductDraft(row, setProductDrafts, { maximum: Number(event.target.value) })
-                            }
-                          />
-                        </td>
-                        <td>
-                          <label className={styles.checkboxInline}>
-                            <input
-                              type="checkbox"
-                              checked={draft.required}
-                              onChange={(event) =>
-                                updateProductDraft(row, setProductDrafts, { required: event.target.checked })
-                              }
-                            />
-                            <span>{draft.required ? 'Si' : 'No'}</span>
-                          </label>
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={draft.nrc}
-                            onChange={(event) =>
-                              updateProductDraft(row, setProductDrafts, { nrc: Number(event.target.value) })
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={draft.mrc}
-                            onChange={(event) =>
-                              updateProductDraft(row, setProductDrafts, { mrc: Number(event.target.value) })
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            value={draft.position}
-                            onChange={(event) =>
-                              updateProductDraft(row, setProductDrafts, { position: Number(event.target.value) })
-                            }
-                          />
-                        </td>
-                        <td className={styles.notesCell}>{row.notes ?? 'n/d'}</td>
-                        <td className={styles.actionsCell}>
-                          <button
-                            type="button"
-                            className={styles.linkButton}
-                            disabled={!dirty}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleSaveSingleProduct(row);
-                          }}
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.linkButton}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setProductEditingId(row.id);
-                              setProductModalMode('edit');
-                              setProductModalDraft(toProductFormState(row, productDrafts[row.id]));
-                              setProductModalOpen(true);
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.linkButtonDanger}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setProductDeleteId(row.id);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </td>
+                        <td>{row.group_name ?? '—'}</td>
+                        <td>{row.minimum}</td>
+                        <td>{row.maximum}</td>
+                        <td>{row.required ? 'Si' : 'No'}</td>
+                        <td className={styles.mono}>{formatMoney(row.nrc)}</td>
+                        <td className={styles.mono}>{formatMoney(row.mrc)}</td>
+                        <td>{row.position}</td>
                       </tr>
                     );
                   })}
@@ -1064,267 +595,158 @@ export function KitDetailPage() {
               </table>
             </div>
           )}
-        </section>
-      ) : null}
+      </section>
 
-      {activeTab === 'custom-values' ? (
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <h2>Valori custom</h2>
-              <p>Chiavi registry e JSON value con salvataggio per riga.</p>
-            </div>
-            <div className={styles.panelActions}>
-              <button type="button" className={styles.primaryButton} onClick={() => void handleCreateCustomValue()}>
-                Add
-              </button>
-              <button type="button" className={styles.secondaryButton} onClick={() => void refetchCustomValues()}>
-                Refresh
-              </button>
-            </div>
+      {/* ── Content: Notes, Help URL, Translations ── */}
+      <section id="content" className={styles.card}>
+        <h3>Note e traduzioni</h3>
+        <label className={styles.field}>
+          <span>Notes</span>
+          <textarea value={kitDraft.notes ?? ''} onChange={(e) => setKitDraft((c) => ({ ...c, notes: e.target.value }))} rows={3} />
+        </label>
+        <label className={styles.field}>
+          <span>Help URL</span>
+          <input value={helpUrlDraft} onChange={(e) => setHelpUrlDraft(e.target.value)} placeholder="https://" />
+        </label>
+        <div className={styles.translationGrid}>
+          {(['it', 'en'] as const).map((language) => (
+            <article key={language} className={styles.translationCard}>
+              <div className={styles.translationHeader}>
+                <strong>{language.toUpperCase()}</strong>
+              </div>
+              <label className={styles.field}>
+                <span>Short</span>
+                <input value={translationDrafts[language].short} onChange={(e) => setTranslationDrafts((c) => ({ ...c, [language]: { ...c[language], short: e.target.value } }))} />
+              </label>
+              <label className={styles.field}>
+                <span>Long</span>
+                <textarea value={translationDrafts[language].long} onChange={(e) => setTranslationDrafts((c) => ({ ...c, [language]: { ...c[language], long: e.target.value } }))} rows={5} />
+              </label>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Custom Values ── */}
+      <section id="custom-values" className={styles.card}>
+        <div className={styles.panelHeader}>
+          <h3>Valori custom ({customValueRows.length})</h3>
+          <div className={styles.panelActions}>
+            <button type="button" className={styles.primaryButton} onClick={() => { setCustomModalMode('create'); setCustomNewDraft(emptyCustomValueFormState()); setCustomEditingId(null); setCustomModalOpen(true); }}>Aggiungi</button>
+            <button type="button" className={styles.secondaryButton} disabled={customEditingId == null} onClick={() => { const row = customValueRows.find((r) => r.id === customEditingId); if (!row) return; setCustomModalMode('edit'); setCustomNewDraft(toCustomValueInlineDraft(row)); setCustomModalOpen(true); }}>Modifica</button>
+            <button type="button" className={styles.dangerButton} disabled={customEditingId == null} onClick={() => { if (customEditingId != null) setCustomDeleteId(customEditingId); }}>Rimuovi</button>
           </div>
+        </div>
 
-          <section className={styles.inlineCreateCard}>
-            <div className={styles.inlineCreateGrid}>
-              <label className={styles.field}>
-                <span>Key name</span>
-                <select
-                  value={customNewDraft.key_name}
-                  onChange={(event) => setCustomNewDraft((current) => ({ ...current, key_name: event.target.value }))}
-                >
-                  <option value="">Seleziona</option>
-                  {customFieldKeyOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className={styles.field}>
-                <span>Value JSON</span>
-                <textarea
-                  value={customNewDraft.valueText}
-                  onChange={(event) =>
-                    setCustomNewDraft((current) => ({ ...current, valueText: event.target.value }))
-                  }
-                  rows={4}
-                  placeholder='{"example": true}'
-                />
-              </label>
-            </div>
-            <div className={styles.inlineCreateActions}>
-              <button type="button" className={styles.secondaryButton} onClick={() => setCustomNewDraft(emptyCustomValueFormState())}>
-                Reset
-              </button>
-              <button type="button" className={styles.primaryButton} onClick={() => void handleCreateCustomValue()}>
-                Create
-              </button>
-            </div>
-          </section>
+        {isCustomValuesLoading ? <Skeleton rows={5} /> : null}
 
-          {isCustomValuesLoading ? <Skeleton rows={5} /> : null}
-
-          {customValuesError ? (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyIcon}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-                </svg>
-              </div>
-              <p className={styles.emptyTitle}>Impossibile caricare i valori custom</p>
-              <p className={styles.emptyText}>{getErrorMessage(customValuesError, 'Riprova tra poco.')}</p>
+        {customValuesError ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
             </div>
-          ) : customValueRows.length === 0 ? (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyIcon}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.248a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
-                  <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                </svg>
-              </div>
-              <p className={styles.emptyTitle}>Nessun valore custom presente</p>
-              <p className={styles.emptyText}>Usa il form sopra per aggiungere il primo elemento.</p>
+            <p className={styles.emptyTitle}>Impossibile caricare i valori custom</p>
+            <p className={styles.emptyText}>{getErrorMessage(customValuesError, 'Riprova tra poco.')}</p>
+          </div>
+        ) : customValueRows.length === 0 ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.248a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
+                <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
             </div>
-          ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Key name</th>
-                    <th>Value</th>
-                    <th className={styles.actionsCell}>Azioni</th>
+            <p className={styles.emptyTitle}>Nessun valore custom</p>
+            <p className={styles.emptyText}>Aggiungi il primo valore con il pulsante Aggiungi.</p>
+          </div>
+        ) : (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customValueRows.map((row, index) => (
+                  <tr
+                    key={row.id}
+                    className={customEditingId === row.id ? styles.rowSelected : ''}
+                    style={{ animationDelay: `${index * 0.03}s` }}
+                    onClick={() => setCustomEditingId(row.id)}
+                    onDoubleClick={() => { setCustomEditingId(row.id); setCustomModalMode('edit'); setCustomNewDraft(toCustomValueInlineDraft(row)); setCustomModalOpen(true); }}
+                  >
+                    <td><code className={styles.mono}>{row.key_name}</code></td>
+                    <td><code className={styles.mono}>{stringifyJsonValue(row.value)}</code></td>
                   </tr>
-                </thead>
-                <tbody>
-                  {customValueRows.map((row, index) => {
-                    const draft = customValueDrafts[row.id] ?? toCustomValueInlineDraft(row);
-                    const dirty = isCustomValueDirty(row, draft);
-                    return (
-                      <tr key={row.id} style={{ animationDelay: `${index * 0.03}s` }}>
-                        <td>
-                          <select
-                            value={draft.key_name}
-                            onChange={(event) =>
-                              updateCustomValueDraft(row, setCustomValueDrafts, { key_name: event.target.value })
-                            }
-                          >
-                            <option value="">Seleziona</option>
-                            {customFieldKeyOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <textarea
-                            rows={4}
-                            value={draft.valueText}
-                            onChange={(event) =>
-                              updateCustomValueDraft(row, setCustomValueDrafts, { valueText: event.target.value })
-                            }
-                          />
-                        </td>
-                        <td className={styles.actionsCell}>
-                          <button
-                            type="button"
-                            className={styles.linkButton}
-                            disabled={!dirty}
-                            onClick={() => void handleSaveCustomValue(row.id)}
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.linkButtonDanger}
-                            onClick={() => setCustomDeleteId(row.id)}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ) : null}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <Modal
         open={productModalOpen}
         onClose={() => setProductModalOpen(false)}
         title={productModalMode === 'create' ? 'Aggiungi prodotto al kit' : 'Modifica prodotto del kit'}
+        wide
       >
         <div className={styles.modalBody}>
           <div className={styles.formGrid}>
             <label className={styles.field}>
               <span>Product</span>
-              <select
-                value={productModalDraft.product_code}
-                onChange={(event) =>
-                  setProductModalDraft((current) => ({ ...current, product_code: event.target.value }))
-                }
-              >
+              <select value={productModalDraft.product_code} onChange={(e) => setProductModalDraft((c) => ({ ...c, product_code: e.target.value }))}>
                 <option value="">Seleziona</option>
-                {products?.map((product) => (
-                  <option key={product.code} value={product.code}>
-                    {product.code} - {product.internal_name}
-                  </option>
-                ))}
+                {products?.map((p) => <option key={p.code} value={p.code}>{p.code} - {p.internal_name}</option>)}
               </select>
             </label>
             <label className={styles.field}>
-              <span>Group name</span>
-              <select
-                value={productModalDraft.group_name ?? ''}
-                onChange={(event) =>
-                  setProductModalDraft((current) => ({ ...current, group_name: event.target.value || null }))
-                }
-              >
+              <span>Group</span>
+              <select value={productModalDraft.group_name ?? ''} onChange={(e) => setProductModalDraft((c) => ({ ...c, group_name: e.target.value || null }))}>
                 <option value="">Nessuno</option>
-                {productGroupOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                {productGroupOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </label>
+          </div>
+          <div className={styles.formGrid3}>
             <label className={styles.field}>
               <span>Minimum</span>
-              <input
-                type="number"
-                value={productModalDraft.minimum}
-                onChange={(event) =>
-                  setProductModalDraft((current) => ({ ...current, minimum: Number(event.target.value) }))
-                }
-              />
+              <input type="number" value={productModalDraft.minimum} onChange={(e) => setProductModalDraft((c) => ({ ...c, minimum: Number(e.target.value) }))} />
             </label>
             <label className={styles.field}>
               <span>Maximum</span>
-              <input
-                type="number"
-                value={productModalDraft.maximum}
-                onChange={(event) =>
-                  setProductModalDraft((current) => ({ ...current, maximum: Number(event.target.value) }))
-                }
-              />
+              <input type="number" value={productModalDraft.maximum} onChange={(e) => setProductModalDraft((c) => ({ ...c, maximum: Number(e.target.value) }))} />
             </label>
             <label className={styles.field}>
               <span>Position</span>
-              <input
-                type="number"
-                value={productModalDraft.position}
-                onChange={(event) =>
-                  setProductModalDraft((current) => ({ ...current, position: Number(event.target.value) }))
-                }
-              />
+              <input type="number" value={productModalDraft.position} onChange={(e) => setProductModalDraft((c) => ({ ...c, position: Number(e.target.value) }))} />
             </label>
+          </div>
+          <div className={styles.formGrid3}>
             <label className={styles.field}>
               <span>NRC</span>
-              <input
-                type="number"
-                step="0.01"
-                value={productModalDraft.nrc}
-                onChange={(event) =>
-                  setProductModalDraft((current) => ({ ...current, nrc: Number(event.target.value) }))
-                }
-              />
+              <input type="number" step="0.01" value={productModalDraft.nrc} onChange={(e) => setProductModalDraft((c) => ({ ...c, nrc: Number(e.target.value) }))} />
             </label>
             <label className={styles.field}>
               <span>MRC</span>
-              <input
-                type="number"
-                step="0.01"
-                value={productModalDraft.mrc}
-                onChange={(event) =>
-                  setProductModalDraft((current) => ({ ...current, mrc: Number(event.target.value) }))
-                }
-              />
+              <input type="number" step="0.01" value={productModalDraft.mrc} onChange={(e) => setProductModalDraft((c) => ({ ...c, mrc: Number(e.target.value) }))} />
             </label>
             <label className={styles.field}>
               <span>Required</span>
               <label className={styles.checkboxInline}>
-                <input
-                  type="checkbox"
-                  checked={productModalDraft.required}
-                  onChange={(event) =>
-                    setProductModalDraft((current) => ({ ...current, required: event.target.checked }))
-                  }
-                />
+                <input type="checkbox" checked={productModalDraft.required} onChange={(e) => setProductModalDraft((c) => ({ ...c, required: e.target.checked }))} />
                 <span>{productModalDraft.required ? 'Si' : 'No'}</span>
               </label>
             </label>
-            <label className={styles.field}>
-              <span>Notes</span>
-              <textarea
-                rows={4}
-                value={productModalDraft.notes}
-                onChange={(event) => setProductModalDraft((current) => ({ ...current, notes: event.target.value }))}
-              />
-            </label>
           </div>
+          <label className={styles.field}>
+            <span>Notes</span>
+            <textarea rows={3} value={productModalDraft.notes} onChange={(e) => setProductModalDraft((c) => ({ ...c, notes: e.target.value }))} />
+          </label>
           <div className={styles.modalActions}>
             <button type="button" className={styles.secondaryButton} onClick={() => setProductModalOpen(false)}>
               Annulla
@@ -1359,6 +781,30 @@ export function KitDetailPage() {
       </Modal>
 
       <Modal
+        open={customModalOpen}
+        onClose={() => setCustomModalOpen(false)}
+        title={customModalMode === 'create' ? 'Nuovo valore custom' : 'Modifica valore custom'}
+      >
+        <div className={styles.modalBody}>
+          <label className={styles.field}>
+            <span>Key name</span>
+            <select value={customNewDraft.key_name} onChange={(e) => setCustomNewDraft((c) => ({ ...c, key_name: e.target.value }))}>
+              <option value="">Seleziona</option>
+              {customFieldKeyOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span>Value (JSON)</span>
+            <textarea value={customNewDraft.valueText} onChange={(e) => setCustomNewDraft((c) => ({ ...c, valueText: e.target.value }))} rows={6} placeholder='{"example": true}' />
+          </label>
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.secondaryButton} onClick={() => setCustomModalOpen(false)}>Annulla</button>
+            <button type="button" className={styles.primaryButton} onClick={() => void handleSaveCustomModal()}>Salva</button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         open={customDeleteId != null}
         onClose={() => setCustomDeleteId(null)}
         title="Rimuovi valore custom"
@@ -1383,35 +829,6 @@ export function KitDetailPage() {
   );
 }
 
-function updateProductDraft(
-  row: KitProductItem,
-  setDrafts: Dispatch<SetStateAction<Record<number, KitProductInlineDraft>>>,
-  patch: Partial<KitProductInlineDraft>,
-) {
-  setDrafts((current) => ({
-    ...current,
-    [row.id]: {
-      ...toProductInlineDraft(row),
-      ...current[row.id],
-      ...patch,
-    },
-  }));
-}
-
-function updateCustomValueDraft(
-  row: KitCustomValueItem,
-  setDrafts: Dispatch<SetStateAction<Record<number, KitCustomValueInlineDraft>>>,
-  patch: Partial<KitCustomValueInlineDraft>,
-) {
-  setDrafts((current) => ({
-    ...current,
-    [row.id]: {
-      ...toCustomValueInlineDraft(row),
-      ...current[row.id],
-      ...patch,
-    },
-  }));
-}
 
 function toProductInlineDraft(row: KitProductItem): KitProductInlineDraft {
   return {
@@ -1456,28 +873,13 @@ function emptyCustomValueFormState(): KitCustomValueFormState {
   };
 }
 
-function isKitProductDirty(row: KitProductItem, draft: KitProductInlineDraft) {
-  return (
-    row.product_code !== draft.product_code ||
-    normalizeNullable(row.group_name) !== normalizeNullable(draft.group_name) ||
-    row.minimum !== draft.minimum ||
-    row.maximum !== draft.maximum ||
-    row.required !== draft.required ||
-    Number(row.nrc) !== Number(draft.nrc) ||
-    Number(row.mrc) !== Number(draft.mrc) ||
-    row.position !== draft.position
-  );
-}
+
 
 function toCustomValueInlineDraft(row: KitCustomValueItem): KitCustomValueInlineDraft {
   return {
     key_name: row.key_name,
     valueText: stringifyJsonValue(row.value),
   };
-}
-
-function isCustomValueDirty(row: KitCustomValueItem, draft: KitCustomValueInlineDraft) {
-  return row.key_name !== draft.key_name || stringifyJsonValue(row.value) !== draft.valueText.trim();
 }
 
 function toKitFormState(kit: KitDetail): KitFormState {
@@ -1632,6 +1034,10 @@ function stringifyJsonValue(value: unknown) {
   } catch {
     return String(value);
   }
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
 
 function resolveProductLabel(

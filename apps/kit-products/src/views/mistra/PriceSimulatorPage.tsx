@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '@mrsmith/api-client';
-import { Skeleton } from '@mrsmith/ui';
+import { SearchInput, SingleSelect, Skeleton } from '@mrsmith/ui';
 import {
   useMistraCustomers,
   useMistraDiscountedKitDetail,
@@ -19,6 +19,7 @@ export function PriceSimulatorPage() {
   const customers = customerResponse?.items ?? [];
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [selectedKitId, setSelectedKitId] = useState<number | null>(null);
+  const [kitSearch, setKitSearch] = useState('');
 
   useEffect(() => {
     const firstCustomer = customers[0];
@@ -52,6 +53,17 @@ export function PriceSimulatorPage() {
   } = useMistraDiscountedKitDetail(selectedCustomerId, selectedKitId);
 
   const selectedKit = discountedKits.find((kit) => kit.id === selectedKitId) ?? null;
+
+  const filteredKits = useMemo(() => {
+    const q = kitSearch.trim().toLowerCase();
+    if (!q) return discountedKits;
+    return discountedKits.filter((kit) =>
+      kit.internal_name.toLowerCase().includes(q) ||
+      kit.category.toLowerCase().includes(q) ||
+      String(kit.id).includes(q),
+    );
+  }, [discountedKits, kitSearch]);
+
   const relatedProducts = useMemo<FlattenedRelatedProduct[]>(
     () =>
       (detail?.related_products ?? []).flatMap((group) =>
@@ -66,47 +78,38 @@ export function PriceSimulatorPage() {
 
   return (
     <section className={styles.page}>
-      <header className={styles.hero}>
+      <header className={styles.pageHeader}>
         <div>
-          <p className={styles.eyebrow}>Phase 6</p>
           <h1>Simulatore prezzi</h1>
-          <p className={styles.lead}>
-            Vista read-only sui kit scontati per cliente, con flatten dei prodotti correlati dal
-            payload Mistra.
-          </p>
+          <p className={styles.subtitle}>{discountedKits.length} kit scontati</p>
         </div>
-        <label className={styles.customerField}>
+        <div className={styles.customerSelect}>
           <span>Cliente</span>
-          <select
-            value={selectedCustomerId ?? 0}
-            disabled={isCustomersLoading}
-            onChange={(event) => setSelectedCustomerId(Number(event.target.value) || null)}
-          >
-            <option value={0}>Seleziona cliente</option>
-            {customers.map((customer) => (
-              <option key={customer.id} value={customer.id}>
-                {customer.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <SingleSelect<number>
+            options={customers.map((c) => ({ value: c.id, label: c.name }))}
+            selected={selectedCustomerId}
+            onChange={setSelectedCustomerId}
+            placeholder="Seleziona cliente..."
+          />
+        </div>
       </header>
 
       {customersError ? <EmptyState title="Impossibile caricare i clienti" text={getErrorMessage(customersError, 'Riprova tra poco.')} /> : null}
       {isCustomersLoading ? <Skeleton rows={4} /> : null}
 
       <section className={styles.layout}>
+        {/* Left — kit list */}
         <article className={styles.panel}>
-          <div className={styles.panelHeader}>
+          <div className={styles.panelToolbar}>
             <h2>Kit scontati</h2>
-            <span>{discountedKits.length} elementi</span>
+            <SearchInput value={kitSearch} onChange={setKitSearch} placeholder="Cerca..." className={styles.searchWrap} />
           </div>
 
           {isKitsLoading ? <Skeleton rows={8} /> : null}
           {kitsError ? <EmptyState title="Impossibile caricare i kit" text={getErrorMessage(kitsError, 'Riprova tra poco.')} /> : null}
           {!isKitsLoading && !kitsError ? (
-            discountedKits.length === 0 ? (
-              <EmptyState title="Nessun kit disponibile" text="Seleziona un cliente con almeno un kit scontato." />
+            filteredKits.length === 0 ? (
+              <EmptyState title={kitSearch ? 'Nessun risultato' : 'Nessun kit disponibile'} text={kitSearch ? `Nessun kit corrisponde a "${kitSearch}".` : 'Seleziona un cliente con almeno un kit scontato.'} />
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
@@ -120,7 +123,7 @@ export function PriceSimulatorPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {discountedKits.map((kit, index) => (
+                    {filteredKits.map((kit, index) => (
                       <tr
                         key={kit.id}
                         className={selectedKitId === kit.id ? styles.rowSelected : ''}
@@ -132,8 +135,8 @@ export function PriceSimulatorPage() {
                           <strong>{kit.internal_name}</strong>
                           <small>#{kit.id}</small>
                         </td>
-                        <td>{kit.base_price?.nrc ?? 'n/d'}</td>
-                        <td>{kit.base_price?.mrc ?? 'n/d'}</td>
+                        <td className={styles.mono}>{kit.base_price?.nrc ?? 'n/d'}</td>
+                        <td className={styles.mono}>{kit.base_price?.mrc ?? 'n/d'}</td>
                         <td>{kit.category}</td>
                       </tr>
                     ))}
@@ -144,19 +147,20 @@ export function PriceSimulatorPage() {
           ) : null}
         </article>
 
-        <article className={styles.panel}>
-          <div className={styles.panelHeader}>
+        {/* Right — related products (sticky) */}
+        <article className={styles.panelSticky}>
+          <div className={styles.panelToolbar}>
             <div>
               <h2>Prodotti correlati</h2>
-              <span>{selectedKit ? `Kit selezionato: ${selectedKit.internal_name}` : 'Seleziona un kit'}</span>
+              {selectedKit ? <small>{selectedKit.internal_name}</small> : null}
             </div>
           </div>
 
           {isDetailLoading ? <Skeleton rows={8} /> : null}
-          {detailError ? <EmptyState title="Impossibile caricare il dettaglio kit" text={getErrorMessage(detailError, 'Riprova tra poco.')} /> : null}
+          {detailError ? <EmptyState title="Impossibile caricare il dettaglio" text={getErrorMessage(detailError, 'Riprova tra poco.')} /> : null}
           {!isDetailLoading && !detailError ? (
             relatedProducts.length === 0 ? (
-              <EmptyState title="Nessun prodotto correlato" text="Il kit selezionato non espone prodotti correlati nel payload Mistra." />
+              <EmptyState title="Nessun prodotto correlato" text="Seleziona un kit dalla lista." />
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
@@ -178,10 +182,10 @@ export function PriceSimulatorPage() {
                           <strong>{product.group_name}</strong>
                           <small>{product.group_required ? 'Obbligatorio' : 'Opzionale'}</small>
                         </td>
-                        <td>{product.id}</td>
+                        <td className={styles.mono}>{product.id}</td>
                         <td>{product.title}</td>
-                        <td>{product.price?.nrc ?? 'n/d'}</td>
-                        <td>{product.price?.mrc ?? 'n/d'}</td>
+                        <td className={styles.mono}>{product.price?.nrc ?? 'n/d'}</td>
+                        <td className={styles.mono}>{product.price?.mrc ?? 'n/d'}</td>
                         <td>{product.min_qty}</td>
                         <td>{product.max_qty}</td>
                       </tr>
@@ -214,12 +218,8 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError && typeof error.body === 'object' && error.body && 'error' in error.body) {
     const message = error.body.error;
-    if (typeof message === 'string') {
-      return message;
-    }
+    if (typeof message === 'string') return message;
   }
-  if (error instanceof Error) {
-    return error.message;
-  }
+  if (error instanceof Error) return error.message;
   return fallback;
 }

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ApiError } from '@mrsmith/api-client';
-import { Skeleton, useToast } from '@mrsmith/ui';
+import { Modal, Skeleton, ToggleSwitch, useToast } from '@mrsmith/ui';
 import {
   useBatchUpdateCustomerGroups,
   useCreateCustomerGroup,
@@ -8,66 +8,54 @@ import {
 } from '../../api/queries';
 import styles from './SettingsPage.module.css';
 
-type Drafts = Record<number, { name: string; is_partner: boolean }>;
-
 export function CustomerGroupsPage() {
   const { toast } = useToast();
-  const [drafts, setDrafts] = useState<Drafts>({});
-  const [newRow, setNewRow] = useState({ name: '', is_partner: false });
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draft, setDraft] = useState({ name: '', is_partner: false });
 
   const { data, isLoading, error } = useCustomerGroups();
   const createCustomerGroup = useCreateCustomerGroup();
   const batchUpdate = useBatchUpdateCustomerGroups();
 
   const groups = data ?? [];
-  const changedItems = useMemo(
-    () =>
-      groups
-        .filter((group) => {
-          const draft = drafts[group.id];
-          return draft != null && !group.read_only && (
-            draft.name.trim() !== group.name ||
-            draft.is_partner !== group.is_partner
-          );
-        })
-        .map((group) => ({
-          id: group.id,
-          name: drafts[group.id]!.name.trim(),
-          is_partner: drafts[group.id]!.is_partner,
-        })),
-    [drafts, groups],
-  );
 
-  async function handleCreate() {
-    if (!newRow.name.trim()) {
+  function openCreate() {
+    setModalMode('create');
+    setDraft({ name: '', is_partner: false });
+    setEditingId(null);
+    setModalOpen(true);
+  }
+
+  function openEdit(id: number) {
+    const group = groups.find((g) => g.id === id);
+    if (!group || group.read_only) return;
+    setModalMode('edit');
+    setDraft({ name: group.name, is_partner: group.is_partner });
+    setEditingId(id);
+    setModalOpen(true);
+  }
+
+  async function handleSave() {
+    if (!draft.name.trim()) {
       toast('Il nome gruppo e obbligatorio', 'error');
       return;
     }
 
     try {
-      await createCustomerGroup.mutateAsync({
-        name: newRow.name.trim(),
-        is_partner: newRow.is_partner,
-      });
-      setNewRow({ name: '', is_partner: false });
-      toast('Gruppo creato', 'success');
+      if (modalMode === 'create') {
+        await createCustomerGroup.mutateAsync({ name: draft.name.trim(), is_partner: draft.is_partner });
+        toast('Gruppo creato', 'success');
+      } else if (editingId != null) {
+        await batchUpdate.mutateAsync({ items: [{ id: editingId, name: draft.name.trim(), is_partner: draft.is_partner }] });
+        toast('Gruppo aggiornato', 'success');
+      }
+      setModalOpen(false);
     } catch (err) {
-      toast(getErrorMessage(err, 'Impossibile creare il gruppo'), 'error');
-    }
-  }
-
-  async function handleBatchSave() {
-    if (changedItems.length === 0) {
-      return;
-    }
-
-    try {
-      await batchUpdate.mutateAsync({ items: changedItems });
-      setDrafts({});
-      toast('Gruppi aggiornati', 'success');
-    } catch (err) {
-      const message = getErrorMessage(err, 'Impossibile aggiornare i gruppi');
-      toast(message === 'read_only_group' ? 'Uno dei gruppi selezionati e protetto in lettura' : message, 'error');
+      const message = getErrorMessage(err, 'Impossibile salvare il gruppo');
+      toast(message === 'read_only_group' ? 'Questo gruppo e protetto in lettura' : message, 'error');
     }
   }
 
@@ -79,84 +67,52 @@ export function CustomerGroupsPage() {
     );
   }
 
+  const selectedGroup = groups.find((g) => g.id === selectedId);
+  const canEdit = selectedGroup != null && !selectedGroup.read_only;
+
   return (
     <section className={styles.page}>
-      <header className={styles.header}>
+      <header className={styles.pageHeader}>
         <div>
-          <p className={styles.eyebrow}>Settings</p>
           <h1>Gruppi cliente</h1>
-          <p className={styles.lead}>
-            Gestisci i profili commerciali condivisi, mantenendo bloccati quelli protetti dal flag di sola lettura.
-          </p>
+          <p className={styles.subtitle}>{groups.length} gruppi</p>
         </div>
-        <div className={styles.highlight}>
-          <span>Pending batch</span>
-          <strong>{changedItems.length}</strong>
-          <p>modifiche pronte per un singolo commit transazionale.</p>
-        </div>
+        <button type="button" className={styles.primaryButton} onClick={openCreate}>
+          Nuovo gruppo
+        </button>
       </header>
 
       <section className={styles.card}>
-        <div className={styles.sectionHeader}>
-          <div>
-            <h2>Nuovo gruppo</h2>
-            <p>Aggiungi un profilo sconto senza uscire dalla pagina di configurazione.</p>
-          </div>
-        </div>
-
-        <div className={styles.inlineForm}>
-          <label className={styles.field}>
-            <span>Nome</span>
-            <input
-              value={newRow.name}
-              onChange={(event) => setNewRow((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Commerciale Wholesale"
-            />
-          </label>
-          <label className={`${styles.field} ${styles.checkboxField}`}>
-            <span>Partner</span>
-            <input
-              type="checkbox"
-              checked={newRow.is_partner}
-              onChange={(event) => setNewRow((current) => ({ ...current, is_partner: event.target.checked }))}
-            />
-          </label>
+        <div className={styles.cardToolbar}>
           <button
             type="button"
-            className={styles.primaryButton}
-            onClick={() => void handleCreate()}
-            disabled={createCustomerGroup.isPending}
+            className={styles.secondaryButton}
+            disabled={!canEdit}
+            onClick={() => { if (selectedId != null) openEdit(selectedId); }}
           >
-            Aggiungi
-          </button>
-        </div>
-      </section>
-
-      <section className={styles.card}>
-        <div className={styles.sectionHeader}>
-          <div>
-            <h2>Profili commerciali</h2>
-            <p>Le modifiche ai gruppi editabili vengono salvate in batch con rollback se un elemento fallisce.</p>
-          </div>
-          <button
-            type="button"
-            className={styles.primaryButton}
-            disabled={changedItems.length === 0 || batchUpdate.isPending}
-            onClick={() => void handleBatchSave()}
-          >
-            Salva modifiche
+            Modifica
           </button>
         </div>
 
         {error ? (
           <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
+            </div>
             <p className={styles.emptyTitle}>Impossibile caricare i gruppi</p>
             <p className={styles.emptyText}>{getErrorMessage(error, 'Riprova tra poco.')}</p>
           </div>
         ) : groups.length === 0 ? (
           <div className={styles.emptyState}>
-            <p className={styles.emptyTitle}>Nessun gruppo disponibile</p>
-            <p className={styles.emptyText}>Aggiungi il primo profilo commerciale per iniziare.</p>
+            <div className={styles.emptyIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+              </svg>
+            </div>
+            <p className={styles.emptyTitle}>Nessun gruppo</p>
+            <p className={styles.emptyText}>Crea il primo gruppo cliente per iniziare.</p>
           </div>
         ) : (
           <div className={styles.tableWrap}>
@@ -170,69 +126,49 @@ export function CustomerGroupsPage() {
                 </tr>
               </thead>
               <tbody>
-                {groups.map((group) => {
-                  const draft = drafts[group.id] ?? {
-                    name: group.name,
-                    is_partner: group.is_partner,
-                  };
-
-                  return (
-                    <tr key={group.id}>
-                      <td>
-                        <input
-                          value={draft.name}
-                          disabled={group.read_only}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            setDrafts((current) => ({
-                              ...current,
-                              [group.id]: {
-                                name: value,
-                                is_partner: current[group.id]?.is_partner ?? group.is_partner,
-                              },
-                            }));
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <span className={styles.numericValue}>
-                          {group.base_discount == null ? 'n/d' : `${(group.base_discount * 100).toFixed(1)}%`}
-                        </span>
-                      </td>
-                      <td>
-                        <label className={styles.checkboxInline}>
-                          <input
-                            type="checkbox"
-                            checked={draft.is_partner}
-                            disabled={group.read_only}
-                            onChange={(event) => {
-                              const value = event.target.checked;
-                              setDrafts((current) => ({
-                                ...current,
-                                [group.id]: {
-                                  name: current[group.id]?.name ?? group.name,
-                                  is_partner: value,
-                                },
-                              }));
-                            }}
-                          />
-                          <span>{draft.is_partner ? 'Si' : 'No'}</span>
-                        </label>
-                      </td>
-                      <td>
-                        <div className={styles.badgeRow}>
-                          {group.is_default ? <span className={styles.badge}>Default</span> : null}
-                          {group.read_only ? <span className={styles.badgeMuted}>Read only</span> : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {groups.map((group, index) => (
+                  <tr
+                    key={group.id}
+                    className={`${selectedId === group.id ? styles.rowSelected : ''} ${group.read_only ? styles.rowMuted : ''}`}
+                    style={{ animationDelay: `${index * 0.03}s` }}
+                    onClick={() => setSelectedId(group.id)}
+                    onDoubleClick={() => openEdit(group.id)}
+                  >
+                    <td>{group.name}</td>
+                    <td><span className={styles.mono}>{group.base_discount == null ? 'n/d' : `${(group.base_discount * 100).toFixed(1)}%`}</span></td>
+                    <td>{group.is_partner ? 'Si' : 'No'}</td>
+                    <td>
+                      <div className={styles.badgeRow}>
+                        {group.is_default ? <span className={styles.badge}>Default</span> : null}
+                        {group.read_only ? <span className={styles.badgeMuted}>Read only</span> : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
       </section>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={modalMode === 'create' ? 'Nuovo gruppo' : 'Modifica gruppo'}>
+        <div className={styles.modalBody}>
+          <label className={styles.field}>
+            <span>Nome</span>
+            <input value={draft.name} onChange={(e) => setDraft((c) => ({ ...c, name: e.target.value }))} placeholder="Nome gruppo" />
+          </label>
+          <ToggleSwitch
+            id="group-partner"
+            checked={draft.is_partner}
+            onChange={(v) => setDraft((c) => ({ ...c, is_partner: v }))}
+            label="Partner"
+          />
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.secondaryButton} onClick={() => setModalOpen(false)}>Annulla</button>
+            <button type="button" className={styles.primaryButton} onClick={() => void handleSave()} disabled={createCustomerGroup.isPending || batchUpdate.isPending}>Salva</button>
+          </div>
+        </div>
+      </Modal>
     </section>
   );
 }
@@ -240,12 +176,8 @@ export function CustomerGroupsPage() {
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError && typeof error.body === 'object' && error.body && 'error' in error.body) {
     const message = error.body.error;
-    if (typeof message === 'string') {
-      return message;
-    }
+    if (typeof message === 'string') return message;
   }
-  if (error instanceof Error) {
-    return error.message;
-  }
+  if (error instanceof Error) return error.message;
   return fallback;
 }
