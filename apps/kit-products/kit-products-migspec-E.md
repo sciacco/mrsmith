@@ -18,7 +18,7 @@
 - **Entities:** 9 managed + 3 lookups + 1 computed view
 - **Integrations:** db-mistra (Postgres), Alyante ERP (MSSQL), Mistra NG REST API (via GW internal CDLAN)
 - **Audit gaps:** 1 dead modal (kit_details in Kit Discounts — no trigger), 14 dead code items, 7 bugs documented
-- **Stored procedures:** All 6 found and analyzed in `docs/mistra_products.json` and `docs/mistra_common.json`
+- **Stored procedures:** All 6 found and analyzed in `docs/mistradb/mistra_products.json` and `docs/mistradb/mistra_common.json`
 
 ---
 
