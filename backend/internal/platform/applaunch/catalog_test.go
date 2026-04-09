@@ -36,21 +36,21 @@ func TestVisibleCategoriesDefaultRoleSeesAllPlaceholders(t *testing.T) {
 	for _, cat := range categories {
 		total += len(cat.Apps)
 	}
-	// All placeholder apps (excludes budget, compliance, kit-products, and listini which require specific roles)
-	if total != 16 {
-		t.Fatalf("expected 16 placeholder apps, got %d", total)
+	// All placeholder apps (excludes budget, compliance, kit-products, listini, and panoramica which require specific roles)
+	if total != 15 {
+		t.Fatalf("expected 15 placeholder apps, got %d", total)
 	}
 }
 
 func TestVisibleCategoriesBothRolesSeesEverything(t *testing.T) {
 	catalog := Catalog(nil)
-	categories := VisibleCategories(catalog, []string{"no-default-roles-cdlan", "app_budget_access", "app_compliance_access", "app_kitproducts_access", "app_listini_access"})
+	categories := VisibleCategories(catalog, []string{"no-default-roles-cdlan", "app_budget_access", "app_compliance_access", "app_kitproducts_access", "app_listini_access", "app_panoramica_access"})
 
 	total := 0
 	for _, cat := range categories {
 		total += len(cat.Apps)
 	}
-	// All 20 apps (16 placeholders + 1 budget + 1 compliance + 1 kit-products + 1 listini)
+	// All 20 apps (15 placeholders + 1 budget + 1 compliance + 1 kit-products + 1 listini + 1 panoramica)
 	if total != 20 {
 		t.Fatalf("expected 20 total apps, got %d", total)
 	}
@@ -130,6 +130,22 @@ func TestVisibleCategoriesFiltersByListiniRole(t *testing.T) {
 	}
 	if categories[0].Apps[0].Href != ListiniAppHref {
 		t.Fatalf("expected listini href %q, got %q", ListiniAppHref, categories[0].Apps[0].Href)
+	}
+}
+
+func TestVisibleCategoriesFiltersByPanoramicaRole(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"app_panoramica_access"})
+	if len(categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(categories))
+	}
+	if categories[0].ID != "smart-apps" {
+		t.Fatalf("expected smart-apps category, got %q", categories[0].ID)
+	}
+	if len(categories[0].Apps) != 1 {
+		t.Fatalf("expected 1 app, got %d", len(categories[0].Apps))
+	}
+	if categories[0].Apps[0].ID != PanoramicaAppID {
+		t.Fatalf("expected panoramica app, got %q", categories[0].Apps[0].ID)
 	}
 }
 

@@ -73,9 +73,24 @@ services:
     depends_on:
       - backend
 
+  panoramica-cliente:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter mrsmith-panoramica-cliente dev --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - panoramica_node_modules:/app/node_modules
+    environment:
+      - VITE_DEV_BACKEND_URL=http://backend:8080
+    ports:
+      - "5178:5178"
+    depends_on:
+      - backend
+
 volumes:
   portal_node_modules:
   budget_node_modules:
   compliance_node_modules:
   kit_products_node_modules:
   listini_node_modules:
+  panoramica_node_modules:

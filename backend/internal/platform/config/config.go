@@ -14,6 +14,7 @@ type Config struct {
 	ComplianceAppURL  string
 	KitProductsAppURL string
 	ListiniAppURL     string
+	PanoramicaAppURL  string
 
 	// Anisetta PostgreSQL (compliance module)
 	AnisettaDSN string
@@ -50,12 +51,13 @@ func Load() Config {
 		Port:              envOr("PORT", "8080"),
 		LogLevel:          envOr("LOG_LEVEL", "info"),
 		KeycloakIssuerURL: envOr("KEYCLOAK_ISSUER_URL", ""),
-		CORSOrigins:       envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177"),
+		CORSOrigins:       envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178"),
 		StaticDir:         envOr("STATIC_DIR", ""),
 		BudgetAppURL:      envOr("BUDGET_APP_URL", ""),
 		ComplianceAppURL:  envOr("COMPLIANCE_APP_URL", ""),
 		KitProductsAppURL: envOr("KIT_PRODUCTS_APP_URL", ""),
 		ListiniAppURL:     envOr("LISTINI_APP_URL", ""),
+		PanoramicaAppURL:  envOr("PANORAMICA_APP_URL", ""),
 		AnisettaDSN:       envOr("ANISETTA_DSN", ""),
 		MistraDSN:         envOr("MISTRA_DSN", ""),
 		AlyanteDSN:        envOr("ALYANTE_DSN", ""),

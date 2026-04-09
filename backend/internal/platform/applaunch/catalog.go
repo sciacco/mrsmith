@@ -17,6 +17,9 @@ const (
 
 	ListiniAppID   = "listini-e-sconti"
 	ListiniAppHref = "/apps/listini-e-sconti/"
+
+	PanoramicaAppID   = "panoramica-cliente"
+	PanoramicaAppHref = "/apps/panoramica-cliente/"
 )
 
 var (
@@ -24,6 +27,7 @@ var (
 	complianceAccessRoles  = []string{"app_compliance_access"}
 	kitProductsAccessRoles = []string{"app_kitproducts_access"}
 	listiniAccessRoles     = []string{"app_listini_access"}
+	panoramicaAccessRoles  = []string{"app_panoramica_access"}
 	defaultAccessRoles     = []string{"no-default-roles-cdlan"}
 )
 
@@ -157,13 +161,14 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			AccessRoles:   defaultRoles,
 		},
 		{
-			ID:            "panoramica-cliente",
+			ID:            PanoramicaAppID,
 			Name:          "Panoramica cliente",
 			Icon:          "folder",
-			Href:          "/apps/smart-apps/panoramica-cliente",
+			Href:          PanoramicaAppHref,
+			Status:        "ready",
 			CategoryID:    "smart-apps",
 			CategoryTitle: "SMART APPS",
-			AccessRoles:   defaultRoles,
+			AccessRoles:   PanoramicaAccessRoles(),
 		},
 		{
 			ID:            "customer-portal",
@@ -313,6 +318,10 @@ func KitProductsAccessRoles() []string {
 
 func ListiniAccessRoles() []string {
 	return slices.Clone(listiniAccessRoles)
+}
+
+func PanoramicaAccessRoles() []string {
+	return slices.Clone(panoramicaAccessRoles)
 }
 
 func DefaultAccessRoles() []string {

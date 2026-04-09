@@ -19,6 +19,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/compliance"
 	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/listini"
+	"github.com/sciacco/mrsmith/internal/panoramica"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/config"
@@ -167,6 +168,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.ListiniAppID] = "http://localhost:5177"
 	}
+	if cfg.PanoramicaAppURL != "" {
+		hrefOverrides[applaunch.PanoramicaAppID] = cfg.PanoramicaAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.PanoramicaAppID] = "http://localhost:5178"
+	}
 	appCatalog := applaunch.Catalog(hrefOverrides)
 	{
 		filtered := make([]applaunch.Definition, 0, len(appCatalog))
@@ -175,6 +181,9 @@ func main() {
 				continue
 			}
 			if definition.ID == applaunch.ListiniAppID && (cfg.MistraDSN == "" || cfg.GrappaDSN == "") {
+				continue
+			}
+			if definition.ID == applaunch.PanoramicaAppID && cfg.MistraDSN == "" && cfg.GrappaDSN == "" && cfg.AnisettaDSN == "" {
 				continue
 			}
 			filtered = append(filtered, definition)
@@ -190,6 +199,7 @@ func main() {
 	}
 	kitproducts.RegisterRoutes(api, mistraDB, alyanteAdapter, arakCli)
 	listini.RegisterRoutes(api, mistraDB, grappaDB, hubspotSvc, carboneSvc)
+	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),
