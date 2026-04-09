@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -92,6 +94,58 @@ func TestRecoverReturnsSanitizedJSONAndLogsPanic(t *testing.T) {
 	}
 }
 
+func TestAccessLogCapturesDownstreamWriteFailure(t *testing.T) {
+	var buf bytes.Buffer
+	logger := logging.NewWithWriter(&buf, "debug")
+
+	handler := RequestID(AccessLog(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("fail"))
+	})))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/demo", nil)
+	req.Header.Set("X-Request-ID", "req-write-fail")
+	rec := &errorResponseWriter{header: make(http.Header), err: errors.New("broken pipe")}
+
+	handler.ServeHTTP(rec, req)
+
+	entry := decodeMiddlewareLog(t, buf.String())
+	if entry["msg"] != "request completed with downstream write failure" {
+		t.Fatalf("expected downstream failure log, got %#v", entry["msg"])
+	}
+	if entry["status"] != float64(http.StatusOK) {
+		t.Fatalf("expected 200 status, got %#v", entry["status"])
+	}
+	if entry["downstream_write_error"] != "broken pipe" {
+		t.Fatalf("expected write error in log, got %#v", entry["downstream_write_error"])
+	}
+}
+
+func TestAccessLogCapturesClientAbort(t *testing.T) {
+	var buf bytes.Buffer
+	logger := logging.NewWithWriter(&buf, "debug")
+
+	handler := RequestID(AccessLog(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/demo", nil).WithContext(ctx)
+	req.Header.Set("X-Request-ID", "req-abort")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	entry := decodeMiddlewareLog(t, buf.String())
+	if entry["msg"] != "request aborted by client" {
+		t.Fatalf("expected client abort log, got %#v", entry["msg"])
+	}
+	if entry["request_context_error"] != context.Canceled.Error() {
+		t.Fatalf("expected context canceled, got %#v", entry["request_context_error"])
+	}
+}
+
 func decodeMiddlewareLog(t *testing.T, raw string) map[string]any {
 	t.Helper()
 
@@ -105,4 +159,22 @@ func decodeMiddlewareLog(t *testing.T, raw string) map[string]any {
 		t.Fatalf("failed to decode log line: %v", err)
 	}
 	return entry
+}
+
+type errorResponseWriter struct {
+	header http.Header
+	status int
+	err    error
+}
+
+func (w *errorResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *errorResponseWriter) WriteHeader(status int) {
+	w.status = status
+}
+
+func (w *errorResponseWriter) Write([]byte) (int, error) {
+	return 0, w.err
 }

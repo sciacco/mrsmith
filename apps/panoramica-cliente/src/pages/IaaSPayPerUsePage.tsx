@@ -32,6 +32,10 @@ const dailyCsvCols: { key: keyof DailyCharge; label: string }[] = [
 
 type TabId = 'giornaliero' | 'mensile';
 
+function QueryErrorState({ message }: { message: string }) {
+  return <div className={s.empty}>{message}</div>;
+}
+
 export function IaaSPayPerUsePage() {
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -62,6 +66,10 @@ export function IaaSPayPerUsePage() {
 
   if (accountsQ.error && (accountsQ.error as ApiError).status === 503) {
     return <ServiceUnavailable service="Grappa" />;
+  }
+
+  if (accountsQ.error) {
+    return <QueryErrorState message="Errore durante il caricamento degli account IaaS." />;
   }
 
   const monthlyData = (monthlyQ.data ?? []).slice().reverse();
@@ -128,6 +136,14 @@ export function IaaSPayPerUsePage() {
             <div className={is.detailSection}>
               {dailyQ.isLoading && <div className={s.loading}>Caricamento...</div>}
 
+              {dailyQ.error && !(dailyQ.error instanceof ApiError && dailyQ.error.status === 503) && (
+                <QueryErrorState message="Errore durante il caricamento dei dati giornalieri." />
+              )}
+
+              {dailyQ.error && (dailyQ.error as ApiError).status === 503 && (
+                <ServiceUnavailable service="Grappa" />
+              )}
+
               {(dailyQ.data ?? []).length > 0 && (
                 <div style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 400px' }}>
@@ -162,6 +178,18 @@ export function IaaSPayPerUsePage() {
                     </div>
                   </div>
 
+                  {selectedDay && breakdownQ.error && !(breakdownQ.error instanceof ApiError && breakdownQ.error.status === 503) && (
+                    <div style={{ flex: '0 0 320px' }}>
+                      <QueryErrorState message="Errore durante il caricamento del dettaglio giornaliero." />
+                    </div>
+                  )}
+
+                  {selectedDay && breakdownQ.error && (breakdownQ.error as ApiError).status === 503 && (
+                    <div style={{ flex: '0 0 320px' }}>
+                      <ServiceUnavailable service="Grappa" />
+                    </div>
+                  )}
+
                   {selectedDay && breakdownQ.data && breakdownQ.data.charges.length > 0 && (
                     <div style={{ flex: '0 0 320px' }}>
                       <h3 style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
@@ -194,7 +222,7 @@ export function IaaSPayPerUsePage() {
                 </div>
               )}
 
-              {!dailyQ.isLoading && (dailyQ.data ?? []).length === 0 && (
+              {!dailyQ.isLoading && !dailyQ.error && (dailyQ.data ?? []).length === 0 && (
                 <div className={s.empty}>Nessun dato giornaliero.</div>
               )}
             </div>
@@ -203,6 +231,14 @@ export function IaaSPayPerUsePage() {
           {activeTab === 'mensile' && (
             <div className={is.detailSection}>
               {monthlyQ.isLoading && <div className={s.loading}>Caricamento...</div>}
+
+              {monthlyQ.error && !(monthlyQ.error instanceof ApiError && monthlyQ.error.status === 503) && (
+                <QueryErrorState message="Errore durante il caricamento dei dati mensili." />
+              )}
+
+              {monthlyQ.error && (monthlyQ.error as ApiError).status === 503 && (
+                <ServiceUnavailable service="Grappa" />
+              )}
 
               {monthlyData.length > 0 && (
                 <div style={{ width: '100%', height: 400 }}>
@@ -226,7 +262,7 @@ export function IaaSPayPerUsePage() {
                 </div>
               )}
 
-              {!monthlyQ.isLoading && monthlyData.length === 0 && (
+              {!monthlyQ.isLoading && !monthlyQ.error && monthlyData.length === 0 && (
                 <div className={s.empty}>Nessun dato mensile.</div>
               )}
             </div>

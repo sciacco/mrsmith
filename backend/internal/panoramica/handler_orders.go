@@ -98,44 +98,45 @@ ORDER BY data_documento, nome_testata_ordine, rn`, placeholders)
 	defer rows.Close()
 
 	type orderRow struct {
-		Stato             string   `json:"stato"`
-		NumeroOrdine      string   `json:"numero_ordine"`
-		DescrizioneLong   string   `json:"descrizione_long"`
-		Quantita          int      `json:"quantita"`
-		NRC               float64  `json:"nrc"`
-		MRC               float64  `json:"mrc"`
-		TotaleMRC         float64  `json:"totale_mrc"`
-		StatoOrdine       string   `json:"stato_ordine"`
-		NomeTestataOrdine string   `json:"nome_testata_ordine"`
-		RN                int      `json:"rn"`
-		NumeroAzienda     int      `json:"numero_azienda"`
-		DataDocumento     *string  `json:"data_documento"`
-		StatoRiga         string   `json:"stato_riga"`
-		DataUltimaFatt    *string  `json:"data_ultima_fatt"`
-		Serialnumber      *string  `json:"serialnumber"`
-		MetodoPagamento   *string  `json:"metodo_pagamento"`
-		DurataServizio    *string  `json:"durata_servizio"`
-		DurataRinnovo     *string  `json:"durata_rinnovo"`
-		DataCessazione    *string  `json:"data_cessazione"`
-		DataAttivazione   *string  `json:"data_attivazione"`
-		NoteLegali        *string  `json:"note_legali"`
-		SostOrd           *string  `json:"sost_ord"`
-		SostituitoDa      *string  `json:"sostituito_da"`
-		Storico           *string  `json:"storico"`
+		Stato             string  `json:"stato"`
+		NumeroOrdine      string  `json:"numero_ordine"`
+		DescrizioneLong   string  `json:"descrizione_long"`
+		Quantita          int     `json:"quantita"`
+		NRC               float64 `json:"nrc"`
+		MRC               float64 `json:"mrc"`
+		TotaleMRC         float64 `json:"totale_mrc"`
+		StatoOrdine       string  `json:"stato_ordine"`
+		NomeTestataOrdine string  `json:"nome_testata_ordine"`
+		RN                int     `json:"rn"`
+		NumeroAzienda     int     `json:"numero_azienda"`
+		DataDocumento     *string `json:"data_documento"`
+		StatoRiga         string  `json:"stato_riga"`
+		DataUltimaFatt    *string `json:"data_ultima_fatt"`
+		Serialnumber      *string `json:"serialnumber"`
+		MetodoPagamento   *string `json:"metodo_pagamento"`
+		DurataServizio    *string `json:"durata_servizio"`
+		DurataRinnovo     *string `json:"durata_rinnovo"`
+		DataCessazione    *string `json:"data_cessazione"`
+		DataAttivazione   *string `json:"data_attivazione"`
+		NoteLegali        *string `json:"note_legali"`
+		SostOrd           *string `json:"sost_ord"`
+		SostituitoDa      *string `json:"sostituito_da"`
+		Storico           *string `json:"storico"`
 	}
 
 	var result []orderRow
 	for rows.Next() {
 		var o orderRow
-		var dataDocumento, dataUltimaFatt, serialnumber sql.NullString
+		var stato, numeroOrdine, descrizioneLong, statoOrdine, nomeTestataOrdine sql.NullString
+		var statoRiga, dataDocumento, dataUltimaFatt, serialnumber sql.NullString
 		var metodoPagamento, durataServizio, durataRinnovo sql.NullString
 		var dataCessazione, dataAttivazione, noteLegali sql.NullString
 		var sostOrd, sostituitoDa, storico sql.NullString
 
 		if err := rows.Scan(
-			&o.Stato, &o.NumeroOrdine, &o.DescrizioneLong, &o.Quantita,
-			&o.NRC, &o.MRC, &o.TotaleMRC, &o.StatoOrdine, &o.NomeTestataOrdine,
-			&o.RN, &o.NumeroAzienda, &dataDocumento, &o.StatoRiga,
+			&stato, &numeroOrdine, &descrizioneLong, &o.Quantita,
+			&o.NRC, &o.MRC, &o.TotaleMRC, &statoOrdine, &nomeTestataOrdine,
+			&o.RN, &o.NumeroAzienda, &dataDocumento, &statoRiga,
 			&dataUltimaFatt, &serialnumber, &metodoPagamento, &durataServizio,
 			&durataRinnovo, &dataCessazione, &dataAttivazione, &noteLegali,
 			&sostOrd, &sostituitoDa, &storico,
@@ -144,6 +145,12 @@ ORDER BY data_documento, nome_testata_ordine, rn`, placeholders)
 			return
 		}
 
+		o.Stato = nullStringValue(stato)
+		o.NumeroOrdine = nullStringValue(numeroOrdine)
+		o.DescrizioneLong = nullStringValue(descrizioneLong)
+		o.StatoOrdine = nullStringValue(statoOrdine)
+		o.NomeTestataOrdine = nullStringValue(nomeTestataOrdine)
+		o.StatoRiga = nullStringValue(statoRiga)
 		o.DataDocumento = nullStringPtr(dataDocumento)
 		o.DataUltimaFatt = nullStringPtr(dataUltimaFatt)
 		o.Serialnumber = nullStringPtr(serialnumber)
@@ -325,10 +332,10 @@ ORDER BY o.nome_testata_ordine, o.data_documento DESC`, placeholders)
 		DataScadenzaOrdine         *string `json:"data_scadenza_ordine"`
 		MRC                        float64 `json:"mrc"`
 		// Prodotto
-		Famiglia       *string `json:"famiglia"`
-		SottoFamiglia  *string `json:"sotto_famiglia"`
-		ContoRicavo    *string `json:"conto_ricavo"`
-		StatoRiga      string  `json:"stato_riga"`
+		Famiglia        *string `json:"famiglia"`
+		SottoFamiglia   *string `json:"sotto_famiglia"`
+		ContoRicavo     *string `json:"conto_ricavo"`
+		StatoRiga       string  `json:"stato_riga"`
 		IntOrdine       *string `json:"intestazione_ordine"`
 		DescrizioneLong *string `json:"descrizione_long"`
 		Storico         *string `json:"storico"`
@@ -338,22 +345,22 @@ ORDER BY o.nome_testata_ordine, o.data_documento DESC`, placeholders)
 	for rows.Next() {
 		var d detailRow
 		var (
-			dataOrdine, cliente, idGamma, commerciale                                    sql.NullString
-			dataDocumento, dataConferma, tipoOrdine, tipoDocumento                       sql.NullString
-			sostOrd, rifODV, durataServizio, tacitoRinnovo                                sql.NullString
-			durataRinnovo, tempiRilascio, metodoPagamento, noteLegali                     sql.NullString
-			refAmmNome, refAmmMail, refAmmTel                                            sql.NullString
-			refTechNome, refTechMail, refTechTel                                         sql.NullString
-			refAltroNome, refAltroMail, refAltroTel                                      sql.NullString
-			dataCreazione, dataVariazione, sostituitoDa                                   sql.NullString
-			codiceKit, codiceProdotto, descProdotto, descEstesa                           sql.NullString
-			serialnumber, valuta                                                          sql.NullString
-			dataAtt, dataDisdetta, dataCess                                               sql.NullString
-			raggFatt, intFattAtt, intFattCanone                                           sql.NullString
-			dataUltFatt, dataFineFatt, sysOdvRow, idGammaTestata                          sql.NullString
-			ordine, dataScadenza                                                          sql.NullString
-			famiglia, sottoFamiglia, contoRicavo                                          sql.NullString
-			intOrdine, descLong, storico                                                   sql.NullString
+			dataOrdine, cliente, idGamma, commerciale                 sql.NullString
+			dataDocumento, dataConferma, tipoOrdine, tipoDocumento    sql.NullString
+			sostOrd, rifODV, durataServizio, tacitoRinnovo            sql.NullString
+			durataRinnovo, tempiRilascio, metodoPagamento, noteLegali sql.NullString
+			refAmmNome, refAmmMail, refAmmTel                         sql.NullString
+			refTechNome, refTechMail, refTechTel                      sql.NullString
+			refAltroNome, refAltroMail, refAltroTel                   sql.NullString
+			dataCreazione, dataVariazione, sostituitoDa               sql.NullString
+			codiceKit, codiceProdotto, descProdotto, descEstesa       sql.NullString
+			serialnumber, valuta                                      sql.NullString
+			dataAtt, dataDisdetta, dataCess                           sql.NullString
+			raggFatt, intFattAtt, intFattCanone                       sql.NullString
+			dataUltFatt, dataFineFatt, sysOdvRow, idGammaTestata      sql.NullString
+			ordine, dataScadenza                                      sql.NullString
+			famiglia, sottoFamiglia, contoRicavo                      sql.NullString
+			intOrdine, descLong, storico                              sql.NullString
 		)
 
 		if err := rows.Scan(
@@ -449,4 +456,11 @@ func nullStringPtr(ns sql.NullString) *string {
 		return &ns.String
 	}
 	return nil
+}
+
+func nullStringValue(ns sql.NullString) string {
+	if ns.Valid {
+		return ns.String
+	}
+	return ""
 }

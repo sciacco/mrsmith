@@ -101,6 +101,26 @@ Alyante ERP ID
 | `385` | IaaS Prezzi risorse, IaaS Credito omaggio |
 | `485` | IaaS Credito omaggio |
 
+## API and Backend Contract Quirks
+
+### Panoramica Orders Summary Text Columns Can Be NULL
+
+- Context: `GET /api/panoramica/v1/orders/summary` backed by `loader.v_ordini_sintesi`.
+- Discovery: production data can return `NULL` for multiple `loader.v_ordini_sintesi` text fields used by the summary endpoint, including `stato` and `numero_ordine`, even though the original backend/frontend contract modeled them as required strings.
+- Practical rule: scan summary text columns with `sql.NullString` in backend handlers and normalize them deliberately before JSON encoding; do not scan those columns directly into Go `string` fields.
+- Evidence: backend failures `list_orders_summary_scan` on 2026-04-09 for `stato` and `numero_ordine` (`converting NULL to string is unsupported`), fixed in `backend/internal/panoramica/handler_orders.go`.
+- Used by: `apps/panoramica-cliente` recurring orders summary view.
+- Open questions: whether the frontend contract should eventually widen affected summary text fields to `string | null` instead of preserving empty-string fallbacks.
+
+### Slow Read Endpoints Must Fit Server Write Timeout
+
+- Context: slow report-style endpoints behind the shared Go HTTP server, including `GET /api/panoramica/v1/iaas/monthly-charges`.
+- Discovery: a handler can finish its SQL work and still surface as a client-side transport failure if response delivery exceeds the server write budget or the downstream connection closes first. In that case, naive access logs can still misleadingly report a clean `200` unless the response writer captures downstream write errors.
+- Practical rule: when a read endpoint is expected to run for tens of seconds, align `http.Server.WriteTimeout` with that runtime budget and make access logs record downstream write failures and request-context cancellation separately from normal completions.
+- Evidence: Panoramica local-dev failure on 2026-04-09 where `monthly-charges` took ~44s, Vite logged `socket hang up`, and backend access logging needed downstream write-error tracking to distinguish true delivery from handler completion.
+- Used by: `apps/panoramica-cliente` IaaS PPU monthly charges view; shared backend middleware in `backend/pkg/middleware`.
+- Open questions: whether future report endpoints should adopt per-handler query deadlines or asynchronous export flows instead of relying on a larger shared write timeout.
+
 ## Legacy Data Model Constraints
 
 ### Alyante Product Translation Write Contract
@@ -111,5 +131,3 @@ Alyante ERP ID
 - Evidence: verified Appsmith query `update MG87_ARTDESC set MG87_DESCART = {{this.params.descr}} where MG87_DITTA_CG18 = 1 and MG87_OPZIONE_MG5E = '                    ' and MG87_LINGUA_MG52 = {{this.params.lang}} AND MG87_CODART_MG66 = {{this.params.code}}`; backend adapter in `backend/internal/kitproducts/alyante.go`.
 - Used by: `apps/kit-products` product translation sync.
 - Open questions: none for this environment; if another Alyante tenant exposes different column names, verify its datasource query before generalizing.
-
-

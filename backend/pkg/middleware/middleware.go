@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
@@ -95,13 +97,29 @@ func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 			r = r.WithContext(logging.IntoContext(r.Context(), reqLogger))
 			rec := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(rec, r)
-			reqLogger.Info("request completed",
+
+			args := []any{
 				"status", rec.status,
 				"bytes_written", rec.bytesWritten,
 				"duration_ms", time.Since(start).Milliseconds(),
 				"remote_addr", r.RemoteAddr,
 				"user_agent", r.UserAgent(),
-			)
+			}
+			if rec.writeErr != nil {
+				args = append(args, "downstream_write_error", rec.writeErr.Error())
+			}
+			if ctxErr := r.Context().Err(); ctxErr != nil {
+				args = append(args, "request_context_error", ctxErr.Error())
+			}
+
+			switch {
+			case rec.writeErr != nil:
+				reqLogger.Warn("request completed with downstream write failure", args...)
+			case errors.Is(r.Context().Err(), context.Canceled):
+				reqLogger.Warn("request aborted by client", args...)
+			default:
+				reqLogger.Info("request completed", args...)
+			}
 		})
 	}
 }
@@ -110,6 +128,7 @@ type responseRecorder struct {
 	http.ResponseWriter
 	status       int
 	bytesWritten int
+	writeErr     error
 }
 
 func (r *responseRecorder) WriteHeader(status int) {
@@ -123,5 +142,8 @@ func (r *responseRecorder) Write(p []byte) (int, error) {
 	}
 	n, err := r.ResponseWriter.Write(p)
 	r.bytesWritten += n
+	if err != nil && r.writeErr == nil {
+		r.writeErr = err
+	}
 	return n, err
 }

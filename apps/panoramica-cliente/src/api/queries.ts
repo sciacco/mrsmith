@@ -128,6 +128,7 @@ export function useDailyCharges(domain: string | null) {
     queryKey: ['panoramica', 'iaas', 'daily-charges', domain],
     queryFn: () => api.get<DailyCharge[]>(`/panoramica/v1/iaas/daily-charges?domain=${domain}`),
     enabled: domain !== null,
+    retry: false,
   });
 }
 
@@ -137,6 +138,7 @@ export function useMonthlyCharges(domain: string | null) {
     queryKey: ['panoramica', 'iaas', 'monthly-charges', domain],
     queryFn: () => api.get<MonthlyCharge[]>(`/panoramica/v1/iaas/monthly-charges?domain=${domain}`),
     enabled: domain !== null,
+    retry: false,
   });
 }
 
@@ -146,6 +148,7 @@ export function useChargeBreakdown(domain: string | null, day: string | null) {
     queryKey: ['panoramica', 'iaas', 'charge-breakdown', domain, day],
     queryFn: () => api.get<ChargeBreakdown>(`/panoramica/v1/iaas/charge-breakdown?domain=${domain}&day=${day}`),
     enabled: domain !== null && day !== null,
+    retry: false,
   });
 }
 
