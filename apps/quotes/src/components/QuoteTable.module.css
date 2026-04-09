@@ -1,0 +1,154 @@
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table th {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted, #64748b);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.sortable {
+  cursor: pointer;
+}
+
+.sortable:hover {
+  color: var(--color-text, #1e293b);
+}
+
+.table td {
+  padding: 0;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+}
+
+.row {
+  height: 56px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  animation: rowEnter 0.4s ease both;
+}
+
+.row:hover {
+  background: rgba(99, 91, 255, 0.02);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--color-text, #1e293b);
+}
+
+.accentCell {
+  position: relative;
+  width: 4px;
+  padding: 0;
+}
+
+.accentBar {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--color-accent, #635bff);
+  opacity: 0;
+  transform: scaleY(0.6);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.row:hover .accentBar {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--color-text-muted, #64748b);
+  font-size: 0.8125rem;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.kebabCell {
+  width: 48px;
+  text-align: center;
+}
+
+/* Skeleton */
+.skeletonRow {
+  height: 56px;
+}
+
+.skeleton {
+  display: inline-block;
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Empty state */
+.empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.emptyTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text, #1e293b);
+  margin-bottom: 0.5rem;
+}
+
+.emptyAction {
+  margin-top: 1rem;
+}
+
+.clearLink {
+  color: var(--color-accent, #635bff);
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.clearLink:hover {
+  text-decoration: underline;
+}
+
+/* Refetch opacity */
+.refetching {
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}

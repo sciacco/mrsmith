@@ -1,0 +1,101 @@
+.accordion {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 0.75rem;
+  background: #fff;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease;
+}
+
+.accordion:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dragHandle {
+  cursor: grab;
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 1rem;
+}
+
+.kitName {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text, #1e293b);
+  flex: 1;
+}
+
+.totals {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.totalLabel {
+  color: var(--color-text-muted, #64748b);
+  margin-right: 0.25rem;
+}
+
+.totalValue {
+  font-weight: 600;
+  color: var(--color-text, #1e293b);
+  transition: opacity 0.3s ease;
+}
+
+.removeBtn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted, #94a3b8);
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  transition: all 0.15s ease;
+}
+
+.removeBtn:hover {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.confirmBtn {
+  composes: removeBtn;
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.body {
+  padding: 0 1rem 1rem;
+  animation: accordionOpen 0.35s ease both;
+}
+
+@keyframes accordionOpen {
+  from { max-height: 0; opacity: 0; }
+  to   { max-height: 2000px; opacity: 1; }
+}
+
+.chevron {
+  transition: transform 0.2s ease;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.dragging {
+  opacity: 0.6;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: scale(1.02);
+}

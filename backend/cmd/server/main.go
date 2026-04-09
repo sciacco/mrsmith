@@ -20,6 +20,8 @@ import (
 	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/listini"
 	"github.com/sciacco/mrsmith/internal/panoramica"
+	"github.com/sciacco/mrsmith/internal/platform/hubspot"
+	"github.com/sciacco/mrsmith/internal/quotes"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/config"
@@ -137,6 +139,13 @@ func main() {
 		logger.Info("hubspot service not configured", "component", "listini")
 	}
 
+	// Shared HubSpot client (quotes module and future consumers)
+	var hubspotCli *hubspot.Client
+	if cfg.HubSpotAPIKey != "" {
+		hubspotCli = hubspot.New(cfg.HubSpotAPIKey)
+		logger.Info("shared hubspot client configured", "component", "hubspot")
+	}
+
 	// Carbone service (optional — listini module)
 	var carboneSvc *listini.CarboneService
 	if cfg.CarboneAPIKey != "" {
@@ -173,6 +182,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.PanoramicaAppID] = "http://localhost:5178"
 	}
+	if cfg.QuotesAppURL != "" {
+		hrefOverrides[applaunch.QuotesAppID] = cfg.QuotesAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.QuotesAppID] = "http://localhost:5179"
+	}
 	appCatalog := applaunch.Catalog(hrefOverrides)
 	{
 		filtered := make([]applaunch.Definition, 0, len(appCatalog))
@@ -184,6 +198,9 @@ func main() {
 				continue
 			}
 			if definition.ID == applaunch.PanoramicaAppID && cfg.MistraDSN == "" && cfg.GrappaDSN == "" && cfg.AnisettaDSN == "" {
+				continue
+			}
+			if definition.ID == applaunch.QuotesAppID && cfg.MistraDSN == "" {
 				continue
 			}
 			filtered = append(filtered, definition)
@@ -200,6 +217,7 @@ func main() {
 	kitproducts.RegisterRoutes(api, mistraDB, alyanteAdapter, arakCli)
 	listini.RegisterRoutes(api, mistraDB, grappaDB, hubspotSvc, carboneSvc)
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
+	quotes.RegisterRoutes(api, mistraDB, alyanteDB, hubspotCli)
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),

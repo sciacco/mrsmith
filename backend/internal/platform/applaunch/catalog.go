@@ -20,6 +20,9 @@ const (
 
 	PanoramicaAppID   = "panoramica-cliente"
 	PanoramicaAppHref = "/apps/panoramica-cliente/"
+
+	QuotesAppID   = "proposte"
+	QuotesAppHref = "/apps/quotes/"
 )
 
 var (
@@ -28,6 +31,8 @@ var (
 	kitProductsAccessRoles = []string{"app_kitproducts_access"}
 	listiniAccessRoles     = []string{"app_listini_access"}
 	panoramicaAccessRoles  = []string{"app_panoramica_access"}
+	quotesAccessRoles      = []string{"app_quotes_access"}
+	quotesDeleteRoles      = []string{"app_quotes_delete"}
 	defaultAccessRoles     = []string{"no-default-roles-cdlan"}
 )
 
@@ -114,13 +119,14 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			AccessRoles:   KitProductsAccessRoles(),
 		},
 		{
-			ID:            "proposte",
+			ID:            QuotesAppID,
 			Name:          "Proposte",
 			Icon:          "mail",
-			Href:          "/apps/mkt-sales/proposte",
+			Href:          QuotesAppHref,
+			Status:        "ready",
 			CategoryID:    "mkt-sales",
 			CategoryTitle: "MKT&Sales",
-			AccessRoles:   defaultRoles,
+			AccessRoles:   QuotesAccessRoles(),
 		},
 		{
 			ID:            "richieste-fattibilita",
@@ -322,6 +328,14 @@ func ListiniAccessRoles() []string {
 
 func PanoramicaAccessRoles() []string {
 	return slices.Clone(panoramicaAccessRoles)
+}
+
+func QuotesAccessRoles() []string {
+	return slices.Clone(quotesAccessRoles)
+}
+
+func QuotesDeleteRoles() []string {
+	return slices.Clone(quotesDeleteRoles)
 }
 
 func DefaultAccessRoles() []string {

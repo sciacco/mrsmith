@@ -1,0 +1,37 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.draft {
+  background: var(--color-surface-raised, #f1f5f9);
+  color: var(--color-text-muted, #64748b);
+}
+
+.pendingApproval {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.approved {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+
+.approvalNotNeeded {
+  background: rgba(34, 197, 94, 0.08);
+  color: #16a34a;
+}
+
+.esignCompleted {
+  background: var(--color-surface-raised, #f1f5f9);
+  color: var(--color-text-muted, #64748b);
+}

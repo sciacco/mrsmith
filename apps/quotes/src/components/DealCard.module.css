@@ -1,0 +1,37 @@
+.card {
+  padding: 1rem 1.25rem;
+  border: 2px solid var(--color-border, #e2e8f0);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: #fff;
+}
+
+.card:hover {
+  border-color: rgba(99, 91, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(99, 91, 255, 0.06);
+}
+
+.selected {
+  border-color: var(--color-accent, #635bff);
+  box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.08);
+}
+
+.dealName {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text, #1e293b);
+  margin-bottom: 0.25rem;
+}
+
+.company {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.amount {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #64748b);
+  margin-top: 0.25rem;
+}

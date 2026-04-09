@@ -1,0 +1,115 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  animation: sectionEnter 0.3s ease both;
+}
+
+@media (max-width: 768px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+.section {
+  background: #fff;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.sectionTitle {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 0.75rem;
+}
+
+.field {
+  margin-bottom: 0.625rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 0.25rem;
+}
+
+.input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  background: #fff;
+  color: var(--color-text, #1e293b);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input:focus {
+  border-color: var(--color-accent, #635bff);
+  box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.08);
+}
+
+.select {
+  composes: input;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2394a3b8' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  padding-right: 2rem;
+}
+
+.readOnly {
+  composes: input;
+  background: var(--color-surface-raised, #f8fafc);
+  cursor: default;
+}
+
+.radioGroup {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  color: var(--color-text, #1e293b);
+}
+
+.radioInput {
+  accent-color: var(--color-accent, #635bff);
+}
+
+.infoCard {
+  background: rgba(99, 91, 255, 0.04);
+  border: 1px solid rgba(99, 91, 255, 0.12);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  color: var(--color-text, #1e293b);
+}
+
+.revealEnter {
+  animation: revealSlide 0.25s ease both;
+  overflow: hidden;
+}
+
+@keyframes revealSlide {
+  from { max-height: 0; opacity: 0; }
+  to   { max-height: 100px; opacity: 1; }
+}
+
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

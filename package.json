@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "concurrently --names backend,portal,budget,compliance,kit-products,listini,panoramica --prefix-colors blue,green,magenta,cyan,yellow,red,white \"cd backend && air\" \"pnpm --filter mrsmith-portal dev\" \"pnpm --filter mrsmith-budget dev\" \"pnpm --filter mrsmith-compliance dev\" \"pnpm --filter mrsmith-kit-products dev\" \"pnpm --filter mrsmith-listini-e-sconti dev\" \"pnpm --filter mrsmith-panoramica-cliente dev\"",
+    "dev": "concurrently --names backend,portal,budget,compliance,kit-products,listini,panoramica,quotes --prefix-colors blue,green,magenta,cyan,yellow,red,white,gray \"cd backend && air\" \"pnpm --filter mrsmith-portal dev\" \"pnpm --filter mrsmith-budget dev\" \"pnpm --filter mrsmith-compliance dev\" \"pnpm --filter mrsmith-kit-products dev\" \"pnpm --filter mrsmith-listini-e-sconti dev\" \"pnpm --filter mrsmith-panoramica-cliente dev\" \"pnpm --filter mrsmith-quotes dev\"",
     "dev:backend": "cd backend && air",
     "dev:portal": "pnpm --filter mrsmith-portal dev",
     "dev:budget": "pnpm --filter mrsmith-budget dev",
@@ -11,6 +11,7 @@
     "dev:kit-products": "pnpm --filter mrsmith-kit-products dev",
     "dev:listini": "pnpm --filter mrsmith-listini-e-sconti dev",
     "dev:panoramica": "pnpm --filter mrsmith-panoramica-cliente dev",
+    "dev:quotes": "pnpm --filter mrsmith-quotes dev",
     "build": "pnpm -r --if-present build && cd backend && go build -o bin/server ./cmd/server",
     "build:frontend": "pnpm -r --if-present build",
     "build:backend": "cd backend && go build -o bin/server ./cmd/server",
