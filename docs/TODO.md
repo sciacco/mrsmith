@@ -27,6 +27,11 @@ Currently rack energy discounts (0–20%) are saved immediately without approval
 ### Dashboard Page
 The Dashboard page (revenue charts per client: revenue by account, historical billing in K EUR, active services) is a work in progress in Appsmith and is not included in the initial migration scope. It should be migrated once the Appsmith version is stabilized and the remaining pages are live. The audit is captured in `apps/panoramica-cliente/PANORAMICA-AUDIT.md` (page 1).
 
+## Quotes App
+
+### Multi-Product Selection per Group
+Currently the quote product configuration enforces single-selection per `group_name` (radio-button behavior in `quotes.upd_quote_row_product`). A future enhancement should support multi-selection within a group (e.g. selecting both "Monitoraggio" and "Backup" in an "Opzioni aggiuntive" group). This requires coordination with kit management (`products.kit_product` model) to define which groups allow multi-select, and changes to both the stored procedure and the UI product configurator.
+
 ## Cross-App Infrastructure
 
 ### Async HubSpot Request Queue
