@@ -74,3 +74,8 @@
 - [AGENTS.md](AGENTS.md) now has a compact `Databases` section pointing contributors to `docs/grappa/GRAPPA.md` and `docs/mistradb/MISTRA.md` as the entry points for schema documentation.
 - Alyante ERP product translation writes in `backend/internal/kitproducts/alyante.go` must match the verified Appsmith contract for `MG87_ARTDESC`: `SET MG87_DESCART`, filter on `MG87_DITTA_CG18 = 1`, `MG87_OPZIONE_MG5E = 20 spaces`, `MG87_LINGUA_MG52`, and `MG87_CODART_MG66`; older unsuffixed names like `MG87_DITTA` and `MG87_DESCRIZIONE` are wrong for this environment.
 - `backend/internal/kitproducts/alyante_test.go` locks the Alyante SQL shape and parameter order with an injected `execFn`, so future edits can verify the exact ERP contract without a live MSSQL connection.
+
+## 2026-04-09
+- Panoramica plan-review heuristic: if a new mini-app plan claims split-server launcher support via `<APP>_APP_URL`, approval should require the full chain to be explicitly planned in `config.go`, `main.go` `hrefOverrides`, and local fallback behavior when `STATIC_DIR == ""`; a checklist note alone is not enough.
+- Panoramica plan-review heuristic: when a plan changes a launcher catalog entry from placeholder access to a dedicated role, it must also decide dependency-based visibility rules up front and call out `backend/internal/platform/applaunch/catalog_test.go` updates plus `go test ./...` verification.
+- Plan-review heuristic: sample code embedded in implementation plans should be sanity-checked for copy-paste breakage such as unused imports and slice-iteration mutation bugs (`for _, row := range rows` does not update returned elements).
