@@ -270,12 +270,13 @@ func (h *Handler) handleListProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.QueryContext(r.Context(),
-		`SELECT id, product_code, product_name, minimum, maximum, required,
-		        nrc, mrc, position, group_name, included, main_product, quantity,
-		        extended_description
-		 FROM quotes.v_quote_rows_products
-		 WHERE quote_row_id = $1
-		 ORDER BY position`, rowID)
+		`SELECT qrp.id, qrp.product_code, p.internal_name, qrp.minimum, qrp.maximum,
+		        qrp.required, qrp.nrc, qrp.mrc, qrp.position, qrp.group_name,
+		        qrp.included, qrp.main_product, qrp.quantity, qrp.extended_description
+		 FROM quotes.quote_rows_products qrp
+		 JOIN products.product p ON p.code = qrp.product_code
+		 WHERE qrp.quote_row_id = $1
+		 ORDER BY qrp.position`, rowID)
 	if err != nil {
 		h.dbFailure(w, r, "list_products", err)
 		return
@@ -296,7 +297,7 @@ func (h *Handler) handleListProducts(w http.ResponseWriter, r *http.Request) {
 		Included            bool    `json:"included"`
 		MainProduct         bool    `json:"main_product"`
 		Quantity            int     `json:"quantity"`
-		ExtendedDescription *string `json:"extended_description"`
+		ExtendedDescription string  `json:"extended_description"`
 	}
 
 	result := []product{}
