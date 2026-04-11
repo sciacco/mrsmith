@@ -1,7 +1,116 @@
 .introText {
   font-size: 0.875rem;
   color: var(--color-text-muted);
-  margin-bottom: var(--space-6);
+  margin: 0 0 var(--space-5);
+}
+
+/* ── Summary card ── */
+.summaryCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.summaryRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  font-size: 0.8125rem;
+}
+
+.summaryLabel {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.summaryValue {
+  color: var(--color-text);
+  font-weight: 500;
+  text-align: right;
+}
+
+.summaryValueMono {
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  font-weight: 600;
+  text-align: right;
+}
+
+.totalsRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.totalsCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.totalsLabel {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.totalsValue {
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.totalsDivider {
+  width: 1px;
+  height: 28px;
+  background: var(--color-border);
+}
+
+.statusPreview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.statusPreviewLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.legalBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-warning-subtle);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  color: var(--color-warning-strong);
+  margin-bottom: var(--space-4);
 }
 
 .blockerBox {
@@ -13,30 +122,36 @@
   margin-bottom: var(--space-4);
 }
 
+/* ── Progress stepper ── */
 .stepList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  margin-bottom: var(--space-6);
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
 }
 
 .step {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  font-size: 0.8125rem;
+  padding: var(--space-2) var(--space-1);
+  min-height: 44px;
+  font-size: 0.875rem;
 }
 
 .stepIcon {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
   font-size: 0.75rem;
   font-weight: 700;
   flex-shrink: 0;
+  transition:
+    background var(--duration-normal) var(--ease-out),
+    color var(--duration-normal) var(--ease-out);
 }
 
 .pending {
@@ -66,39 +181,59 @@
 
 .stepLabel {
   color: var(--color-text);
+  font-weight: 500;
 }
 
 .stepErrorInline {
   color: var(--color-danger);
   font-size: 0.75rem;
   margin-top: var(--space-1);
-  margin-left: calc(24px + var(--space-3));
+  margin-left: calc(28px + var(--space-3));
 }
 
+/* ── Success moment ── */
+.successWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) 0 var(--space-2);
+  animation: successFade var(--duration-slow) var(--ease-out);
+}
+
+.successTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-success);
+  letter-spacing: -0.02em;
+  text-align: center;
+  margin-top: var(--space-2);
+}
+
+.successMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.successQuoteNumber {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+@keyframes successFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Actions ── */
 .actions {
   display: flex;
   gap: var(--space-3);
   justify-content: flex-end;
-  margin-top: var(--space-4);
-}
-
-.successIcon {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-full);
-  background: var(--color-success-bg);
-  color: var(--color-success);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  margin: 0 auto var(--space-4);
-}
-
-.successText {
-  text-align: center;
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: var(--space-6);
-  color: var(--color-text);
+  margin-top: var(--space-2);
 }

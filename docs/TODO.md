@@ -41,6 +41,9 @@ Wizard Step 1 still uses native `<input type="radio">` groups for: document type
 ### TrialSlider Custom Component (deferred from refactor Phase 3)
 The IaaS wizard trial field (`QuoteCreatePage.tsx` step 1) currently uses a native `<input type="range">` with `accent-color`. Spec §2.3 asked for a custom slider: track `--color-surface`, thumb 18px `--color-accent` with `--shadow-sm`, live preview label with currency formatting, tick marks every 50€. Native range works but looks inconsistent with the rest of the DS. Implement as a local `components/TrialSlider.tsx` (or promote to `@mrsmith/ui` if another app needs it) using `role="slider"` + keyboard navigation.
 
+### Accordion drag-drop via @dnd-kit
+il KitAccordion usa ancora HTML5 drag-and-drop nativo. @dnd-kit porta hint visivi migliori (shadow-float, scale). sostituirlo
+
 ## Design System (@mrsmith/ui)
 
 ### Stylelint Cleanup for Shared Components (deferred from refactor Phase 2)
