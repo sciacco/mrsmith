@@ -11,7 +11,7 @@ import (
 
 const customerOrdersQuery = `SELECT TOP 500 LTRIM(RTRIM(NOME_TESTATA_ORDINE)) as order_name
 	          FROM Tsmi_Ordini
-	          WHERE NUMERO_AZIENDA = @p1
+	          WHERE ID_CLIENTE = @p1
 	            AND STATO_ORDINE IN ('Evaso', 'Confermato')
 	          GROUP BY NOME_TESTATA_ORDINE
 	          ORDER BY NOME_TESTATA_ORDINE DESC`

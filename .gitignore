@@ -6,6 +6,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 backend/bin/
+backend/server
 backend/tmp/
 extracted/
 
