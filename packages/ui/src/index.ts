@@ -6,6 +6,8 @@ export { TabNavGroup } from './components/TabNavGroup/TabNavGroup';
 export type { TabGroup } from './components/TabNavGroup/TabNavGroup';
 export { Modal } from './components/Modal/Modal';
 export type { ModalSize } from './components/Modal/Modal';
+export { Drawer } from './components/Drawer/Drawer';
+export type { DrawerSize, DrawerSide } from './components/Drawer/Drawer';
 export { Button } from './components/Button/Button';
 export type { ButtonVariant, ButtonSize } from './components/Button/Button';
 export { Tooltip } from './components/Tooltip/Tooltip';

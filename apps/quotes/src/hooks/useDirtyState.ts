@@ -16,8 +16,12 @@ export function useDirtyState() {
     setDirtyTabs(prev => ({ ...prev, [tab]: true }));
   }, []);
 
-  const markClean = useCallback(() => {
-    setDirtyTabs({ header: false, kits: false, notes: false, contacts: false });
+  const markClean = useCallback((tab?: TabKey) => {
+    if (tab) {
+      setDirtyTabs(prev => ({ ...prev, [tab]: false }));
+    } else {
+      setDirtyTabs({ header: false, kits: false, notes: false, contacts: false });
+    }
   }, []);
 
   // Track snapshot for comparison

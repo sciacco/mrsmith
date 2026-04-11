@@ -16,7 +16,8 @@ import {
 import { Button, Icon } from '@mrsmith/ui';
 import { useQuoteRows, useAddRow, useDeleteRow, useUpdateRowPosition } from '../api/queries';
 import type { DocumentType, QuoteRow } from '../api/types';
-import { KitAccordion } from './KitAccordion';
+import { KitCard } from './KitCard';
+import { KitEditorDrawer } from './KitEditorDrawer';
 import { KitPickerModal } from './KitPickerModal';
 import { ConfirmDialog } from './ConfirmDialog';
 import styles from './KitsTab.module.css';
@@ -24,9 +25,10 @@ import styles from './KitsTab.module.css';
 interface KitsTabProps {
   quoteId: number;
   documentType: DocumentType;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
-export function KitsTab({ quoteId, documentType }: KitsTabProps) {
+export function KitsTab({ quoteId, documentType, onDirtyChange }: KitsTabProps) {
   const { data: rows } = useQuoteRows(quoteId);
   const addRow = useAddRow();
   const deleteRow = useDeleteRow();
@@ -34,6 +36,7 @@ export function KitsTab({ quoteId, documentType }: KitsTabProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [pendingDeleteRowId, setPendingDeleteRowId] = useState<number | null>(null);
   const [pendingDeleteRow, setPendingDeleteRow] = useState<QuoteRow | null>(null);
+  const [editingRowId, setEditingRowId] = useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -112,12 +115,13 @@ export function KitsTab({ quoteId, documentType }: KitsTabProps) {
           <SortableContext items={rowIds} strategy={verticalListSortingStrategy}>
             <div className={styles.list}>
               {rows.map(row => (
-                <KitAccordion
+                <KitCard
                   key={row.id}
                   row={row}
                   quoteId={quoteId}
                   documentType={documentType}
-                  onDelete={() => requestDelete(row)}
+                  onEdit={r => setEditingRowId(r.id)}
+                  onDelete={requestDelete}
                   isDeleting={pendingDeleteRowId === row.id}
                   sortable
                 />
@@ -162,6 +166,16 @@ export function KitsTab({ quoteId, documentType }: KitsTabProps) {
         open={showPicker}
         onSelect={handleAdd}
         onClose={() => setShowPicker(false)}
+      />
+
+      <KitEditorDrawer
+        open={editingRowId !== null}
+        quoteId={quoteId}
+        documentType={documentType}
+        rows={rows ?? []}
+        initialRowId={editingRowId}
+        onClose={() => setEditingRowId(null)}
+        onDirtyChange={onDirtyChange}
       />
 
       <ConfirmDialog

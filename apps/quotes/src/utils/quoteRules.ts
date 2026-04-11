@@ -120,28 +120,26 @@ export function buildQuoteSavePayload(quote: Quote) {
   };
 }
 
-export function buildProductUpdatePayload(
-  product: {
-    id: number;
-    product_name: string;
-    nrc: number;
-    mrc: number;
-    quantity: number;
-    extended_description: string | null;
-  },
-  included: boolean,
-  quantity: number,
-  isSpotQuote: boolean
-) {
-  const nextQuantity = included && quantity <= 0 ? 1 : quantity;
+export interface ProductUpdateValues {
+  id: number;
+  product_name: string;
+  nrc: number;
+  mrc: number;
+  quantity: number;
+  extended_description: string | null;
+  included: boolean;
+}
+
+export function buildProductUpdatePayload(values: ProductUpdateValues, isSpotQuote: boolean) {
+  const nextQuantity = values.included && values.quantity <= 0 ? 1 : values.quantity;
 
   return {
-    id: product.id,
-    product_name: product.product_name,
-    nrc: product.nrc,
-    mrc: isSpotQuote ? 0 : product.mrc,
+    id: values.id,
+    product_name: values.product_name,
+    nrc: values.nrc,
+    mrc: isSpotQuote ? 0 : values.mrc,
     quantity: nextQuantity,
-    extended_description: product.extended_description,
-    included,
+    extended_description: values.extended_description,
+    included: values.included,
   };
 }

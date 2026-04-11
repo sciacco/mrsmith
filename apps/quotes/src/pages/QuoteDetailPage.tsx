@@ -241,7 +241,11 @@ export function QuoteDetailPage() {
             <HeaderTab quote={localQuote} onChange={handleChange} />
           )}
           {activeTab === 'kits' && (
-            <KitsTab quoteId={quoteId} documentType={localQuote.document_type} />
+            <KitsTab
+              quoteId={quoteId}
+              documentType={localQuote.document_type}
+              onDirtyChange={dirty => (dirty ? markDirty('kits') : markClean('kits'))}
+            />
           )}
           {activeTab === 'notes' && (
             <NotesTab quote={localQuote} onChange={handleChange} />
