@@ -24,23 +24,23 @@
   width: 40px;
   height: 40px;
   flex-shrink: 0;
-  border: 1.5px solid var(--color-border, #e2e8f0);
+  border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md, 10px);
-  background: var(--color-bg, #fafbfd);
-  color: var(--color-text-muted, #94a3b8);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: all var(--duration-normal, 250ms) var(--ease-out);
 }
 
 .filterToggle:hover {
-  border-color: var(--color-text-muted, #94a3b8);
-  color: var(--color-text-secondary, #334155);
+  border-color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .filterToggleOpen {
-  border-color: var(--color-accent, #635bff);
-  color: var(--color-accent, #635bff);
-  background: var(--color-accent-subtle, rgba(99, 91, 255, 0.08));
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
 }
 
 /* ═══ Active filter badge ═══ */
@@ -55,8 +55,8 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 10px;
-  background: var(--color-accent, #635bff);
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
   font-size: 0.625rem;
   font-weight: 700;
   line-height: 1;

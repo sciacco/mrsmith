@@ -1,4 +1,18 @@
 import { useCallback, useMemo, useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { Button, Icon } from '@mrsmith/ui';
 import { useQuoteRows, useAddRow, useDeleteRow, useUpdateRowPosition } from '../api/queries';
 import type { DocumentType, QuoteRow } from '../api/types';
@@ -18,9 +32,13 @@ export function KitsTab({ quoteId, documentType }: KitsTabProps) {
   const deleteRow = useDeleteRow();
   const updatePosition = useUpdateRowPosition();
   const [showPicker, setShowPicker] = useState(false);
-  const [dragId, setDragId] = useState<number | null>(null);
   const [pendingDeleteRowId, setPendingDeleteRowId] = useState<number | null>(null);
   const [pendingDeleteRow, setPendingDeleteRow] = useState<QuoteRow | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const handleAdd = useCallback((kitId: number) => {
     addRow.mutate({ quoteId, kitId });
@@ -44,19 +62,17 @@ export function KitsTab({ quoteId, documentType }: KitsTabProps) {
 
   const cancelDelete = useCallback(() => setPendingDeleteRow(null), []);
 
-  const handleDragStart = useCallback((_e: React.DragEvent, rowId: number) => {
-    setDragId(rowId);
-  }, []);
-
-  const handleDrop = useCallback(async (_e: React.DragEvent, targetId: number) => {
-    if (dragId === null || dragId === targetId || !rows) return;
-    const dragRow = rows.find(r => r.id === dragId);
-    const targetRow = rows.find(r => r.id === targetId);
-    if (dragRow && targetRow) {
-      await updatePosition.mutateAsync({ quoteId, rowId: dragId, position: targetRow.position });
-    }
-    setDragId(null);
-  }, [dragId, rows, updatePosition, quoteId]);
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !rows) return;
+    const targetRow = rows.find(r => r.id === Number(over.id));
+    if (!targetRow) return;
+    updatePosition.mutate({
+      quoteId,
+      rowId: Number(active.id),
+      position: targetRow.position,
+    });
+  }, [rows, updatePosition, quoteId]);
 
   const totals = useMemo(() => {
     if (!rows) return { nrc: 0, mrc: 0 };
@@ -67,6 +83,7 @@ export function KitsTab({ quoteId, documentType }: KitsTabProps) {
   }, [rows]);
 
   const hasRows = rows && rows.length > 0;
+  const rowIds = useMemo(() => (rows ?? []).map(r => r.id), [rows]);
 
   return (
     <div className={styles.wrap}>
@@ -87,21 +104,27 @@ export function KitsTab({ quoteId, documentType }: KitsTabProps) {
       </div>
 
       {hasRows ? (
-        <div className={styles.list}>
-          {rows.map(row => (
-            <KitAccordion
-              key={row.id}
-              row={row}
-              quoteId={quoteId}
-              documentType={documentType}
-              onDelete={() => requestDelete(row)}
-              isDeleting={pendingDeleteRowId === row.id}
-              draggable
-              onDragStart={handleDragStart}
-              onDrop={handleDrop}
-            />
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={rowIds} strategy={verticalListSortingStrategy}>
+            <div className={styles.list}>
+              {rows.map(row => (
+                <KitAccordion
+                  key={row.id}
+                  row={row}
+                  quoteId={quoteId}
+                  documentType={documentType}
+                  onDelete={() => requestDelete(row)}
+                  isDeleting={pendingDeleteRowId === row.id}
+                  sortable
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       ) : (
         <div className={styles.empty}>
           <div className={styles.emptyIcon}>

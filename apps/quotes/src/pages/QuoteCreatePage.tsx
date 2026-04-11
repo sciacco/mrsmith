@@ -21,6 +21,7 @@ import { CollapsibleSection } from '../components/CollapsibleSection';
 import { ContactCard, type ContactFields } from '../components/ContactCard';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { KitPickerModal } from '../components/KitPickerModal';
+import { TrialSlider } from '../components/TrialSlider';
 import { buildIaaSTrialText, getLanguageCode, getIaaSTemplateRule } from '../utils/quoteRules';
 import styles from './QuoteCreatePage.module.css';
 
@@ -527,15 +528,11 @@ export function QuoteCreatePage() {
                       </div>
                     </div>
                     <div className={styles.field}>
-                      <label className={styles.label}>Trial ({state.trial_value}€)</label>
-                      <input
-                        className={styles.trialRange}
-                        type="range"
-                        min="0"
-                        max="200"
-                        step="10"
+                      <label className={styles.label}>Trial</label>
+                      <TrialSlider
                         value={state.trial_value}
-                        onChange={e => update('trial_value', Number(e.target.value))}
+                        onChange={v => update('trial_value', v)}
+                        aria-label="Trial"
                       />
                       {state.trial && <div className={styles.hint}>{state.trial}</div>}
                     </div>

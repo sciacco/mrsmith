@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Button, Icon } from '@mrsmith/ui';
 import type { DocumentType, QuoteRow } from '../api/types';
 import { useRowProducts } from '../api/queries';
@@ -11,10 +13,7 @@ interface KitAccordionProps {
   documentType: DocumentType;
   onDelete: (rowId: number) => void | Promise<void>;
   isDeleting?: boolean;
-  draggable?: boolean;
-  onDragStart?: (e: React.DragEvent, rowId: number) => void;
-  onDragOver?: (e: React.DragEvent) => void;
-  onDrop?: (e: React.DragEvent, rowId: number) => void;
+  sortable?: boolean;
 }
 
 export function KitAccordion({
@@ -23,34 +22,49 @@ export function KitAccordion({
   documentType,
   onDelete,
   isDeleting = false,
-  draggable,
-  onDragStart,
-  onDragOver,
-  onDrop,
+  sortable = false,
 }: KitAccordionProps) {
   const [open, setOpen] = useState(false);
   const { data: groups } = useRowProducts(quoteId, open ? row.id : 0);
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: row.id, disabled: !sortable });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
   return (
     <div
-      className={styles.accordion}
-      draggable={draggable}
-      onDragStart={e => onDragStart?.(e, row.id)}
-      onDragOver={e => { e.preventDefault(); onDragOver?.(e); }}
-      onDrop={e => onDrop?.(e, row.id)}
+      ref={setNodeRef}
+      style={style}
+      className={`${styles.accordion} ${isDragging ? styles.dragging : ''}`}
+      {...attributes}
     >
       <div className={styles.header}>
+        {sortable && (
+          <span
+            className={styles.dragHandle}
+            aria-label="Trascina per riordinare"
+            {...listeners}
+          >
+            <Icon name="grip-vertical" size={16} />
+          </span>
+        )}
         <button
           type="button"
           className={styles.expandBtn}
           onClick={() => setOpen(!open)}
           aria-expanded={open}
         >
-          {draggable && (
-            <span className={styles.dragHandle} aria-label="Trascina per riordinare">
-              <Icon name="grip-vertical" size={16} />
-            </span>
-          )}
           <span className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} aria-hidden="true">
             <Icon name="chevron-right" size={16} />
           </span>

@@ -1,0 +1,85 @@
+.root {
+  width: 100%;
+  padding: 28px 10px 10px;
+}
+
+.trackWrap {
+  position: relative;
+  height: 18px;
+}
+
+.track {
+  position: absolute;
+  inset: 6px 0;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  overflow: visible;
+}
+
+.fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  transition: width var(--duration-fast) var(--ease-out);
+}
+
+.tick {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  margin-left: -1px;
+  transform: translateY(-50%);
+  border-radius: var(--radius-full);
+  background: var(--color-text-faint);
+  pointer-events: none;
+}
+
+.thumb {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  transform: translateY(-50%);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  border: 2px solid var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  transition: left var(--duration-fast) var(--ease-out);
+  pointer-events: none;
+}
+
+.bubble {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-on-accent);
+  background: var(--color-accent);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+}
+
+.input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.trackWrap:focus-within .thumb {
+  outline: 2px solid var(--color-accent-muted);
+  outline-offset: 2px;
+}

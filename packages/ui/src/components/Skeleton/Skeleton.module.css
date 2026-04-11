@@ -10,9 +10,9 @@
   border-radius: var(--radius-md, 10px);
   background: linear-gradient(
     90deg,
-    var(--color-surface, #f1f5f9) 0%,
-    var(--color-surface-hover, #e8edf3) 30%,
-    var(--color-surface, #f1f5f9) 60%
+    var(--color-surface) 0%,
+    var(--color-surface-hover) 30%,
+    var(--color-surface) 60%
   );
   background-size: 300% 100%;
   animation: shimmer 2s ease-in-out infinite, rowFadeIn 0.4s var(--ease-out, ease) both;

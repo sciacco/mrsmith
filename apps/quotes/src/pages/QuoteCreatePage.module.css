@@ -150,12 +150,6 @@
   accent-color: var(--color-accent);
 }
 
-.trialRange {
-  width: 100%;
-  accent-color: var(--color-accent);
-  margin-top: var(--space-1);
-}
-
 .emptyBlock {
   padding: var(--space-8);
   text-align: center;
