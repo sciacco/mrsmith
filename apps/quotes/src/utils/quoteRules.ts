@@ -52,6 +52,15 @@ export function parseReplaceOrders(value: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+export function parseServiceCategoryIds(value: string | null | undefined): string[] {
+  return (value ?? '')
+    .replaceAll('[', '')
+    .replaceAll(']', '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
 export function normalizeReplaceOrdersForSave(value: string | null | undefined): string {
   return parseReplaceOrders(value).join(';');
 }
