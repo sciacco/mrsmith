@@ -103,6 +103,33 @@ Alyante ERP ID
 
 ## API and Backend Contract Quirks
 
+### Quotes Create Flow Uses Context-Specific Category Exclusions
+
+- Context: `apps/quotes` service-category loading for Nuova Proposta versus other quotes views.
+- Discovery: the Appsmith Nuova Proposta `get_product_category` query excludes only category ids `12` and `13`, while other quotes references and later repo specs may exclude `12,13,14,15`. A single hardcoded "standard" exclusion set caused QA drift in the create flow.
+- Practical rule: quotes category endpoints should support context-specific exclusions instead of assuming one global standard-flow filter. For the create wizard, pass explicit excluded ids and keep the filtering contract in the request, not hidden in the frontend.
+- Evidence: `apps/quotes/check/out_08.md`, `apps/quotes/src/api/queries.ts` `useCategories`, `backend/internal/quotes/handler_reference.go` `exclude_ids` support.
+- Used by: `apps/quotes` Nuova Proposta wizard.
+- Open questions: if another quotes surface needs the broader `12,13,14,15` exclusion, keep that as an explicit caller decision rather than reusing the create-flow contract.
+
+### Quotes Replacement Orders Need Appsmith Column Names Plus Customer Scoping
+
+- Context: `SOSTITUZIONE` order pickers in quotes create/detail flows.
+- Discovery: the Appsmith dataset shape comes from Alyante `Tsmi_Ordini.NOME_TESTATA_ORDINE` with `STATO_ORDINE IN ('Evaso', 'Confermato')`; the migrated app must also add the resolved ERP customer filter on `NUMERO_AZIENDA` to avoid the legacy unscoped read.
+- Practical rule: when loading replacement-order options, query `NOME_TESTATA_ORDINE`, keep the `STATO_ORDINE` filter, and add the customer bridge filter via `loader.hubs_company.numero_azienda -> Tsmi_Ordini.NUMERO_AZIENDA`.
+- Evidence: `apps/quotes/check/out_07.md`, `backend/internal/quotes/handler_reference.go` `customerOrdersQuery`, `backend/internal/quotes/handler_reference_test.go`.
+- Used by: `apps/quotes` create and detail replacement-order selectors.
+- Open questions: none.
+
+### Quotes Publish Payment Labels Use Loader ERP Column Names
+
+- Context: quotes publish orchestration when generating HubSpot terms and conditions.
+- Discovery: payment-method labels must be read from `loader.erp_metodi_pagamento.desc_pagamento` keyed by `cod_pagamento`; older aliases `descrizione` / `codice` are wrong for this schema and broke the publish path.
+- Practical rule: any quotes publish or save logic that needs the payment-method label should use `cod_pagamento` / `desc_pagamento`, and backend tests should pin those column names because similar stale aliases have already regressed once.
+- Evidence: `backend/internal/quotes/handler_publish.go` `paymentMethodLabelQuery`, `backend/internal/quotes/handler_publish_test.go`, `apps/quotes/check/fix_QA.md`.
+- Used by: `apps/quotes` publish flow.
+- Open questions: none.
+
 ### Panoramica Orders Summary Text Columns Can Be NULL
 
 - Context: `GET /api/panoramica/v1/orders/summary` backed by `loader.v_ordini_sintesi`.

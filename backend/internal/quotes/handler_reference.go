@@ -9,6 +9,13 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
+const customerOrdersQuery = `SELECT TOP 500 LTRIM(RTRIM(NOME_TESTATA_ORDINE)) as order_name
+	          FROM Tsmi_Ordini
+	          WHERE NUMERO_AZIENDA = @p1
+	            AND STATO_ORDINE IN ('Evaso', 'Confermato')
+	          GROUP BY NOME_TESTATA_ORDINE
+	          ORDER BY NOME_TESTATA_ORDINE DESC`
+
 // ── Templates ──
 
 func (h *Handler) handleListTemplates(w http.ResponseWriter, r *http.Request) {
@@ -85,11 +92,23 @@ func (h *Handler) handleListCategories(w http.ResponseWriter, r *http.Request) {
 	}
 
 	excludeStandard := r.URL.Query().Get("exclude_standard") == "true"
+	excludeIDs := parseCategoryExclusions(r.URL.Query().Get("exclude_ids"))
 
 	query := `SELECT id, name FROM products.product_category`
 	args := []any{}
 
-	if excludeStandard {
+	switch {
+	case len(excludeIDs) > 0:
+		query += ` WHERE id NOT IN (`
+		for i, id := range excludeIDs {
+			if i > 0 {
+				query += `, `
+			}
+			query += `$` + strconv.Itoa(len(args)+1)
+			args = append(args, id)
+		}
+		query += `)`
+	case excludeStandard:
 		query += ` WHERE id NOT IN (12, 13, 14, 15)`
 	}
 	query += ` ORDER BY name`
@@ -120,6 +139,27 @@ func (h *Handler) handleListCategories(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.JSON(w, http.StatusOK, result)
+}
+
+func parseCategoryExclusions(raw string) []int {
+	if raw == "" {
+		return nil
+	}
+
+	parts := strings.Split(raw, ",")
+	result := make([]int, 0, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		if value == "" {
+			continue
+		}
+		id, err := strconv.Atoi(value)
+		if err != nil {
+			continue
+		}
+		result = append(result, id)
+	}
+	return result
 }
 
 // ── Kits ──
@@ -536,12 +576,7 @@ func (h *Handler) handleCustomerOrders(w http.ResponseWriter, r *http.Request) {
 	// Step 2: Query Alyante with the resolved ERP ID.
 	// IMPORTANT: Always filter by customer ID — this fixes the Appsmith bug
 	// where cli_orders was unscoped (bug A7 in spec).
-	query := `SELECT TOP 500 LTRIM(RTRIM(NOME)) as order_name
-	          FROM Tsmi_Ordini
-	          WHERE NUMERO_AZIENDA = @p1
-	          ORDER BY NOME DESC`
-
-	rows, err := h.alyanteDB.QueryContext(r.Context(), query, erpID.String)
+	rows, err := h.alyanteDB.QueryContext(r.Context(), customerOrdersQuery, erpID.String)
 	if err != nil {
 		h.dbFailure(w, r, "customer_orders", err)
 		return

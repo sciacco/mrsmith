@@ -79,3 +79,11 @@
 - Panoramica plan-review heuristic: if a new mini-app plan claims split-server launcher support via `<APP>_APP_URL`, approval should require the full chain to be explicitly planned in `config.go`, `main.go` `hrefOverrides`, and local fallback behavior when `STATIC_DIR == ""`; a checklist note alone is not enough.
 - Panoramica plan-review heuristic: when a plan changes a launcher catalog entry from placeholder access to a dedicated role, it must also decide dependency-based visibility rules up front and call out `backend/internal/platform/applaunch/catalog_test.go` updates plus `go test ./...` verification.
 - Plan-review heuristic: sample code embedded in implementation plans should be sanity-checked for copy-paste breakage such as unused imports and slice-iteration mutation bugs (`for _, row := range rows` does not update returned elements).
+
+## 2026-04-11
+- Quotes create-flow categories are not one-size-fits-all: the Nuova Proposta wizard now requests `/quotes/v1/categories?exclude_ids=12,13`, while the backend still supports the older broader `exclude_standard=true` path for callers that explicitly need `12,13,14,15`.
+- Quotes replacement-order loading is pinned to the Alyante/Appsmith shape `Tsmi_Ordini.NOME_TESTATA_ORDINE` with `STATO_ORDINE IN ('Evaso','Confermato')`, plus the migrated customer ERP bridge filter on `NUMERO_AZIENDA`; `backend/internal/quotes/handler_reference_test.go` locks that contract.
+- Quotes create now clears `replace_orders` when leaving `SOSTITUZIONE` and only submits that field for `proposal_type === 'SOSTITUZIONE'`, preventing hidden-state leakage in the wizard.
+- Quotes IaaS create no longer inherits the standard COLOCATION billing lock: `useCategories` is disabled outside standard mode, `billingLocked` is standard-only, and quote-type switching clears standard service state before IaaS fixed `1/1/1` enforcement runs.
+- Quotes publish payment labels must use `loader.erp_metodi_pagamento.cod_pagamento` / `desc_pagamento`; `backend/internal/quotes/handler_publish_test.go` locks that schema contract and the publish save path no longer uses `fmt.Errorf(procResult.Message)`, so `go test ./internal/quotes/...` passes again.
+- Quotes row reorder mutations now invalidate `quote-rows` and `publish-precheck`, so the UI reflects backend renumbering immediately after a move.

@@ -12,6 +12,8 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 )
 
+const paymentMethodLabelQuery = `SELECT desc_pagamento FROM loader.erp_metodi_pagamento WHERE cod_pagamento = $1`
+
 type publishStep struct {
 	Step   int    `json:"step"`
 	Name   string `json:"name"`
@@ -112,7 +114,7 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 	paymentLabel := "402"
 	if q.PaymentMethod != nil {
 		_ = h.db.QueryRowContext(ctx,
-			`SELECT descrizione FROM loader.erp_metodi_pagamento WHERE codice = $1`,
+			paymentMethodLabelQuery,
 			*q.PaymentMethod).Scan(&paymentLabel)
 	}
 
@@ -351,7 +353,7 @@ func (h *Handler) persistQuoteForPublish(ctx context.Context, quoteID int) error
 		return fmt.Errorf("parse publish save response: %w", err)
 	}
 	if procResult.Status == "ERROR" {
-		return fmt.Errorf(procResult.Message)
+		return fmt.Errorf("%s", procResult.Message)
 	}
 	return nil
 }

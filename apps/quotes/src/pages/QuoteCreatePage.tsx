@@ -76,19 +76,25 @@ export function QuoteCreatePage() {
   const { data: deals } = useDeals();
   const { data: owners } = useOwners();
   const { data: paymentMethods } = usePaymentMethods();
-  // Appsmith parity: service categories for the standard create flow.
-  // Matches `get_product_category` (excludes IaaS/VCloud category ids 12,13,14,15).
-  const { data: categories } = useCategories(true);
+  // Appsmith parity: standard create uses the Nuova Proposta service list,
+  // which excludes only categories 12 and 13.
+  const { data: categories } = useCategories({
+    excludeIds: [12, 13],
+    enabled: state.quoteType === 'standard',
+  });
   // Appsmith parity: template list depends on document_type. Spot docs exclude
   // colocation templates; recurring docs allow both colo and non-colo templates
   // (see `TypeDocument.template_suServizio`).
-  const templatesParams: { type: string; lang?: string; is_colo?: string } = { type: state.quoteType };
-  if (state.quoteType === 'iaas') {
-    templatesParams.lang = getLanguageCode(state.iaasLanguage);
-  }
-  if (state.quoteType === 'standard' && state.document_type === 'TSC-ORDINE') {
-    templatesParams.is_colo = 'false';
-  }
+  const templatesParams = useMemo<{ type: string; lang?: string; is_colo?: string }>(() => {
+    const params: { type: string; lang?: string; is_colo?: string } = { type: state.quoteType };
+    if (state.quoteType === 'iaas') {
+      params.lang = getLanguageCode(state.iaasLanguage);
+    }
+    if (state.quoteType === 'standard' && state.document_type === 'TSC-ORDINE') {
+      params.is_colo = 'false';
+    }
+    return params;
+  }, [state.document_type, state.iaasLanguage, state.quoteType]);
   const { data: templates } = useTemplates(templatesParams);
   // Appsmith parity: the `mst_kit` multi-select in "Nuova Proposta" is populated
   // from `list_kit`, grouped by category. Selected kit ids are inserted as
@@ -116,14 +122,17 @@ export function QuoteCreatePage() {
     [state.services]
   );
   const colocationSelected = useMemo(() => {
-    if (!categories) return false;
+    if (state.quoteType !== 'standard' || !categories) return false;
     return categories.some(
       c => selectedServiceIds.includes(String(c.id)) && c.name.toUpperCase() === 'COLOCATION'
     );
-  }, [categories, selectedServiceIds]);
+  }, [categories, selectedServiceIds, state.quoteType]);
   // Appsmith parity: COLOCATION + TSC-ORDINE-RIC → force trimestral billing (3)
   // and disable the billing selector.
-  const billingLocked = colocationSelected && state.document_type === 'TSC-ORDINE-RIC';
+  const billingLocked =
+    state.quoteType === 'standard' &&
+    colocationSelected &&
+    state.document_type === 'TSC-ORDINE-RIC';
 
   // ERP customer-specific default payment lookup (Appsmith parity: metodoPagDefault)
   const selectedCustomerId = state.selectedDeal?.company_id != null
@@ -179,6 +188,13 @@ export function QuoteCreatePage() {
       };
     });
   }, [state.iaasLanguage, state.quoteType, state.template, state.trial_value]);
+
+  useEffect(() => {
+    if (state.proposal_type === 'SOSTITUZIONE' || state.replace_orders === '') {
+      return;
+    }
+    setState(prev => ({ ...prev, replace_orders: '' }));
+  }, [state.proposal_type, state.replace_orders]);
 
   // When the selected customer resolves, apply the ERP default payment code.
   // Fallback to '402' if the lookup has no value or fails, matching Appsmith.
@@ -266,7 +282,7 @@ export function QuoteCreatePage() {
         document_date: new Date().toISOString().split('T')[0],
         document_type: state.document_type,
         proposal_type: state.proposal_type,
-        replace_orders: state.replace_orders,
+        replace_orders: state.proposal_type === 'SOSTITUZIONE' ? state.replace_orders : '',
         template: state.template,
         services: state.services,
         payment_method: state.payment_method,
@@ -286,6 +302,28 @@ export function QuoteCreatePage() {
       // Error handling via mutation
     }
   }, [state, createQuote, navigate]);
+
+  const handleQuoteTypeChange = useCallback((quoteType: WizardState['quoteType']) => {
+    setState(prev => {
+      if (prev.quoteType === quoteType) {
+        return prev;
+      }
+      if (quoteType === 'iaas') {
+        return {
+          ...prev,
+          quoteType,
+          services: '',
+          bill_months: 1,
+        };
+      }
+      return {
+        ...prev,
+        quoteType,
+        services: '',
+        trial: '',
+      };
+    });
+  }, []);
 
   const handleNext = () => {
     if (step === 4) {
@@ -327,7 +365,7 @@ export function QuoteCreatePage() {
 
         {step === 1 && (
           <>
-            <TypeSelector value={state.quoteType} onChange={v => update('quoteType', v)} />
+            <TypeSelector value={state.quoteType} onChange={handleQuoteTypeChange} />
             <div className={styles.configGrid}>
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>Configurazione</div>

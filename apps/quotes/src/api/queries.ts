@@ -22,13 +22,19 @@ export function useTemplates(params?: { type?: string; lang?: string; is_colo?: 
   });
 }
 
-export function useCategories(excludeStandard = false) {
+export function useCategories(params?: { excludeIds?: number[]; enabled?: boolean }) {
   const api = useApiClient();
+  const search = new URLSearchParams();
+  if (params?.excludeIds && params.excludeIds.length > 0) {
+    search.set('exclude_ids', params.excludeIds.join(','));
+  }
+  const qs = search.toString();
   return useQuery({
-    queryKey: ['categories', excludeStandard],
+    queryKey: ['categories', params?.excludeIds ?? [], params?.enabled ?? true],
     queryFn: () => api.get<ProductCategory[]>(
-      `/quotes/v1/categories${excludeStandard ? '?exclude_standard=true' : ''}`
+      `/quotes/v1/categories${qs ? '?' + qs : ''}`
     ),
+    enabled: params?.enabled ?? true,
   });
 }
 
@@ -243,9 +249,14 @@ export function useDeleteRow() {
 
 export function useUpdateRowPosition() {
   const api = useApiClient();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ quoteId, rowId, position }: { quoteId: number; rowId: number; position: number }) =>
       api.put(`/quotes/v1/quotes/${quoteId}/rows/${rowId}/position`, { position }),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['quote-rows', variables.quoteId] });
+      void qc.invalidateQueries({ queryKey: ['publish-precheck', variables.quoteId] });
+    },
   });
 }
 
