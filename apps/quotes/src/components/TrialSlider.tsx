@@ -56,6 +56,10 @@ export function TrialSlider({
           aria-valuenow={value}
         />
       </div>
+      <div className={styles.endpoints} aria-hidden="true">
+        <span>{min}€</span>
+        <span>{max}€</span>
+      </div>
     </div>
   );
 }

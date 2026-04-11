@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Icon, MultiSelect, SingleSelect, SearchInput } from '@mrsmith/ui';
+import { Button, Icon, MultiSelect, SingleSelect, SearchInput, Tooltip } from '@mrsmith/ui';
 import {
   useCategories,
   useCustomerOrders,
@@ -22,6 +22,8 @@ import { ContactCard, type ContactFields } from '../components/ContactCard';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { KitPickerModal } from '../components/KitPickerModal';
 import { TrialSlider } from '../components/TrialSlider';
+import { SegmentedControl } from '../components/SegmentedControl';
+import { TemplateHeroCard } from '../components/TemplateHeroCard';
 import { buildIaaSTrialText, getLanguageCode, getIaaSTemplateRule } from '../utils/quoteRules';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import styles from './QuoteCreatePage.module.css';
@@ -113,6 +115,7 @@ export function QuoteCreatePage() {
     legalNotes: false,
     contacts: false,
   });
+  const [ownerAutoFilled, setOwnerAutoFilled] = useState(false);
   const shouldLoadKits =
     (state.quoteType === 'standard' && step >= 2) ||
     (state.quoteType === 'iaas' && state.template !== '');
@@ -247,7 +250,11 @@ export function QuoteCreatePage() {
     if (state.owner !== '' || !owners || !user?.email) return;
     const match = owners.find(o => o.email?.toLowerCase() === user.email?.toLowerCase());
     if (match) {
-      setState(prev => (prev.owner === '' ? { ...prev, owner: String(match.id) } : prev));
+      setState(prev => {
+        if (prev.owner !== '') return prev;
+        setOwnerAutoFilled(true);
+        return { ...prev, owner: String(match.id) };
+      });
     }
   }, [owners, user?.email, state.owner]);
 
@@ -301,6 +308,9 @@ export function QuoteCreatePage() {
 
   const update = useCallback(<K extends keyof WizardState>(key: K, value: WizardState[K]) => {
     setState(prev => ({ ...prev, [key]: value }));
+    if (key === 'owner') {
+      setOwnerAutoFilled(false);
+    }
   }, []);
 
   const updateContact = useCallback(
@@ -459,223 +469,298 @@ export function QuoteCreatePage() {
         {step === 1 && (
           <div className={styles.stepInner}>
             <TypeSelector value={state.quoteType} onChange={handleQuoteTypeChange} />
-            <div className={styles.configGrid}>
-              <div className={styles.section}>
-                <div className={styles.sectionTitle}>Configurazione</div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Tipo documento</label>
-                  {state.quoteType === 'iaas' ? (
-                    <input className={styles.readOnly} readOnly value="Ricorrente" />
-                  ) : (
-                    <div className={styles.radioGroup}>
-                      <label className={styles.radioLabel}>
-                        <input
-                          className={styles.radioInput}
-                          type="radio"
-                          checked={state.document_type === 'TSC-ORDINE-RIC'}
-                          onChange={() => update('document_type', 'TSC-ORDINE-RIC')}
-                        />
-                        Ricorrente
-                      </label>
-                      <label className={styles.radioLabel}>
-                        <input
-                          className={styles.radioInput}
-                          type="radio"
-                          checked={state.document_type === 'TSC-ORDINE'}
-                          onChange={() => update('document_type', 'TSC-ORDINE')}
-                        />
-                        Spot
-                      </label>
+            <div className={styles.configColumn}>
+              {/* Atto 1 — L'OFFERTA */}
+              <section className={styles.act}>
+                <div className={styles.actEyebrow}>L&apos;offerta</div>
+                <div className={styles.actBody}>
+                  <div className={styles.fieldRow}>
+                    <label className={styles.fieldLabel}>Tipo proposta</label>
+                    <SegmentedControl<'NUOVO' | 'SOSTITUZIONE' | 'RINNOVO'>
+                      value={state.proposal_type}
+                      onChange={v => update('proposal_type', v)}
+                      options={[
+                        { value: 'NUOVO', label: 'Nuovo' },
+                        { value: 'SOSTITUZIONE', label: 'Sostituzione' },
+                        { value: 'RINNOVO', label: 'Rinnovo' },
+                      ]}
+                      aria-label="Tipo proposta"
+                    />
+                  </div>
+                  {state.quoteType === 'standard' && (
+                    <div className={styles.fieldRow}>
+                      <label className={styles.fieldLabel}>Tipo documento</label>
+                      <SegmentedControl<'TSC-ORDINE-RIC' | 'TSC-ORDINE'>
+                        value={state.document_type}
+                        onChange={v => update('document_type', v)}
+                        options={[
+                          { value: 'TSC-ORDINE-RIC', label: 'Ricorrente' },
+                          { value: 'TSC-ORDINE', label: 'Spot' },
+                        ]}
+                        aria-label="Tipo documento"
+                      />
+                    </div>
+                  )}
+                  {state.proposal_type === 'SOSTITUZIONE' && (
+                    <div className={`${styles.fieldRow} ${styles.conditionalWrap}`}>
+                      <label className={styles.fieldLabel}>Ordini da sostituire</label>
+                      <MultiSelect<string>
+                        options={customerOrders.map(o => ({ value: o.name, label: o.name }))}
+                        selected={state.replace_orders.split(';').map(s => s.trim()).filter(Boolean)}
+                        onChange={chosen => update('replace_orders', chosen.join(';'))}
+                        placeholder={
+                          customerOrdersQuery.isPending
+                            ? 'Caricamento ordini...'
+                            : customerOrders.length === 0
+                              ? 'Nessun ordine disponibile'
+                              : 'Seleziona ordini...'
+                        }
+                      />
                     </div>
                   )}
                 </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Tipo proposta</label>
-                  <div className={styles.radioGroup}>
-                    {(['NUOVO', 'SOSTITUZIONE', 'RINNOVO'] as const).map(pt => (
-                      <label key={pt} className={styles.radioLabel}>
-                        <input
-                          className={styles.radioInput}
-                          type="radio"
-                          checked={state.proposal_type === pt}
-                          onChange={() => update('proposal_type', pt)}
-                        />
-                        {pt === 'NUOVO' ? 'Nuovo' : pt === 'SOSTITUZIONE' ? 'Sostituzione' : 'Rinnovo'}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                {state.proposal_type === 'SOSTITUZIONE' && (
-                  <div className={styles.field}>
-                    <label className={styles.label}>Ordini da sostituire</label>
-                    <MultiSelect<string>
-                      options={customerOrders.map(o => ({ value: o.name, label: o.name }))}
-                      selected={state.replace_orders.split(';').map(s => s.trim()).filter(Boolean)}
-                      onChange={chosen => update('replace_orders', chosen.join(';'))}
-                      placeholder={
-                        customerOrdersQuery.isPending
-                          ? 'Caricamento ordini...'
-                          : customerOrders.length === 0
-                            ? 'Nessun ordine disponibile'
-                            : 'Seleziona ordini...'
-                      }
-                    />
-                  </div>
-                )}
-                <div className={styles.field}>
-                  <label className={styles.label}>Owner</label>
-                  <SingleSelect<string>
-                    options={(owners ?? []).map(o => ({
-                      value: String(o.id),
-                      label: [o.firstname, o.lastname].filter(Boolean).join(' '),
-                    }))}
-                    selected={state.owner || null}
-                    onChange={v => update('owner', v ?? '')}
-                    placeholder="— Seleziona —"
-                  />
-                </div>
-                {state.quoteType === 'standard' && (
-                  <div className={styles.field}>
-                    <label className={styles.label}>Servizi</label>
-                    <MultiSelect<number>
-                      options={(categories ?? []).map(c => ({ value: c.id, label: c.name }))}
-                      selected={selectedServiceIds.map(Number)}
-                      onChange={chosen => update('services', chosen.join(','))}
-                      placeholder="Seleziona servizi..."
-                    />
-                  </div>
-                )}
-                {state.quoteType === 'iaas' && (
-                  <>
-                    <div className={styles.field}>
-                      <label className={styles.label}>Lingua cliente</label>
-                      <div className={styles.radioGroup}>
-                        {(['ITA', 'ENG'] as const).map(language => (
-                          <label key={language} className={styles.radioLabel}>
-                            <input
-                              className={styles.radioInput}
-                              type="radio"
-                              checked={state.iaasLanguage === language}
-                              onChange={() => update('iaasLanguage', language)}
-                            />
-                            {language}
-                          </label>
-                        ))}
-                      </div>
+              </section>
+
+              {/* Atto 2 — IL CONTESTO */}
+              <section className={styles.act}>
+                <div className={styles.actEyebrow}>Il contesto</div>
+                <div className={styles.actBody}>
+                  <div className={styles.fieldRow}>
+                    <div className={styles.fieldLabelWithChip}>
+                      <label className={styles.fieldLabel}>Owner</label>
+                      {ownerAutoFilled && state.owner !== '' && (
+                        <button
+                          type="button"
+                          className={styles.ownerAutoChip}
+                          onClick={() => update('owner', '')}
+                          aria-label="Rimuovi auto-compilazione owner"
+                        >
+                          <Icon name="check" size={11} />
+                          Te stesso
+                        </button>
+                      )}
                     </div>
-                    <div className={styles.field}>
-                      <label className={styles.label}>Trial</label>
+                    <SingleSelect<string>
+                      options={(owners ?? []).map(o => ({
+                        value: String(o.id),
+                        label: [o.firstname, o.lastname].filter(Boolean).join(' '),
+                      }))}
+                      selected={state.owner || null}
+                      onChange={v => update('owner', v ?? '')}
+                      placeholder="— Seleziona —"
+                    />
+                  </div>
+                  {state.quoteType === 'standard' && (
+                    <div className={styles.fieldRow}>
+                      <label className={styles.fieldLabel}>Servizi</label>
+                      <MultiSelect<number>
+                        options={(categories ?? []).map(c => ({ value: c.id, label: c.name }))}
+                        selected={selectedServiceIds.map(Number)}
+                        onChange={chosen => update('services', chosen.join(','))}
+                        placeholder="Seleziona servizi..."
+                      />
+                    </div>
+                  )}
+                  {state.quoteType === 'iaas' && (
+                    <div className={`${styles.fieldRow} ${styles.conditionalWrap}`}>
+                      <label className={styles.fieldLabel}>Lingua cliente</label>
+                      <SegmentedControl<'ITA' | 'ENG'>
+                        value={state.iaasLanguage}
+                        onChange={v => update('iaasLanguage', v)}
+                        options={[
+                          { value: 'ITA', label: 'Italiano' },
+                          { value: 'ENG', label: 'English' },
+                        ]}
+                        aria-label="Lingua cliente"
+                      />
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Atto 3 — LA RICETTA */}
+              <section className={styles.act}>
+                <div className={styles.actEyebrow}>
+                  {state.quoteType === 'iaas' ? 'La ricetta' : 'Template'}
+                </div>
+                <div className={styles.actBody}>
+                  <div className={styles.fieldRow}>
+                    <label className={styles.fieldLabel}>Template</label>
+                    <div className={styles.bigSelect}>
+                      <SingleSelect<string>
+                        options={(templates ?? []).map(t => ({
+                          value: t.template_id,
+                          label: t.description,
+                        }))}
+                        selected={state.template || null}
+                        onChange={v => update('template', v ?? '')}
+                        placeholder={
+                          templates && templates.length === 0
+                            ? 'Nessun template disponibile'
+                            : '— Seleziona —'
+                        }
+                      />
+                    </div>
+                    {state.quoteType === 'iaas' && (
+                      <TemplateHeroCard
+                        kitName={derivedIaaSKit?.internal_name ?? null}
+                        category={derivedIaaSKit?.category_name ?? null}
+                        services={derivedIaaSRule?.services ?? ''}
+                        initialTermMonths={1}
+                        renewalTermMonths={1}
+                      />
+                    )}
+                  </div>
+                  {state.quoteType === 'iaas' && (
+                    <div className={`${styles.fieldRow} ${styles.conditionalWrap}`}>
+                      <label className={styles.fieldLabel}>Trial</label>
                       <TrialSlider
                         value={state.trial_value}
                         onChange={v => update('trial_value', v)}
                         aria-label="Trial"
                       />
-                      {state.trial && <div className={styles.hint}>{state.trial}</div>}
+                      {state.trial && (
+                        <div className={styles.hint} style={{ marginTop: 8 }}>
+                          {state.trial}
+                        </div>
+                      )}
                     </div>
-                  </>
-                )}
-                <div className={styles.field}>
-                  <label className={styles.label}>Template</label>
-                  <SingleSelect<string>
-                    options={(templates ?? []).map(t => ({
-                      value: t.template_id,
-                      label: t.description,
-                    }))}
-                    selected={state.template || null}
-                    onChange={v => update('template', v ?? '')}
-                    placeholder={
-                      templates && templates.length === 0
-                        ? 'Nessun template disponibile'
-                        : '— Seleziona —'
-                    }
-                  />
+                  )}
                 </div>
-                {state.quoteType === 'iaas' && (
-                  <div className={styles.field}>
-                    <label className={styles.label}>Valori derivati</label>
-                    <div className={styles.readOnly}>
-                      {derivedIaaSKit
-                        ? `${derivedIaaSKit.internal_name} · servizi ${derivedIaaSRule?.services ?? '—'} · termini 1/1/1`
-                        : 'Seleziona un template IaaS per derivare kit, servizi e termini.'}
-                    </div>
-                  </div>
-                )}
-              </div>
+              </section>
 
-              <div className={styles.section}>
-                <div className={styles.sectionTitle}>Condizioni</div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Pagamento</label>
-                  <SingleSelect<string>
-                    options={(paymentMethods ?? []).map(pm => ({
-                      value: pm.code,
-                      label: pm.description,
-                    }))}
-                    selected={state.payment_method || null}
-                    onChange={v => update('payment_method', v ?? '')}
-                    placeholder="— Seleziona —"
-                  />
-                </div>
-                {state.quoteType === 'iaas' ? (
-                  <div className={styles.field}>
-                    <label className={styles.label}>Fatturazione canoni</label>
-                    <input className={styles.readOnly} readOnly value="Mensile (1)" />
+              {/* Atto 4 — CONDIZIONI ECONOMICHE */}
+              <section className={styles.act}>
+                <div className={styles.actEyebrow}>Condizioni economiche</div>
+                <div className={styles.actBody}>
+                  <div className={styles.fieldRow}>
+                    <label className={styles.fieldLabel}>Pagamento</label>
+                    <SingleSelect<string>
+                      options={(paymentMethods ?? []).map(pm => ({
+                        value: pm.code,
+                        label: pm.description,
+                      }))}
+                      selected={state.payment_method || null}
+                      onChange={v => update('payment_method', v ?? '')}
+                      placeholder="— Seleziona —"
+                    />
                   </div>
-                ) : (
-                  <div className={styles.field}>
-                    <label className={styles.label}>Fatturazione canoni</label>
-                    {billingLocked ? (
-                      <input className={styles.readOnly} readOnly value="Trimestrale (3)" />
-                    ) : (
-                      <SingleSelect<number>
-                        options={[
-                          { value: 1, label: 'Mensile (1)' },
-                          { value: 2, label: 'Bimestrale (2)' },
-                          { value: 3, label: 'Trimestrale (3)' },
-                          { value: 6, label: 'Semestrale (6)' },
-                          { value: 12, label: 'Annuale (12)' },
-                        ]}
-                        selected={state.bill_months}
-                        onChange={v => update('bill_months', v ?? 1)}
-                      />
-                    )}
-                    {billingLocked && (
-                      <div className={styles.hint}>
-                        COLOCATION ricorrente: fatturazione trimestrale obbligatoria.
+
+                  {state.quoteType === 'standard' && (
+                    <>
+                      <div className={styles.fieldRow}>
+                        <label className={styles.fieldLabel}>Fatturazione canoni</label>
+                        {billingLocked ? (
+                          <div className={styles.colocationBanner}>
+                            <Icon name="triangle-alert" size={16} />
+                            <span>
+                              COLOCATION ricorrente: fatturazione trimestrale obbligatoria.
+                            </span>
+                          </div>
+                        ) : (
+                          <SegmentedControl<string>
+                            value={String(state.bill_months)}
+                            onChange={v => update('bill_months', Number(v))}
+                            options={[
+                              { value: '1', label: 'Mens.' },
+                              { value: '2', label: 'Bim.' },
+                              { value: '3', label: 'Trim.' },
+                              { value: '6', label: 'Sem.' },
+                              { value: '12', label: 'Ann.' },
+                            ]}
+                            aria-label="Fatturazione canoni"
+                          />
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
-                <div className={styles.field}>
-                  <label className={styles.label}>Durata iniziale (mesi)</label>
-                  <input
-                    className={state.quoteType === 'iaas' ? styles.readOnly : styles.input}
-                    type="number"
-                    value={state.initial_term_months}
-                    readOnly={state.quoteType === 'iaas'}
-                    onChange={e => update('initial_term_months', Number(e.target.value))}
-                  />
+                      <div className={styles.tileTrio}>
+                        <div className={styles.numberTile}>
+                          <div className={styles.numberTileLabel}>Durata iniziale</div>
+                          <div>
+                            <input
+                              className={styles.numberTileInput}
+                              type="number"
+                              min={1}
+                              value={state.initial_term_months}
+                              onChange={e =>
+                                update('initial_term_months', Number(e.target.value))
+                              }
+                            />
+                            <span className={styles.numberTileSuffix}>mesi</span>
+                          </div>
+                        </div>
+                        <div className={styles.numberTile}>
+                          <div className={styles.numberTileLabel}>Rinnovo</div>
+                          <div>
+                            <input
+                              className={styles.numberTileInput}
+                              type="number"
+                              min={1}
+                              value={state.next_term_months}
+                              onChange={e =>
+                                update('next_term_months', Number(e.target.value))
+                              }
+                            />
+                            <span className={styles.numberTileSuffix}>mesi</span>
+                          </div>
+                        </div>
+                        <div className={styles.numberTile}>
+                          <div className={styles.numberTileLabel}>Consegna</div>
+                          <div>
+                            <input
+                              className={styles.numberTileInput}
+                              type="number"
+                              min={0}
+                              value={state.delivered_in_days}
+                              onChange={e =>
+                                update('delivered_in_days', Number(e.target.value))
+                              }
+                            />
+                            <span className={styles.numberTileSuffix}>giorni</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {state.quoteType === 'iaas' && (
+                    <>
+                      <Tooltip
+                        placement="top"
+                        content="In modalità IaaS, tipo documento, fatturazione e termini sono fissati dal template selezionato."
+                      >
+                        <div className={styles.autoConfigChip}>
+                          <span className={styles.autoConfigIcon} aria-hidden="true">
+                            <Icon name="lock" size={14} />
+                          </span>
+                          <div className={styles.autoConfigBody}>
+                            <div className={styles.autoConfigLabel}>Auto-configurato</div>
+                            <div className={styles.autoConfigValue}>
+                              Ricorrente · Mensile · 1/1 mesi
+                            </div>
+                          </div>
+                        </div>
+                      </Tooltip>
+                      <div className={styles.tileTrioSingle}>
+                        <div className={styles.numberTile}>
+                          <div className={styles.numberTileLabel}>Consegna</div>
+                          <div>
+                            <input
+                              className={styles.numberTileInput}
+                              type="number"
+                              min={0}
+                              value={state.delivered_in_days}
+                              onChange={e =>
+                                update('delivered_in_days', Number(e.target.value))
+                              }
+                            />
+                            <span className={styles.numberTileSuffix}>giorni</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Durata rinnovo (mesi)</label>
-                  <input
-                    className={state.quoteType === 'iaas' ? styles.readOnly : styles.input}
-                    type="number"
-                    value={state.next_term_months}
-                    readOnly={state.quoteType === 'iaas'}
-                    onChange={e => update('next_term_months', Number(e.target.value))}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Consegna (giorni)</label>
-                  <input
-                    className={styles.input}
-                    type="number"
-                    value={state.delivered_in_days}
-                    onChange={e => update('delivered_in_days', Number(e.target.value))}
-                  />
-                </div>
-              </div>
+              </section>
             </div>
           </div>
         )}
