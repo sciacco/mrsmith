@@ -142,12 +142,10 @@ export function KitCard({
             const visible = summaries.filter(
               ({ group, missing }) => missing || group.included_product !== null,
             );
-            const skippedCount = summaries.length - visible.length;
             if (visible.length === 0) {
               return (
                 <p className={styles.hint}>
                   Nessun prodotto incluso.
-                  {skippedCount > 0 && ` ${skippedCount} grupp${skippedCount === 1 ? 'o opzionale' : 'i opzionali'} non incluso.`}
                 </p>
               );
             }
@@ -194,11 +192,6 @@ export function KitCard({
                 );
               })}
             </ul>
-            {skippedCount > 0 && (
-              <div className={styles.skippedNote}>
-                {skippedCount} grupp{skippedCount === 1 ? 'o opzionale' : 'i opzionali'} non incluso{skippedCount === 1 ? '' : 'i'}
-              </div>
-            )}
             </>
             );
           })()}

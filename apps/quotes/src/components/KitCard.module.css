@@ -250,14 +250,6 @@
   border-bottom: none;
 }
 
-.skippedNote {
-  margin-top: var(--space-2);
-  font-size: 0.6875rem;
-  font-style: italic;
-  color: var(--color-text-muted);
-  text-align: right;
-}
-
 .dragging {
   opacity: 0.6;
   box-shadow: var(--shadow-float);

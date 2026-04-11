@@ -81,6 +81,7 @@
 - Plan-review heuristic: sample code embedded in implementation plans should be sanity-checked for copy-paste breakage such as unused imports and slice-iteration mutation bugs (`for _, row := range rows` does not update returned elements).
 
 ## 2026-04-11
+- Quotes kit cards no longer render the optional-group omission helper copy (`"X gruppi opzionali non inclusi"`) in [apps/quotes/src/components/KitCard.tsx](apps/quotes/src/components/KitCard.tsx); both the footer note and the all-skipped empty state were removed to recover vertical space in the card body.
 - Quotes create-flow categories are not one-size-fits-all: the Nuova Proposta wizard now requests `/quotes/v1/categories?exclude_ids=12,13`, while the backend still supports the older broader `exclude_standard=true` path for callers that explicitly need `12,13,14,15`.
 - Quotes replacement-order loading is pinned to the Alyante/Appsmith shape `Tsmi_Ordini.NOME_TESTATA_ORDINE` with `STATO_ORDINE IN ('Evaso','Confermato')`, plus the migrated customer ERP bridge filter on `ID_CLIENTE` resolved from `loader.hubs_company.numero_azienda`; `backend/internal/quotes/handler_reference_test.go` locks that contract.
 - Quotes create now clears `replace_orders` when leaving `SOSTITUZIONE` and only submits that field for `proposal_type === 'SOSTITUZIONE'`, preventing hidden-state leakage in the wizard.
