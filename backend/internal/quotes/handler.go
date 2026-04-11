@@ -6,8 +6,8 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
-	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 )
 
 // Handler holds dependencies for all quotes endpoints.
@@ -43,6 +43,7 @@ func RegisterRoutes(mux *http.ServeMux, db, alyanteDB *sql.DB, hs *hubspot.Clien
 	handle("GET /quotes/v1/quotes/{id}", h.handleGetQuote)
 	handle("PUT /quotes/v1/quotes/{id}", h.handleUpdateQuote)
 	handle("GET /quotes/v1/quotes/{id}/hs-status", h.handleGetHSStatus)
+	handle("GET /quotes/v1/quotes/{id}/publish-precheck", h.handlePublishPrecheck)
 
 	// ── Kit rows and products ──
 	handle("GET /quotes/v1/quotes/{id}/rows", h.handleListRows)

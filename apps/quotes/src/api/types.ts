@@ -28,6 +28,9 @@ export interface Kit {
   mrc: number;
   category_id: number | null;
   category_name: string | null;
+  is_active: boolean;
+  ecommerce: boolean;
+  quotable: boolean;
 }
 
 export interface Customer {
@@ -127,6 +130,8 @@ export interface QuoteRow {
   hs_line_item_id: number | null;
   hs_line_item_nrc: number | null;
   position: number;
+  hs_mrc?: string;
+  hs_nrc?: string;
 }
 
 export interface ProductVariant {
@@ -154,10 +159,19 @@ export interface ProductGroup {
   required: boolean;
   main_product: boolean;
   position: number;
+  included_product: ProductVariant | null;
 }
 
 export interface HSStatus {
   hs_quote_id: number | null;
   status: QuoteStatus;
+  hs_status: string | null;
+  quote_url: string | null;
   pdf_url: string | null;
+  sign_status: string | null;
+}
+
+export interface PublishPrecheck {
+  invalid_required_groups: number;
+  has_missing_required_products: boolean;
 }

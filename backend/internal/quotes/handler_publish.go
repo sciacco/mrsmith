@@ -1,14 +1,15 @@
 package quotes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 )
 
 type publishStep struct {
@@ -45,44 +46,37 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Step 1: Save
+	if err := h.persistQuoteForPublish(ctx, quoteID); err != nil {
+		failStep(1, "save", err.Error())
+		return
+	}
 	addStep(1, "save", "completed")
 
 	// Step 2: Validate required products
-	var invalidCount int
-	err = h.db.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM quotes.quote_rows qr
-		WHERE qr.quote_id = $1
-		AND NOT EXISTS (
-			SELECT 1 FROM quotes.quote_rows_products qrp
-			WHERE qrp.quote_row_id = qr.id AND qrp.required = true AND qrp.included = true
-		)
-		AND EXISTS (
-			SELECT 1 FROM quotes.quote_rows_products qrp
-			WHERE qrp.quote_row_id = qr.id AND qrp.required = true
-		)`, quoteID).Scan(&invalidCount)
+	invalidCount, err := h.countInvalidRequiredGroups(ctx, quoteID)
 	if err != nil {
 		failStep(2, "validate", fmt.Sprintf("validation query failed: %v", err))
 		return
 	}
 	if invalidCount > 0 {
-		failStep(2, "validate", fmt.Sprintf("%d kit rows have missing required products", invalidCount))
+		failStep(2, "validate", fmt.Sprintf("%d required product groups are not configured", invalidCount))
 		return
 	}
 	addStep(2, "validate", "completed")
 
 	// Load quote data for HS
 	var q struct {
-		QuoteNumber   string
-		CustomerID    *int64
-		HSDealID      *int64
-		HSQuoteID     *int64
-		Template      *string
-		Owner         *string
-		DocumentDate  *string
-		Notes         *string
-		Status        string
-		Description   string
-		BillMonths    int
+		QuoteNumber       string
+		CustomerID        *int64
+		HSDealID          *int64
+		HSQuoteID         *int64
+		Template          *string
+		Owner             *string
+		DocumentDate      *string
+		Notes             *string
+		Status            string
+		Description       string
+		BillMonths        int
 		InitialTermMonths int
 		NextTermMonths    int
 		DeliveredInDays   int
@@ -238,11 +232,11 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 	for _, rd := range rowList {
 		// MRC line item
 		mrcProps := map[string]any{
-			"name":          rd.InternalName + " (MRC)",
-			"hs_sku":        fmt.Sprintf("MRC-%d", rd.KitID),
+			"name":                      rd.InternalName + " (MRC)",
+			"hs_sku":                    fmt.Sprintf("MRC-%d", rd.KitID),
 			"recurringbillingfrequency": "monthly",
-			"price":         rd.MrcRow,
-			"quantity":      1,
+			"price":                     rd.MrcRow,
+			"quantity":                  1,
 		}
 
 		if rd.HsLineItemID != nil {
@@ -294,6 +288,72 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 		"steps":   steps,
 		"quote":   updatedQuote,
 	})
+}
+
+func (h *Handler) handlePublishPrecheck(w http.ResponseWriter, r *http.Request) {
+	if !h.requireDB(w) {
+		return
+	}
+
+	quoteID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_quote_id")
+		return
+	}
+
+	invalidCount, err := h.countInvalidRequiredGroups(r.Context(), quoteID)
+	if err != nil {
+		h.dbFailure(w, r, "publish_precheck", err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, map[string]any{
+		"invalid_required_groups":       invalidCount,
+		"has_missing_required_products": invalidCount > 0,
+	})
+}
+
+func (h *Handler) countInvalidRequiredGroups(ctx context.Context, quoteID int) (int, error) {
+	var invalidCount int
+	err := h.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM quotes.v_quote_rows_products vqrp
+		WHERE vqrp.quote_row_id IN (
+			SELECT id FROM quotes.quote_rows WHERE quote_id = $1
+		)
+		AND vqrp.required = 1
+		AND NOT EXISTS (
+			SELECT 1
+			FROM jsonb_array_elements(vqrp.riga::jsonb) AS j(obj)
+			WHERE obj->>'included' = 'true'
+		)`, quoteID).Scan(&invalidCount)
+	return invalidCount, err
+}
+
+func (h *Handler) persistQuoteForPublish(ctx context.Context, quoteID int) error {
+	var currentJSON json.RawMessage
+	if err := h.db.QueryRowContext(ctx,
+		`SELECT row_to_json(q) FROM quotes.quote q WHERE q.id = $1`, quoteID).Scan(&currentJSON); err != nil {
+		return fmt.Errorf("load quote before publish: %w", err)
+	}
+
+	var result json.RawMessage
+	if err := h.db.QueryRowContext(ctx,
+		`SELECT quotes.upd_quote_head($1::json)`, string(currentJSON)).Scan(&result); err != nil {
+		return fmt.Errorf("persist quote before publish: %w", err)
+	}
+
+	var procResult struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(result, &procResult); err != nil {
+		return fmt.Errorf("parse publish save response: %w", err)
+	}
+	if procResult.Status == "ERROR" {
+		return fmt.Errorf(procResult.Message)
+	}
+	return nil
 }
 
 func ptrStr(s *string) string {

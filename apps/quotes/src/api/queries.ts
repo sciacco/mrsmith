@@ -3,7 +3,7 @@ import { useApiClient } from './client';
 import type {
   Template, ProductCategory, Kit, Customer, Deal, Owner,
   PaymentMethod, CustomerPayment, CustomerOrder, QuoteListResponse,
-  Quote, HSStatus, QuoteRow, ProductVariant,
+  Quote, HSStatus, QuoteRow, ProductGroup, PublishPrecheck, ProductVariant,
 } from './types';
 
 // ── Reference data hooks ──
@@ -36,7 +36,10 @@ export function useKits() {
   const api = useApiClient();
   return useQuery({
     queryKey: ['kits'],
-    queryFn: () => api.get<Kit[]>('/quotes/v1/kits'),
+    queryFn: async () => {
+      const kits = await api.get<Kit[]>('/quotes/v1/kits');
+      return kits.filter(kit => kit.is_active && !kit.ecommerce && kit.quotable);
+    },
   });
 }
 
@@ -149,6 +152,7 @@ export function useUpdateQuote() {
     onSuccess: (_data, variables) => {
       void qc.invalidateQueries({ queryKey: ['quote', variables.id] });
       void qc.invalidateQueries({ queryKey: ['quotes'] });
+      void qc.invalidateQueries({ queryKey: ['publish-precheck', variables.id] });
     },
   });
 }
@@ -158,6 +162,15 @@ export function useHSStatus(id: number) {
   return useQuery({
     queryKey: ['hs-status', id],
     queryFn: () => api.get<HSStatus>(`/quotes/v1/quotes/${id}/hs-status`),
+  });
+}
+
+export function usePublishPrecheck(id: number) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['publish-precheck', id],
+    queryFn: () => api.get<PublishPrecheck>(`/quotes/v1/quotes/${id}/publish-precheck`),
+    enabled: id > 0,
   });
 }
 
@@ -175,6 +188,7 @@ export function usePublishQuote() {
       void qc.invalidateQueries({ queryKey: ['quote', id] });
       void qc.invalidateQueries({ queryKey: ['hs-status', id] });
       void qc.invalidateQueries({ queryKey: ['quotes'] });
+      void qc.invalidateQueries({ queryKey: ['publish-precheck', id] });
     },
   });
 }
@@ -210,6 +224,7 @@ export function useAddRow() {
       api.post<QuoteRow>(`/quotes/v1/quotes/${quoteId}/rows`, { kit_id: kitId }),
     onSuccess: (_data, variables) => {
       void qc.invalidateQueries({ queryKey: ['quote-rows', variables.quoteId] });
+      void qc.invalidateQueries({ queryKey: ['publish-precheck', variables.quoteId] });
     },
   });
 }
@@ -222,6 +237,7 @@ export function useDeleteRow() {
       api.delete(`/quotes/v1/quotes/${quoteId}/rows/${rowId}`),
     onSuccess: (_data, variables) => {
       void qc.invalidateQueries({ queryKey: ['quote-rows', variables.quoteId] });
+      void qc.invalidateQueries({ queryKey: ['publish-precheck', variables.quoteId] });
     },
   });
 }
@@ -238,7 +254,7 @@ export function useRowProducts(quoteId: number, rowId: number) {
   const api = useApiClient();
   return useQuery({
     queryKey: ['row-products', quoteId, rowId],
-    queryFn: () => api.get<ProductVariant[]>(`/quotes/v1/quotes/${quoteId}/rows/${rowId}/products`),
+    queryFn: () => api.get<ProductGroup[]>(`/quotes/v1/quotes/${quoteId}/rows/${rowId}/products`),
     enabled: rowId > 0,
   });
 }
@@ -253,6 +269,7 @@ export function useUpdateProduct() {
     onSuccess: (_data, variables) => {
       void qc.invalidateQueries({ queryKey: ['row-products', variables.quoteId, variables.rowId] });
       void qc.invalidateQueries({ queryKey: ['quote-rows', variables.quoteId] });
+      void qc.invalidateQueries({ queryKey: ['publish-precheck', variables.quoteId] });
     },
   });
 }

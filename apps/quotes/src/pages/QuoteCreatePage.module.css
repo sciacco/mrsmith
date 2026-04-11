@@ -93,6 +93,13 @@
   border-color: var(--color-accent, #635bff);
 }
 
+.readOnly {
+  composes: input;
+  background: var(--color-border-light, #f8fafc);
+  color: var(--color-text, #1e293b);
+  cursor: default;
+}
+
 .select {
   composes: input;
   appearance: none;

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { usePublishQuote } from '../api/queries';
+import type { HSStatus, PublishPrecheck } from '../api/types';
 import styles from './PublishModal.module.css';
 
 const stepNames = ['Salvataggio dati', 'Validazione prodotti', 'Offerta HubSpot', 'Sincronizzazione prodotti', 'Aggiornamento stato'];
@@ -7,18 +8,31 @@ const stepNames = ['Salvataggio dati', 'Validazione prodotti', 'Offerta HubSpot'
 interface PublishModalProps {
   quoteId: number;
   isRepublish: boolean;
+  hsStatus: HSStatus | null;
+  precheck: PublishPrecheck | null;
   onClose: () => void;
 }
 
 type ModalState = 'confirm' | 'progress' | 'success' | 'error';
 
-export function PublishModal({ quoteId, isRepublish, onClose }: PublishModalProps) {
+export function PublishModal({ quoteId, isRepublish, hsStatus, precheck, onClose }: PublishModalProps) {
   const [modalState, setModalState] = useState<ModalState>('confirm');
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [errorStep, setErrorStep] = useState<{ step: number; message: string } | null>(null);
   const publishQuote = usePublishQuote();
+  const blockers: string[] = [];
+
+  if (hsStatus?.sign_status === 'ESIGN_COMPLETED') {
+    blockers.push('La proposta risulta gia firmata su HubSpot e non puo essere ripubblicata.');
+  }
+  if (precheck?.has_missing_required_products) {
+    blockers.push('Sono presenti gruppi prodotto obbligatori non configurati.');
+  }
 
   const handlePublish = useCallback(async () => {
+    if (blockers.length > 0) {
+      return;
+    }
     setModalState('progress');
     setCompletedSteps([]);
     setErrorStep(null);
@@ -41,7 +55,7 @@ export function PublishModal({ quoteId, isRepublish, onClose }: PublishModalProp
       setModalState('error');
       setErrorStep({ step: 0, message: e instanceof Error ? e.message : 'Errore di rete' });
     }
-  }, [quoteId, publishQuote]);
+  }, [blockers.length, quoteId, publishQuote]);
 
   if (modalState === 'confirm') {
     return (
@@ -53,9 +67,16 @@ export function PublishModal({ quoteId, isRepublish, onClose }: PublishModalProp
           <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1.5rem' }}>
             La proposta verrà sincronizzata con HubSpot. Questo processo include validazione, creazione offerta e sincronizzazione prodotti.
           </p>
+          {blockers.length > 0 && (
+            <div className={styles.stepError} style={{ marginBottom: '1rem' }}>
+              {blockers.join(' ')}
+            </div>
+          )}
           <div className={styles.actions}>
             <button className={styles.btnSecondary} onClick={onClose}>Annulla</button>
-            <button className={styles.btnPrimary} onClick={() => void handlePublish()}>Pubblica</button>
+            <button className={styles.btnPrimary} disabled={blockers.length > 0} onClick={() => void handlePublish()}>
+              Pubblica
+            </button>
           </div>
         </div>
       </div>

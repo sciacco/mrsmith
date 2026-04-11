@@ -1,59 +1,61 @@
-import { useMemo } from 'react';
-import type { ProductVariant } from '../api/types';
+import type { DocumentType, ProductGroup, ProductVariant } from '../api/types';
 import { useUpdateProduct } from '../api/queries';
+import { buildProductUpdatePayload } from '../utils/quoteRules';
 import styles from './ProductGroupRadio.module.css';
 
 interface ProductGroupRadioProps {
-  products: ProductVariant[];
+  groups: ProductGroup[];
   quoteId: number;
   rowId: number;
+  documentType: DocumentType;
 }
 
-export function ProductGroupRadio({ products, quoteId, rowId }: ProductGroupRadioProps) {
+export function ProductGroupRadio({ groups, quoteId, rowId, documentType }: ProductGroupRadioProps) {
   const updateProduct = useUpdateProduct();
+  const isSpotQuote = documentType === 'TSC-ORDINE';
 
-  // Group products by group_name
-  const groups = useMemo(() => {
-    const map = new Map<string, ProductVariant[]>();
-    for (const p of products) {
-      const list = map.get(p.group_name) ?? [];
-      list.push(p);
-      map.set(p.group_name, list);
-    }
-    return Array.from(map.entries()).map(([name, items]) => ({
-      name,
-      items,
-      required: items.some(i => i.required),
-    }));
-  }, [products]);
-
-  const handleSelect = (product: ProductVariant) => {
+  const handleSelect = (product: ProductVariant, included: boolean, quantity = product.quantity) => {
     updateProduct.mutate({
       quoteId, rowId, productId: product.id,
-      data: { included: true, quantity: product.quantity || 1 },
+      data: buildProductUpdatePayload(product, included, quantity, isSpotQuote),
     });
   };
 
   const handleQuantity = (product: ProductVariant, qty: number) => {
-    updateProduct.mutate({
-      quoteId, rowId, productId: product.id,
-      data: { quantity: qty },
-    });
+    handleSelect(product, true, qty);
+  };
+
+  const handleExclude = (group: ProductGroup) => {
+    const fallback = group.included_product ?? group.products[0];
+    if (!fallback) return;
+    handleSelect(fallback, false, fallback.quantity);
   };
 
   return (
     <div>
       {groups.map(g => (
-        <div key={g.name} className={`${styles.group} ${g.required ? styles.required : ''}`}>
-          <div className={styles.groupHeader}>{g.name}</div>
-          {g.items.map(p => (
+        <div key={g.group_name} className={`${styles.group} ${g.required ? styles.required : ''}`}>
+          <div className={styles.groupHeader}>{g.group_name}</div>
+          {!g.required && (
+            <label className={styles.variant}>
+              <input
+                className={styles.radioInput}
+                type="radio"
+                name={`group-${rowId}-${g.group_name}`}
+                checked={g.included_product === null}
+                onChange={() => handleExclude(g)}
+              />
+              <span className={styles.variantName}>Non incluso</span>
+            </label>
+          )}
+          {g.products.map(p => (
             <div key={p.id} className={styles.variant}>
               <input
                 className={styles.radioInput}
                 type="radio"
-                name={`group-${rowId}-${g.name}`}
+                name={`group-${rowId}-${g.group_name}`}
                 checked={p.included}
-                onChange={() => handleSelect(p)}
+                onChange={() => handleSelect(p, true)}
               />
               <span className={styles.variantName}>{p.product_name}</span>
               <span className={styles.variantPrice}>
@@ -65,7 +67,7 @@ export function ProductGroupRadio({ products, quoteId, rowId }: ProductGroupRadi
                 <input
                   className={styles.qtyInput}
                   type="number"
-                  min={p.minimum}
+                  min={p.minimum > 0 ? p.minimum : 0}
                   max={p.maximum || 999}
                   value={p.quantity}
                   onChange={e => handleQuantity(p, Number(e.target.value))}

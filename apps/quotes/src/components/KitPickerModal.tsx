@@ -18,7 +18,10 @@ export function KitPickerModal({ onSelect, onClose }: KitPickerModalProps) {
     if (!kits) return [];
     if (!search) return kits;
     const q = search.toLowerCase();
-    return kits.filter(k => k.internal_name.toLowerCase().includes(q));
+    return kits.filter(k =>
+      k.internal_name.toLowerCase().includes(q) ||
+      (k.category_name?.toLowerCase().includes(q) ?? false)
+    );
   }, [kits, search]);
 
   // Group by category
@@ -50,6 +53,9 @@ export function KitPickerModal({ onSelect, onClose }: KitPickerModalProps) {
           />
         </div>
         <div className={styles.list}>
+          {grouped.length === 0 && (
+            <div className={styles.kitItem}>Nessun kit selezionabile disponibile.</div>
+          )}
           {grouped.map(([cat, items]) => (
             <div key={cat}>
               <div className={styles.category}>{cat}</div>

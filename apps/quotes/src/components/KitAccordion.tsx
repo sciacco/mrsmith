@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import type { QuoteRow } from '../api/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { DocumentType, QuoteRow } from '../api/types';
 import { useRowProducts } from '../api/queries';
 import { ProductGroupRadio } from './ProductGroupRadio';
 import styles from './KitAccordion.module.css';
@@ -7,27 +7,54 @@ import styles from './KitAccordion.module.css';
 interface KitAccordionProps {
   row: QuoteRow;
   quoteId: number;
-  onDelete: (rowId: number) => void;
+  documentType: DocumentType;
+  onDelete: (rowId: number) => void | Promise<void>;
+  isDeleting?: boolean;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent, rowId: number) => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent, rowId: number) => void;
 }
 
-export function KitAccordion({ row, quoteId, onDelete, draggable, onDragStart, onDragOver, onDrop }: KitAccordionProps) {
+export function KitAccordion({
+  row,
+  quoteId,
+  documentType,
+  onDelete,
+  isDeleting = false,
+  draggable,
+  onDragStart,
+  onDragOver,
+  onDrop,
+}: KitAccordionProps) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const { data: products } = useRowProducts(quoteId, open ? row.id : 0);
+  const confirmTimeoutRef = useRef<number | null>(null);
+  const { data: groups } = useRowProducts(quoteId, open ? row.id : 0);
+
+  useEffect(() => () => {
+    if (confirmTimeoutRef.current !== null) {
+      window.clearTimeout(confirmTimeoutRef.current);
+    }
+  }, []);
 
   const handleRemove = useCallback(() => {
+    if (isDeleting) return;
     if (confirming) {
-      onDelete(row.id);
+      if (confirmTimeoutRef.current !== null) {
+        window.clearTimeout(confirmTimeoutRef.current);
+        confirmTimeoutRef.current = null;
+      }
+      void onDelete(row.id);
       setConfirming(false);
     } else {
       setConfirming(true);
-      setTimeout(() => setConfirming(false), 3000);
+      confirmTimeoutRef.current = window.setTimeout(() => {
+        setConfirming(false);
+        confirmTimeoutRef.current = null;
+      }, 3000);
     }
-  }, [confirming, onDelete, row.id]);
+  }, [confirming, isDeleting, onDelete, row.id]);
 
   return (
     <div
@@ -53,15 +80,16 @@ export function KitAccordion({ row, quoteId, onDelete, draggable, onDragStart, o
         </div>
         <button
           className={confirming ? styles.confirmBtn : styles.removeBtn}
+          disabled={isDeleting}
           onClick={e => { e.stopPropagation(); handleRemove(); }}
         >
-          {confirming ? 'Conferma?' : '\u2715'}
+          {isDeleting ? '...' : confirming ? 'Conferma?' : '\u2715'}
         </button>
       </div>
       {open && (
         <div className={styles.body}>
-          {products ? (
-            <ProductGroupRadio products={products} quoteId={quoteId} rowId={row.id} />
+          {groups ? (
+            <ProductGroupRadio groups={groups} quoteId={quoteId} rowId={row.id} documentType={documentType} />
           ) : (
             <p style={{ color: '#94a3b8', fontSize: '0.8125rem' }}>Caricamento prodotti...</p>
           )}

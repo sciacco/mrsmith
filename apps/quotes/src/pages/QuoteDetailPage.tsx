@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuote, useUpdateQuote, useHSStatus } from '../api/queries';
+import { useHSStatus, usePublishPrecheck, useQuote, useUpdateQuote } from '../api/queries';
 import type { Quote } from '../api/types';
 import { StatusBadge } from '../components/StatusBadge';
 import { DirtyBanner } from '../components/DirtyBanner';
@@ -10,6 +10,7 @@ import { NotesTab } from '../components/NotesTab';
 import { KitsTab } from '../components/KitsTab';
 import { PublishModal } from '../components/PublishModal';
 import { useDirtyState } from '../hooks/useDirtyState';
+import { buildQuoteSavePayload, prepareQuoteForDetail } from '../utils/quoteRules';
 import styles from './QuoteDetailPage.module.css';
 
 const tabs = [
@@ -27,6 +28,7 @@ export function QuoteDetailPage() {
   const navigate = useNavigate();
   const { data: quote, isLoading } = useQuote(quoteId);
   const { data: hsStatus } = useHSStatus(quoteId);
+  const publishPrecheck = usePublishPrecheck(quoteId);
   const updateQuote = useUpdateQuote();
   const { isDirty, dirtyTabs, markDirty, markClean, setSnapshot } = useDirtyState();
 
@@ -38,8 +40,9 @@ export function QuoteDetailPage() {
   // Sync server data to local state
   useEffect(() => {
     if (quote && !localQuote) {
-      setLocalQuote(quote);
-      setSnapshot(quote);
+      const prepared = prepareQuoteForDetail(quote);
+      setLocalQuote(prepared);
+      setSnapshot(prepared);
     }
   }, [quote, localQuote, setSnapshot]);
 
@@ -54,9 +57,11 @@ export function QuoteDetailPage() {
   const handleSave = useCallback(async () => {
     if (!localQuote) return;
     try {
-      await updateQuote.mutateAsync({ id: quoteId, data: localQuote });
+      const saved = await updateQuote.mutateAsync({ id: quoteId, data: buildQuoteSavePayload(localQuote) });
+      const prepared = prepareQuoteForDetail(saved);
+      setLocalQuote(prepared);
       markClean();
-      setSnapshot(localQuote);
+      setSnapshot(prepared);
       setSaveFlash(true);
       setTimeout(() => setSaveFlash(false), 600);
     } catch {
@@ -92,14 +97,28 @@ export function QuoteDetailPage() {
 
         <div className={styles.actions}>
           {hsStatus?.hs_quote_id && (
-            <a
-              className={styles.hsLink}
-              href={hsStatus.pdf_url ?? '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Apri su HS
-            </a>
+            <>
+              {hsStatus.quote_url && (
+                <a
+                  className={styles.hsLink}
+                  href={hsStatus.quote_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Apri su HS
+                </a>
+              )}
+              {hsStatus.pdf_url && hsStatus.pdf_url !== hsStatus.quote_url && (
+                <a
+                  className={styles.hsLink}
+                  href={hsStatus.pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  PDF HS
+                </a>
+              )}
+            </>
           )}
           <button
             className={styles.publishBtn}
@@ -146,7 +165,7 @@ export function QuoteDetailPage() {
           <HeaderTab quote={localQuote} onChange={handleChange} />
         )}
         {activeTab === 'kits' && (
-          <KitsTab quoteId={quoteId} />
+          <KitsTab quoteId={quoteId} documentType={localQuote.document_type} />
         )}
         {activeTab === 'notes' && (
           <NotesTab quote={localQuote} onChange={handleChange} />
@@ -160,6 +179,8 @@ export function QuoteDetailPage() {
         <PublishModal
           quoteId={quoteId}
           isRepublish={!!hsStatus?.hs_quote_id}
+          hsStatus={hsStatus ?? null}
+          precheck={publishPrecheck.data ?? null}
           onClose={() => setShowPublish(false)}
         />
       )}

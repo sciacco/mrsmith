@@ -251,7 +251,7 @@ func (h *Handler) handleGetQuote(w http.ResponseWriter, r *http.Request) {
 
 	row := h.db.QueryRowContext(r.Context(),
 		`SELECT q.id, q.quote_number, q.customer_id, q.deal_number, q.owner,
-		        q.document_date, q.document_type, q.replace_orders, q.template, q.services,
+		        q.document_date, q.document_type, REPLACE(q.replace_orders, ';', ','), q.template, q.services,
 		        q.proposal_type, q.initial_term_months, q.next_term_months, q.bill_months,
 		        q.delivered_in_days, q.date_sent, q.status, q.notes, q.nrc_charge_time,
 		        q.created_at, q.updated_at, q.description, q.hs_deal_id, q.hs_quote_id,
@@ -470,16 +470,38 @@ func (h *Handler) handleGetHSStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var quoteURL *string
 	var pdfURL *string
+	var signStatus *string
+	hsStatus := status
 	if hsQuoteID != nil {
 		u := fmt.Sprintf("https://app.hubspot.com/quotes/%d", *hsQuoteID)
-		pdfURL = &u
+		quoteURL = &u
+		if h.hs != nil {
+			if remote, err := h.hs.GetQuoteStatus(r.Context(), *hsQuoteID); err == nil && remote != nil {
+				if link := strings.TrimSpace(remote.Properties["hs_quote_link"]); link != "" {
+					quoteURL = &link
+				}
+				if link := strings.TrimSpace(remote.Properties["hs_pdf_download_link"]); link != "" {
+					pdfURL = &link
+				}
+				if remoteStatus := strings.TrimSpace(remote.Properties["hs_status"]); remoteStatus != "" {
+					hsStatus = remoteStatus
+				}
+				if remoteSign := strings.TrimSpace(remote.Properties["hs_sign_status"]); remoteSign != "" {
+					signStatus = &remoteSign
+				}
+			}
+		}
 	}
 
 	httputil.JSON(w, http.StatusOK, map[string]any{
 		"hs_quote_id": hsQuoteID,
 		"status":      status,
+		"hs_status":   hsStatus,
+		"quote_url":   quoteURL,
 		"pdf_url":     pdfURL,
+		"sign_status": signStatus,
 	})
 }
 

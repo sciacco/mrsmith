@@ -35,7 +35,8 @@ func (h *Handler) handleListRows(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.QueryContext(r.Context(),
 		`SELECT qr.id, qr.quote_id, qr.kit_id, k.internal_name, qr.nrc_row, qr.mrc_row,
-		        COALESCE(qr.bundle_prefix_row, ''), qr.hs_line_item_id, qr.hs_line_item_nrc, qr.position
+		        COALESCE(qr.bundle_prefix_row, ''), qr.hs_line_item_id, qr.hs_line_item_nrc, qr.position,
+		        COALESCE(qr.hs_line_item_id::varchar, ''), COALESCE(qr.hs_line_item_nrc::varchar, '')
 		 FROM quotes.quote_rows qr
 		 LEFT JOIN products.kit k ON k.id = qr.kit_id
 		 WHERE qr.quote_id = $1
@@ -57,13 +58,15 @@ func (h *Handler) handleListRows(w http.ResponseWriter, r *http.Request) {
 		HsLineItemID    *int64  `json:"hs_line_item_id"`
 		HsLineItemNrc   *int64  `json:"hs_line_item_nrc"`
 		Position        int     `json:"position"`
+		HsMRC           string  `json:"hs_mrc"`
+		HsNRC           string  `json:"hs_nrc"`
 	}
 
 	result := []kitRow{}
 	for rows.Next() {
 		var kr kitRow
 		if err := rows.Scan(&kr.ID, &kr.QuoteID, &kr.KitID, &kr.InternalName, &kr.NrcRow, &kr.MrcRow,
-			&kr.BundlePrefixRow, &kr.HsLineItemID, &kr.HsLineItemNrc, &kr.Position); err != nil {
+			&kr.BundlePrefixRow, &kr.HsLineItemID, &kr.HsLineItemNrc, &kr.Position, &kr.HsMRC, &kr.HsNRC); err != nil {
 			h.dbFailure(w, r, "list_rows_scan", err)
 			return
 		}
@@ -97,6 +100,31 @@ func (h *Handler) handleAddRow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var quoteExists bool
+	if err := h.db.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM quotes.quote WHERE id = $1)`, quoteID).Scan(&quoteExists); err != nil {
+		h.dbFailure(w, r, "add_row_quote_check", err)
+		return
+	}
+	if !quoteExists {
+		httputil.Error(w, http.StatusNotFound, "quote_not_found")
+		return
+	}
+
+	var kitEligible bool
+	if err := h.db.QueryRowContext(r.Context(),
+		`SELECT EXISTS(
+			SELECT 1
+			FROM products.kit
+			WHERE id = $1 AND is_active = true AND ecommerce = false AND quotable = true
+		)`, body.KitID).Scan(&kitEligible); err != nil {
+		h.dbFailure(w, r, "add_row_kit_check", err)
+		return
+	}
+	if !kitEligible {
+		httputil.Error(w, http.StatusBadRequest, "kit_not_selectable")
+		return
+	}
+
 	// Get next position
 	var maxPos int
 	_ = h.db.QueryRowContext(r.Context(),
@@ -120,15 +148,21 @@ func (h *Handler) handleAddRow(w http.ResponseWriter, r *http.Request) {
 		NrcRow          float64 `json:"nrc_row"`
 		MrcRow          float64 `json:"mrc_row"`
 		BundlePrefixRow string  `json:"bundle_prefix_row"`
+		HsLineItemID    *int64  `json:"hs_line_item_id"`
+		HsLineItemNrc   *int64  `json:"hs_line_item_nrc"`
 		Position        int     `json:"position"`
+		HsMRC           string  `json:"hs_mrc"`
+		HsNRC           string  `json:"hs_nrc"`
 	}
 	err = h.db.QueryRowContext(r.Context(),
 		`SELECT qr.id, qr.quote_id, qr.kit_id, k.internal_name, qr.nrc_row, qr.mrc_row,
-		        COALESCE(qr.bundle_prefix_row, ''), qr.position
+		        COALESCE(qr.bundle_prefix_row, ''), qr.hs_line_item_id, qr.hs_line_item_nrc, qr.position,
+		        COALESCE(qr.hs_line_item_id::varchar, ''), COALESCE(qr.hs_line_item_nrc::varchar, '')
 		 FROM quotes.quote_rows qr
 		 LEFT JOIN products.kit k ON k.id = qr.kit_id
 		 WHERE qr.id = $1`, rowID).Scan(
-		&kr.ID, &kr.QuoteID, &kr.KitID, &kr.InternalName, &kr.NrcRow, &kr.MrcRow, &kr.BundlePrefixRow, &kr.Position)
+		&kr.ID, &kr.QuoteID, &kr.KitID, &kr.InternalName, &kr.NrcRow, &kr.MrcRow, &kr.BundlePrefixRow,
+		&kr.HsLineItemID, &kr.HsLineItemNrc, &kr.Position, &kr.HsMRC, &kr.HsNRC)
 	if err != nil {
 		h.dbFailure(w, r, "add_row_refetch", err)
 		return
@@ -224,10 +258,73 @@ func (h *Handler) handleUpdateRowPosition(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	_, err = h.db.ExecContext(r.Context(),
-		`UPDATE quotes.quote_rows SET position = $1 WHERE id = $2`, body.Position, rowID)
+	tx, err := h.db.BeginTx(r.Context(), nil)
 	if err != nil {
-		h.dbFailure(w, r, "update_position", err)
+		h.dbFailure(w, r, "update_position_begin", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.QueryContext(r.Context(),
+		`SELECT id FROM quotes.quote_rows WHERE quote_id = $1 ORDER BY position, id`, quoteID)
+	if err != nil {
+		h.dbFailure(w, r, "update_position_list", err)
+		return
+	}
+	defer rows.Close()
+
+	order := []int{}
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			h.dbFailure(w, r, "update_position_scan", err)
+			return
+		}
+		order = append(order, id)
+	}
+	if !h.rowsDone(w, r, rows, "update_position") {
+		return
+	}
+
+	currentIndex := -1
+	for i, id := range order {
+		if id == rowID {
+			currentIndex = i
+			break
+		}
+	}
+	if currentIndex == -1 {
+		httputil.Error(w, http.StatusNotFound, "row_not_found")
+		return
+	}
+
+	targetIndex := body.Position - 1
+	if targetIndex < 0 {
+		targetIndex = 0
+	}
+	if targetIndex >= len(order) {
+		targetIndex = len(order) - 1
+	}
+	if targetIndex != currentIndex {
+		moved := order[currentIndex]
+		order = append(order[:currentIndex], order[currentIndex+1:]...)
+		if targetIndex >= len(order) {
+			order = append(order, moved)
+		} else {
+			order = append(order[:targetIndex], append([]int{moved}, order[targetIndex:]...)...)
+		}
+	}
+
+	for i, id := range order {
+		if _, err := tx.ExecContext(r.Context(),
+			`UPDATE quotes.quote_rows SET position = $1 WHERE id = $2`, i+1, id); err != nil {
+			h.dbFailure(w, r, "update_position_write", err)
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		h.dbFailure(w, r, "update_position_commit", err)
 		return
 	}
 
@@ -270,13 +367,10 @@ func (h *Handler) handleListProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.QueryContext(r.Context(),
-		`SELECT qrp.id, qrp.product_code, p.internal_name, qrp.minimum, qrp.maximum,
-		        qrp.required, qrp.nrc, qrp.mrc, qrp.position, qrp.group_name,
-		        qrp.included, qrp.main_product, qrp.quantity, qrp.extended_description
-		 FROM quotes.quote_rows_products qrp
-		 JOIN products.product p ON p.code = qrp.product_code
-		 WHERE qrp.quote_row_id = $1
-		 ORDER BY qrp.position`, rowID)
+		`SELECT group_name, quote_row_id, riga, conta, required, main_product, position
+		 FROM quotes.v_quote_rows_products
+		 WHERE quote_row_id = $1
+		 ORDER BY position`, rowID)
 	if err != nil {
 		h.dbFailure(w, r, "list_products", err)
 		return
@@ -297,19 +391,47 @@ func (h *Handler) handleListProducts(w http.ResponseWriter, r *http.Request) {
 		Included            bool    `json:"included"`
 		MainProduct         bool    `json:"main_product"`
 		Quantity            int     `json:"quantity"`
-		ExtendedDescription string  `json:"extended_description"`
+		ExtendedDescription *string `json:"extended_description"`
 	}
 
-	result := []product{}
+	type productGroup struct {
+		GroupName       string    `json:"group_name"`
+		QuoteRowID      int       `json:"quote_row_id"`
+		Products        []product `json:"products"`
+		Count           int       `json:"count"`
+		Required        bool      `json:"required"`
+		MainProduct     bool      `json:"main_product"`
+		Position        int       `json:"position"`
+		IncludedProduct *product  `json:"included_product"`
+	}
+
+	result := []productGroup{}
 	for rows.Next() {
-		var p product
-		if err := rows.Scan(&p.ID, &p.ProductCode, &p.ProductName, &p.Minimum, &p.Maximum, &p.Required,
-			&p.NRC, &p.MRC, &p.Position, &p.GroupName, &p.Included, &p.MainProduct, &p.Quantity,
-			&p.ExtendedDescription); err != nil {
+		var (
+			group        productGroup
+			productsJSON json.RawMessage
+			count        int
+			required     int
+			mainProduct  int
+		)
+		if err := rows.Scan(&group.GroupName, &group.QuoteRowID, &productsJSON, &count, &required, &mainProduct, &group.Position); err != nil {
 			h.dbFailure(w, r, "list_products_scan", err)
 			return
 		}
-		result = append(result, p)
+		if err := json.Unmarshal(productsJSON, &group.Products); err != nil {
+			h.dbFailure(w, r, "list_products_unmarshal", err)
+			return
+		}
+		group.Count = count
+		group.Required = required > 0
+		group.MainProduct = mainProduct > 0
+		for i := range group.Products {
+			if group.Products[i].Included {
+				group.IncludedProduct = &group.Products[i]
+				break
+			}
+		}
+		result = append(result, group)
 	}
 	if !h.rowsDone(w, r, rows, "list_products") {
 		return

@@ -129,7 +129,8 @@ func (h *Handler) handleListKits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `SELECT k.id, k.internal_name, k.nrc, k.mrc, k.category_id, pc.name as category_name
+	query := `SELECT k.id, k.internal_name, k.nrc, k.mrc, k.category_id, pc.name as category_name,
+	                 k.is_active, k.ecommerce, k.quotable
 	          FROM products.kit k
 	          LEFT JOIN products.product_category pc ON pc.id = k.category_id
 	          WHERE k.is_active = true AND k.ecommerce = false AND k.quotable = true
@@ -151,12 +152,15 @@ func (h *Handler) handleListKits(w http.ResponseWriter, r *http.Request) {
 		CategoryName sql.NullString `json:"-"`
 		Category     *string        `json:"category_name"`
 		CategoryIDV  *int           `json:"category_id"`
+		IsActive     bool           `json:"is_active"`
+		Ecommerce    bool           `json:"ecommerce"`
+		Quotable     bool           `json:"quotable"`
 	}
 
 	result := []kit{}
 	for rows.Next() {
 		var k kit
-		if err := rows.Scan(&k.ID, &k.InternalName, &k.NRC, &k.MRC, &k.CategoryID, &k.CategoryName); err != nil {
+		if err := rows.Scan(&k.ID, &k.InternalName, &k.NRC, &k.MRC, &k.CategoryID, &k.CategoryName, &k.IsActive, &k.Ecommerce, &k.Quotable); err != nil {
 			h.dbFailure(w, r, "list_kits_scan", err)
 			return
 		}

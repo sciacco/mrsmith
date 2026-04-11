@@ -16,6 +16,7 @@ import { Stepper } from '../components/Stepper';
 import { WizardNav } from '../components/WizardNav';
 import { DealCard } from '../components/DealCard';
 import { TypeSelector } from '../components/TypeSelector';
+import { buildIaaSTrialText, getLanguageCode, getIaaSTemplateRule } from '../utils/quoteRules';
 import styles from './QuoteCreatePage.module.css';
 
 const stepNames = ['Deal', 'Configurazione', 'Kit e Prodotti', 'Extra', 'Riepilogo'];
@@ -23,6 +24,7 @@ const stepNames = ['Deal', 'Configurazione', 'Kit e Prodotti', 'Extra', 'Riepilo
 interface WizardState {
   selectedDeal: Deal | null;
   quoteType: 'standard' | 'iaas';
+  iaasLanguage: 'ITA' | 'ENG';
   document_type: 'TSC-ORDINE-RIC' | 'TSC-ORDINE';
   proposal_type: 'NUOVO' | 'SOSTITUZIONE' | 'RINNOVO';
   replace_orders: string;
@@ -37,12 +39,15 @@ interface WizardState {
   nrc_charge_time: number;
   description: string;
   notes: string;
+  trial: string;
+  trial_value: number;
   kit_ids: number[];
 }
 
 const initialState: WizardState = {
   selectedDeal: null,
   quoteType: 'standard',
+  iaasLanguage: 'ITA',
   document_type: 'TSC-ORDINE-RIC',
   proposal_type: 'NUOVO',
   replace_orders: '',
@@ -57,6 +62,8 @@ const initialState: WizardState = {
   nrc_charge_time: 2,
   description: '',
   notes: '',
+  trial: '',
+  trial_value: 0,
   kit_ids: [],
 };
 
@@ -75,7 +82,10 @@ export function QuoteCreatePage() {
   // Appsmith parity: template list depends on document_type. Spot docs exclude
   // colocation templates; recurring docs allow both colo and non-colo templates
   // (see `TypeDocument.template_suServizio`).
-  const templatesParams: { type: string; is_colo?: string } = { type: state.quoteType };
+  const templatesParams: { type: string; lang?: string; is_colo?: string } = { type: state.quoteType };
+  if (state.quoteType === 'iaas') {
+    templatesParams.lang = getLanguageCode(state.iaasLanguage);
+  }
   if (state.quoteType === 'standard' && state.document_type === 'TSC-ORDINE') {
     templatesParams.is_colo = 'false';
   }
@@ -86,6 +96,18 @@ export function QuoteCreatePage() {
   const { data: kits } = useKits();
   const createQuote = useCreateQuote();
   const [kitSearch, setKitSearch] = useState('');
+  const selectedTemplate = useMemo(
+    () => templates?.find(template => template.template_id === state.template) ?? null,
+    [state.template, templates]
+  );
+  const derivedIaaSRule = useMemo(
+    () => getIaaSTemplateRule(state.template),
+    [state.template]
+  );
+  const derivedIaaSKit = useMemo(
+    () => kits?.find(kit => kit.id === (derivedIaaSRule?.kitId ?? selectedTemplate?.kit_id ?? -1)) ?? null,
+    [derivedIaaSRule, kits, selectedTemplate]
+  );
 
   // Appsmith parity: detect COLOCATION service selection via category name.
   // `Service.ServiceChange()` checks `sl_services.selectedOptionLabels.includes('COLOCATION')`.
@@ -136,6 +158,27 @@ export function QuoteCreatePage() {
       setState(prev => ({ ...prev, template: '' }));
     }
   }, [templates, state.template]);
+
+  useEffect(() => {
+    if (state.quoteType !== 'iaas') {
+      return;
+    }
+    setState(prev => {
+      const nextTemplate = prev.template;
+      const nextRule = getIaaSTemplateRule(nextTemplate);
+      const nextTrial = buildIaaSTrialText(prev.trial_value, getLanguageCode(prev.iaasLanguage));
+      return {
+        ...prev,
+        document_type: 'TSC-ORDINE-RIC',
+        services: nextRule?.services ?? '',
+        initial_term_months: 1,
+        next_term_months: 1,
+        bill_months: 1,
+        kit_ids: nextRule ? [nextRule.kitId] : [],
+        trial: nextTrial,
+      };
+    });
+  }, [state.iaasLanguage, state.quoteType, state.template, state.trial_value]);
 
   // When the selected customer resolves, apply the ERP default payment code.
   // Fallback to '402' if the lookup has no value or fails, matching Appsmith.
@@ -234,6 +277,7 @@ export function QuoteCreatePage() {
         nrc_charge_time: state.nrc_charge_time,
         description: state.description,
         notes: state.notes,
+        trial: state.trial,
         status: 'DRAFT',
         kit_ids: state.kit_ids,
       });
@@ -289,16 +333,20 @@ export function QuoteCreatePage() {
                 <div className={styles.sectionTitle}>Configurazione</div>
                 <div className={styles.field}>
                   <label className={styles.label}>Tipo documento</label>
-                  <div className={styles.radioGroup}>
-                    <label className={styles.radioLabel}>
-                      <input className={styles.radioInput} type="radio" checked={state.document_type === 'TSC-ORDINE-RIC'}
-                        onChange={() => update('document_type', 'TSC-ORDINE-RIC')} /> Ricorrente
-                    </label>
-                    <label className={styles.radioLabel}>
-                      <input className={styles.radioInput} type="radio" checked={state.document_type === 'TSC-ORDINE'}
-                        onChange={() => update('document_type', 'TSC-ORDINE')} /> Spot
-                    </label>
-                  </div>
+                  {state.quoteType === 'iaas' ? (
+                    <input className={styles.readOnly} readOnly value="Ricorrente" />
+                  ) : (
+                    <div className={styles.radioGroup}>
+                      <label className={styles.radioLabel}>
+                        <input className={styles.radioInput} type="radio" checked={state.document_type === 'TSC-ORDINE-RIC'}
+                          onChange={() => update('document_type', 'TSC-ORDINE-RIC')} /> Ricorrente
+                      </label>
+                      <label className={styles.radioLabel}>
+                        <input className={styles.radioInput} type="radio" checked={state.document_type === 'TSC-ORDINE'}
+                          onChange={() => update('document_type', 'TSC-ORDINE')} /> Spot
+                      </label>
+                    </div>
+                  )}
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Tipo proposta</label>
@@ -365,6 +413,46 @@ export function QuoteCreatePage() {
                     </select>
                   </div>
                 )}
+                {state.quoteType === 'iaas' && (
+                  <>
+                    <div className={styles.field}>
+                      <label className={styles.label}>Lingua cliente</label>
+                      <div className={styles.radioGroup}>
+                        {(['ITA', 'ENG'] as const).map(language => (
+                          <label key={language} className={styles.radioLabel}>
+                            <input
+                              className={styles.radioInput}
+                              type="radio"
+                              checked={state.iaasLanguage === language}
+                              onChange={() => update('iaasLanguage', language)}
+                            />
+                            {language}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.label}>Trial</label>
+                      <input
+                        className={styles.input}
+                        type="range"
+                        min="0"
+                        max="200"
+                        step="10"
+                        value={state.trial_value}
+                        onChange={e => update('trial_value', Number(e.target.value))}
+                      />
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                        Trial gratuito: {state.trial_value}€
+                      </div>
+                      {state.trial && (
+                        <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.5rem' }}>
+                          {state.trial}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
                 <div className={styles.field}>
                   <label className={styles.label}>Template</label>
                   <select className={styles.select} value={state.template} onChange={e => update('template', e.target.value)}>
@@ -379,6 +467,16 @@ export function QuoteCreatePage() {
                     </div>
                   )}
                 </div>
+                {state.quoteType === 'iaas' && (
+                  <div className={styles.field}>
+                    <label className={styles.label}>Valori derivati</label>
+                    <div className={styles.readOnly}>
+                      {derivedIaaSKit
+                        ? `${derivedIaaSKit.internal_name} • servizi ${derivedIaaSRule?.services ?? '—'} • termini 1/1/1`
+                        : 'Seleziona un template IaaS per derivare kit, servizi e termini.'}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className={styles.section}>
@@ -391,34 +489,43 @@ export function QuoteCreatePage() {
                     ))}
                   </select>
                 </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Fatturazione canoni</label>
-                  <select
-                    className={styles.select}
-                    value={String(state.bill_months)}
-                    disabled={billingLocked}
-                    onChange={e => update('bill_months', Number(e.target.value))}
-                  >
-                    <option value="1">Mensile (1)</option>
-                    <option value="2">Bimestrale (2)</option>
-                    <option value="3">Trimestrale (3)</option>
-                    <option value="6">Semestrale (6)</option>
-                    <option value="12">Annuale (12)</option>
-                  </select>
-                  {billingLocked && (
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                      COLOCATION ricorrente: fatturazione trimestrale obbligatoria.
-                    </div>
-                  )}
-                </div>
+                {state.quoteType === 'iaas' ? (
+                  <div className={styles.field}>
+                    <label className={styles.label}>Fatturazione canoni</label>
+                    <input className={styles.readOnly} readOnly value="Mensile (1)" />
+                  </div>
+                ) : (
+                  <div className={styles.field}>
+                    <label className={styles.label}>Fatturazione canoni</label>
+                    <select
+                      className={styles.select}
+                      value={String(state.bill_months)}
+                      disabled={billingLocked}
+                      onChange={e => update('bill_months', Number(e.target.value))}
+                    >
+                      <option value="1">Mensile (1)</option>
+                      <option value="2">Bimestrale (2)</option>
+                      <option value="3">Trimestrale (3)</option>
+                      <option value="6">Semestrale (6)</option>
+                      <option value="12">Annuale (12)</option>
+                    </select>
+                    {billingLocked && (
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                        COLOCATION ricorrente: fatturazione trimestrale obbligatoria.
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className={styles.field}>
                   <label className={styles.label}>Durata iniziale (mesi)</label>
-                  <input className={styles.input} type="number" value={state.initial_term_months}
+                  <input className={state.quoteType === 'iaas' ? styles.readOnly : styles.input} type="number" value={state.initial_term_months}
+                    readOnly={state.quoteType === 'iaas'}
                     onChange={e => update('initial_term_months', Number(e.target.value))} />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Durata rinnovo (mesi)</label>
-                  <input className={styles.input} type="number" value={state.next_term_months}
+                  <input className={state.quoteType === 'iaas' ? styles.readOnly : styles.input} type="number" value={state.next_term_months}
+                    readOnly={state.quoteType === 'iaas'}
                     onChange={e => update('next_term_months', Number(e.target.value))} />
                 </div>
                 <div className={styles.field}>
@@ -434,51 +541,66 @@ export function QuoteCreatePage() {
         {step === 2 && (
           <div className={styles.section}>
             <div className={styles.sectionTitle}>Kit e Prodotti</div>
-            <p style={{ color: '#64748b', fontSize: '0.8125rem', marginBottom: '0.75rem' }}>
-              Seleziona uno o piu kit da inserire nella proposta. I kit scelti diventeranno le righe iniziali.
-            </p>
-            <div className={styles.field}>
-              <input
-                className={styles.input}
-                placeholder="Cerca kit..."
-                value={kitSearch}
-                onChange={e => setKitSearch(e.target.value)}
-              />
-            </div>
-            <div className={styles.kitList}>
-              {groupedKits.length === 0 && (
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                  Nessun kit disponibile.
+            {state.quoteType === 'iaas' ? (
+              <>
+                <p style={{ color: '#64748b', fontSize: '0.8125rem', marginBottom: '0.75rem' }}>
+                  Il kit iniziale viene derivato automaticamente dal template IaaS selezionato.
+                </p>
+                <div className={styles.readOnly}>
+                  {derivedIaaSKit
+                    ? `${derivedIaaSKit.internal_name} • NRC ${derivedIaaSKit.nrc.toFixed(2)} / MRC ${derivedIaaSKit.mrc.toFixed(2)}`
+                    : 'Seleziona un template IaaS valido per generare la riga kit iniziale.'}
                 </div>
-              )}
-              {groupedKits.map(([cat, items]) => (
-                <div key={cat} className={styles.kitGroup}>
-                  <div className={styles.kitGroupTitle}>{cat}</div>
-                  {items.map(k => {
-                    const checked = state.kit_ids.includes(k.id);
-                    return (
-                      <label key={k.id} className={styles.kitRow}>
-                        <input
-                          type="checkbox"
-                          className={styles.radioInput}
-                          checked={checked}
-                          onChange={() => toggleKit(k.id)}
-                        />
-                        <span className={styles.kitName}>{k.internal_name}</span>
-                        <span className={styles.kitPrice}>
-                          NRC {k.nrc.toFixed(2)} / MRC {k.mrc.toFixed(2)}
-                        </span>
-                      </label>
-                    );
-                  })}
+              </>
+            ) : (
+              <>
+                <p style={{ color: '#64748b', fontSize: '0.8125rem', marginBottom: '0.75rem' }}>
+                  Seleziona uno o piu kit da inserire nella proposta. I kit scelti diventeranno le righe iniziali.
+                </p>
+                <div className={styles.field}>
+                  <input
+                    className={styles.input}
+                    placeholder="Cerca kit..."
+                    value={kitSearch}
+                    onChange={e => setKitSearch(e.target.value)}
+                  />
                 </div>
-              ))}
-            </div>
-            <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#64748b' }}>
-              {state.kit_ids.length === 0
-                ? 'Nessun kit selezionato.'
-                : `${state.kit_ids.length} kit selezionati.`}
-            </div>
+                <div className={styles.kitList}>
+                  {groupedKits.length === 0 && (
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      Nessun kit disponibile.
+                    </div>
+                  )}
+                  {groupedKits.map(([cat, items]) => (
+                    <div key={cat} className={styles.kitGroup}>
+                      <div className={styles.kitGroupTitle}>{cat}</div>
+                      {items.map(k => {
+                        const checked = state.kit_ids.includes(k.id);
+                        return (
+                          <label key={k.id} className={styles.kitRow}>
+                            <input
+                              type="checkbox"
+                              className={styles.radioInput}
+                              checked={checked}
+                              onChange={() => toggleKit(k.id)}
+                            />
+                            <span className={styles.kitName}>{k.internal_name}</span>
+                            <span className={styles.kitPrice}>
+                              NRC {k.nrc.toFixed(2)} / MRC {k.mrc.toFixed(2)}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#64748b' }}>
+                  {state.kit_ids.length === 0
+                    ? 'Nessun kit selezionato.'
+                    : `${state.kit_ids.length} kit selezionati.`}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -522,6 +644,12 @@ export function QuoteCreatePage() {
                   : selectedKits.map(k => k.internal_name).join(', ')}
               </span>
             </div>
+            {state.trial && (
+              <div className={styles.summaryRow}>
+                <span className={styles.summaryLabel}>Trial</span>
+                <span className={styles.summaryValue}>{state.trial}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

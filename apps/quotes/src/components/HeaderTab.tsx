@@ -1,5 +1,6 @@
 import type { Quote } from '../api/types';
 import { useCustomerOrders, useOwners, usePaymentMethods } from '../api/queries';
+import { isIaaSTemplate, parseReplaceOrders } from '../utils/quoteRules';
 import styles from './HeaderTab.module.css';
 
 interface HeaderTabProps {
@@ -15,12 +16,9 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
   const customerOrders = customerOrdersQuery.data ?? [];
 
   // Stored as `;`-separated string (Appsmith parity); present as multi-select.
-  const selectedOrders = (quote.replace_orders ?? '')
-    .split(';')
-    .map(s => s.trim())
-    .filter(Boolean);
+  const selectedOrders = parseReplaceOrders(quote.replace_orders);
 
-  const isIaaS = false; // Will be resolved from template lookup in later phases
+  const isIaaS = isIaaSTemplate(quote.template);
   const isSpot = quote.document_type === 'TSC-ORDINE';
 
   return (
@@ -121,6 +119,11 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
             </select>
             {!customerOrdersQuery.isPending && customerOrders.length === 0 && (
               <div className={styles.emptyHint}>Nessun ordine disponibile per il cliente.</div>
+            )}
+            {selectedOrders.length > 0 && (
+              <div className={styles.emptyHint}>
+                Ordini selezionati: {selectedOrders.join(', ')}
+              </div>
             )}
           </div>
         )}

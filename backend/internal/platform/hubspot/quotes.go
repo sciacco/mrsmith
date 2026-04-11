@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strings"
 )
 
 // Verified association type IDs from Appsmith source code:
@@ -47,7 +49,9 @@ func (c *Client) CreateQuote(ctx context.Context, properties map[string]any, ass
 	if err != nil {
 		return 0, fmt.Errorf("create quote: %w", err)
 	}
-	var result struct{ ID string `json:"id"` }
+	var result struct {
+		ID string `json:"id"`
+	}
 	if err := json.Unmarshal(resp, &result); err != nil {
 		return 0, fmt.Errorf("parse create quote response: %w", err)
 	}
@@ -66,6 +70,37 @@ func (c *Client) DeleteQuote(ctx context.Context, quoteID int64) error {
 	return c.Delete(ctx, fmt.Sprintf("/crm/v3/objects/quotes/%d", quoteID))
 }
 
+type QuoteStatus struct {
+	Properties map[string]string `json:"properties"`
+}
+
+func (c *Client) GetQuoteStatus(ctx context.Context, quoteID int64) (*QuoteStatus, error) {
+	properties := []string{
+		"hs_status",
+		"hs_language",
+		"hs_pdf_download_link",
+		"hs_quote_link",
+		"hs_sign_status",
+		"hs_esign_enabled",
+		"hs_esign_num_signers_completed",
+		"hs_esign_num_signers_required",
+	}
+	path := fmt.Sprintf(
+		"/crm/v3/objects/quotes/%d?properties=%s",
+		quoteID,
+		url.QueryEscape(strings.Join(properties, ",")),
+	)
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("get quote status: %w", err)
+	}
+	var result QuoteStatus
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("parse quote status response: %w", err)
+	}
+	return &result, nil
+}
+
 func (c *Client) GetQuoteLineItemIDs(ctx context.Context, quoteID int64) ([]int64, error) {
 	resp, err := c.Get(ctx, fmt.Sprintf("/crm/v3/objects/quotes/%d?associations=line_items", quoteID))
 	if err != nil {
@@ -73,7 +108,9 @@ func (c *Client) GetQuoteLineItemIDs(ctx context.Context, quoteID int64) ([]int6
 	}
 	var result struct {
 		Associations map[string]struct {
-			Results []struct{ ID json.Number `json:"id"` } `json:"results"`
+			Results []struct {
+				ID json.Number `json:"id"`
+			} `json:"results"`
 		} `json:"associations"`
 	}
 	if err := json.Unmarshal(resp, &result); err != nil {
@@ -100,7 +137,9 @@ func (c *Client) CreateLineItem(ctx context.Context, properties map[string]any, 
 	if err != nil {
 		return 0, fmt.Errorf("create line item: %w", err)
 	}
-	var result struct{ ID string `json:"id"` }
+	var result struct {
+		ID string `json:"id"`
+	}
 	if err := json.Unmarshal(resp, &result); err != nil {
 		return 0, fmt.Errorf("parse line item response: %w", err)
 	}
