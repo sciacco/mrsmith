@@ -9,7 +9,9 @@
       "Bash(pnpm:*)",
       "Bash(GONOSUMCHECK=github.com/go-sql-driver/mysql GOFLAGS=-insecure go get github.com/go-sql-driver/mysql)",
       "Bash(GOINSECURE=github.com/go-sql-driver/mysql go get github.com/go-sql-driver/mysql)",
-      "Bash(GOINSECURE=github.com/go-sql-driver/mysql go mod:*)"
+      "Bash(GOINSECURE=github.com/go-sql-driver/mysql go mod:*)",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "mcp__plugin_playwright_playwright__browser_close"
     ]
   }
 }
