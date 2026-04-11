@@ -1,13 +1,31 @@
 .banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
   background: var(--color-warning-subtle);
-  border: 1px solid var(--color-warning-subtle);
   border-left: 3px solid var(--color-warning);
   border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
-  font-size: 0.8125rem;
-  font-weight: 500;
+  min-height: 44px;
   color: var(--color-warning-strong);
   animation: slideDown var(--duration-fast) var(--ease-out) both;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-warning);
+}
+
+.text {
+  flex: 1;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.action {
+  display: flex;
+  align-items: center;
 }
 
 @keyframes slideDown {

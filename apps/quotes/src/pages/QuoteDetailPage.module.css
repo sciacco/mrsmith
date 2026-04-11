@@ -1,28 +1,33 @@
 .page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: var(--space-8);
   animation: pageEnter var(--duration-slow) var(--ease-out) both;
 }
 
-.headerBar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
+/* ── Sticky elevated action bar ── */
+.actionBar {
   position: sticky;
-  top: 0;
+  top: 60px;
   z-index: 10;
   background: var(--color-bg-elevated);
-  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.actionBarInner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-8);
+  min-height: 56px;
 }
 
 .backBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-elevated);
@@ -42,101 +47,103 @@
 
 .quoteNumber {
   font-family: var(--font-mono);
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--color-text);
+  letter-spacing: -0.01em;
 }
 
-.actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: auto;
-}
-
-.saveBtn {
-  padding: var(--space-2) var(--space-5);
-  border: none;
-  border-radius: var(--radius-full);
-  background: var(--color-accent);
-  color: var(--color-text-on-accent);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow-accent);
-  transition:
-    background var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-spring);
-}
-
-.saveBtn:hover:not(:disabled) {
-  background: var(--color-accent-hover);
-  transform: translateY(-1px);
-}
-
-.saveBtn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.saveSuccess {
-  background: var(--color-success);
-}
-
-.publishBtn {
-  padding: var(--space-2) var(--space-5);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-accent);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-spring);
-}
-
-.publishBtn:hover:not(:disabled) {
-  background: var(--color-accent-subtle);
-  transform: translateY(-1px);
-}
-
-.publishBtn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.actionBarSpacer {
+  flex: 1;
 }
 
 .hsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
   font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--color-accent);
   text-decoration: none;
-  font-weight: 500;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--ease-out);
 }
 
 .hsLink:hover {
-  text-decoration: underline;
+  background: var(--color-accent-subtle);
+}
+
+.saveWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.attentionDot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-warning);
+  border: 2px solid var(--color-bg-elevated);
+  pointer-events: none;
+  animation: dotPulse var(--duration-normal) var(--ease-spring) both;
+}
+
+@keyframes dotPulse {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+
+.publishBlockers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.publishBlockersTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.publishBlockersList {
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text);
+}
+
+.publishBlockersList li {
+  list-style: disc;
+}
+
+/* ── Content area ── */
+.contentWrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-8) var(--space-12);
 }
 
 .tabs {
   border-bottom: 1px solid var(--color-border);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-5);
   height: 44px;
 }
 
 .dirtyWrap {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .tabContent {
   animation: sectionEnter var(--duration-normal) var(--ease-out) both;
-}
-
-.placeholder {
-  padding: var(--space-12);
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
 }
 
 .loading {

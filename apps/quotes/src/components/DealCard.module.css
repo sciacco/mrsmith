@@ -1,14 +1,25 @@
 .card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  min-height: 72px;
   padding: var(--space-4) var(--space-5);
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  cursor: pointer;
   background: var(--color-bg-elevated);
   box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  overflow: hidden;
   transition:
     border-color var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-spring);
+    transform var(--duration-fast) var(--ease-spring),
+    background var(--duration-fast) var(--ease-out);
 }
 
 .card:hover {
@@ -17,27 +28,110 @@
   transform: translateY(-1px);
 }
 
+.card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.accent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-accent);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
 .selected {
   border-color: var(--color-accent);
   background: var(--color-accent-subtle);
-  box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
-.dealName {
+.selected .accent {
+  opacity: 1;
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
   font-weight: 600;
-  font-size: 0.875rem;
   color: var(--color-text);
-  margin-bottom: var(--space-1);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .company {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.amount {
-  font-family: var(--font-mono);
+.stage {
   font-size: 0.75rem;
   color: var(--color-text-muted);
-  margin-top: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.selected .avatar {
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+}
+
+.pipeline {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .card {
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3);
+  }
+  .code {
+    grid-column: 1 / -1;
+  }
+  .pipeline {
+    display: none;
+  }
 }

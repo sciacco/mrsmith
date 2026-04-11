@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MultiSelect, SingleSelect } from '@mrsmith/ui';
+import { Button, Icon, MultiSelect, SingleSelect, SearchInput } from '@mrsmith/ui';
 import {
   useCategories,
   useCustomerOrders,
@@ -17,10 +17,16 @@ import { Stepper } from '../components/Stepper';
 import { WizardNav } from '../components/WizardNav';
 import { DealCard } from '../components/DealCard';
 import { TypeSelector } from '../components/TypeSelector';
+import { CollapsibleSection } from '../components/CollapsibleSection';
+import { ContactCard, type ContactFields } from '../components/ContactCard';
+import { RichTextEditor } from '../components/RichTextEditor';
+import { KitPickerModal } from '../components/KitPickerModal';
 import { buildIaaSTrialText, getLanguageCode, getIaaSTemplateRule } from '../utils/quoteRules';
 import styles from './QuoteCreatePage.module.css';
 
-const stepNames = ['Deal', 'Configurazione', 'Kit e Prodotti', 'Extra', 'Riepilogo'];
+const stepNames = ['Deal', 'Configurazione', 'Kit', 'Extra', 'Riepilogo'];
+
+const emptyContact: ContactFields = { name: '', tel: '', email: '' };
 
 interface WizardState {
   selectedDeal: Deal | null;
@@ -43,6 +49,10 @@ interface WizardState {
   trial: string;
   trial_value: number;
   kit_ids: number[];
+  rif_ordcli: string;
+  contactTech: ContactFields;
+  contactAltroTech: ContactFields;
+  contactAdm: ContactFields;
 }
 
 const initialState: WizardState = {
@@ -66,13 +76,41 @@ const initialState: WizardState = {
   trial: '',
   trial_value: 0,
   kit_ids: [],
+  rif_ordcli: '',
+  contactTech: { ...emptyContact },
+  contactAltroTech: { ...emptyContact },
+  contactAdm: { ...emptyContact },
 };
+
+function formatCurrency(value: number): string {
+  return value.toLocaleString('it-IT', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function truncateHtml(html: string, max = 80): string {
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (text.length === 0) return '';
+  return text.length > max ? text.slice(0, max).trimEnd() + '…' : text;
+}
+
+function countFilledContacts(state: WizardState): number {
+  const contacts = [state.contactTech, state.contactAltroTech, state.contactAdm];
+  return contacts.filter(c => c.name || c.tel || c.email).length + (state.rif_ordcli ? 1 : 0);
+}
 
 export function QuoteCreatePage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [state, setState] = useState<WizardState>(initialState);
   const [dealSearch, setDealSearch] = useState('');
+  const [showKitPicker, setShowKitPicker] = useState(false);
+  const [extraOpen, setExtraOpen] = useState<Record<string, boolean>>({
+    description: false,
+    legalNotes: false,
+    contacts: false,
+  });
   const shouldLoadKits =
     (state.quoteType === 'standard' && step >= 2) ||
     (state.quoteType === 'iaas' && state.template !== '');
@@ -80,15 +118,10 @@ export function QuoteCreatePage() {
   const { data: deals } = useDeals();
   const { data: owners } = useOwners();
   const { data: paymentMethods } = usePaymentMethods();
-  // Appsmith parity: standard create uses the Nuova Proposta service list,
-  // which excludes only categories 12 and 13.
   const { data: categories } = useCategories({
     excludeIds: [12, 13],
     enabled: state.quoteType === 'standard',
   });
-  // Appsmith parity: template list depends on document_type. Spot docs exclude
-  // colocation templates; recurring docs allow both colo and non-colo templates
-  // (see `TypeDocument.template_suServizio`).
   const templatesParams = useMemo<{ type: string; lang?: string; is_colo?: string }>(() => {
     const params: { type: string; lang?: string; is_colo?: string } = { type: state.quoteType };
     if (state.quoteType === 'iaas') {
@@ -100,45 +133,36 @@ export function QuoteCreatePage() {
     return params;
   }, [state.document_type, state.iaasLanguage, state.quoteType]);
   const { data: templates } = useTemplates(templatesParams);
-  // Appsmith parity: the `mst_kit` multi-select in "Nuova Proposta" is populated
-  // from `list_kit`, grouped by category. Selected kit ids are inserted as
-  // quote rows right after `ins_quote` (see `salvaOfferta`).
   const { data: kits, isPending: kitsPending } = useKits({ enabled: shouldLoadKits });
   const createQuote = useCreateQuote();
-  const [kitSearch, setKitSearch] = useState('');
   const selectedTemplate = useMemo(
-    () => templates?.find(template => template.template_id === state.template) ?? null,
-    [state.template, templates]
+    () => templates?.find(t => t.template_id === state.template) ?? null,
+    [state.template, templates],
   );
   const derivedIaaSRule = useMemo(
     () => getIaaSTemplateRule(state.template),
-    [state.template]
+    [state.template],
   );
   const derivedIaaSKit = useMemo(
-    () => kits?.find(kit => kit.id === (derivedIaaSRule?.kitId ?? selectedTemplate?.kit_id ?? -1)) ?? null,
-    [derivedIaaSRule, kits, selectedTemplate]
+    () => kits?.find(k => k.id === (derivedIaaSRule?.kitId ?? selectedTemplate?.kit_id ?? -1)) ?? null,
+    [derivedIaaSRule, kits, selectedTemplate],
   );
 
-  // Appsmith parity: detect COLOCATION service selection via category name.
-  // `Service.ServiceChange()` checks `sl_services.selectedOptionLabels.includes('COLOCATION')`.
   const selectedServiceIds = useMemo(
     () => state.services.split(',').map(s => s.trim()).filter(Boolean),
-    [state.services]
+    [state.services],
   );
   const colocationSelected = useMemo(() => {
     if (state.quoteType !== 'standard' || !categories) return false;
     return categories.some(
-      c => selectedServiceIds.includes(String(c.id)) && c.name.toUpperCase() === 'COLOCATION'
+      c => selectedServiceIds.includes(String(c.id)) && c.name.toUpperCase() === 'COLOCATION',
     );
   }, [categories, selectedServiceIds, state.quoteType]);
-  // Appsmith parity: COLOCATION + TSC-ORDINE-RIC → force trimestral billing (3)
-  // and disable the billing selector.
   const billingLocked =
     state.quoteType === 'standard' &&
     colocationSelected &&
     state.document_type === 'TSC-ORDINE-RIC';
 
-  // ERP customer-specific default payment lookup (Appsmith parity: metodoPagDefault)
   const selectedCustomerId = state.selectedDeal?.company_id != null
     ? String(state.selectedDeal.company_id)
     : null;
@@ -146,25 +170,18 @@ export function QuoteCreatePage() {
   const customerOrdersQuery = useCustomerOrders(selectedCustomerId);
   const customerOrders = customerOrdersQuery.data ?? [];
 
-  // beforeunload protection
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
-  // Appsmith parity: while COLOCATION is selected for a recurring document,
-  // force bill_months to 3 (Trimestrale). When the condition clears, keep the
-  // existing value — editability is restored via `billingLocked` on the select.
   useEffect(() => {
     if (billingLocked) {
       setState(prev => (prev.bill_months === 3 ? prev : { ...prev, bill_months: 3 }));
     }
   }, [billingLocked]);
 
-  // Appsmith parity: if the currently selected template disappears from the
-  // allowed list (because document_type changed), drop it so the user is
-  // forced to pick a still-valid option instead of silently keeping a bad one.
   useEffect(() => {
     if (!state.template || !templates) return;
     if (!templates.some(t => t.template_id === state.template)) {
@@ -173,9 +190,7 @@ export function QuoteCreatePage() {
   }, [templates, state.template]);
 
   useEffect(() => {
-    if (state.quoteType !== 'iaas') {
-      return;
-    }
+    if (state.quoteType !== 'iaas') return;
     setState(prev => {
       const nextTemplate = prev.template;
       const nextRule = getIaaSTemplateRule(nextTemplate);
@@ -194,21 +209,10 @@ export function QuoteCreatePage() {
   }, [state.iaasLanguage, state.quoteType, state.template, state.trial_value]);
 
   useEffect(() => {
-    if (state.proposal_type === 'SOSTITUZIONE' || state.replace_orders === '') {
-      return;
-    }
+    if (state.proposal_type === 'SOSTITUZIONE' || state.replace_orders === '') return;
     setState(prev => ({ ...prev, replace_orders: '' }));
   }, [state.proposal_type, state.replace_orders]);
 
-  useEffect(() => {
-    if (step === 2 || kitSearch === '') {
-      return;
-    }
-    setKitSearch('');
-  }, [kitSearch, step]);
-
-  // When the selected customer resolves, apply the ERP default payment code.
-  // Fallback to '402' if the lookup has no value or fails, matching Appsmith.
   useEffect(() => {
     if (!selectedCustomerId) return;
     if (customerPaymentQuery.isPending) return;
@@ -217,57 +221,34 @@ export function QuoteCreatePage() {
     setState(prev => (prev.payment_method === nextCode ? prev : { ...prev, payment_method: nextCode }));
   }, [selectedCustomerId, customerPaymentQuery.isPending, customerPaymentQuery.data, customerPaymentQuery.isError]);
 
-  // Appsmith parity: filter kit tree with a single text box (same affordance
-  // as `KitPickerModal` in the detail page), then group by category so the
-  // user sees the same shape `treeOfKits` produced.
-  const filteredKits = useMemo<Kit[]>(() => {
-    if (!kits) return [];
-    if (!kitSearch) return kits;
-    const needle = kitSearch.toLowerCase();
-    return kits.filter(k =>
-      k.internal_name.toLowerCase().includes(needle) ||
-      (k.category_name?.toLowerCase().includes(needle) ?? false)
-    );
-  }, [kits, kitSearch]);
-
-  const groupedKits = useMemo<[string, Kit[]][]>(() => {
-    const map = new Map<string, Kit[]>();
-    for (const k of filteredKits) {
-      const cat = k.category_name ?? 'Altro';
-      const list = map.get(cat) ?? [];
-      list.push(k);
-      map.set(cat, list);
-    }
-    return Array.from(map.entries());
-  }, [filteredKits]);
-
   const selectedKits = useMemo<Kit[]>(() => {
     if (!kits || state.kit_ids.length === 0) return [];
-    const chosen = new Set(state.kit_ids);
-    return kits.filter(k => chosen.has(k.id));
+    const order = new Map(state.kit_ids.map((id, i) => [id, i]));
+    return kits
+      .filter(k => order.has(k.id))
+      .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   }, [kits, state.kit_ids]);
 
-  const selectedKitsSummary = useMemo(() => {
-    if (state.kit_ids.length === 0) {
-      return 'Nessuno';
+  const totals = useMemo(() => {
+    let nrc = 0;
+    let mrc = 0;
+    for (const k of selectedKits) {
+      nrc += k.nrc;
+      mrc += k.mrc;
     }
-    if (kitsPending && selectedKits.length === 0) {
-      return `${state.kit_ids.length} kit selezionati (caricamento...)`;
-    }
-    if (selectedKits.length === 0) {
-      return `${state.kit_ids.length} kit selezionati`;
-    }
-    return selectedKits.map(k => k.internal_name).join(', ');
-  }, [kitsPending, selectedKits, state.kit_ids.length]);
+    return { nrc, mrc };
+  }, [selectedKits]);
 
-  const toggleKit = useCallback((kitId: number) => {
-    setState(prev => {
-      const exists = prev.kit_ids.includes(kitId);
-      const next = exists
-        ? prev.kit_ids.filter(id => id !== kitId)
-        : [...prev.kit_ids, kitId];
-      return { ...prev, kit_ids: next };
-    });
+  const addKit = useCallback((kitId: number) => {
+    setState(prev => (
+      prev.kit_ids.includes(kitId)
+        ? prev
+        : { ...prev, kit_ids: [...prev.kit_ids, kitId] }
+    ));
+  }, []);
+
+  const removeKit = useCallback((kitId: number) => {
+    setState(prev => ({ ...prev, kit_ids: prev.kit_ids.filter(id => id !== kitId) }));
   }, []);
 
   const filteredDeals = useMemo(() => {
@@ -276,7 +257,7 @@ export function QuoteCreatePage() {
     const q = dealSearch.toLowerCase();
     return deals.filter(d =>
       d.name.toLowerCase().includes(q) ||
-      (d.company_name?.toLowerCase().includes(q) ?? false)
+      (d.company_name?.toLowerCase().includes(q) ?? false),
     );
   }, [deals, dealSearch]);
 
@@ -284,13 +265,24 @@ export function QuoteCreatePage() {
     setState(prev => ({ ...prev, [key]: value }));
   }, []);
 
+  const updateContact = useCallback(
+    (key: 'contactTech' | 'contactAltroTech' | 'contactAdm', patch: Partial<ContactFields>) => {
+      setState(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+    },
+    [],
+  );
+
+  const toggleExtra = useCallback((key: string) => {
+    setExtraOpen(prev => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
   const canAdvance = useMemo(() => {
     switch (step) {
       case 0: return state.selectedDeal !== null;
       case 1: return state.template !== '' && state.owner !== '';
-      case 2: return true; // Kit step is flexible
-      case 3: return true; // Optional
-      case 4: return true; // Summary — user confirms
+      case 2: return state.quoteType === 'iaas' || state.kit_ids.length > 0;
+      case 3: return true;
+      case 4: return true;
       default: return false;
     }
   }, [step, state]);
@@ -320,6 +312,16 @@ export function QuoteCreatePage() {
         trial: state.trial,
         status: 'DRAFT',
         kit_ids: state.kit_ids,
+        rif_ordcli: state.rif_ordcli || null,
+        rif_tech_nom: state.contactTech.name || null,
+        rif_tech_tel: state.contactTech.tel || null,
+        rif_tech_email: state.contactTech.email || null,
+        rif_altro_tech_nom: state.contactAltroTech.name || null,
+        rif_altro_tech_tel: state.contactAltroTech.tel || null,
+        rif_altro_tech_email: state.contactAltroTech.email || null,
+        rif_adm_nom: state.contactAdm.name || null,
+        rif_adm_tech_tel: state.contactAdm.tel || null,
+        rif_adm_tech_email: state.contactAdm.email || null,
       });
       navigate(`/quotes/${result.id}`);
     } catch {
@@ -329,23 +331,11 @@ export function QuoteCreatePage() {
 
   const handleQuoteTypeChange = useCallback((quoteType: WizardState['quoteType']) => {
     setState(prev => {
-      if (prev.quoteType === quoteType) {
-        return prev;
-      }
+      if (prev.quoteType === quoteType) return prev;
       if (quoteType === 'iaas') {
-        return {
-          ...prev,
-          quoteType,
-          services: '',
-          bill_months: 1,
-        };
+        return { ...prev, quoteType, services: '', bill_months: 1 };
       }
-      return {
-        ...prev,
-        quoteType,
-        services: '',
-        trial: '',
-      };
+      return { ...prev, quoteType, services: '', trial: '' };
     });
   }, []);
 
@@ -357,38 +347,79 @@ export function QuoteCreatePage() {
     }
   };
 
+  const descriptionSummary = truncateHtml(state.description) || 'Nessuna descrizione';
+  const legalNotesSummary = truncateHtml(state.notes) || 'Nessuna pattuizione';
+  const filledContactCount = countFilledContacts(state);
+  const contactsSummary =
+    filledContactCount === 0
+      ? 'Nessun contatto'
+      : `${filledContactCount} contatt${filledContactCount === 1 ? 'o' : 'i'} inserit${filledContactCount === 1 ? 'o' : 'i'}`;
+
+  const templateLabel = selectedTemplate?.description ?? state.template ?? '—';
+  const ownerLabel = useMemo(() => {
+    if (!state.owner) return '—';
+    const o = owners?.find(item => item.id === state.owner);
+    if (!o) return state.owner;
+    return [o.firstname, o.lastname].filter(Boolean).join(' ');
+  }, [owners, state.owner]);
+  const paymentLabel = useMemo(() => {
+    if (!state.payment_method) return '—';
+    return paymentMethods?.find(p => p.code === state.payment_method)?.description ?? state.payment_method;
+  }, [paymentMethods, state.payment_method]);
+  const servicesLabel = useMemo(() => {
+    if (!categories || selectedServiceIds.length === 0) return '—';
+    return selectedServiceIds
+      .map(id => categories.find(c => String(c.id) === id)?.name ?? id)
+      .join(', ');
+  }, [categories, selectedServiceIds]);
+
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Nuova proposta</h1>
+      <header className={styles.pageHeader}>
+        <h1 className={styles.title}>Nuova proposta</h1>
+        {state.selectedDeal && (
+          <p className={styles.subtitle}>
+            <span className={styles.subtitleCode}>{state.selectedDeal.name}</span>
+            <span>·</span>
+            <span>{state.selectedDeal.company_name ?? '—'}</span>
+          </p>
+        )}
+      </header>
+
       <Stepper steps={stepNames} current={step} onStepClick={s => setStep(s)} />
 
       <div className={styles.stepContent} key={step}>
         {step === 0 && (
-          <>
+          <div className={styles.stepInner}>
             <div className={styles.dealSearch}>
-              <input
-                className={styles.dealSearchInput}
-                placeholder="Cerca deal..."
+              <SearchInput
                 value={dealSearch}
-                onChange={e => setDealSearch(e.target.value)}
+                onChange={setDealSearch}
+                placeholder="Cerca deal per nome o cliente..."
                 autoFocus
               />
             </div>
-            <div className={styles.dealGrid}>
-              {filteredDeals.map(d => (
-                <DealCard
-                  key={d.id}
-                  deal={d}
-                  selected={state.selectedDeal?.id === d.id}
-                  onClick={() => update('selectedDeal', d)}
-                />
-              ))}
-            </div>
-          </>
+            {filteredDeals.length > 0 ? (
+              <div className={styles.dealGrid}>
+                {filteredDeals.map(d => (
+                  <DealCard
+                    key={d.id}
+                    deal={d}
+                    selected={state.selectedDeal?.id === d.id}
+                    onClick={() => update('selectedDeal', d)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className={styles.emptyBlock}>
+                {dealSearch ? 'Nessun deal corrispondente alla ricerca.' : 'Nessun deal disponibile.'}
+              </div>
+            )}
+          </div>
         )}
 
         {step === 1 && (
-          <>
+          <div className={styles.stepInner}>
             <TypeSelector value={state.quoteType} onChange={handleQuoteTypeChange} />
             <div className={styles.configGrid}>
               <div className={styles.section}>
@@ -400,12 +431,22 @@ export function QuoteCreatePage() {
                   ) : (
                     <div className={styles.radioGroup}>
                       <label className={styles.radioLabel}>
-                        <input className={styles.radioInput} type="radio" checked={state.document_type === 'TSC-ORDINE-RIC'}
-                          onChange={() => update('document_type', 'TSC-ORDINE-RIC')} /> Ricorrente
+                        <input
+                          className={styles.radioInput}
+                          type="radio"
+                          checked={state.document_type === 'TSC-ORDINE-RIC'}
+                          onChange={() => update('document_type', 'TSC-ORDINE-RIC')}
+                        />
+                        Ricorrente
                       </label>
                       <label className={styles.radioLabel}>
-                        <input className={styles.radioInput} type="radio" checked={state.document_type === 'TSC-ORDINE'}
-                          onChange={() => update('document_type', 'TSC-ORDINE')} /> Spot
+                        <input
+                          className={styles.radioInput}
+                          type="radio"
+                          checked={state.document_type === 'TSC-ORDINE'}
+                          onChange={() => update('document_type', 'TSC-ORDINE')}
+                        />
+                        Spot
                       </label>
                     </div>
                   )}
@@ -415,8 +456,12 @@ export function QuoteCreatePage() {
                   <div className={styles.radioGroup}>
                     {(['NUOVO', 'SOSTITUZIONE', 'RINNOVO'] as const).map(pt => (
                       <label key={pt} className={styles.radioLabel}>
-                        <input className={styles.radioInput} type="radio" checked={state.proposal_type === pt}
-                          onChange={() => update('proposal_type', pt)} />
+                        <input
+                          className={styles.radioInput}
+                          type="radio"
+                          checked={state.proposal_type === pt}
+                          onChange={() => update('proposal_type', pt)}
+                        />
                         {pt === 'NUOVO' ? 'Nuovo' : pt === 'SOSTITUZIONE' ? 'Sostituzione' : 'Rinnovo'}
                       </label>
                     ))}
@@ -482,9 +527,9 @@ export function QuoteCreatePage() {
                       </div>
                     </div>
                     <div className={styles.field}>
-                      <label className={styles.label}>Trial</label>
+                      <label className={styles.label}>Trial ({state.trial_value}€)</label>
                       <input
-                        className={styles.input}
+                        className={styles.trialRange}
                         type="range"
                         min="0"
                         max="200"
@@ -492,14 +537,7 @@ export function QuoteCreatePage() {
                         value={state.trial_value}
                         onChange={e => update('trial_value', Number(e.target.value))}
                       />
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                        Trial gratuito: {state.trial_value}€
-                      </div>
-                      {state.trial && (
-                        <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.5rem' }}>
-                          {state.trial}
-                        </div>
-                      )}
+                      {state.trial && <div className={styles.hint}>{state.trial}</div>}
                     </div>
                   </>
                 )}
@@ -525,7 +563,7 @@ export function QuoteCreatePage() {
                     <label className={styles.label}>Valori derivati</label>
                     <div className={styles.readOnly}>
                       {derivedIaaSKit
-                        ? `${derivedIaaSKit.internal_name} • servizi ${derivedIaaSRule?.services ?? '—'} • termini 1/1/1`
+                        ? `${derivedIaaSKit.internal_name} · servizi ${derivedIaaSRule?.services ?? '—'} · termini 1/1/1`
                         : 'Seleziona un template IaaS per derivare kit, servizi e termini.'}
                     </div>
                   </div>
@@ -570,7 +608,7 @@ export function QuoteCreatePage() {
                       />
                     )}
                     {billingLocked && (
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                      <div className={styles.hint}>
                         COLOCATION ricorrente: fatturazione trimestrale obbligatoria.
                       </div>
                     )}
@@ -578,136 +616,374 @@ export function QuoteCreatePage() {
                 )}
                 <div className={styles.field}>
                   <label className={styles.label}>Durata iniziale (mesi)</label>
-                  <input className={state.quoteType === 'iaas' ? styles.readOnly : styles.input} type="number" value={state.initial_term_months}
+                  <input
+                    className={state.quoteType === 'iaas' ? styles.readOnly : styles.input}
+                    type="number"
+                    value={state.initial_term_months}
                     readOnly={state.quoteType === 'iaas'}
-                    onChange={e => update('initial_term_months', Number(e.target.value))} />
+                    onChange={e => update('initial_term_months', Number(e.target.value))}
+                  />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Durata rinnovo (mesi)</label>
-                  <input className={state.quoteType === 'iaas' ? styles.readOnly : styles.input} type="number" value={state.next_term_months}
+                  <input
+                    className={state.quoteType === 'iaas' ? styles.readOnly : styles.input}
+                    type="number"
+                    value={state.next_term_months}
                     readOnly={state.quoteType === 'iaas'}
-                    onChange={e => update('next_term_months', Number(e.target.value))} />
+                    onChange={e => update('next_term_months', Number(e.target.value))}
+                  />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Consegna (giorni)</label>
-                  <input className={styles.input} type="number" value={state.delivered_in_days}
-                    onChange={e => update('delivered_in_days', Number(e.target.value))} />
+                  <input
+                    className={styles.input}
+                    type="number"
+                    value={state.delivered_in_days}
+                    onChange={e => update('delivered_in_days', Number(e.target.value))}
+                  />
                 </div>
               </div>
             </div>
-          </>
+          </div>
         )}
 
         {step === 2 && (
-          <div className={styles.section}>
-            <div className={styles.sectionTitle}>Kit e Prodotti</div>
+          <div className={styles.stepInner}>
             {state.quoteType === 'iaas' ? (
-              <>
-                <p style={{ color: '#64748b', fontSize: '0.8125rem', marginBottom: '0.75rem' }}>
+              <div className={styles.section}>
+                <div className={styles.sectionTitle}>Kit IaaS</div>
+                <p className={styles.hint}>
                   Il kit iniziale viene derivato automaticamente dal template IaaS selezionato.
                 </p>
-                <div className={styles.readOnly}>
-                  {derivedIaaSKit
-                    ? `${derivedIaaSKit.internal_name} • NRC ${derivedIaaSKit.nrc.toFixed(2)} / MRC ${derivedIaaSKit.mrc.toFixed(2)}`
-                    : 'Seleziona un template IaaS valido per generare la riga kit iniziale.'}
-                </div>
-              </>
+                {derivedIaaSKit ? (
+                  <div className={styles.kitCard}>
+                    <div className={styles.kitCardLeft}>
+                      <span className={styles.kitCardName}>{derivedIaaSKit.internal_name}</span>
+                      {derivedIaaSKit.category_name && (
+                        <span className={styles.kitCardCategory}>{derivedIaaSKit.category_name}</span>
+                      )}
+                    </div>
+                    <div className={styles.kitCardTotals}>
+                      <span>
+                        <span className={styles.kitCardTotalLabel}>NRC</span>{' '}
+                        {formatCurrency(derivedIaaSKit.nrc)}
+                      </span>
+                      <span>
+                        <span className={styles.kitCardTotalLabel}>MRC</span>{' '}
+                        {formatCurrency(derivedIaaSKit.mrc)}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.emptyBlock}>
+                    Seleziona un template IaaS valido per generare la riga kit iniziale.
+                  </div>
+                )}
+              </div>
             ) : (
-              <>
-                <p style={{ color: '#64748b', fontSize: '0.8125rem', marginBottom: '0.75rem' }}>
-                  Seleziona uno o piu kit da inserire nella proposta. I kit scelti diventeranno le righe iniziali.
-                </p>
-                <div className={styles.field}>
-                  <input
-                    className={styles.input}
-                    placeholder="Cerca kit..."
-                    value={kitSearch}
-                    onChange={e => setKitSearch(e.target.value)}
-                  />
+              <div className={styles.kitStep}>
+                <div className={styles.kitStepHeader}>
+                  <div>
+                    <div className={styles.sectionTitle}>Kit selezionati</div>
+                    <p className={styles.hint}>
+                      Aggiungi i kit che saranno le righe iniziali della proposta. Prodotti e
+                      obbligatorietà si configurano dopo la creazione.
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    leftIcon={<Icon name="plus" size={16} />}
+                    onClick={() => setShowKitPicker(true)}
+                  >
+                    Aggiungi kit
+                  </Button>
                 </div>
-                <div className={styles.kitList}>
-                  {groupedKits.length === 0 && (
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                      Nessun kit disponibile.
+
+                {kitsPending && state.kit_ids.length === 0 && (
+                  <div className={styles.hint}>Caricamento catalogo kit...</div>
+                )}
+
+                {selectedKits.length === 0 ? (
+                  <div className={styles.emptyKits}>
+                    <div className={styles.emptyKitsIcon}>
+                      <Icon name="package" size={28} strokeWidth={1.5} />
                     </div>
-                  )}
-                  {groupedKits.map(([cat, items]) => (
-                    <div key={cat} className={styles.kitGroup}>
-                      <div className={styles.kitGroupTitle}>{cat}</div>
-                      {items.map(k => {
-                        const checked = state.kit_ids.includes(k.id);
-                        return (
-                          <label key={k.id} className={styles.kitRow}>
-                            <input
-                              type="checkbox"
-                              className={styles.checkInput}
-                              checked={checked}
-                              onChange={() => toggleKit(k.id)}
-                            />
-                            <span className={styles.kitName}>{k.internal_name}</span>
-                            <span className={styles.kitPrice}>
-                              NRC {k.nrc.toFixed(2)} / MRC {k.mrc.toFixed(2)}
-                            </span>
-                          </label>
-                        );
-                      })}
+                    <div className={styles.emptyKitsTitle}>Nessun kit selezionato</div>
+                    <div className={styles.emptyKitsText}>
+                      Apri il catalogo per aggiungere i primi kit alla proposta.
                     </div>
-                  ))}
-                </div>
-                <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#64748b' }}>
-                  {state.kit_ids.length === 0
-                    ? 'Nessun kit selezionato.'
-                    : `${state.kit_ids.length} kit selezionati.`}
-                </div>
-              </>
+                  </div>
+                ) : (
+                  <div className={styles.kitList}>
+                    {selectedKits.map(k => (
+                      <div key={k.id} className={styles.kitCard}>
+                        <div className={styles.kitCardLeft}>
+                          <span className={styles.kitCardName}>{k.internal_name}</span>
+                          {k.category_name && (
+                            <span className={styles.kitCardCategory}>{k.category_name}</span>
+                          )}
+                        </div>
+                        <div className={styles.kitCardTotals}>
+                          <span>
+                            <span className={styles.kitCardTotalLabel}>NRC</span>{' '}
+                            {formatCurrency(k.nrc)}
+                          </span>
+                          <span>
+                            <span className={styles.kitCardTotalLabel}>MRC</span>{' '}
+                            {formatCurrency(k.mrc)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.kitCardRemove}
+                          onClick={() => removeKit(k.id)}
+                          aria-label={`Rimuovi ${k.internal_name}`}
+                        >
+                          <Icon name="x" size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {selectedKits.length > 0 && (
+                  <div className={styles.kitTotals}>
+                    <span>
+                      <span className={styles.kitTotalsLabel}>NRC Totale</span>{' '}
+                      {formatCurrency(totals.nrc)}
+                    </span>
+                    <span>
+                      <span className={styles.kitTotalsLabel}>MRC Totale</span>{' '}
+                      {formatCurrency(totals.mrc)}
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
 
         {step === 3 && (
-          <div className={styles.section}>
-            <div className={styles.sectionTitle}>Extra (opzionale)</div>
-            <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
-              Descrizione, note e contatti potranno essere aggiunti dopo la creazione.
+          <div className={styles.stepInner}>
+            <p className={styles.extraIntro}>
+              Aggiungi descrizione, pattuizioni speciali e contatti di riferimento. Tutte le sezioni
+              sono opzionali e possono essere modificate anche dopo la creazione.
             </p>
+            <div className={styles.collapseList}>
+              <CollapsibleSection
+                title="Descrizione"
+                summary={descriptionSummary}
+                open={extraOpen.description === true}
+                onToggle={() => toggleExtra('description')}
+              >
+                <RichTextEditor
+                  value={state.description}
+                  onChange={html => update('description', html)}
+                  placeholder="Scrivi una breve descrizione della proposta..."
+                />
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Pattuizioni speciali"
+                summary={legalNotesSummary}
+                open={extraOpen.legalNotes === true}
+                onToggle={() => toggleExtra('legalNotes')}
+              >
+                <div className={styles.approvalBanner}>
+                  <Icon name="triangle-alert" size={16} />
+                  <span>
+                    Se inserisci pattuizioni speciali, la proposta richiederà l&apos;approvazione di un responsabile commerciale.
+                  </span>
+                </div>
+                <RichTextEditor
+                  value={state.notes}
+                  onChange={html => update('notes', html)}
+                  placeholder="Specifica eventuali pattuizioni fuori standard..."
+                />
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Contatti di riferimento"
+                summary={contactsSummary}
+                open={extraOpen.contacts === true}
+                onToggle={() => toggleExtra('contacts')}
+              >
+                <div className={styles.field}>
+                  <label className={styles.label}>Riferimento ordine cliente</label>
+                  <input
+                    className={styles.input}
+                    value={state.rif_ordcli}
+                    onChange={e => update('rif_ordcli', e.target.value)}
+                    placeholder="Es. PO 2026/0015"
+                  />
+                </div>
+                <div className={styles.contactGrid}>
+                  <ContactCard
+                    title="Tecnico"
+                    icon="settings"
+                    value={state.contactTech}
+                    onChange={patch => updateContact('contactTech', patch)}
+                  />
+                  <ContactCard
+                    title="Altro tecnico"
+                    icon="settings"
+                    value={state.contactAltroTech}
+                    onChange={patch => updateContact('contactAltroTech', patch)}
+                  />
+                  <ContactCard
+                    title="Amministrativo"
+                    icon="mail"
+                    value={state.contactAdm}
+                    onChange={patch => updateContact('contactAdm', patch)}
+                  />
+                </div>
+              </CollapsibleSection>
+            </div>
           </div>
         )}
 
         {step === 4 && (
-          <div className={styles.summaryCard}>
-            <div className={styles.sectionTitle}>Riepilogo</div>
-            <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>Deal</span>
-              <span className={styles.summaryValue}>{state.selectedDeal?.name ?? '—'}</span>
-            </div>
-            <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>Cliente</span>
-              <span className={styles.summaryValue}>{state.selectedDeal?.company_name ?? '—'}</span>
-            </div>
-            <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>Tipo</span>
-              <span className={styles.summaryValue}>
-                {state.document_type === 'TSC-ORDINE-RIC' ? 'Ricorrente' : 'Spot'} / {state.proposal_type}
-              </span>
-            </div>
-            <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>Durata</span>
-              <span className={styles.summaryValue}>
-                {state.initial_term_months}m init / {state.next_term_months}m rinnovo
-              </span>
-            </div>
-            <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>Kit selezionati</span>
-              <span className={styles.summaryValue}>
-                {selectedKitsSummary}
-              </span>
-            </div>
-            {state.trial && (
-              <div className={styles.summaryRow}>
-                <span className={styles.summaryLabel}>Trial</span>
-                <span className={styles.summaryValue}>{state.trial}</span>
+          <div className={styles.stepInner}>
+            <div className={styles.summaryCard}>
+              <div className={styles.summarySection}>
+                <div className={styles.summarySectionHeader}>
+                  <span>Deal e cliente</span>
+                  <button type="button" className={styles.editLink} onClick={() => setStep(0)}>
+                    <Icon name="pencil" size={14} />
+                    Modifica
+                  </button>
+                </div>
+                <div className={styles.summaryGrid}>
+                  <div>
+                    <div className={styles.summaryKey}>Deal</div>
+                    <div className={styles.summaryVal}>{state.selectedDeal?.name ?? '—'}</div>
+                  </div>
+                  <div>
+                    <div className={styles.summaryKey}>Cliente</div>
+                    <div className={styles.summaryVal}>{state.selectedDeal?.company_name ?? '—'}</div>
+                  </div>
+                </div>
               </div>
-            )}
+
+              <div className={styles.summarySection}>
+                <div className={styles.summarySectionHeader}>
+                  <span>Configurazione</span>
+                  <button type="button" className={styles.editLink} onClick={() => setStep(1)}>
+                    <Icon name="pencil" size={14} />
+                    Modifica
+                  </button>
+                </div>
+                <div className={styles.summaryGrid}>
+                  <div>
+                    <div className={styles.summaryKey}>Tipo</div>
+                    <div className={styles.summaryVal}>
+                      {state.quoteType === 'iaas' ? 'IaaS' : 'Standard'} · {state.document_type === 'TSC-ORDINE-RIC' ? 'Ricorrente' : 'Spot'} · {state.proposal_type}
+                    </div>
+                  </div>
+                  <div>
+                    <div className={styles.summaryKey}>Template</div>
+                    <div className={styles.summaryVal}>{templateLabel}</div>
+                  </div>
+                  <div>
+                    <div className={styles.summaryKey}>Owner</div>
+                    <div className={styles.summaryVal}>{ownerLabel}</div>
+                  </div>
+                  <div>
+                    <div className={styles.summaryKey}>Pagamento</div>
+                    <div className={styles.summaryVal}>{paymentLabel}</div>
+                  </div>
+                  {state.quoteType === 'standard' && (
+                    <div className={styles.summaryColSpan}>
+                      <div className={styles.summaryKey}>Servizi</div>
+                      <div className={styles.summaryVal}>{servicesLabel}</div>
+                    </div>
+                  )}
+                  <div>
+                    <div className={styles.summaryKey}>Termini</div>
+                    <div className={styles.summaryVal}>
+                      {state.initial_term_months}m iniziale · {state.next_term_months}m rinnovo · bill {state.bill_months}
+                    </div>
+                  </div>
+                  <div>
+                    <div className={styles.summaryKey}>Consegna</div>
+                    <div className={styles.summaryVal}>{state.delivered_in_days} giorni</div>
+                  </div>
+                  {state.trial && (
+                    <div className={styles.summaryColSpan}>
+                      <div className={styles.summaryKey}>Trial</div>
+                      <div className={styles.summaryVal}>{state.trial}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.summarySection}>
+                <div className={styles.summarySectionHeader}>
+                  <span>Kit</span>
+                  <button type="button" className={styles.editLink} onClick={() => setStep(2)}>
+                    <Icon name="pencil" size={14} />
+                    Modifica
+                  </button>
+                </div>
+                {selectedKits.length === 0 && state.quoteType !== 'iaas' ? (
+                  <div className={styles.warningBanner}>
+                    <Icon name="triangle-alert" size={16} />
+                    <span>Nessun kit selezionato — la proposta verrà creata vuota.</span>
+                  </div>
+                ) : (
+                  <ul className={styles.kitSummaryList}>
+                    {(state.quoteType === 'iaas' && derivedIaaSKit
+                      ? [derivedIaaSKit]
+                      : selectedKits
+                    ).map(k => (
+                      <li key={k.id} className={styles.kitSummaryRow}>
+                        <span className={styles.kitSummaryName}>{k.internal_name}</span>
+                        <span className={styles.kitSummaryPrice}>
+                          NRC {formatCurrency(k.nrc)} · MRC {formatCurrency(k.mrc)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className={styles.summarySection}>
+                <div className={styles.summarySectionHeader}>
+                  <span>Note e contatti</span>
+                  <button type="button" className={styles.editLink} onClick={() => setStep(3)}>
+                    <Icon name="pencil" size={14} />
+                    Modifica
+                  </button>
+                </div>
+                <div className={styles.summaryList}>
+                  <div className={styles.summaryListRow}>
+                    <span className={styles.summaryKey}>Descrizione</span>
+                    <span className={styles.summaryVal}>{descriptionSummary}</span>
+                  </div>
+                  <div className={styles.summaryListRow}>
+                    <span className={styles.summaryKey}>Pattuizioni speciali</span>
+                    <span className={styles.summaryVal}>{legalNotesSummary}</span>
+                  </div>
+                  <div className={styles.summaryListRow}>
+                    <span className={styles.summaryKey}>Contatti</span>
+                    <span className={styles.summaryVal}>{contactsSummary}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.totalsBar}>
+                <div className={styles.totalsItem}>
+                  <span className={styles.totalsLabel}>NRC Totale</span>
+                  <span className={styles.totalsValue}>{formatCurrency(totals.nrc)}</span>
+                </div>
+                <div className={styles.totalsDivider} aria-hidden="true" />
+                <div className={styles.totalsItem}>
+                  <span className={styles.totalsLabel}>MRC Totale</span>
+                  <span className={styles.totalsValue}>{formatCurrency(totals.mrc)}</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -721,6 +997,14 @@ export function QuoteCreatePage() {
         onNext={handleNext}
         isPending={createQuote.isPending}
       />
+
+      {state.quoteType === 'standard' && (
+        <KitPickerModal
+          open={showKitPicker}
+          onSelect={addKit}
+          onClose={() => setShowKitPicker(false)}
+        />
+      )}
     </div>
   );
 }

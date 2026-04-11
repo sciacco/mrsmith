@@ -5,10 +5,16 @@
   animation: sectionEnter var(--duration-normal) var(--ease-out) both;
 }
 
-.field {
+.section {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 .label {
@@ -16,26 +22,37 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+
+.hint {
+  font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
 
-.warning {
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   font-size: 0.8125rem;
-  font-weight: 500;
+  line-height: 1.5;
+  border: 1px solid transparent;
 }
 
-.warningMuted {
+.bannerMuted {
   background: var(--color-surface);
   color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
+  border-color: var(--color-border);
 }
 
-.warningAmber {
+.bannerAmber {
   background: var(--color-warning-subtle);
   color: var(--color-warning-strong);
-  border: 1px solid var(--color-warning-subtle);
+  border-color: var(--color-warning-subtle);
+  font-weight: 500;
+  border-left: 3px solid var(--color-warning);
 }
 
 @keyframes sectionEnter {

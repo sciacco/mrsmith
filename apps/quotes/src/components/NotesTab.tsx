@@ -1,3 +1,4 @@
+import { Icon } from '@mrsmith/ui';
 import type { Quote } from '../api/types';
 import { RichTextEditor } from './RichTextEditor';
 import styles from './NotesTab.module.css';
@@ -12,27 +13,41 @@ export function NotesTab({ quote, onChange }: NotesTabProps) {
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.field}>
-        <label className={styles.label}>Descrizione</label>
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.label}>Descrizione</span>
+          <span className={styles.hint}>
+            Testo introduttivo visibile nell&apos;offerta PDF.
+          </span>
+        </div>
         <RichTextEditor
           value={quote.description ?? ''}
           onChange={html => onChange('description', html)}
+          placeholder="Scrivi una breve descrizione della proposta..."
         />
-      </div>
+      </section>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Pattuizioni speciali</label>
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.label}>Pattuizioni speciali</span>
+          <span className={styles.hint}>
+            Condizioni fuori standard. La loro presenza richiede approvazione commerciale.
+          </span>
+        </div>
         <RichTextEditor
           value={quote.notes ?? ''}
           onChange={html => onChange('notes', html)}
+          placeholder="Specifica eventuali pattuizioni fuori standard..."
         />
-      </div>
-
-      <div className={`${styles.warning} ${hasNotes ? styles.warningAmber : styles.warningMuted}`}>
-        {hasNotes
-          ? 'Questa proposta richiederà approvazione'
-          : 'Le pattuizioni speciali richiedono approvazione'}
-      </div>
+        <div className={`${styles.banner} ${hasNotes ? styles.bannerAmber : styles.bannerMuted}`}>
+          <Icon name={hasNotes ? 'triangle-alert' : 'info'} size={16} />
+          <span>
+            {hasNotes
+              ? 'Questa proposta contiene pattuizioni speciali e richiederà approvazione commerciale.'
+              : 'Se inserisci pattuizioni speciali, la proposta richiederà approvazione commerciale.'}
+          </span>
+        </div>
+      </section>
     </div>
   );
 }

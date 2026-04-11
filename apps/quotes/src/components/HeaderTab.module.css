@@ -91,6 +91,19 @@
   color: var(--color-text);
 }
 
+.infoPill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent-muted);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  color: var(--color-accent);
+  margin-bottom: var(--space-3);
+}
+
 .revealEnter {
   animation: revealSlide var(--duration-normal) var(--ease-out) both;
   overflow: hidden;

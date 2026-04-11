@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { MultiSelect, SingleSelect } from '@mrsmith/ui';
+import { Icon, MultiSelect, SingleSelect } from '@mrsmith/ui';
 import type { Quote } from '../api/types';
 import {
   useCategories,
@@ -166,6 +166,12 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
       {/* Condizioni Commerciali */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Condizioni Commerciali</div>
+        {isIaaS && (
+          <div className={styles.infoPill}>
+            <Icon name="info" size={14} />
+            <span>Valori fissi per offerte IaaS/VCloud — durata e rinnovo non modificabili.</span>
+          </div>
+        )}
         <div className={styles.field}>
           <label className={styles.label}>Metodo di pagamento</label>
           <SingleSelect<string>

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Icon, TabNav, type TabNavDotIndicator } from '@mrsmith/ui';
+import { Button, Icon, TabNav, Tooltip, type TabNavDotIndicator } from '@mrsmith/ui';
 import { useHSStatus, usePublishPrecheck, useQuote, useUpdateQuote } from '../api/queries';
-import type { Quote } from '../api/types';
+import type { HSStatus, PublishPrecheck, Quote } from '../api/types';
 import { StatusBadge } from '../components/StatusBadge';
 import { DirtyBanner } from '../components/DirtyBanner';
 import { HeaderTab } from '../components/HeaderTab';
@@ -29,6 +29,35 @@ function isTabKey(value: string): value is TabKey {
   return (tabKeys as readonly string[]).includes(value);
 }
 
+interface PublishBlocker {
+  key: string;
+  label: string;
+}
+
+function computePublishBlockers(
+  isDirty: boolean,
+  hsStatus: HSStatus | null | undefined,
+  precheck: PublishPrecheck | null | undefined,
+): PublishBlocker[] {
+  const blockers: PublishBlocker[] = [];
+  if (isDirty) {
+    blockers.push({ key: 'dirty', label: 'Salva le modifiche prima di pubblicare' });
+  }
+  if (hsStatus?.sign_status === 'ESIGN_COMPLETED') {
+    blockers.push({ key: 'esign', label: 'La proposta è già firmata su HubSpot' });
+  }
+  if (precheck?.has_missing_required_products) {
+    const count = precheck.invalid_required_groups;
+    blockers.push({
+      key: 'required',
+      label: count
+        ? `${count} grupp${count === 1 ? 'o' : 'i'} prodotto obbligator${count === 1 ? 'io' : 'i'} da configurare`
+        : 'Gruppi prodotto obbligatori da configurare',
+    });
+  }
+  return blockers;
+}
+
 export function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const quoteId = Number(id);
@@ -41,7 +70,6 @@ export function QuoteDetailPage() {
 
   const [activeTab, setActiveTab] = useState<TabKey>('header');
   const [localQuote, setLocalQuote] = useState<Quote | null>(null);
-  const [saveFlash, setSaveFlash] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
 
   const dotIndicator = useMemo<Record<string, TabNavDotIndicator>>(
@@ -79,8 +107,6 @@ export function QuoteDetailPage() {
       setLocalQuote(prepared);
       markClean();
       setSnapshot(prepared);
-      setSaveFlash(true);
-      setTimeout(() => setSaveFlash(false), 600);
     } catch {
       // Error handled by mutation
     }
@@ -98,100 +124,138 @@ export function QuoteDetailPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [isDirty, handleSave]);
 
+  const publishBlockers = useMemo(
+    () => computePublishBlockers(isDirty, hsStatus, publishPrecheck.data),
+    [isDirty, hsStatus, publishPrecheck.data],
+  );
+  const publishBlocked = publishBlockers.length > 0;
+  const isRepublish = !!hsStatus?.hs_quote_id;
+
   if (isLoading || !localQuote) {
     return <div className={styles.loading}>Caricamento...</div>;
   }
 
   return (
     <div className={styles.page}>
-      {/* Header bar */}
-      <div className={styles.headerBar}>
-        <button className={styles.backBtn} onClick={() => navigate('/quotes')} aria-label="Torna all'elenco">
-          <Icon name="arrow-left" size={20} />
-        </button>
-        <span className={styles.quoteNumber}>{localQuote.quote_number}</span>
-        <StatusBadge status={localQuote.status} />
+      {/* Sticky action bar */}
+      <div className={styles.actionBar}>
+        <div className={styles.actionBarInner}>
+          <button
+            type="button"
+            className={styles.backBtn}
+            onClick={() => navigate('/quotes')}
+            aria-label="Torna all'elenco"
+          >
+            <Icon name="arrow-left" size={18} />
+          </button>
+          <span className={styles.quoteNumber}>{localQuote.quote_number}</span>
+          <StatusBadge status={localQuote.status} />
 
-        <div className={styles.actions}>
-          {hsStatus?.hs_quote_id && (
-            <>
-              {hsStatus.quote_url && (
-                <a
-                  className={styles.hsLink}
-                  href={hsStatus.quote_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Apri su HS
-                </a>
-              )}
-              {hsStatus.pdf_url && hsStatus.pdf_url !== hsStatus.quote_url && (
-                <a
-                  className={styles.hsLink}
-                  href={hsStatus.pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  PDF HS
-                </a>
-              )}
-            </>
+          <div className={styles.actionBarSpacer} />
+
+          {hsStatus?.hs_quote_id && hsStatus.quote_url && (
+            <a
+              className={styles.hsLink}
+              href={hsStatus.quote_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Icon name="external-link" size={14} />
+              Apri su HS
+            </a>
           )}
-          <button
-            className={styles.publishBtn}
-            disabled={isDirty}
-            title={isDirty ? 'Salva prima di pubblicare' : undefined}
-            onClick={() => setShowPublish(true)}
+          {hsStatus?.pdf_url && hsStatus.pdf_url !== hsStatus.quote_url && (
+            <a
+              className={styles.hsLink}
+              href={hsStatus.pdf_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Icon name="download" size={14} />
+              PDF
+            </a>
+          )}
+
+          <div className={styles.saveWrap}>
+            <Button
+              variant="primary"
+              onClick={() => void handleSave()}
+              disabled={!isDirty}
+              loading={updateQuote.isPending}
+            >
+              Salva
+            </Button>
+            {isDirty && !updateQuote.isPending && <span className={styles.attentionDot} aria-hidden="true" />}
+          </div>
+
+          <Tooltip
+            content={
+              publishBlocked ? (
+                <div className={styles.publishBlockers}>
+                  <div className={styles.publishBlockersTitle}>Impossibile pubblicare</div>
+                  <ul className={styles.publishBlockersList}>
+                    {publishBlockers.map(b => (
+                      <li key={b.key}>{b.label}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <span>Pubblica la proposta su HubSpot</span>
+              )
+            }
+            placement="bottom"
           >
-            {hsStatus?.hs_quote_id ? 'Ripubblica' : 'Pubblica su HubSpot'}
-          </button>
-          <button
-            className={`${styles.saveBtn} ${saveFlash ? styles.saveSuccess : ''}`}
-            disabled={!isDirty || updateQuote.isPending}
-            onClick={() => void handleSave()}
-          >
-            {updateQuote.isPending ? 'Salvataggio...' : 'Salva'}
-          </button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowPublish(true)}
+              disabled={publishBlocked}
+              leftIcon={<Icon name="external-link" size={16} />}
+            >
+              {isRepublish ? 'Ripubblica' : 'Pubblica'}
+            </Button>
+          </Tooltip>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className={styles.tabs}>
-        <TabNav
-          items={tabs.map(t => ({ key: t.key, label: t.label }))}
-          activeKey={activeTab}
-          onTabChange={(key) => { if (isTabKey(key)) setActiveTab(key); }}
-          dotIndicator={dotIndicator}
-        />
-      </div>
-
-      {/* Dirty banner */}
-      {isDirty && (
-        <div className={styles.dirtyWrap}>
-          <DirtyBanner />
+      <div className={styles.contentWrap}>
+        {/* Tabs */}
+        <div className={styles.tabs}>
+          <TabNav
+            items={tabs.map(t => ({ key: t.key, label: t.label }))}
+            activeKey={activeTab}
+            onTabChange={(key) => { if (isTabKey(key)) setActiveTab(key); }}
+            dotIndicator={dotIndicator}
+          />
         </div>
-      )}
 
-      {/* Tab content */}
-      <div className={styles.tabContent} key={activeTab}>
-        {activeTab === 'header' && (
-          <HeaderTab quote={localQuote} onChange={handleChange} />
+        {/* Dirty banner */}
+        {isDirty && (
+          <div className={styles.dirtyWrap}>
+            <DirtyBanner onSave={() => void handleSave()} saving={updateQuote.isPending} />
+          </div>
         )}
-        {activeTab === 'kits' && (
-          <KitsTab quoteId={quoteId} documentType={localQuote.document_type} />
-        )}
-        {activeTab === 'notes' && (
-          <NotesTab quote={localQuote} onChange={handleChange} />
-        )}
-        {activeTab === 'contacts' && (
-          <ContactsTab quote={localQuote} onChange={handleChange} />
-        )}
+
+        {/* Tab content */}
+        <div className={styles.tabContent} key={activeTab}>
+          {activeTab === 'header' && (
+            <HeaderTab quote={localQuote} onChange={handleChange} />
+          )}
+          {activeTab === 'kits' && (
+            <KitsTab quoteId={quoteId} documentType={localQuote.document_type} />
+          )}
+          {activeTab === 'notes' && (
+            <NotesTab quote={localQuote} onChange={handleChange} />
+          )}
+          {activeTab === 'contacts' && (
+            <ContactsTab quote={localQuote} onChange={handleChange} />
+          )}
+        </div>
       </div>
 
       <PublishModal
         open={showPublish}
         quoteId={quoteId}
-        isRepublish={!!hsStatus?.hs_quote_id}
+        isRepublish={isRepublish}
         hsStatus={hsStatus ?? null}
         precheck={publishPrecheck.data ?? null}
         onClose={() => setShowPublish(false)}

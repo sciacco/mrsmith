@@ -1,9 +1,8 @@
 .stepper {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  gap: 0;
-  padding: var(--space-4) 0;
+  padding: var(--space-5) 0;
   position: sticky;
   top: 0;
   background: var(--color-bg);
@@ -14,25 +13,44 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-1);
-  cursor: pointer;
+  gap: var(--space-2);
   position: relative;
-  min-width: 80px;
+  flex: 0 1 140px;
+  min-width: 90px;
 }
 
 .step:not(:last-child)::after {
   content: '';
   position: absolute;
   top: 14px;
-  left: calc(50% + 16px);
-  width: calc(100% - 32px);
+  left: calc(50% + 18px);
+  width: calc(100% - 36px);
   height: 2px;
   background: var(--color-border);
-  transition: background var(--duration-slow) var(--ease-out);
+  transform-origin: left center;
+  transform: scaleX(1);
 }
 
 .stepCompleted:not(:last-child)::after {
   background: var(--color-accent);
+  animation: lineFill var(--duration-slow) var(--ease-out) both;
+}
+
+@keyframes lineFill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.stepClickable {
+  cursor: pointer;
+}
+
+.stepClickable:hover .circle {
+  border-color: var(--color-accent);
 }
 
 .circle {
@@ -50,14 +68,16 @@
   position: relative;
   z-index: 1;
   transition:
-    border-color var(--duration-normal) var(--ease-out),
+    border-color var(--duration-normal) var(--ease-spring),
     background var(--duration-normal) var(--ease-out),
-    color var(--duration-normal) var(--ease-out);
+    color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
 }
 
 .circleCurrent {
   border-color: var(--color-accent);
   color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-subtle);
 }
 
 .circleCompleted {
@@ -66,18 +86,36 @@
   color: var(--color-text-on-accent);
 }
 
-.circleError {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-}
-
 .label {
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-text-muted);
   white-space: nowrap;
+  text-align: center;
+  transition: color var(--duration-normal) var(--ease-out);
 }
 
 .labelActive {
   color: var(--color-text);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .stepper {
+    padding: var(--space-3) 0;
+  }
+  .step {
+    min-width: auto;
+    flex: 0 0 auto;
+  }
+  .label {
+    display: none;
+  }
+  .step.stepCurrent .label {
+    display: block;
+    position: absolute;
+    top: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 }

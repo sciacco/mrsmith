@@ -1,41 +1,23 @@
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+.wrap {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-5);
   animation: sectionEnter var(--duration-normal) var(--ease-out) both;
 }
 
-@media (max-width: 768px) {
-  .grid { grid-template-columns: 1fr; }
-}
-
-.card {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  box-shadow: var(--shadow-xs);
-}
-
-.cardTitle {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: var(--space-3);
-}
-
-.field {
-  margin-bottom: var(--space-3);
+.orderSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 480px;
 }
 
 .label {
-  display: block;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
-  margin-bottom: var(--space-1);
 }
 
 .input {
@@ -43,9 +25,10 @@
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
   background: var(--color-bg-elevated);
   color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.875rem;
   outline: none;
   transition: border-color var(--duration-fast) var(--ease-out);
 }
@@ -53,6 +36,24 @@
 .input:focus {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+.contactGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  .contactGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .contactGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @keyframes sectionEnter {
