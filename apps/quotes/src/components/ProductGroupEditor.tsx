@@ -102,16 +102,18 @@ interface NoneRowProps {
 
 function NoneRow({ checked, name, onSelect }: NoneRowProps) {
   return (
-    <label className={`${styles.row} ${styles.rowNone} ${checked ? styles.rowActive : ''}`}>
-      <input
-        type="radio"
-        className={styles.control}
-        name={name}
-        checked={checked}
-        onChange={onSelect}
-      />
-      <span className={styles.noneLabel}>Non incluso</span>
-    </label>
+    <div className={`${styles.row} ${styles.rowNone} ${checked ? styles.rowActive : ''}`}>
+      <label className={styles.rowMain}>
+        <input
+          type="radio"
+          className={styles.control}
+          name={name}
+          checked={checked}
+          onChange={onSelect}
+        />
+        <span className={styles.noneLabel}>Non incluso</span>
+      </label>
+    </div>
   );
 }
 
