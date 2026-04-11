@@ -3,7 +3,9 @@
   width: 100%;
 }
 
-/* ── Trigger (filled) ── */
+/* ─────────────────────────────────────────────
+   TRIGGER — filled state
+───────────────────────────────────────────────*/
 .trigger {
   display: flex;
   align-items: center;
@@ -11,37 +13,45 @@
   width: 100%;
   padding: var(--space-3) var(--space-4);
   background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
   font-family: inherit;
   text-align: left;
   transition:
     border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .trigger:hover {
-  border-color: var(--color-accent-muted);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
 }
 
-.triggerOpen,
-.trigger:focus-visible {
+.trigger_standard:hover { border-color: var(--color-accent); }
+.trigger_colocation:hover { border-color: var(--color-success); }
+.trigger_iaas:hover { border-color: var(--color-warning); }
+
+.triggerOpen {
   outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+  box-shadow: var(--shadow-sm);
+}
+.trigger.trigger_standard.triggerOpen { border-color: var(--color-accent); }
+.trigger.trigger_colocation.triggerOpen { border-color: var(--color-success); }
+.trigger.trigger_iaas.triggerOpen { border-color: var(--color-warning); }
+
+.trigger:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .triggerIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-md);
-  background: var(--color-accent-subtle);
-  color: var(--color-accent);
   flex-shrink: 0;
 }
 
@@ -54,61 +64,86 @@
 }
 
 .triggerName {
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.9375rem;
+  font-weight: 700;
   color: var(--color-text);
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.triggerSub {
+.triggerMeta {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.familyPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
   font-size: 0.6875rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-muted);
-}
-
-.triggerCta {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-accent);
-  background: var(--color-accent-subtle);
   border-radius: var(--radius-full);
   flex-shrink: 0;
 }
 
-/* ── Trigger (empty / placeholder) ── */
+.pill_standard {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+.pill_colocation {
+  background: var(--color-success-subtle);
+  color: var(--color-success-strong);
+}
+.pill_iaas {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
+.triggerChevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  margin-left: var(--space-1);
+}
+
+/* ─────────────────────────────────────────────
+   TRIGGER — empty state
+   Inviting accent treatment, NO dashed border
+───────────────────────────────────────────────*/
 .triggerEmpty {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   width: 100%;
-  padding: var(--space-5) var(--space-4);
-  background: var(--color-surface);
-  border: 1px dashed var(--color-border);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-accent-subtle);
+  border: 1.5px solid var(--color-accent-muted);
   border-radius: var(--radius-md);
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
+  text-align: left;
   transition:
     border-color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .triggerEmpty:hover:not(:disabled) {
   border-color: var(--color-accent);
-  background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  box-shadow: var(--shadow-accent);
+  transform: translateY(-1px);
+}
+
+.triggerEmpty:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .triggerEmpty:disabled {
@@ -116,7 +151,44 @@
   opacity: 0.6;
 }
 
-/* ── Popover ── */
+.triggerEmptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  flex-shrink: 0;
+}
+
+.triggerEmptyBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.triggerEmptyTitle {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.triggerEmptySub {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+}
+
+/* ─────────────────────────────────────────────
+   POPOVER
+───────────────────────────────────────────────*/
 .popover {
   position: fixed;
   background: var(--color-bg-elevated);
@@ -126,7 +198,7 @@
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  max-height: 480px;
+  max-height: 520px;
   overflow: hidden;
   animation: popoverEnter var(--duration-normal) var(--ease-out) both;
 }
@@ -167,117 +239,217 @@
   color: var(--color-text-muted);
 }
 
-.sectionsWrap {
+.bandsWrap {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
 }
 
-.section {
+/* ─────────────────────────────────────────────
+   BANDS — tinted surfaces per family
+───────────────────────────────────────────────*/
+.band {
   display: flex;
   flex-direction: column;
+  padding: var(--space-3) 0 var(--space-2);
+}
+
+.band_standard {
+  background: var(--color-accent-subtle);
+}
+.band_colocation {
+  background: var(--color-success-subtle);
+}
+.band_iaas {
+  background: var(--color-warning-subtle);
+}
+
+.band + .band {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.bandHeader {
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-2);
 }
 
-.sectionHeader {
+.bandHeaderIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.bandHeaderLabel {
   font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.band_standard .bandHeaderLabel { color: var(--color-accent); }
+.band_colocation .bandHeaderLabel { color: var(--color-success-strong); }
+.band_iaas .bandHeaderLabel { color: var(--color-warning-strong); }
+
+.bandEmpty {
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.8125rem;
   color: var(--color-text-muted);
-  padding: 0 var(--space-1);
+  font-style: italic;
 }
 
-.cardGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
-}
-
-.card {
-  position: relative;
+/* ─────────────────────────────────────────────
+   ROWS
+───────────────────────────────────────────────*/
+.rowList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  background: var(--color-bg-elevated);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
   cursor: pointer;
   font-family: inherit;
   text-align: left;
-  min-height: 92px;
+  min-height: 48px;
   transition:
-    border-color var(--duration-fast) var(--ease-out),
     background var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out);
+    border-left-color var(--duration-fast) var(--ease-out);
 }
 
-.card:hover {
-  border-color: var(--color-accent-muted);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+.row:hover {
+  background: var(--color-bg-elevated);
 }
 
-.card:focus-visible {
+.rowHover_standard:hover { border-left-color: var(--color-accent); }
+.rowHover_colocation:hover { border-left-color: var(--color-success); }
+.rowHover_iaas:hover { border-left-color: var(--color-warning); }
+
+.row:focus-visible {
   outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+  background: var(--color-bg-elevated);
+  border-left-width: 3px;
 }
 
-.cardSelected {
-  border-color: var(--color-accent);
-  background: var(--color-accent-subtle);
+.rowSelected {
+  background: var(--color-bg-elevated);
 }
 
-.cardSelected .cardName {
-  color: var(--color-accent);
-}
+.band_standard .rowSelected { border-left-color: var(--color-accent); }
+.band_colocation .rowSelected { border-left-color: var(--color-success); }
+.band_iaas .rowSelected { border-left-color: var(--color-warning); }
 
-.cardIcon {
+.rowIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  flex-shrink: 0;
 }
 
-.cardSelected .cardIcon {
-  background: var(--color-accent);
-  color: var(--color-text-on-accent);
-}
-
-.cardName {
-  font-size: 0.8125rem;
+.rowName {
+  flex: 1;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--color-text);
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
   overflow: hidden;
-  word-break: break-word;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.cardCheck {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
+.rowMeta {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.rowChevron {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
+  color: var(--color-text-faint);
+  flex-shrink: 0;
+}
+
+.rowCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
   border-radius: var(--radius-full);
+  color: var(--color-text-on-accent);
+  flex-shrink: 0;
+}
+
+.band_standard .rowCheck { background: var(--color-accent); }
+.band_colocation .rowCheck { background: var(--color-success); }
+.band_iaas .rowCheck { background: var(--color-warning); }
+
+/* ─────────────────────────────────────────────
+   FAMILY TINTS — used by both icons
+   in trigger and inside band rows
+───────────────────────────────────────────────*/
+.tint_standard {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+.tint_colocation {
+  background: var(--color-success-subtle);
+  color: var(--color-success-strong);
+}
+.tint_iaas {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
+/* When the row is selected, the row icon swaps to a stronger
+   "filled" version for visual emphasis */
+.rowSelected .rowIcon.tint_standard {
   background: var(--color-accent);
+  color: var(--color-text-on-accent);
+}
+.rowSelected .rowIcon.tint_colocation {
+  background: var(--color-success);
+  color: var(--color-text-on-accent);
+}
+.rowSelected .rowIcon.tint_iaas {
+  background: var(--color-warning);
+  color: var(--color-text-on-accent);
+}
+
+/* When the trigger is filled, the trigger icon also uses
+   the stronger "filled" treatment for the family */
+.trigger_standard .triggerIcon {
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+}
+.trigger_colocation .triggerIcon {
+  background: var(--color-success);
+  color: var(--color-text-on-accent);
+}
+.trigger_iaas .triggerIcon {
+  background: var(--color-warning);
   color: var(--color-text-on-accent);
 }
 
@@ -288,27 +460,12 @@
   color: var(--color-text-muted);
 }
 
-/* ── Section icon tints (subtle hue per family) ── */
-.icon_standard {
-  /* uses default accent */
-}
-
-.icon_colocation {
-  /* same accent for now */
-}
-
-.icon_iaas {
-  /* same accent for now */
-}
-
-@media (max-width: 720px) {
-  .cardGrid {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 560px) {
+  .rowMeta {
+    display: none;
   }
-}
-
-@media (max-width: 480px) {
-  .cardGrid {
-    grid-template-columns: 1fr;
+  .triggerEmpty,
+  .trigger {
+    padding: var(--space-3);
   }
 }

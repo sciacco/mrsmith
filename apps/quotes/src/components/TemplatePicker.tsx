@@ -22,12 +22,14 @@ interface Section {
 
 const POPOVER_GAP = 6;
 const VIEWPORT_PAD = 8;
-const POPOVER_MAX_HEIGHT = 480;
+const POPOVER_MAX_HEIGHT = 520;
 
-function classifySection(t: Template): SectionKey {
+const SECTION_ORDER: SectionKey[] = ['standard', 'colocation', 'iaas'];
+
+function classifySection(t: Template): SectionKey | null {
   if (t.template_type === 'iaas') return 'iaas';
-  if (t.is_colo) return 'colocation';
-  return 'standard';
+  if (t.template_type === 'standard') return t.is_colo ? 'colocation' : 'standard';
+  return null;
 }
 
 function sectionLabel(key: SectionKey): string {
@@ -46,10 +48,17 @@ function sectionIcon(key: SectionKey): IconName {
     case 'standard':
       return 'package';
     case 'colocation':
-      return 'box';
+      return 'server';
     case 'iaas':
       return 'cloud';
   }
+}
+
+function langLabel(lang: string | null | undefined): string {
+  const normalized = (lang ?? '').trim().toLowerCase();
+  if (normalized.startsWith('en')) return 'English';
+  if (normalized.startsWith('it')) return 'Italiano';
+  return normalized.toUpperCase() || '—';
 }
 
 export function TemplatePicker({
@@ -73,17 +82,16 @@ export function TemplatePicker({
   const sections: Section[] = useMemo(() => {
     const list = templates ?? [];
     const filtered = search.trim()
-      ? list.filter(t => t.description.toLowerCase().includes(search.toLowerCase()))
+      ? list.filter(t =>
+          t.description.toLowerCase().includes(search.toLowerCase()),
+        )
       : list;
-    const order: SectionKey[] = ['standard', 'colocation', 'iaas'];
-    return order
-      .map<Section>(key => ({
-        key,
-        label: sectionLabel(key),
-        icon: sectionIcon(key),
-        items: filtered.filter(t => classifySection(t) === key),
-      }))
-      .filter(s => s.items.length > 0);
+    return SECTION_ORDER.map<Section>(key => ({
+      key,
+      label: sectionLabel(key),
+      icon: sectionIcon(key),
+      items: filtered.filter(t => classifySection(t) === key),
+    }));
   }, [templates, search]);
 
   useEffect(() => {
@@ -144,6 +152,7 @@ export function TemplatePicker({
   }, [open]);
 
   const selectedSection: SectionKey | null = selected ? classifySection(selected) : null;
+  const totalCount = templates?.length ?? 0;
 
   return (
     <div className={styles.root}>
@@ -151,21 +160,25 @@ export function TemplatePicker({
         <button
           ref={triggerRef}
           type="button"
-          className={`${styles.trigger} ${open ? styles.triggerOpen : ''}`}
+          className={`${styles.trigger} ${styles[`trigger_${selectedSection}`]} ${open ? styles.triggerOpen : ''}`}
           onClick={() => setOpen(o => !o)}
           aria-haspopup="dialog"
           aria-expanded={open}
         >
-          <span className={`${styles.triggerIcon} ${styles[`icon_${selectedSection}`]}`}>
-            <Icon name={sectionIcon(selectedSection)} size={20} />
+          <span className={`${styles.triggerIcon} ${styles[`tint_${selectedSection}`]}`}>
+            <Icon name={sectionIcon(selectedSection)} size={22} />
           </span>
           <span className={styles.triggerBody}>
             <span className={styles.triggerName}>{selected.description}</span>
-            <span className={styles.triggerSub}>{sectionLabel(selectedSection)}</span>
+            <span className={styles.triggerMeta}>
+              Lingua {langLabel(selected.lang)}
+            </span>
           </span>
-          <span className={styles.triggerCta}>
-            Cambia
-            <Icon name="chevron-down" size={14} />
+          <span className={`${styles.familyPill} ${styles[`pill_${selectedSection}`]}`}>
+            {sectionLabel(selectedSection)}
+          </span>
+          <span className={styles.triggerChevron}>
+            <Icon name="chevron-down" size={16} />
           </span>
         </button>
       ) : (
@@ -178,11 +191,20 @@ export function TemplatePicker({
           aria-expanded={open}
           disabled={isLoading}
         >
-          <Icon name="package" size={18} />
-          <span>
-            {isLoading ? 'Caricamento template...' : 'Scegli un template per iniziare'}
+          <span className={styles.triggerEmptyIcon}>
+            <Icon name="package" size={22} />
           </span>
-          <Icon name="chevron-down" size={14} />
+          <span className={styles.triggerEmptyBody}>
+            <span className={styles.triggerEmptyTitle}>
+              {isLoading ? 'Caricamento template...' : 'Scegli un template per iniziare'}
+            </span>
+            <span className={styles.triggerEmptySub}>
+              Standard · Colocation · IaaS
+            </span>
+          </span>
+          <span className={styles.triggerChevron}>
+            <Icon name="chevron-down" size={16} />
+          </span>
         </button>
       )}
 
@@ -194,7 +216,7 @@ export function TemplatePicker({
             style={{
               top: coords.top,
               left: coords.left,
-              width: Math.max(coords.width, 480),
+              width: Math.max(coords.width, 520),
               transform: coords.placeTop ? 'translateY(-100%)' : undefined,
             }}
             role="dialog"
@@ -211,46 +233,75 @@ export function TemplatePicker({
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <div className={styles.sectionsWrap}>
-              {sections.length === 0 ? (
+            <div className={styles.bandsWrap}>
+              {totalCount === 0 ? (
                 <div className={styles.empty}>
                   {templates === undefined
                     ? 'Caricamento template...'
-                    : 'Nessun template trovato.'}
+                    : 'Nessun template disponibile.'}
                 </div>
               ) : (
                 sections.map(section => (
-                  <div key={section.key} className={styles.section}>
-                    <div className={styles.sectionHeader}>{section.label.toUpperCase()}</div>
-                    <div className={styles.cardGrid}>
-                      {section.items.map(t => {
-                        const isSelected = t.template_id === selectedId;
-                        return (
-                          <button
-                            key={t.template_id}
-                            type="button"
-                            className={`${styles.card} ${isSelected ? styles.cardSelected : ''}`}
-                            onClick={() => {
-                              onChange(t.template_id);
-                              setOpen(false);
-                            }}
-                            title={t.description}
-                          >
-                            <span
-                              className={`${styles.cardIcon} ${styles[`icon_${section.key}`]}`}
-                            >
-                              <Icon name={section.icon} size={18} />
-                            </span>
-                            <span className={styles.cardName}>{t.description}</span>
-                            {isSelected && (
-                              <span className={styles.cardCheck} aria-hidden="true">
-                                <Icon name="check" size={14} />
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                  <div
+                    key={section.key}
+                    className={`${styles.band} ${styles[`band_${section.key}`]}`}
+                  >
+                    <div className={styles.bandHeader}>
+                      <span
+                        className={`${styles.bandHeaderIcon} ${styles[`tint_${section.key}`]}`}
+                      >
+                        <Icon name={section.icon} size={14} />
+                      </span>
+                      <span className={styles.bandHeaderLabel}>
+                        {section.label.toUpperCase()}
+                      </span>
                     </div>
+                    {section.items.length === 0 ? (
+                      <div className={styles.bandEmpty}>
+                        {search.trim()
+                          ? 'Nessun risultato in questa famiglia.'
+                          : `Nessun template ${section.label} per la lingua selezionata.`}
+                      </div>
+                    ) : (
+                      <ul className={styles.rowList}>
+                        {section.items.map(t => {
+                          const isSelected = t.template_id === selectedId;
+                          return (
+                            <li key={t.template_id}>
+                              <button
+                                type="button"
+                                className={`${styles.row} ${isSelected ? styles.rowSelected : ''} ${styles[`rowHover_${section.key}`]}`}
+                                onClick={() => {
+                                  onChange(t.template_id);
+                                  setOpen(false);
+                                }}
+                              >
+                                <span
+                                  className={`${styles.rowIcon} ${styles[`tint_${section.key}`]}`}
+                                >
+                                  <Icon name={section.icon} size={16} />
+                                </span>
+                                <span className={styles.rowName}>{t.description}</span>
+                                <span className={styles.rowMeta}>
+                                  {langLabel(t.lang)}
+                                </span>
+                                {isSelected ? (
+                                  <span
+                                    className={`${styles.rowCheck} ${styles[`tint_${section.key}`]}`}
+                                  >
+                                    <Icon name="check" size={14} />
+                                  </span>
+                                ) : (
+                                  <span className={styles.rowChevron}>
+                                    <Icon name="chevron-right" size={14} />
+                                  </span>
+                                )}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </div>
                 ))
               )}

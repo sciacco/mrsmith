@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Icon, MultiSelect, SingleSelect, SearchInput, Tooltip } from '@mrsmith/ui';
+import { Button, Icon, MultiSelect, SingleSelect, SearchInput } from '@mrsmith/ui';
 import {
   useCategories,
   useCustomerOrders,
@@ -127,16 +127,10 @@ export function QuoteCreatePage() {
     excludeIds: [12, 13],
     enabled: state.quoteType === 'standard',
   });
-  const templatesParams = useMemo<{ type: string; lang?: string; is_colo?: string }>(() => {
-    const params: { type: string; lang?: string; is_colo?: string } = {
-      type: state.quoteType,
-      lang: getLanguageCode(state.iaasLanguage),
-    };
-    if (state.quoteType === 'standard' && state.document_type === 'TSC-ORDINE') {
-      params.is_colo = 'false';
-    }
-    return params;
-  }, [state.document_type, state.iaasLanguage, state.quoteType]);
+  const templatesParams = useMemo<{ lang?: string }>(
+    () => ({ lang: getLanguageCode(state.iaasLanguage) }),
+    [state.iaasLanguage],
+  );
   const { data: templates } = useTemplates(templatesParams);
   const { data: kits, isPending: kitsPending } = useKits({ enabled: shouldLoadKits });
   const createQuote = useCreateQuote();
@@ -163,15 +157,10 @@ export function QuoteCreatePage() {
       c => selectedServiceIds.includes(String(c.id)) && c.name.toUpperCase() === 'COLOCATION',
     );
   }, [categories, selectedServiceIds, state.quoteType]);
-  const customerLang: 'it' | 'en' = useMemo(() => {
-    const raw = state.selectedDeal?.company_lingua;
-    if (!raw) return 'it';
-    return raw.trim().toLowerCase().startsWith('en') ? 'en' : 'it';
-  }, [state.selectedDeal]);
   const billingLocked =
     state.quoteType === 'standard' &&
-    colocationSelected &&
-    state.document_type === 'TSC-ORDINE-RIC';
+    state.document_type === 'TSC-ORDINE-RIC' &&
+    (colocationSelected || selectedTemplate?.is_colo === true);
 
   const selectedCustomerId = state.selectedDeal?.company_id != null
     ? String(state.selectedDeal.company_id)
@@ -198,28 +187,6 @@ export function QuoteCreatePage() {
       setState(prev => ({ ...prev, template: '' }));
     }
   }, [templates, state.template]);
-
-  useEffect(() => {
-    if (state.quoteType !== 'standard') return;
-    if (!templates || templates.length === 0) return;
-
-    if (colocationSelected) {
-      const match = templates.find(
-        t => t.is_colo === true && (t.lang ?? '').toLowerCase() === customerLang,
-      );
-      if (match && state.template !== match.template_id) {
-        const current = templates.find(t => t.template_id === state.template);
-        if (!current || current.is_colo === true) {
-          setState(prev => ({ ...prev, template: match.template_id }));
-        }
-      }
-    } else {
-      const current = templates.find(t => t.template_id === state.template);
-      if (current?.is_colo === true) {
-        setState(prev => ({ ...prev, template: '' }));
-      }
-    }
-  }, [colocationSelected, customerLang, templates, state.quoteType, state.template]);
 
   useEffect(() => {
     if (state.quoteType !== 'iaas') return;
@@ -667,16 +634,26 @@ export function QuoteCreatePage() {
 
                   {state.quoteType === 'standard' && (
                     <>
-                      <div className={styles.fieldRow}>
-                        <label className={styles.fieldLabel}>Fatturazione canoni</label>
-                        {billingLocked ? (
-                          <div className={styles.colocationBanner}>
+                      {billingLocked ? (
+                        <div
+                          className={`${styles.autoConfigChip} ${styles.autoConfigChip_colo}`}
+                        >
+                          <span className={styles.autoConfigIcon} aria-hidden="true">
                             <Icon name="triangle-alert" size={16} />
-                            <span>
+                          </span>
+                          <div className={styles.autoConfigBody}>
+                            <div className={styles.autoConfigLabel}>Auto-configurato</div>
+                            <div className={styles.autoConfigValue}>
+                              Fatturazione trimestrale
+                            </div>
+                            <div className={styles.autoConfigHelper}>
                               COLOCATION ricorrente: fatturazione trimestrale obbligatoria.
-                            </span>
+                            </div>
                           </div>
-                        ) : (
+                        </div>
+                      ) : (
+                        <div className={styles.fieldRow}>
+                          <label className={styles.fieldLabel}>Fatturazione canoni</label>
                           <SegmentedControl<string>
                             value={String(state.bill_months)}
                             onChange={v => update('bill_months', Number(v))}
@@ -689,8 +666,8 @@ export function QuoteCreatePage() {
                             ]}
                             aria-label="Fatturazione canoni"
                           />
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <div className={styles.tileTrio}>
                         <div className={styles.numberTile}>
                           <div className={styles.numberTileLabel}>Durata iniziale</div>
@@ -743,22 +720,23 @@ export function QuoteCreatePage() {
 
                   {state.quoteType === 'iaas' && (
                     <>
-                      <Tooltip
-                        placement="top"
-                        content="In modalità IaaS, tipo documento, fatturazione e termini sono fissati dal template selezionato."
+                      <div
+                        className={`${styles.autoConfigChip} ${styles.autoConfigChip_iaas}`}
                       >
-                        <div className={styles.autoConfigChip}>
-                          <span className={styles.autoConfigIcon} aria-hidden="true">
-                            <Icon name="lock" size={14} />
-                          </span>
-                          <div className={styles.autoConfigBody}>
-                            <div className={styles.autoConfigLabel}>Auto-configurato</div>
-                            <div className={styles.autoConfigValue}>
-                              Ricorrente · Mensile · 1/1 mesi
-                            </div>
+                        <span className={styles.autoConfigIcon} aria-hidden="true">
+                          <Icon name="lock" size={16} />
+                        </span>
+                        <div className={styles.autoConfigBody}>
+                          <div className={styles.autoConfigLabel}>Auto-configurato</div>
+                          <div className={styles.autoConfigValue}>
+                            Ricorrente · Mensile · 1/1 mesi
+                          </div>
+                          <div className={styles.autoConfigHelper}>
+                            Tipo documento, fatturazione e termini sono fissati dal template
+                            IaaS e non possono essere modificati.
                           </div>
                         </div>
-                      </Tooltip>
+                      </div>
                       <div className={styles.tileTrioSingle}>
                         <div className={styles.numberTile}>
                           <div className={styles.numberTileLabel}>Consegna</div>

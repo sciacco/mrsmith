@@ -271,28 +271,46 @@
   margin-left: 4px;
 }
 
-/* Auto-configured chip strip (IaaS only) */
+/* Auto-configured chip — shared format for both IaaS and Colocation locks.
+   Family colors come from variant classes (.autoConfigChip_iaas / _colo)
+   and follow the TemplatePicker family palette. */
 .autoConfigChip {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-accent-subtle);
-  border-left: 3px solid var(--color-accent);
+  padding: var(--space-4);
   border-radius: var(--radius-md);
-  cursor: help;
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+.autoConfigChip_iaas {
+  background: var(--color-warning-subtle);
+  border-left-color: var(--color-warning);
+}
+
+.autoConfigChip_colo {
+  background: var(--color-success-subtle);
+  border-left-color: var(--color-success);
 }
 
 .autoConfigIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-full);
-  background: var(--color-accent);
   color: var(--color-text-on-accent);
   flex-shrink: 0;
+}
+
+.autoConfigChip_iaas .autoConfigIcon {
+  background: var(--color-warning);
+}
+
+.autoConfigChip_colo .autoConfigIcon {
+  background: var(--color-success);
 }
 
 .autoConfigBody {
@@ -300,6 +318,7 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
 }
 
 .autoConfigLabel {
@@ -307,32 +326,33 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-accent);
+}
+
+.autoConfigChip_iaas .autoConfigLabel {
+  color: var(--color-warning-strong);
+}
+
+.autoConfigChip_colo .autoConfigLabel {
+  color: var(--color-success-strong);
 }
 
 .autoConfigValue {
   font-family: var(--font-mono);
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.9375rem;
+  font-weight: 600;
   color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* COLOCATION billing lock banner — mirrors .approvalBanner */
-.colocationBanner {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-warning-subtle);
-  border-left: 3px solid var(--color-warning);
-  border-radius: var(--radius-md);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-warning-strong);
-  margin-top: var(--space-2);
+.autoConfigHelper {
+  margin-top: var(--space-1);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  white-space: normal;
 }
 
 /* Slide-in wrapper for conditional fields */
