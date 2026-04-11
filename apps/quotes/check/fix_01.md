@@ -17,8 +17,10 @@ not guaranteed.
 
 ## Implementation Summary
 
-- Updated the quotes frontend hook to omit `page=1` from the untouched default
-  request so the initial list load stays parameterless.
+- Updated the list page to preserve the distinction between an omitted `page`
+  parameter and an explicit `page=1`.
+- Updated the quotes frontend hook to serialize an explicit `page=1` instead of
+  dropping it unconditionally.
 - Added backend detection for the true Appsmith-equivalent default request:
   no page, no filters, no explicit sort, no explicit direction.
 - Kept the existing backend default sort of `quote_number DESC`.
@@ -48,9 +50,9 @@ not guaranteed.
 
 ## Remaining Risks
 
-- The parity path now depends on the frontend continuing to omit `page=1` for
-  the untouched default list request. If a future change starts sending
-  `page=1` again, the backend will treat it as explicit pagination and use the
+- The parity path still depends on the frontend leaving `page` unset on the
+  untouched initial load. If a future change starts always serializing
+  `page=1`, the backend will treat that as explicit pagination and use the
   migrated 25-row page size.
 - Verification here is focused. I did not run an end-to-end browser check
   against live quote data.
@@ -63,18 +65,17 @@ not guaranteed.
 
 ### Acceptance Criteria Verification
 
-- **AC 1 — Default quote-list load matches Appsmith reference.** PASS. `QuoteListPage.tsx` passes `page=1` to `useQuotes`, which omits `page=1` (queries.ts:107-108). Backend receives no `page`, `isAppsmithDefaultQuoteListRequest` returns true, handler uses `pageSize=2000` with `quote_number DESC`.
+- **AC 1 — Default quote-list load matches Appsmith reference.** PASS. `QuoteListPage.tsx` now passes `page: undefined` only when the URL truly has no `page` param, so the untouched default request stays parameterless and the backend keeps the Appsmith 2000-row path.
 - **AC 2 — Sorting and row-limit aligned.** PASS. Sort defaults to `q.quote_number DESC` (handler_quotes.go:53-58); 2000-row LIMIT applied and `total` capped at 2000 (handler_quotes.go:126-128).
-- **AC 3 — Migrated filters/pagination still work.** PASS. Any non-empty filter, explicit page, or explicit sort/dir flips `isAppsmithDefaultQuoteListRequest` to false, preserving `pageSize=25` paginated behavior.
+- **AC 3 — Migrated filters/pagination still work.** PASS. Once pagination is explicit, `useQuotes()` now keeps `page=1` instead of collapsing back to the Appsmith path, so returning from page 2 to page 1 remains on the 25-row migrated pagination contract.
 - **AC 4 — `out_01` would now result in MATCH.** PASS by construction.
 
 ### Code Quality Findings
 
-- **Finding 1 — Mid-session flip to Appsmith path (confidence: 85).** When a user pages to 2 then returns to page 1 via `handlePageChange(1)`, `useQuotes` suppresses `page=1`, causing the backend to return 2000 rows with `page_size=2000`. The `Pagination` UI collapses mid-session. Fix: make frontend detection symmetric to `isAppsmithDefaultQuoteListRequest` (only omit `page=1` when all other params are also absent), or guard `handlePageChange` to not navigate to page 1 via the empty-params path after explicit pagination started.
+- **Finding 1 — Mid-session flip to Appsmith path.** RESOLVED. `QuoteListPage.tsx` now preserves whether `page` was explicitly present in the URL, and `useQuotes()` no longer strips `page=1`. Returning from page 2 to page 1 stays on the paginated backend path.
 - **Finding 2 — Total count capping clarity (confidence: 80).** Logic is correct (filters are guaranteed empty in the Appsmith path), but a brief comment tying the cap to "mirrors Appsmith LIMIT" would improve readability. Minor.
 
 ### Recommendations
 
-1. Guard `handlePageChange` against reinstating the Appsmith path mid-session; make frontend/backend detection symmetric.
-2. Add a handler integration test (httptest + sqlmock) verifying `page_size=2000` for empty params and `page_size=25` for filtered requests.
-3. Promote the "Remaining Risks" note about `page=1` regression into a tracked TODO.
+1. Add a handler integration test (httptest + sqlmock) verifying `page_size=2000` for empty params and `page_size=25` for explicit `page=1` or filtered requests.
+2. Promote the remaining frontend/backed contract dependency about untouched default `page` omission into a tracked TODO if this behavior is likely to evolve again.

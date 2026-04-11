@@ -10,7 +10,9 @@ export function QuoteListPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const page = Number(params.get('page') ?? '1');
+  const explicitPage = params.get('page');
+  const pageValue = Number(explicitPage ?? '1');
+  const page = Number.isFinite(pageValue) && pageValue > 0 ? pageValue : 1;
   const status = params.get('status') ?? '';
   const owner = params.get('owner') ?? '';
   const search = params.get('q') ?? '';
@@ -20,7 +22,8 @@ export function QuoteListPage() {
   const dir = params.get('dir') ?? '';
 
   const { data, isLoading, isFetching } = useQuotes({
-    page, status, owner, q: search,
+    page: explicitPage === null ? undefined : page,
+    status, owner, q: search,
     date_from: dateFrom, date_to: dateTo,
     sort, dir,
   });
