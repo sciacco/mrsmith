@@ -16,6 +16,13 @@ const customerOrdersQuery = `SELECT TOP 500 LTRIM(RTRIM(NOME_TESTATA_ORDINE)) as
 	          GROUP BY NOME_TESTATA_ORDINE
 	          ORDER BY NOME_TESTATA_ORDINE DESC`
 
+const listKitsQuery = `SELECT k.id, k.internal_name, k.nrc, k.mrc, k.category_id, pc.name as category_name,
+	                 k.is_active, k.ecommerce, k.quotable
+	          FROM products.kit k
+	          LEFT JOIN products.product_category pc ON pc.id = k.category_id
+	          WHERE k.is_active = true AND k.ecommerce = false AND k.quotable = true
+	          ORDER BY pc.name, k.internal_name`
+
 // ── Templates ──
 
 func (h *Handler) handleListTemplates(w http.ResponseWriter, r *http.Request) {
@@ -169,14 +176,7 @@ func (h *Handler) handleListKits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `SELECT k.id, k.internal_name, k.nrc, k.mrc, k.category_id, pc.name as category_name,
-	                 k.is_active, k.ecommerce, k.quotable
-	          FROM products.kit k
-	          LEFT JOIN products.product_category pc ON pc.id = k.category_id
-	          WHERE k.is_active = true AND k.ecommerce = false AND k.quotable = true
-	          ORDER BY pc.name, k.internal_name`
-
-	rows, err := h.db.QueryContext(r.Context(), query)
+	rows, err := h.db.QueryContext(r.Context(), listKitsQuery)
 	if err != nil {
 		h.dbFailure(w, r, "list_kits", err)
 		return

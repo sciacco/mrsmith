@@ -122,6 +122,10 @@
   accent-color: var(--color-accent, #635bff);
 }
 
+.checkInput {
+  accent-color: var(--color-accent, #635bff);
+}
+
 .kitList {
   max-height: 22rem;
   overflow-y: auto;

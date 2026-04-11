@@ -81,15 +81,16 @@ func TestListDealsQueryMatchesAppsmithEligibility(t *testing.T) {
 		}
 	}
 
-	// The assembled query must honor the three Appsmith eligibility rules:
-	// pipeline filter, stage whitelist, and non-empty codice.
-	q := listDealsQuery
+	// Normalize whitespace so the assertions pin SQL structure rather than indentation.
+	q := strings.Join(strings.Fields(listDealsQuery), " ")
 	mustContain := []string{
+		"WHERE ((d.pipeline = '255768766'",
 		"d.pipeline = '255768766'",
 		"d.dealstage IN ('424443344','424502259','424502261','424502262')",
 		"d.pipeline = '255768768'",
 		"d.dealstage IN ('424443381','424443586','424443588','424443587','424443589')",
-		"d.codice <> ''",
+		")) AND d.codice <> ''",
+		"ORDER BY d.id DESC",
 	}
 	for _, frag := range mustContain {
 		if !strings.Contains(q, frag) {

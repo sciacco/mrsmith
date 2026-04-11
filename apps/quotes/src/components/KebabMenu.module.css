@@ -59,12 +59,25 @@
   background: var(--color-surface-raised, #f1f5f9);
 }
 
+.menuItem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.menuItem:disabled:hover {
+  background: transparent;
+}
+
 .menuItemDanger {
   color: #dc2626;
 }
 
 .menuItemDanger:hover {
   background: rgba(220, 38, 38, 0.06);
+}
+
+.menuItemDanger:disabled {
+  color: #f87171;
 }
 
 .menuItemDisabled {

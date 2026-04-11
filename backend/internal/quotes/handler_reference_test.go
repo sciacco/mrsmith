@@ -31,3 +31,17 @@ func TestParseCategoryExclusions(t *testing.T) {
 		t.Fatalf("parseCategoryExclusions mismatch: got %v, want %v", got, want)
 	}
 }
+
+func TestListKitsQueryMatchesAppsmithEligibility(t *testing.T) {
+	mustContain := []string{
+		"k.is_active = true",
+		"k.ecommerce = false",
+		"k.quotable = true",
+		"ORDER BY pc.name, k.internal_name",
+	}
+	for _, frag := range mustContain {
+		if !strings.Contains(listKitsQuery, frag) {
+			t.Fatalf("listKitsQuery missing %q; query was:\n%s", frag, listKitsQuery)
+		}
+	}
+}

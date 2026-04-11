@@ -6,9 +6,11 @@ interface KebabMenuProps {
   quoteId: number;
   canDelete: boolean;
   onDelete?: () => void;
+  deleteDisabled?: boolean;
+  deleteLabel?: string;
 }
 
-export function KebabMenu({ quoteId, canDelete, onDelete }: KebabMenuProps) {
+export function KebabMenu({ quoteId, canDelete, onDelete, deleteDisabled = false, deleteLabel = 'Elimina' }: KebabMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -44,9 +46,11 @@ export function KebabMenu({ quoteId, canDelete, onDelete }: KebabMenuProps) {
           {canDelete && (
             <button
               className={`${styles.menuItem} ${styles.menuItemDanger}`}
+              disabled={deleteDisabled}
+              title={deleteDisabled ? 'Attendi il completamento della cancellazione corrente.' : undefined}
               onClick={e => { e.stopPropagation(); onDelete?.(); close(); }}
             >
-              Elimina
+              {deleteLabel}
             </button>
           )}
           <button

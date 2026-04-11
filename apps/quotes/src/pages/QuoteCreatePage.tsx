@@ -72,6 +72,9 @@ export function QuoteCreatePage() {
   const [step, setStep] = useState(0);
   const [state, setState] = useState<WizardState>(initialState);
   const [dealSearch, setDealSearch] = useState('');
+  const shouldLoadKits =
+    (state.quoteType === 'standard' && step >= 2) ||
+    (state.quoteType === 'iaas' && state.template !== '');
 
   const { data: deals } = useDeals();
   const { data: owners } = useOwners();
@@ -99,7 +102,7 @@ export function QuoteCreatePage() {
   // Appsmith parity: the `mst_kit` multi-select in "Nuova Proposta" is populated
   // from `list_kit`, grouped by category. Selected kit ids are inserted as
   // quote rows right after `ins_quote` (see `salvaOfferta`).
-  const { data: kits } = useKits();
+  const { data: kits, isPending: kitsPending } = useKits({ enabled: shouldLoadKits });
   const createQuote = useCreateQuote();
   const [kitSearch, setKitSearch] = useState('');
   const selectedTemplate = useMemo(
@@ -196,6 +199,13 @@ export function QuoteCreatePage() {
     setState(prev => ({ ...prev, replace_orders: '' }));
   }, [state.proposal_type, state.replace_orders]);
 
+  useEffect(() => {
+    if (step === 2 || kitSearch === '') {
+      return;
+    }
+    setKitSearch('');
+  }, [kitSearch, step]);
+
   // When the selected customer resolves, apply the ERP default payment code.
   // Fallback to '402' if the lookup has no value or fails, matching Appsmith.
   useEffect(() => {
@@ -235,6 +245,19 @@ export function QuoteCreatePage() {
     const chosen = new Set(state.kit_ids);
     return kits.filter(k => chosen.has(k.id));
   }, [kits, state.kit_ids]);
+
+  const selectedKitsSummary = useMemo(() => {
+    if (state.kit_ids.length === 0) {
+      return 'Nessuno';
+    }
+    if (kitsPending && selectedKits.length === 0) {
+      return `${state.kit_ids.length} kit selezionati (caricamento...)`;
+    }
+    if (selectedKits.length === 0) {
+      return `${state.kit_ids.length} kit selezionati`;
+    }
+    return selectedKits.map(k => k.internal_name).join(', ');
+  }, [kitsPending, selectedKits, state.kit_ids.length]);
 
   const toggleKit = useCallback((kitId: number) => {
     setState(prev => {
@@ -618,7 +641,7 @@ export function QuoteCreatePage() {
                           <label key={k.id} className={styles.kitRow}>
                             <input
                               type="checkbox"
-                              className={styles.radioInput}
+                              className={styles.checkInput}
                               checked={checked}
                               onChange={() => toggleKit(k.id)}
                             />
@@ -677,9 +700,7 @@ export function QuoteCreatePage() {
             <div className={styles.summaryRow}>
               <span className={styles.summaryLabel}>Kit selezionati</span>
               <span className={styles.summaryValue}>
-                {selectedKits.length === 0
-                  ? 'Nessuno'
-                  : selectedKits.map(k => k.internal_name).join(', ')}
+                {selectedKitsSummary}
               </span>
             </div>
             {state.trial && (

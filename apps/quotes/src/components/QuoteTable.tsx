@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Quote } from '../api/types';
 import { StatusBadge } from './StatusBadge';
@@ -36,10 +37,16 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
   const { user } = useOptionalAuth();
   const canDelete = user?.roles?.includes('app_quotes_delete') ?? false;
   const deleteQuote = useDeleteQuote();
+  const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
 
   const handleDelete = (id: number) => {
     if (deleteQuote.isPending) return;
-    deleteQuote.mutate(id);
+    setDeletingQuoteId(id);
+    deleteQuote.mutate(id, {
+      onSettled: () => {
+        setDeletingQuoteId(current => (current === id ? null : current));
+      },
+    });
   };
 
   const handleSort = (col: string) => {
@@ -180,6 +187,12 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
                 quoteId={q.id}
                 canDelete={canDelete}
                 onDelete={() => handleDelete(q.id)}
+                deleteDisabled={deleteQuote.isPending}
+                deleteLabel={
+                  deleteQuote.isPending
+                    ? (deletingQuoteId === q.id ? 'Eliminazione in corso…' : 'Eliminazione in corso')
+                    : 'Elimina'
+                }
               />
             </td>
           </tr>

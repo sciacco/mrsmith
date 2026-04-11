@@ -38,14 +38,12 @@ export function useCategories(params?: { excludeIds?: number[]; enabled?: boolea
   });
 }
 
-export function useKits() {
+export function useKits(options?: { enabled?: boolean }) {
   const api = useApiClient();
   return useQuery({
     queryKey: ['kits'],
-    queryFn: async () => {
-      const kits = await api.get<Kit[]>('/quotes/v1/kits');
-      return kits.filter(kit => kit.is_active && !kit.ecommerce && kit.quotable);
-    },
+    queryFn: () => api.get<Kit[]>('/quotes/v1/kits'),
+    enabled: options?.enabled ?? true,
   });
 }
 
