@@ -16,13 +16,13 @@ import type { Deal, Kit } from '../api/types';
 import { Stepper } from '../components/Stepper';
 import { WizardNav } from '../components/WizardNav';
 import { DealCard } from '../components/DealCard';
-import { TypeSelector } from '../components/TypeSelector';
 import { CollapsibleSection } from '../components/CollapsibleSection';
 import { ContactCard, type ContactFields } from '../components/ContactCard';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { KitPickerModal } from '../components/KitPickerModal';
 import { TrialSlider } from '../components/TrialSlider';
 import { SegmentedControl } from '../components/SegmentedControl';
+import { TemplatePicker } from '../components/TemplatePicker';
 import { buildIaaSTrialText, getLanguageCode, getIaaSTemplateRule } from '../utils/quoteRules';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import styles from './QuoteCreatePage.module.css';
@@ -383,15 +383,44 @@ export function QuoteCreatePage() {
     }
   }, [state, createQuote, navigate]);
 
-  const handleQuoteTypeChange = useCallback((quoteType: WizardState['quoteType']) => {
-    setState(prev => {
-      if (prev.quoteType === quoteType) return prev;
-      if (quoteType === 'iaas') {
-        return { ...prev, quoteType, services: '', bill_months: 1 };
-      }
-      return { ...prev, quoteType, services: '', trial: '' };
-    });
-  }, []);
+  const handleTemplateChange = useCallback(
+    (templateId: string) => {
+      if (!templates) return;
+      const t = templates.find(x => x.template_id === templateId);
+      if (!t) return;
+      const nextType: 'standard' | 'iaas' = t.template_type === 'iaas' ? 'iaas' : 'standard';
+      setState(prev => {
+        if (nextType === 'iaas') {
+          return {
+            ...prev,
+            template: templateId,
+            quoteType: 'iaas',
+            document_type: 'TSC-ORDINE-RIC',
+            services: '',
+          };
+        }
+        const wasIaaS = prev.quoteType === 'iaas';
+        return {
+          ...prev,
+          template: templateId,
+          quoteType: 'standard',
+          document_type: 'TSC-ORDINE-RIC',
+          services: wasIaaS ? '' : prev.services,
+          trial: '',
+          initial_term_months: wasIaaS ? 12 : prev.initial_term_months,
+          next_term_months: wasIaaS ? 12 : prev.next_term_months,
+          bill_months: wasIaaS ? 2 : prev.bill_months,
+          kit_ids: wasIaaS ? [] : prev.kit_ids,
+        };
+      });
+    },
+    [templates],
+  );
+
+  const templateIsColo = useMemo(
+    () => selectedTemplate?.is_colo === true,
+    [selectedTemplate],
+  );
 
   const handleNext = () => {
     if (step === 4) {
@@ -474,48 +503,80 @@ export function QuoteCreatePage() {
 
         {step === 1 && (
           <div className={styles.stepInner}>
-            <TypeSelector value={state.quoteType} onChange={handleQuoteTypeChange} />
             <div className={styles.configColumn}>
               {/* Gruppo: dati comuni */}
               <section className={styles.actBare}>
                 <div className={styles.actBody}>
-                  <div className={styles.fieldRow}>
-                    <div className={styles.fieldLabelWithChip}>
-                      <label className={styles.fieldLabel}>Owner</label>
-                      {ownerAutoFilled && state.owner !== '' && (
-                        <button
-                          type="button"
-                          className={styles.ownerAutoChip}
-                          onClick={() => update('owner', '')}
-                          aria-label="Rimuovi auto-compilazione owner"
-                        >
-                          <Icon name="check" size={11} />
-                          Te stesso
-                        </button>
-                      )}
+                  <div className={styles.commonRow}>
+                    <div className={`${styles.fieldRow} ${styles.ownerCell}`}>
+                      <div className={styles.fieldLabelWithChip}>
+                        <label className={styles.fieldLabel}>Owner</label>
+                        {ownerAutoFilled && state.owner !== '' && (
+                          <button
+                            type="button"
+                            className={styles.ownerAutoChip}
+                            onClick={() => update('owner', '')}
+                            aria-label="Rimuovi auto-compilazione owner"
+                          >
+                            <Icon name="check" size={11} />
+                            Te stesso
+                          </button>
+                        )}
+                      </div>
+                      <SingleSelect<string>
+                        options={(owners ?? []).map(o => ({
+                          value: String(o.id),
+                          label: [o.firstname, o.lastname].filter(Boolean).join(' '),
+                        }))}
+                        selected={state.owner || null}
+                        onChange={v => update('owner', v ?? '')}
+                        placeholder="— Seleziona —"
+                      />
                     </div>
-                    <SingleSelect<string>
-                      options={(owners ?? []).map(o => ({
-                        value: String(o.id),
-                        label: [o.firstname, o.lastname].filter(Boolean).join(' '),
-                      }))}
-                      selected={state.owner || null}
-                      onChange={v => update('owner', v ?? '')}
-                      placeholder="— Seleziona —"
-                    />
+                    <div className={`${styles.fieldRow} ${styles.languageCell}`}>
+                      <label className={styles.fieldLabel}>Lingua cliente</label>
+                      <SegmentedControl<'ITA' | 'ENG'>
+                        value={state.iaasLanguage}
+                        onChange={v => update('iaasLanguage', v)}
+                        options={[
+                          { value: 'ITA', label: 'Italiano' },
+                          { value: 'ENG', label: 'English' },
+                        ]}
+                        aria-label="Lingua cliente"
+                      />
+                    </div>
                   </div>
+                </div>
+              </section>
+
+              {/* Gruppo: template */}
+              <section className={styles.actBare}>
+                <div className={styles.actBody}>
                   <div className={styles.fieldRow}>
-                    <label className={styles.fieldLabel}>Lingua cliente</label>
-                    <SegmentedControl<'ITA' | 'ENG'>
-                      value={state.iaasLanguage}
-                      onChange={v => update('iaasLanguage', v)}
-                      options={[
-                        { value: 'ITA', label: 'Italiano' },
-                        { value: 'ENG', label: 'English' },
-                      ]}
-                      aria-label="Lingua cliente"
+                    <label className={styles.fieldLabel}>Template</label>
+                    <TemplatePicker
+                      templates={templates}
+                      selectedId={state.template}
+                      onChange={handleTemplateChange}
                     />
                   </div>
+                  {state.template !== '' &&
+                    state.quoteType === 'standard' &&
+                    !templateIsColo && (
+                      <div className={`${styles.fieldRow} ${styles.conditionalWrap}`}>
+                        <label className={styles.fieldLabel}>Tipo documento</label>
+                        <SegmentedControl<'TSC-ORDINE-RIC' | 'TSC-ORDINE'>
+                          value={state.document_type}
+                          onChange={v => update('document_type', v)}
+                          options={[
+                            { value: 'TSC-ORDINE-RIC', label: 'Ricorrente' },
+                            { value: 'TSC-ORDINE', label: 'Spot' },
+                          ]}
+                          aria-label="Tipo documento"
+                          size="sm"
+                        />
+                      </div>
+                    )}
                 </div>
               </section>
 
@@ -536,21 +597,6 @@ export function QuoteCreatePage() {
                       size="sm"
                     />
                   </div>
-                  {state.quoteType === 'standard' && (
-                    <div className={styles.fieldRow}>
-                      <label className={styles.fieldLabel}>Tipo documento</label>
-                      <SegmentedControl<'TSC-ORDINE-RIC' | 'TSC-ORDINE'>
-                        value={state.document_type}
-                        onChange={v => update('document_type', v)}
-                        options={[
-                          { value: 'TSC-ORDINE-RIC', label: 'Ricorrente' },
-                          { value: 'TSC-ORDINE', label: 'Spot' },
-                        ]}
-                        aria-label="Tipo documento"
-                        size="sm"
-                      />
-                    </div>
-                  )}
                   {state.proposal_type === 'SOSTITUZIONE' && (
                     <div className={`${styles.fieldRow} ${styles.conditionalWrap}`}>
                       <label className={styles.fieldLabel}>Ordini da sostituire</label>
@@ -571,25 +617,9 @@ export function QuoteCreatePage() {
                 </div>
               </section>
 
-              {/* Gruppo: template + servizi/trial */}
+              {/* Gruppo: servizi (Standard) / trial (IaaS) */}
               <section className={styles.actBare}>
                 <div className={styles.actBody}>
-                  <div className={styles.fieldRow}>
-                    <label className={styles.fieldLabel}>Template</label>
-                    <SingleSelect<string>
-                      options={(templates ?? []).map(t => ({
-                        value: t.template_id,
-                        label: t.description,
-                      }))}
-                      selected={state.template || null}
-                      onChange={v => update('template', v ?? '')}
-                      placeholder={
-                        templates && templates.length === 0
-                          ? 'Nessun template disponibile'
-                          : '— Seleziona —'
-                      }
-                    />
-                  </div>
                   {state.quoteType === 'standard' && (
                     <div className={styles.fieldRow}>
                       <label className={styles.fieldLabel}>Servizi</label>

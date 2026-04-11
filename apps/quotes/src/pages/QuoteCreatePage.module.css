@@ -100,6 +100,29 @@
   border-bottom: none;
 }
 
+.commonRow {
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-end;
+}
+
+.ownerCell {
+  flex: 1;
+  min-width: 0;
+}
+
+.languageCell {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .commonRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+  }
+}
+
 .actEyebrow {
   font-size: 0.6875rem;
   font-weight: 700;
