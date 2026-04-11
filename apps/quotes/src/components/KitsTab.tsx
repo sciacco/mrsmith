@@ -70,9 +70,11 @@ export function KitsTab({ quoteId, documentType }: KitsTabProps) {
         <div className={styles.empty}>Nessun kit aggiunto. Clicca &quot;Aggiungi kit&quot; per iniziare.</div>
       )}
 
-      {showPicker && (
-        <KitPickerModal onSelect={handleAdd} onClose={() => setShowPicker(false)} />
-      )}
+      <KitPickerModal
+        open={showPicker}
+        onSelect={handleAdd}
+        onClose={() => setShowPicker(false)}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Icon, TabNav, type TabNavDotIndicator } from '@mrsmith/ui';
 import { useHSStatus, usePublishPrecheck, useQuote, useUpdateQuote } from '../api/queries';
 import type { Quote } from '../api/types';
 import { StatusBadge } from '../components/StatusBadge';
@@ -22,6 +23,12 @@ const tabs = [
 
 type TabKey = (typeof tabs)[number]['key'];
 
+const tabKeys: readonly TabKey[] = tabs.map(t => t.key);
+
+function isTabKey(value: string): value is TabKey {
+  return (tabKeys as readonly string[]).includes(value);
+}
+
 export function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const quoteId = Number(id);
@@ -36,6 +43,16 @@ export function QuoteDetailPage() {
   const [localQuote, setLocalQuote] = useState<Quote | null>(null);
   const [saveFlash, setSaveFlash] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
+
+  const dotIndicator = useMemo<Record<string, TabNavDotIndicator>>(
+    () => ({
+      header: dirtyTabs.header ? 'warning' : null,
+      kits: dirtyTabs.kits ? 'warning' : null,
+      notes: dirtyTabs.notes ? 'warning' : null,
+      contacts: dirtyTabs.contacts ? 'warning' : null,
+    }),
+    [dirtyTabs],
+  );
 
   // Sync server data to local state
   useEffect(() => {
@@ -89,8 +106,8 @@ export function QuoteDetailPage() {
     <div className={styles.page}>
       {/* Header bar */}
       <div className={styles.headerBar}>
-        <button className={styles.backBtn} onClick={() => navigate('/quotes')}>
-          &#x2190;
+        <button className={styles.backBtn} onClick={() => navigate('/quotes')} aria-label="Torna all'elenco">
+          <Icon name="arrow-left" size={20} />
         </button>
         <span className={styles.quoteNumber}>{localQuote.quote_number}</span>
         <StatusBadge status={localQuote.status} />
@@ -140,16 +157,12 @@ export function QuoteDetailPage() {
 
       {/* Tabs */}
       <div className={styles.tabs}>
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            className={`${styles.tab} ${activeTab === t.key ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab(t.key)}
-          >
-            {t.label}
-            {dirtyTabs[t.key] && <span className={styles.tabDot} />}
-          </button>
-        ))}
+        <TabNav
+          items={tabs.map(t => ({ key: t.key, label: t.label }))}
+          activeKey={activeTab}
+          onTabChange={(key) => { if (isTabKey(key)) setActiveTab(key); }}
+          dotIndicator={dotIndicator}
+        />
       </div>
 
       {/* Dirty banner */}
@@ -175,15 +188,14 @@ export function QuoteDetailPage() {
         )}
       </div>
 
-      {showPublish && (
-        <PublishModal
-          quoteId={quoteId}
-          isRepublish={!!hsStatus?.hs_quote_id}
-          hsStatus={hsStatus ?? null}
-          precheck={publishPrecheck.data ?? null}
-          onClose={() => setShowPublish(false)}
-        />
-      )}
+      <PublishModal
+        open={showPublish}
+        quoteId={quoteId}
+        isRepublish={!!hsStatus?.hs_quote_id}
+        hsStatus={hsStatus ?? null}
+        precheck={publishPrecheck.data ?? null}
+        onClose={() => setShowPublish(false)}
+      />
     </div>
   );
 }

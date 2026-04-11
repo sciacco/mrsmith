@@ -1,0 +1,25 @@
+{
+  "rules": {
+    "color-no-invalid-hex": true,
+    "declaration-property-value-disallowed-list": [
+      {
+        "/^color$/": ["/#[0-9a-fA-F]/"],
+        "/^background(-color)?$/": ["/#[0-9a-fA-F]/"],
+        "/^border(-color|-top-color|-right-color|-bottom-color|-left-color)?$/": ["/#[0-9a-fA-F]/"],
+        "/^outline(-color)?$/": ["/#[0-9a-fA-F]/"],
+        "/^fill$/": ["/#[0-9a-fA-F]/"],
+        "/^stroke$/": ["/#[0-9a-fA-F]/"],
+        "/^box-shadow$/": ["/#[0-9a-fA-F]/"]
+      },
+      {
+        "message": "Non usare hex letterali: usa i design token --color-* definiti in packages/ui/src/themes/clean.css"
+      }
+    ]
+  },
+  "ignoreFiles": [
+    "packages/ui/src/themes/**/*.css",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/*.tsbuildinfo"
+  ]
+}

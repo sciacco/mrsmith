@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Icon } from '@mrsmith/ui';
 import styles from './KebabMenu.module.css';
 
 interface KebabMenuProps {
@@ -33,7 +34,7 @@ export function KebabMenu({ quoteId, canDelete, onDelete, deleteDisabled = false
         onClick={e => { e.stopPropagation(); setOpen(!open); }}
         aria-label="Menu azioni"
       >
-        &#x22EE;
+        <Icon name="more-vertical" size={18} />
       </button>
       {open && (
         <div className={styles.menu}>

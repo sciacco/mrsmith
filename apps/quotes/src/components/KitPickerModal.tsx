@@ -1,18 +1,28 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
+import { Modal, SearchInput } from '@mrsmith/ui';
 import { useKits } from '../api/queries';
 import styles from './KitPickerModal.module.css';
 
 interface KitPickerModalProps {
+  open: boolean;
   onSelect: (kitId: number) => void;
   onClose: () => void;
 }
 
-export function KitPickerModal({ onSelect, onClose }: KitPickerModalProps) {
+export function KitPickerModal({ open, onSelect, onClose }: KitPickerModalProps) {
   const { data: kits } = useKits();
   const [search, setSearch] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    if (open) {
+      const id = window.setTimeout(() => {
+        searchWrapperRef.current?.querySelector('input')?.focus();
+      }, 60);
+      return () => window.clearTimeout(id);
+    }
+    setSearch('');
+  }, [open]);
 
   const filtered = useMemo(() => {
     if (!kits) return [];
@@ -20,11 +30,10 @@ export function KitPickerModal({ onSelect, onClose }: KitPickerModalProps) {
     const q = search.toLowerCase();
     return kits.filter(k =>
       k.internal_name.toLowerCase().includes(q) ||
-      (k.category_name?.toLowerCase().includes(q) ?? false)
+      (k.category_name?.toLowerCase().includes(q) ?? false),
     );
   }, [kits, search]);
 
-  // Group by category
   const grouped = useMemo(() => {
     const map = new Map<string, typeof filtered>();
     for (const k of filtered) {
@@ -37,40 +46,33 @@ export function KitPickerModal({ onSelect, onClose }: KitPickerModalProps) {
   }, [filtered]);
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.header}>
-          <span className={styles.title}>Aggiungi kit</span>
-          <button className={styles.closeBtn} onClick={onClose}>&times;</button>
-        </div>
-        <div className={styles.search}>
-          <input
-            ref={inputRef}
-            className={styles.searchInput}
-            placeholder="Cerca kit..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-        <div className={styles.list}>
-          {grouped.length === 0 && (
-            <div className={styles.kitItem}>Nessun kit selezionabile disponibile.</div>
-          )}
-          {grouped.map(([cat, items]) => (
-            <div key={cat}>
-              <div className={styles.category}>{cat}</div>
-              {items.map(k => (
-                <div key={k.id} className={styles.kitItem} onClick={() => { onSelect(k.id); onClose(); }}>
-                  <span>{k.internal_name}</span>
-                  <span className={styles.kitPrice}>
-                    NRC {k.nrc.toFixed(2)} / MRC {k.mrc.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+    <Modal open={open} onClose={onClose} title="Aggiungi kit" size="lg">
+      <div className={styles.search} ref={searchWrapperRef}>
+        <SearchInput value={search} onChange={setSearch} placeholder="Cerca kit..." />
       </div>
-    </div>
+      <div className={styles.list}>
+        {grouped.length === 0 && (
+          <div className={styles.empty}>Nessun kit selezionabile disponibile.</div>
+        )}
+        {grouped.map(([cat, items]) => (
+          <div key={cat}>
+            <div className={styles.category}>{cat}</div>
+            {items.map(k => (
+              <button
+                key={k.id}
+                type="button"
+                className={styles.kitItem}
+                onClick={() => { onSelect(k.id); onClose(); }}
+              >
+                <span className={styles.kitName}>{k.internal_name}</span>
+                <span className={styles.kitPrice}>
+                  NRC {k.nrc.toFixed(2)} / MRC {k.mrc.toFixed(2)}
+                </span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </Modal>
   );
 }

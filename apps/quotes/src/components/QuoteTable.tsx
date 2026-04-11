@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Skeleton } from '@mrsmith/ui';
 import type { Quote } from '../api/types';
 import { StatusBadge } from './StatusBadge';
 import { KebabMenu } from './KebabMenu';
@@ -69,34 +70,9 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
 
   if (isLoading) {
     return (
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th style={{ width: 4 }} />
-            <th>Numero</th>
-            <th>Data</th>
-            <th>Cliente</th>
-            <th>Deal</th>
-            <th>Owner</th>
-            <th>Stato</th>
-            <th style={{ width: 48 }} />
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: 8 }, (_, i) => (
-            <tr key={i} className={styles.skeletonRow}>
-              <td />
-              <td><div className={styles.cell}><span className={styles.skeleton} style={{ width: 100 }} /></div></td>
-              <td><div className={styles.cell}><span className={styles.skeleton} style={{ width: 80 }} /></div></td>
-              <td><div className={styles.cell}><span className={styles.skeleton} style={{ width: 140 }} /></div></td>
-              <td><div className={styles.cell}><span className={styles.skeleton} style={{ width: 120 }} /></div></td>
-              <td><div className={styles.cell}><span className={styles.skeleton} style={{ width: 60 }} /></div></td>
-              <td><div className={styles.cell}><span className={styles.skeleton} style={{ width: 80 }} /></div></td>
-              <td />
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className={styles.skeletonWrap}>
+        <Skeleton rows={8} />
+      </div>
     );
   }
 

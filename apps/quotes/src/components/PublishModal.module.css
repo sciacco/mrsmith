@@ -1,57 +1,36 @@
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  display: grid;
-  place-items: center;
-  z-index: 100;
-  animation: fadeIn 0.15s ease;
+.introText {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-6);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.modal {
-  background: #fff;
-  border-radius: 0.75rem;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
-  width: 90%;
-  max-width: 480px;
-  padding: 1.5rem;
-  animation: slideUp 0.2s ease;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(12px); opacity: 0; }
-  to   { transform: translateY(0); opacity: 1; }
-}
-
-.title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  margin-bottom: 1.25rem;
+.blockerBox {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  margin-bottom: var(--space-4);
 }
 
 .stepList {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
-  margin-bottom: 1.5rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
 }
 
 .step {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-3);
   font-size: 0.8125rem;
 }
 
 .stepIcon {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -61,13 +40,13 @@
 }
 
 .pending {
-  background: var(--color-surface-raised, #f1f5f9);
-  color: var(--color-text-muted, #94a3b8);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
 }
 
 .inProgress {
-  background: rgba(99, 91, 255, 0.12);
-  color: var(--color-accent, #635bff);
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
   animation: spin 1s linear infinite;
 }
 
@@ -76,74 +55,50 @@
 }
 
 .completed {
-  background: rgba(34, 197, 94, 0.12);
-  color: #16a34a;
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .error {
-  background: rgba(220, 38, 38, 0.12);
-  color: #dc2626;
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
 }
 
 .stepLabel {
-  color: var(--color-text, #1e293b);
+  color: var(--color-text);
 }
 
-.stepError {
-  color: #dc2626;
+.stepErrorInline {
+  color: var(--color-danger);
   font-size: 0.75rem;
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
+  margin-left: calc(24px + var(--space-3));
 }
 
 .actions {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   justify-content: flex-end;
-}
-
-.btn {
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btnPrimary {
-  composes: btn;
-  border: none;
-  background: var(--color-accent, #635bff);
-  color: #fff;
-}
-
-.btnPrimary:hover {
-  background: #4f46e5;
-}
-
-.btnSecondary {
-  composes: btn;
-  border: 1px solid var(--color-border, #e2e8f0);
-  background: #fff;
-  color: var(--color-text, #1e293b);
+  margin-top: var(--space-4);
 }
 
 .successIcon {
   width: 48px;
   height: 48px;
-  border-radius: 50%;
-  background: rgba(34, 197, 94, 0.12);
-  color: #16a34a;
+  border-radius: var(--radius-full);
+  background: var(--color-success-bg);
+  color: var(--color-success);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
-  margin: 0 auto 1rem;
+  margin: 0 auto var(--space-4);
 }
 
 .successText {
   text-align: center;
   font-size: 1rem;
   font-weight: 600;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-6);
+  color: var(--color-text);
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Icon } from '@mrsmith/ui';
 import type { DocumentType, QuoteRow } from '../api/types';
 import { useRowProducts } from '../api/queries';
 import { ProductGroupRadio } from './ProductGroupRadio';
@@ -65,8 +66,14 @@ export function KitAccordion({
       onDrop={e => onDrop?.(e, row.id)}
     >
       <div className={styles.header} onClick={() => setOpen(!open)}>
-        {draggable && <span className={styles.dragHandle}>&#x2630;</span>}
-        <span className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`}>&#x25B6;</span>
+        {draggable && (
+          <span className={styles.dragHandle} aria-label="Trascina per riordinare">
+            <Icon name="grip-vertical" size={16} />
+          </span>
+        )}
+        <span className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`}>
+          <Icon name="chevron-right" size={16} />
+        </span>
         <span className={styles.kitName}>{row.internal_name}</span>
         <div className={styles.totals}>
           <span>
@@ -82,8 +89,9 @@ export function KitAccordion({
           className={confirming ? styles.confirmBtn : styles.removeBtn}
           disabled={isDeleting}
           onClick={e => { e.stopPropagation(); handleRemove(); }}
+          aria-label="Rimuovi kit"
         >
-          {isDeleting ? '...' : confirming ? 'Conferma?' : '\u2715'}
+          {isDeleting ? '...' : confirming ? 'Conferma?' : <Icon name="x" size={16} />}
         </button>
       </div>
       {open && (

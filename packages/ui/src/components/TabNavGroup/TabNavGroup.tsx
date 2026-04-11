@@ -3,9 +3,11 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import type { TabNavItem } from '../TabNav/TabNav';
 import styles from './TabNavGroup.module.css';
 
+export type TabNavGroupItem = TabNavItem & { path: string };
+
 export interface TabGroup {
   label: string;
-  items: TabNavItem[];
+  items: TabNavGroupItem[];
 }
 
 interface TabNavGroupProps {

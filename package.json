@@ -16,9 +16,11 @@
     "build:frontend": "pnpm -r --if-present build",
     "build:backend": "cd backend && go build -o bin/server ./cmd/server",
     "test": "cd backend && go test ./... && pnpm -r --if-present test",
-    "lint": "cd backend && golangci-lint run && pnpm -r --if-present lint"
+    "lint": "cd backend && golangci-lint run && pnpm -r --if-present lint",
+    "lint:css": "stylelint \"apps/quotes/src/**/*.module.css\""
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "stylelint": "^16.12.0"
   }
 }

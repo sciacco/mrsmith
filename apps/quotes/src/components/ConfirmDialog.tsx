@@ -1,24 +1,32 @@
+import { Modal, Button } from '@mrsmith/ui';
 import styles from './ConfirmDialog.module.css';
 
 interface ConfirmDialogProps {
+  open: boolean;
   title: string;
   message: string;
   confirmLabel: string;
+  variant?: 'danger' | 'primary';
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel,
+  variant = 'danger',
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
   return (
-    <div className={styles.overlay} onClick={onCancel}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.title}>{title}</div>
-        <div className={styles.message}>{message}</div>
-        <div className={styles.actions}>
-          <button className={styles.btnCancel} onClick={onCancel}>Annulla</button>
-          <button className={styles.btnDanger} onClick={onConfirm}>{confirmLabel}</button>
-        </div>
+    <Modal open={open} onClose={onCancel} title={title} size="sm">
+      <p className={styles.message}>{message}</p>
+      <div className={styles.actions}>
+        <Button variant="ghost" onClick={onCancel}>Annulla</Button>
+        <Button variant={variant} onClick={onConfirm}>{confirmLabel}</Button>
       </div>
-    </div>
+    </Modal>
   );
 }

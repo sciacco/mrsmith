@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { MultiSelect, SingleSelect } from '@mrsmith/ui';
 import {
   useCategories,
   useCustomerOrders,
@@ -424,54 +425,42 @@ export function QuoteCreatePage() {
                 {state.proposal_type === 'SOSTITUZIONE' && (
                   <div className={styles.field}>
                     <label className={styles.label}>Ordini da sostituire</label>
-                    <select
-                      className={styles.input}
-                      multiple
-                      size={Math.min(6, Math.max(3, customerOrders.length))}
-                      value={state.replace_orders.split(';').map(s => s.trim()).filter(Boolean)}
-                      disabled={customerOrdersQuery.isPending || customerOrders.length === 0}
-                      onChange={e => {
-                        const chosen = Array.from(e.target.selectedOptions, o => o.value);
-                        update('replace_orders', chosen.join(';'));
-                      }}
-                    >
-                      {customerOrders.map(o => (
-                        <option key={o.name} value={o.name}>{o.name}</option>
-                      ))}
-                    </select>
-                    {!customerOrdersQuery.isPending && customerOrders.length === 0 && (
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                        Nessun ordine disponibile per il cliente.
-                      </div>
-                    )}
+                    <MultiSelect<string>
+                      options={customerOrders.map(o => ({ value: o.name, label: o.name }))}
+                      selected={state.replace_orders.split(';').map(s => s.trim()).filter(Boolean)}
+                      onChange={chosen => update('replace_orders', chosen.join(';'))}
+                      placeholder={
+                        customerOrdersQuery.isPending
+                          ? 'Caricamento ordini...'
+                          : customerOrders.length === 0
+                            ? 'Nessun ordine disponibile'
+                            : 'Seleziona ordini...'
+                      }
+                    />
                   </div>
                 )}
                 <div className={styles.field}>
                   <label className={styles.label}>Owner</label>
-                  <select className={styles.select} value={state.owner} onChange={e => update('owner', e.target.value)}>
-                    <option value="">— Seleziona —</option>
-                    {owners?.map(o => (
-                      <option key={o.id} value={o.id}>{[o.firstname, o.lastname].filter(Boolean).join(' ')}</option>
-                    ))}
-                  </select>
+                  <SingleSelect<string>
+                    options={(owners ?? []).map(o => ({
+                      value: String(o.id),
+                      label: [o.firstname, o.lastname].filter(Boolean).join(' '),
+                    }))}
+                    selected={state.owner || null}
+                    onChange={v => update('owner', v ?? '')}
+                    placeholder="— Seleziona —"
+                    allowClear
+                  />
                 </div>
                 {state.quoteType === 'standard' && (
                   <div className={styles.field}>
                     <label className={styles.label}>Servizi</label>
-                    <select
-                      className={styles.input}
-                      multiple
-                      size={Math.min(6, Math.max(3, categories?.length ?? 3))}
-                      value={selectedServiceIds}
-                      onChange={e => {
-                        const chosen = Array.from(e.target.selectedOptions, o => o.value);
-                        update('services', chosen.join(','));
-                      }}
-                    >
-                      {categories?.map(c => (
-                        <option key={c.id} value={String(c.id)}>{c.name}</option>
-                      ))}
-                    </select>
+                    <MultiSelect<number>
+                      options={(categories ?? []).map(c => ({ value: c.id, label: c.name }))}
+                      selected={selectedServiceIds.map(Number)}
+                      onChange={chosen => update('services', chosen.join(','))}
+                      placeholder="Seleziona servizi..."
+                    />
                   </div>
                 )}
                 {state.quoteType === 'iaas' && (
@@ -516,17 +505,20 @@ export function QuoteCreatePage() {
                 )}
                 <div className={styles.field}>
                   <label className={styles.label}>Template</label>
-                  <select className={styles.select} value={state.template} onChange={e => update('template', e.target.value)}>
-                    <option value="">— Seleziona —</option>
-                    {templates?.map(t => (
-                      <option key={t.template_id} value={t.template_id}>{t.description}</option>
-                    ))}
-                  </select>
-                  {templates && templates.length === 0 && (
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                      Nessun template disponibile per la combinazione selezionata.
-                    </div>
-                  )}
+                  <SingleSelect<string>
+                    options={(templates ?? []).map(t => ({
+                      value: t.template_id,
+                      label: t.description,
+                    }))}
+                    selected={state.template || null}
+                    onChange={v => update('template', v ?? '')}
+                    placeholder={
+                      templates && templates.length === 0
+                        ? 'Nessun template disponibile'
+                        : '— Seleziona —'
+                    }
+                    allowClear
+                  />
                 </div>
                 {state.quoteType === 'iaas' && (
                   <div className={styles.field}>
@@ -544,11 +536,15 @@ export function QuoteCreatePage() {
                 <div className={styles.sectionTitle}>Condizioni</div>
                 <div className={styles.field}>
                   <label className={styles.label}>Pagamento</label>
-                  <select className={styles.select} value={state.payment_method} onChange={e => update('payment_method', e.target.value)}>
-                    {paymentMethods?.map(pm => (
-                      <option key={pm.code} value={pm.code}>{pm.description}</option>
-                    ))}
-                  </select>
+                  <SingleSelect<string>
+                    options={(paymentMethods ?? []).map(pm => ({
+                      value: pm.code,
+                      label: pm.description,
+                    }))}
+                    selected={state.payment_method || null}
+                    onChange={v => update('payment_method', v ?? '')}
+                    placeholder="— Seleziona —"
+                  />
                 </div>
                 {state.quoteType === 'iaas' ? (
                   <div className={styles.field}>
@@ -558,18 +554,21 @@ export function QuoteCreatePage() {
                 ) : (
                   <div className={styles.field}>
                     <label className={styles.label}>Fatturazione canoni</label>
-                    <select
-                      className={styles.select}
-                      value={String(state.bill_months)}
-                      disabled={billingLocked}
-                      onChange={e => update('bill_months', Number(e.target.value))}
-                    >
-                      <option value="1">Mensile (1)</option>
-                      <option value="2">Bimestrale (2)</option>
-                      <option value="3">Trimestrale (3)</option>
-                      <option value="6">Semestrale (6)</option>
-                      <option value="12">Annuale (12)</option>
-                    </select>
+                    {billingLocked ? (
+                      <input className={styles.readOnly} readOnly value="Trimestrale (3)" />
+                    ) : (
+                      <SingleSelect<number>
+                        options={[
+                          { value: 1, label: 'Mensile (1)' },
+                          { value: 2, label: 'Bimestrale (2)' },
+                          { value: 3, label: 'Trimestrale (3)' },
+                          { value: 6, label: 'Semestrale (6)' },
+                          { value: 12, label: 'Annuale (12)' },
+                        ]}
+                        selected={state.bill_months}
+                        onChange={v => update('bill_months', v ?? 1)}
+                      />
+                    )}
                     {billingLocked && (
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
                         COLOCATION ricorrente: fatturazione trimestrale obbligatoria.

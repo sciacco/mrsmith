@@ -1,10 +1,17 @@
 export { AppShell } from './components/AppShell/AppShell';
 export { UserMenu } from './components/UserMenu/UserMenu';
 export { TabNav } from './components/TabNav/TabNav';
-export type { TabNavItem } from './components/TabNav/TabNav';
+export type { TabNavItem, TabNavDotIndicator } from './components/TabNav/TabNav';
 export { TabNavGroup } from './components/TabNavGroup/TabNavGroup';
 export type { TabGroup } from './components/TabNavGroup/TabNavGroup';
 export { Modal } from './components/Modal/Modal';
+export type { ModalSize } from './components/Modal/Modal';
+export { Button } from './components/Button/Button';
+export type { ButtonVariant, ButtonSize } from './components/Button/Button';
+export { Tooltip } from './components/Tooltip/Tooltip';
+export type { TooltipPlacement } from './components/Tooltip/Tooltip';
+export { Icon } from './components/Icon/Icon';
+export type { IconName } from './components/Icon/Icon';
 export { MultiSelect } from './components/MultiSelect/MultiSelect';
 export { SingleSelect } from './components/SingleSelect/SingleSelect';
 export { SearchInput } from './components/SearchInput/SearchInput';

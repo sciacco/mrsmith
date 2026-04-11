@@ -9,16 +9,58 @@
 .tab {
   display: flex;
   align-items: center;
+  gap: var(--space-2, 8px);
   padding: 0 var(--space-5, 20px);
+  font-family: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--color-text-muted, #94a3b8);
   text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
   transition: color var(--duration-normal, 250ms) var(--ease-out),
               background var(--duration-normal, 250ms) var(--ease-out);
   position: relative;
   border-radius: var(--radius-sm, 6px) var(--radius-sm, 6px) 0 0;
   letter-spacing: -0.01em;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full, 999px);
+  flex-shrink: 0;
+  animation: dotIn var(--duration-normal, 250ms) var(--ease-spring) both;
+}
+
+.dotWarning {
+  background: var(--color-warning, #f59e0b);
+}
+
+.dotDanger {
+  background: var(--color-danger, #ef4444);
+}
+
+@keyframes dotIn {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .tab:hover {

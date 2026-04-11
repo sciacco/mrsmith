@@ -64,6 +64,18 @@
   transform: rotate(90deg);
 }
 
+.sm {
+  max-width: 400px;
+}
+
+.md {
+  max-width: 480px;
+}
+
+.lg {
+  max-width: 640px;
+}
+
 .wide {
   max-width: 860px;
 }

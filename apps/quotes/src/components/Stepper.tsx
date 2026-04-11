@@ -1,3 +1,4 @@
+import { Icon } from '@mrsmith/ui';
 import styles from './Stepper.module.css';
 
 interface StepperProps {
@@ -22,7 +23,7 @@ export function Stepper({ steps, current, onStepClick }: StepperProps) {
               isCompleted ? styles.circleCompleted :
               isCurrent ? styles.circleCurrent : ''
             }`}>
-              {isCompleted ? '\u2713' : i + 1}
+              {isCompleted ? <Icon name="check" size={14} strokeWidth={2.5} /> : i + 1}
             </div>
             <span className={`${styles.label} ${isCurrent || isCompleted ? styles.labelActive : ''}`}>
               {label}

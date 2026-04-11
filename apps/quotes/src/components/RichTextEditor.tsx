@@ -2,6 +2,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import { useEffect } from 'react';
+import { Icon } from '@mrsmith/ui';
 import styles from './RichTextEditor.module.css';
 
 interface RichTextEditorProps {
@@ -64,24 +65,27 @@ export function RichTextEditor({ value, onChange, disabled }: RichTextEditorProp
           className={`${styles.toolBtn} ${editor.isActive('bulletList') ? styles.toolBtnActive : ''}`}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           title="Elenco puntato"
+          aria-label="Elenco puntato"
         >
-          &#x2022;
+          <Icon name="list" size={16} />
         </button>
         <button
           type="button"
           className={`${styles.toolBtn} ${editor.isActive('orderedList') ? styles.toolBtnActive : ''}`}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           title="Elenco numerato"
+          aria-label="Elenco numerato"
         >
-          1.
+          <Icon name="list-ordered" size={16} />
         </button>
         <button
           type="button"
           className={styles.toolBtn}
           onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}
           title="Cancella formattazione"
+          aria-label="Cancella formattazione"
         >
-          &#x2715;
+          <Icon name="remove-formatting" size={16} />
         </button>
       </div>
       <EditorContent editor={editor} className={styles.editor} />

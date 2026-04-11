@@ -1,11 +1,19 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
+import { Modal, Button, Icon } from '@mrsmith/ui';
 import { usePublishQuote } from '../api/queries';
 import type { HSStatus, PublishPrecheck } from '../api/types';
 import styles from './PublishModal.module.css';
 
-const stepNames = ['Salvataggio dati', 'Validazione prodotti', 'Offerta HubSpot', 'Sincronizzazione prodotti', 'Aggiornamento stato'];
+const stepNames = [
+  'Salvataggio dati',
+  'Validazione prodotti',
+  'Offerta HubSpot',
+  'Sincronizzazione prodotti',
+  'Aggiornamento stato',
+];
 
 interface PublishModalProps {
+  open: boolean;
   quoteId: number;
   isRepublish: boolean;
   hsStatus: HSStatus | null;
@@ -15,7 +23,14 @@ interface PublishModalProps {
 
 type ModalState = 'confirm' | 'progress' | 'success' | 'error';
 
-export function PublishModal({ quoteId, isRepublish, hsStatus, precheck, onClose }: PublishModalProps) {
+export function PublishModal({
+  open,
+  quoteId,
+  isRepublish,
+  hsStatus,
+  precheck,
+  onClose,
+}: PublishModalProps) {
   const [modalState, setModalState] = useState<ModalState>('confirm');
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [errorStep, setErrorStep] = useState<{ step: number; message: string } | null>(null);
@@ -30,9 +45,7 @@ export function PublishModal({ quoteId, isRepublish, hsStatus, precheck, onClose
   }
 
   const handlePublish = useCallback(async () => {
-    if (blockers.length > 0) {
-      return;
-    }
+    if (blockers.length > 0) return;
     setModalState('progress');
     setCompletedSteps([]);
     setErrorStep(null);
@@ -57,87 +70,108 @@ export function PublishModal({ quoteId, isRepublish, hsStatus, precheck, onClose
     }
   }, [blockers.length, quoteId, publishQuote]);
 
-  if (modalState === 'confirm') {
-    return (
-      <div className={styles.overlay} onClick={onClose}>
-        <div className={styles.modal} onClick={e => e.stopPropagation()}>
-          <div className={styles.title}>
-            {isRepublish ? 'Ripubblica su HubSpot' : 'Pubblica su HubSpot'}
-          </div>
-          <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1.5rem' }}>
+  const handleClose = useCallback(() => {
+    setModalState('confirm');
+    setCompletedSteps([]);
+    setErrorStep(null);
+    onClose();
+  }, [onClose]);
+
+  const title =
+    modalState === 'confirm'
+      ? isRepublish
+        ? 'Ripubblica su HubSpot'
+        : 'Pubblica su HubSpot'
+      : modalState === 'progress'
+        ? 'Pubblicazione in corso...'
+        : modalState === 'error'
+          ? 'Errore durante la pubblicazione'
+          : 'Pubblicazione completata';
+
+  const dismissible = modalState !== 'progress';
+
+  return (
+    <Modal open={open} onClose={handleClose} title={title} size="md" dismissible={dismissible}>
+      {modalState === 'confirm' && (
+        <>
+          <p className={styles.introText}>
             La proposta verrà sincronizzata con HubSpot. Questo processo include validazione, creazione offerta e sincronizzazione prodotti.
           </p>
           {blockers.length > 0 && (
-            <div className={styles.stepError} style={{ marginBottom: '1rem' }}>
-              {blockers.join(' ')}
-            </div>
+            <div className={styles.blockerBox}>{blockers.join(' ')}</div>
           )}
           <div className={styles.actions}>
-            <button className={styles.btnSecondary} onClick={onClose}>Annulla</button>
-            <button className={styles.btnPrimary} disabled={blockers.length > 0} onClick={() => void handlePublish()}>
+            <Button variant="ghost" onClick={handleClose}>Annulla</Button>
+            <Button
+              variant="primary"
+              disabled={blockers.length > 0}
+              onClick={() => void handlePublish()}
+            >
               Pubblica
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
-    );
-  }
+        </>
+      )}
 
-  if (modalState === 'success') {
-    return (
-      <div className={styles.overlay}>
-        <div className={styles.modal}>
-          <div className={styles.successIcon}>{'\u2713'}</div>
+      {modalState === 'success' && (
+        <>
+          <div className={styles.successIcon}>
+            <Icon name="check" size={32} strokeWidth={2.5} />
+          </div>
           <div className={styles.successText}>Pubblicazione completata</div>
           <div className={styles.actions}>
-            <button className={styles.btnSecondary} onClick={onClose}>Chiudi</button>
+            <Button variant="primary" onClick={handleClose}>Chiudi</Button>
           </div>
-        </div>
-      </div>
-    );
-  }
+        </>
+      )}
 
-  return (
-    <div className={styles.overlay}>
-      <div className={styles.modal}>
-        <div className={styles.title}>
-          {modalState === 'error' ? 'Errore durante la pubblicazione' : 'Pubblicazione in corso...'}
-        </div>
-        <div className={styles.stepList}>
-          {stepNames.map((name, i) => {
-            const stepNum = i + 1;
-            const isCompleted = completedSteps.includes(stepNum);
-            const isError = errorStep?.step === stepNum;
-            const isCurrent = !isCompleted && !isError && stepNum === Math.max(...completedSteps, 0) + 1 && modalState === 'progress';
+      {(modalState === 'progress' || modalState === 'error') && (
+        <>
+          <div className={styles.stepList}>
+            {stepNames.map((name, i) => {
+              const stepNum = i + 1;
+              const isCompleted = completedSteps.includes(stepNum);
+              const isError = errorStep?.step === stepNum;
+              const isCurrent =
+                !isCompleted &&
+                !isError &&
+                stepNum === Math.max(...completedSteps, 0) + 1 &&
+                modalState === 'progress';
 
-            let iconClass = styles.pending ?? '';
-            let icon = String(stepNum);
-            if (isCompleted) { iconClass = styles.completed ?? ''; icon = '\u2713'; }
-            else if (isError) { iconClass = styles.error ?? ''; icon = '\u2717'; }
-            else if (isCurrent) { iconClass = styles.inProgress ?? ''; icon = '\u25CF'; }
+              let iconClass = styles.pending ?? '';
+              let icon: ReactNode = String(stepNum);
+              if (isCompleted) {
+                iconClass = styles.completed ?? '';
+                icon = <Icon name="check" size={14} strokeWidth={2.5} />;
+              } else if (isError) {
+                iconClass = styles.error ?? '';
+                icon = <Icon name="x" size={14} strokeWidth={2.5} />;
+              } else if (isCurrent) {
+                iconClass = styles.inProgress ?? '';
+                icon = <Icon name="loader" size={14} strokeWidth={2.5} />;
+              }
 
-            return (
-              <div key={i}>
-                <div className={styles.step}>
-                  <span className={`${styles.stepIcon} ${iconClass}`}>{icon}</span>
-                  <span className={styles.stepLabel}>{name}</span>
-                </div>
-                {isError && errorStep && (
-                  <div className={styles.stepError} style={{ marginLeft: '2.5rem' }}>
-                    {errorStep.message}
+              return (
+                <div key={i}>
+                  <div className={styles.step}>
+                    <span className={`${styles.stepIcon} ${iconClass}`}>{icon}</span>
+                    <span className={styles.stepLabel}>{name}</span>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {modalState === 'error' && (
-          <div className={styles.actions}>
-            <button className={styles.btnSecondary} onClick={onClose}>Chiudi</button>
-            <button className={styles.btnPrimary} onClick={() => void handlePublish()}>Riprova</button>
+                  {isError && errorStep && (
+                    <div className={styles.stepErrorInline}>{errorStep.message}</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )}
-      </div>
-    </div>
+          {modalState === 'error' && (
+            <div className={styles.actions}>
+              <Button variant="ghost" onClick={handleClose}>Chiudi</Button>
+              <Button variant="primary" onClick={() => void handlePublish()}>Riprova</Button>
+            </div>
+          )}
+        </>
+      )}
+    </Modal>
   );
 }

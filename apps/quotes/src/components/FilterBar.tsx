@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { SearchInput } from '@mrsmith/ui';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { useOwners } from '../api/queries';
 import styles from './FilterBar.module.css';
@@ -101,13 +102,10 @@ export function FilterBar() {
         </div>
 
         <div className={styles.searchWrap}>
-          <span className={styles.searchIcon}>&#x1F50D;</span>
-          <input
-            className={styles.searchInput}
-            type="text"
-            placeholder="Cerca proposte..."
+          <SearchInput
             value={searchValue}
-            onChange={e => handleSearch(e.target.value)}
+            onChange={handleSearch}
+            placeholder="Cerca proposte..."
           />
         </div>
 
