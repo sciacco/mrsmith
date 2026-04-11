@@ -210,6 +210,18 @@
   gap: var(--space-3);
 }
 
+.tileDuoLeft {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 220px));
+  gap: var(--space-3);
+}
+
+@media (max-width: 480px) {
+  .tileDuoLeft {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 560px) {
   .tileTrio {
     grid-template-columns: 1fr;

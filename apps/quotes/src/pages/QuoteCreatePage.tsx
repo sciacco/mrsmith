@@ -20,7 +20,6 @@ import { CollapsibleSection } from '../components/CollapsibleSection';
 import { ContactCard, type ContactFields } from '../components/ContactCard';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { KitPickerModal } from '../components/KitPickerModal';
-import { TrialSlider } from '../components/TrialSlider';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { TemplatePicker } from '../components/TemplatePicker';
 import { buildIaaSTrialText, getLanguageCode, getIaaSTemplateRule } from '../utils/quoteRules';
@@ -600,10 +599,10 @@ export function QuoteCreatePage() {
                 </div>
               </section>
 
-              {/* Gruppo: servizi (Standard) / trial (IaaS) */}
-              <section className={styles.actBare}>
-                <div className={styles.actBody}>
-                  {state.quoteType === 'standard' && (
+              {/* Gruppo: servizi (solo Standard) */}
+              {state.quoteType === 'standard' && (
+                <section className={styles.actBare}>
+                  <div className={styles.actBody}>
                     <div className={styles.fieldRow}>
                       <label className={styles.fieldLabel}>Servizi</label>
                       <MultiSelect<number>
@@ -613,24 +612,9 @@ export function QuoteCreatePage() {
                         placeholder="Seleziona servizi..."
                       />
                     </div>
-                  )}
-                  {state.quoteType === 'iaas' && (
-                    <div className={`${styles.fieldRow} ${styles.conditionalWrap}`}>
-                      <label className={styles.fieldLabel}>Trial</label>
-                      <TrialSlider
-                        value={state.trial_value}
-                        onChange={v => update('trial_value', v)}
-                        aria-label="Trial"
-                      />
-                      {state.trial && (
-                        <div className={styles.hint} style={{ marginTop: 8 }}>
-                          {state.trial}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </section>
+                  </div>
+                </section>
+              )}
 
               {/* Gruppo: condizioni economiche */}
               <section className={styles.actBare}>
@@ -753,7 +737,7 @@ export function QuoteCreatePage() {
                           </div>
                         </div>
                       </div>
-                      <div className={styles.tileTrioSingle}>
+                      <div className={styles.tileDuoLeft}>
                         <div className={styles.numberTile}>
                           <div className={styles.numberTileLabel}>Consegna</div>
                           <div>
@@ -769,7 +753,27 @@ export function QuoteCreatePage() {
                             <span className={styles.numberTileSuffix}>giorni</span>
                           </div>
                         </div>
+                        <div className={styles.numberTile}>
+                          <div className={styles.numberTileLabel}>Trial</div>
+                          <div>
+                            <input
+                              className={styles.numberTileInput}
+                              type="number"
+                              min={0}
+                              max={200}
+                              step={10}
+                              value={state.trial_value}
+                              onChange={e =>
+                                update('trial_value', Number(e.target.value))
+                              }
+                            />
+                            <span className={styles.numberTileSuffix}>euro</span>
+                          </div>
+                        </div>
                       </div>
+                      {state.trial && (
+                        <div className={styles.hint}>{state.trial}</div>
+                      )}
                     </>
                   )}
                 </div>
