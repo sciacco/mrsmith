@@ -1,6 +1,13 @@
+import { useMemo } from 'react';
 import type { Quote } from '../api/types';
-import { useCustomerOrders, useOwners, usePaymentMethods } from '../api/queries';
-import { isIaaSTemplate, parseReplaceOrders } from '../utils/quoteRules';
+import {
+  useCategories,
+  useCustomerOrders,
+  useOwners,
+  usePaymentMethods,
+  useTemplates,
+} from '../api/queries';
+import { isIaaSTemplate, parseReplaceOrders, parseServiceCategoryIds } from '../utils/quoteRules';
 import styles from './HeaderTab.module.css';
 
 interface HeaderTabProps {
@@ -11,6 +18,8 @@ interface HeaderTabProps {
 export function HeaderTab({ quote, onChange }: HeaderTabProps) {
   const { data: owners } = useOwners();
   const { data: paymentMethods } = usePaymentMethods();
+  const categoriesQuery = useCategories();
+  const templatesQuery = useTemplates();
   const customerIdStr = quote.customer_id != null ? String(quote.customer_id) : null;
   const customerOrdersQuery = useCustomerOrders(customerIdStr);
   const customerOrders = customerOrdersQuery.data ?? [];
@@ -20,6 +29,35 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
 
   const isIaaS = isIaaSTemplate(quote.template);
   const isSpot = quote.document_type === 'TSC-ORDINE';
+  const categoryNameById = useMemo(
+    () => new Map((categoriesQuery.data ?? []).map(category => [String(category.id), category.name])),
+    [categoriesQuery.data]
+  );
+  const templateDescriptionById = useMemo(
+    () => new Map((templatesQuery.data ?? []).map(template => [template.template_id, template.description])),
+    [templatesQuery.data]
+  );
+  const servicesLabel = useMemo(() => {
+    const serviceIds = parseServiceCategoryIds(quote.services);
+    if (serviceIds.length === 0) {
+      return '—';
+    }
+    if (categoriesQuery.isPending) {
+      return 'Risoluzione...';
+    }
+    return serviceIds
+      .map(serviceId => categoryNameById.get(serviceId) ?? `ID ${serviceId} non trovato`)
+      .join(', ');
+  }, [categoryNameById, categoriesQuery.isPending, quote.services]);
+  const templateLabel = useMemo(() => {
+    if (!quote.template) {
+      return '—';
+    }
+    if (templatesQuery.isPending) {
+      return 'Risoluzione...';
+    }
+    return templateDescriptionById.get(quote.template) ?? `Template non risolto (${quote.template})`;
+  }, [quote.template, templateDescriptionById, templatesQuery.isPending]);
 
   return (
     <div className={styles.grid}>
@@ -200,11 +238,11 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
         <div className={styles.sectionTitle}>Servizi e Template</div>
         <div className={styles.field}>
           <label className={styles.label}>Servizi</label>
-          <input className={styles.readOnly} readOnly value={quote.services ?? '—'} />
+          <input className={styles.readOnly} readOnly value={servicesLabel} />
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Template</label>
-          <input className={styles.readOnly} readOnly value={quote.template ?? '—'} />
+          <input className={styles.readOnly} readOnly value={templateLabel} />
         </div>
       </div>
     </div>
