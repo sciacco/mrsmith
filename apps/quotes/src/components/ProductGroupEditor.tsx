@@ -1,6 +1,5 @@
-import { useId } from 'react';
-import { Icon } from '@mrsmith/ui';
-import type { DocumentType, ProductGroup } from '../api/types';
+import { useId, type ReactNode } from 'react';
+import type { DocumentType, ProductGroup, ProductVariant } from '../api/types';
 import type { KitEditorForm } from '../hooks/useKitEditorForm';
 import styles from './ProductGroupEditor.module.css';
 
@@ -11,132 +10,234 @@ interface ProductGroupEditorProps {
   isMissing: boolean;
 }
 
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[()[\],.\-_/]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isRedundant(groupName: string, variantName: string): boolean {
+  const g = normalize(groupName);
+  const v = normalize(variantName);
+  if (!g || !v) return false;
+  return g === v || g.includes(v) || v.includes(g);
+}
+
+function formatPrice(value: number): string {
+  return value.toFixed(2);
+}
+
 export function ProductGroupEditor({ group, documentType, form, isMissing }: ProductGroupEditorProps) {
   const uid = useId();
-  const isSpot = documentType === 'TSC-ORDINE';
   const radioName = `group-${uid}`;
+  const isSpot = documentType === 'TSC-ORDINE';
+
+  const onlyVariant: ProductVariant | null =
+    group.products.length === 1 ? group.products[0] ?? null : null;
+  const flatCollapsed =
+    onlyVariant !== null &&
+    !group.required &&
+    isRedundant(group.group_name, onlyVariant.product_name);
 
   const noneSelected = !group.products.some(p => form.state.get(p.id)?.included);
-  // Single-variant optional groups collapse the "Non incluso" row into a single checkbox.
-  const singleCheckbox = group.products.length === 1 && !group.required;
+
+  if (flatCollapsed && onlyVariant) {
+    return (
+      <ProductRow
+        variant={onlyVariant}
+        form={form}
+        groupName={group.group_name}
+        controlType="checkbox"
+        isSpot={isSpot}
+        isMissing={false}
+      />
+    );
+  }
 
   return (
     <section
-      className={`${styles.group} ${isMissing ? styles.missing : ''}`}
+      className={`${styles.section} ${isMissing ? styles.sectionMissing : ''}`}
       aria-labelledby={`${uid}-title`}
     >
-      <header className={styles.header}>
-        <h3 id={`${uid}-title`} className={styles.title}>
+      <header className={styles.eyebrow}>
+        <span id={`${uid}-title`} className={styles.eyebrowName}>
           {group.group_name}
-        </h3>
-        <div className={styles.badges}>
-          {group.required && <span className={styles.badgeRequired}>Obbligatorio</span>}
-          {isMissing && (
-            <span className={styles.badgeMissing}>
-              <Icon name="triangle-alert" size={12} /> Selezione richiesta
-            </span>
-          )}
-        </div>
+        </span>
+        {group.required && <span className={styles.eyebrowMeta}>· Obbligatorio</span>}
+        {isMissing && <span className={styles.eyebrowMissing}>· Selezione richiesta</span>}
       </header>
 
-      <ul className={styles.variants}>
-        {!group.required && !singleCheckbox && (
-          <li className={`${styles.variant} ${noneSelected ? styles.variantActive : ''}`}>
-            <label className={styles.variantHead}>
-              <input
-                type="radio"
-                className={styles.radio}
-                name={radioName}
-                checked={noneSelected}
-                onChange={() => form.setIncludedForGroup(group.group_name, null)}
-              />
-              <span className={styles.variantName}>Non incluso</span>
-            </label>
-          </li>
+      <div className={styles.sectionRows}>
+        {!group.required && (
+          <NoneRow
+            checked={noneSelected}
+            name={radioName}
+            onSelect={() => form.setIncludedForGroup(group.group_name, null)}
+          />
         )}
-
-        {group.products.map(p => {
-          const entry = form.state.get(p.id);
-          if (!entry) return null;
-          const active = entry.included;
-          return (
-            <li
-              key={p.id}
-              className={`${styles.variant} ${active ? styles.variantActive : styles.variantDimmed}`}
-            >
-              <label className={styles.variantHead}>
-                <input
-                  type={singleCheckbox ? 'checkbox' : 'radio'}
-                  className={styles.radio}
-                  name={singleCheckbox ? undefined : radioName}
-                  checked={active}
-                  onChange={() =>
-                    form.setIncludedForGroup(group.group_name, active ? null : p.id)
-                  }
-                />
-                <div className={styles.variantInfo}>
-                  <span className={styles.variantName}>{p.product_name}</span>
-                  <span className={styles.variantCode}>{p.product_code}</span>
-                </div>
-              </label>
-
-              {active && (
-                <div className={styles.fields}>
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Quantità</label>
-                    <input
-                      type="number"
-                      className={styles.input}
-                      min={p.minimum > 0 ? p.minimum : 0}
-                      max={p.maximum || undefined}
-                      value={entry.quantity}
-                      onChange={e => form.setProductField(p.id, 'quantity', Number(e.target.value))}
-                    />
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel}>NRC</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={styles.input}
-                      value={entry.nrc}
-                      onChange={e => form.setProductField(p.id, 'nrc', Number(e.target.value))}
-                    />
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel}>MRC</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={`${styles.input} ${isSpot ? styles.inputDisabled : ''}`}
-                      value={isSpot ? 0 : entry.mrc}
-                      disabled={isSpot}
-                      onChange={e => form.setProductField(p.id, 'mrc', Number(e.target.value))}
-                      title={isSpot ? 'MRC non disponibile per ordini spot' : undefined}
-                    />
-                  </div>
-                  <div className={`${styles.field} ${styles.fieldFull}`}>
-                    <label className={styles.fieldLabel}>Descrizione aggiuntiva</label>
-                    <textarea
-                      className={styles.textarea}
-                      rows={2}
-                      placeholder="Personalizza la descrizione per questo cliente…"
-                      value={entry.extended_description ?? ''}
-                      onChange={e =>
-                        form.setProductField(
-                          p.id,
-                          'extended_description',
-                          e.target.value === '' ? null : e.target.value,
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+        {group.products.map(p => (
+          <ProductRow
+            key={p.id}
+            variant={p}
+            form={form}
+            groupName={group.group_name}
+            controlType="radio"
+            radioName={radioName}
+            isSpot={isSpot}
+            isMissing={isMissing}
+          />
+        ))}
+      </div>
     </section>
+  );
+}
+
+interface NoneRowProps {
+  checked: boolean;
+  name: string;
+  onSelect: () => void;
+}
+
+function NoneRow({ checked, name, onSelect }: NoneRowProps) {
+  return (
+    <label className={`${styles.row} ${styles.rowNone} ${checked ? styles.rowActive : ''}`}>
+      <input
+        type="radio"
+        className={styles.control}
+        name={name}
+        checked={checked}
+        onChange={onSelect}
+      />
+      <span className={styles.noneLabel}>Non incluso</span>
+    </label>
+  );
+}
+
+interface ProductRowProps {
+  variant: ProductVariant;
+  form: KitEditorForm;
+  groupName: string;
+  controlType: 'checkbox' | 'radio';
+  radioName?: string;
+  isSpot: boolean;
+  isMissing: boolean;
+}
+
+function ProductRow({
+  variant,
+  form,
+  groupName,
+  controlType,
+  radioName,
+  isSpot,
+  isMissing,
+}: ProductRowProps) {
+  const entry = form.state.get(variant.id);
+  if (!entry) return null;
+  const active = entry.included;
+  const displayMrc = isSpot ? 0 : variant.mrc;
+
+  const handleToggle = () => {
+    if (controlType === 'checkbox') {
+      form.setIncludedForGroup(groupName, active ? null : variant.id);
+    } else {
+      form.setIncludedForGroup(groupName, variant.id);
+    }
+  };
+
+  return (
+    <div
+      className={`${styles.row} ${active ? styles.rowActive : ''} ${isMissing ? styles.rowMissing : ''}`}
+    >
+      <label className={styles.rowMain}>
+        <input
+          type={controlType}
+          className={styles.control}
+          name={controlType === 'radio' ? radioName : undefined}
+          checked={active}
+          onChange={handleToggle}
+        />
+        <div className={styles.nameCell}>
+          <span className={styles.name}>{variant.product_name}</span>
+          <span className={styles.code}>{variant.product_code}</span>
+        </div>
+        <div className={styles.prices}>
+          <PriceSlot label="NRC" value={variant.nrc} dimmed={!active} />
+          <PriceSlot label="MRC" value={displayMrc} dimmed={!active} />
+        </div>
+      </label>
+
+      {active && (
+        <div className={styles.expand}>
+          <div className={styles.fields}>
+            <Field label="Quantità">
+              <input
+                type="number"
+                className={styles.input}
+                min={variant.minimum > 0 ? variant.minimum : 0}
+                max={variant.maximum || undefined}
+                value={entry.quantity}
+                onChange={e => form.setProductField(variant.id, 'quantity', Number(e.target.value))}
+              />
+            </Field>
+            <Field label="NRC">
+              <input
+                type="number"
+                step="0.01"
+                className={styles.input}
+                value={entry.nrc}
+                onChange={e => form.setProductField(variant.id, 'nrc', Number(e.target.value))}
+              />
+            </Field>
+            <Field label="MRC">
+              <input
+                type="number"
+                step="0.01"
+                className={`${styles.input} ${isSpot ? styles.inputDisabled : ''}`}
+                value={isSpot ? 0 : entry.mrc}
+                disabled={isSpot}
+                onChange={e => form.setProductField(variant.id, 'mrc', Number(e.target.value))}
+                title={isSpot ? 'MRC non disponibile per ordini spot' : undefined}
+              />
+            </Field>
+          </div>
+          <Field label="Descrizione aggiuntiva">
+            <textarea
+              className={styles.textarea}
+              rows={2}
+              placeholder="Personalizza la descrizione per questo cliente…"
+              value={entry.extended_description ?? ''}
+              onChange={e =>
+                form.setProductField(
+                  variant.id,
+                  'extended_description',
+                  e.target.value === '' ? null : e.target.value,
+                )
+              }
+            />
+          </Field>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className={styles.field}>
+      <span className={styles.fieldLabel}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function PriceSlot({ label, value, dimmed }: { label: string; value: number; dimmed: boolean }) {
+  return (
+    <span className={`${styles.priceSlot} ${dimmed ? styles.priceDimmed : ''}`}>
+      <span className={styles.priceLabel}>{label}</span>
+      <span className={styles.priceValue}>{formatPrice(value)}</span>
+    </span>
   );
 }

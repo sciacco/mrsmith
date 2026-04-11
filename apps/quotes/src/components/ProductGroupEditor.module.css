@@ -1,146 +1,191 @@
-.group {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated);
-  padding: var(--space-4) var(--space-5);
+.section {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-1);
+  padding-top: var(--space-3);
 }
 
-.group.missing {
-  border-color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 5%, var(--color-bg-elevated));
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.title {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.badges {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-.badgeRequired {
-  font-size: 0.625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill, 999px);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-}
-
-.badgeMissing {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill, 999px);
-  background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+.sectionMissing .eyebrowName {
   color: var(--color-danger);
 }
 
-.variants {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.eyebrow {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 0 var(--space-1);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
 }
 
-.variant {
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  transition: background var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out);
-}
-
-.variantDimmed {
-  opacity: 0.55;
-}
-
-.variantDimmed:hover {
-  opacity: 1;
-}
-
-.variantActive {
-  border-color: var(--color-accent-muted);
-  background: var(--color-accent-subtle);
-}
-
-.variantHead {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  cursor: pointer;
-  user-select: none;
-}
-
-.radio {
-  accent-color: var(--color-accent);
-  cursor: pointer;
-}
-
-.variantInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.variantName {
-  font-size: 0.875rem;
-  font-weight: 600;
+.eyebrowName {
   color: var(--color-text);
 }
 
-.variantCode {
+.eyebrowMeta {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.eyebrowMissing {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.sectionRows {
+  display: flex;
+  flex-direction: column;
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--color-border-subtle);
+  margin-left: 2px;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px dashed var(--color-border-subtle);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rowMain {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  cursor: pointer;
+  user-select: none;
+  min-height: 40px;
+}
+
+.row:hover {
+  background: var(--color-surface-hover);
+}
+
+.rowActive {
+  background: var(--color-accent-subtle);
+}
+
+.rowActive:hover {
+  background: var(--color-accent-subtle);
+}
+
+.rowNone {
+  min-height: 32px;
+}
+
+.rowNone .rowMain {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3) var(--space-1) 0;
+  grid-template-columns: 22px 1fr;
+}
+
+.rowMissing {
+  background: color-mix(in srgb, var(--color-danger) 5%, transparent);
+}
+
+.control {
+  accent-color: var(--color-accent);
+  cursor: pointer;
+  justify-self: center;
+}
+
+.nameCell {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.code {
   font-size: 0.6875rem;
   font-family: var(--font-mono);
   color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.noneLabel {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.prices {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+}
+
+.priceSlot {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.priceLabel {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.priceValue {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  min-width: 56px;
+  text-align: right;
+}
+
+.priceDimmed .priceValue {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.expand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-3) calc(22px + var(--space-3));
+  border-top: 1px dashed var(--color-border-subtle);
+  animation: expandIn var(--duration-fast) var(--ease-out) both;
+}
+
+@keyframes expandIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .fields {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-3);
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px dashed var(--color-border-subtle);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 4px;
   min-width: 0;
-}
-
-.fieldFull {
-  grid-column: 1 / -1;
 }
 
 .fieldLabel {
@@ -161,6 +206,7 @@
   color: var(--color-text);
   outline: none;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   transition: border-color var(--duration-fast) var(--ease-out);
 }
 
@@ -186,7 +232,7 @@
   color: var(--color-text);
   outline: none;
   resize: vertical;
-  min-height: 56px;
+  min-height: 52px;
   transition: border-color var(--duration-fast) var(--ease-out);
 }
 
