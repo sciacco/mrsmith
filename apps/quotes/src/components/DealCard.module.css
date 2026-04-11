@@ -1,37 +1,43 @@
 .card {
-  padding: 1rem 1.25rem;
-  border: 2px solid var(--color-border, #e2e8f0);
-  border-radius: 0.75rem;
+  padding: var(--space-4) var(--space-5);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all 0.15s ease;
-  background: #fff;
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
 }
 
 .card:hover {
-  border-color: rgba(99, 91, 255, 0.3);
-  box-shadow: 0 2px 8px rgba(99, 91, 255, 0.06);
+  border-color: var(--color-accent-muted);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .selected {
-  border-color: var(--color-accent, #635bff);
-  box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.08);
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
 .dealName {
   font-weight: 600;
   font-size: 0.875rem;
-  color: var(--color-text, #1e293b);
-  margin-bottom: 0.25rem;
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
 }
 
 .company {
   font-size: 0.8125rem;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .amount {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: var(--color-text-muted, #64748b);
-  margin-top: 0.25rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
 }

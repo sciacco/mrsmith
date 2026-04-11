@@ -1,7 +1,7 @@
 .group {
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .group:last-child {
@@ -14,43 +14,45 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-muted, #64748b);
-  margin-bottom: 0.5rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
 }
 
 .required {
-  border-left: 3px solid #dc2626;
-  padding-left: 0.625rem;
+  border-left: 3px solid var(--color-danger);
+  padding-left: var(--space-3);
 }
 
 .variant {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
   font-size: 0.8125rem;
 }
 
 .variantName {
   flex: 1;
-  color: var(--color-text, #1e293b);
+  color: var(--color-text);
 }
 
 .variantPrice {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .qtyInput {
   width: 3.5rem;
-  padding: 0.25rem 0.375rem;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 0.25rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
   text-align: center;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
 }
 
 .radioInput {
-  accent-color: var(--color-accent, #635bff);
+  accent-color: var(--color-accent);
 }

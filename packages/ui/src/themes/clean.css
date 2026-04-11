@@ -13,6 +13,7 @@
   --color-text-secondary: #334155;
   --color-text-muted: #94a3b8;
   --color-text-faint: #cbd5e1;
+  --color-text-on-accent: #ffffff;
 
   /* ── Accent (Indigo) ── */
   --color-accent: #635bff;
@@ -23,11 +24,15 @@
 
   /* ── Semantic ── */
   --color-success: #10b981;
+  --color-success-strong: #15803d;
   --color-success-bg: #ecfdf5;
+  --color-success-subtle: rgba(16, 185, 129, 0.10);
   --color-danger: #ef4444;
   --color-danger-hover: #dc2626;
   --color-danger-subtle: rgba(239, 68, 68, 0.08);
   --color-warning: #f59e0b;
+  --color-warning-strong: #b45309;
+  --color-warning-subtle: rgba(245, 158, 11, 0.12);
 
   /* ── Typography ── */
   --font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

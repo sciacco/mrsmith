@@ -5,49 +5,51 @@
 }
 
 .table th {
-  padding: 0.625rem 0.75rem;
+  padding: var(--space-3);
   font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   text-align: left;
-  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
   white-space: nowrap;
   user-select: none;
 }
 
 .sortable {
   cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 .sortable:hover {
-  color: var(--color-text, #1e293b);
+  color: var(--color-text);
 }
 
 .table td {
   padding: 0;
-  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .row {
   height: 56px;
   cursor: pointer;
-  transition: background 0.1s ease;
-  animation: rowEnter 0.4s ease both;
+  transition: background var(--duration-fast) var(--ease-out);
+  animation: rowEnter var(--duration-slow) var(--ease-out) both;
 }
 
 .row:hover {
-  background: rgba(99, 91, 255, 0.02);
+  background: var(--color-accent-subtle);
 }
 
 .cell {
   display: flex;
   align-items: center;
   height: 56px;
-  padding: 0 0.75rem;
+  padding: 0 var(--space-3);
   font-size: 0.8125rem;
-  color: var(--color-text, #1e293b);
+  color: var(--color-text);
 }
 
 .accentCell {
@@ -59,29 +61,31 @@
 .accentBar {
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
+  top: 50%;
   width: 3px;
-  border-radius: 2px;
-  background: var(--color-accent, #635bff);
-  opacity: 0;
-  transform: scaleY(0.6);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  height: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  transform: translateY(-50%);
+  transition: height var(--duration-normal) var(--ease-spring);
 }
 
 .row:hover .accentBar {
-  opacity: 1;
-  transform: scaleY(1);
+  height: 20px;
+}
+
+.row:focus-within .accentBar {
+  height: 28px;
 }
 
 .mono {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .muted {
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
 
@@ -97,45 +101,30 @@
   text-align: center;
 }
 
-/* Skeleton */
-.skeletonRow {
-  height: 56px;
-}
-
-.skeleton {
-  display: inline-block;
-  height: 14px;
-  border-radius: 4px;
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+.skeletonWrap {
+  padding: var(--space-4);
 }
 
 /* Empty state */
 .empty {
   text-align: center;
-  padding: 4rem 2rem;
-  color: var(--color-text-muted, #64748b);
+  padding: var(--space-16) var(--space-8);
+  color: var(--color-text-muted);
 }
 
 .emptyTitle {
   font-size: 1.125rem;
   font-weight: 600;
-  color: var(--color-text, #1e293b);
-  margin-bottom: 0.5rem;
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
 }
 
 .emptyAction {
-  margin-top: 1rem;
+  margin-top: var(--space-4);
 }
 
 .clearLink {
-  color: var(--color-accent, #635bff);
+  color: var(--color-accent);
   cursor: pointer;
   border: none;
   background: none;
@@ -150,7 +139,7 @@
 /* Refetch opacity */
 .refetching {
   opacity: 0.6;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 
 /* Delete error banner */
@@ -158,14 +147,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-danger-subtle);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
   font-size: 0.8125rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .errorDismiss {
@@ -175,9 +164,20 @@
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
-  padding: 0 0.25rem;
+  padding: 0 var(--space-1);
 }
 
 .errorDismiss:hover {
   opacity: 0.75;
+}
+
+@keyframes rowEnter {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }

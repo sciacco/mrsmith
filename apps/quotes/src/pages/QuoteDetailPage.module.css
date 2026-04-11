@@ -1,70 +1,77 @@
 .page {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
-  animation: pageEnter 0.4s ease both;
+  padding: var(--space-8);
+  animation: pageEnter var(--duration-slow) var(--ease-out) both;
 }
 
 .headerBar {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
   position: sticky;
   top: 0;
   z-index: 10;
-  background: inherit;
-  padding: 0.5rem 0;
+  background: var(--color-bg-elevated);
+  padding: var(--space-2) 0;
 }
 
 .backBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 0.375rem;
-  background: #fff;
-  color: var(--color-text-muted, #64748b);
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.15s ease;
-  font-size: 1rem;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 
 .backBtn:hover {
-  border-color: var(--color-accent, #635bff);
-  color: var(--color-accent, #635bff);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
 }
 
 .quoteNumber {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--color-text, #1e293b);
+  color: var(--color-text);
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   margin-left: auto;
 }
 
 .saveBtn {
-  padding: 0.5rem 1.25rem;
+  padding: var(--space-2) var(--space-5);
   border: none;
-  border-radius: 0.5rem;
-  background: var(--color-accent, #635bff);
-  color: #fff;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  box-shadow: var(--shadow-accent);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
 }
 
 .saveBtn:hover:not(:disabled) {
-  background: #4f46e5;
+  background: var(--color-accent-hover);
+  transform: translateY(-1px);
 }
 
 .saveBtn:disabled {
@@ -73,23 +80,26 @@
 }
 
 .saveSuccess {
-  background: #16a34a;
+  background: var(--color-success);
 }
 
 .publishBtn {
-  padding: 0.5rem 1.25rem;
-  border: 1px solid var(--color-accent, #635bff);
-  border-radius: 0.5rem;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-full);
   background: transparent;
-  color: var(--color-accent, #635bff);
+  color: var(--color-accent);
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
 }
 
 .publishBtn:hover:not(:disabled) {
-  background: rgba(99, 91, 255, 0.04);
+  background: var(--color-accent-subtle);
+  transform: translateY(-1px);
 }
 
 .publishBtn:disabled {
@@ -99,7 +109,7 @@
 
 .hsLink {
   font-size: 0.8125rem;
-  color: var(--color-accent, #635bff);
+  color: var(--color-accent);
   text-decoration: none;
   font-weight: 500;
 }
@@ -109,28 +119,50 @@
 }
 
 .tabs {
-  border-bottom: 1px solid var(--color-border, #e2e8f0);
-  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-6);
   height: 44px;
 }
 
 .dirtyWrap {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 
 .tabContent {
-  animation: sectionEnter 0.3s ease both;
+  animation: sectionEnter var(--duration-normal) var(--ease-out) both;
 }
 
 .placeholder {
-  padding: 3rem;
+  padding: var(--space-12);
   text-align: center;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   font-size: 0.875rem;
 }
 
 .loading {
   text-align: center;
-  padding: 4rem;
-  color: var(--color-text-muted, #64748b);
+  padding: var(--space-16);
+  color: var(--color-text-muted);
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sectionEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

@@ -1,39 +1,50 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  animation: sectionEnter 0.3s ease both;
+  gap: var(--space-6);
+  animation: sectionEnter var(--duration-normal) var(--ease-out) both;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: var(--space-2);
 }
 
 .label {
-  font-size: 0.6875rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .warning {
-  padding: 0.625rem 1rem;
-  border-radius: 0.5rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
   font-size: 0.8125rem;
   font-weight: 500;
 }
 
 .warningMuted {
-  background: var(--color-surface-raised, #f1f5f9);
-  color: var(--color-text-muted, #64748b);
-  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
 }
 
 .warningAmber {
-  background: rgba(245, 158, 11, 0.08);
-  color: #b45309;
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+  border: 1px solid var(--color-warning-subtle);
+}
+
+@keyframes sectionEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

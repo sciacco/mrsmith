@@ -1,49 +1,53 @@
 .page {
   max-width: 960px;
   margin: 0 auto;
-  padding: 2rem 2rem 5rem;
-  animation: pageEnter 0.4s ease both;
+  padding: var(--space-8) var(--space-8) var(--space-16);
+  animation: pageEnter var(--duration-slow) var(--ease-out) both;
 }
 
 .title {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  color: var(--color-text, #1e293b);
-  margin-bottom: 0.5rem;
+  letter-spacing: -0.04em;
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
 }
 
 .stepContent {
-  animation: sectionEnter 0.3s ease both;
+  animation: sectionEnter var(--duration-normal) var(--ease-out) both;
 }
 
 .dealSearch {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 
 .dealSearchInput {
   width: 100%;
   max-width: 400px;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 0.5rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: 0.8125rem;
   outline: none;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 
 .dealSearchInput:focus {
-  border-color: var(--color-accent, #635bff);
+  border-color: var(--color-accent);
 }
 
 .dealGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .configGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1.25rem;
+  gap: var(--space-5);
 }
 
 @media (max-width: 768px) {
@@ -51,52 +55,56 @@
 }
 
 .section {
-  background: #fff;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-xs);
 }
 
 .sectionTitle {
-  font-size: 0.6875rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-muted, #64748b);
-  margin-bottom: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
 }
 
 .field {
-  margin-bottom: 0.625rem;
+  margin-bottom: var(--space-3);
 }
 
 .label {
   display: block;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-muted, #64748b);
-  margin-bottom: 0.25rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
 }
 
 .input {
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 0.375rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   font-size: 0.8125rem;
   outline: none;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 
 .input:focus {
-  border-color: var(--color-accent, #635bff);
+  border-color: var(--color-accent);
 }
 
 .readOnly {
   composes: input;
-  background: var(--color-border-light, #f8fafc);
-  color: var(--color-text, #1e293b);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
   cursor: default;
 }
 
@@ -107,36 +115,37 @@
 
 .radioGroup {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .radioLabel {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--space-1);
   font-size: 0.8125rem;
+  color: var(--color-text);
   cursor: pointer;
 }
 
 .radioInput {
-  accent-color: var(--color-accent, #635bff);
+  accent-color: var(--color-accent);
 }
 
 .checkInput {
-  accent-color: var(--color-accent, #635bff);
+  accent-color: var(--color-accent);
 }
 
 .kitList {
   max-height: 22rem;
   overflow-y: auto;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  background: var(--color-bg-elevated);
 }
 
 .kitGroup {
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .kitGroupTitle {
@@ -144,58 +153,83 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-muted, #64748b);
-  padding: 0.375rem 0.5rem;
-  background: var(--color-border-light, #f1f5f9);
-  border-radius: 0.25rem;
-  margin-bottom: 0.25rem;
+  color: var(--color-text-muted);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-1);
 }
 
 .kitRow {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  padding: 0.375rem 0.5rem;
-  border-radius: 0.25rem;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 0.8125rem;
+  transition: background var(--duration-fast) var(--ease-out);
 }
 
 .kitRow:hover {
-  background: var(--color-border-light, #f1f5f9);
+  background: var(--color-surface);
 }
 
 .kitName {
   flex: 1;
-  color: var(--color-text, #1e293b);
+  color: var(--color-text);
 }
 
 .kitPrice {
+  font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .summaryCard {
-  background: #fff;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 0.75rem;
-  padding: 1.5rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-md);
 }
 
 .summaryRow {
   display: flex;
   justify-content: space-between;
-  padding: 0.375rem 0;
+  padding: var(--space-2) 0;
   font-size: 0.8125rem;
-  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .summaryLabel {
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .summaryValue {
   font-weight: 600;
-  color: var(--color-text, #1e293b);
+  color: var(--color-text);
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sectionEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

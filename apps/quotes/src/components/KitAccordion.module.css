@@ -1,82 +1,90 @@
 .accordion {
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 0.75rem;
-  background: #fff;
-  margin-bottom: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  margin-bottom: var(--space-3);
   overflow: hidden;
-  transition: box-shadow 0.15s ease;
+  transition:
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
 }
 
 .accordion:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 .header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   cursor: pointer;
   user-select: none;
 }
 
 .dragHandle {
+  display: inline-flex;
+  align-items: center;
   cursor: grab;
-  color: var(--color-text-muted, #94a3b8);
-  font-size: 1rem;
+  color: var(--color-text-muted);
 }
 
 .kitName {
   font-weight: 600;
   font-size: 0.875rem;
-  color: var(--color-text, #1e293b);
+  color: var(--color-text);
   flex: 1;
 }
 
 .totals {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-4);
   font-size: 0.75rem;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
 }
 
 .totalLabel {
-  color: var(--color-text-muted, #64748b);
-  margin-right: 0.25rem;
+  color: var(--color-text-muted);
+  margin-right: var(--space-1);
 }
 
 .totalValue {
   font-weight: 600;
-  color: var(--color-text, #1e293b);
-  transition: opacity 0.3s ease;
+  color: var(--color-text);
+  transition: opacity var(--duration-normal) var(--ease-out);
 }
 
 .removeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   cursor: pointer;
-  font-size: 0.875rem;
-  padding: 0.25rem;
-  border-radius: 0.25rem;
-  transition: all 0.15s ease;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 
 .removeBtn:hover {
-  color: #dc2626;
-  background: rgba(220, 38, 38, 0.06);
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
 }
 
 .confirmBtn {
   composes: removeBtn;
-  color: #dc2626;
+  color: var(--color-danger);
   font-size: 0.75rem;
   font-weight: 600;
+  padding: var(--space-1) var(--space-2);
 }
 
 .body {
-  padding: 0 1rem 1rem;
-  animation: accordionOpen 0.35s ease both;
+  padding: 0 var(--space-4) var(--space-4);
+  animation: accordionOpen var(--duration-slow) var(--ease-out) both;
 }
 
 @keyframes accordionOpen {
@@ -85,9 +93,10 @@
 }
 
 .chevron {
-  transition: transform 0.2s ease;
-  font-size: 0.75rem;
-  color: var(--color-text-muted, #94a3b8);
+  display: inline-flex;
+  align-items: center;
+  transition: transform var(--duration-fast) var(--ease-out);
+  color: var(--color-text-muted);
 }
 
 .chevronOpen {
@@ -96,6 +105,6 @@
 
 .dragging {
   opacity: 0.6;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-float);
   transform: scale(1.02);
 }
