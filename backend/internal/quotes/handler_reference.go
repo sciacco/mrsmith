@@ -460,7 +460,7 @@ func (h *Handler) handleListPaymentMethods(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	query := `SELECT cod_pagamento, desc_pagamento FROM loader.erp_metodi_pagamento WHERE selezionabile IS TRUE ORDER BY desc_pagamento`
+	query := `SELECT RTRIM(cod_pagamento) AS cod_pagamento, desc_pagamento FROM loader.erp_metodi_pagamento WHERE selezionabile IS TRUE ORDER BY desc_pagamento`
 
 	rows, err := h.db.QueryContext(r.Context(), query)
 	if err != nil {

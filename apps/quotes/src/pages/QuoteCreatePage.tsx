@@ -23,6 +23,7 @@ import { RichTextEditor } from '../components/RichTextEditor';
 import { KitPickerModal } from '../components/KitPickerModal';
 import { TrialSlider } from '../components/TrialSlider';
 import { buildIaaSTrialText, getLanguageCode, getIaaSTemplateRule } from '../utils/quoteRules';
+import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import styles from './QuoteCreatePage.module.css';
 
 const stepNames = ['Deal', 'Configurazione', 'Kit', 'Extra', 'Riepilogo'];
@@ -116,6 +117,7 @@ export function QuoteCreatePage() {
     (state.quoteType === 'standard' && step >= 2) ||
     (state.quoteType === 'iaas' && state.template !== '');
 
+  const { user } = useOptionalAuth();
   const { data: deals } = useDeals();
   const { data: owners } = useOwners();
   const { data: paymentMethods } = usePaymentMethods();
@@ -240,6 +242,14 @@ export function QuoteCreatePage() {
     if (state.proposal_type === 'SOSTITUZIONE' || state.replace_orders === '') return;
     setState(prev => ({ ...prev, replace_orders: '' }));
   }, [state.proposal_type, state.replace_orders]);
+
+  useEffect(() => {
+    if (state.owner !== '' || !owners || !user?.email) return;
+    const match = owners.find(o => o.email?.toLowerCase() === user.email?.toLowerCase());
+    if (match) {
+      setState(prev => (prev.owner === '' ? { ...prev, owner: String(match.id) } : prev));
+    }
+  }, [owners, user?.email, state.owner]);
 
   useEffect(() => {
     if (!selectedCustomerId) return;
@@ -522,7 +532,6 @@ export function QuoteCreatePage() {
                     selected={state.owner || null}
                     onChange={v => update('owner', v ?? '')}
                     placeholder="— Seleziona —"
-                    allowClear
                   />
                 </div>
                 {state.quoteType === 'standard' && (

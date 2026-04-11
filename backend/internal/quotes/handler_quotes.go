@@ -255,7 +255,7 @@ func (h *Handler) handleGetQuote(w http.ResponseWriter, r *http.Request) {
 		        q.proposal_type, q.initial_term_months, q.next_term_months, q.bill_months,
 		        q.delivered_in_days, q.date_sent, q.status, q.notes, q.nrc_charge_time,
 		        q.created_at, q.updated_at, q.description, q.hs_deal_id, q.hs_quote_id,
-		        q.payment_method, q.trial,
+		        RTRIM(q.payment_method) AS payment_method, q.trial,
 		        q.rif_ordcli, q.rif_tech_nom, q.rif_tech_tel, q.rif_tech_email,
 		        q.rif_altro_tech_nom, q.rif_altro_tech_tel, q.rif_altro_tech_email,
 		        q.rif_adm_nom, q.rif_adm_tech_tel, q.rif_adm_tech_email,
