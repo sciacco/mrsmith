@@ -2,40 +2,57 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3) 0;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
 }
 
 .info {
   font-size: 0.8125rem;
   color: var(--color-text-muted);
+  font-weight: 500;
 }
 
-.buttons {
+.controls {
   display: flex;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .btn {
-  padding: var(--space-2) var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--color-bg-elevated);
-  font-family: inherit;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition:
     border-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
+    color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 
 .btn:hover:not(:disabled) {
   border-color: var(--color-accent);
   color: var(--color-accent);
+  background: var(--color-accent-subtle);
 }
 
 .btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
+}
+
+.pageText {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.pageText strong {
+  color: var(--color-text);
+  font-weight: 600;
 }

@@ -107,33 +107,42 @@
 
 /* Empty state */
 .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
   text-align: center;
   padding: var(--space-16) var(--space-8);
-  color: var(--color-text-muted);
 }
 
-.emptyTitle {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--color-text);
+.emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
   margin-bottom: var(--space-2);
 }
 
+.emptyTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.emptyText {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  max-width: 360px;
+  line-height: 1.5;
+}
+
 .emptyAction {
-  margin-top: var(--space-4);
-}
-
-.clearLink {
-  color: var(--color-accent);
-  cursor: pointer;
-  border: none;
-  background: none;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.clearLink:hover {
-  text-decoration: underline;
+  margin-top: var(--space-3);
 }
 
 /* Refetch opacity */

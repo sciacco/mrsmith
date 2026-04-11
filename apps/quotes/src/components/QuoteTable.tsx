@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Skeleton } from '@mrsmith/ui';
+import { Button, Icon, Skeleton } from '@mrsmith/ui';
 import type { Quote } from '../api/types';
 import { StatusBadge } from './StatusBadge';
 import { KebabMenu } from './KebabMenu';
@@ -79,24 +79,32 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
   if (quotes.length === 0) {
     return (
       <div className={styles.empty}>
-        {hasFilters ? (
-          <>
-            <p className={styles.emptyTitle}>Nessun risultato</p>
-            <div className={styles.emptyAction}>
-              <button className={styles.clearLink} onClick={onClearFilters}>Cancella filtri</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className={styles.emptyTitle}>Nessuna proposta ancora</p>
-            <p>Crea la tua prima proposta per iniziare.</p>
-            <div className={styles.emptyAction}>
-              <button className={styles.clearLink} onClick={() => navigate('/quotes/new')}>
-                Crea la tua prima proposta
-              </button>
-            </div>
-          </>
-        )}
+        <div className={styles.emptyIcon}>
+          <Icon name={hasFilters ? 'filter' : 'file-text'} size={32} strokeWidth={1.5} />
+        </div>
+        <div className={styles.emptyTitle}>
+          {hasFilters ? 'Nessun risultato' : 'Nessuna proposta ancora'}
+        </div>
+        <div className={styles.emptyText}>
+          {hasFilters
+            ? 'Prova a modificare i filtri o a cancellare la ricerca per vedere altre proposte.'
+            : 'Crea la tua prima proposta per iniziare.'}
+        </div>
+        <div className={styles.emptyAction}>
+          {hasFilters ? (
+            <Button variant="ghost" onClick={onClearFilters}>
+              Cancella filtri
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              leftIcon={<Icon name="plus" size={16} />}
+              onClick={() => navigate('/quotes/new')}
+            >
+              Nuova proposta
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
