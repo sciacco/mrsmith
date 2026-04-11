@@ -27,17 +27,27 @@ export function ConfirmDialog({
   onDiscard,
   confirmLoading = false,
 }: ConfirmDialogProps) {
+  const hasDiscardAction = Boolean(discardLabel && onDiscard);
+
   return (
-    <Modal open={open} onClose={onCancel} title={title} size="sm">
-      <p className={styles.message}>{message}</p>
-      <div className={styles.actions}>
-        <Button variant="ghost" onClick={onCancel}>Annulla</Button>
-        {discardLabel && onDiscard && (
-          <Button variant="secondary" onClick={onDiscard}>{discardLabel}</Button>
-        )}
-        <Button variant={variant} onClick={onConfirm} loading={confirmLoading}>
-          {confirmLabel}
-        </Button>
+    <Modal open={open} onClose={onCancel} title={title} size={hasDiscardAction ? 'md' : 'sm'}>
+      <div className={styles.body}>
+        <p className={styles.message}>{message}</p>
+        <div className={`${styles.actions} ${hasDiscardAction ? styles.actionsSplit : ''}`}>
+          <Button variant="ghost" className={styles.cancelButton} onClick={onCancel}>
+            Annulla
+          </Button>
+          <div className={styles.primaryActions}>
+            {discardLabel && onDiscard && (
+              <Button variant="secondary" onClick={onDiscard}>
+                {discardLabel}
+              </Button>
+            )}
+            <Button variant={variant} onClick={onConfirm} loading={confirmLoading}>
+              {confirmLabel}
+            </Button>
+          </div>
+        </div>
       </div>
     </Modal>
   );

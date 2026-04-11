@@ -1,12 +1,49 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
 .message {
-  font-size: 0.875rem;
+  margin: 0;
+  max-width: 34ch;
+  font-size: 0.9375rem;
   color: var(--color-text-secondary);
-  line-height: 1.5;
-  margin-bottom: var(--space-6);
+  line-height: 1.6;
 }
 
 .actions {
   display: flex;
+  align-items: center;
   gap: var(--space-3);
   justify-content: flex-end;
+}
+
+.actionsSplit {
+  justify-content: space-between;
+}
+
+.primaryActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.cancelButton {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .message {
+    max-width: none;
+  }
+
+  .actions,
+  .actionsSplit,
+  .primaryActions {
+    width: 100%;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
 }
