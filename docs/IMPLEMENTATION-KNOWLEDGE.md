@@ -115,8 +115,8 @@ Alyante ERP ID
 ### Quotes Replacement Orders Need Appsmith Column Names Plus Customer Scoping
 
 - Context: `SOSTITUZIONE` order pickers in quotes create/detail flows.
-- Discovery: the Appsmith dataset shape comes from Alyante `Tsmi_Ordini.NOME_TESTATA_ORDINE` with `STATO_ORDINE IN ('Evaso', 'Confermato')`; the migrated app must also add the resolved ERP customer filter on `NUMERO_AZIENDA` to avoid the legacy unscoped read.
-- Practical rule: when loading replacement-order options, query `NOME_TESTATA_ORDINE`, keep the `STATO_ORDINE` filter, and add the customer bridge filter via `loader.hubs_company.numero_azienda -> Tsmi_Ordini.NUMERO_AZIENDA`.
+- Discovery: the Appsmith dataset shape comes from Alyante `Tsmi_Ordini.NOME_TESTATA_ORDINE` with `STATO_ORDINE IN ('Evaso', 'Confermato')`; in this Alyante schema the customer scope column is `ID_CLIENTE`, not `NUMERO_AZIENDA`.
+- Practical rule: when loading replacement-order options, query `NOME_TESTATA_ORDINE`, keep the `STATO_ORDINE` filter, and scope orders by the resolved ERP customer via `loader.hubs_company.numero_azienda -> Tsmi_Ordini.ID_CLIENTE`.
 - Evidence: `apps/quotes/check/out_07.md`, `backend/internal/quotes/handler_reference.go` `customerOrdersQuery`, `backend/internal/quotes/handler_reference_test.go`.
 - Used by: `apps/quotes` create and detail replacement-order selectors.
 - Open questions: none.

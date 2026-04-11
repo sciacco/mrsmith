@@ -512,13 +512,13 @@ func (h *Handler) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var result json.RawMessage
+	var updated bool
 	err = h.db.QueryRowContext(r.Context(),
-		`SELECT quotes.upd_quote_row_product($1::json)`, string(payload)).Scan(&result)
+		`SELECT quotes.upd_quote_row_product($1::json)`, string(payload)).Scan(&updated)
 	if err != nil {
 		h.dbFailure(w, r, "update_product_proc", err)
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, result)
+	httputil.JSON(w, http.StatusOK, map[string]bool{"ok": updated})
 }

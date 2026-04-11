@@ -9,7 +9,7 @@ import (
 func TestCustomerOrdersQueryMatchesAppsmithContract(t *testing.T) {
 	mustContain := []string{
 		"NOME_TESTATA_ORDINE",
-		"NUMERO_AZIENDA = @p1",
+		"ID_CLIENTE = @p1",
 		"STATO_ORDINE IN ('Evaso', 'Confermato')",
 		"GROUP BY NOME_TESTATA_ORDINE",
 		"ORDER BY NOME_TESTATA_ORDINE DESC",
@@ -21,6 +21,9 @@ func TestCustomerOrdersQueryMatchesAppsmithContract(t *testing.T) {
 	}
 	if strings.Contains(customerOrdersQuery, "LTRIM(RTRIM(NOME))") {
 		t.Fatalf("customerOrdersQuery drifted back to NOME; query was:\n%s", customerOrdersQuery)
+	}
+	if strings.Contains(customerOrdersQuery, "NUMERO_AZIENDA") {
+		t.Fatalf("customerOrdersQuery regressed to stale Alyante column; query was:\n%s", customerOrdersQuery)
 	}
 }
 
