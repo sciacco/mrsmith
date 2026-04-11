@@ -77,6 +77,7 @@ type QuoteStatus struct {
 func (c *Client) GetQuoteStatus(ctx context.Context, quoteID int64) (*QuoteStatus, error) {
 	properties := []string{
 		"hs_status",
+		"hs_locked",
 		"hs_language",
 		"hs_pdf_download_link",
 		"hs_quote_link",

@@ -473,6 +473,7 @@ func (h *Handler) handleGetHSStatus(w http.ResponseWriter, r *http.Request) {
 	var quoteURL *string
 	var pdfURL *string
 	var signStatus *string
+	var hsLocked *bool
 	hsStatus := status
 	if hsQuoteID != nil {
 		u := fmt.Sprintf("https://app.hubspot.com/quotes/%d", *hsQuoteID)
@@ -488,6 +489,12 @@ func (h *Handler) handleGetHSStatus(w http.ResponseWriter, r *http.Request) {
 				if remoteStatus := strings.TrimSpace(remote.Properties["hs_status"]); remoteStatus != "" {
 					hsStatus = remoteStatus
 				}
+				if locked, ok := parseHubSpotBool(remote.Properties["hs_locked"]); ok {
+					hsLocked = &locked
+				} else if remoteQuoteLocked(remote) {
+					locked := true
+					hsLocked = &locked
+				}
 				if remoteSign := strings.TrimSpace(remote.Properties["hs_sign_status"]); remoteSign != "" {
 					signStatus = &remoteSign
 				}
@@ -499,6 +506,7 @@ func (h *Handler) handleGetHSStatus(w http.ResponseWriter, r *http.Request) {
 		"hs_quote_id": hsQuoteID,
 		"status":      status,
 		"hs_status":   hsStatus,
+		"hs_locked":   hsLocked,
 		"quote_url":   quoteURL,
 		"pdf_url":     pdfURL,
 		"sign_status": signStatus,

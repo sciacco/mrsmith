@@ -113,6 +113,19 @@
   margin-bottom: var(--space-4);
 }
 
+.infoBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-info-subtle, rgba(14, 116, 144, 0.1));
+  border-left: 3px solid var(--color-info, #0ea5e9);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  color: var(--color-info-strong, #075985);
+  margin-bottom: var(--space-4);
+}
+
 .blockerBox {
   padding: var(--space-3) var(--space-4);
   background: var(--color-danger-subtle);

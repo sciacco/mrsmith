@@ -130,6 +130,15 @@ Alyante ERP ID
 - Used by: `apps/quotes` publish flow.
 - Open questions: none.
 
+### Quotes Republish Must Unlock Published HubSpot Quotes First
+
+- Context: republishing an existing HubSpot-backed quote from `apps/quotes`.
+- Discovery: published HubSpot quotes are locked (`hs_locked=true`) and reject direct property updates with `Published Quote cannot be edited`. The legacy Appsmith `Dettaglio.mainForm.mandaSuHubspot()` flow explicitly PATCHed `hs_status=DRAFT` before syncing changes, and HubSpot's legacy quotes docs require moving published quotes back to `DRAFT`, `PENDING_APPROVAL`, or `REJECTED` before editing.
+- Practical rule: any republish/update flow for an existing HubSpot quote must fetch live quote status first and, if the quote is locked or already in a published state (`APPROVED` / `APPROVAL_NOT_NEEDED`), unlock it with `hs_status=DRAFT` before updating properties or line items. Do not rely only on the local DB status.
+- Evidence: `apps/quotes/quotes-main.tar.gz` -> `quotes-main/pages/Dettaglio/jsobjects/mainForm/mainForm.js`, `backend/internal/platform/hubspot/quotes.go`, `backend/internal/quotes/handler_publish.go`, HubSpot legacy quotes docs ("Properties set by quote state", last modified 2026-03-30).
+- Used by: `apps/quotes` republish flow and `GET /quotes/v1/quotes/:id/hs-status`.
+- Open questions: none.
+
 ### Panoramica Orders Summary Text Columns Can Be NULL
 
 - Context: `GET /api/panoramica/v1/orders/summary` backed by `loader.v_ordini_sintesi`.

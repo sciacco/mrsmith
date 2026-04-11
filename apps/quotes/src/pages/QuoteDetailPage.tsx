@@ -63,7 +63,7 @@ export function QuoteDetailPage() {
   const quoteId = Number(id);
   const navigate = useNavigate();
   const { data: quote, isLoading } = useQuote(quoteId);
-  const { data: hsStatus } = useHSStatus(quoteId);
+  const { data: hsStatus, refetch: refetchHSStatus } = useHSStatus(quoteId);
   const publishPrecheck = usePublishPrecheck(quoteId);
   const updateQuote = useUpdateQuote();
   const { isDirty, dirtyTabs, markDirty, markClean, setSnapshot } = useDirtyState();
@@ -111,6 +111,16 @@ export function QuoteDetailPage() {
       // Error handled by mutation
     }
   }, [localQuote, quoteId, updateQuote, markClean, setSnapshot]);
+
+  const handleOpenPublish = useCallback(async () => {
+    await refetchHSStatus();
+    setShowPublish(true);
+  }, [refetchHSStatus]);
+
+  const refreshHSStatus = useCallback(async () => {
+    const result = await refetchHSStatus();
+    return result.data ?? null;
+  }, [refetchHSStatus]);
 
   // Cmd+S keyboard shortcut
   useEffect(() => {
@@ -200,14 +210,18 @@ export function QuoteDetailPage() {
                   </ul>
                 </div>
               ) : (
-                <span>Pubblica la proposta su HubSpot</span>
+                <span>
+                  {hsStatus?.hs_locked
+                    ? "HubSpot riportera l'offerta in bozza prima di aggiornarla"
+                    : 'Pubblica la proposta su HubSpot'}
+                </span>
               )
             }
             placement="bottom"
           >
             <Button
               variant="secondary"
-              onClick={() => setShowPublish(true)}
+              onClick={() => void handleOpenPublish()}
               disabled={publishBlocked}
               leftIcon={<Icon name="external-link" size={16} />}
             >
@@ -256,14 +270,15 @@ export function QuoteDetailPage() {
         </div>
       </div>
 
-      <PublishModal
-        open={showPublish}
-        quoteId={quoteId}
-        isRepublish={isRepublish}
-        hsStatus={hsStatus ?? null}
-        precheck={publishPrecheck.data ?? null}
-        onClose={() => setShowPublish(false)}
-      />
-    </div>
+        <PublishModal
+          open={showPublish}
+          quoteId={quoteId}
+          isRepublish={isRepublish}
+          hsStatus={hsStatus ?? null}
+          precheck={publishPrecheck.data ?? null}
+          refreshHSStatus={refreshHSStatus}
+          onClose={() => setShowPublish(false)}
+        />
+      </div>
   );
 }

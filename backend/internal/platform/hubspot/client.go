@@ -13,19 +13,33 @@ import (
 // Client is a shared HubSpot REST API client.
 type Client struct {
 	apiKey  string
+	baseURL string
 	httpCli *http.Client
 }
 
 // New creates a new HubSpot client. Returns nil if apiKey is empty.
 func New(apiKey string) *Client {
+	return NewWithBaseURL(apiKey, "", nil)
+}
+
+// NewWithBaseURL creates a HubSpot client with an optional custom base URL or HTTP client.
+// It is used by tests and any future proxy scenarios.
+func NewWithBaseURL(apiKey, baseURL string, httpCli *http.Client) *Client {
 	if apiKey == "" {
 		return nil
 	}
-	return &Client{
-		apiKey: apiKey,
-		httpCli: &http.Client{
+	if baseURL == "" {
+		baseURL = "https://api.hubapi.com"
+	}
+	if httpCli == nil {
+		httpCli = &http.Client{
 			Timeout: 30 * time.Second,
-		},
+		}
+	}
+	return &Client{
+		apiKey:  apiKey,
+		baseURL: baseURL,
+		httpCli: httpCli,
 	}
 }
 
@@ -75,7 +89,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any) (json.Ra
 		bodyReader = bytes.NewReader(b)
 	}
 
-	url := "https://api.hubapi.com" + path
+	url := c.baseURL + path
 	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("hubspot: create request: %w", err)

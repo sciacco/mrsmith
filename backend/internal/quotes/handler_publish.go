@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 const paymentMethodLabelQuery = `SELECT desc_pagamento FROM loader.erp_metodi_pagamento WHERE cod_pagamento = $1`
@@ -155,14 +157,35 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 
 	// Step 3: Create or update HS quote
 	var hsQuoteID int64
+	finalHSProps := cloneMap(hsProps)
 	if q.HSQuoteID != nil {
 		hsQuoteID = *q.HSQuoteID
-		err = h.hs.UpdateQuote(ctx, hsQuoteID, hsProps)
+		remote, err := h.hs.GetQuoteStatus(ctx, hsQuoteID)
 		if err != nil {
-			failStep(3, "hubspot_quote", err.Error())
+			failStep(3, "hubspot_quote", fmt.Sprintf("load current HubSpot quote status: %v", err))
 			return
 		}
+
+		if remoteQuoteLocked(remote) {
+			currentStatus := remoteQuoteState(remote)
+			if err := h.hs.UpdateQuote(ctx, hsQuoteID, map[string]any{"hs_status": "DRAFT"}); err != nil {
+				logging.FromContext(ctx).Warn("failed to unlock hubspot quote before republish",
+					"component", "quotes",
+					"operation", "publish_unlock_quote",
+					"quote_id", quoteID,
+					"hs_quote_id", hsQuoteID,
+					"remote_hs_status", currentStatus,
+					"remote_hs_locked", true,
+					"error", err,
+				)
+				failStep(3, "hubspot_quote", fmt.Sprintf("unlock HubSpot quote from %s: %v", currentStatus, err))
+				return
+			}
+		}
 	} else {
+		createProps := cloneMap(hsProps)
+		createProps["hs_status"] = "DRAFT"
+
 		// Build associations
 		associations := []hubspot.Association{}
 		if q.Template != nil {
@@ -176,7 +199,7 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 			associations = append(associations, hubspot.NewAssociation(*q.CustomerID, hubspot.AssocTypeQuoteToCompany))
 		}
 
-		hsQuoteID, err = h.hs.CreateQuote(ctx, hsProps, associations)
+		hsQuoteID, err = h.hs.CreateQuote(ctx, createProps, associations)
 		if err != nil {
 			failStep(3, "hubspot_quote", err.Error())
 			return
@@ -272,6 +295,11 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 	addStep(4, "line_items", "completed")
 
 	// Step 5: Update status
+	if err := h.hs.UpdateQuote(ctx, hsQuoteID, finalHSProps); err != nil {
+		failStep(5, "update_status", err.Error())
+		return
+	}
+
 	_, err = h.db.ExecContext(ctx,
 		`UPDATE quotes.quote SET status = $1, date_sent = NOW() WHERE id = $2`, hsStatus, quoteID)
 	if err != nil {
@@ -363,4 +391,45 @@ func ptrStr(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func cloneMap(src map[string]any) map[string]any {
+	dst := make(map[string]any, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func remoteQuoteState(remote *hubspot.QuoteStatus) string {
+	if remote == nil {
+		return ""
+	}
+	return strings.TrimSpace(remote.Properties["hs_status"])
+}
+
+func remoteQuoteLocked(remote *hubspot.QuoteStatus) bool {
+	if remote == nil {
+		return false
+	}
+	if locked, ok := parseHubSpotBool(remote.Properties["hs_locked"]); ok {
+		return locked
+	}
+	switch remoteQuoteState(remote) {
+	case "APPROVED", "APPROVAL_NOT_NEEDED":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseHubSpotBool(raw string) (bool, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "true":
+		return true, true
+	case "false":
+		return false, true
+	default:
+		return false, false
+	}
 }

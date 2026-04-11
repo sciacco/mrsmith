@@ -166,6 +166,7 @@ export interface HSStatus {
   hs_quote_id: number | null;
   status: QuoteStatus;
   hs_status: string | null;
+  hs_locked: boolean | null;
   quote_url: string | null;
   pdf_url: string | null;
   sign_status: string | null;

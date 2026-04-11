@@ -22,6 +22,7 @@ interface PublishModalProps {
   isRepublish: boolean;
   hsStatus: HSStatus | null;
   precheck: PublishPrecheck | null;
+  refreshHSStatus: () => Promise<HSStatus | null>;
   onClose: () => void;
 }
 
@@ -40,6 +41,7 @@ export function PublishModal({
   isRepublish,
   hsStatus,
   precheck,
+  refreshHSStatus,
   onClose,
 }: PublishModalProps) {
   const [modalState, setModalState] = useState<ModalState>('confirm');
@@ -64,6 +66,7 @@ export function PublishModal({
 
   const hasLegalNotes = (quote?.notes ?? '').trim().length > 0;
   const previewStatus = hasLegalNotes ? 'PENDING_APPROVAL' : 'APPROVAL_NOT_NEEDED';
+  const willUnlockHubSpotQuote = !!(isRepublish && hsStatus?.hs_locked);
 
   const blockers: string[] = [];
   if (hsStatus?.sign_status === 'ESIGN_COMPLETED') {
@@ -113,6 +116,12 @@ export function PublishModal({
 
   const handlePublish = useCallback(async () => {
     if (blockers.length > 0) return;
+
+    const latestHSStatus = (await refreshHSStatus()) ?? hsStatus;
+    if (latestHSStatus?.sign_status === 'ESIGN_COMPLETED') {
+      return;
+    }
+
     setModalState('progress');
     setCompletedSteps([]);
     setSimulatedCurrentStep(1);
@@ -145,7 +154,7 @@ export function PublishModal({
       setErrorStep({ step: 0, message: e instanceof Error ? e.message : 'Errore di rete' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockers.length, quoteId, publishQuote, startSimulation, clearTimers]);
+  }, [blockers.length, quoteId, publishQuote, startSimulation, clearTimers, refreshHSStatus, hsStatus]);
 
   const handleClose = useCallback(() => {
     clearTimers();
@@ -216,6 +225,15 @@ export function PublishModal({
               <Icon name="triangle-alert" size={16} />
               <span>
                 La proposta contiene pattuizioni speciali e richiederà l&apos;approvazione di un responsabile commerciale.
+              </span>
+            </div>
+          )}
+
+          {willUnlockHubSpotQuote && (
+            <div className={styles.infoBanner}>
+              <Icon name="info" size={16} />
+              <span>
+                L&apos;offerta risulta gia pubblicata su HubSpot. La ripubblicazione la riportera prima in bozza, applichera le modifiche e poi la pubblichera di nuovo.
               </span>
             </div>
           )}
