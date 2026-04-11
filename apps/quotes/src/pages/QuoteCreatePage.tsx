@@ -23,7 +23,6 @@ import { RichTextEditor } from '../components/RichTextEditor';
 import { KitPickerModal } from '../components/KitPickerModal';
 import { TrialSlider } from '../components/TrialSlider';
 import { SegmentedControl } from '../components/SegmentedControl';
-import { TemplateHeroCard } from '../components/TemplateHeroCard';
 import { buildIaaSTrialText, getLanguageCode, getIaaSTemplateRule } from '../utils/quoteRules';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import styles from './QuoteCreatePage.module.css';
@@ -129,10 +128,10 @@ export function QuoteCreatePage() {
     enabled: state.quoteType === 'standard',
   });
   const templatesParams = useMemo<{ type: string; lang?: string; is_colo?: string }>(() => {
-    const params: { type: string; lang?: string; is_colo?: string } = { type: state.quoteType };
-    if (state.quoteType === 'iaas') {
-      params.lang = getLanguageCode(state.iaasLanguage);
-    }
+    const params: { type: string; lang?: string; is_colo?: string } = {
+      type: state.quoteType,
+      lang: getLanguageCode(state.iaasLanguage),
+    };
     if (state.quoteType === 'standard' && state.document_type === 'TSC-ORDINE') {
       params.is_colo = 'false';
     }
@@ -245,6 +244,13 @@ export function QuoteCreatePage() {
     if (state.proposal_type === 'SOSTITUZIONE' || state.replace_orders === '') return;
     setState(prev => ({ ...prev, replace_orders: '' }));
   }, [state.proposal_type, state.replace_orders]);
+
+  useEffect(() => {
+    const dealLang = state.selectedDeal?.company_lingua;
+    if (!dealLang) return;
+    const next: 'ITA' | 'ENG' = dealLang.trim().toLowerCase().startsWith('en') ? 'ENG' : 'ITA';
+    setState(prev => (prev.iaasLanguage === next ? prev : { ...prev, iaasLanguage: next }));
+  }, [state.selectedDeal?.id]);
 
   useEffect(() => {
     if (state.owner !== '' || !owners || !user?.email) return;
@@ -470,60 +476,8 @@ export function QuoteCreatePage() {
           <div className={styles.stepInner}>
             <TypeSelector value={state.quoteType} onChange={handleQuoteTypeChange} />
             <div className={styles.configColumn}>
-              {/* Atto 1 — L'OFFERTA */}
-              <section className={styles.act}>
-                <div className={styles.actEyebrow}>L&apos;offerta</div>
-                <div className={styles.actBody}>
-                  <div className={styles.fieldRow}>
-                    <label className={styles.fieldLabel}>Tipo proposta</label>
-                    <SegmentedControl<'NUOVO' | 'SOSTITUZIONE' | 'RINNOVO'>
-                      value={state.proposal_type}
-                      onChange={v => update('proposal_type', v)}
-                      options={[
-                        { value: 'NUOVO', label: 'Nuovo' },
-                        { value: 'SOSTITUZIONE', label: 'Sostituzione' },
-                        { value: 'RINNOVO', label: 'Rinnovo' },
-                      ]}
-                      aria-label="Tipo proposta"
-                    />
-                  </div>
-                  {state.quoteType === 'standard' && (
-                    <div className={styles.fieldRow}>
-                      <label className={styles.fieldLabel}>Tipo documento</label>
-                      <SegmentedControl<'TSC-ORDINE-RIC' | 'TSC-ORDINE'>
-                        value={state.document_type}
-                        onChange={v => update('document_type', v)}
-                        options={[
-                          { value: 'TSC-ORDINE-RIC', label: 'Ricorrente' },
-                          { value: 'TSC-ORDINE', label: 'Spot' },
-                        ]}
-                        aria-label="Tipo documento"
-                      />
-                    </div>
-                  )}
-                  {state.proposal_type === 'SOSTITUZIONE' && (
-                    <div className={`${styles.fieldRow} ${styles.conditionalWrap}`}>
-                      <label className={styles.fieldLabel}>Ordini da sostituire</label>
-                      <MultiSelect<string>
-                        options={customerOrders.map(o => ({ value: o.name, label: o.name }))}
-                        selected={state.replace_orders.split(';').map(s => s.trim()).filter(Boolean)}
-                        onChange={chosen => update('replace_orders', chosen.join(';'))}
-                        placeholder={
-                          customerOrdersQuery.isPending
-                            ? 'Caricamento ordini...'
-                            : customerOrders.length === 0
-                              ? 'Nessun ordine disponibile'
-                              : 'Seleziona ordini...'
-                        }
-                      />
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {/* Atto 2 — IL CONTESTO */}
-              <section className={styles.act}>
-                <div className={styles.actEyebrow}>Il contesto</div>
+              {/* Gruppo: dati comuni */}
+              <section className={styles.actBare}>
                 <div className={styles.actBody}>
                   <div className={styles.fieldRow}>
                     <div className={styles.fieldLabelWithChip}>
@@ -550,6 +504,92 @@ export function QuoteCreatePage() {
                       placeholder="— Seleziona —"
                     />
                   </div>
+                  <div className={styles.fieldRow}>
+                    <label className={styles.fieldLabel}>Lingua cliente</label>
+                    <SegmentedControl<'ITA' | 'ENG'>
+                      value={state.iaasLanguage}
+                      onChange={v => update('iaasLanguage', v)}
+                      options={[
+                        { value: 'ITA', label: 'Italiano' },
+                        { value: 'ENG', label: 'English' },
+                      ]}
+                      aria-label="Lingua cliente"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Gruppo: tipo proposta */}
+              <section className={styles.actBare}>
+                <div className={styles.actBody}>
+                  <div className={styles.fieldRow}>
+                    <label className={styles.fieldLabel}>Tipo proposta</label>
+                    <SegmentedControl<'NUOVO' | 'SOSTITUZIONE' | 'RINNOVO'>
+                      value={state.proposal_type}
+                      onChange={v => update('proposal_type', v)}
+                      options={[
+                        { value: 'NUOVO', label: 'Nuovo' },
+                        { value: 'SOSTITUZIONE', label: 'Sostituzione' },
+                        { value: 'RINNOVO', label: 'Rinnovo' },
+                      ]}
+                      aria-label="Tipo proposta"
+                      size="sm"
+                    />
+                  </div>
+                  {state.quoteType === 'standard' && (
+                    <div className={styles.fieldRow}>
+                      <label className={styles.fieldLabel}>Tipo documento</label>
+                      <SegmentedControl<'TSC-ORDINE-RIC' | 'TSC-ORDINE'>
+                        value={state.document_type}
+                        onChange={v => update('document_type', v)}
+                        options={[
+                          { value: 'TSC-ORDINE-RIC', label: 'Ricorrente' },
+                          { value: 'TSC-ORDINE', label: 'Spot' },
+                        ]}
+                        aria-label="Tipo documento"
+                        size="sm"
+                      />
+                    </div>
+                  )}
+                  {state.proposal_type === 'SOSTITUZIONE' && (
+                    <div className={`${styles.fieldRow} ${styles.conditionalWrap}`}>
+                      <label className={styles.fieldLabel}>Ordini da sostituire</label>
+                      <MultiSelect<string>
+                        options={customerOrders.map(o => ({ value: o.name, label: o.name }))}
+                        selected={state.replace_orders.split(';').map(s => s.trim()).filter(Boolean)}
+                        onChange={chosen => update('replace_orders', chosen.join(';'))}
+                        placeholder={
+                          customerOrdersQuery.isPending
+                            ? 'Caricamento ordini...'
+                            : customerOrders.length === 0
+                              ? 'Nessun ordine disponibile'
+                              : 'Seleziona ordini...'
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Gruppo: template + servizi/trial */}
+              <section className={styles.actBare}>
+                <div className={styles.actBody}>
+                  <div className={styles.fieldRow}>
+                    <label className={styles.fieldLabel}>Template</label>
+                    <SingleSelect<string>
+                      options={(templates ?? []).map(t => ({
+                        value: t.template_id,
+                        label: t.description,
+                      }))}
+                      selected={state.template || null}
+                      onChange={v => update('template', v ?? '')}
+                      placeholder={
+                        templates && templates.length === 0
+                          ? 'Nessun template disponibile'
+                          : '— Seleziona —'
+                      }
+                    />
+                  </div>
                   {state.quoteType === 'standard' && (
                     <div className={styles.fieldRow}>
                       <label className={styles.fieldLabel}>Servizi</label>
@@ -561,56 +601,6 @@ export function QuoteCreatePage() {
                       />
                     </div>
                   )}
-                  {state.quoteType === 'iaas' && (
-                    <div className={`${styles.fieldRow} ${styles.conditionalWrap}`}>
-                      <label className={styles.fieldLabel}>Lingua cliente</label>
-                      <SegmentedControl<'ITA' | 'ENG'>
-                        value={state.iaasLanguage}
-                        onChange={v => update('iaasLanguage', v)}
-                        options={[
-                          { value: 'ITA', label: 'Italiano' },
-                          { value: 'ENG', label: 'English' },
-                        ]}
-                        aria-label="Lingua cliente"
-                      />
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {/* Atto 3 — LA RICETTA */}
-              <section className={styles.act}>
-                <div className={styles.actEyebrow}>
-                  {state.quoteType === 'iaas' ? 'La ricetta' : 'Template'}
-                </div>
-                <div className={styles.actBody}>
-                  <div className={styles.fieldRow}>
-                    <label className={styles.fieldLabel}>Template</label>
-                    <div className={styles.bigSelect}>
-                      <SingleSelect<string>
-                        options={(templates ?? []).map(t => ({
-                          value: t.template_id,
-                          label: t.description,
-                        }))}
-                        selected={state.template || null}
-                        onChange={v => update('template', v ?? '')}
-                        placeholder={
-                          templates && templates.length === 0
-                            ? 'Nessun template disponibile'
-                            : '— Seleziona —'
-                        }
-                      />
-                    </div>
-                    {state.quoteType === 'iaas' && (
-                      <TemplateHeroCard
-                        kitName={derivedIaaSKit?.internal_name ?? null}
-                        category={derivedIaaSKit?.category_name ?? null}
-                        services={derivedIaaSRule?.services ?? ''}
-                        initialTermMonths={1}
-                        renewalTermMonths={1}
-                      />
-                    )}
-                  </div>
                   {state.quoteType === 'iaas' && (
                     <div className={`${styles.fieldRow} ${styles.conditionalWrap}`}>
                       <label className={styles.fieldLabel}>Trial</label>
@@ -629,9 +619,8 @@ export function QuoteCreatePage() {
                 </div>
               </section>
 
-              {/* Atto 4 — CONDIZIONI ECONOMICHE */}
-              <section className={styles.act}>
-                <div className={styles.actEyebrow}>Condizioni economiche</div>
+              {/* Gruppo: condizioni economiche */}
+              <section className={styles.actBare}>
                 <div className={styles.actBody}>
                   <div className={styles.fieldRow}>
                     <label className={styles.fieldLabel}>Pagamento</label>
@@ -662,11 +651,11 @@ export function QuoteCreatePage() {
                             value={String(state.bill_months)}
                             onChange={v => update('bill_months', Number(v))}
                             options={[
-                              { value: '1', label: 'Mens.' },
-                              { value: '2', label: 'Bim.' },
-                              { value: '3', label: 'Trim.' },
-                              { value: '6', label: 'Sem.' },
-                              { value: '12', label: 'Ann.' },
+                              { value: '1', label: 'Mensile' },
+                              { value: '2', label: 'Bimestrale' },
+                              { value: '3', label: 'Trimestrale' },
+                              { value: '6', label: 'Semestrale' },
+                              { value: '12', label: 'Annuale' },
                             ]}
                             aria-label="Fatturazione canoni"
                           />
