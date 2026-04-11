@@ -159,6 +159,11 @@ export function QuoteCreatePage() {
       c => selectedServiceIds.includes(String(c.id)) && c.name.toUpperCase() === 'COLOCATION',
     );
   }, [categories, selectedServiceIds, state.quoteType]);
+  const customerLang: 'it' | 'en' = useMemo(() => {
+    const raw = state.selectedDeal?.company_lingua;
+    if (!raw) return 'it';
+    return raw.trim().toLowerCase().startsWith('en') ? 'en' : 'it';
+  }, [state.selectedDeal]);
   const billingLocked =
     state.quoteType === 'standard' &&
     colocationSelected &&
@@ -189,6 +194,28 @@ export function QuoteCreatePage() {
       setState(prev => ({ ...prev, template: '' }));
     }
   }, [templates, state.template]);
+
+  useEffect(() => {
+    if (state.quoteType !== 'standard') return;
+    if (!templates || templates.length === 0) return;
+
+    if (colocationSelected) {
+      const match = templates.find(
+        t => t.is_colo === true && (t.lang ?? '').toLowerCase() === customerLang,
+      );
+      if (match && state.template !== match.template_id) {
+        const current = templates.find(t => t.template_id === state.template);
+        if (!current || current.is_colo === true) {
+          setState(prev => ({ ...prev, template: match.template_id }));
+        }
+      }
+    } else {
+      const current = templates.find(t => t.template_id === state.template);
+      if (current?.is_colo === true) {
+        setState(prev => ({ ...prev, template: '' }));
+      }
+    }
+  }, [colocationSelected, customerLang, templates, state.quoteType, state.template]);
 
   useEffect(() => {
     if (state.quoteType !== 'iaas') return;
@@ -552,7 +579,6 @@ export function QuoteCreatePage() {
                         ? 'Nessun template disponibile'
                         : '— Seleziona —'
                     }
-                    allowClear
                   />
                 </div>
                 {state.quoteType === 'iaas' && (

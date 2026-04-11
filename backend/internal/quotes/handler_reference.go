@@ -291,7 +291,7 @@ func quoteStageInClause(stages []string) string {
 // non-empty `codice`. Ordering is kept deterministic by id desc to match the
 // Appsmith source (`order by id desc`).
 var listDealsQuery = `SELECT d.id, d.name, d.pipeline, d.dealstage,
-                             c.id as company_id, c.name as company_name
+                             c.id as company_id, c.name as company_name, c.lingua as company_lingua
                       FROM loader.hubs_deal d
                       LEFT JOIN loader.hubs_company c ON c.id = d.company_id
                       WHERE ((d.pipeline = '` + standardPipeline + `' AND d.dealstage IN ` + quoteStageInClause(standardStages) + `)
@@ -312,22 +312,24 @@ func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type deal struct {
-		ID           int64          `json:"id"`
-		DealName     string         `json:"name"`
-		Pipeline     sql.NullString `json:"-"`
-		PipelineV    *string        `json:"pipeline"`
-		DealStage    sql.NullString `json:"-"`
-		DealStageV   *string        `json:"dealstage"`
-		CompanyID    sql.NullInt64  `json:"-"`
-		CompanyIDV   *int64         `json:"company_id"`
-		CompanyName  sql.NullString `json:"-"`
-		CompanyNameV *string        `json:"company_name"`
+		ID             int64          `json:"id"`
+		DealName       string         `json:"name"`
+		Pipeline       sql.NullString `json:"-"`
+		PipelineV      *string        `json:"pipeline"`
+		DealStage      sql.NullString `json:"-"`
+		DealStageV     *string        `json:"dealstage"`
+		CompanyID      sql.NullInt64  `json:"-"`
+		CompanyIDV     *int64         `json:"company_id"`
+		CompanyName    sql.NullString `json:"-"`
+		CompanyNameV   *string        `json:"company_name"`
+		CompanyLingua  sql.NullString `json:"-"`
+		CompanyLinguaV *string        `json:"company_lingua"`
 	}
 
 	result := []deal{}
 	for rows.Next() {
 		var d deal
-		if err := rows.Scan(&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName); err != nil {
+		if err := rows.Scan(&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.CompanyLingua); err != nil {
 			h.dbFailure(w, r, "list_deals_scan", err)
 			return
 		}
@@ -342,6 +344,9 @@ func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 		}
 		if d.CompanyName.Valid {
 			d.CompanyNameV = &d.CompanyName.String
+		}
+		if d.CompanyLingua.Valid {
+			d.CompanyLinguaV = &d.CompanyLingua.String
 		}
 		result = append(result, d)
 	}
@@ -373,16 +378,17 @@ func (h *Handler) handleGetDeal(w http.ResponseWriter, r *http.Request) {
 		CompanyID     *int64  `json:"company_id"`
 		CompanyName   *string `json:"company_name"`
 		NumeroAzienda *string `json:"numero_azienda"`
+		CompanyLingua *string `json:"company_lingua"`
 	}
 
 	var d dealDetail
 	err = h.db.QueryRowContext(r.Context(),
 		`SELECT d.id, d.name, d.pipeline, d.dealstage,
-		        c.id, c.name, c.numero_azienda
+		        c.id, c.name, c.numero_azienda, c.lingua
 		 FROM loader.hubs_deal d
 		 LEFT JOIN loader.hubs_company c ON c.id = d.company_id
 		 WHERE d.id = $1`, dealID).Scan(
-		&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.NumeroAzienda)
+		&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.NumeroAzienda, &d.CompanyLingua)
 
 	if err == sql.ErrNoRows {
 		httputil.Error(w, http.StatusNotFound, "deal_not_found")
@@ -535,6 +541,19 @@ func (h *Handler) handleCustomerPayment(w http.ResponseWriter, r *http.Request) 
 	}
 	if err != nil {
 		h.dbFailure(w, r, "customer_payment", err)
+		return
+	}
+
+	// Step 3: The code from Alyante must exist in the selectable list the
+	// frontend binds against; otherwise the SingleSelect would silently fall
+	// back to its placeholder. Validate and fall through to the 402 default.
+	var exists bool
+	err = h.db.QueryRowContext(r.Context(),
+		`SELECT EXISTS(SELECT 1 FROM loader.erp_metodi_pagamento
+		               WHERE cod_pagamento = $1 AND selezionabile IS TRUE)`,
+		p.PaymentCode).Scan(&exists)
+	if err != nil || !exists {
+		httputil.JSON(w, http.StatusOK, defaultPayment)
 		return
 	}
 

@@ -46,6 +46,7 @@ export interface Deal {
   dealstage: string | null;
   company_id: number | null;
   company_name: string | null;
+  company_lingua: string | null;
 }
 
 export interface Owner {
