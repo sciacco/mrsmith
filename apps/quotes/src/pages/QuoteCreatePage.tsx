@@ -367,12 +367,28 @@ export function QuoteCreatePage() {
           };
         }
         const wasIaaS = prev.quoteType === 'iaas';
+        let nextServices = wasIaaS ? '' : prev.services;
+        if (t.is_colo && categories) {
+          const coloCat = categories.find(
+            c => c.name.toUpperCase() === 'COLOCATION',
+          );
+          if (coloCat) {
+            const ids = nextServices
+              .split(',')
+              .map(s => s.trim())
+              .filter(Boolean);
+            if (!ids.includes(String(coloCat.id))) {
+              ids.push(String(coloCat.id));
+              nextServices = ids.join(',');
+            }
+          }
+        }
         return {
           ...prev,
           template: templateId,
           quoteType: 'standard',
           document_type: 'TSC-ORDINE-RIC',
-          services: wasIaaS ? '' : prev.services,
+          services: nextServices,
           trial: '',
           initial_term_months: wasIaaS ? 12 : prev.initial_term_months,
           next_term_months: wasIaaS ? 12 : prev.next_term_months,
@@ -381,7 +397,7 @@ export function QuoteCreatePage() {
         };
       });
     },
-    [templates],
+    [templates, categories],
   );
 
   const templateIsColo = useMemo(
@@ -501,7 +517,7 @@ export function QuoteCreatePage() {
                       />
                     </div>
                     <div className={`${styles.fieldRow} ${styles.languageCell}`}>
-                      <label className={styles.fieldLabel}>Lingua cliente</label>
+                      <label className={styles.fieldLabel}>Lingua template</label>
                       <SegmentedControl<'ITA' | 'ENG'>
                         value={state.iaasLanguage}
                         onChange={v => update('iaasLanguage', v)}
@@ -509,7 +525,7 @@ export function QuoteCreatePage() {
                           { value: 'ITA', label: 'Italiano' },
                           { value: 'ENG', label: 'English' },
                         ]}
-                        aria-label="Lingua cliente"
+                        aria-label="Lingua template"
                       />
                     </div>
                   </div>
