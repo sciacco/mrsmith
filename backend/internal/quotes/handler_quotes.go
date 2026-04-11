@@ -5,11 +5,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
+
+// appsmithRowCap mirrors the hard "limit 2000" from the Appsmith get_quotes
+// query for the untouched default list view.
+const appsmithRowCap = 2000
+
+func isAppsmithDefaultQuoteListRequest(q url.Values) bool {
+	return !q.Has("page") &&
+		q.Get("status") == "" &&
+		q.Get("owner") == "" &&
+		q.Get("q") == "" &&
+		q.Get("date_from") == "" &&
+		q.Get("date_to") == "" &&
+		q.Get("sort") == "" &&
+		q.Get("dir") == ""
+}
 
 func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 	if !h.requireDB(w) {
@@ -18,11 +34,15 @@ func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 
 	// Parse query parameters
 	q := r.URL.Query()
+	useAppsmithDefaults := isAppsmithDefaultQuoteListRequest(q)
 	page, _ := strconv.Atoi(q.Get("page"))
 	if page < 1 {
 		page = 1
 	}
 	pageSize := 25 // Fixed per spec
+	if useAppsmithDefaults {
+		pageSize = appsmithRowCap
+	}
 
 	status := q.Get("status")
 	owner := q.Get("owner")
@@ -94,15 +114,22 @@ func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 	              LEFT JOIN loader.hubs_deal d ON d.id = q.hs_deal_id
 	              LEFT JOIN loader.hubs_owner o ON o.id::text = q.owner`
 
-	// Count total
+	// Count total. The untouched default list view mirrors the Appsmith
+	// "ORDER BY quote_number DESC LIMIT 2000" query, while explicit migrated
+	// controls keep the paginated total for their current behavior.
 	var total int
 	countQuery := "SELECT COUNT(*)" + baseFrom + whereClause
 	if err := h.db.QueryRowContext(r.Context(), countQuery, args...).Scan(&total); err != nil {
 		h.dbFailure(w, r, "list_quotes_count", err)
 		return
 	}
+	if useAppsmithDefaults && total > appsmithRowCap {
+		total = appsmithRowCap
+	}
 
-	// Fetch page
+	// Fetch page. Only the untouched default load uses the Appsmith row cap;
+	// filtered, sorted, or explicitly paginated requests keep the migrated
+	// page size.
 	offset := (page - 1) * pageSize
 	argIdx++
 	limitArg := argIdx
@@ -110,12 +137,13 @@ func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 	offsetArg := argIdx
 	args = append(args, pageSize, offset)
 
-	selectQuery := fmt.Sprintf(`SELECT q.id, q.quote_number, q.customer_id, q.document_date, q.document_type,
+	selectQuery := `SELECT q.id, q.quote_number, q.customer_id, q.document_date, q.document_type,
 	       q.status, q.owner, q.hs_deal_id, q.hs_quote_id, q.proposal_type, q.created_at, q.updated_at,
 	       c.name as customer_name, d.name as deal_name,
-	       COALESCE(o.first_name || ' ' || o.last_name, '') as owner_name`+
-		baseFrom+whereClause+
-		fmt.Sprintf(` ORDER BY %s %s LIMIT $%d OFFSET $%d`, sortCol, sortDir, limitArg, offsetArg))
+	       COALESCE(o.first_name || ' ' || o.last_name, '') as owner_name` +
+		baseFrom + whereClause +
+		" ORDER BY " + sortCol + " " + sortDir +
+		" LIMIT $" + strconv.Itoa(limitArg) + " OFFSET $" + strconv.Itoa(offsetArg)
 
 	rows, err := h.db.QueryContext(r.Context(), selectQuery, args...)
 	if err != nil {

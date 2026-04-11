@@ -103,7 +103,9 @@ export function useQuotes(params: {
   const api = useApiClient();
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') search.set(key, String(value));
+    if (value === undefined || value === '') return;
+    if (key === 'page' && Number(value) === 1) return;
+    search.set(key, String(value));
   });
   const qs = search.toString();
 

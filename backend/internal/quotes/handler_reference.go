@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
@@ -221,6 +222,8 @@ func (h *Handler) handleListCustomers(w http.ResponseWriter, r *http.Request) {
 
 // Pipeline and stage filtering constants from Appsmith get_potentials / get_deals SQL.
 // These are backend constants per spec decision A6 (not configurable in v1).
+// Source: Appsmith export — pages/Nuova Proposta/queries/get_potentials.txt
+// Stages are coupled per pipeline — the WHERE clause must pair them.
 var (
 	standardPipeline = "255768766"
 	standardStages   = []string{"424443344", "424502259", "424502261", "424502262"}
@@ -228,29 +231,36 @@ var (
 	iaasStages       = []string{"424443381", "424443586", "424443588", "424443587", "424443589"}
 )
 
-// Suppress "unused" warnings for pipeline/stage vars used only in the hardcoded query string.
-var (
-	_ = standardPipeline
-	_ = standardStages
-	_ = iaasPipeline
-	_ = iaasStages
-)
+// quoteStageInClause renders a `('a','b',...)` SQL IN list from a stage slice.
+// The stage IDs are hardcoded backend constants (not user input), so direct
+// interpolation is safe and matches the Appsmith source query verbatim.
+func quoteStageInClause(stages []string) string {
+	quoted := make([]string, len(stages))
+	for i, s := range stages {
+		quoted[i] = "'" + s + "'"
+	}
+	return "(" + strings.Join(quoted, ",") + ")"
+}
+
+// listDealsQuery reproduces the Appsmith `get_potentials` eligibility rules:
+// (standard pipeline + its stages) OR (iaas pipeline + its stages), AND a
+// non-empty `codice`. Ordering is kept deterministic by id desc to match the
+// Appsmith source (`order by id desc`).
+var listDealsQuery = `SELECT d.id, d.name, d.pipeline, d.dealstage,
+                             c.id as company_id, c.name as company_name
+                      FROM loader.hubs_deal d
+                      LEFT JOIN loader.hubs_company c ON c.id = d.company_id
+                      WHERE ((d.pipeline = '` + standardPipeline + `' AND d.dealstage IN ` + quoteStageInClause(standardStages) + `)
+                          OR (d.pipeline = '` + iaasPipeline + `' AND d.dealstage IN ` + quoteStageInClause(iaasStages) + `))
+                        AND d.codice <> ''
+                      ORDER BY d.id DESC`
 
 func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 	if !h.requireDB(w) {
 		return
 	}
 
-	query := `SELECT d.id, d.name, d.pipeline, d.dealstage,
-	                 c.id as company_id, c.name as company_name
-	          FROM loader.hubs_deal d
-	          LEFT JOIN loader.hubs_company c ON c.id = d.company_id
-	          WHERE ((d.pipeline = '255768766' AND d.dealstage IN ('424443344','424502259','424502261','424502262'))
-	              OR (d.pipeline = '255768768' AND d.dealstage IN ('424443381','424443586','424443588','424443587','424443589')))
-	            AND d.codice <> ''
-	          ORDER BY d.name`
-
-	rows, err := h.db.QueryContext(r.Context(), query)
+	rows, err := h.db.QueryContext(r.Context(), listDealsQuery)
 	if err != nil {
 		h.dbFailure(w, r, "list_deals", err)
 		return
@@ -349,7 +359,7 @@ func (h *Handler) handleListOwners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `SELECT id, first_name, last_name, email FROM loader.hubs_owner ORDER BY last_name, first_name`
+	query := `SELECT id, first_name, last_name, email FROM loader.hubs_owner WHERE archived = FALSE ORDER BY last_name, first_name`
 
 	rows, err := h.db.QueryContext(r.Context(), query)
 	if err != nil {
@@ -400,7 +410,7 @@ func (h *Handler) handleListPaymentMethods(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	query := `SELECT codice, descrizione FROM loader.erp_metodi_pagamento ORDER BY descrizione`
+	query := `SELECT cod_pagamento, desc_pagamento FROM loader.erp_metodi_pagamento WHERE selezionabile IS TRUE ORDER BY desc_pagamento`
 
 	rows, err := h.db.QueryContext(r.Context(), query)
 	if err != nil {

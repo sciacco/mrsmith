@@ -3,6 +3,7 @@ import type { Quote } from '../api/types';
 import { StatusBadge } from './StatusBadge';
 import { KebabMenu } from './KebabMenu';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
+import { useDeleteQuote } from '../api/queries';
 import styles from './QuoteTable.module.css';
 
 interface QuoteTableProps {
@@ -34,6 +35,12 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
   const currentDir = params.get('dir') ?? 'desc';
   const { user } = useOptionalAuth();
   const canDelete = user?.roles?.includes('app_quotes_delete') ?? false;
+  const deleteQuote = useDeleteQuote();
+
+  const handleDelete = (id: number) => {
+    if (deleteQuote.isPending) return;
+    deleteQuote.mutate(id);
+  };
 
   const handleSort = (col: string) => {
     setParams(prev => {
@@ -111,8 +118,26 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
     );
   }
 
+  const deleteError = deleteQuote.isError
+    ? (deleteQuote.error instanceof Error ? deleteQuote.error.message : 'Errore durante la cancellazione')
+    : null;
+
   return (
-    <table className={`${styles.table} ${isFetching ? styles.refetching : ''}`}>
+    <>
+      {deleteError && (
+        <div className={styles.errorBar} role="alert">
+          {deleteError}
+          <button
+            type="button"
+            className={styles.errorDismiss}
+            onClick={() => deleteQuote.reset()}
+            aria-label="Chiudi"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+      <table className={`${styles.table} ${isFetching ? styles.refetching : ''}`}>
       <thead>
         <tr>
           <th style={{ width: 4 }} />
@@ -151,11 +176,16 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
             <td><div className={`${styles.cell} ${styles.muted}`}>{abbreviateName(q.owner_name)}</div></td>
             <td><div className={styles.cell}><StatusBadge status={q.status} /></div></td>
             <td className={styles.kebabCell}>
-              <KebabMenu quoteId={q.id} canDelete={canDelete} />
+              <KebabMenu
+                quoteId={q.id}
+                canDelete={canDelete}
+                onDelete={() => handleDelete(q.id)}
+              />
             </td>
           </tr>
         ))}
       </tbody>
     </table>
+    </>
   );
 }

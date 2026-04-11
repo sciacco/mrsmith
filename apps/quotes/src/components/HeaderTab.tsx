@@ -1,5 +1,5 @@
 import type { Quote } from '../api/types';
-import { useOwners, usePaymentMethods } from '../api/queries';
+import { useCustomerOrders, useOwners, usePaymentMethods } from '../api/queries';
 import styles from './HeaderTab.module.css';
 
 interface HeaderTabProps {
@@ -10,6 +10,15 @@ interface HeaderTabProps {
 export function HeaderTab({ quote, onChange }: HeaderTabProps) {
   const { data: owners } = useOwners();
   const { data: paymentMethods } = usePaymentMethods();
+  const customerIdStr = quote.customer_id != null ? String(quote.customer_id) : null;
+  const customerOrdersQuery = useCustomerOrders(customerIdStr);
+  const customerOrders = customerOrdersQuery.data ?? [];
+
+  // Stored as `;`-separated string (Appsmith parity); present as multi-select.
+  const selectedOrders = (quote.replace_orders ?? '')
+    .split(';')
+    .map(s => s.trim())
+    .filter(Boolean);
 
   const isIaaS = false; // Will be resolved from template lookup in later phases
   const isSpot = quote.document_type === 'TSC-ORDINE';
@@ -89,13 +98,30 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
         {quote.proposal_type === 'SOSTITUZIONE' && (
           <div className={`${styles.field} ${styles.revealEnter}`}>
             <label className={styles.label}>Ordini da sostituire</label>
-            <input
+            <select
               className={styles.input}
-              type="text"
-              value={quote.replace_orders ?? ''}
-              onChange={e => onChange('replace_orders', e.target.value)}
-              placeholder="Separare con ;"
-            />
+              multiple
+              size={Math.min(6, Math.max(3, customerOrders.length))}
+              value={selectedOrders}
+              disabled={customerOrdersQuery.isPending || customerOrders.length === 0}
+              onChange={e => {
+                const chosen = Array.from(e.target.selectedOptions, o => o.value);
+                onChange('replace_orders', chosen.join(';'));
+              }}
+            >
+              {customerOrders.map(o => (
+                <option key={o.name} value={o.name}>{o.name}</option>
+              ))}
+              {/* Preserve any legacy stored values that are not in the loaded list */}
+              {selectedOrders
+                .filter(v => !customerOrders.some(o => o.name === v))
+                .map(v => (
+                  <option key={`legacy-${v}`} value={v}>{v} (legacy)</option>
+                ))}
+            </select>
+            {!customerOrdersQuery.isPending && customerOrders.length === 0 && (
+              <div className={styles.emptyHint}>Nessun ordine disponibile per il cliente.</div>
+            )}
           </div>
         )}
       </div>

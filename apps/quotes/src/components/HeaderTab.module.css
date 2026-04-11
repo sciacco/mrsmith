@@ -106,7 +106,13 @@
 
 @keyframes revealSlide {
   from { max-height: 0; opacity: 0; }
-  to   { max-height: 100px; opacity: 1; }
+  to   { max-height: 200px; opacity: 1; }
+}
+
+.emptyHint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #64748b);
+  margin-top: 0.25rem;
 }
 
 .disabled {
