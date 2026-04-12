@@ -38,11 +38,21 @@ export function useCategories(params?: { excludeIds?: number[]; enabled?: boolea
   });
 }
 
-export function useKits(options?: { enabled?: boolean }) {
+export function useKits(options?: { enabled?: boolean; includeIds?: number[] }) {
   const api = useApiClient();
+  const includeIds = (options?.includeIds ?? [])
+    .filter((id): id is number => Number.isInteger(id) && id > 0)
+    .sort((a, b) => a - b);
+
+  const search = new URLSearchParams();
+  if (includeIds.length > 0) {
+    search.set('include_ids', includeIds.join(','));
+  }
+  const qs = search.toString();
+
   return useQuery({
-    queryKey: ['kits'],
-    queryFn: () => api.get<Kit[]>('/quotes/v1/kits'),
+    queryKey: ['kits', includeIds],
+    queryFn: () => api.get<Kit[]>(`/quotes/v1/kits${qs ? '?' + qs : ''}`),
     enabled: options?.enabled ?? true,
   });
 }

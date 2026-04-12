@@ -43,7 +43,7 @@ func TestHandleCreateQuoteRejectsIaaSTemplateMissingKit(t *testing.T) {
 	}
 }
 
-func TestHandleCreateQuoteRejectsIaaSTemplateUnavailableKit(t *testing.T) {
+func TestHandleCreateQuoteRejectsIaaSTemplateKitNotFound(t *testing.T) {
 	resetCreateHandlerTracker("create-iaas-kit-unavailable")
 
 	h := &Handler{db: openCreateHandlerTestDB(t, "create-iaas-kit-unavailable")}
@@ -67,7 +67,7 @@ func TestHandleCreateQuoteRejectsIaaSTemplateUnavailableKit(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if payload.Error != "iaas_template_kit_unavailable" {
+	if payload.Error != "iaas_template_kit_not_found" {
 		t.Fatalf("unexpected error payload: %#v", payload)
 	}
 }

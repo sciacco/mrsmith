@@ -117,8 +117,8 @@ Alyante ERP ID
 
 - Context: `apps/quotes` Nuova Proposta IaaS path and `POST /quotes/v1/quotes`.
 - Discovery: hardcoded frontend template-ID maps can drift from `quotes.template` and produce dead-end create flows where no kit is derivable, even when template metadata exists in DB.
-- Practical rule: derive IaaS kit/services from `quotes.template` (`template_type`, `kit_id`, `service_category_id`) and treat DB metadata as the single source of truth. Backend create must reject IaaS templates without a selectable kit.
-- Evidence: `apps/quotes/src/pages/QuoteCreatePage.tsx`, `apps/quotes/src/components/HeaderTab.tsx`, `backend/internal/quotes/handler_quotes.go`, `backend/internal/quotes/handler_create_test.go`.
+- Practical rule: derive IaaS kit/services from `quotes.template` (`template_type`, `kit_id`, `service_category_id`) and treat DB metadata as the single source of truth. For template-linked kits, bypass standard catalog eligibility (`is_active/ecommerce/quotable`) when resolving the kit; backend create must still reject missing template kit IDs or non-existent kit IDs.
+- Evidence: `apps/quotes/src/pages/QuoteCreatePage.tsx`, `apps/quotes/src/api/queries.ts` (`include_ids`), `backend/internal/quotes/handler_reference.go` (`include_ids` merge), `backend/internal/quotes/handler_quotes.go`, `backend/internal/quotes/handler_create_test.go`.
 - Used by: `apps/quotes` create wizard and create endpoint validation.
 - Open questions: none.
 

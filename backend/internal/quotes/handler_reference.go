@@ -180,6 +180,8 @@ func (h *Handler) handleListKits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	includeIDs := parseKitInclusions(r.URL.Query().Get("include_ids"))
+
 	rows, err := h.db.QueryContext(r.Context(), listKitsQuery)
 	if err != nil {
 		h.dbFailure(w, r, "list_kits", err)
@@ -202,6 +204,7 @@ func (h *Handler) handleListKits(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := []kit{}
+	seen := make(map[int64]struct{})
 	for rows.Next() {
 		var k kit
 		if err := rows.Scan(&k.ID, &k.InternalName, &k.NRC, &k.MRC, &k.CategoryID, &k.CategoryName, &k.IsActive, &k.Ecommerce, &k.Quotable); err != nil {
@@ -215,13 +218,88 @@ func (h *Handler) handleListKits(w http.ResponseWriter, r *http.Request) {
 			v := int(k.CategoryID.Int32)
 			k.CategoryIDV = &v
 		}
+		if _, exists := seen[k.ID]; exists {
+			continue
+		}
+		seen[k.ID] = struct{}{}
 		result = append(result, k)
 	}
 	if !h.rowsDone(w, r, rows, "list_kits") {
 		return
 	}
 
+	if len(includeIDs) > 0 {
+		// Explicit template-linked kits must be recoverable even if they are not
+		// selectable in the standard quotable catalog.
+		args := make([]any, 0, len(includeIDs))
+		placeholders := make([]string, 0, len(includeIDs))
+		for i, id := range includeIDs {
+			args = append(args, id)
+			placeholders = append(placeholders, "$"+strconv.Itoa(i+1))
+		}
+		query := `SELECT k.id, k.internal_name, k.nrc, k.mrc, k.category_id, pc.name as category_name,
+		                 k.is_active, k.ecommerce, k.quotable
+		          FROM products.kit k
+		          LEFT JOIN products.product_category pc ON pc.id = k.category_id
+		          WHERE k.id IN (` + strings.Join(placeholders, ",") + `)
+		          ORDER BY pc.name, k.internal_name`
+		includeRows, err := h.db.QueryContext(r.Context(), query, args...)
+		if err != nil {
+			h.dbFailure(w, r, "list_kits_include_ids", err)
+			return
+		}
+		defer includeRows.Close()
+		for includeRows.Next() {
+			var k kit
+			if err := includeRows.Scan(&k.ID, &k.InternalName, &k.NRC, &k.MRC, &k.CategoryID, &k.CategoryName, &k.IsActive, &k.Ecommerce, &k.Quotable); err != nil {
+				h.dbFailure(w, r, "list_kits_include_ids_scan", err)
+				return
+			}
+			if _, exists := seen[k.ID]; exists {
+				continue
+			}
+			if k.CategoryName.Valid {
+				k.Category = &k.CategoryName.String
+			}
+			if k.CategoryID.Valid {
+				v := int(k.CategoryID.Int32)
+				k.CategoryIDV = &v
+			}
+			seen[k.ID] = struct{}{}
+			result = append(result, k)
+		}
+		if !h.rowsDone(w, r, includeRows, "list_kits_include_ids") {
+			return
+		}
+	}
+
 	httputil.JSON(w, http.StatusOK, result)
+}
+
+func parseKitInclusions(raw string) []int {
+	if raw == "" {
+		return nil
+	}
+
+	parts := strings.Split(raw, ",")
+	result := make([]int, 0, len(parts))
+	seen := make(map[int]struct{}, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		if value == "" {
+			continue
+		}
+		id, err := strconv.Atoi(value)
+		if err != nil || id <= 0 {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
 }
 
 // ── Customers (HubSpot companies from loader) ──

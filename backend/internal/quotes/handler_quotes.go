@@ -586,7 +586,7 @@ func (h *Handler) handleCreateQuote(w http.ResponseWriter, r *http.Request) {
 		body["bill_months"] = 3
 	}
 
-	// IaaS templates must derive a single quotable kit from template metadata.
+	// IaaS templates must derive a single existing kit from template metadata.
 	if templateType == "iaas" {
 		if !templateKitID.Valid {
 			httputil.Error(w, http.StatusUnprocessableEntity, "iaas_template_missing_kit")
@@ -598,7 +598,7 @@ func (h *Handler) handleCreateQuote(w http.ResponseWriter, r *http.Request) {
 			`SELECT EXISTS(
 				SELECT 1
 				FROM products.kit k
-				WHERE k.id = $1 AND k.is_active = true AND k.ecommerce = false AND k.quotable = true
+				WHERE k.id = $1
 			)`,
 			templateKitID.Int64,
 		).Scan(&kitIsSelectable)
@@ -607,7 +607,7 @@ func (h *Handler) handleCreateQuote(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !kitIsSelectable {
-			httputil.Error(w, http.StatusUnprocessableEntity, "iaas_template_kit_unavailable")
+			httputil.Error(w, http.StatusUnprocessableEntity, "iaas_template_kit_not_found")
 			return
 		}
 

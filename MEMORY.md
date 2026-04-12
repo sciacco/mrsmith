@@ -100,8 +100,9 @@
 
 ## 2026-04-12
 - Quotes Nuova Proposta IaaS no longer depends on hardcoded template-ID maps in frontend utilities; create wizard derivation now uses `quotes.template` metadata already loaded via `useTemplates` (`template_type`, `kit_id`, `service_category_id`).
-- Quotes create-step gating for IaaS is now strict: step 2 can advance only when the template resolves to a real kit in the quotable kit catalog; otherwise the wizard shows an explicit data-alignment error state.
+- Quotes create-step gating for IaaS is now strict on template linkage: step 2 can advance only when the template resolves to a real kit; the UI no longer assumes that template-linked kits must also be in the standard quotable catalog.
 - Quotes detail header now detects IaaS mode from template metadata (`template_type === 'iaas'`) instead of hardcoded template IDs.
-- `POST /quotes/v1/quotes` now enforces IaaS template integrity server-side: it requires `kit_id` on IaaS templates, verifies kit selectability (`is_active=true`, `ecommerce=false`, `quotable=true`), derives the inserted kit row from template metadata, and returns `422` errors (`iaas_template_missing_kit`, `iaas_template_kit_unavailable`) on inconsistency.
+- `GET /quotes/v1/kits` now supports `include_ids` so template-linked kits can be returned even when excluded by standard catalog filters; the endpoint de-duplicates results across filtered and explicitly included kits.
+- `POST /quotes/v1/quotes` now enforces IaaS template integrity server-side by requiring `kit_id` and verifying kit existence (not quotable eligibility), derives the inserted kit row from template metadata, and returns `422` errors (`iaas_template_missing_kit`, `iaas_template_kit_not_found`) on inconsistency.
 - Added backend coverage in `backend/internal/quotes/handler_create_test.go` for the new IaaS create validation and derivation rules (missing kit, unavailable kit, and successful forced derivation).
 - Added reusable guidance to `docs/IMPLEMENTATION-KNOWLEDGE.md`: IaaS template derivation in Quotes must be DB-driven, with backend rejection for invalid template-kit mappings.

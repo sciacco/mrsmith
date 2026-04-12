@@ -49,6 +49,14 @@ func TestParseCategoryExclusions(t *testing.T) {
 	}
 }
 
+func TestParseKitInclusions(t *testing.T) {
+	got := parseKitInclusions("62, 116,foo,0,-1,62,,119")
+	want := []int{62, 116, 119}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("parseKitInclusions mismatch: got %v, want %v", got, want)
+	}
+}
+
 func TestListKitsQueryMatchesAppsmithEligibility(t *testing.T) {
 	mustContain := []string{
 		"k.is_active = true",

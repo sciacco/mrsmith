@@ -136,12 +136,19 @@ export function QuoteCreatePage() {
     [state.iaasLanguage],
   );
   const { data: templates } = useTemplates(templatesParams);
-  const { data: kits, isPending: kitsPending } = useKits({ enabled: shouldLoadKits });
-  const createQuote = useCreateQuote();
   const selectedTemplate = useMemo(
     () => templates?.find(t => t.template_id === state.template) ?? null,
     [state.template, templates],
   );
+  const kitsQueryOptions = useMemo<{ enabled?: boolean; includeIds?: number[] }>(() => {
+    if (!shouldLoadKits) return { enabled: false };
+    if (state.quoteType === 'iaas' && selectedTemplate?.kit_id != null) {
+      return { enabled: true, includeIds: [selectedTemplate.kit_id] };
+    }
+    return { enabled: true };
+  }, [selectedTemplate?.kit_id, shouldLoadKits, state.quoteType]);
+  const { data: kits, isPending: kitsPending } = useKits(kitsQueryOptions);
+  const createQuote = useCreateQuote();
   const derivedIaaSKit = useMemo(
     () => kits?.find(k => k.id === (selectedTemplate?.kit_id ?? -1)) ?? null,
     [kits, selectedTemplate],
@@ -816,8 +823,8 @@ export function QuoteCreatePage() {
                   </div>
                 ) : (
                   <div className={styles.emptyBlock}>
-                    Template IaaS non allineato: il kit configurato non e disponibile nel catalogo
-                    quotabile. Correggi template/kit prima di continuare.
+                    Template IaaS non allineato: il kit configurato non e stato trovato.
+                    Correggi il collegamento template/kit prima di continuare.
                   </div>
                 )}
               </div>
