@@ -31,6 +31,22 @@ const listKitsQuery = `SELECT k.id, k.internal_name, k.nrc, k.mrc, k.category_id
 	          WHERE k.is_active = true AND k.ecommerce = false AND k.quotable = true
 	          ORDER BY pc.name, k.internal_name`
 
+func normalizedERPBridgeID(erpID sql.NullString) (string, bool) {
+	if !erpID.Valid {
+		return "", false
+	}
+	id := strings.TrimSpace(erpID.String)
+	if id == "" {
+		return "", false
+	}
+	for i := 0; i < len(id); i++ {
+		if id[i] < '0' || id[i] > '9' {
+			return "", false
+		}
+	}
+	return id, true
+}
+
 // ── Templates ──
 
 func (h *Handler) handleListTemplates(w http.ResponseWriter, r *http.Request) {
@@ -673,7 +689,8 @@ func (h *Handler) handleCustomerPayment(w http.ResponseWriter, r *http.Request) 
 		h.dbFailure(w, r, "customer_payment_bridge", err)
 		return
 	}
-	if err == sql.ErrNoRows || !erpID.Valid {
+	resolvedERPID, ok := normalizedERPBridgeID(erpID)
+	if err == sql.ErrNoRows || !ok {
 		httputil.JSON(w, http.StatusOK, defaultPayment)
 		return
 	}
@@ -681,7 +698,7 @@ func (h *Handler) handleCustomerPayment(w http.ResponseWriter, r *http.Request) 
 	// Step 2: Query Alyante with the resolved ERP ID
 	var p payment
 	err = h.alyanteDB.QueryRowContext(r.Context(),
-		customerPaymentQuery, erpID.String).Scan(&p.PaymentCode)
+		customerPaymentQuery, resolvedERPID).Scan(&p.PaymentCode)
 
 	if err == sql.ErrNoRows {
 		httputil.JSON(w, http.StatusOK, defaultPayment)
@@ -735,7 +752,8 @@ func (h *Handler) handleCustomerOrders(w http.ResponseWriter, r *http.Request) {
 		h.dbFailure(w, r, "customer_orders_bridge", err)
 		return
 	}
-	if err == sql.ErrNoRows || !erpID.Valid {
+	resolvedERPID, ok := normalizedERPBridgeID(erpID)
+	if err == sql.ErrNoRows || !ok {
 		httputil.JSON(w, http.StatusOK, []struct{}{})
 		return
 	}
@@ -743,7 +761,7 @@ func (h *Handler) handleCustomerOrders(w http.ResponseWriter, r *http.Request) {
 	// Step 2: Query Alyante with the resolved ERP ID.
 	// IMPORTANT: Always filter by customer ID — this fixes the Appsmith bug
 	// where cli_orders was unscoped (bug A7 in spec).
-	rows, err := h.alyanteDB.QueryContext(r.Context(), customerOrdersQuery, erpID.String)
+	rows, err := h.alyanteDB.QueryContext(r.Context(), customerOrdersQuery, resolvedERPID)
 	if err != nil {
 		h.dbFailure(w, r, "customer_orders", err)
 		return

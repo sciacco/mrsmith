@@ -119,6 +119,108 @@ func TestHandleCustomerOrdersUsesResolvedERPCustomerID(t *testing.T) {
 	}
 }
 
+func TestHandleCustomerOrdersSkipsAlyanteWhenBridgeIDUnavailable(t *testing.T) {
+	cases := []struct {
+		name string
+		mode string
+	}{
+		{name: "null", mode: "customer-orders-mistra-null"},
+		{name: "empty", mode: "customer-orders-mistra-empty"},
+		{name: "whitespace", mode: "customer-orders-mistra-whitespace"},
+		{name: "non-numeric", mode: "customer-orders-mistra-nonnumeric"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetQuotesHandlerTracker(tc.mode)
+			resetQuotesHandlerTracker("customer-orders-alyante-skip")
+
+			h := &Handler{
+				db:        openQuotesHandlerTestDB(t, tc.mode),
+				alyanteDB: openQuotesHandlerTestDB(t, "customer-orders-alyante-skip"),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/quotes/v1/customer-orders/12345", nil)
+			req.SetPathValue("customerId", "12345")
+			rec := httptest.NewRecorder()
+
+			h.handleCustomerOrders(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+			}
+
+			var got []struct {
+				Name string `json:"name"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+			if len(got) != 0 {
+				t.Fatalf("expected empty orders payload, got %#v", got)
+			}
+
+			if tracker := quotesHandlerTrackerForMode(tc.mode); tracker.bridgeCustomerID != "12345" {
+				t.Fatalf("bridge lookup used customer id %q, want %q", tracker.bridgeCustomerID, "12345")
+			}
+			if tracker := quotesHandlerTrackerForMode("customer-orders-alyante-skip"); tracker.ordersQueryCalls != 0 {
+				t.Fatalf("expected no Alyante orders query, got %d call(s)", tracker.ordersQueryCalls)
+			}
+		})
+	}
+}
+
+func TestHandleCustomerPaymentSkipsAlyanteWhenBridgeIDUnavailable(t *testing.T) {
+	cases := []struct {
+		name string
+		mode string
+	}{
+		{name: "null", mode: "customer-payment-mistra-null"},
+		{name: "empty", mode: "customer-payment-mistra-empty"},
+		{name: "whitespace", mode: "customer-payment-mistra-whitespace"},
+		{name: "non-numeric", mode: "customer-payment-mistra-nonnumeric"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetQuotesHandlerTracker(tc.mode)
+			resetQuotesHandlerTracker("customer-payment-alyante-skip")
+
+			h := &Handler{
+				db:        openQuotesHandlerTestDB(t, tc.mode),
+				alyanteDB: openQuotesHandlerTestDB(t, "customer-payment-alyante-skip"),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/quotes/v1/customer-payment/12345", nil)
+			req.SetPathValue("customerId", "12345")
+			rec := httptest.NewRecorder()
+
+			h.handleCustomerPayment(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+			}
+
+			var got struct {
+				PaymentCode string `json:"payment_code"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+			if got.PaymentCode != "402" {
+				t.Fatalf("payment_code = %q, want %q", got.PaymentCode, "402")
+			}
+
+			if tracker := quotesHandlerTrackerForMode(tc.mode); tracker.bridgeCustomerID != "12345" {
+				t.Fatalf("bridge lookup used customer id %q, want %q", tracker.bridgeCustomerID, "12345")
+			}
+			if tracker := quotesHandlerTrackerForMode("customer-payment-alyante-skip"); tracker.paymentQueryCalls != 0 {
+				t.Fatalf("expected no Alyante payment query, got %d call(s)", tracker.paymentQueryCalls)
+			}
+		})
+	}
+}
+
 func TestHandleUpdateProductAcceptsBooleanProcResult(t *testing.T) {
 	resetQuotesHandlerTracker("update-product-success")
 
@@ -194,6 +296,8 @@ var (
 type quotesHandlerTracker struct {
 	bridgeCustomerID  string
 	alyanteCustomerID string
+	ordersQueryCalls  int
+	paymentQueryCalls int
 	procPayload       string
 	lastQuery         string
 }
@@ -269,18 +373,53 @@ func (c *quotesHandlerTestConn) QueryContext(_ context.Context, query string, ar
 				int64(99), "Acme Spa", "10642803691", "it", "newbusiness", nil, nil,
 			}},
 		}, nil
-	case c.mode == "customer-orders-mistra" && strings.Contains(query, "SELECT numero_azienda FROM loader.hubs_company"):
+	case strings.HasPrefix(c.mode, "customer-orders-mistra") && strings.Contains(query, "SELECT numero_azienda FROM loader.hubs_company"):
 		tracker.bridgeCustomerID = namedString(args[0])
+		bridgeValue := driver.Value("10642803691")
+		switch c.mode {
+		case "customer-orders-mistra-null":
+			bridgeValue = nil
+		case "customer-orders-mistra-empty":
+			bridgeValue = ""
+		case "customer-orders-mistra-whitespace":
+			bridgeValue = "   "
+		case "customer-orders-mistra-nonnumeric":
+			bridgeValue = "ABC123"
+		}
 		return &quotesHandlerTestRows{
 			columns: []string{"numero_azienda"},
-			values:  [][]driver.Value{{"10642803691"}},
+			values:  [][]driver.Value{{bridgeValue}},
 		}, nil
 	case c.mode == "customer-orders-alyante" && strings.Contains(query, "FROM Tsmi_Ordini"):
+		tracker.ordersQueryCalls++
 		tracker.alyanteCustomerID = namedString(args[0])
 		return &quotesHandlerTestRows{
 			columns: []string{"order_name"},
 			values:  [][]driver.Value{{"ORD-200"}, {"ORD-100"}},
 		}, nil
+	case c.mode == "customer-orders-alyante-skip" && strings.Contains(query, "FROM Tsmi_Ordini"):
+		tracker.ordersQueryCalls++
+		return nil, errors.New("unexpected Alyante orders query")
+	case strings.HasPrefix(c.mode, "customer-payment-mistra") && strings.Contains(query, "SELECT numero_azienda FROM loader.hubs_company"):
+		tracker.bridgeCustomerID = namedString(args[0])
+		bridgeValue := driver.Value("10642803691")
+		switch c.mode {
+		case "customer-payment-mistra-null":
+			bridgeValue = nil
+		case "customer-payment-mistra-empty":
+			bridgeValue = ""
+		case "customer-payment-mistra-whitespace":
+			bridgeValue = "   "
+		case "customer-payment-mistra-nonnumeric":
+			bridgeValue = "ABC123"
+		}
+		return &quotesHandlerTestRows{
+			columns: []string{"numero_azienda"},
+			values:  [][]driver.Value{{bridgeValue}},
+		}, nil
+	case c.mode == "customer-payment-alyante-skip" && strings.Contains(query, "FROM Tsmi_Anagrafiche_clienti"):
+		tracker.paymentQueryCalls++
+		return nil, errors.New("unexpected Alyante payment query")
 	case c.mode == "update-product-success" && strings.Contains(query, "SELECT qr.quote_id FROM quotes.quote_rows_products qrp"):
 		return &quotesHandlerTestRows{
 			columns: []string{"quote_id"},
