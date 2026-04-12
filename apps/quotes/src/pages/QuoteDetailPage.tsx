@@ -139,6 +139,38 @@ export function QuoteDetailPage() {
   );
   const publishBlocked = publishBlockers.length > 0;
   const isRepublish = !!hsStatus?.hs_quote_id;
+  const pdfAction = useMemo(() => {
+    if (!hsStatus?.hs_quote_id) {
+      return {
+        enabled: false,
+        href: null as string | null,
+        message: 'Pubblica prima la proposta su HubSpot per generare il PDF.',
+      };
+    }
+    if (!hsStatus.pdf_url) {
+      return {
+        enabled: false,
+        href: null as string | null,
+        message: 'HubSpot non ha ancora generato il PDF.',
+      };
+    }
+    if (hsStatus.quote_url && hsStatus.pdf_url === hsStatus.quote_url) {
+      return {
+        enabled: false,
+        href: null as string | null,
+        message: 'Il link PDF non è ancora disponibile separatamente.',
+      };
+    }
+    return {
+      enabled: true,
+      href: hsStatus.pdf_url,
+      message: 'Scarica il PDF della proposta da HubSpot.',
+    };
+  }, [hsStatus]);
+  const handleOpenPdf = useCallback(() => {
+    if (!pdfAction.enabled || !pdfAction.href) return;
+    window.open(pdfAction.href, '_blank', 'noopener,noreferrer');
+  }, [pdfAction.enabled, pdfAction.href]);
 
   if (isLoading || !localQuote) {
     return <div className={styles.loading}>Caricamento...</div>;
@@ -180,17 +212,20 @@ export function QuoteDetailPage() {
               Apri su HS
             </a>
           )}
-          {hsStatus?.pdf_url && hsStatus.pdf_url !== hsStatus.quote_url && (
-            <a
-              className={styles.hsLink}
-              href={hsStatus.pdf_url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Icon name="download" size={14} />
-              PDF
-            </a>
-          )}
+          <Tooltip content={<span>{pdfAction.message}</span>} placement="bottom">
+            <span className={styles.hsLinkWrap}>
+              <button
+                type="button"
+                className={`${styles.hsLinkButton} ${!pdfAction.enabled ? styles.hsLinkButtonDisabled : ''}`}
+                onClick={handleOpenPdf}
+                disabled={!pdfAction.enabled}
+                aria-label="Scarica PDF"
+              >
+                <Icon name="download" size={14} />
+                PDF
+              </button>
+            </span>
+          </Tooltip>
 
           <div className={styles.saveWrap}>
             <Button

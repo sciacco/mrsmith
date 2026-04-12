@@ -84,6 +84,41 @@
   background: var(--color-accent-subtle);
 }
 
+.hsLinkWrap {
+  display: inline-flex;
+}
+
+.hsLinkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-accent);
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.hsLinkButton:hover:not(:disabled) {
+  background: var(--color-accent-subtle);
+}
+
+.hsLinkButtonDisabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.hsLinkButton:disabled {
+  pointer-events: none;
+}
+
 .saveWrap {
   position: relative;
   display: inline-flex;
