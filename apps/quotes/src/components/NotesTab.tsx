@@ -24,6 +24,7 @@ export function NotesTab({ quote, onChange }: NotesTabProps) {
           value={quote.description ?? ''}
           onChange={html => onChange('description', html)}
           placeholder="Scrivi una breve descrizione della proposta..."
+          standalone
         />
       </section>
 
@@ -38,6 +39,7 @@ export function NotesTab({ quote, onChange }: NotesTabProps) {
           value={quote.notes ?? ''}
           onChange={html => onChange('notes', html)}
           placeholder="Specifica eventuali pattuizioni fuori standard..."
+          standalone
         />
         <div className={`${styles.banner} ${hasNotes ? styles.bannerAmber : styles.bannerMuted}`}>
           <Icon name={hasNotes ? 'triangle-alert' : 'info'} size={16} />
