@@ -99,6 +99,7 @@
 - Quotes customer-payment lookups against Alyante must use `Tsmi_Anagrafiche_clienti.CODICE_PAGAMENTO` with `402` fallback semantics; `backend/internal/quotes/handler_reference_test.go` pins that SQL contract.
 
 ## 2026-04-12
+- Quotes deal-selection payload now includes nullable `owner_email` from `loader.hubs_owner.email` (via existing owner LEFT JOIN) on `GET /quotes/v1/deals`; this is intentionally backend/frontend-contract only and not rendered yet, to support a future "I miei deal" filter by authenticated user email.
 - Quotes deal-selection list (`GET /quotes/v1/deals`) now enriches each deal with optional owner identity from `loader.hubs_owner` via `LEFT JOIN` on `hubs_deal.hubspot_owner_id`; payload adds nullable `owner_firstname` and `owner_lastname`.
 - Nuova Proposta `DealCard` metadata now renders owner full name (if present) next to dealtype and timestamps (`Creata`, `Mod.`) with separator-aware conditional rendering so missing owner/dealtype does not leave broken bullets.
 - Quotes DealCard metadata has a strict `dealtype` mapping: only `newbusiness -> New` and `existingbusiness -> Existing`; unknown/missing values are hidden (no fallback labels).

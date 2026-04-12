@@ -49,6 +49,7 @@ export interface Deal {
   updated_at?: string | null;
   owner_firstname?: string | null;
   owner_lastname?: string | null;
+  owner_email?: string | null;
   company_id: number | null;
   company_name: string | null;
   company_lingua: string | null;

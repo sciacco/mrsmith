@@ -376,7 +376,7 @@ func quoteStageInClause(stages []string) string {
 var listDealsQuery = `SELECT d.id, d.name, p.label as pipeline, s.label as dealstage,
                              c.id as company_id, c.name as company_name, c.lingua as company_lingua,
                              d.dealtype, d.created_at, d.updated_at,
-                             o.first_name as owner_firstname, o.last_name as owner_lastname
+                             o.first_name as owner_firstname, o.last_name as owner_lastname, o.email as owner_email
                       FROM loader.hubs_deal d
                       LEFT JOIN loader.hubs_company c ON c.id = d.company_id
                       LEFT JOIN loader.hubs_pipeline p ON p.id = d.pipeline
@@ -422,12 +422,14 @@ func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 		OwnerFirstNameV *string        `json:"owner_firstname"`
 		OwnerLastName   sql.NullString `json:"-"`
 		OwnerLastNameV  *string        `json:"owner_lastname"`
+		OwnerEmail      sql.NullString `json:"-"`
+		OwnerEmailV     *string        `json:"owner_email"`
 	}
 
 	result := []deal{}
 	for rows.Next() {
 		var d deal
-		if err := rows.Scan(&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.CompanyLingua, &d.DealType, &d.CreatedAt, &d.UpdatedAt, &d.OwnerFirstName, &d.OwnerLastName); err != nil {
+		if err := rows.Scan(&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.CompanyLingua, &d.DealType, &d.CreatedAt, &d.UpdatedAt, &d.OwnerFirstName, &d.OwnerLastName, &d.OwnerEmail); err != nil {
 			h.dbFailure(w, r, "list_deals_scan", err)
 			return
 		}
@@ -454,6 +456,9 @@ func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 		}
 		if d.OwnerLastName.Valid {
 			d.OwnerLastNameV = &d.OwnerLastName.String
+		}
+		if d.OwnerEmail.Valid {
+			d.OwnerEmailV = &d.OwnerEmail.String
 		}
 		d.CreatedAtV = nullTimeToRFC3339(d.CreatedAt)
 		d.UpdatedAtV = nullTimeToRFC3339(d.UpdatedAt)

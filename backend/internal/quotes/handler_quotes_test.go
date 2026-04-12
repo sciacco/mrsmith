@@ -87,6 +87,7 @@ func TestListDealsQueryMatchesAppsmithEligibility(t *testing.T) {
 		"SELECT d.id, d.name, p.label as pipeline, s.label as dealstage,",
 		"d.dealtype, d.created_at, d.updated_at",
 		"o.first_name as owner_firstname, o.last_name as owner_lastname",
+		"o.email as owner_email",
 		"LEFT JOIN loader.hubs_owner o ON o.id = d.hubspot_owner_id",
 		"WHERE ((d.pipeline = '255768766'",
 		"d.pipeline = '255768766'",
