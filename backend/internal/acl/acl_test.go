@@ -35,8 +35,8 @@ func TestRequireRole(t *testing.T) {
 			wantStatus: http.StatusOK,
 		},
 		{
-			name:       "devadmin bypass",
-			claims:     &auth.Claims{Roles: []string{"devadmin"}},
+			name:       "app_devadmin bypass",
+			claims:     &auth.Claims{Roles: []string{"app_devadmin"}},
 			wantStatus: http.StatusOK,
 		},
 	}

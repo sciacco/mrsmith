@@ -58,14 +58,14 @@ func TestVisibleCategoriesBothRolesSeesEverything(t *testing.T) {
 
 func TestVisibleCategoriesDevAdminSeesEverything(t *testing.T) {
 	catalog := Catalog(nil)
-	categories := VisibleCategories(catalog, []string{"devadmin"})
+	categories := VisibleCategories(catalog, []string{"app_devadmin"})
 
 	total := 0
 	for _, cat := range categories {
 		total += len(cat.Apps)
 	}
 	if total != 20 {
-		t.Fatalf("expected 20 total apps for devadmin, got %d", total)
+		t.Fatalf("expected 20 total apps for app_devadmin, got %d", total)
 	}
 }
 

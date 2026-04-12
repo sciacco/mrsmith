@@ -1,6 +1,6 @@
 package authz
 
-const DevAdminRole = "devadmin"
+const DevAdminRole = "app_devadmin"
 
 func HasRole(userRoles []string, requiredRole string) bool {
 	if requiredRole == "" {

@@ -121,8 +121,8 @@ func TestHandleListAppsDevAdminSeesEverything(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/portal/apps", nil)
 	req = req.WithContext(context.WithValue(req.Context(), auth.ClaimsKey, auth.Claims{
 		Name:  "Dev Admin",
-		Email: "devadmin@example.com",
-		Roles: []string{"devadmin"},
+		Email: "app_devadmin@example.com",
+		Roles: []string{"app_devadmin"},
 	}))
 
 	rec := httptest.NewRecorder()
@@ -144,7 +144,7 @@ func TestHandleListAppsDevAdminSeesEverything(t *testing.T) {
 		total += len(cat.Apps)
 	}
 	if total != 20 {
-		t.Fatalf("expected 20 apps for devadmin, got %d", total)
+		t.Fatalf("expected 20 apps for app_devadmin, got %d", total)
 	}
 }
 

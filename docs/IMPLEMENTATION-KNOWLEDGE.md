@@ -191,7 +191,7 @@ Alyante ERP ID
 
 - Context: Keycloak-role authorization across launcher visibility, backend ACL middleware, and app-specific elevated permissions.
 - Discovery: role checks implemented independently (`acl.RequireRole`, launcher catalog filtering, and direct role checks like quotes delete) drift unless they share a single superuser rule.
-- Practical rule: implement `devadmin` as a centralized override in shared authz helpers and consume those helpers everywhere role checks are performed (backend ACL, portal catalog filters, app-specific elevated checks, and frontend role-gated controls). Avoid raw `includes`/`slices.Contains` role checks in feature code.
+- Practical rule: implement `app_devadmin` as a centralized override in shared authz helpers and consume those helpers everywhere role checks are performed (backend ACL, portal catalog filters, app-specific elevated checks, and frontend role-gated controls). Avoid raw `includes`/`slices.Contains` role checks in feature code.
 - Evidence: `backend/internal/authz/authz.go`, `backend/internal/acl/acl.go`, `backend/internal/platform/applaunch/catalog.go`, `backend/internal/quotes/handler_quotes.go`, `packages/auth-client/src/roles.ts`, `apps/quotes/src/components/QuoteTable.tsx`.
 - Used by: portal app visibility, all ACL-protected backend app routes, quotes delete authorization.
 - Open questions: none.

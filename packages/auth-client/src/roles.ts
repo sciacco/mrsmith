@@ -1,4 +1,4 @@
-export const DEVADMIN_ROLE = 'devadmin';
+export const DEVADMIN_ROLE = 'app_devadmin';
 
 function containsRole(userRoles: readonly string[], role: string): boolean {
   return userRoles.some(userRole => userRole === role);

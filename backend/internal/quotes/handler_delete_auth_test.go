@@ -14,8 +14,8 @@ func TestCanDeleteQuote(t *testing.T) {
 			want:      true,
 		},
 		{
-			name:      "devadmin bypass",
-			userRoles: []string{"devadmin"},
+			name:      "app_devadmin bypass",
+			userRoles: []string{"app_devadmin"},
 			want:      true,
 		},
 		{

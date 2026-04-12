@@ -16,7 +16,7 @@ func TestHasAnyRole(t *testing.T) {
 			want:          true,
 		},
 		{
-			name:          "devadmin bypass",
+			name:          "app_devadmin bypass",
 			userRoles:     []string{DevAdminRole},
 			requiredRoles: []string{"app_budget_access"},
 			want:          true,
@@ -59,7 +59,7 @@ func TestHasRole(t *testing.T) {
 			want:         true,
 		},
 		{
-			name:         "devadmin bypass",
+			name:         "app_devadmin bypass",
 			userRoles:    []string{DevAdminRole},
 			requiredRole: "app_quotes_delete",
 			want:         true,
