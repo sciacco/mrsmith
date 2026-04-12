@@ -98,3 +98,27 @@ func TestListDealsQueryMatchesAppsmithEligibility(t *testing.T) {
 		}
 	}
 }
+
+func TestHasAtLeastOneService(t *testing.T) {
+	tests := []struct {
+		name  string
+		value any
+		want  bool
+	}{
+		{name: "comma separated", value: "12,13", want: true},
+		{name: "json-like brackets", value: "[12]", want: true},
+		{name: "spaces only", value: "   ", want: false},
+		{name: "empty list-like", value: "[]", want: false},
+		{name: "empty string", value: "", want: false},
+		{name: "non string", value: 12, want: false},
+		{name: "nil", value: nil, want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hasAtLeastOneService(tc.value); got != tc.want {
+				t.Fatalf("hasAtLeastOneService(%v) = %v, want %v", tc.value, got, tc.want)
+			}
+		})
+	}
+}

@@ -106,3 +106,6 @@
 - `POST /quotes/v1/quotes` now enforces IaaS template integrity server-side by requiring `kit_id` and verifying kit existence (not quotable eligibility), derives the inserted kit row from template metadata, and returns `422` errors (`iaas_template_missing_kit`, `iaas_template_kit_not_found`) on inconsistency.
 - Added backend coverage in `backend/internal/quotes/handler_create_test.go` for the new IaaS create validation and derivation rules (missing kit, unavailable kit, and successful forced derivation).
 - Added reusable guidance to `docs/IMPLEMENTATION-KNOWLEDGE.md`: IaaS template derivation in Quotes must be DB-driven, with backend rejection for invalid template-kit mappings.
+- Quotes now enforce `services` presence as an invariant in both create and update handlers: if the normalized `services` payload has no IDs (including empty string or `[]`), backend returns `422 {"error":"quote_services_required"}` before stored-procedure calls.
+- IaaS template derivation is now consistent with the services invariant: when template metadata does not provide `service_category_id`, create fails with `quote_services_required` instead of silently persisting `services=""`.
+- Nuova Proposta wizard step-2 gating now requires at least one service before advancing, using shared `parseServiceCategoryIds()` so bracketed payloads like `[12]` are treated as valid IDs.

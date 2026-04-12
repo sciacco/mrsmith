@@ -22,7 +22,7 @@ import { RichTextEditor } from '../components/RichTextEditor';
 import { KitPickerModal } from '../components/KitPickerModal';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { TemplatePicker } from '../components/TemplatePicker';
-import { buildIaaSTrialText, getLanguageCode } from '../utils/quoteRules';
+import { buildIaaSTrialText, getLanguageCode, parseServiceCategoryIds } from '../utils/quoteRules';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import styles from './QuoteCreatePage.module.css';
 
@@ -155,7 +155,7 @@ export function QuoteCreatePage() {
   );
 
   const selectedServiceIds = useMemo(
-    () => state.services.split(',').map(s => s.trim()).filter(Boolean),
+    () => parseServiceCategoryIds(state.services),
     [state.services],
   );
   const colocationSelected = useMemo(() => {
@@ -306,7 +306,7 @@ export function QuoteCreatePage() {
   const canAdvance = useMemo(() => {
     switch (step) {
       case 0: return state.selectedDeal !== null;
-      case 1: return state.template !== '' && state.owner !== '';
+      case 1: return state.template !== '' && state.owner !== '' && selectedServiceIds.length > 0;
       case 2:
         if (state.quoteType === 'iaas') {
           return state.kit_ids.length > 0 && derivedIaaSKit !== null;
@@ -325,7 +325,9 @@ export function QuoteCreatePage() {
       case 1:
         if (state.template === '' && state.owner === '') return 'Compila template e owner per continuare';
         if (state.template === '') return 'Seleziona un template per continuare';
-        return 'Seleziona un owner per continuare';
+        if (state.owner === '') return 'Seleziona un owner per continuare';
+        if (state.quoteType === 'iaas') return 'Il template IaaS selezionato non ha servizi associati';
+        return 'Seleziona almeno un servizio per continuare';
       case 2:
         if (state.quoteType === 'iaas' && state.kit_ids.length > 0 && derivedIaaSKit === null)
           return 'Kit IaaS non trovato per il template selezionato';

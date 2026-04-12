@@ -27,6 +27,20 @@ func isAppsmithDefaultQuoteListRequest(q url.Values) bool {
 		q.Get("dir") == ""
 }
 
+func hasAtLeastOneService(value any) bool {
+	raw, ok := value.(string)
+	if !ok {
+		return false
+	}
+	normalized := strings.NewReplacer("[", "", "]", "").Replace(raw)
+	for _, item := range strings.Split(normalized, ",") {
+		if strings.TrimSpace(item) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 	if !h.requireDB(w) {
 		return
@@ -411,6 +425,11 @@ func (h *Handler) handleUpdateQuote(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if !hasAtLeastOneService(current["services"]) {
+		httputil.Error(w, http.StatusUnprocessableEntity, "quote_services_required")
+		return
+	}
+
 	// Step 4: Call stored procedure
 	payload, err := json.Marshal(current)
 	if err != nil {
@@ -621,6 +640,11 @@ func (h *Handler) handleCreateQuote(w http.ResponseWriter, r *http.Request) {
 		body["initial_term_months"] = 1
 		body["next_term_months"] = 1
 		body["bill_months"] = 1
+	}
+
+	if !hasAtLeastOneService(body["services"]) {
+		httputil.Error(w, http.StatusUnprocessableEntity, "quote_services_required")
+		return
 	}
 
 	// Default payment

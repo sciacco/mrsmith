@@ -124,6 +124,65 @@ func TestHandleCreateQuoteDerivesIaaSKitAndServicesFromTemplate(t *testing.T) {
 	}
 }
 
+func TestHandleCreateQuoteRejectsMissingServices(t *testing.T) {
+	resetCreateHandlerTracker("create-standard-missing-services")
+
+	h := &Handler{db: openCreateHandlerTestDB(t, "create-standard-missing-services")}
+
+	req := httptest.NewRequest(http.MethodPost, "/quotes/v1/quotes", strings.NewReader(`{
+		"template":"tmpl-standard",
+		"owner":"7",
+		"services":""
+	}`))
+	rec := httptest.NewRecorder()
+
+	h.handleCreateQuote(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var payload struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error != "quote_services_required" {
+		t.Fatalf("unexpected error payload: %#v", payload)
+	}
+}
+
+func TestHandleCreateQuoteRejectsIaaSTemplateMissingService(t *testing.T) {
+	resetCreateHandlerTracker("create-iaas-missing-service")
+
+	h := &Handler{db: openCreateHandlerTestDB(t, "create-iaas-missing-service")}
+
+	req := httptest.NewRequest(http.MethodPost, "/quotes/v1/quotes", strings.NewReader(`{
+		"template":"tmpl-iaas-missing-service",
+		"owner":"7",
+		"services":"999",
+		"kit_ids":[99]
+	}`))
+	rec := httptest.NewRecorder()
+
+	h.handleCreateQuote(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var payload struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error != "quote_services_required" {
+		t.Fatalf("unexpected error payload: %#v", payload)
+	}
+}
+
 func openCreateHandlerTestDB(t *testing.T, mode string) *sql.DB {
 	t.Helper()
 
@@ -219,6 +278,11 @@ func (c *createHandlerTestConn) QueryContext(_ context.Context, query string, ar
 				columns: []string{"template_type", "kit_id", "service_category_id", "is_colo"},
 				values:  [][]driver.Value{{"iaas", int64(62), int64(12), false}},
 			}, nil
+		case "create-iaas-missing-service":
+			return &createHandlerTestRows{
+				columns: []string{"template_type", "kit_id", "service_category_id", "is_colo"},
+				values:  [][]driver.Value{{"iaas", int64(62), nil, false}},
+			}, nil
 		default:
 			return &createHandlerTestRows{columns: []string{"template_type", "kit_id", "service_category_id", "is_colo"}}, nil
 		}
@@ -230,6 +294,11 @@ func (c *createHandlerTestConn) QueryContext(_ context.Context, query string, ar
 				values:  [][]driver.Value{{false}},
 			}, nil
 		case "create-iaas-success":
+			return &createHandlerTestRows{
+				columns: []string{"exists"},
+				values:  [][]driver.Value{{true}},
+			}, nil
+		case "create-iaas-missing-service":
 			return &createHandlerTestRows{
 				columns: []string{"exists"},
 				values:  [][]driver.Value{{true}},
