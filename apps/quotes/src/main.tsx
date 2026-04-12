@@ -53,7 +53,7 @@ async function bootstrap() {
         clientId={config.clientId}
       >
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter basename={routerBasename}>
+          <BrowserRouter basename={routerBasename} unstable_useTransitions={false}>
             <ToastProvider>
               <App />
             </ToastProvider>
