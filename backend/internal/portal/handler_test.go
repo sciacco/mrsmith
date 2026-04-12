@@ -114,6 +114,40 @@ func TestHandleListAppsBothBudgetAndComplianceRoles(t *testing.T) {
 	}
 }
 
+func TestHandleListAppsDevAdminSeesEverything(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, applaunch.Catalog(nil))
+
+	req := httptest.NewRequest(http.MethodGet, "/portal/apps", nil)
+	req = req.WithContext(context.WithValue(req.Context(), auth.ClaimsKey, auth.Claims{
+		Name:  "Dev Admin",
+		Email: "devadmin@example.com",
+		Roles: []string{"devadmin"},
+	}))
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var body struct {
+		Categories []applaunch.Category `json:"categories"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	total := 0
+	for _, cat := range body.Categories {
+		total += len(cat.Apps)
+	}
+	if total != 20 {
+		t.Fatalf("expected 20 apps for devadmin, got %d", total)
+	}
+}
+
 func TestHandleListAppsRequiresClaims(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, applaunch.Catalog(nil))

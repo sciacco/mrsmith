@@ -185,6 +185,17 @@ Alyante ERP ID
 - Used by: `apps/panoramica-cliente` IaaS PPU monthly charges view; shared backend middleware in `backend/pkg/middleware`.
 - Open questions: whether future report endpoints should adopt per-handler query deadlines or asynchronous export flows instead of relying on a larger shared write timeout.
 
+## Auth and Transport Behavior
+
+### Devadmin Must Be Centralized as a Superuser Override
+
+- Context: Keycloak-role authorization across launcher visibility, backend ACL middleware, and app-specific elevated permissions.
+- Discovery: role checks implemented independently (`acl.RequireRole`, launcher catalog filtering, and direct role checks like quotes delete) drift unless they share a single superuser rule.
+- Practical rule: implement `devadmin` as a centralized override in shared authz helpers and consume those helpers everywhere role checks are performed (backend ACL, portal catalog filters, app-specific elevated checks, and frontend role-gated controls). Avoid raw `includes`/`slices.Contains` role checks in feature code.
+- Evidence: `backend/internal/authz/authz.go`, `backend/internal/acl/acl.go`, `backend/internal/platform/applaunch/catalog.go`, `backend/internal/quotes/handler_quotes.go`, `packages/auth-client/src/roles.ts`, `apps/quotes/src/components/QuoteTable.tsx`.
+- Used by: portal app visibility, all ACL-protected backend app routes, quotes delete authorization.
+- Open questions: none.
+
 ## Legacy Data Model Constraints
 
 ### Alyante Product Translation Write Contract

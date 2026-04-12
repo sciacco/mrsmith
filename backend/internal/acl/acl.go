@@ -2,9 +2,9 @@ package acl
 
 import (
 	"net/http"
-	"slices"
 
 	"github.com/sciacco/mrsmith/internal/auth"
+	"github.com/sciacco/mrsmith/internal/authz"
 )
 
 // RequireRole returns middleware that checks if the user has one of the required roles.
@@ -17,11 +17,9 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 				return
 			}
 
-			for _, role := range roles {
-				if slices.Contains(claims.Roles, role) {
-					next.ServeHTTP(w, r)
-					return
-				}
+			if authz.HasAnyRole(claims.Roles, roles...) {
+				next.ServeHTTP(w, r)
+				return
 			}
 
 			http.Error(w, "forbidden", http.StatusForbidden)

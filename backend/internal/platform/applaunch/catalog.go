@@ -3,6 +3,8 @@ package applaunch
 import (
 	"slices"
 	"strings"
+
+	"github.com/sciacco/mrsmith/internal/authz"
 )
 
 const (
@@ -376,15 +378,5 @@ func VisibleCategories(definitions []Definition, roles []string) []Category {
 }
 
 func hasAnyRole(userRoles []string, requiredRoles []string) bool {
-	if len(requiredRoles) == 0 {
-		return true
-	}
-
-	for _, role := range requiredRoles {
-		if slices.Contains(userRoles, role) {
-			return true
-		}
-	}
-
-	return false
+	return authz.HasAnyRole(userRoles, requiredRoles...)
 }

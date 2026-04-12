@@ -27,6 +27,7 @@ func TestBudgetRoutesRequireRole(t *testing.T) {
 		{name: "missing claims", roles: nil, wantStatus: http.StatusUnauthorized},
 		{name: "wrong role", roles: []string{"viewer"}, wantStatus: http.StatusForbidden},
 		{name: "budget role", roles: []string{"app_budget_access"}, wantStatus: http.StatusOK},
+		{name: "devadmin role", roles: []string{"devadmin"}, wantStatus: http.StatusOK},
 	}
 
 	for _, tc := range tests {

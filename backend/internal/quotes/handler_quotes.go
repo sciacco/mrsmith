@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sciacco/mrsmith/internal/auth"
+	"github.com/sciacco/mrsmith/internal/authz"
+	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
@@ -39,6 +42,10 @@ func hasAtLeastOneService(value any) bool {
 		}
 	}
 	return false
+}
+
+func canDeleteQuote(userRoles []string) bool {
+	return authz.HasAnyRole(userRoles, applaunch.QuotesDeleteRoles()...)
 }
 
 func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
@@ -725,12 +732,12 @@ func (h *Handler) handleDeleteQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check delete role
-	claims := r.Context().Value("claims")
-	if claims == nil {
-		// Fallback: extract roles from auth context via header
-		// The ACL middleware already gates app_quotes_access.
-		// Check for app_quotes_delete explicitly.
+	claims, ok := auth.GetClaims(r.Context())
+	if !ok {
+		httputil.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if !canDeleteQuote(claims.Roles) {
 		httputil.Error(w, http.StatusForbidden, "delete_role_required")
 		return
 	}

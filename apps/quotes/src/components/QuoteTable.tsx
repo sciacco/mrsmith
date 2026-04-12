@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Icon, Skeleton } from '@mrsmith/ui';
+import { hasRole } from '@mrsmith/auth-client';
 import type { Quote } from '../api/types';
 import { StatusBadge } from './StatusBadge';
 import { KebabMenu } from './KebabMenu';
@@ -36,7 +37,7 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
   const currentSort = params.get('sort') ?? 'quote_number';
   const currentDir = params.get('dir') ?? 'desc';
   const { user } = useOptionalAuth();
-  const canDelete = user?.roles?.includes('app_quotes_delete') ?? false;
+  const canDelete = hasRole(user?.roles, 'app_quotes_delete');
   const deleteQuote = useDeleteQuote();
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
 
