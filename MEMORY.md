@@ -99,6 +99,10 @@
 - Quotes customer-payment lookups against Alyante must use `Tsmi_Anagrafiche_clienti.CODICE_PAGAMENTO` with `402` fallback semantics; `backend/internal/quotes/handler_reference_test.go` pins that SQL contract.
 
 ## 2026-04-12
+- Quotes DealCard metadata has a strict `dealtype` mapping: only `newbusiness -> New` and `existingbusiness -> Existing`; unknown/missing values are hidden (no fallback labels).
+- Deal type label is now rendered as small inline metadata before `Creata`/`Mod.` timestamps in [apps/quotes/src/components/DealCard.tsx](apps/quotes/src/components/DealCard.tsx), and no longer as a separate right-column badge.
+- DealCard layout is rebalanced to avoid right-side dead space: reduced card height, centered vertical alignment, and simplified right column with only stage/pipeline badges in [apps/quotes/src/components/DealCard.module.css](apps/quotes/src/components/DealCard.module.css).
+- `GET /quotes/v1/deals` e `GET /quotes/v1/deals/{id}` ora espongono anche `dealtype`, `created_at`, `updated_at` letti da `loader.hubs_deal`; i timestamp sono serializzati in RFC3339 UTC e `backend/internal/quotes/handler_quotes_test.go` pinna anche la presenza dei nuovi campi nella query list.
 - Quotes Nuova Proposta IaaS no longer depends on hardcoded template-ID maps in frontend utilities; create wizard derivation now uses `quotes.template` metadata already loaded via `useTemplates` (`template_type`, `kit_id`, `service_category_id`).
 - Quotes create-step gating for IaaS is now strict on template linkage: step 2 can advance only when the template resolves to a real kit; the UI no longer assumes that template-linked kits must also be in the standard quotable catalog.
 - Quotes detail header now detects IaaS mode from template metadata (`template_type === 'iaas'`) instead of hardcoded template IDs.

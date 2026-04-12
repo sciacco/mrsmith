@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
@@ -373,7 +374,8 @@ func quoteStageInClause(stages []string) string {
 // non-empty `codice`. Ordering is kept deterministic by id desc to match the
 // Appsmith source (`order by id desc`).
 var listDealsQuery = `SELECT d.id, d.name, p.label as pipeline, s.label as dealstage,
-                             c.id as company_id, c.name as company_name, c.lingua as company_lingua
+                             c.id as company_id, c.name as company_name, c.lingua as company_lingua,
+                             d.dealtype, d.created_at, d.updated_at
                       FROM loader.hubs_deal d
                       LEFT JOIN loader.hubs_company c ON c.id = d.company_id
                       LEFT JOIN loader.hubs_pipeline p ON p.id = d.pipeline
@@ -408,12 +410,18 @@ func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 		CompanyNameV   *string        `json:"company_name"`
 		CompanyLingua  sql.NullString `json:"-"`
 		CompanyLinguaV *string        `json:"company_lingua"`
+		DealType       sql.NullString `json:"-"`
+		DealTypeV      *string        `json:"dealtype"`
+		CreatedAt      sql.NullTime   `json:"-"`
+		CreatedAtV     *string        `json:"created_at"`
+		UpdatedAt      sql.NullTime   `json:"-"`
+		UpdatedAtV     *string        `json:"updated_at"`
 	}
 
 	result := []deal{}
 	for rows.Next() {
 		var d deal
-		if err := rows.Scan(&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.CompanyLingua); err != nil {
+		if err := rows.Scan(&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.CompanyLingua, &d.DealType, &d.CreatedAt, &d.UpdatedAt); err != nil {
 			h.dbFailure(w, r, "list_deals_scan", err)
 			return
 		}
@@ -432,6 +440,11 @@ func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 		if d.CompanyLingua.Valid {
 			d.CompanyLinguaV = &d.CompanyLingua.String
 		}
+		if d.DealType.Valid {
+			d.DealTypeV = &d.DealType.String
+		}
+		d.CreatedAtV = nullTimeToRFC3339(d.CreatedAt)
+		d.UpdatedAtV = nullTimeToRFC3339(d.UpdatedAt)
 		result = append(result, d)
 	}
 	if !h.rowsDone(w, r, rows, "list_deals") {
@@ -463,18 +476,25 @@ func (h *Handler) handleGetDeal(w http.ResponseWriter, r *http.Request) {
 		CompanyName   *string `json:"company_name"`
 		NumeroAzienda *string `json:"numero_azienda"`
 		CompanyLingua *string `json:"company_lingua"`
+		DealType      *string `json:"dealtype"`
+		CreatedAt     *string `json:"created_at"`
+		UpdatedAt     *string `json:"updated_at"`
 	}
 
-	var d dealDetail
+	var (
+		d                dealDetail
+		createdAtRawTime sql.NullTime
+		updatedAtRawTime sql.NullTime
+	)
 	err = h.db.QueryRowContext(r.Context(),
 		`SELECT d.id, d.name, p.label, s.label,
-		        c.id, c.name, c.numero_azienda, c.lingua
+		        c.id, c.name, c.numero_azienda, c.lingua, d.dealtype, d.created_at, d.updated_at
 		 FROM loader.hubs_deal d
 		 LEFT JOIN loader.hubs_company c ON c.id = d.company_id
 		 LEFT JOIN loader.hubs_pipeline p ON p.id = d.pipeline
 		 LEFT JOIN loader.hubs_stages s ON s.id = d.dealstage
 		 WHERE d.id = $1`, dealID).Scan(
-		&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.NumeroAzienda, &d.CompanyLingua)
+		&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.NumeroAzienda, &d.CompanyLingua, &d.DealType, &createdAtRawTime, &updatedAtRawTime)
 
 	if err == sql.ErrNoRows {
 		httputil.Error(w, http.StatusNotFound, "deal_not_found")
@@ -484,8 +504,18 @@ func (h *Handler) handleGetDeal(w http.ResponseWriter, r *http.Request) {
 		h.dbFailure(w, r, "get_deal", err)
 		return
 	}
+	d.CreatedAt = nullTimeToRFC3339(createdAtRawTime)
+	d.UpdatedAt = nullTimeToRFC3339(updatedAtRawTime)
 
 	httputil.JSON(w, http.StatusOK, d)
+}
+
+func nullTimeToRFC3339(v sql.NullTime) *string {
+	if !v.Valid {
+		return nil
+	}
+	formatted := v.Time.UTC().Format(time.RFC3339)
+	return &formatted
 }
 
 // ── Owners ──

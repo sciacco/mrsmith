@@ -44,6 +44,9 @@ export interface Deal {
   name: string;
   pipeline: string | null;
   dealstage: string | null;
+  dealtype?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
   company_id: number | null;
   company_name: string | null;
   company_lingua: string | null;

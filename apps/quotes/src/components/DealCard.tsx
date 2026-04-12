@@ -32,8 +32,28 @@ function stageColor(label: string): { color: string; bg: string } {
   return { color: stageColors[idx]![0], bg: stageColors[idx]![1] };
 }
 
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function dealTypeLabel(dealType: string | null | undefined): string | null {
+  if (!dealType) return null;
+  const normalized = dealType.trim().toLowerCase();
+  if (normalized === 'newbusiness') return 'New';
+  if (normalized === 'existingbusiness') return 'Existing';
+  return null;
+}
+
 export function DealCard({ deal, selected, onClick }: DealCardProps) {
   const company = deal.company_name ?? '—';
+  const dealType = dealTypeLabel(deal.dealtype);
+  const createdAt = formatDate(deal.created_at);
+  const updatedAt = formatDate(deal.updated_at);
+  const stageTone = deal.dealstage ? stageColor(deal.dealstage) : null;
+
   return (
     <button
       type="button"
@@ -48,12 +68,19 @@ export function DealCard({ deal, selected, onClick }: DealCardProps) {
       <div className={styles.center}>
         <span className={styles.dealName}>{deal.name}</span>
         <span className={styles.company}>{company}</span>
+        <span className={styles.meta}>
+          {dealType && <span className={styles.metaType}>{dealType}</span>}
+          {dealType && <span aria-hidden="true">•</span>}
+          <span>Creata {createdAt}</span>
+          <span aria-hidden="true">•</span>
+          <span>Mod. {updatedAt}</span>
+        </span>
       </div>
       <div className={styles.right}>
-        {deal.dealstage && (
+        {deal.dealstage && stageTone && (
           <span
             className={styles.stage}
-            style={{ color: stageColor(deal.dealstage).color, background: stageColor(deal.dealstage).bg }}
+            style={{ color: stageTone.color, background: stageTone.bg }}
           >
             {deal.dealstage}
           </span>

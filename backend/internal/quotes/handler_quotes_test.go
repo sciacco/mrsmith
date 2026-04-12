@@ -84,6 +84,8 @@ func TestListDealsQueryMatchesAppsmithEligibility(t *testing.T) {
 	// Normalize whitespace so the assertions pin SQL structure rather than indentation.
 	q := strings.Join(strings.Fields(listDealsQuery), " ")
 	mustContain := []string{
+		"SELECT d.id, d.name, p.label as pipeline, s.label as dealstage,",
+		"d.dealtype, d.created_at, d.updated_at",
 		"WHERE ((d.pipeline = '255768766'",
 		"d.pipeline = '255768766'",
 		"d.dealstage IN ('424443344','424502259','424502261','424502262')",
