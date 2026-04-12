@@ -439,6 +439,7 @@ export function QuoteCreatePage() {
   }, [categories, selectedServiceIds]);
 
   return (
+    <>
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <h1 className={styles.title}>Nuova proposta</h1>
@@ -1121,6 +1122,7 @@ export function QuoteCreatePage() {
           </div>
         )}
       </div>
+    </div>
 
       <WizardNav
         step={step}
@@ -1139,6 +1141,6 @@ export function QuoteCreatePage() {
           onClose={() => setShowKitPicker(false)}
         />
       )}
-    </div>
+    </>
   );
 }

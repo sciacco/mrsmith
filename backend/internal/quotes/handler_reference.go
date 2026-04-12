@@ -294,10 +294,12 @@ func quoteStageInClause(stages []string) string {
 // (standard pipeline + its stages) OR (iaas pipeline + its stages), AND a
 // non-empty `codice`. Ordering is kept deterministic by id desc to match the
 // Appsmith source (`order by id desc`).
-var listDealsQuery = `SELECT d.id, d.name, d.pipeline, d.dealstage,
+var listDealsQuery = `SELECT d.id, d.name, p.label as pipeline, s.label as dealstage,
                              c.id as company_id, c.name as company_name, c.lingua as company_lingua
                       FROM loader.hubs_deal d
                       LEFT JOIN loader.hubs_company c ON c.id = d.company_id
+                      LEFT JOIN loader.hubs_pipeline p ON p.id = d.pipeline
+                      LEFT JOIN loader.hubs_stages s ON s.id = d.dealstage
                       WHERE ((d.pipeline = '` + standardPipeline + `' AND d.dealstage IN ` + quoteStageInClause(standardStages) + `)
                           OR (d.pipeline = '` + iaasPipeline + `' AND d.dealstage IN ` + quoteStageInClause(iaasStages) + `))
                         AND d.codice <> ''
@@ -387,10 +389,12 @@ func (h *Handler) handleGetDeal(w http.ResponseWriter, r *http.Request) {
 
 	var d dealDetail
 	err = h.db.QueryRowContext(r.Context(),
-		`SELECT d.id, d.name, d.pipeline, d.dealstage,
+		`SELECT d.id, d.name, p.label, s.label,
 		        c.id, c.name, c.numero_azienda, c.lingua
 		 FROM loader.hubs_deal d
 		 LEFT JOIN loader.hubs_company c ON c.id = d.company_id
+		 LEFT JOIN loader.hubs_pipeline p ON p.id = d.pipeline
+		 LEFT JOIN loader.hubs_stages s ON s.id = d.dealstage
 		 WHERE d.id = $1`, dealID).Scan(
 		&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.NumeroAzienda, &d.CompanyLingua)
 

@@ -1,9 +1,9 @@
 .card {
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto;
   align-items: center;
-  gap: var(--space-5);
+  gap: var(--space-4);
   width: 100%;
   min-height: 72px;
   padding: var(--space-4) var(--space-5);
@@ -53,13 +53,24 @@
   opacity: 1;
 }
 
-.code {
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--color-text);
-  letter-spacing: -0.01em;
-  white-space: nowrap;
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.selected .avatar {
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
 }
 
 .center {
@@ -69,17 +80,20 @@
   min-width: 0;
 }
 
-.company {
-  font-size: 0.9375rem;
-  font-weight: 500;
+.dealName {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
   color: var(--color-text);
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.stage {
-  font-size: 0.75rem;
+.company {
+  font-size: 0.8125rem;
+  font-weight: 400;
   color: var(--color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -88,27 +102,18 @@
 
 .right {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
-.avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.selected .avatar {
-  background: var(--color-accent);
-  color: var(--color-text-on-accent);
+.stage {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
 }
 
 .pipeline {
@@ -125,11 +130,8 @@
 
 @media (max-width: 640px) {
   .card {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: auto 1fr auto;
     gap: var(--space-3);
-  }
-  .code {
-    grid-column: 1 / -1;
   }
   .pipeline {
     display: none;
