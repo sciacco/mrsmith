@@ -47,6 +47,8 @@ export interface Deal {
   dealtype?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  owner_firstname?: string | null;
+  owner_lastname?: string | null;
   company_id: number | null;
   company_name: string | null;
   company_lingua: string | null;

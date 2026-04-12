@@ -99,6 +99,8 @@
 - Quotes customer-payment lookups against Alyante must use `Tsmi_Anagrafiche_clienti.CODICE_PAGAMENTO` with `402` fallback semantics; `backend/internal/quotes/handler_reference_test.go` pins that SQL contract.
 
 ## 2026-04-12
+- Quotes deal-selection list (`GET /quotes/v1/deals`) now enriches each deal with optional owner identity from `loader.hubs_owner` via `LEFT JOIN` on `hubs_deal.hubspot_owner_id`; payload adds nullable `owner_firstname` and `owner_lastname`.
+- Nuova Proposta `DealCard` metadata now renders owner full name (if present) next to dealtype and timestamps (`Creata`, `Mod.`) with separator-aware conditional rendering so missing owner/dealtype does not leave broken bullets.
 - Quotes DealCard metadata has a strict `dealtype` mapping: only `newbusiness -> New` and `existingbusiness -> Existing`; unknown/missing values are hidden (no fallback labels).
 - Deal type label is now rendered as small inline metadata before `Creata`/`Mod.` timestamps in [apps/quotes/src/components/DealCard.tsx](apps/quotes/src/components/DealCard.tsx), and no longer as a separate right-column badge.
 - DealCard layout is rebalanced to avoid right-side dead space: reduced card height, centered vertical alignment, and simplified right column with only stage/pipeline badges in [apps/quotes/src/components/DealCard.module.css](apps/quotes/src/components/DealCard.module.css).

@@ -122,6 +122,11 @@
   color: var(--color-text-muted);
 }
 
+.metaOwner {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
 .right {
   display: flex;
   flex-direction: column;

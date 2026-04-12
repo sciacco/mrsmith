@@ -47,9 +47,16 @@ function dealTypeLabel(dealType: string | null | undefined): string | null {
   return null;
 }
 
+function ownerLabel(firstName: string | null | undefined, lastName: string | null | undefined): string | null {
+  const parts = [firstName?.trim(), lastName?.trim()].filter((part): part is string => Boolean(part));
+  if (parts.length === 0) return null;
+  return parts.join(' ');
+}
+
 export function DealCard({ deal, selected, onClick }: DealCardProps) {
   const company = deal.company_name ?? '—';
   const dealType = dealTypeLabel(deal.dealtype);
+  const owner = ownerLabel(deal.owner_firstname, deal.owner_lastname);
   const createdAt = formatDate(deal.created_at);
   const updatedAt = formatDate(deal.updated_at);
   const stageTone = deal.dealstage ? stageColor(deal.dealstage) : null;
@@ -71,6 +78,8 @@ export function DealCard({ deal, selected, onClick }: DealCardProps) {
         <span className={styles.meta}>
           {dealType && <span className={styles.metaType}>{dealType}</span>}
           {dealType && <span aria-hidden="true">•</span>}
+          {owner && <span className={styles.metaOwner}>{owner}</span>}
+          {owner && <span aria-hidden="true">•</span>}
           <span>Creata {createdAt}</span>
           <span aria-hidden="true">•</span>
           <span>Mod. {updatedAt}</span>

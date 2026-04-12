@@ -375,11 +375,13 @@ func quoteStageInClause(stages []string) string {
 // Appsmith source (`order by id desc`).
 var listDealsQuery = `SELECT d.id, d.name, p.label as pipeline, s.label as dealstage,
                              c.id as company_id, c.name as company_name, c.lingua as company_lingua,
-                             d.dealtype, d.created_at, d.updated_at
+                             d.dealtype, d.created_at, d.updated_at,
+                             o.first_name as owner_firstname, o.last_name as owner_lastname
                       FROM loader.hubs_deal d
                       LEFT JOIN loader.hubs_company c ON c.id = d.company_id
                       LEFT JOIN loader.hubs_pipeline p ON p.id = d.pipeline
                       LEFT JOIN loader.hubs_stages s ON s.id = d.dealstage
+                      LEFT JOIN loader.hubs_owner o ON o.id = d.hubspot_owner_id
                       WHERE ((d.pipeline = '` + standardPipeline + `' AND d.dealstage IN ` + quoteStageInClause(standardStages) + `)
                           OR (d.pipeline = '` + iaasPipeline + `' AND d.dealstage IN ` + quoteStageInClause(iaasStages) + `))
                         AND d.codice <> ''
@@ -398,30 +400,34 @@ func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type deal struct {
-		ID             int64          `json:"id"`
-		DealName       string         `json:"name"`
-		Pipeline       sql.NullString `json:"-"`
-		PipelineV      *string        `json:"pipeline"`
-		DealStage      sql.NullString `json:"-"`
-		DealStageV     *string        `json:"dealstage"`
-		CompanyID      sql.NullInt64  `json:"-"`
-		CompanyIDV     *int64         `json:"company_id"`
-		CompanyName    sql.NullString `json:"-"`
-		CompanyNameV   *string        `json:"company_name"`
-		CompanyLingua  sql.NullString `json:"-"`
-		CompanyLinguaV *string        `json:"company_lingua"`
-		DealType       sql.NullString `json:"-"`
-		DealTypeV      *string        `json:"dealtype"`
-		CreatedAt      sql.NullTime   `json:"-"`
-		CreatedAtV     *string        `json:"created_at"`
-		UpdatedAt      sql.NullTime   `json:"-"`
-		UpdatedAtV     *string        `json:"updated_at"`
+		ID              int64          `json:"id"`
+		DealName        string         `json:"name"`
+		Pipeline        sql.NullString `json:"-"`
+		PipelineV       *string        `json:"pipeline"`
+		DealStage       sql.NullString `json:"-"`
+		DealStageV      *string        `json:"dealstage"`
+		CompanyID       sql.NullInt64  `json:"-"`
+		CompanyIDV      *int64         `json:"company_id"`
+		CompanyName     sql.NullString `json:"-"`
+		CompanyNameV    *string        `json:"company_name"`
+		CompanyLingua   sql.NullString `json:"-"`
+		CompanyLinguaV  *string        `json:"company_lingua"`
+		DealType        sql.NullString `json:"-"`
+		DealTypeV       *string        `json:"dealtype"`
+		CreatedAt       sql.NullTime   `json:"-"`
+		CreatedAtV      *string        `json:"created_at"`
+		UpdatedAt       sql.NullTime   `json:"-"`
+		UpdatedAtV      *string        `json:"updated_at"`
+		OwnerFirstName  sql.NullString `json:"-"`
+		OwnerFirstNameV *string        `json:"owner_firstname"`
+		OwnerLastName   sql.NullString `json:"-"`
+		OwnerLastNameV  *string        `json:"owner_lastname"`
 	}
 
 	result := []deal{}
 	for rows.Next() {
 		var d deal
-		if err := rows.Scan(&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.CompanyLingua, &d.DealType, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.CompanyLingua, &d.DealType, &d.CreatedAt, &d.UpdatedAt, &d.OwnerFirstName, &d.OwnerLastName); err != nil {
 			h.dbFailure(w, r, "list_deals_scan", err)
 			return
 		}
@@ -442,6 +448,12 @@ func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 		}
 		if d.DealType.Valid {
 			d.DealTypeV = &d.DealType.String
+		}
+		if d.OwnerFirstName.Valid {
+			d.OwnerFirstNameV = &d.OwnerFirstName.String
+		}
+		if d.OwnerLastName.Valid {
+			d.OwnerLastNameV = &d.OwnerLastName.String
 		}
 		d.CreatedAtV = nullTimeToRFC3339(d.CreatedAt)
 		d.UpdatedAtV = nullTimeToRFC3339(d.UpdatedAt)
