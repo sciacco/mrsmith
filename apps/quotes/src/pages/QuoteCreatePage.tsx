@@ -318,6 +318,22 @@ export function QuoteCreatePage() {
     }
   }, [derivedIaaSKit, step, state]);
 
+  const validationMessage = useMemo(() => {
+    if (canAdvance) return undefined;
+    switch (step) {
+      case 0: return 'Seleziona un deal per continuare';
+      case 1:
+        if (state.template === '' && state.owner === '') return 'Compila template e owner per continuare';
+        if (state.template === '') return 'Seleziona un template per continuare';
+        return 'Seleziona un owner per continuare';
+      case 2:
+        if (state.quoteType === 'iaas' && state.kit_ids.length > 0 && derivedIaaSKit === null)
+          return 'Kit IaaS non trovato per il template selezionato';
+        return 'Seleziona almeno un kit';
+      default: return undefined;
+    }
+  }, [canAdvance, derivedIaaSKit, step, state]);
+
   const handleCreate = useCallback(async () => {
     if (!state.selectedDeal) return;
     try {
@@ -1140,6 +1156,7 @@ export function QuoteCreatePage() {
         step={step}
         totalSteps={stepNames.length}
         canAdvance={canAdvance}
+        validationMessage={validationMessage}
         isLastStep={step === 4}
         onBack={() => setStep(s => s - 1)}
         onNext={handleNext}

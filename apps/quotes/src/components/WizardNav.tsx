@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@mrsmith/ui';
+import { Button, useToast } from '@mrsmith/ui';
 import styles from './WizardNav.module.css';
 
 interface WizardNavProps {
   step: number;
   totalSteps: number;
   canAdvance: boolean;
+  validationMessage?: string;
   isLastStep: boolean;
   onBack: () => void;
   onNext: () => void;
@@ -16,11 +17,13 @@ export function WizardNav({
   step,
   totalSteps,
   canAdvance,
+  validationMessage,
   isLastStep,
   onBack,
   onNext,
   isPending,
 }: WizardNavProps) {
+  const { toast } = useToast();
   const [shake, setShake] = useState(false);
 
   useEffect(() => {
@@ -32,6 +35,7 @@ export function WizardNav({
   const handleNextClick = () => {
     if (!canAdvance) {
       setShake(true);
+      if (validationMessage) toast(validationMessage, 'warning');
       return;
     }
     onNext();
