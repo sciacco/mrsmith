@@ -2,35 +2,6 @@ import type { Quote } from '../api/types';
 
 type IaaSLanguage = 'it' | 'en';
 
-interface IaaSTemplateRule {
-  templateId: string;
-  kitId: number;
-  services: string;
-  lang: IaaSLanguage;
-}
-
-const IAAS_TEMPLATE_RULES: Record<string, IaaSTemplateRule> = {
-  '850825381069': { templateId: '850825381069', kitId: 62, services: '[12]', lang: 'en' },
-  '853027287235': { templateId: '853027287235', kitId: 62, services: '[12]', lang: 'it' },
-  '853237903587': { templateId: '853237903587', kitId: 116, services: '[14]', lang: 'it' },
-  '853320143046': { templateId: '853320143046', kitId: 63, services: '[13]', lang: 'en' },
-  '853500178641': { templateId: '853500178641', kitId: 63, services: '[13]', lang: 'it' },
-  '853500899556': { templateId: '853500899556', kitId: 116, services: '[14]', lang: 'en' },
-  '855439340792': { templateId: '855439340792', kitId: 119, services: '[15]', lang: 'en' },
-  '856380863697': { templateId: '856380863697', kitId: 119, services: '[15]', lang: 'it' },
-};
-
-export function getIaaSTemplateRule(templateId: string | null | undefined): IaaSTemplateRule | null {
-  if (!templateId) {
-    return null;
-  }
-  return IAAS_TEMPLATE_RULES[templateId] ?? null;
-}
-
-export function isIaaSTemplate(templateId: string | null | undefined): boolean {
-  return getIaaSTemplateRule(templateId) !== null;
-}
-
 export function getLanguageCode(selection: 'ITA' | 'ENG'): IaaSLanguage {
   return selection === 'ENG' ? 'en' : 'it';
 }
@@ -80,8 +51,6 @@ export function prepareQuoteForDetail(quote: Quote): Quote {
 }
 
 export function buildQuoteSavePayload(quote: Quote) {
-  const iaasRule = getIaaSTemplateRule(quote.template);
-
   return {
     id: quote.id,
     quote_number: quote.quote_number,
@@ -89,14 +58,14 @@ export function buildQuoteSavePayload(quote: Quote) {
     deal_number: quote.deal_number,
     owner: quote.owner,
     document_date: quote.document_date,
-    document_type: iaasRule ? 'TSC-ORDINE-RIC' : quote.document_type,
+    document_type: quote.document_type,
     replace_orders: normalizeReplaceOrdersForSave(quote.replace_orders),
-    template: iaasRule?.templateId ?? quote.template,
-    services: iaasRule?.services ?? quote.services,
+    template: quote.template,
+    services: quote.services,
     proposal_type: quote.proposal_type,
-    initial_term_months: iaasRule ? 1 : quote.initial_term_months,
-    next_term_months: iaasRule ? 1 : quote.next_term_months,
-    bill_months: iaasRule ? 1 : quote.bill_months,
+    initial_term_months: quote.initial_term_months,
+    next_term_months: quote.next_term_months,
+    bill_months: quote.bill_months,
     delivered_in_days: quote.delivered_in_days,
     date_sent: quote.date_sent,
     status: quote.status,

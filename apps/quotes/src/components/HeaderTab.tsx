@@ -8,7 +8,7 @@ import {
   usePaymentMethods,
   useTemplates,
 } from '../api/queries';
-import { isIaaSTemplate, parseReplaceOrders, parseServiceCategoryIds } from '../utils/quoteRules';
+import { parseReplaceOrders, parseServiceCategoryIds } from '../utils/quoteRules';
 import styles from './HeaderTab.module.css';
 
 interface HeaderTabProps {
@@ -30,8 +30,12 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
     () => parseServiceCategoryIds(quote.services).map(Number),
     [quote.services],
   );
+  const selectedTemplate = useMemo(
+    () => (templatesQuery.data ?? []).find(t => t.template_id === quote.template) ?? null,
+    [templatesQuery.data, quote.template],
+  );
 
-  const isIaaS = isIaaSTemplate(quote.template);
+  const isIaaS = selectedTemplate?.template_type === 'iaas';
   const isSpot = quote.document_type === 'TSC-ORDINE';
 
   const ownerOptions = useMemo(

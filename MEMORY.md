@@ -97,3 +97,11 @@
 - Quotes create wizard only loads kits when the flow needs them, clears `kitSearch` when leaving the kit step, and the summary falls back to a selected-count/loading message instead of showing `Nessuno` while kit metadata is still loading.
 - Quotes `ConfirmDialog` now adapts to the dirty-kit prompt: when a discard action is present it uses a wider modal with a split footer (`Annulla` isolated from `Scarta modifiche` / `Salva e continua`) and collapses to stacked full-width actions on small screens, preventing the kit-row unsaved-changes modal from overflowing.
 - Quotes customer-payment lookups against Alyante must use `Tsmi_Anagrafiche_clienti.CODICE_PAGAMENTO` with `402` fallback semantics; `backend/internal/quotes/handler_reference_test.go` pins that SQL contract.
+
+## 2026-04-12
+- Quotes Nuova Proposta IaaS no longer depends on hardcoded template-ID maps in frontend utilities; create wizard derivation now uses `quotes.template` metadata already loaded via `useTemplates` (`template_type`, `kit_id`, `service_category_id`).
+- Quotes create-step gating for IaaS is now strict: step 2 can advance only when the template resolves to a real kit in the quotable kit catalog; otherwise the wizard shows an explicit data-alignment error state.
+- Quotes detail header now detects IaaS mode from template metadata (`template_type === 'iaas'`) instead of hardcoded template IDs.
+- `POST /quotes/v1/quotes` now enforces IaaS template integrity server-side: it requires `kit_id` on IaaS templates, verifies kit selectability (`is_active=true`, `ecommerce=false`, `quotable=true`), derives the inserted kit row from template metadata, and returns `422` errors (`iaas_template_missing_kit`, `iaas_template_kit_unavailable`) on inconsistency.
+- Added backend coverage in `backend/internal/quotes/handler_create_test.go` for the new IaaS create validation and derivation rules (missing kit, unavailable kit, and successful forced derivation).
+- Added reusable guidance to `docs/IMPLEMENTATION-KNOWLEDGE.md`: IaaS template derivation in Quotes must be DB-driven, with backend rejection for invalid template-kit mappings.

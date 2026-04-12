@@ -560,18 +560,67 @@ func (h *Handler) handleCreateQuote(w http.ResponseWriter, r *http.Request) {
 	body["status"] = "DRAFT"
 	body["hs_quote_id"] = nil
 
-	// COLOCATION template → force bill_months = 3
+	// Template-derived rules
+	var (
+		templateType      string
+		templateKitID     sql.NullInt64
+		templateServiceID sql.NullInt64
+		templateIsColo    bool
+	)
 	if tmpl, ok := body["template"]; ok && tmpl != nil {
 		templateID, _ := tmpl.(string)
 		if templateID != "" {
-			var isColo bool
-			_ = tx.QueryRowContext(r.Context(),
-				`SELECT COALESCE(is_colo, false) FROM quotes.template WHERE template_id = $1`,
-				templateID).Scan(&isColo)
-			if isColo {
-				body["bill_months"] = 3
+			err = tx.QueryRowContext(r.Context(),
+				`SELECT COALESCE(template_type, 'standard'), kit_id, service_category_id, COALESCE(is_colo, false)
+				 FROM quotes.template WHERE template_id = $1`,
+				templateID).Scan(&templateType, &templateKitID, &templateServiceID, &templateIsColo)
+			if err != nil && err != sql.ErrNoRows {
+				h.dbFailure(w, r, "create_quote_template_lookup", err)
+				return
 			}
 		}
+	}
+
+	// COLOCATION template → force bill_months = 3
+	if templateIsColo {
+		body["bill_months"] = 3
+	}
+
+	// IaaS templates must derive a single quotable kit from template metadata.
+	if templateType == "iaas" {
+		if !templateKitID.Valid {
+			httputil.Error(w, http.StatusUnprocessableEntity, "iaas_template_missing_kit")
+			return
+		}
+
+		var kitIsSelectable bool
+		err = tx.QueryRowContext(r.Context(),
+			`SELECT EXISTS(
+				SELECT 1
+				FROM products.kit k
+				WHERE k.id = $1 AND k.is_active = true AND k.ecommerce = false AND k.quotable = true
+			)`,
+			templateKitID.Int64,
+		).Scan(&kitIsSelectable)
+		if err != nil {
+			h.dbFailure(w, r, "create_quote_iaas_kit_lookup", err)
+			return
+		}
+		if !kitIsSelectable {
+			httputil.Error(w, http.StatusUnprocessableEntity, "iaas_template_kit_unavailable")
+			return
+		}
+
+		kitIDs = []int{int(templateKitID.Int64)}
+		if templateServiceID.Valid {
+			body["services"] = fmt.Sprintf("[%d]", templateServiceID.Int64)
+		} else {
+			body["services"] = ""
+		}
+		body["document_type"] = "TSC-ORDINE-RIC"
+		body["initial_term_months"] = 1
+		body["next_term_months"] = 1
+		body["bill_months"] = 1
 	}
 
 	// Default payment

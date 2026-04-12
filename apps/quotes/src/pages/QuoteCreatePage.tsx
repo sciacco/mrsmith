@@ -22,7 +22,7 @@ import { RichTextEditor } from '../components/RichTextEditor';
 import { KitPickerModal } from '../components/KitPickerModal';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { TemplatePicker } from '../components/TemplatePicker';
-import { buildIaaSTrialText, getLanguageCode, getIaaSTemplateRule } from '../utils/quoteRules';
+import { buildIaaSTrialText, getLanguageCode } from '../utils/quoteRules';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import styles from './QuoteCreatePage.module.css';
 
@@ -97,6 +97,11 @@ function truncateHtml(html: string, max = 80): string {
   return text.length > max ? text.slice(0, max).trimEnd() + '…' : text;
 }
 
+function formatIaaSServices(serviceCategoryID: number | null | undefined): string {
+  if (serviceCategoryID == null) return '';
+  return `[${serviceCategoryID}]`;
+}
+
 function countFilledContacts(state: WizardState): number {
   const contacts = [state.contactTech, state.contactAltroTech, state.contactAdm];
   return contacts.filter(c => c.name || c.tel || c.email).length + (state.rif_ordcli ? 1 : 0);
@@ -137,13 +142,9 @@ export function QuoteCreatePage() {
     () => templates?.find(t => t.template_id === state.template) ?? null,
     [state.template, templates],
   );
-  const derivedIaaSRule = useMemo(
-    () => getIaaSTemplateRule(state.template),
-    [state.template],
-  );
   const derivedIaaSKit = useMemo(
-    () => kits?.find(k => k.id === (derivedIaaSRule?.kitId ?? selectedTemplate?.kit_id ?? -1)) ?? null,
-    [derivedIaaSRule, kits, selectedTemplate],
+    () => kits?.find(k => k.id === (selectedTemplate?.kit_id ?? -1)) ?? null,
+    [kits, selectedTemplate],
   );
 
   const selectedServiceIds = useMemo(
@@ -190,21 +191,20 @@ export function QuoteCreatePage() {
   useEffect(() => {
     if (state.quoteType !== 'iaas') return;
     setState(prev => {
-      const nextTemplate = prev.template;
-      const nextRule = getIaaSTemplateRule(nextTemplate);
+      const template = selectedTemplate?.template_type === 'iaas' ? selectedTemplate : null;
       const nextTrial = buildIaaSTrialText(prev.trial_value, getLanguageCode(prev.iaasLanguage));
       return {
         ...prev,
         document_type: 'TSC-ORDINE-RIC',
-        services: nextRule?.services ?? '',
+        services: formatIaaSServices(template?.service_category_id),
         initial_term_months: 1,
         next_term_months: 1,
         bill_months: 1,
-        kit_ids: nextRule ? [nextRule.kitId] : [],
+        kit_ids: template?.kit_id != null ? [template.kit_id] : [],
         trial: nextTrial,
       };
     });
-  }, [state.iaasLanguage, state.quoteType, state.template, state.trial_value]);
+  }, [selectedTemplate, state.iaasLanguage, state.quoteType, state.template, state.trial_value]);
 
   useEffect(() => {
     if (state.proposal_type === 'SOSTITUZIONE' || state.replace_orders === '') return;
@@ -300,12 +300,16 @@ export function QuoteCreatePage() {
     switch (step) {
       case 0: return state.selectedDeal !== null;
       case 1: return state.template !== '' && state.owner !== '';
-      case 2: return state.quoteType === 'iaas' || state.kit_ids.length > 0;
+      case 2:
+        if (state.quoteType === 'iaas') {
+          return state.kit_ids.length > 0 && derivedIaaSKit !== null;
+        }
+        return state.kit_ids.length > 0;
       case 3: return true;
       case 4: return true;
       default: return false;
     }
-  }, [step, state]);
+  }, [derivedIaaSKit, step, state]);
 
   const handleCreate = useCallback(async () => {
     if (!state.selectedDeal) return;
@@ -812,7 +816,8 @@ export function QuoteCreatePage() {
                   </div>
                 ) : (
                   <div className={styles.emptyBlock}>
-                    Seleziona un template IaaS valido per generare la riga kit iniziale.
+                    Template IaaS non allineato: il kit configurato non e disponibile nel catalogo
+                    quotabile. Correggi template/kit prima di continuare.
                   </div>
                 )}
               </div>
