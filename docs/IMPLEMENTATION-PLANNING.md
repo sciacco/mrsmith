@@ -6,6 +6,7 @@ A plan can be strong on features and still fail at execution if it is not valida
 
 Use this document when drafting or reviewing implementation plans for new apps, major features, or cross-cutting refactors.
 Before locking assumptions, also review [docs/IMPLEMENTATION-KNOWLEDGE.md](IMPLEMENTATION-KNOWLEDGE.md) for reusable discoveries that may already define identifiers, exclusions, or cross-system rules.
+If the work is an Appsmith migration or another legacy-app port, also follow [docs/APPSMITH-MIGRATION-PLAYBOOK.md](APPSMITH-MIGRATION-PLAYBOOK.md) so risky contracts are verified and pinned before implementation.
 
 ## Core Lessons
 
