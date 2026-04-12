@@ -86,17 +86,18 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 		DeliveredInDays   int
 		NrcChargeTime     int
 		PaymentMethod     *string
+		Trial             string
 	}
 	err = h.db.QueryRowContext(ctx, `
 		SELECT quote_number, customer_id, hs_deal_id, hs_quote_id, template, owner,
 		       document_date, notes, status, COALESCE(description, ''),
 		       bill_months, initial_term_months, next_term_months, delivered_in_days,
-		       nrc_charge_time, payment_method
+		       nrc_charge_time, payment_method, COALESCE(trial, '')
 		FROM quotes.quote WHERE id = $1`, quoteID).Scan(
 		&q.QuoteNumber, &q.CustomerID, &q.HSDealID, &q.HSQuoteID, &q.Template, &q.Owner,
 		&q.DocumentDate, &q.Notes, &q.Status, &q.Description,
 		&q.BillMonths, &q.InitialTermMonths, &q.NextTermMonths, &q.DeliveredInDays,
-		&q.NrcChargeTime, &q.PaymentMethod)
+		&q.NrcChargeTime, &q.PaymentMethod, &q.Trial)
 	if err != nil {
 		failStep(3, "hubspot_quote", fmt.Sprintf("load quote: %v", err))
 		return
@@ -143,6 +144,7 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 		"hs_expiration_date": expiryDate,
 		"hs_status":          hsStatus,
 		"hs_terms":           tec,
+		"hs_comments":        buildHSComments(q.Trial, q.Description),
 	}
 
 	// Lookup owner email
@@ -218,10 +220,16 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 
 	// Step 4: Sync line items
 	rows, err := h.db.QueryContext(ctx,
-		`SELECT qr.id, qr.kit_id, k.internal_name, qr.nrc_row, qr.mrc_row,
-		        qr.hs_line_item_id, qr.hs_line_item_nrc
+		`SELECT qr.id, qr.kit_id,
+		        COALESCE(v.translation_it, qr.internal_name, ''),
+		        COALESCE(v.translation_en, qr.internal_name, ''),
+		        COALESCE(qr.internal_name, ''),
+		        qr.nrc_row, qr.mrc_row,
+		        qr.hs_line_item_id, qr.hs_line_item_nrc,
+		        COALESCE(v.descrizione_estesa, ''),
+		        COALESCE(v.descrizione_estesa_en, '')
 		 FROM quotes.quote_rows qr
-		 LEFT JOIN products.kit k ON k.id = qr.kit_id
+		 LEFT JOIN quotes.v_quote_rows_for_hs v ON v.id = qr.id
 		 WHERE qr.quote_id = $1 ORDER BY qr.position`, quoteID)
 	if err != nil {
 		failStep(4, "line_items", err.Error())
@@ -231,65 +239,137 @@ func (h *Handler) handlePublish(w http.ResponseWriter, r *http.Request) {
 	type rowData struct {
 		ID            int
 		KitID         int
+		TranslationIT string
+		TranslationEN string
 		InternalName  string
 		NrcRow        float64
 		MrcRow        float64
 		HsLineItemID  *int64
 		HsLineItemNrc *int64
+		DescriptionIT string
+		DescriptionEN string
 	}
 	var rowList []rowData
 	for rows.Next() {
 		var rd rowData
-		if err := rows.Scan(&rd.ID, &rd.KitID, &rd.InternalName, &rd.NrcRow, &rd.MrcRow,
-			&rd.HsLineItemID, &rd.HsLineItemNrc); err != nil {
+		if err := rows.Scan(
+			&rd.ID, &rd.KitID, &rd.TranslationIT, &rd.TranslationEN, &rd.InternalName, &rd.NrcRow, &rd.MrcRow,
+			&rd.HsLineItemID, &rd.HsLineItemNrc, &rd.DescriptionIT, &rd.DescriptionEN,
+		); err != nil {
 			rows.Close()
 			failStep(4, "line_items", err.Error())
 			return
 		}
 		rowList = append(rowList, rd)
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		failStep(4, "line_items", err.Error())
+		return
+	}
 	rows.Close()
+
+	remoteLineItemIDs, err := h.hs.GetQuoteLineItemIDs(ctx, hsQuoteID)
+	if err != nil {
+		failStep(4, "line_items", fmt.Sprintf("load HubSpot line items: %v", err))
+		return
+	}
+	activeLineItemIDs := map[int64]struct{}{}
 
 	lineAssoc := []hubspot.Association{
 		hubspot.NewAssociation(hsQuoteID, hubspot.AssocTypeLineItemToQuote),
 	}
 
-	for _, rd := range rowList {
+	position := 0
+	language := preferredQuoteLanguage(lang)
+	for i, rd := range rowList {
+		baseName := quoteLineItemName(language, rd.TranslationIT, rd.TranslationEN, rd.InternalName)
+		itemName := fmt.Sprintf("%s %s", quoteLineItemGroupPrefix(i), baseName)
+		mrcDescription := lineItemMRCDescription(language, rd.DescriptionIT, rd.DescriptionEN)
+
 		// MRC line item
 		mrcProps := map[string]any{
-			"name":                      rd.InternalName + " (MRC)",
+			"name":                      itemName,
 			"hs_sku":                    fmt.Sprintf("MRC-%d", rd.KitID),
+			"description":               mrcDescription,
+			"hs_product_type":           "service",
+			"hs_position_on_quote":      position,
 			"recurringbillingfrequency": "monthly",
 			"price":                     rd.MrcRow,
 			"quantity":                  1,
 		}
+		position++
 
 		if rd.HsLineItemID != nil {
-			_ = h.hs.UpdateLineItem(ctx, *rd.HsLineItemID, mrcProps, lineAssoc)
+			if err := h.hs.UpdateLineItem(ctx, *rd.HsLineItemID, mrcProps, lineAssoc); err != nil {
+				failStep(4, "line_items", fmt.Sprintf("update MRC line item for row %d: %v", rd.ID, err))
+				return
+			}
+			activeLineItemIDs[*rd.HsLineItemID] = struct{}{}
 		} else {
 			itemID, err := h.hs.CreateLineItem(ctx, mrcProps, lineAssoc)
-			if err == nil {
-				_, _ = h.db.ExecContext(ctx,
-					`UPDATE quotes.quote_rows SET hs_line_item_id = $1 WHERE id = $2`, itemID, rd.ID)
+			if err != nil {
+				failStep(4, "line_items", fmt.Sprintf("create MRC line item for row %d: %v", rd.ID, err))
+				return
 			}
+			if _, err := h.db.ExecContext(ctx,
+				`UPDATE quotes.quote_rows SET hs_line_item_id = $1 WHERE id = $2`, itemID, rd.ID); err != nil {
+				failStep(4, "line_items", fmt.Sprintf("store MRC line item id for row %d: %v", rd.ID, err))
+				return
+			}
+			activeLineItemIDs[itemID] = struct{}{}
 		}
 
 		// NRC line item
-		nrcProps := map[string]any{
-			"name":     rd.InternalName + " (NRC)",
-			"hs_sku":   fmt.Sprintf("NRC-%d", rd.KitID),
-			"price":    rd.NrcRow,
-			"quantity": 1,
+		if rd.NrcRow <= 0 {
+			if rd.HsLineItemNrc != nil {
+				if _, err := h.db.ExecContext(ctx,
+					`UPDATE quotes.quote_rows SET hs_line_item_nrc = NULL WHERE id = $1`, rd.ID); err != nil {
+					failStep(4, "line_items", fmt.Sprintf("clear NRC line item id for row %d: %v", rd.ID, err))
+					return
+				}
+			}
+			continue
 		}
+		nrcProps := map[string]any{
+			"name":                 itemName + " (NRC)",
+			"hs_sku":               fmt.Sprintf("NRC-%d", rd.KitID),
+			"description":          lineItemNRCDescription(language),
+			"hs_product_type":      "service",
+			"hs_position_on_quote": position,
+			"price":                rd.NrcRow,
+			"quantity":             1,
+		}
+		position++
 
 		if rd.HsLineItemNrc != nil {
-			_ = h.hs.UpdateLineItem(ctx, *rd.HsLineItemNrc, nrcProps, lineAssoc)
+			if err := h.hs.UpdateLineItem(ctx, *rd.HsLineItemNrc, nrcProps, lineAssoc); err != nil {
+				failStep(4, "line_items", fmt.Sprintf("update NRC line item for row %d: %v", rd.ID, err))
+				return
+			}
+			activeLineItemIDs[*rd.HsLineItemNrc] = struct{}{}
 		} else {
 			itemID, err := h.hs.CreateLineItem(ctx, nrcProps, lineAssoc)
-			if err == nil {
-				_, _ = h.db.ExecContext(ctx,
-					`UPDATE quotes.quote_rows SET hs_line_item_nrc = $1 WHERE id = $2`, itemID, rd.ID)
+			if err != nil {
+				failStep(4, "line_items", fmt.Sprintf("create NRC line item for row %d: %v", rd.ID, err))
+				return
 			}
+			if _, err := h.db.ExecContext(ctx,
+				`UPDATE quotes.quote_rows SET hs_line_item_nrc = $1 WHERE id = $2`, itemID, rd.ID); err != nil {
+				failStep(4, "line_items", fmt.Sprintf("store NRC line item id for row %d: %v", rd.ID, err))
+				return
+			}
+			activeLineItemIDs[itemID] = struct{}{}
+		}
+	}
+
+	for _, remoteID := range remoteLineItemIDs {
+		if _, keep := activeLineItemIDs[remoteID]; keep {
+			continue
+		}
+		if err := h.hs.DeleteLineItem(ctx, remoteID); err != nil {
+			failStep(4, "line_items", fmt.Sprintf("delete orphan HubSpot line item %d: %v", remoteID, err))
+			return
 		}
 	}
 	addStep(4, "line_items", "completed")
@@ -432,4 +512,57 @@ func parseHubSpotBool(raw string) (bool, bool) {
 	default:
 		return false, false
 	}
+}
+
+func buildHSComments(trial, description string) string {
+	return trial + description
+}
+
+func preferredQuoteLanguage(lang string) string {
+	if strings.EqualFold(strings.TrimSpace(lang), "en") {
+		return "en"
+	}
+	return "it"
+}
+
+func quoteLineItemGroupPrefix(index int) string {
+	return fmt.Sprintf("%c)", 'A'+rune(index%26))
+}
+
+func quoteLineItemName(lang, translationIT, translationEN, fallback string) string {
+	name := fallback
+	if lang == "en" {
+		if strings.TrimSpace(translationEN) != "" {
+			name = translationEN
+		}
+	} else if strings.TrimSpace(translationIT) != "" {
+		name = translationIT
+	}
+	if strings.TrimSpace(name) == "" {
+		return "Item"
+	}
+	return strings.TrimSpace(name)
+}
+
+func lineItemMRCDescription(lang, descriptionIT, descriptionEN string) string {
+	details := descriptionIT
+	if lang == "en" {
+		details = descriptionEN
+	}
+
+	label := "Dettaglio della soluzione:"
+	if lang == "en" {
+		label = "Solution details:"
+	}
+	if strings.TrimSpace(details) == "" {
+		return label
+	}
+	return label + "<br/>" + details
+}
+
+func lineItemNRCDescription(lang string) string {
+	if lang == "en" {
+		return "One time charges"
+	}
+	return "Corrispettivi una tantum"
 }

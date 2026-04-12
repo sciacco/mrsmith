@@ -57,6 +57,16 @@
   flex: 1;
 }
 
+.dirtyHint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-warning-strong);
+  animation: dotPulse var(--duration-normal) var(--ease-spring) both;
+}
+
 .hsLink {
   display: inline-flex;
   align-items: center;
@@ -81,10 +91,10 @@
 
 .attentionDot {
   position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
   border-radius: var(--radius-full);
   background: var(--color-warning);
   border: 2px solid var(--color-bg-elevated);
@@ -136,10 +146,6 @@
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--space-5);
   height: 44px;
-}
-
-.dirtyWrap {
-  margin-bottom: var(--space-5);
 }
 
 .tabContent {

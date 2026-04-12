@@ -4,7 +4,6 @@ import { Button, Icon, TabNav, Tooltip, type TabNavDotIndicator } from '@mrsmith
 import { useHSStatus, usePublishPrecheck, useQuote, useUpdateQuote } from '../api/queries';
 import type { HSStatus, PublishPrecheck, Quote } from '../api/types';
 import { StatusBadge } from '../components/StatusBadge';
-import { DirtyBanner } from '../components/DirtyBanner';
 import { HeaderTab } from '../components/HeaderTab';
 import { ContactsTab } from '../components/ContactsTab';
 import { NotesTab } from '../components/NotesTab';
@@ -161,6 +160,13 @@ export function QuoteDetailPage() {
           <span className={styles.quoteNumber}>{localQuote.quote_number}</span>
           <StatusBadge status={localQuote.status} />
 
+          {isDirty && (
+            <span className={styles.dirtyHint}>
+              <Icon name="triangle-alert" size={14} />
+              Hai modifiche non salvate
+            </span>
+          )}
+
           <div className={styles.actionBarSpacer} />
 
           {hsStatus?.hs_quote_id && hsStatus.quote_url && (
@@ -241,13 +247,6 @@ export function QuoteDetailPage() {
             dotIndicator={dotIndicator}
           />
         </div>
-
-        {/* Dirty banner */}
-        {isDirty && (
-          <div className={styles.dirtyWrap}>
-            <DirtyBanner onSave={() => void handleSave()} saving={updateQuote.isPending} />
-          </div>
-        )}
 
         {/* Tab content */}
         <div className={styles.tabContent} key={activeTab}>
