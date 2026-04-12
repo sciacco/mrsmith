@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Icon, MultiSelect, SingleSelect } from '@mrsmith/ui';
 import type { Quote } from '../api/types';
 import {
@@ -9,6 +9,7 @@ import {
   useTemplates,
 } from '../api/queries';
 import { parseReplaceOrders, parseServiceCategoryIds } from '../utils/quoteRules';
+import { SegmentedControl } from './SegmentedControl';
 import styles from './HeaderTab.module.css';
 
 interface HeaderTabProps {
@@ -37,6 +38,13 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
 
   const isIaaS = selectedTemplate?.template_type === 'iaas';
   const isSpot = quote.document_type === 'TSC-ORDINE';
+  const colocationSelected = useMemo(() => {
+    return (categoriesQuery.data ?? []).some(
+      c => selectedServiceIds.includes(c.id) && c.name.trim().toUpperCase() === 'COLOCATION',
+    );
+  }, [categoriesQuery.data, selectedServiceIds]);
+  const billingLockedByColo = selectedTemplate?.is_colo === true || colocationSelected;
+  const billingLocked = isIaaS || billingLockedByColo;
 
   const ownerOptions = useMemo(
     () =>
@@ -77,6 +85,16 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
       })),
     [templatesQuery.data],
   );
+  const billMonthsValue = useMemo(() => {
+    const raw = String(quote.bill_months);
+    if (raw === '1' || raw === '2' || raw === '3' || raw === '6' || raw === '12') return raw;
+    return '1';
+  }, [quote.bill_months]);
+
+  useEffect(() => {
+    if (!billingLockedByColo || quote.bill_months === 3) return;
+    onChange('bill_months', 3);
+  }, [billingLockedByColo, onChange, quote.bill_months]);
 
   return (
     <div className={styles.grid}>
@@ -185,6 +203,28 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
             placeholder="— Seleziona —"
             allowClear
           />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Frequenza di fatturazione</label>
+          <SegmentedControl<'1' | '2' | '3' | '6' | '12'>
+            value={billMonthsValue}
+            onChange={v => onChange('bill_months', Number(v))}
+            options={[
+              { value: '1', label: 'Mensile', disabled: billingLocked },
+              { value: '2', label: 'Bimestrale', disabled: billingLocked },
+              { value: '3', label: 'Trimestrale', disabled: billingLocked },
+              { value: '6', label: 'Semestrale', disabled: billingLocked },
+              { value: '12', label: 'Annuale', disabled: billingLocked },
+            ]}
+            aria-label="Frequenza di fatturazione"
+            size="sm"
+          />
+          {billingLockedByColo && (
+            <div className={styles.emptyHint}>Frequenza fissata a Trimestrale per COLOCATION.</div>
+          )}
+          {isIaaS && (
+            <div className={styles.emptyHint}>Frequenza derivata dal template IaaS/VCloud.</div>
+          )}
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Durata iniziale (mesi)</label>
