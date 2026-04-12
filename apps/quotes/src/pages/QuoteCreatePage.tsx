@@ -969,7 +969,7 @@ export function QuoteCreatePage() {
               </CollapsibleSection>
 
               <CollapsibleSection
-                title="Contatti di riferimento"
+                title="Riferimenti"
                 summary={contactsSummary}
                 open={extraOpen.contacts === true}
                 onToggle={() => toggleExtra('contacts')}
@@ -1131,7 +1131,7 @@ export function QuoteCreatePage() {
                     <span className={styles.summaryVal}>{legalNotesSummary}</span>
                   </div>
                   <div className={styles.summaryListRow}>
-                    <span className={styles.summaryKey}>Contatti</span>
+                    <span className={styles.summaryKey}>Riferimenti</span>
                     <span className={styles.summaryVal}>{contactsSummary}</span>
                   </div>
                 </div>

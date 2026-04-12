@@ -18,7 +18,7 @@ const tabs = [
   { key: 'header', label: 'Intestazione' },
   { key: 'kits', label: 'Kit e Prodotti' },
   { key: 'notes', label: 'Note e Condizioni' },
-  { key: 'contacts', label: 'Contatti' },
+  { key: 'contacts', label: 'Riferimenti' },
 ] as const;
 
 type TabKey = (typeof tabs)[number]['key'];
