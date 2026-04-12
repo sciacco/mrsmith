@@ -23,6 +23,7 @@ import { KitPickerModal } from '../components/KitPickerModal';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { TemplatePicker } from '../components/TemplatePicker';
 import { buildIaaSTrialText, getLanguageCode, parseServiceCategoryIds } from '../utils/quoteRules';
+import { billingPeriodLabel } from '../utils/kitLabels';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import styles from './QuoteCreatePage.module.css';
 
@@ -84,12 +85,6 @@ const initialState: WizardState = {
   contactAdm: { ...emptyContact },
 };
 
-function formatCurrency(value: number): string {
-  return value.toLocaleString('it-IT', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 function truncateHtml(html: string, max = 80): string {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -252,16 +247,6 @@ export function QuoteCreatePage() {
       .filter(k => order.has(k.id))
       .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   }, [kits, state.kit_ids]);
-
-  const totals = useMemo(() => {
-    let nrc = 0;
-    let mrc = 0;
-    for (const k of selectedKits) {
-      nrc += k.nrc;
-      mrc += k.mrc;
-    }
-    return { nrc, mrc };
-  }, [selectedKits]);
 
   const addKit = useCallback((kitId: number) => {
     setState(prev => (
@@ -828,15 +813,13 @@ export function QuoteCreatePage() {
                         <span className={styles.kitCardCategory}>{derivedIaaSKit.category_name}</span>
                       )}
                     </div>
-                    <div className={styles.kitCardTotals}>
-                      <span>
-                        <span className={styles.kitCardTotalLabel}>NRC</span>{' '}
-                        {formatCurrency(derivedIaaSKit.nrc)}
-                      </span>
-                      <span>
-                        <span className={styles.kitCardTotalLabel}>MRC</span>{' '}
-                        {formatCurrency(derivedIaaSKit.mrc)}
-                      </span>
+                    <div className={styles.kitCardMeta}>
+                      <span className={styles.kitCardMetaTag}>{billingPeriodLabel(derivedIaaSKit.billing_period)}</span>
+                      <span className={styles.kitCardMetaTag}>Attivazione {derivedIaaSKit.activation_time_days}gg</span>
+                      <span className={styles.kitCardMetaTag}>Durata {derivedIaaSKit.initial_subscription_months}/{derivedIaaSKit.next_subscription_months} mesi</span>
+                      {derivedIaaSKit.notes && (
+                        <span className={styles.kitCardNotes} title={derivedIaaSKit.notes}>{derivedIaaSKit.notes}</span>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -889,15 +872,13 @@ export function QuoteCreatePage() {
                             <span className={styles.kitCardCategory}>{k.category_name}</span>
                           )}
                         </div>
-                        <div className={styles.kitCardTotals}>
-                          <span>
-                            <span className={styles.kitCardTotalLabel}>NRC</span>{' '}
-                            {formatCurrency(k.nrc)}
-                          </span>
-                          <span>
-                            <span className={styles.kitCardTotalLabel}>MRC</span>{' '}
-                            {formatCurrency(k.mrc)}
-                          </span>
+                        <div className={styles.kitCardMeta}>
+                          <span className={styles.kitCardMetaTag}>{billingPeriodLabel(k.billing_period)}</span>
+                          <span className={styles.kitCardMetaTag}>Attivazione {k.activation_time_days}gg</span>
+                          <span className={styles.kitCardMetaTag}>Durata {k.initial_subscription_months}/{k.next_subscription_months} mesi</span>
+                          {k.notes && (
+                            <span className={styles.kitCardNotes} title={k.notes}>{k.notes}</span>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -909,19 +890,6 @@ export function QuoteCreatePage() {
                         </button>
                       </div>
                     ))}
-                  </div>
-                )}
-
-                {selectedKits.length > 0 && (
-                  <div className={styles.kitTotals}>
-                    <span>
-                      <span className={styles.kitTotalsLabel}>NRC Totale</span>{' '}
-                      {formatCurrency(totals.nrc)}
-                    </span>
-                    <span>
-                      <span className={styles.kitTotalsLabel}>MRC Totale</span>{' '}
-                      {formatCurrency(totals.mrc)}
-                    </span>
                   </div>
                 )}
               </div>
@@ -1104,8 +1072,8 @@ export function QuoteCreatePage() {
                     ).map(k => (
                       <li key={k.id} className={styles.kitSummaryRow}>
                         <span className={styles.kitSummaryName}>{k.internal_name}</span>
-                        <span className={styles.kitSummaryPrice}>
-                          NRC {formatCurrency(k.nrc)} · MRC {formatCurrency(k.mrc)}
+                        <span className={styles.kitSummaryMeta}>
+                          {billingPeriodLabel(k.billing_period)} · {k.activation_time_days}gg · {k.initial_subscription_months}/{k.next_subscription_months} mesi
                         </span>
                       </li>
                     ))}
@@ -1137,17 +1105,6 @@ export function QuoteCreatePage() {
                 </div>
               </div>
 
-              <div className={styles.totalsBar}>
-                <div className={styles.totalsItem}>
-                  <span className={styles.totalsLabel}>NRC Totale</span>
-                  <span className={styles.totalsValue}>{formatCurrency(totals.nrc)}</span>
-                </div>
-                <div className={styles.totalsDivider} aria-hidden="true" />
-                <div className={styles.totalsItem}>
-                  <span className={styles.totalsLabel}>MRC Totale</span>
-                  <span className={styles.totalsValue}>{formatCurrency(totals.mrc)}</span>
-                </div>
-              </div>
             </div>
           </div>
         )}

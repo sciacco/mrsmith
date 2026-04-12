@@ -22,7 +22,10 @@ const customerPaymentQuery = `SELECT TOP 1 CONVERT(varchar(20), ISNULL(CAST(CODI
 	          WHERE NUMERO_AZIENDA = @p1`
 
 const listKitsQuery = `SELECT k.id, k.internal_name, k.nrc, k.mrc, k.category_id, pc.name as category_name,
-	                 k.is_active, k.ecommerce, k.quotable
+	                 k.is_active, k.ecommerce, k.quotable,
+	                 k.billing_period, k.activation_time_days,
+	                 k.initial_subscription_months, k.next_subscription_months,
+	                 COALESCE(k.notes, '') as notes
 	          FROM products.kit k
 	          LEFT JOIN products.product_category pc ON pc.id = k.category_id
 	          WHERE k.is_active = true AND k.ecommerce = false AND k.quotable = true
@@ -191,24 +194,29 @@ func (h *Handler) handleListKits(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type kit struct {
-		ID           int64          `json:"id"`
-		InternalName string         `json:"internal_name"`
-		NRC          float64        `json:"nrc"`
-		MRC          float64        `json:"mrc"`
-		CategoryID   sql.NullInt32  `json:"-"`
-		CategoryName sql.NullString `json:"-"`
-		Category     *string        `json:"category_name"`
-		CategoryIDV  *int           `json:"category_id"`
-		IsActive     bool           `json:"is_active"`
-		Ecommerce    bool           `json:"ecommerce"`
-		Quotable     bool           `json:"quotable"`
+		ID                        int64          `json:"id"`
+		InternalName              string         `json:"internal_name"`
+		NRC                       float64        `json:"nrc"`
+		MRC                       float64        `json:"mrc"`
+		CategoryID                sql.NullInt32  `json:"-"`
+		CategoryName              sql.NullString `json:"-"`
+		Category                  *string        `json:"category_name"`
+		CategoryIDV               *int           `json:"category_id"`
+		IsActive                  bool           `json:"is_active"`
+		Ecommerce                 bool           `json:"ecommerce"`
+		Quotable                  bool           `json:"quotable"`
+		BillingPeriod             int            `json:"billing_period"`
+		ActivationTimeDays        int            `json:"activation_time_days"`
+		InitialSubscriptionMonths int            `json:"initial_subscription_months"`
+		NextSubscriptionMonths    int            `json:"next_subscription_months"`
+		Notes                     string         `json:"notes"`
 	}
 
 	result := []kit{}
 	seen := make(map[int64]struct{})
 	for rows.Next() {
 		var k kit
-		if err := rows.Scan(&k.ID, &k.InternalName, &k.NRC, &k.MRC, &k.CategoryID, &k.CategoryName, &k.IsActive, &k.Ecommerce, &k.Quotable); err != nil {
+		if err := rows.Scan(&k.ID, &k.InternalName, &k.NRC, &k.MRC, &k.CategoryID, &k.CategoryName, &k.IsActive, &k.Ecommerce, &k.Quotable, &k.BillingPeriod, &k.ActivationTimeDays, &k.InitialSubscriptionMonths, &k.NextSubscriptionMonths, &k.Notes); err != nil {
 			h.dbFailure(w, r, "list_kits_scan", err)
 			return
 		}
@@ -239,7 +247,10 @@ func (h *Handler) handleListKits(w http.ResponseWriter, r *http.Request) {
 			placeholders = append(placeholders, "$"+strconv.Itoa(i+1))
 		}
 		query := `SELECT k.id, k.internal_name, k.nrc, k.mrc, k.category_id, pc.name as category_name,
-		                 k.is_active, k.ecommerce, k.quotable
+		                 k.is_active, k.ecommerce, k.quotable,
+		                 k.billing_period, k.activation_time_days,
+		                 k.initial_subscription_months, k.next_subscription_months,
+		                 COALESCE(k.notes, '') as notes
 		          FROM products.kit k
 		          LEFT JOIN products.product_category pc ON pc.id = k.category_id
 		          WHERE k.id IN (` + strings.Join(placeholders, ",") + `)
@@ -252,7 +263,7 @@ func (h *Handler) handleListKits(w http.ResponseWriter, r *http.Request) {
 		defer includeRows.Close()
 		for includeRows.Next() {
 			var k kit
-			if err := includeRows.Scan(&k.ID, &k.InternalName, &k.NRC, &k.MRC, &k.CategoryID, &k.CategoryName, &k.IsActive, &k.Ecommerce, &k.Quotable); err != nil {
+			if err := includeRows.Scan(&k.ID, &k.InternalName, &k.NRC, &k.MRC, &k.CategoryID, &k.CategoryName, &k.IsActive, &k.Ecommerce, &k.Quotable, &k.BillingPeriod, &k.ActivationTimeDays, &k.InitialSubscriptionMonths, &k.NextSubscriptionMonths, &k.Notes); err != nil {
 				h.dbFailure(w, r, "list_kits_include_ids_scan", err)
 				return
 			}

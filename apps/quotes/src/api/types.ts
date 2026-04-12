@@ -31,6 +31,11 @@ export interface Kit {
   is_active: boolean;
   ecommerce: boolean;
   quotable: boolean;
+  billing_period: number;
+  activation_time_days: number;
+  initial_subscription_months: number;
+  next_subscription_months: number;
+  notes: string;
 }
 
 export interface Customer {

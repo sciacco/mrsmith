@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { Modal, SearchInput } from '@mrsmith/ui';
 import { useKits } from '../api/queries';
+import { billingPeriodLabel } from '../utils/kitLabels';
 import styles from './KitPickerModal.module.css';
 
 interface KitPickerModalProps {
@@ -65,8 +66,8 @@ export function KitPickerModal({ open, onSelect, onClose }: KitPickerModalProps)
                 onClick={() => { onSelect(k.id); onClose(); }}
               >
                 <span className={styles.kitName}>{k.internal_name}</span>
-                <span className={styles.kitPrice}>
-                  NRC {k.nrc.toFixed(2)} / MRC {k.mrc.toFixed(2)}
+                <span className={styles.kitMeta}>
+                  {billingPeriodLabel(k.billing_period)} · {k.activation_time_days}gg · {k.initial_subscription_months}/{k.next_subscription_months}m
                 </span>
               </button>
             ))}
