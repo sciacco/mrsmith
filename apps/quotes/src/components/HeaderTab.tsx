@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Icon, MultiSelect, SingleSelect } from '@mrsmith/ui';
 import type { Quote } from '../api/types';
 import {
@@ -38,13 +38,7 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
 
   const isIaaS = selectedTemplate?.template_type === 'iaas';
   const isSpot = quote.document_type === 'TSC-ORDINE';
-  const colocationSelected = useMemo(() => {
-    return (categoriesQuery.data ?? []).some(
-      c => selectedServiceIds.includes(c.id) && c.name.trim().toUpperCase() === 'COLOCATION',
-    );
-  }, [categoriesQuery.data, selectedServiceIds]);
-  const billingLockedByColo = selectedTemplate?.is_colo === true || colocationSelected;
-  const billingLocked = isIaaS || billingLockedByColo;
+  const billingLocked = isIaaS;
 
   const ownerOptions = useMemo(
     () =>
@@ -90,11 +84,6 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
     if (raw === '1' || raw === '2' || raw === '3' || raw === '6' || raw === '12') return raw;
     return '1';
   }, [quote.bill_months]);
-
-  useEffect(() => {
-    if (!billingLockedByColo || quote.bill_months === 3) return;
-    onChange('bill_months', 3);
-  }, [billingLockedByColo, onChange, quote.bill_months]);
 
   const dealLabel = useMemo(() => {
     if (quote.deal_number) {
@@ -226,9 +215,6 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
             aria-label="Frequenza di fatturazione"
             size="sm"
           />
-          {billingLockedByColo && (
-            <div className={styles.emptyHint}>Frequenza fissata a Trimestrale per COLOCATION.</div>
-          )}
           {isIaaS && (
             <div className={styles.emptyHint}>Frequenza derivata dal template IaaS/VCloud.</div>
           )}
