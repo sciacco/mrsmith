@@ -1,4 +1,5 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
+import { Icon } from '@mrsmith/ui';
 import type { DocumentType, ProductGroup, ProductVariant } from '../api/types';
 import type { KitEditorForm } from '../hooks/useKitEditorForm';
 import styles from './ProductGroupEditor.module.css';
@@ -41,6 +42,7 @@ export function ProductGroupEditor({ group, documentType, form, isMissing }: Pro
     !group.required &&
     isRedundant(group.group_name, onlyVariant.product_name);
 
+  const [open, setOpen] = useState(true);
   const noneSelected = !group.products.some(p => form.state.get(p.id)?.included);
 
   if (flatCollapsed && onlyVariant) {
@@ -62,14 +64,24 @@ export function ProductGroupEditor({ group, documentType, form, isMissing }: Pro
       aria-labelledby={`${uid}-title`}
     >
       <header className={styles.eyebrow}>
-        <span id={`${uid}-title`} className={styles.eyebrowName}>
-          {group.group_name}
-        </span>
+        <button
+          type="button"
+          className={styles.eyebrowToggle}
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+        >
+          <span className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} aria-hidden="true">
+            <Icon name="chevron-right" size={12} />
+          </span>
+          <span id={`${uid}-title`} className={styles.eyebrowName}>
+            {group.group_name}
+          </span>
+        </button>
         {group.required && <span className={styles.eyebrowMeta}>· Obbligatorio</span>}
         {isMissing && <span className={styles.eyebrowMissing}>· Selezione richiesta</span>}
       </header>
 
-      <div className={styles.sectionRows}>
+      {open && <div className={styles.sectionRows}>
         {!group.required && (
           <NoneRow
             checked={noneSelected}
@@ -89,7 +101,7 @@ export function ProductGroupEditor({ group, documentType, form, isMissing }: Pro
             isMissing={isMissing}
           />
         ))}
-      </div>
+      </div>}
     </section>
   );
 }
