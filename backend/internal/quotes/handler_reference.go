@@ -384,7 +384,7 @@ func quoteStageInClause(stages []string) string {
 // (standard pipeline + its stages) OR (iaas pipeline + its stages), AND a
 // non-empty `codice`. Ordering is kept deterministic by id desc to match the
 // Appsmith source (`order by id desc`).
-var listDealsQuery = `SELECT d.id, d.name, p.label as pipeline, s.label as dealstage,
+var listDealsQuery = `SELECT d.id, d.name, d.codice as deal_number, p.label as pipeline, s.label as dealstage,
                              c.id as company_id, c.name as company_name, c.lingua as company_lingua,
                              d.dealtype, d.created_at, d.updated_at,
                              o.first_name as owner_firstname, o.last_name as owner_lastname, o.email as owner_email
@@ -413,6 +413,8 @@ func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 	type deal struct {
 		ID              int64          `json:"id"`
 		DealName        string         `json:"name"`
+		DealNumber      sql.NullString `json:"-"`
+		DealNumberV     *string        `json:"deal_number"`
 		Pipeline        sql.NullString `json:"-"`
 		PipelineV       *string        `json:"pipeline"`
 		DealStage       sql.NullString `json:"-"`
@@ -440,9 +442,12 @@ func (h *Handler) handleListDeals(w http.ResponseWriter, r *http.Request) {
 	result := []deal{}
 	for rows.Next() {
 		var d deal
-		if err := rows.Scan(&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.CompanyLingua, &d.DealType, &d.CreatedAt, &d.UpdatedAt, &d.OwnerFirstName, &d.OwnerLastName, &d.OwnerEmail); err != nil {
+		if err := rows.Scan(&d.ID, &d.DealName, &d.DealNumber, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.CompanyLingua, &d.DealType, &d.CreatedAt, &d.UpdatedAt, &d.OwnerFirstName, &d.OwnerLastName, &d.OwnerEmail); err != nil {
 			h.dbFailure(w, r, "list_deals_scan", err)
 			return
+		}
+		if d.DealNumber.Valid {
+			d.DealNumberV = &d.DealNumber.String
 		}
 		if d.Pipeline.Valid {
 			d.PipelineV = &d.Pipeline.String
@@ -498,6 +503,7 @@ func (h *Handler) handleGetDeal(w http.ResponseWriter, r *http.Request) {
 	type dealDetail struct {
 		ID            int64   `json:"id"`
 		DealName      string  `json:"name"`
+		DealNumber    *string `json:"deal_number"`
 		Pipeline      *string `json:"pipeline"`
 		DealStage     *string `json:"dealstage"`
 		CompanyID     *int64  `json:"company_id"`
@@ -515,14 +521,14 @@ func (h *Handler) handleGetDeal(w http.ResponseWriter, r *http.Request) {
 		updatedAtRawTime sql.NullTime
 	)
 	err = h.db.QueryRowContext(r.Context(),
-		`SELECT d.id, d.name, p.label, s.label,
+		`SELECT d.id, d.name, d.codice, p.label, s.label,
 		        c.id, c.name, c.numero_azienda, c.lingua, d.dealtype, d.created_at, d.updated_at
 		 FROM loader.hubs_deal d
 		 LEFT JOIN loader.hubs_company c ON c.id = d.company_id
 		 LEFT JOIN loader.hubs_pipeline p ON p.id = d.pipeline
 		 LEFT JOIN loader.hubs_stages s ON s.id = d.dealstage
 		 WHERE d.id = $1`, dealID).Scan(
-		&d.ID, &d.DealName, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.NumeroAzienda, &d.CompanyLingua, &d.DealType, &createdAtRawTime, &updatedAtRawTime)
+		&d.ID, &d.DealName, &d.DealNumber, &d.Pipeline, &d.DealStage, &d.CompanyID, &d.CompanyName, &d.NumeroAzienda, &d.CompanyLingua, &d.DealType, &createdAtRawTime, &updatedAtRawTime)
 
 	if err == sql.ErrNoRows {
 		httputil.Error(w, http.StatusNotFound, "deal_not_found")

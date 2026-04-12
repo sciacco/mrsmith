@@ -55,6 +55,7 @@ function ownerLabel(firstName: string | null | undefined, lastName: string | nul
 
 export function DealCard({ deal, selected, onClick }: DealCardProps) {
   const company = deal.company_name ?? '—';
+  const dealHeading = [deal.deal_number, deal.name].filter(Boolean).join(' · ') || deal.name;
   const dealType = dealTypeLabel(deal.dealtype);
   const owner = ownerLabel(deal.owner_firstname, deal.owner_lastname);
   const createdAt = formatDate(deal.created_at);
@@ -73,7 +74,7 @@ export function DealCard({ deal, selected, onClick }: DealCardProps) {
         {initialsFromCompany(deal.company_name)}
       </span>
       <div className={styles.center}>
-        <span className={styles.dealName}>{deal.name}</span>
+        <span className={styles.dealName}>{dealHeading}</span>
         <span className={styles.company}>{company}</span>
         <span className={styles.meta}>
           {dealType && <span className={styles.metaType}>{dealType}</span>}

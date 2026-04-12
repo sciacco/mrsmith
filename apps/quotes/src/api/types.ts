@@ -47,6 +47,7 @@ export interface Customer {
 export interface Deal {
   id: number;
   name: string;
+  deal_number: string | null;
   pipeline: string | null;
   dealstage: string | null;
   dealtype?: string | null;

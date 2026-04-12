@@ -14,6 +14,70 @@ import (
 	"testing"
 )
 
+func TestHandleListDealsReturnsDealNumber(t *testing.T) {
+	resetQuotesHandlerTracker("list-deals")
+
+	h := &Handler{db: openQuotesHandlerTestDB(t, "list-deals")}
+
+	req := httptest.NewRequest(http.MethodGet, "/quotes/v1/deals", nil)
+	rec := httptest.NewRecorder()
+
+	h.handleListDeals(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var got []struct {
+		ID         int64   `json:"id"`
+		Name       string  `json:"name"`
+		DealNumber *string `json:"deal_number"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("unexpected deals payload length: %#v", got)
+	}
+	if got[0].Name != "Deal Alpha" {
+		t.Fatalf("name = %q, want %q", got[0].Name, "Deal Alpha")
+	}
+	if got[0].DealNumber == nil || *got[0].DealNumber != "D-456/2026" {
+		t.Fatalf("deal_number = %#v, want %q", got[0].DealNumber, "D-456/2026")
+	}
+}
+
+func TestHandleGetDealReturnsDealNumber(t *testing.T) {
+	resetQuotesHandlerTracker("get-deal")
+
+	h := &Handler{db: openQuotesHandlerTestDB(t, "get-deal")}
+
+	req := httptest.NewRequest(http.MethodGet, "/quotes/v1/deals/42", nil)
+	req.SetPathValue("id", "42")
+	rec := httptest.NewRecorder()
+
+	h.handleGetDeal(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var got struct {
+		ID         int64   `json:"id"`
+		Name       string  `json:"name"`
+		DealNumber *string `json:"deal_number"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if got.Name != "Deal Alpha" {
+		t.Fatalf("name = %q, want %q", got.Name, "Deal Alpha")
+	}
+	if got.DealNumber == nil || *got.DealNumber != "D-456/2026" {
+		t.Fatalf("deal_number = %#v, want %q", got.DealNumber, "D-456/2026")
+	}
+}
+
 func TestHandleCustomerOrdersUsesResolvedERPCustomerID(t *testing.T) {
 	resetQuotesHandlerTracker("customer-orders-mistra")
 	resetQuotesHandlerTracker("customer-orders-alyante")
@@ -180,6 +244,31 @@ func (c *quotesHandlerTestConn) QueryContext(_ context.Context, query string, ar
 	tracker.lastQuery = query
 
 	switch {
+	case c.mode == "list-deals" && strings.Contains(query, "FROM loader.hubs_deal d"):
+		return &quotesHandlerTestRows{
+			columns: []string{
+				"id", "name", "deal_number", "pipeline", "dealstage",
+				"company_id", "company_name", "company_lingua", "dealtype",
+				"created_at", "updated_at", "owner_firstname", "owner_lastname", "owner_email",
+			},
+			values: [][]driver.Value{{
+				int64(42), "Deal Alpha", "D-456/2026", "Pipeline A", "Qualified",
+				int64(99), "Acme Spa", "it", "newbusiness",
+				nil, nil, "Ada", "Lovelace", "ada@example.com",
+			}},
+		}, nil
+	case c.mode == "get-deal" && strings.Contains(query, "WHERE d.id = $1"):
+		return &quotesHandlerTestRows{
+			columns: []string{
+				"id", "name", "deal_number", "pipeline", "dealstage",
+				"company_id", "company_name", "numero_azienda", "company_lingua",
+				"dealtype", "created_at", "updated_at",
+			},
+			values: [][]driver.Value{{
+				int64(42), "Deal Alpha", "D-456/2026", "Pipeline A", "Qualified",
+				int64(99), "Acme Spa", "10642803691", "it", "newbusiness", nil, nil,
+			}},
+		}, nil
 	case c.mode == "customer-orders-mistra" && strings.Contains(query, "SELECT numero_azienda FROM loader.hubs_company"):
 		tracker.bridgeCustomerID = namedString(args[0])
 		return &quotesHandlerTestRows{

@@ -140,6 +140,15 @@ Alyante ERP ID
 - Used by: `apps/quotes` publish flow.
 - Open questions: none.
 
+### Quotes Deal Number Must Come From HubSpot `codice`, Not Deal Title
+
+- Context: `apps/quotes` Nuova Proposta deal picker, quote creation payload, and detail header rendering.
+- Discovery: `quotes.quote.deal_number` is the HubSpot deal code, while `loader.hubs_deal.name` is the human title. Reusing `d.name` in the wizard create payload stores the title in `deal_number`, which breaks downstream views that expect the code.
+- Practical rule: quotes deal reference APIs should expose both `name` and `deal_number` (`loader.hubs_deal.codice`), wizard search should include the code, and quote create should persist `selectedDeal.deal_number`, never the title.
+- Evidence: `backend/internal/quotes/handler_reference.go`, `apps/quotes/src/pages/QuoteCreatePage.tsx`, `apps/quotes/src/components/HeaderTab.tsx`, production quotes `1373` and `1374` created on 2026-04-12 with `deal_number` incorrectly set to `TEST ALESSANDRA - NON ELIMINARE`.
+- Used by: `apps/quotes` deal list, create flow, and detail header.
+- Open questions: whether to add a separate backfill for already-corrupted `quotes.quote.deal_number` rows.
+
 ### Quotes Customer Default Payment Must Use Alyante `CODICE_PAGAMENTO`
 
 - Context: quotes create enrichment endpoint `GET /quotes/v1/customer-payment/{customerId}` against Alyante `Tsmi_Anagrafiche_clienti`.

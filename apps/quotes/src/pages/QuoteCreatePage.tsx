@@ -265,6 +265,7 @@ export function QuoteCreatePage() {
     if (!dealSearch) return deals;
     const q = dealSearch.toLowerCase();
     return deals.filter(d =>
+      (d.deal_number?.toLowerCase().includes(q) ?? false) ||
       d.name.toLowerCase().includes(q) ||
       (d.company_name?.toLowerCase().includes(q) ?? false),
     );
@@ -326,7 +327,7 @@ export function QuoteCreatePage() {
     try {
       const result = await createQuote.mutateAsync({
         customer_id: state.selectedDeal.company_id,
-        deal_number: state.selectedDeal.name,
+        deal_number: state.selectedDeal.deal_number,
         hs_deal_id: state.selectedDeal.id,
         owner: state.owner,
         document_date: new Date().toISOString().split('T')[0],

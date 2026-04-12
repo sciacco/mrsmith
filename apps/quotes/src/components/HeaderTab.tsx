@@ -96,14 +96,21 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
     onChange('bill_months', 3);
   }, [billingLockedByColo, onChange, quote.bill_months]);
 
+  const dealLabel = useMemo(() => {
+    if (quote.deal_number) {
+      return `Deal ${quote.deal_number}`;
+    }
+    return 'Deal';
+  }, [quote.deal_number]);
+
   return (
     <div className={styles.grid}>
       {/* Deal e Proprieta */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Deal e Proprieta</div>
         <div className={styles.field}>
-          <label className={styles.label}>Deal</label>
-          <input className={styles.readOnly} readOnly value={quote.deal_name ?? quote.deal_number ?? '—'} />
+          <label className={styles.label}>{dealLabel}</label>
+          <input className={styles.readOnly} readOnly value={quote.deal_name ?? '—'} />
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Cliente</label>
