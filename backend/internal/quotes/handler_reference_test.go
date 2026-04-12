@@ -27,6 +27,20 @@ func TestCustomerOrdersQueryMatchesAppsmithContract(t *testing.T) {
 	}
 }
 
+func TestCustomerPaymentQueryMatchesAppsmithContract(t *testing.T) {
+	mustContain := []string{
+		"CODICE_PAGAMENTO",
+		"ISNULL",
+		"CAST(CODICE_PAGAMENTO as INT)",
+		"NUMERO_AZIENDA = @p1",
+	}
+	for _, frag := range mustContain {
+		if !strings.Contains(customerPaymentQuery, frag) {
+			t.Fatalf("customerPaymentQuery missing %q; query was:\n%s", frag, customerPaymentQuery)
+		}
+	}
+}
+
 func TestParseCategoryExclusions(t *testing.T) {
 	got := parseCategoryExclusions("12, 13,foo,,15")
 	want := []int{12, 13, 15}

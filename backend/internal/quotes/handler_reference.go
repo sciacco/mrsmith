@@ -16,6 +16,10 @@ const customerOrdersQuery = `SELECT TOP 500 LTRIM(RTRIM(NOME_TESTATA_ORDINE)) as
 	          GROUP BY NOME_TESTATA_ORDINE
 	          ORDER BY NOME_TESTATA_ORDINE DESC`
 
+const customerPaymentQuery = `SELECT TOP 1 CONVERT(varchar(20), ISNULL(CAST(CODICE_PAGAMENTO as INT), 402)) as payment_code
+	          FROM Tsmi_Anagrafiche_clienti
+	          WHERE NUMERO_AZIENDA = @p1`
+
 const listKitsQuery = `SELECT k.id, k.internal_name, k.nrc, k.mrc, k.category_id, pc.name as category_name,
 	                 k.is_active, k.ecommerce, k.quotable
 	          FROM products.kit k
@@ -531,9 +535,7 @@ func (h *Handler) handleCustomerPayment(w http.ResponseWriter, r *http.Request) 
 	// Step 2: Query Alyante with the resolved ERP ID
 	var p payment
 	err = h.alyanteDB.QueryRowContext(r.Context(),
-		`SELECT TOP 1 LTRIM(RTRIM(AN_CONDPAG)) as payment_code
-		 FROM Tsmi_Anagrafiche_clienti
-		 WHERE NUMERO_AZIENDA = @p1`, erpID.String).Scan(&p.PaymentCode)
+		customerPaymentQuery, erpID.String).Scan(&p.PaymentCode)
 
 	if err == sql.ErrNoRows {
 		httputil.JSON(w, http.StatusOK, defaultPayment)

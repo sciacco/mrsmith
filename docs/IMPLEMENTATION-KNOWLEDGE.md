@@ -130,6 +130,15 @@ Alyante ERP ID
 - Used by: `apps/quotes` publish flow.
 - Open questions: none.
 
+### Quotes Customer Default Payment Must Use Alyante `CODICE_PAGAMENTO`
+
+- Context: quotes create enrichment endpoint `GET /quotes/v1/customer-payment/{customerId}` against Alyante `Tsmi_Anagrafiche_clienti`.
+- Discovery: this Alyante environment exposes the customer default payment as `CODICE_PAGAMENTO`; the stale alias `AN_CONDPAG` is invalid and causes `mssql: Invalid column name 'AN_CONDPAG'`. The legacy Appsmith contract already used `ISNULL(CAST(CODICE_PAGAMENTO as INT), 402)`.
+- Practical rule: any quotes customer-payment lookup should query `CODICE_PAGAMENTO` and preserve the `402` fallback semantics in SQL or equivalent null-safe backend logic. Keep a backend test that pins that positive contract.
+- Evidence: `apps/quotes/quotes-migspec-phaseA.md`, `apps/quotes/APPSMITH-AUDIT.md`, `backend/internal/quotes/handler_reference.go`, `backend/internal/quotes/handler_reference_test.go`.
+- Used by: `apps/quotes` create flow payment-method prefill.
+- Open questions: none.
+
 ### Quotes Republish Must Unlock Published HubSpot Quotes First
 
 - Context: republishing an existing HubSpot-backed quote from `apps/quotes`.
