@@ -37,6 +37,7 @@
 
 .stepContent {
   animation: sectionEnter var(--duration-normal) var(--ease-out) both;
+  padding-top: var(--space-2);
 }
 
 .stepInner {
