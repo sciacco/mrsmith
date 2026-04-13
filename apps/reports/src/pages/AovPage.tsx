@@ -3,6 +3,7 @@ import { Skeleton, MultiSelect } from '@mrsmith/ui';
 import { useOrderStatuses } from '../api/queries';
 import { useApiClient } from '../api/client';
 import type { AovPreviewResponse } from '../types';
+import shared from './shared.module.css';
 import styles from './AovPage.module.css';
 
 type AovTab = 'byType' | 'byCategory' | 'bySales' | 'detail';
@@ -69,26 +70,26 @@ export default function AovPage() {
     : 0;
 
   return (
-    <div className={styles.page}>
-      <h1 className={styles.title}>AOV</h1>
+    <div className={shared.page}>
+      <h1 className={shared.title}>AOV</h1>
 
-      <div className={styles.toolbar}>
-        <div className={styles.field}>
+      <div className={shared.toolbar}>
+        <div className={`${shared.field} ${styles.field}`}>
           <label>Data da</label>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         </div>
-        <div className={styles.field}>
+        <div className={`${shared.field} ${styles.field}`}>
           <label>Data a</label>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </div>
-        <div className={styles.field} style={{ minWidth: 200 }}>
+        <div className={shared.field} style={{ minWidth: 200 }}>
           <label>Stati ordine</label>
           <MultiSelect options={statiOptions} selected={statuses} onChange={setStatuses} placeholder="Stati..." />
         </div>
-        <button className={styles.btnPrimary} onClick={handleExecute} disabled={!canExecute}>
+        <button className={shared.btnPrimary} onClick={handleExecute} disabled={!canExecute}>
           Esegui
         </button>
-        <button className={styles.btnSecondary} onClick={handleExport} disabled={!canExecute}>
+        <button className={shared.btnSecondary} onClick={handleExport} disabled={!canExecute}>
           Esporta XLSX
         </button>
       </div>
@@ -160,17 +161,17 @@ export default function AovPage() {
 
 function ByTypeTable({ data }: { data: AovPreviewResponse['byType'] }) {
   return (
-    <div className={styles.tableWrap}>
-      <div className={styles.info}>{data.length} righe</div>
-      <table className={styles.table}>
+    <div className={shared.tableWrap}>
+      <div className={shared.info}>{data.length} righe</div>
+      <table className={shared.table}>
         <thead>
           <tr>
             <th>Anno/Mese</th>
             <th>Tipo ordine</th>
-            <th className={styles.numCol}>N. Ordini</th>
-            <th className={styles.numCol}>AOV</th>
-            <th className={styles.numCol}>Totale MRC</th>
-            <th className={styles.numCol}>Totale NRC</th>
+            <th className={shared.numCol}>N. Ordini</th>
+            <th className={shared.numCol}>AOV</th>
+            <th className={shared.numCol}>Totale MRC</th>
+            <th className={shared.numCol}>Totale NRC</th>
           </tr>
         </thead>
         <tbody>
@@ -178,10 +179,10 @@ function ByTypeTable({ data }: { data: AovPreviewResponse['byType'] }) {
             <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
               <td>{row.anno_mese}</td>
               <td>{row.tipo_ordine}</td>
-              <td className={styles.numCol}>{row.numero_ordini}</td>
-              <td className={styles.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
-              <td className={styles.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
-              <td className={styles.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.numero_ordini}</td>
+              <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
             </tr>
           ))}
         </tbody>
@@ -192,17 +193,17 @@ function ByTypeTable({ data }: { data: AovPreviewResponse['byType'] }) {
 
 function ByCategoryTable({ data }: { data: AovPreviewResponse['byCategory'] }) {
   return (
-    <div className={styles.tableWrap}>
-      <div className={styles.info}>{data.length} righe</div>
-      <table className={styles.table}>
+    <div className={shared.tableWrap}>
+      <div className={shared.info}>{data.length} righe</div>
+      <table className={shared.table}>
         <thead>
           <tr>
             <th>Anno/Mese</th>
             <th>Categoria</th>
-            <th className={styles.numCol}>N. Ordini</th>
-            <th className={styles.numCol}>AOV</th>
-            <th className={styles.numCol}>Totale MRC</th>
-            <th className={styles.numCol}>Totale NRC</th>
+            <th className={shared.numCol}>N. Ordini</th>
+            <th className={shared.numCol}>AOV</th>
+            <th className={shared.numCol}>Totale MRC</th>
+            <th className={shared.numCol}>Totale NRC</th>
           </tr>
         </thead>
         <tbody>
@@ -210,10 +211,10 @@ function ByCategoryTable({ data }: { data: AovPreviewResponse['byCategory'] }) {
             <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
               <td>{row.anno_mese}</td>
               <td>{row.categoria ?? ''}</td>
-              <td className={styles.numCol}>{row.numero_ordini}</td>
-              <td className={styles.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
-              <td className={styles.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
-              <td className={styles.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.numero_ordini}</td>
+              <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
             </tr>
           ))}
         </tbody>
@@ -224,18 +225,18 @@ function ByCategoryTable({ data }: { data: AovPreviewResponse['byCategory'] }) {
 
 function BySalesTable({ data }: { data: AovPreviewResponse['bySales'] }) {
   return (
-    <div className={styles.tableWrap}>
-      <div className={styles.info}>{data.length} righe</div>
-      <table className={styles.table}>
+    <div className={shared.tableWrap}>
+      <div className={shared.info}>{data.length} righe</div>
+      <table className={shared.table}>
         <thead>
           <tr>
             <th>Anno</th>
             <th>Commerciale</th>
             <th>Tipo ordine</th>
-            <th className={styles.numCol}>N. Ordini</th>
-            <th className={styles.numCol}>AOV</th>
-            <th className={styles.numCol}>Totale MRC</th>
-            <th className={styles.numCol}>Totale NRC</th>
+            <th className={shared.numCol}>N. Ordini</th>
+            <th className={shared.numCol}>AOV</th>
+            <th className={shared.numCol}>Totale MRC</th>
+            <th className={shared.numCol}>Totale NRC</th>
           </tr>
         </thead>
         <tbody>
@@ -244,10 +245,10 @@ function BySalesTable({ data }: { data: AovPreviewResponse['bySales'] }) {
               <td>{row.anno}</td>
               <td>{row.commerciale ?? ''}</td>
               <td>{row.tipo_ordine}</td>
-              <td className={styles.numCol}>{row.numero_ordini}</td>
-              <td className={styles.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
-              <td className={styles.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
-              <td className={styles.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.numero_ordini}</td>
+              <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
             </tr>
           ))}
         </tbody>
@@ -258,9 +259,9 @@ function BySalesTable({ data }: { data: AovPreviewResponse['bySales'] }) {
 
 function DetailTable({ data }: { data: AovPreviewResponse['detail'] }) {
   return (
-    <div className={styles.tableWrap}>
-      <div className={styles.info}>{data.length} righe</div>
-      <table className={styles.table}>
+    <div className={shared.tableWrap}>
+      <div className={shared.info}>{data.length} righe</div>
+      <table className={shared.table}>
         <thead>
           <tr>
             <th>Cliente</th>
@@ -269,10 +270,10 @@ function DetailTable({ data }: { data: AovPreviewResponse['detail'] }) {
             <th>Commerciale</th>
             <th>Data documento</th>
             <th>Descrizione</th>
-            <th className={styles.numCol}>Quantita</th>
-            <th className={styles.numCol}>MRC</th>
-            <th className={styles.numCol}>NRC</th>
-            <th className={styles.numCol}>AOV</th>
+            <th className={shared.numCol}>Quantita</th>
+            <th className={shared.numCol}>MRC</th>
+            <th className={shared.numCol}>NRC</th>
+            <th className={shared.numCol}>AOV</th>
           </tr>
         </thead>
         <tbody>
@@ -280,14 +281,14 @@ function DetailTable({ data }: { data: AovPreviewResponse['detail'] }) {
             <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
               <td>{row.ragione_sociale}</td>
               <td>{row.tipo_ordine}</td>
-              <td className={styles.mono}>{row.numero_ordine}</td>
+              <td className={shared.mono}>{row.numero_ordine}</td>
               <td>{row.commerciale ?? ''}</td>
               <td>{row.data_documento?.slice(0, 10) ?? ''}</td>
               <td>{row.descrizione_long ?? ''}</td>
-              <td className={styles.numCol}>{row.quantita ?? ''}</td>
-              <td className={styles.numCol}>{row.mrc != null ? row.mrc.toFixed(2) : ''}</td>
-              <td className={styles.numCol}>{row.nrc != null ? row.nrc.toFixed(2) : ''}</td>
-              <td className={styles.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.quantita ?? ''}</td>
+              <td className={shared.numCol}>{row.mrc != null ? row.mrc.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.nrc != null ? row.nrc.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
             </tr>
           ))}
         </tbody>

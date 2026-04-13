@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Icon, type IconName } from '@mrsmith/ui';
+import shared from './shared.module.css';
 import styles from './HomePage.module.css';
 
 interface CardProps {
@@ -52,8 +53,8 @@ const sections = [
 
 export default function HomePage() {
   return (
-    <div className={styles.page}>
-      <h1 className={styles.title}>Reports</h1>
+    <div className={shared.page}>
+      <h1 className={shared.title}>Reports</h1>
       {sections.map((section) => (
         <section key={section.label} className={styles.section}>
           <h2 className={styles.sectionTitle}>{section.label}</h2>

@@ -3,6 +3,7 @@ import { Skeleton, MultiSelect } from '@mrsmith/ui';
 import { useConnectionTypes } from '../api/queries';
 import { useApiClient } from '../api/client';
 import type { ActiveLineRow } from '../types';
+import shared from './shared.module.css';
 import styles from './AccessiAttiviPage.module.css';
 
 const defaultStati = ['Attiva'];
@@ -99,19 +100,19 @@ export default function AccessiAttiviPage() {
   }, [previewData]);
 
   return (
-    <div className={styles.page}>
-      <h1 className={styles.title}>Accessi attivi</h1>
+    <div className={shared.page}>
+      <h1 className={shared.title}>Accessi attivi</h1>
 
-      <div className={styles.toolbar}>
-        <div className={styles.field} style={{ minWidth: 220 }}>
+      <div className={shared.toolbar}>
+        <div className={shared.field} style={{ minWidth: 220 }}>
           <label>Tipo connessione</label>
           <MultiSelect options={connOptions} selected={connectionTypes} onChange={setConnectionTypes} placeholder="Tipi..." />
         </div>
-        <div className={styles.field} style={{ minWidth: 200 }}>
+        <div className={shared.field} style={{ minWidth: 200 }}>
           <label>Stato</label>
           <MultiSelect options={statiOptions} selected={statuses} onChange={setStatuses} placeholder="Stati..." />
         </div>
-        <button className={styles.btnSecondary} onClick={handlePreview} disabled={!canExecute}>
+        <button className={shared.btnSecondary} onClick={handlePreview} disabled={!canExecute}>
           Anteprima
         </button>
       </div>
@@ -156,10 +157,10 @@ export default function AccessiAttiviPage() {
           )}
 
           <div className={styles.actions}>
-            <button className={styles.btnPrimary} onClick={handleExport}>
+            <button className={shared.btnPrimary} onClick={handleExport}>
               Esporta XLSX
             </button>
-            <button className={styles.btnLink} onClick={() => setShowDetail((v) => !v)}>
+            <button className={shared.btnLink} onClick={() => setShowDetail((v) => !v)}>
               {showDetail ? 'Nascondi dettaglio' : 'Mostra dettaglio'}
             </button>
           </div>
@@ -171,8 +172,8 @@ export default function AccessiAttiviPage() {
           <div className={styles.banner}>
             Mostrando {Math.min(100, previewData.length)} di {previewData.length} righe
           </div>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
+          <div className={shared.tableWrap}>
+            <table className={shared.table}>
               <thead>
                 <tr>
                   <th>Cliente</th>
@@ -186,8 +187,8 @@ export default function AccessiAttiviPage() {
                   <th>Ordine</th>
                   <th>Stato</th>
                   <th>Serialnumber</th>
-                  <th className={styles.numCol}>Quantita</th>
-                  <th className={styles.numCol}>Canone</th>
+                  <th className={shared.numCol}>Quantita</th>
+                  <th className={shared.numCol}>Canone</th>
                 </tr>
               </thead>
               <tbody>
@@ -201,11 +202,11 @@ export default function AccessiAttiviPage() {
                     <td>{row.tipo ?? ''}</td>
                     <td>{row.profilo_commerciale ?? ''}</td>
                     <td>{row.intestatario ?? ''}</td>
-                    <td className={styles.mono}>{row.ordine ?? ''}</td>
+                    <td className={shared.mono}>{row.ordine ?? ''}</td>
                     <td>{row.stato ?? ''}</td>
-                    <td className={styles.mono}>{row.serialnumber ?? ''}</td>
-                    <td className={styles.numCol}>{row.quantita ?? ''}</td>
-                    <td className={styles.numCol}>{row.canone != null ? formatCurrency(row.canone) : ''}</td>
+                    <td className={shared.mono}>{row.serialnumber ?? ''}</td>
+                    <td className={shared.numCol}>{row.quantita ?? ''}</td>
+                    <td className={shared.numCol}>{row.canone != null ? formatCurrency(row.canone) : ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -215,7 +216,7 @@ export default function AccessiAttiviPage() {
       )}
 
       {!previewData && !loading && !error && (
-        <div className={styles.empty}>Seleziona i filtri e premi Anteprima per visualizzare i dati.</div>
+        <div className={shared.empty}>Seleziona i filtri e premi Anteprima per visualizzare i dati.</div>
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { Skeleton, MultiSelect } from '@mrsmith/ui';
 import { useOrderStatuses } from '../api/queries';
 import { useApiClient } from '../api/client';
 import type { OrderRow } from '../types';
+import shared from './shared.module.css';
 import styles from './OrdiniPage.module.css';
 
 function defaultDateFrom(): string {
@@ -103,23 +104,23 @@ export default function OrdiniPage() {
   }, [previewData]);
 
   return (
-    <div className={styles.page}>
-      <h1 className={styles.title}>Ordini</h1>
+    <div className={shared.page}>
+      <h1 className={shared.title}>Ordini</h1>
 
-      <div className={styles.toolbar}>
-        <div className={styles.field}>
+      <div className={shared.toolbar}>
+        <div className={`${shared.field} ${styles.field}`}>
           <label>Data da</label>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         </div>
-        <div className={styles.field}>
+        <div className={`${shared.field} ${styles.field}`}>
           <label>Data a</label>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </div>
-        <div className={styles.field} style={{ minWidth: 200 }}>
+        <div className={shared.field} style={{ minWidth: 200 }}>
           <label>Stati ordine</label>
           <MultiSelect options={statiOptions} selected={statuses} onChange={setStatuses} placeholder="Stati..." />
         </div>
-        <button className={styles.btnSecondary} onClick={handlePreview} disabled={!canExecute}>
+        <button className={shared.btnSecondary} onClick={handlePreview} disabled={!canExecute}>
           Anteprima
         </button>
       </div>
@@ -154,10 +155,10 @@ export default function OrdiniPage() {
           </div>
 
           <div className={styles.actions}>
-            <button className={styles.btnPrimary} onClick={handleExport}>
+            <button className={shared.btnPrimary} onClick={handleExport}>
               Esporta XLSX
             </button>
-            <button className={styles.btnLink} onClick={() => setShowDetail((v) => !v)}>
+            <button className={shared.btnLink} onClick={() => setShowDetail((v) => !v)}>
               {showDetail ? 'Nascondi dettaglio' : 'Mostra dettaglio'}
             </button>
           </div>
@@ -169,18 +170,18 @@ export default function OrdiniPage() {
           <div className={styles.banner}>
             Mostrando {Math.min(100, previewData.length)} di {previewData.length} righe
           </div>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
+          <div className={shared.tableWrap}>
+            <table className={shared.table}>
               <thead>
                 <tr>
                   <th>Cliente</th>
                   <th>Stato ordine</th>
                   <th>N. Ordine</th>
                   <th>Descrizione</th>
-                  <th className={styles.numCol}>Quantita</th>
-                  <th className={styles.numCol}>NRC</th>
-                  <th className={styles.numCol}>MRC</th>
-                  <th className={styles.numCol}>Totale MRC</th>
+                  <th className={shared.numCol}>Quantita</th>
+                  <th className={shared.numCol}>NRC</th>
+                  <th className={shared.numCol}>MRC</th>
+                  <th className={shared.numCol}>Totale MRC</th>
                   <th>Data documento</th>
                   <th>Stato riga</th>
                   <th>Serial number</th>
@@ -195,15 +196,15 @@ export default function OrdiniPage() {
                   <tr key={`${row.numero_ordine}-${row.progressivo_riga ?? i}`} style={{ animationDelay: `${Math.min(i * 15, 300)}ms` }}>
                     <td>{row.ragione_sociale}</td>
                     <td>{row.stato_ordine}</td>
-                    <td className={styles.mono}>{row.numero_ordine}</td>
+                    <td className={shared.mono}>{row.numero_ordine}</td>
                     <td>{row.descrizione_long ?? ''}</td>
-                    <td className={styles.numCol}>{row.quantita ?? ''}</td>
-                    <td className={styles.numCol}>{row.nrc != null ? formatCurrency(row.nrc) : ''}</td>
-                    <td className={styles.numCol}>{row.mrc != null ? formatCurrency(row.mrc) : ''}</td>
-                    <td className={styles.numCol}>{row.totale_mrc != null ? formatCurrency(row.totale_mrc) : ''}</td>
+                    <td className={shared.numCol}>{row.quantita ?? ''}</td>
+                    <td className={shared.numCol}>{row.nrc != null ? formatCurrency(row.nrc) : ''}</td>
+                    <td className={shared.numCol}>{row.mrc != null ? formatCurrency(row.mrc) : ''}</td>
+                    <td className={shared.numCol}>{row.totale_mrc != null ? formatCurrency(row.totale_mrc) : ''}</td>
                     <td>{row.data_documento?.slice(0, 10) ?? ''}</td>
                     <td>{row.stato_riga ?? ''}</td>
-                    <td className={styles.mono}>{row.serialnumber ?? ''}</td>
+                    <td className={shared.mono}>{row.serialnumber ?? ''}</td>
                     <td>{row.metodo_pagamento ?? ''}</td>
                     <td>{row.durata_servizio ?? ''}</td>
                     <td>{row.data_attivazione?.slice(0, 10) ?? ''}</td>
@@ -217,7 +218,7 @@ export default function OrdiniPage() {
       )}
 
       {!previewData && !loading && !error && (
-        <div className={styles.empty}>Seleziona i filtri e premi Anteprima per visualizzare i dati.</div>
+        <div className={shared.empty}>Seleziona i filtri e premi Anteprima per visualizzare i dati.</div>
       )}
     </div>
   );

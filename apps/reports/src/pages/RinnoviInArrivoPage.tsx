@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Skeleton } from '@mrsmith/ui';
 import { useUpcomingRenewals, useRenewalRows } from '../api/queries';
+import shared from './shared.module.css';
 import styles from './RinnoviInArrivoPage.module.css';
 
 export default function RinnoviInArrivoPage() {
@@ -23,11 +24,11 @@ export default function RinnoviInArrivoPage() {
   }
 
   return (
-    <div className={styles.page}>
-      <h1 className={styles.title}>Rinnovi in arrivo</h1>
+    <div className={shared.page}>
+      <h1 className={shared.title}>Rinnovi in arrivo</h1>
 
-      <div className={styles.toolbar}>
-        <div className={styles.field}>
+      <div className={shared.toolbar}>
+        <div className={`${shared.field} ${styles.field}`}>
           <label>MRC minimo</label>
           <input
             type="number"
@@ -36,7 +37,7 @@ export default function RinnoviInArrivoPage() {
           />
         </div>
 
-        <div className={styles.field}>
+        <div className={shared.field}>
           <label>Rinnovi entro N mesi</label>
           <div className={styles.rangeWrap}>
             <input
@@ -50,7 +51,7 @@ export default function RinnoviInArrivoPage() {
           </div>
         </div>
 
-        <button className={styles.btnPrimary} onClick={handleExecute}>
+        <button className={shared.btnPrimary} onClick={handleExecute}>
           Esegui
         </button>
       </div>
@@ -61,9 +62,9 @@ export default function RinnoviInArrivoPage() {
 
       {renewalsQ.data && (
         <>
-          <div className={styles.info}>{renewalsQ.data.length} clienti</div>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
+          <div className={shared.info}>{renewalsQ.data.length} clienti</div>
+          <div className={shared.tableWrap}>
+            <table className={`${shared.table} ${styles.table}`}>
               <thead>
                 <tr>
                   <th></th>
@@ -72,7 +73,7 @@ export default function RinnoviInArrivoPage() {
                   <th>Rinnovi al</th>
                   <th>Ordini/Servizi</th>
                   <th>Senza tacito rinnovo</th>
-                  <th className={styles.numCol}>Canoni</th>
+                  <th className={shared.numCol}>Canoni</th>
                 </tr>
               </thead>
               <tbody>
@@ -91,7 +92,7 @@ export default function RinnoviInArrivoPage() {
                     <td>{row.rinnovi_al?.slice(0, 10) ?? ''}</td>
                     <td>{row.ordini_servizi}</td>
                     <td>{row.senza_tacito_rinnovo ? 'Si' : 'No'}</td>
-                    <td className={styles.numCol}>{row.canoni != null ? row.canoni.toFixed(2) : ''}</td>
+                    <td className={shared.numCol}>{row.canoni != null ? row.canoni.toFixed(2) : ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -111,16 +112,16 @@ export default function RinnoviInArrivoPage() {
           {rowsQ.error && <p>Errore nel caricamento delle righe.</p>}
 
           {rowsQ.data && (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
+            <div className={shared.tableWrap}>
+              <table className={shared.table}>
                 <thead>
                   <tr>
                     <th>N. Ordine</th>
                     <th>Stato ordine</th>
                     <th>Descrizione</th>
-                    <th className={styles.numCol}>Quantita</th>
-                    <th className={styles.numCol}>NRC</th>
-                    <th className={styles.numCol}>MRC</th>
+                    <th className={shared.numCol}>Quantita</th>
+                    <th className={shared.numCol}>NRC</th>
+                    <th className={shared.numCol}>MRC</th>
                     <th>Stato riga</th>
                     <th>Serial</th>
                     <th>Note</th>
@@ -135,14 +136,14 @@ export default function RinnoviInArrivoPage() {
                 <tbody>
                   {rowsQ.data.map((row, i) => (
                     <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
-                      <td className={styles.mono}>{row.nome_testata_ordine}</td>
+                      <td className={shared.mono}>{row.nome_testata_ordine}</td>
                       <td>{row.stato_ordine ?? ''}</td>
                       <td>{row.descrizione_long ?? ''}</td>
-                      <td className={styles.numCol}>{row.quantita ?? ''}</td>
-                      <td className={styles.numCol}>{row.nrc != null ? row.nrc.toFixed(2) : ''}</td>
-                      <td className={styles.numCol}>{row.mrc != null ? row.mrc.toFixed(2) : ''}</td>
+                      <td className={shared.numCol}>{row.quantita ?? ''}</td>
+                      <td className={shared.numCol}>{row.nrc != null ? row.nrc.toFixed(2) : ''}</td>
+                      <td className={shared.numCol}>{row.mrc != null ? row.mrc.toFixed(2) : ''}</td>
                       <td>{row.stato_riga ?? ''}</td>
-                      <td className={styles.mono}>{row.serialnumber ?? ''}</td>
+                      <td className={shared.mono}>{row.serialnumber ?? ''}</td>
                       <td>{row.note_legali ?? ''}</td>
                       <td>{row.data_attivazione?.slice(0, 10) ?? ''}</td>
                       <td>{row.durata ?? ''}</td>

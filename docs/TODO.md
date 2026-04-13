@@ -51,6 +51,9 @@ The `lint:css` script enforces the `declaration-property-value-disallowed-list` 
 
 ## Cross-App Infrastructure
 
+### Shared Carbone Service
+`CarboneService` is duplicated in two packages (`internal/listini/carbone.go` and `internal/reports/carbone.go`) with nearly identical code — the only difference is `convertTo: "pdf"` vs `"xlsx"` and template ID handling (per-struct vs per-call). Extract to a shared `internal/platform/carbone` package with a single service that accepts both format and template ID per call. Both listini and reports would receive the same instance from `main.go`.
+
 ### Async HubSpot Request Queue
 Design and implement a shared async queue for submitting requests to HubSpot across all mrsmith apps. Current approach is fire-and-forget with failures tolerated. The queue should support: configurable expiry (TTL per message), exponential retry with backoff, notification channel on persistent failure (e.g. Slack, email), dead-letter handling for undeliverable messages, and per-app/per-entity configuration. This replaces the current pattern where each app calls HubSpot synchronously and silently ignores failures.
 

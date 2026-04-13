@@ -42,6 +42,9 @@ dev-panoramica:       ## Solo panoramica-cliente app
 dev-quotes:           ## Solo quotes app
 	pnpm --filter mrsmith-quotes dev
 
+dev-reports:          ## Solo reports app
+	pnpm --filter mrsmith-reports dev
+
 # Build ────────────────────────────────────────
 build:                ## Build completo (frontend + backend)
 	pnpm -r --if-present build
@@ -102,5 +105,5 @@ tidy:                 ## go mod tidy
 help:                 ## Mostra questo help
 	@grep -h -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget dev-compliance dev-kit-products dev-listini dev-panoramica dev-quotes build build-frontend build-backend docker-build docker-build-amd64 package-prod-amd64 deploy-prod rollback-prod test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
+.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget dev-compliance dev-kit-products dev-listini dev-panoramica dev-quotes dev-reports build build-frontend build-backend docker-build docker-build-amd64 package-prod-amd64 deploy-prod rollback-prod test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
 .DEFAULT_GOAL := help

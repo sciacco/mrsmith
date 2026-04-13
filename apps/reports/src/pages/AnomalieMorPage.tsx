@@ -1,13 +1,14 @@
 import { Skeleton } from '@mrsmith/ui';
 import { useMorAnomalies } from '../api/queries';
+import shared from './shared.module.css';
 import styles from './AnomalieMorPage.module.css';
 
 export default function AnomalieMorPage() {
   const { data, isLoading, error } = useMorAnomalies();
 
   return (
-    <div className={styles.page}>
-      <h1 className={styles.title}>Anomalie MOR</h1>
+    <div className={shared.page}>
+      <h1 className={shared.title}>Anomalie MOR</h1>
 
       {isLoading && <Skeleton rows={8} />}
 
@@ -16,8 +17,8 @@ export default function AnomalieMorPage() {
       )}
 
       {data && (
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
+        <div className={shared.tableWrap}>
+          <table className={`${shared.table} ${styles.table}`}>
             <thead>
               <tr>
                 <th>Conto</th>

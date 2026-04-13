@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Skeleton } from '@mrsmith/ui';
 import { usePendingActivations, usePendingActivationRows } from '../api/queries';
+import shared from './shared.module.css';
 import styles from './AttivazioniInCorsoPage.module.css';
 
 export default function AttivazioniInCorsoPage() {
@@ -9,8 +10,8 @@ export default function AttivazioniInCorsoPage() {
   const rowsQ = usePendingActivationRows(selectedOrder);
 
   return (
-    <div className={styles.page}>
-      <h1 className={styles.title}>Attivazioni in corso</h1>
+    <div className={shared.page}>
+      <h1 className={shared.title}>Attivazioni in corso</h1>
       <p className={styles.subtitle}>
         Elenco ordini in stato confermato con righe da attivare
       </p>
@@ -23,9 +24,9 @@ export default function AttivazioniInCorsoPage() {
 
       {activationsQ.data && (
         <>
-          <div className={styles.info}>{activationsQ.data.length} ordini</div>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
+          <div className={shared.info}>{activationsQ.data.length} ordini</div>
+          <div className={shared.tableWrap}>
+            <table className={`${shared.table} ${styles.table}`}>
               <thead>
                 <tr>
                   <th></th>
@@ -51,7 +52,7 @@ export default function AttivazioniInCorsoPage() {
                   >
                     <td><div className={styles.accentBar} /></td>
                     <td>{row.ragione_sociale}</td>
-                    <td className={styles.mono}>{row.numero_ordine}</td>
+                    <td className={shared.mono}>{row.numero_ordine}</td>
                     <td>{row.data_documento?.slice(0, 10) ?? ''}</td>
                     <td>{row.durata_servizio ?? ''}</td>
                     <td>{row.durata_rinnovo ?? ''}</td>
@@ -77,15 +78,15 @@ export default function AttivazioniInCorsoPage() {
           {rowsQ.error && <p>Errore nel caricamento delle righe.</p>}
 
           {rowsQ.data && (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
+            <div className={shared.tableWrap}>
+              <table className={shared.table}>
                 <thead>
                   <tr>
                     <th>Descrizione</th>
-                    <th className={styles.numCol}>Quantita</th>
-                    <th className={styles.numCol}>NRC</th>
-                    <th className={styles.numCol}>MRC</th>
-                    <th className={styles.numCol}>Totale MRC</th>
+                    <th className={shared.numCol}>Quantita</th>
+                    <th className={shared.numCol}>NRC</th>
+                    <th className={shared.numCol}>MRC</th>
+                    <th className={shared.numCol}>Totale MRC</th>
                     <th>Stato riga</th>
                     <th>Serial number</th>
                     <th>Note legali</th>
@@ -95,12 +96,12 @@ export default function AttivazioniInCorsoPage() {
                   {rowsQ.data.map((row, i) => (
                     <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
                       <td>{row.descrizione_long ?? ''}</td>
-                      <td className={styles.numCol}>{row.quantita ?? ''}</td>
-                      <td className={styles.numCol}>{row.nrc != null ? row.nrc.toFixed(2) : ''}</td>
-                      <td className={styles.numCol}>{row.mrc != null ? row.mrc.toFixed(2) : ''}</td>
-                      <td className={styles.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
+                      <td className={shared.numCol}>{row.quantita ?? ''}</td>
+                      <td className={shared.numCol}>{row.nrc != null ? row.nrc.toFixed(2) : ''}</td>
+                      <td className={shared.numCol}>{row.mrc != null ? row.mrc.toFixed(2) : ''}</td>
+                      <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
                       <td>{row.stato_riga ?? ''}</td>
-                      <td className={styles.mono}>{row.serialnumber ?? ''}</td>
+                      <td className={shared.mono}>{row.serialnumber ?? ''}</td>
                       <td>{row.note_legali ?? ''}</td>
                     </tr>
                   ))}
