@@ -172,9 +172,10 @@ export function KitCard({
                         <span className={styles.productCode}>{p.product_code}</span>
                       </div>
                       {p.extended_description && (
-                        <p className={styles.productDesc}>
-                          <em>{p.extended_description}</em>
-                        </p>
+                        <div
+                          className={styles.productDesc}
+                          dangerouslySetInnerHTML={{ __html: p.extended_description }}
+                        />
                       )}
                     </div>
                     <div className={styles.productQty}>× {p.quantity}</div>
