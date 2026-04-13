@@ -125,6 +125,40 @@
   pointer-events: none;
 }
 
+.fieldRow {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.fieldRow > .field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.inputWithSuffix {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inputWithSuffix .input {
+  width: 7.5ch;
+  -moz-appearance: textfield;
+}
+
+.inputWithSuffix .input::-webkit-inner-spin-button,
+.inputWithSuffix .input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.suffix {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
 @keyframes sectionEnter {
   from {
     opacity: 0;

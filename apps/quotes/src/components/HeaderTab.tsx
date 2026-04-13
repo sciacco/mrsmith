@@ -219,34 +219,45 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
             <div className={styles.emptyHint}>Frequenza derivata dal template IaaS/VCloud.</div>
           )}
         </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Durata iniziale (mesi)</label>
-          <input
-            className={`${styles.input} ${isIaaS ? styles.disabled : ''}`}
-            type="number" min={1}
-            value={quote.initial_term_months}
-            onChange={e => onChange('initial_term_months', Number(e.target.value))}
-            disabled={isIaaS}
-          />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Durata rinnovo (mesi)</label>
-          <input
-            className={`${styles.input} ${isIaaS ? styles.disabled : ''}`}
-            type="number" min={1}
-            value={quote.next_term_months}
-            onChange={e => onChange('next_term_months', Number(e.target.value))}
-            disabled={isIaaS}
-          />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Tempi di consegna (giorni)</label>
-          <input
-            className={styles.input}
-            type="number" min={0}
-            value={quote.delivered_in_days}
-            onChange={e => onChange('delivered_in_days', Number(e.target.value))}
-          />
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <label className={styles.label}>Durata iniziale</label>
+            <div className={styles.inputWithSuffix}>
+              <input
+                className={`${styles.input} ${isIaaS ? styles.disabled : ''}`}
+                type="number" min={1}
+                value={quote.initial_term_months}
+                onChange={e => onChange('initial_term_months', Number(e.target.value))}
+                disabled={isIaaS}
+              />
+              <span className={styles.suffix}>mesi</span>
+            </div>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Durata rinnovo</label>
+            <div className={styles.inputWithSuffix}>
+              <input
+                className={`${styles.input} ${isIaaS ? styles.disabled : ''}`}
+                type="number" min={1}
+                value={quote.next_term_months}
+                onChange={e => onChange('next_term_months', Number(e.target.value))}
+                disabled={isIaaS}
+              />
+              <span className={styles.suffix}>mesi</span>
+            </div>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Tempi di consegna</label>
+            <div className={styles.inputWithSuffix}>
+              <input
+                className={styles.input}
+                type="number" min={0}
+                value={quote.delivered_in_days}
+                onChange={e => onChange('delivered_in_days', Number(e.target.value))}
+              />
+              <span className={styles.suffix}>giorni</span>
+            </div>
+          </div>
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Addebito NRC</label>

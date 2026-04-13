@@ -92,7 +92,7 @@ export function KitCard({
           </span>
         </button>
         <div className={styles.title}>
-          <span className={styles.kitName}>{row.internal_name}</span>
+          <span className={styles.kitName} onDoubleClick={() => onEdit(row)}>{row.internal_name}</span>
           {hasIssues && (
             <span className={styles.badgeIssue}>
               <Icon name="triangle-alert" size={12} />
