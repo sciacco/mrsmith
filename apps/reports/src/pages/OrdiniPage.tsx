@@ -36,7 +36,7 @@ export default function OrdiniPage() {
 
   const statiOptions = (statusesQ.data ?? []).map((st) => ({ value: st, label: st }));
 
-  const canExecute = dateFrom !== '' && dateTo !== '';
+  const canExecute = dateFrom !== '' && dateTo !== '' && statuses.length > 0;
 
   const handlePreview = useCallback(async () => {
     if (!canExecute) return;

@@ -38,8 +38,9 @@ func NewCarboneService(apiKey string) *CarboneService {
 // GenerateXLSX sends data to Carbone and returns XLSX bytes.
 func (s *CarboneService) GenerateXLSX(ctx context.Context, templateID string, data any) ([]byte, error) {
 	// Step 1: Render
+	// Carbone templates expect data inside {"righe": [...]} — matching the Appsmith payload structure.
 	renderPayload := map[string]any{
-		"data":      data,
+		"data":      map[string]any{"righe": data},
 		"convertTo": "xlsx",
 	}
 

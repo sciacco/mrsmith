@@ -32,7 +32,7 @@ export default function AccessiAttiviPage() {
 
   const connOptions = (connTypesQ.data ?? []).map((t) => ({ value: t, label: t }));
 
-  const canExecute = statuses.length > 0;
+  const canExecute = statuses.length > 0 && connectionTypes.length > 0;
 
   const handlePreview = useCallback(async () => {
     if (!canExecute) return;

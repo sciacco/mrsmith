@@ -21,32 +21,32 @@ function Card({ icon, title, desc }: CardProps) {
   );
 }
 
-const sections = [
+const sections: { label: string; cards: { to: string; icon: IconName; title: string; desc: string }[] }[] = [
   {
     label: 'Commerciale',
     cards: [
-      { to: '/ordini', icon: 'file-text' as IconName, title: 'Ordini', desc: 'Report ordini per data e stato' },
-      { to: '/aov', icon: 'bar-chart-2' as IconName, title: 'AOV', desc: 'Annual Order Value per tipo, categoria e commerciale' },
+      { to: '/ordini', icon: 'file-text', title: 'Ordini', desc: 'Report ordini per data e stato' },
+      { to: '/aov', icon: 'bar-chart-2', title: 'AOV', desc: 'Annual Order Value per tipo, categoria e commerciale' },
     ],
   },
   {
     label: 'Rete',
     cards: [
-      { to: '/accessi-attivi', icon: 'wifi' as IconName, title: 'Accessi attivi', desc: 'Linee di accesso per tipo e stato' },
-      { to: '/attivazioni-in-corso', icon: 'clock' as IconName, title: 'Attivazioni in corso', desc: 'Ordini confermati con righe da attivare' },
+      { to: '/accessi-attivi', icon: 'wifi', title: 'Accessi attivi', desc: 'Linee di accesso per tipo e stato' },
+      { to: '/attivazioni-in-corso', icon: 'clock', title: 'Attivazioni in corso', desc: 'Ordini confermati con righe da attivare' },
     ],
   },
   {
     label: 'Contratti',
     cards: [
-      { to: '/rinnovi-in-arrivo', icon: 'calendar' as IconName, title: 'Rinnovi in arrivo', desc: 'Scadenze contrattuali nei prossimi mesi' },
+      { to: '/rinnovi-in-arrivo', icon: 'calendar', title: 'Rinnovi in arrivo', desc: 'Scadenze contrattuali nei prossimi mesi' },
     ],
   },
   {
     label: 'Operativo',
     cards: [
-      { to: '/anomalie-mor', icon: 'alert-triangle' as IconName, title: 'Anomalie MOR', desc: 'Anomalie fatturazione telefonica' },
-      { to: '/accounting-timoo', icon: 'phone' as IconName, title: 'Accounting TIMOO', desc: 'Statistiche giornaliere utenti e SE per tenant' },
+      { to: '/anomalie-mor', icon: 'triangle-alert', title: 'Anomalie MOR', desc: 'Anomalie fatturazione telefonica' },
+      { to: '/accounting-timoo', icon: 'phone', title: 'Accounting TIMOO', desc: 'Statistiche giornaliere utenti e SE per tenant' },
     ],
   },
 ];
