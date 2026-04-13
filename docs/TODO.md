@@ -61,3 +61,14 @@ Audit logging for budget and approval rule changes (create, edit, delete) is not
 
 ### Budget Year-End Lifecycle
 Unresolved: what happens to budgets at year-end? Do old-year budgets get archived, copied forward, or accumulate indefinitely in the list? This affects long-term UX of the budget list view. Needs a decision from the domain owner before the budget app grows historical data.
+
+## Reports App
+
+### Anomalie MOR — AI Analysis (Phase 2)
+The Anomalie MOR page in Appsmith has a Tab 2 with AI-powered anomaly analysis via OpenRouter (model selector, prompt with 6 Italian-language validation rules, HTML output). This feature is deferred from the V1 migration. When implemented it needs: (a) backend proxy for OpenRouter calls (API key must not be in frontend), (b) AI validation prompt moved to backend (Go constant or config file), (c) proper Keycloak RBAC role (`app_reports_ai_access`) replacing the hardcoded email gate (`sciacco`), (d) model selector UI. The audit details are in `apps/reports/APPSMITH-AUDIT.md` §2.6 (BR8, BR10).
+
+### AOV Calculation Inconsistency in `get_report_data_area`
+The AOV page has 4 SQL queries sharing ~80% identical logic. The `get_report_data_area` query computes `valore_aov` as `(quantita * canone) * 12 + (quantita * setup)` regardless of `tipo_ordine`, while the other 3 queries subtract old MRC for substitutions (`tipo_ordine = 'A'`). This means the "per categoria" view may show different totals than the other views for the same data. Replicated as-is in the 1:1 migration from Appsmith. Needs review and correction post-coexistence.
+
+### AOV Query Consolidation (Post-Coexistence)
+The 4 AOV SQL queries (`get_report_data`, `get_report_data_tipo_ord`, `get_report_data_area`, `get_report_data_sales`) share ~80% identical SQL with different GROUP BY/SELECT. They are kept as 4 separate verbatim queries in the V1 backend to guarantee 1:1 correspondence with Appsmith and avoid LLM-introduced drift during migration. Consolidation into a single parameterized query or stored procedure should happen post-coexistence, validated by diffing query results against the original.
