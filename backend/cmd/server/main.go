@@ -20,6 +20,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/listini"
 	"github.com/sciacco/mrsmith/internal/panoramica"
+	"github.com/sciacco/mrsmith/internal/reports"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 	"github.com/sciacco/mrsmith/internal/quotes"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
@@ -153,6 +154,13 @@ func main() {
 		logger.Info("carbone service configured", "component", "listini")
 	}
 
+	// Carbone service (optional — reports module)
+	var reportsCarboneSvc *reports.CarboneService
+	if cfg.CarboneAPIKey != "" {
+		reportsCarboneSvc = reports.NewCarboneService(cfg.CarboneAPIKey)
+		logger.Info("carbone service configured", "component", "reports")
+	}
+
 	// API routes (with auth)
 	api := http.NewServeMux()
 	hrefOverrides := map[string]string{}
@@ -187,6 +195,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.QuotesAppID] = "http://localhost:5179"
 	}
+	if cfg.ReportsAppURL != "" {
+		hrefOverrides[applaunch.ReportsAppID] = cfg.ReportsAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.ReportsAppID] = "http://localhost:5180"
+	}
 	appCatalog := applaunch.Catalog(hrefOverrides)
 	{
 		filtered := make([]applaunch.Definition, 0, len(appCatalog))
@@ -201,6 +214,9 @@ func main() {
 				continue
 			}
 			if definition.ID == applaunch.QuotesAppID && cfg.MistraDSN == "" {
+				continue
+			}
+			if definition.ID == applaunch.ReportsAppID && cfg.MistraDSN == "" && cfg.GrappaDSN == "" && cfg.AnisettaDSN == "" {
 				continue
 			}
 			filtered = append(filtered, definition)
@@ -218,6 +234,7 @@ func main() {
 	listini.RegisterRoutes(api, mistraDB, grappaDB, hubspotSvc, carboneSvc)
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 	quotes.RegisterRoutes(api, mistraDB, alyanteDB, hubspotCli)
+	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),

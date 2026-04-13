@@ -1,0 +1,169 @@
+.page {
+  animation: pageEnter 0.5s var(--ease-out) both;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  margin-bottom: var(--space-6);
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.field input[type="number"] {
+  height: 36px;
+  width: 80px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+}
+
+.rangeWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rangeWrap input[type="range"] {
+  width: 140px;
+  accent-color: var(--color-accent);
+}
+
+.rangeValue {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  min-width: 2ch;
+  text-align: right;
+}
+
+.btnPrimary {
+  height: 36px;
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btnPrimary:hover {
+  background: var(--color-accent-hover);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.table th {
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+}
+
+.table tbody tr {
+  animation: rowEnter 0.4s var(--ease-out) both;
+  cursor: pointer;
+}
+
+.table tbody tr:hover {
+  background: var(--color-accent-subtle);
+}
+
+.accentBar {
+  width: 4px;
+  height: 0;
+  border-radius: 4px;
+  background: var(--color-accent);
+  transition: height var(--duration-normal) var(--ease-spring);
+}
+
+.table tbody tr:hover .accentBar {
+  height: 20px;
+}
+
+.selectedRow {
+  background: var(--color-accent-subtle);
+}
+
+.selectedRow .accentBar {
+  height: 28px;
+  box-shadow: 0 0 8px var(--color-accent-glow);
+}
+
+.detailSection {
+  margin-top: var(--space-6);
+  animation: sectionEnter 0.5s var(--ease-out) both;
+}
+
+.detailTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+  color: var(--color-text);
+}
+
+.numCol {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.info {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
+}

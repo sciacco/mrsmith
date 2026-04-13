@@ -25,6 +25,9 @@ const (
 
 	QuotesAppID   = "proposte"
 	QuotesAppHref = "/apps/quotes/"
+
+	ReportsAppID   = "reports"
+	ReportsAppHref = "/apps/reports/"
 )
 
 var (
@@ -35,6 +38,7 @@ var (
 	panoramicaAccessRoles  = []string{"app_panoramica_access"}
 	quotesAccessRoles      = []string{"app_quotes_access"}
 	quotesDeleteRoles      = []string{"app_quotes_delete"}
+	reportsAccessRoles     = []string{"app_reports_access"}
 	defaultAccessRoles     = []string{"no-default-roles-cdlan"}
 )
 
@@ -68,7 +72,7 @@ type Category struct {
 // Catalog returns the full app catalog. hrefOverrides maps app IDs to
 // custom hrefs, primarily for split-server local development.
 func Catalog(hrefOverrides map[string]string) []Definition {
-	defaultRoles := DefaultAccessRoles()
+	_ = DefaultAccessRoles // used by commented-out entries below
 
 	defs := []Definition{
 		// ── Acquisti ──
@@ -160,13 +164,14 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		// },
 		// ── SMART APPS ──
 		{
-			ID:            "reports",
+			ID:            ReportsAppID,
 			Name:          "Reports",
 			Icon:          "chart",
-			Href:          "/apps/smart-apps/reports",
+			Href:          ReportsAppHref,
+			Status:        "ready",
 			CategoryID:    "smart-apps",
 			CategoryTitle: "SMART APPS",
-			AccessRoles:   defaultRoles,
+			AccessRoles:   ReportsAccessRoles(),
 		},
 		{
 			ID:            PanoramicaAppID,
@@ -338,6 +343,10 @@ func QuotesAccessRoles() []string {
 
 func QuotesDeleteRoles() []string {
 	return slices.Clone(quotesDeleteRoles)
+}
+
+func ReportsAccessRoles() []string {
+	return slices.Clone(reportsAccessRoles)
 }
 
 func DefaultAccessRoles() []string {
