@@ -117,34 +117,45 @@ export function HeaderTab({ quote, onChange }: HeaderTabProps) {
         </div>
       </div>
 
-      {/* Tipo Proposta */}
+      {/* Proposta */}
       <div className={styles.section}>
-        <div className={styles.sectionTitle}>Tipo Proposta</div>
-        <div className={styles.field}>
-          <label className={styles.label}>Tipo documento</label>
-          <div className={styles.radioGroup}>
-            <label className={styles.radioLabel}>
-              <input
-                className={styles.radioInput}
-                type="radio" name="document_type" value="TSC-ORDINE-RIC"
-                checked={quote.document_type === 'TSC-ORDINE-RIC'}
-                onChange={() => onChange('document_type', 'TSC-ORDINE-RIC')}
-              />
-              Ricorrente
-            </label>
-            <label className={styles.radioLabel}>
-              <input
-                className={styles.radioInput}
-                type="radio" name="document_type" value="TSC-ORDINE"
-                checked={isSpot}
-                onChange={() => onChange('document_type', 'TSC-ORDINE')}
-              />
-              Spot
-            </label>
+        <div className={styles.sectionTitle}>Proposta</div>
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <label className={styles.label}>Data</label>
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={quote.document_date?.slice(0, 10) ?? ''}
+              onChange={e => onChange('document_date', e.target.value)}
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Fatturazione</label>
+            <div className={styles.radioGroup}>
+              <label className={styles.radioLabel}>
+                <input
+                  className={styles.radioInput}
+                  type="radio" name="document_type" value="TSC-ORDINE-RIC"
+                  checked={quote.document_type === 'TSC-ORDINE-RIC'}
+                  onChange={() => onChange('document_type', 'TSC-ORDINE-RIC')}
+                />
+                Ricorrente
+              </label>
+              <label className={styles.radioLabel}>
+                <input
+                  className={styles.radioInput}
+                  type="radio" name="document_type" value="TSC-ORDINE"
+                  checked={isSpot}
+                  onChange={() => onChange('document_type', 'TSC-ORDINE')}
+                />
+                Spot
+              </label>
+            </div>
           </div>
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>Tipo proposta</label>
+          <label className={styles.label}>Business</label>
           <div className={styles.radioGroup}>
             {(['NUOVO', 'SOSTITUZIONE', 'RINNOVO'] as const).map(pt => (
               <label key={pt} className={styles.radioLabel}>
