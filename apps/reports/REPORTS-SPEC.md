@@ -147,7 +147,7 @@ No entity separation or abstraction in V1 — all queries use the same flat view
 ### View: Ordini
 
 - **User intent**: Generate filtered order detail XLSX report
-- **Interaction pattern**: Filter → Preview (summary) → Export
+- **Interaction pattern**: Filter → Preview (summary + detail when rows > 0) → Export
 - **Filters**:
   - Date range: `i_from` (default: 1 month ago), `i_to` (default: yesterday)
   - Order status: multi-select (options from `GET /api/reports/order-statuses`)
@@ -155,9 +155,10 @@ No entity separation or abstraction in V1 — all queries use the same flat view
   - Order count, total MRC, total NRC
   - Breakdown by `stato_ordine` (chip/badge)
   - Effective date range (first/last order)
-- **Phase 2 — Detail table** (optional, "Mostra dettaglio"):
+- **Phase 2 — Detail table**:
+  - Auto-shown when preview returns rows
   - First 100 rows with truncation indicator
-- **Actions**: "Anteprima" (secondary button), "Esporta XLSX" (primary button), "Mostra dettaglio" (link button)
+- **Actions**: "Anteprima" (secondary button), "Esporta XLSX" (primary button)
 - **Data source**: `POST /api/reports/orders/preview` → `POST /api/reports/orders/export`
 - **Appsmith SQL**: `get_report_data` (Ordini) — verbatim in backend
 - **Notes**: Date filter uses `data_ordine`, not `data_conferma` (differs from AOV)
@@ -165,7 +166,7 @@ No entity separation or abstraction in V1 — all queries use the same flat view
 ### View: Accessi attivi
 
 - **User intent**: Generate filtered active access lines XLSX report
-- **Interaction pattern**: Filter → Preview (summary) → Export
+- **Interaction pattern**: Filter → Preview (summary + detail when rows > 0) → Export
 - **Filters**:
   - Connection type: multi-select (options from `GET /api/reports/connection-types`)
   - Line status: multi-select (hardcoded options: Attiva, Cessata, da attivare, in attivazione, KO; default: `["Attiva"]`)
@@ -173,8 +174,10 @@ No entity separation or abstraction in V1 — all queries use the same flat view
   - Line count
   - Breakdown by `tipo_conn`
   - Breakdown by `stato`
-- **Phase 2 — Detail table**: First 100 rows
-- **Actions**: "Anteprima", "Esporta XLSX", "Mostra dettaglio"
+- **Phase 2 — Detail table**:
+  - Auto-shown when preview returns rows
+  - First 100 rows
+- **Actions**: "Anteprima", "Esporta XLSX"
 - **Data source**: `POST /api/reports/active-lines/preview` → `POST /api/reports/active-lines/export`
 - **Appsmith SQL**: `get_accessi` — verbatim in backend
 - **Notes**: Report name is static (`report_accessi_attivi`), different Carbone template

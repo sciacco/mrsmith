@@ -241,7 +241,7 @@ Vincoli:
 - Il rendering XLSX via Carbone.io richiede tempo
 - L'utente vuole un feedback significativo, non solo "42 righe trovate"
 
-### Proposta A: Anteprima a due fasi con riepilogo aggregato (raccomandata)
+### Proposta A: Anteprima con riepilogo aggregato e dettaglio automatico (raccomandata)
 
 Dopo aver impostato i filtri, l'utente clicca un pulsante **"Anteprima"** (Button secondary). Il sistema esegue la query e mostra:
 
@@ -260,13 +260,12 @@ Un pannello riassuntivo con metriche aggregate calcolate sui dati filtrati. Il c
 - Breakdown per tipo connessione
 - Breakdown per stato linea
 
-Sotto il riepilogo, due azioni:
+Sotto il riepilogo, una sola azione:
 - **"Esporta XLSX"** (Button primary) — genera e scarica
-- **"Mostra dettaglio"** (Button link/secondary) — espande la tabella completa
 
-**Fase 2 — Dettaglio (opzionale)**
+**Fase 2 — Dettaglio**
 
-Se l'utente clicca "Mostra dettaglio", appare la tabella completa dei dati sotto il riepilogo. La tabella mostra le prime 100 righe con un indicatore "mostrando 100 di 1.247 righe". L'export XLSX contiene comunque tutte le righe.
+La tabella dettaglio appare automaticamente sotto il riepilogo quando il risultato contiene almeno una riga. La tabella mostra le prime 100 righe con un indicatore di campionamento. L'export XLSX contiene comunque tutte le righe.
 
 **Layout:**
 
@@ -286,10 +285,8 @@ Se l'utente clicca "Mostra dettaglio", appare la tabella completa dei dati sotto
 | Per stato:  Confermato 890 | In lavorazione 245 | Nuovo 112  |
 | Periodo:    12/01/2026 — 11/04/2026                           |
 -----------------------------------------------------------------
-[Esporta XLSX]  [Mostra dettaglio v]
+[Esporta XLSX]
 -----------------------------------------------------------------
-
-        dopo click "Mostra dettaglio":
 
 -----------------------------------------------------------------
 | Tabella (prime 100 di 1.247 righe)                            |
@@ -303,20 +300,19 @@ Se l'utente clicca "Mostra dettaglio", appare la tabella completa dei dati sotto
 - Breakdown: chip/badge per ogni valore con count, `--color-surface` sfondo, `--radius-full`, `0.8125rem`
 - Animazione comparsa: `sectionEnter` (0.5s ease-out)
 - Pulsante "Esporta XLSX": `Button` primary (pill, indigo gradient)
-- Pulsante "Mostra dettaglio": `Button` variant link con chevron animato (ruota 180deg su expand)
 - Tabella: stile standard con `rowEnter` stagger, `Skeleton` durante il caricamento
 - Indicatore troncamento: banner sopra la tabella, `--color-surface` sfondo, `0.8125rem`, `--color-text-secondary`
 
 **Pro:**
 - L'utente verifica i filtri prima di esportare grazie a metriche significative
 - Il riepilogo e veloce da calcolare (stessi dati, solo aggregazione client-side)
-- La tabella completa e opzionale — non rallenta il flusso base
+- La tabella completa e immediatamente disponibile quando ci sono risultati
 - Il pattern "preview before commit" e molto Stripe (es. preview fattura prima di invio)
 - Nessuna chiamata API aggiuntiva: i dati vengono fetchati una volta, il riepilogo e calcolato in-memory
 
 **Contro:**
 - Due click invece di uno per l'export (mitigato: il pulsante "Esporta" e prominente nel riepilogo)
-- I dati vengono tenuti in memoria per la tabella opzionale (accettabile per volumi tipici)
+- I dati vengono tenuti in memoria per la tabella (accettabile per volumi tipici)
 
 **Responsive:**
 - Metriche principali: riga orizzontale su desktop, stack su mobile
@@ -374,9 +370,9 @@ Approccio minimale: il pulsante "Genera report" apre un `Modal` che mostra il ri
 
 ### Raccomandazione
 
-**Proposta A** (anteprima a due fasi). E il miglior equilibrio tra verifica dei filtri, velocita del flusso, e polish. Il riepilogo aggregato e piu utile di un semplice conteggio righe, e la tabella opzionale soddisfa chi vuole ispezionare i dati senza essere obbligatoria.
+**Proposta A** (anteprima con dettaglio automatico). E il miglior equilibrio tra verifica dei filtri, velocita del flusso, e polish. Il riepilogo aggregato e piu utile di un semplice conteggio righe, e il dettaglio immediato elimina un click non necessario.
 
-Il flusso diventa: Filtri -> Anteprima (riepilogo) -> Esporta XLSX. L'utente che gia conosce i propri filtri fa 2 click (Anteprima + Esporta). L'utente che vuole verificare fa 2-3 click (Anteprima + eventualmente Mostra dettaglio + Esporta). In entrambi i casi il feedback e immediato e significativo.
+Il flusso diventa: Filtri -> Anteprima (riepilogo + dettaglio se righe > 0) -> Esporta XLSX. L'utente fa 2 click (Anteprima + Esporta) con feedback immediato e significativo.
 
 ---
 
@@ -386,4 +382,4 @@ Il flusso diventa: Filtri -> Anteprima (riepilogo) -> Esporta XLSX. L'utente che
 |---------|----------------|----------------------|
 | 1. Home / Navigazione | TabNavGroup con raggruppamento logico + Home con card compatte | Coerenza con le altre mini-app, pattern gia validato nel codebase |
 | 2. AOV 4 tabelle | Tab interni con pannello stat card riassuntivo | Zero scroll, contesto globale mantenuto, estetica Stripe |
-| 3. Export cieco | Anteprima a due fasi (riepilogo aggregato + dettaglio opzionale) | Verifica filtri significativa, flusso progressivo, nessuna API aggiuntiva |
+| 3. Export cieco | Anteprima con riepilogo aggregato + dettaglio automatico | Verifica filtri significativa, flusso progressivo, nessuna API aggiuntiva |

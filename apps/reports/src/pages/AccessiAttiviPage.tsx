@@ -23,7 +23,6 @@ export default function AccessiAttiviPage() {
   const [connectionTypes, setConnectionTypes] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>(defaultStati);
   const [previewData, setPreviewData] = useState<ActiveLineRow[] | null>(null);
-  const [showDetail, setShowDetail] = useState(false);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +39,6 @@ export default function AccessiAttiviPage() {
     if (!canExecute) return;
     setLoading(true);
     setError(null);
-    setShowDetail(false);
     try {
       const data = await api.post<ActiveLineRow[]>('/reports/v1/active-lines/preview', {
         connectionTypes,
@@ -165,17 +163,16 @@ export default function AccessiAttiviPage() {
             <button className={shared.btnPrimary} onClick={handleExport} disabled={exporting}>
               {exporting ? 'Esportazione…' : 'Esporta XLSX'}
             </button>
-            <button className={shared.btnLink} onClick={() => setShowDetail((v) => !v)}>
-              {showDetail ? 'Nascondi dettaglio' : 'Mostra dettaglio'}
-            </button>
           </div>
         </div>
       )}
 
-      {previewData && showDetail && !loading && (
+      {previewData && previewData.length > 0 && !loading && (
         <>
           <div className={styles.banner}>
-            Mostrando {Math.min(100, previewData.length)} di {previewData.length} righe
+            {previewData.length <= 100
+              ? `${previewData.length} Righe accessi`
+              : `Campione di 100 righe su ${previewData.length} in totale`}
           </div>
           <div className={shared.tableWrap}>
             <table className={shared.table}>

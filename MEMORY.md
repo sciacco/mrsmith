@@ -142,3 +142,8 @@
 - Updated existing Panoramica test fixture in `backend/internal/panoramica/handler_orders_test.go` to use fractional `quantita` and assert JSON preservation.
 - Updated Panoramica frontend contracts in `apps/panoramica-cliente/src/types/index.ts` so `quantita` is `number | null` in both summary and detail row types.
 - Added reusable implementation knowledge entry in `docs/IMPLEMENTATION-KNOWLEDGE.md` documenting that loader `quantita` is `double precision` and must remain decimal/nullable in API contracts.
+- Reports frontend (`apps/reports`) no longer uses the `Mostra/Nascondi dettaglio` toggle in `Ordini` and `Accessi attivi`: detail tables are now auto-shown after preview only when result rows are `> 0`.
+- Reports row-count banner copy is now context-specific and sample-aware:
+  - Ordini: `"{X} Righe ordini"` when `X <= 100`, otherwise `"Campione di 100 righe su {Y} in totale"`.
+  - Accessi attivi: `"{X} Righe accessi"` when `X <= 100`, otherwise the same sample message.
+- Reports docs were aligned to the new UX in `apps/reports/REPORTS-SPEC.md` and `apps/reports/reports-migspec-phaseB-ux.md` (detail automatico, action list senza toggle).
