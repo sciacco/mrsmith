@@ -89,6 +89,18 @@
   border-top: 1px solid var(--color-border);
 }
 
+.bandLevel1 td {
+  background: rgba(99, 91, 255, 0.08);
+}
+
+.bandLevel2 td {
+  background: rgba(99, 91, 255, 0.04);
+}
+
+.groupRowHead:hover td {
+  background: inherit;
+}
+
 .groupValue {
   font-weight: 700;
   color: var(--color-text);
@@ -97,6 +109,24 @@
 .groupGap {
   color: transparent;
   user-select: none;
+}
+
+.subtotalRow td {
+  border-top: 1px solid var(--color-border);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.subtotalRow:hover td {
+  background: inherit;
+}
+
+.subtotalRow.bandLevel1 td {
+  background: rgba(99, 91, 255, 0.14);
+}
+
+.subtotalRow.bandLevel2 td {
+  background: rgba(99, 91, 255, 0.1);
 }
 
 @media (max-width: 900px) {

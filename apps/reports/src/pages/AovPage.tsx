@@ -163,6 +163,75 @@ export default function AovPage() {
 }
 
 function ByTypeTable({ data }: { data: AovPreviewResponse['byType'] }) {
+  let activeGroupKey: string | null = null;
+  let subtotalOrders = 0;
+  let subtotalAov = 0;
+  let subtotalMrc = 0;
+  let subtotalNrc = 0;
+  let groupRowCount = 0;
+
+  const bodyRows = data.reduce<JSX.Element[]>((acc, row, i) => {
+    const currentYearMonth = formatYearMonth(row.anno, row.mese);
+    const isNewGroup = activeGroupKey !== currentYearMonth;
+
+    if (isNewGroup) {
+      if (activeGroupKey !== null && groupRowCount > 1) {
+        acc.push(
+          <tr key={`subtotal-${activeGroupKey}-${i}`} className={`${styles.subtotalRow} ${styles.bandLevel1}`}>
+            <td colSpan={2} />
+            <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
+            <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
+            <td className={shared.numCol}>{formatMoneyEUR(subtotalMrc)}</td>
+            <td className={shared.numCol}>{formatMoneyEUR(subtotalNrc)}</td>
+          </tr>,
+        );
+      }
+      activeGroupKey = currentYearMonth;
+      subtotalOrders = 0;
+      subtotalAov = 0;
+      subtotalMrc = 0;
+      subtotalNrc = 0;
+      groupRowCount = 0;
+    }
+
+    subtotalOrders += row.numero_ordini;
+    subtotalAov += row.valore_aov ?? 0;
+    subtotalMrc += row.totale_mrc ?? 0;
+    subtotalNrc += row.totale_nrc ?? 0;
+    groupRowCount += 1;
+
+    acc.push(
+      <tr
+        key={i}
+        className={isNewGroup ? `${styles.groupRowHead} ${styles.bandLevel1}` : undefined}
+        style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
+      >
+        <td className={isNewGroup ? styles.groupValue : styles.groupGap}>
+          {isNewGroup ? currentYearMonth : ''}
+        </td>
+        <td>{row.tipo_ordine ?? ''}</td>
+        <td className={shared.numCol}>{row.numero_ordini}</td>
+        <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
+        <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
+        <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
+      </tr>,
+    );
+
+    if (i === data.length - 1 && activeGroupKey !== null && groupRowCount > 1) {
+      acc.push(
+        <tr key={`subtotal-${activeGroupKey}-final`} className={`${styles.subtotalRow} ${styles.bandLevel1}`}>
+          <td colSpan={2} />
+          <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
+          <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
+          <td className={shared.numCol}>{formatMoneyEUR(subtotalMrc)}</td>
+          <td className={shared.numCol}>{formatMoneyEUR(subtotalNrc)}</td>
+        </tr>,
+      );
+    }
+
+    return acc;
+  }, []);
+
   return (
     <div className={shared.tableWrap}>
       <div className={shared.info}>{data.length} righe</div>
@@ -177,37 +246,82 @@ function ByTypeTable({ data }: { data: AovPreviewResponse['byType'] }) {
             <th className={shared.numCol}>Totale NRC</th>
           </tr>
         </thead>
-        <tbody>
-          {data.map((row, i) => {
-            const prev = i > 0 ? data[i - 1] : undefined;
-            const currentYearMonth = formatYearMonth(row.anno, row.mese);
-            const prevYearMonth = prev ? formatYearMonth(prev.anno, prev.mese) : '';
-            const showYearMonth = i === 0 || currentYearMonth !== prevYearMonth;
-
-            return (
-              <tr
-                key={i}
-                className={showYearMonth ? styles.groupRowHead : undefined}
-                style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
-              >
-                <td className={showYearMonth ? styles.groupValue : styles.groupGap}>
-                  {showYearMonth ? currentYearMonth : ''}
-                </td>
-                <td>{row.tipo_ordine ?? ''}</td>
-                <td className={shared.numCol}>{row.numero_ordini}</td>
-                <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
-                <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
-                <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
-              </tr>
-            );
-          })}
-        </tbody>
+        <tbody>{bodyRows}</tbody>
       </table>
     </div>
   );
 }
 
 function ByCategoryTable({ data }: { data: AovPreviewResponse['byCategory'] }) {
+  let activeGroupKey: string | null = null;
+  let subtotalOrders = 0;
+  let subtotalAov = 0;
+  let subtotalMrc = 0;
+  let subtotalNrc = 0;
+  let groupRowCount = 0;
+
+  const bodyRows = data.reduce<JSX.Element[]>((acc, row, i) => {
+    const currentYearMonth = formatYearMonth(row.anno, row.mese);
+    const isNewGroup = activeGroupKey !== currentYearMonth;
+
+    if (isNewGroup) {
+      if (activeGroupKey !== null && groupRowCount > 1) {
+        acc.push(
+          <tr key={`subtotal-${activeGroupKey}-${i}`} className={`${styles.subtotalRow} ${styles.bandLevel1}`}>
+            <td colSpan={2} />
+            <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
+            <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
+            <td className={shared.numCol}>{formatMoneyEUR(subtotalMrc)}</td>
+            <td className={shared.numCol}>{formatMoneyEUR(subtotalNrc)}</td>
+          </tr>,
+        );
+      }
+      activeGroupKey = currentYearMonth;
+      subtotalOrders = 0;
+      subtotalAov = 0;
+      subtotalMrc = 0;
+      subtotalNrc = 0;
+      groupRowCount = 0;
+    }
+
+    subtotalOrders += row.numero_ordini;
+    subtotalAov += row.valore_aov ?? 0;
+    subtotalMrc += row.totale_mrc ?? 0;
+    subtotalNrc += row.totale_nrc ?? 0;
+    groupRowCount += 1;
+
+    acc.push(
+      <tr
+        key={i}
+        className={isNewGroup ? `${styles.groupRowHead} ${styles.bandLevel1}` : undefined}
+        style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
+      >
+        <td className={isNewGroup ? styles.groupValue : styles.groupGap}>
+          {isNewGroup ? currentYearMonth : ''}
+        </td>
+        <td>{row.categoria ?? ''}</td>
+        <td className={shared.numCol}>{row.numero_ordini}</td>
+        <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
+        <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
+        <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
+      </tr>,
+    );
+
+    if (i === data.length - 1 && activeGroupKey !== null && groupRowCount > 1) {
+      acc.push(
+        <tr key={`subtotal-${activeGroupKey}-final`} className={`${styles.subtotalRow} ${styles.bandLevel1}`}>
+          <td colSpan={2} />
+          <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
+          <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
+          <td className={shared.numCol}>{formatMoneyEUR(subtotalMrc)}</td>
+          <td className={shared.numCol}>{formatMoneyEUR(subtotalNrc)}</td>
+        </tr>,
+      );
+    }
+
+    return acc;
+  }, []);
+
   return (
     <div className={shared.tableWrap}>
       <div className={shared.info}>{data.length} righe</div>
@@ -222,37 +336,87 @@ function ByCategoryTable({ data }: { data: AovPreviewResponse['byCategory'] }) {
             <th className={shared.numCol}>Totale NRC</th>
           </tr>
         </thead>
-        <tbody>
-          {data.map((row, i) => {
-            const prev = i > 0 ? data[i - 1] : undefined;
-            const currentYearMonth = formatYearMonth(row.anno, row.mese);
-            const prevYearMonth = prev ? formatYearMonth(prev.anno, prev.mese) : '';
-            const showYearMonth = i === 0 || currentYearMonth !== prevYearMonth;
-
-            return (
-              <tr
-                key={i}
-                className={showYearMonth ? styles.groupRowHead : undefined}
-                style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
-              >
-                <td className={showYearMonth ? styles.groupValue : styles.groupGap}>
-                  {showYearMonth ? currentYearMonth : ''}
-                </td>
-                <td>{row.categoria ?? ''}</td>
-                <td className={shared.numCol}>{row.numero_ordini}</td>
-                <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
-                <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
-                <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
-              </tr>
-            );
-          })}
-        </tbody>
+        <tbody>{bodyRows}</tbody>
       </table>
     </div>
   );
 }
 
 function BySalesTable({ data }: { data: AovPreviewResponse['bySales'] }) {
+  let activeGroupKey: string | null = null;
+  let subtotalOrders = 0;
+  let subtotalAov = 0;
+  let subtotalMrc = 0;
+  let subtotalNrc = 0;
+  let groupRowCount = 0;
+
+  const bodyRows = data.reduce<JSX.Element[]>((acc, row, i) => {
+    const groupKey = `${row.anno ?? ''}::${row.commerciale ?? ''}`;
+    const isNewGroup = activeGroupKey !== groupKey;
+    const prev = i > 0 ? data[i - 1] : undefined;
+    const showAnno = i === 0 || row.anno !== prev?.anno;
+
+    if (isNewGroup) {
+      if (activeGroupKey !== null && groupRowCount > 1) {
+        acc.push(
+          <tr key={`subtotal-${activeGroupKey}-${i}`} className={`${styles.subtotalRow} ${styles.bandLevel2}`}>
+            <td colSpan={3} />
+            <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
+            <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
+            <td className={shared.numCol}>{formatMoneyEUR(subtotalMrc)}</td>
+            <td className={shared.numCol}>{formatMoneyEUR(subtotalNrc)}</td>
+          </tr>,
+        );
+      }
+      activeGroupKey = groupKey;
+      subtotalOrders = 0;
+      subtotalAov = 0;
+      subtotalMrc = 0;
+      subtotalNrc = 0;
+      groupRowCount = 0;
+    }
+
+    subtotalOrders += row.numero_ordini;
+    subtotalAov += row.valore_aov ?? 0;
+    subtotalMrc += row.totale_mrc ?? 0;
+    subtotalNrc += row.totale_nrc ?? 0;
+    groupRowCount += 1;
+
+    acc.push(
+      <tr
+        key={i}
+        className={isNewGroup ? `${styles.groupRowHead} ${showAnno ? styles.bandLevel1 : styles.bandLevel2}` : undefined}
+        style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
+      >
+        <td className={showAnno ? styles.groupValue : styles.groupGap}>
+          {showAnno ? row.anno ?? '' : ''}
+        </td>
+        <td className={isNewGroup ? styles.groupValue : styles.groupGap}>
+          {isNewGroup ? row.commerciale ?? '' : ''}
+        </td>
+        <td>{row.tipo_ordine ?? ''}</td>
+        <td className={shared.numCol}>{row.numero_ordini}</td>
+        <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
+        <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
+        <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
+      </tr>,
+    );
+
+    if (i === data.length - 1 && activeGroupKey !== null && groupRowCount > 1) {
+      acc.push(
+        <tr key={`subtotal-${activeGroupKey}-final`} className={`${styles.subtotalRow} ${styles.bandLevel2}`}>
+          <td colSpan={3} />
+          <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
+          <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
+          <td className={shared.numCol}>{formatMoneyEUR(subtotalMrc)}</td>
+          <td className={shared.numCol}>{formatMoneyEUR(subtotalNrc)}</td>
+        </tr>,
+      );
+    }
+
+    return acc;
+  }, []);
+
   return (
     <div className={shared.tableWrap}>
       <div className={shared.info}>{data.length} righe</div>
@@ -268,33 +432,7 @@ function BySalesTable({ data }: { data: AovPreviewResponse['bySales'] }) {
             <th className={shared.numCol}>Totale NRC</th>
           </tr>
         </thead>
-        <tbody>
-          {data.map((row, i) => {
-            const prev = i > 0 ? data[i - 1] : undefined;
-            const showAnno = i === 0 || row.anno !== prev?.anno;
-            const showCommerciale = i === 0 || row.anno !== prev?.anno || row.commerciale !== prev?.commerciale;
-
-            return (
-              <tr
-                key={i}
-                className={showCommerciale ? styles.groupRowHead : undefined}
-                style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
-              >
-                <td className={showAnno ? styles.groupValue : styles.groupGap}>
-                  {showAnno ? row.anno ?? '' : ''}
-                </td>
-                <td className={showCommerciale ? styles.groupValue : styles.groupGap}>
-                  {showCommerciale ? row.commerciale ?? '' : ''}
-                </td>
-                <td>{row.tipo_ordine ?? ''}</td>
-                <td className={shared.numCol}>{row.numero_ordini}</td>
-                <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
-                <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
-                <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
-              </tr>
-            );
-          })}
-        </tbody>
+        <tbody>{bodyRows}</tbody>
       </table>
     </div>
   );

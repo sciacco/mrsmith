@@ -162,3 +162,12 @@
 - `backend/internal/reports/handler_quantita_test.go` now fails fast if those final AOV `ORDER BY` clauses are missing, so grouped-table UX remains deterministic.
 - Reports frontend now centralizes monetary rendering in `apps/reports/src/utils/format.ts` (`formatMoneyEUR`), replacing local `toFixed`/ad-hoc formatters across AOV, Ordini, Accessi attivi, Attivazioni in corso, Rinnovi in arrivo, and Anomalie MOR pages.
 - AOV aggregate tabs (`Per tipo`, `Per categoria`, `Per commerciale`) now suppress repeated left-side grouping values and emphasize first rows of each group via `apps/reports/src/pages/AovPage.tsx` + `AovPage.module.css`, using the same first-row-emphasis pattern already used in Panoramica tables.
+- AOV aggregate tabs now also render inline per-group subtotal rows (UI-only) at each group boundary:
+  - `Per tipo` and `Per categoria`: subtotal per `anno/mese` group (`N. Ordini`, `AOV`, `Totale MRC`, `Totale NRC`)
+  - `Per commerciale`: subtotal per `anno + commerciale` group with the same numeric aggregates
+- Subtotal rows are presentation-only and do not change backend payloads or export behavior; styling is centralized in `apps/reports/src/pages/AovPage.module.css` (`.subtotalRow`, `.subtotalLabel`).
+- AOV subtotal follow-up UX refinement: subtotal rows are now suppressed for single-row groups (`groupRowCount <= 1`) and subtotal text labels were removed from leading columns (numeric subtotal values only), to preserve readability in dense grouped tables.
+- AOV grouped-table banding now supports nesting-depth color differentiation:
+  - `bandLevel1` for top-level breaks (`Per tipo`/`Per categoria` month groups, and `Per commerciale` year breaks)
+  - `bandLevel2` for deeper breaks (`Per commerciale` same-year commerciale groups)
+  - subtotal rows reuse depth-aware banding (`level1` for month-group subtotals, `level2` for commerciale-group subtotals).
