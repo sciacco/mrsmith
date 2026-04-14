@@ -11,9 +11,9 @@ import (
 
 // Handler holds references to all three databases and the Carbone XLSX service.
 type Handler struct {
-	mistraDB   *sql.DB          // Mistra PostgreSQL (loader schema)
-	grappaDB   *sql.DB          // Grappa MySQL
-	anisettaDB *sql.DB          // Anisetta PostgreSQL
+	mistraDB   *sql.DB // Mistra PostgreSQL (loader schema)
+	grappaDB   *sql.DB // Grappa MySQL
+	anisettaDB *sql.DB // Anisetta PostgreSQL
 	carbone    *CarboneService
 }
 
@@ -53,7 +53,6 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB, anisettaDB *sql.DB, 
 
 	// -- AOV --
 	handle("POST /reports/v1/aov/preview", h.handleAovPreview)
-	handle("POST /reports/v1/aov/export", h.handleAovExport)
 }
 
 // -- Shared helpers --

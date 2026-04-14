@@ -18,45 +18,45 @@ type aovRequest struct {
 // ── AOV response types ──
 
 type aovByType struct {
-	Anno       *string  `json:"anno"`
-	Mese       *string  `json:"mese"`
-	TipoOrdine *string  `json:"tipo_ordine"`
-	TotaleMRC  float64  `json:"totale_mrc"`
-	TotaleNRC  float64  `json:"totale_nrc"`
-	ValoreAOV  float64  `json:"valore_aov"`
+	Anno       *string `json:"anno"`
+	Mese       *string `json:"mese"`
+	TipoOrdine *string `json:"tipo_ordine"`
+	TotaleMRC  float64 `json:"totale_mrc"`
+	TotaleNRC  float64 `json:"totale_nrc"`
+	ValoreAOV  float64 `json:"valore_aov"`
 }
 
 type aovByCategory struct {
-	Anno      *string  `json:"anno"`
-	Mese      *string  `json:"mese"`
-	Categoria *string  `json:"categoria"`
-	TotaleMRC float64  `json:"totale_mrc"`
-	TotaleNRC float64  `json:"totale_nrc"`
-	ValoreAOV float64  `json:"valore_aov"`
+	Anno      *string `json:"anno"`
+	Mese      *string `json:"mese"`
+	Categoria *string `json:"categoria"`
+	TotaleMRC float64 `json:"totale_mrc"`
+	TotaleNRC float64 `json:"totale_nrc"`
+	ValoreAOV float64 `json:"valore_aov"`
 }
 
 type aovBySales struct {
-	Anno        *string  `json:"anno"`
-	Commerciale *string  `json:"commerciale"`
-	TipoOrdine  *string  `json:"tipo_ordine"`
-	TotaleMRC   float64  `json:"totale_mrc"`
-	TotaleNRC   float64  `json:"totale_nrc"`
-	ValoreAOV   float64  `json:"valore_aov"`
+	Anno        *string `json:"anno"`
+	Commerciale *string `json:"commerciale"`
+	TipoOrdine  *string `json:"tipo_ordine"`
+	TotaleMRC   float64 `json:"totale_mrc"`
+	TotaleNRC   float64 `json:"totale_nrc"`
+	ValoreAOV   float64 `json:"valore_aov"`
 }
 
 type aovDetail struct {
-	TipoDocumento    *string  `json:"tipo_documento"`
-	Anno             *string  `json:"anno"`
-	Mese             *string  `json:"mese"`
-	NomeTestataOrdine *string `json:"nome_testata_ordine"`
-	TipoOrdine       *string  `json:"tipo_ordine"`
-	SostOrd          *string  `json:"sost_ord"`
-	Commerciale      *string  `json:"commerciale"`
-	TotaleMRC        *float64 `json:"totale_mrc"`
-	TotaleNRC        *float64 `json:"totale_nrc"`
-	TotaleMRCOdvSost *float64 `json:"totale_mrc_odv_sost"`
-	TotaleMRCNew     *float64 `json:"totale_mrc_new"`
-	ValoreAOV        *float64 `json:"valore_aov"`
+	TipoDocumento     *string  `json:"tipo_documento"`
+	Anno              *string  `json:"anno"`
+	Mese              *string  `json:"mese"`
+	NomeTestataOrdine *string  `json:"nome_testata_ordine"`
+	TipoOrdine        *string  `json:"tipo_ordine"`
+	SostOrd           *string  `json:"sost_ord"`
+	Commerciale       *string  `json:"commerciale"`
+	TotaleMRC         *float64 `json:"totale_mrc"`
+	TotaleNRC         *float64 `json:"totale_nrc"`
+	TotaleMRCOdvSost  *float64 `json:"totale_mrc_odv_sost"`
+	TotaleMRCNew      *float64 `json:"totale_mrc_new"`
+	ValoreAOV         *float64 `json:"valore_aov"`
 }
 
 type aovPreviewResponse struct {
@@ -521,12 +521,12 @@ ORDER BY o.tipo_ordine ASC`, where)
 	for rows.Next() {
 		var row aovDetail
 		var (
-			tipoDocumento, anno, mese    sql.NullString
-			nomeTestataOrdine, tipoOrd   sql.NullString
-			sostOrd, commerciale         sql.NullString
-			totaleMRC, totaleNRC         sql.NullFloat64
-			totaleMRCOdvSost             sql.NullFloat64
-			totaleMRCNew, valoreAOV      sql.NullFloat64
+			tipoDocumento, anno, mese  sql.NullString
+			nomeTestataOrdine, tipoOrd sql.NullString
+			sostOrd, commerciale       sql.NullString
+			totaleMRC, totaleNRC       sql.NullFloat64
+			totaleMRCOdvSost           sql.NullFloat64
+			totaleMRCNew, valoreAOV    sql.NullFloat64
 		)
 		if err := rows.Scan(
 			&tipoDocumento, &anno, &mese,
@@ -616,37 +616,4 @@ func (h *Handler) handleAovPreview(w http.ResponseWriter, r *http.Request) {
 		BySales:    bySales,
 		Detail:     detail,
 	})
-}
-
-// handleAovExport generates an XLSX export of AOV data (by-type) via Carbone.
-// POST /reports/v1/aov/export
-func (h *Handler) handleAovExport(w http.ResponseWriter, r *http.Request) {
-	if !h.requireMistra(w) {
-		return
-	}
-	if h.carbone == nil {
-		httputil.Error(w, http.StatusServiceUnavailable, "carbone_not_configured")
-		return
-	}
-
-	req, ok := h.decodeAovRequest(w, r)
-	if !ok {
-		return
-	}
-
-	result, err := h.queryAovByType(r, req)
-	if err != nil {
-		h.dbFailure(w, r, "aov_export", err)
-		return
-	}
-
-	xlsxBytes, err := h.carbone.GenerateXLSX(r.Context(), OrdiniTemplateID, result)
-	if err != nil {
-		h.dbFailure(w, r, "aov_export_carbone", err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", `attachment; filename="report_aov.xlsx"`)
-	w.Write(xlsxBytes)
 }
