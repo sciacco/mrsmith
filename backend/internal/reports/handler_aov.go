@@ -99,9 +99,9 @@ func (h *Handler) queryAovByType(r *http.Request, req aovRequest) ([]aovByType, 
 
 	query := fmt.Sprintf(`SELECT anno, mese, tipo_ordine,
 count(distinct nome_testata_ordine) as numero_ordini,
-SUM(totale_mrc_new) AS totale_mrc,
-sum(totale_nrc) AS totale_nrc,
-sum(valore_aov) AS valore_aov
+COALESCE(SUM(totale_mrc_new), 0) AS totale_mrc,
+COALESCE(SUM(totale_nrc), 0) AS totale_nrc,
+COALESCE(SUM(valore_aov), 0) AS valore_aov
 
 FROM (
 SELECT
@@ -150,10 +150,10 @@ CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
 		-
-		(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+		COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
 		FROM loader.v_ordini_ric_spot  AS odv WHERE
 		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0)
+		AND odv.annullato = 0), 0)
 		)
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
 	ELSE sum(round(o.quantita::decimal * o.canone::decimal,2))
@@ -164,10 +164,10 @@ CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
 		-
-		(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+		COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
 		FROM loader.v_ordini_ric_spot  AS odv WHERE
 		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0)
+		AND odv.annullato = 0), 0)
 		)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
 	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12)
@@ -230,9 +230,9 @@ func (h *Handler) queryAovByCategory(r *http.Request, req aovRequest) ([]aovByCa
 
 	query := fmt.Sprintf(`SELECT anno, mese, categoria,
 count(distinct nome_testata_ordine) as numero_ordini,
-SUM(totale_mrc) AS totale_mrc,
-sum(totale_nrc) AS totale_nrc,
-sum(valore_aov) AS valore_aov
+COALESCE(SUM(totale_mrc), 0) AS totale_mrc,
+COALESCE(SUM(totale_nrc), 0) AS totale_nrc,
+COALESCE(SUM(valore_aov), 0) AS valore_aov
 FROM(
 SELECT
 o.tipo_documento,
@@ -323,9 +323,9 @@ func (h *Handler) queryAovBySales(r *http.Request, req aovRequest) ([]aovBySales
 
 	query := fmt.Sprintf(`SELECT anno, commerciale,tipo_ordine,
 count(distinct nome_testata_ordine) as numero_ordini,
-SUM(totale_mrc_new) AS totale_mrc,
-sum(totale_nrc) AS totale_nrc,
-sum(valore_aov) AS valore_aov
+COALESCE(SUM(totale_mrc_new), 0) AS totale_mrc,
+COALESCE(SUM(totale_nrc), 0) AS totale_nrc,
+COALESCE(SUM(valore_aov), 0) AS valore_aov
 
 FROM (
 SELECT
@@ -373,10 +373,10 @@ CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
 		-
-		(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+		COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
 		FROM loader.v_ordini_ric_spot  AS odv WHERE
 		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0)
+		AND odv.annullato = 0), 0)
 		)
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
 	ELSE sum(round(o.quantita::decimal * o.canone::decimal,2))
@@ -386,10 +386,10 @@ CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
 		-
-		(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+		COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
 		FROM loader.v_ordini_ric_spot  AS odv WHERE
 		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0)
+		AND odv.annullato = 0), 0)
 		)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
 	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12)

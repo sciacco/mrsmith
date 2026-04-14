@@ -177,7 +177,7 @@ function ByTypeTable({ data }: { data: AovPreviewResponse['byType'] }) {
     if (isNewGroup) {
       if (activeGroupKey !== null && groupRowCount > 1) {
         acc.push(
-          <tr key={`subtotal-${activeGroupKey}-${i}`} className={`${styles.subtotalRow} ${styles.bandLevel1}`}>
+          <tr key={`subtotal-${activeGroupKey}-${i}`} className={styles.subtotalRow}>
             <td colSpan={2} />
             <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
             <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
@@ -203,7 +203,7 @@ function ByTypeTable({ data }: { data: AovPreviewResponse['byType'] }) {
     acc.push(
       <tr
         key={i}
-        className={isNewGroup ? `${styles.groupRowHead} ${styles.bandLevel1}` : undefined}
+        className={isNewGroup ? styles.groupRowHead : undefined}
         style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
       >
         <td className={isNewGroup ? styles.groupValue : styles.groupGap}>
@@ -219,7 +219,7 @@ function ByTypeTable({ data }: { data: AovPreviewResponse['byType'] }) {
 
     if (i === data.length - 1 && activeGroupKey !== null && groupRowCount > 1) {
       acc.push(
-        <tr key={`subtotal-${activeGroupKey}-final`} className={`${styles.subtotalRow} ${styles.bandLevel1}`}>
+        <tr key={`subtotal-${activeGroupKey}-final`} className={styles.subtotalRow}>
           <td colSpan={2} />
           <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
           <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
@@ -267,7 +267,7 @@ function ByCategoryTable({ data }: { data: AovPreviewResponse['byCategory'] }) {
     if (isNewGroup) {
       if (activeGroupKey !== null && groupRowCount > 1) {
         acc.push(
-          <tr key={`subtotal-${activeGroupKey}-${i}`} className={`${styles.subtotalRow} ${styles.bandLevel1}`}>
+          <tr key={`subtotal-${activeGroupKey}-${i}`} className={styles.subtotalRow}>
             <td colSpan={2} />
             <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
             <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
@@ -293,7 +293,7 @@ function ByCategoryTable({ data }: { data: AovPreviewResponse['byCategory'] }) {
     acc.push(
       <tr
         key={i}
-        className={isNewGroup ? `${styles.groupRowHead} ${styles.bandLevel1}` : undefined}
+        className={isNewGroup ? styles.groupRowHead : undefined}
         style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
       >
         <td className={isNewGroup ? styles.groupValue : styles.groupGap}>
@@ -309,7 +309,7 @@ function ByCategoryTable({ data }: { data: AovPreviewResponse['byCategory'] }) {
 
     if (i === data.length - 1 && activeGroupKey !== null && groupRowCount > 1) {
       acc.push(
-        <tr key={`subtotal-${activeGroupKey}-final`} className={`${styles.subtotalRow} ${styles.bandLevel1}`}>
+        <tr key={`subtotal-${activeGroupKey}-final`} className={styles.subtotalRow}>
           <td colSpan={2} />
           <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
           <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
@@ -359,7 +359,7 @@ function BySalesTable({ data }: { data: AovPreviewResponse['bySales'] }) {
     if (isNewGroup) {
       if (activeGroupKey !== null && groupRowCount > 1) {
         acc.push(
-          <tr key={`subtotal-${activeGroupKey}-${i}`} className={`${styles.subtotalRow} ${styles.bandLevel2}`}>
+          <tr key={`subtotal-${activeGroupKey}-${i}`} className={styles.subtotalRow}>
             <td colSpan={3} />
             <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
             <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>
@@ -385,7 +385,7 @@ function BySalesTable({ data }: { data: AovPreviewResponse['bySales'] }) {
     acc.push(
       <tr
         key={i}
-        className={isNewGroup ? `${styles.groupRowHead} ${showAnno ? styles.bandLevel1 : styles.bandLevel2}` : undefined}
+        className={isNewGroup ? styles.groupRowHead : undefined}
         style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
       >
         <td className={showAnno ? styles.groupValue : styles.groupGap}>
@@ -404,7 +404,7 @@ function BySalesTable({ data }: { data: AovPreviewResponse['bySales'] }) {
 
     if (i === data.length - 1 && activeGroupKey !== null && groupRowCount > 1) {
       acc.push(
-        <tr key={`subtotal-${activeGroupKey}-final`} className={`${styles.subtotalRow} ${styles.bandLevel2}`}>
+        <tr key={`subtotal-${activeGroupKey}-final`} className={styles.subtotalRow}>
           <td colSpan={3} />
           <td className={shared.numCol}>{subtotalOrders.toLocaleString('it-IT')}</td>
           <td className={shared.numCol}>{formatMoneyEUR(subtotalAov)}</td>

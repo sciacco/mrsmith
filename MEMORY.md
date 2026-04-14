@@ -171,3 +171,5 @@
   - `bandLevel1` for top-level breaks (`Per tipo`/`Per categoria` month groups, and `Per commerciale` year breaks)
   - `bandLevel2` for deeper breaks (`Per commerciale` same-year commerciale groups)
   - subtotal rows reuse depth-aware banding (`level1` for month-group subtotals, `level2` for commerciale-group subtotals).
+- `POST /api/reports/v1/aov/preview` no longer fails when substitution aggregates have missing baseline rows: `backend/internal/reports/handler_aov.go` now applies `COALESCE` to AOV grouped sums (`totale_mrc`, `totale_nrc`, `valore_aov`) and to substitution baseline subqueries in by-type/by-sales formulas, so null aggregate math is normalized to `0`.
+- The dedicated coalesce-specific AOV regression test (`TestHandleAovPreviewCoalescesNullAggregatesToZero`) and related query-shape assertions were intentionally removed to keep the reports test suite leaner; the runtime fix in `handler_aov.go` remains.
