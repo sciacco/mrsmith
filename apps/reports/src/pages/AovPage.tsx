@@ -3,6 +3,7 @@ import { Skeleton, MultiSelect } from '@mrsmith/ui';
 import { useOrderStatuses } from '../api/queries';
 import { useApiClient } from '../api/client';
 import type { AovPreviewResponse } from '../types';
+import { formatMoneyEUR } from '../utils/format';
 import shared from './shared.module.css';
 import styles from './AovPage.module.css';
 
@@ -109,9 +110,7 @@ export default function AovPage() {
               className={`${styles.card} ${activeTab === 'detail' ? styles.cardActive : ''}`}
               onClick={() => setActiveTab('detail')}
             >
-              <div className={styles.cardValue}>
-                {totalAov.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
-              </div>
+              <div className={styles.cardValue}>{formatMoneyEUR(totalAov)}</div>
               <div className={styles.cardLabel}>AOV Totale</div>
             </div>
             <div
@@ -179,16 +178,29 @@ function ByTypeTable({ data }: { data: AovPreviewResponse['byType'] }) {
           </tr>
         </thead>
         <tbody>
-          {data.map((row, i) => (
-            <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
-              <td>{formatYearMonth(row.anno, row.mese)}</td>
-              <td>{row.tipo_ordine ?? ''}</td>
-              <td className={shared.numCol}>{row.numero_ordini}</td>
-              <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
-            </tr>
-          ))}
+          {data.map((row, i) => {
+            const prev = i > 0 ? data[i - 1] : undefined;
+            const currentYearMonth = formatYearMonth(row.anno, row.mese);
+            const prevYearMonth = prev ? formatYearMonth(prev.anno, prev.mese) : '';
+            const showYearMonth = i === 0 || currentYearMonth !== prevYearMonth;
+
+            return (
+              <tr
+                key={i}
+                className={showYearMonth ? styles.groupRowHead : undefined}
+                style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
+              >
+                <td className={showYearMonth ? styles.groupValue : styles.groupGap}>
+                  {showYearMonth ? currentYearMonth : ''}
+                </td>
+                <td>{row.tipo_ordine ?? ''}</td>
+                <td className={shared.numCol}>{row.numero_ordini}</td>
+                <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
+                <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
+                <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -211,16 +223,29 @@ function ByCategoryTable({ data }: { data: AovPreviewResponse['byCategory'] }) {
           </tr>
         </thead>
         <tbody>
-          {data.map((row, i) => (
-            <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
-              <td>{formatYearMonth(row.anno, row.mese)}</td>
-              <td>{row.categoria ?? ''}</td>
-              <td className={shared.numCol}>{row.numero_ordini}</td>
-              <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
-            </tr>
-          ))}
+          {data.map((row, i) => {
+            const prev = i > 0 ? data[i - 1] : undefined;
+            const currentYearMonth = formatYearMonth(row.anno, row.mese);
+            const prevYearMonth = prev ? formatYearMonth(prev.anno, prev.mese) : '';
+            const showYearMonth = i === 0 || currentYearMonth !== prevYearMonth;
+
+            return (
+              <tr
+                key={i}
+                className={showYearMonth ? styles.groupRowHead : undefined}
+                style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
+              >
+                <td className={showYearMonth ? styles.groupValue : styles.groupGap}>
+                  {showYearMonth ? currentYearMonth : ''}
+                </td>
+                <td>{row.categoria ?? ''}</td>
+                <td className={shared.numCol}>{row.numero_ordini}</td>
+                <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
+                <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
+                <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -244,17 +269,31 @@ function BySalesTable({ data }: { data: AovPreviewResponse['bySales'] }) {
           </tr>
         </thead>
         <tbody>
-          {data.map((row, i) => (
-            <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
-              <td>{row.anno ?? ''}</td>
-              <td>{row.commerciale ?? ''}</td>
-              <td>{row.tipo_ordine ?? ''}</td>
-              <td className={shared.numCol}>{row.numero_ordini}</td>
-              <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
-            </tr>
-          ))}
+          {data.map((row, i) => {
+            const prev = i > 0 ? data[i - 1] : undefined;
+            const showAnno = i === 0 || row.anno !== prev?.anno;
+            const showCommerciale = i === 0 || row.anno !== prev?.anno || row.commerciale !== prev?.commerciale;
+
+            return (
+              <tr
+                key={i}
+                className={showCommerciale ? styles.groupRowHead : undefined}
+                style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
+              >
+                <td className={showAnno ? styles.groupValue : styles.groupGap}>
+                  {showAnno ? row.anno ?? '' : ''}
+                </td>
+                <td className={showCommerciale ? styles.groupValue : styles.groupGap}>
+                  {showCommerciale ? row.commerciale ?? '' : ''}
+                </td>
+                <td>{row.tipo_ordine ?? ''}</td>
+                <td className={shared.numCol}>{row.numero_ordini}</td>
+                <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
+                <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
+                <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -290,11 +329,11 @@ function DetailTable({ data }: { data: AovPreviewResponse['detail'] }) {
               <td>{row.commerciale ?? ''}</td>
               <td>{formatTipoDocumento(row.tipo_documento)}</td>
               <td className={shared.mono}>{row.sost_ord ?? ''}</td>
-              <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.totale_mrc_odv_sost != null ? row.totale_mrc_odv_sost.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.totale_mrc_new != null ? row.totale_mrc_new.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
+              <td className={shared.numCol}>{row.totale_mrc_odv_sost != null ? formatMoneyEUR(row.totale_mrc_odv_sost) : ''}</td>
+              <td className={shared.numCol}>{row.totale_mrc_new != null ? formatMoneyEUR(row.totale_mrc_new) : ''}</td>
+              <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
+              <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
             </tr>
           ))}
         </tbody>

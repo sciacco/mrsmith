@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Skeleton, Button, SingleSelect } from '@mrsmith/ui';
 import { useUpcomingRenewals, useRenewalRows } from '../api/queries';
+import { formatMoneyEUR } from '../utils/format';
 import shared from './shared.module.css';
 import styles from './RinnoviInArrivoPage.module.css';
 
@@ -98,7 +99,7 @@ export default function RinnoviInArrivoPage() {
                     <td>{row.rinnovi_al?.slice(0, 10) ?? ''}</td>
                     <td>{row.ordini_servizi}</td>
                     <td>{row.senza_tacito_rinnovo ? 'Si' : 'No'}</td>
-                    <td className={shared.numCol}>{row.canoni != null ? row.canoni.toFixed(2) : ''}</td>
+                    <td className={shared.numCol}>{row.canoni != null ? formatMoneyEUR(row.canoni) : ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -146,8 +147,8 @@ export default function RinnoviInArrivoPage() {
                       <td>{row.stato_ordine ?? ''}</td>
                       <td>{row.descrizione_long ?? ''}</td>
                       <td className={shared.numCol}>{row.quantita ?? ''}</td>
-                      <td className={shared.numCol}>{row.nrc != null ? row.nrc.toFixed(2) : ''}</td>
-                      <td className={shared.numCol}>{row.mrc != null ? row.mrc.toFixed(2) : ''}</td>
+                      <td className={shared.numCol}>{row.nrc != null ? formatMoneyEUR(row.nrc) : ''}</td>
+                      <td className={shared.numCol}>{row.mrc != null ? formatMoneyEUR(row.mrc) : ''}</td>
                       <td>{row.stato_riga ?? ''}</td>
                       <td className={shared.mono}>{row.serialnumber ?? ''}</td>
                       <td>{row.note_legali ?? ''}</td>

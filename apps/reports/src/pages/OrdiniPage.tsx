@@ -3,6 +3,7 @@ import { Skeleton, MultiSelect, useToast } from '@mrsmith/ui';
 import { useOrderStatuses } from '../api/queries';
 import { useApiClient } from '../api/client';
 import type { OrderRow } from '../types';
+import { formatMoneyEUR } from '../utils/format';
 import shared from './shared.module.css';
 import styles from './OrdiniPage.module.css';
 
@@ -16,10 +17,6 @@ function defaultDateTo(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return d.toISOString().slice(0, 10);
-}
-
-function formatCurrency(value: number): string {
-  return value.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function OrdiniPage() {
@@ -142,11 +139,11 @@ export default function OrdiniPage() {
               <div className={styles.metricLabel}>Ordini</div>
             </div>
             <div className={styles.metric}>
-              <div className={styles.metricValue}>&euro;{formatCurrency(totalMrc)}</div>
+              <div className={styles.metricValue}>{formatMoneyEUR(totalMrc)}</div>
               <div className={styles.metricLabel}>MRC totale</div>
             </div>
             <div className={styles.metric}>
-              <div className={styles.metricValue}>&euro;{formatCurrency(totalNrc)}</div>
+              <div className={styles.metricValue}>{formatMoneyEUR(totalNrc)}</div>
               <div className={styles.metricLabel}>NRC totale</div>
             </div>
           </div>
@@ -203,9 +200,9 @@ export default function OrdiniPage() {
                     <td className={shared.mono}>{row.numero_ordine}</td>
                     <td>{row.descrizione_long ?? ''}</td>
                     <td className={shared.numCol}>{row.quantita ?? ''}</td>
-                    <td className={shared.numCol}>{row.nrc != null ? formatCurrency(row.nrc) : ''}</td>
-                    <td className={shared.numCol}>{row.mrc != null ? formatCurrency(row.mrc) : ''}</td>
-                    <td className={shared.numCol}>{row.totale_mrc != null ? formatCurrency(row.totale_mrc) : ''}</td>
+                    <td className={shared.numCol}>{row.nrc != null ? formatMoneyEUR(row.nrc) : ''}</td>
+                    <td className={shared.numCol}>{row.mrc != null ? formatMoneyEUR(row.mrc) : ''}</td>
+                    <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
                     <td>{row.data_documento?.slice(0, 10) ?? ''}</td>
                     <td>{row.stato_riga ?? ''}</td>
                     <td className={shared.mono}>{row.serialnumber ?? ''}</td>

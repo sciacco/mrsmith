@@ -153,3 +153,12 @@
 - AOV aggregate tables now render `Anno/Mese` from `anno` + `mese` and correctly display `N. Ordini` values.
 - AOV detail table is now aligned to the legacy dataset shape (`tipo_documento`, `anno`, `mese`, `nome_testata_ordine`, `tipo_ordine`, `sost_ord`, `commerciale`, `totale_mrc`, `totale_mrc_odv_sost`, `totale_mrc_new`, `totale_nrc`, `valore_aov`) instead of the orders-preview shape.
 - Added backend regression coverage in `backend/internal/reports/handler_quantita_test.go` (`TestHandleAovPreviewIncludesOrderCountsAndDetailFields`) to pin `numero_ordini` and detail-field population for AOV preview responses.
+- Reports shared table numeric-header alignment now requires selector specificity (`.table th.numCol`) in `apps/reports/src/pages/shared.module.css`; `.numCol` alone does not override `.table th { text-align: left; }`.
+- AOV preview SQL outputs are now explicitly ordered in `backend/internal/reports/handler_aov.go`:
+  - `byType`: `anno, mese, tipo_ordine` with business-type rank (`NUOVO`, `SOST`, `RINNOVO`, `CESSAZIONE`)
+  - `byCategory`: `anno, mese, categoria`
+  - `bySales`: `anno, commerciale, tipo_ordine` with the same business-type rank
+  - `detail`: `anno, mese, commerciale, tipo_ordine rank, nome_testata_ordine`
+- `backend/internal/reports/handler_quantita_test.go` now fails fast if those final AOV `ORDER BY` clauses are missing, so grouped-table UX remains deterministic.
+- Reports frontend now centralizes monetary rendering in `apps/reports/src/utils/format.ts` (`formatMoneyEUR`), replacing local `toFixed`/ad-hoc formatters across AOV, Ordini, Accessi attivi, Attivazioni in corso, Rinnovi in arrivo, and Anomalie MOR pages.
+- AOV aggregate tabs (`Per tipo`, `Per categoria`, `Per commerciale`) now suppress repeated left-side grouping values and emphasize first rows of each group via `apps/reports/src/pages/AovPage.tsx` + `AovPage.module.css`, using the same first-row-emphasis pattern already used in Panoramica tables.

@@ -317,8 +317,12 @@ func (c *reportsTestConn) QueryContext(_ context.Context, query string, _ []driv
 			}, nil
 		}
 	case "aov-preview":
+		qLower := strings.ToLower(query)
 		switch {
 		case strings.Contains(query, "GROUP BY anno, mese, tipo_ordine"):
+			if !strings.Contains(qLower, "order by\nanno asc,\nmese asc,") || !strings.Contains(qLower, "case tipo_ordine") {
+				return nil, errors.New("missing final ORDER BY in byType query")
+			}
 			return &reportsTestRows{
 				columns: []string{"anno", "mese", "tipo_ordine", "numero_ordini", "totale_mrc", "totale_nrc", "valore_aov"},
 				values: [][]driver.Value{
@@ -326,6 +330,9 @@ func (c *reportsTestConn) QueryContext(_ context.Context, query string, _ []driv
 				},
 			}, nil
 		case strings.Contains(query, "GROUP BY anno, mese, categoria"):
+			if !strings.Contains(qLower, "order by anno asc, mese asc, categoria asc") {
+				return nil, errors.New("missing final ORDER BY in byCategory query")
+			}
 			return &reportsTestRows{
 				columns: []string{"anno", "mese", "categoria", "numero_ordini", "totale_mrc", "totale_nrc", "valore_aov"},
 				values: [][]driver.Value{
@@ -333,6 +340,9 @@ func (c *reportsTestConn) QueryContext(_ context.Context, query string, _ []driv
 				},
 			}, nil
 		case strings.Contains(query, "GROUP BY anno, commerciale, tipo_ordine"):
+			if !strings.Contains(qLower, "order by\nanno asc,\ncommerciale asc,") || !strings.Contains(qLower, "case tipo_ordine") {
+				return nil, errors.New("missing final ORDER BY in bySales query")
+			}
 			return &reportsTestRows{
 				columns: []string{"anno", "commerciale", "tipo_ordine", "numero_ordini", "totale_mrc", "totale_nrc", "valore_aov"},
 				values: [][]driver.Value{
@@ -340,6 +350,9 @@ func (c *reportsTestConn) QueryContext(_ context.Context, query string, _ []driv
 				},
 			}, nil
 		case strings.Contains(query, "SELECT\no.tipo_documento,"):
+			if !strings.Contains(qLower, "order by\nanno asc,\nmese asc,\ncommerciale asc,") || !strings.Contains(qLower, "o.nome_testata_ordine asc") {
+				return nil, errors.New("missing final ORDER BY in detail query")
+			}
 			return &reportsTestRows{
 				columns: []string{
 					"tipo_documento", "anno", "mese", "nome_testata_ordine", "tipo_ordine",

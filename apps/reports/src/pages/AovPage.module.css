@@ -85,6 +85,20 @@
   color: var(--color-text-muted);
 }
 
+.groupRowHead td {
+  border-top: 1px solid var(--color-border);
+}
+
+.groupValue {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.groupGap {
+  color: transparent;
+  user-select: none;
+}
+
 @media (max-width: 900px) {
   .cards {
     grid-template-columns: repeat(2, 1fr);

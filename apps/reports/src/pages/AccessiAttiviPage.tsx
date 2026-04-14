@@ -3,6 +3,7 @@ import { Skeleton, MultiSelect, useToast } from '@mrsmith/ui';
 import { useConnectionTypes } from '../api/queries';
 import { useApiClient } from '../api/client';
 import type { ActiveLineRow } from '../types';
+import { formatMoneyEUR } from '../utils/format';
 import shared from './shared.module.css';
 import styles from './AccessiAttiviPage.module.css';
 
@@ -14,10 +15,6 @@ const statiOptions = [
   { value: 'in attivazione', label: 'in attivazione' },
   { value: 'KO', label: 'KO' },
 ];
-
-function formatCurrency(value: number): string {
-  return value.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 export default function AccessiAttiviPage() {
   const [connectionTypes, setConnectionTypes] = useState<string[]>([]);
@@ -210,7 +207,7 @@ export default function AccessiAttiviPage() {
                     <td>{row.stato ?? ''}</td>
                     <td className={shared.mono}>{row.serialnumber ?? ''}</td>
                     <td className={shared.numCol}>{row.quantita ?? ''}</td>
-                    <td className={shared.numCol}>{row.canone != null ? formatCurrency(row.canone) : ''}</td>
+                    <td className={shared.numCol}>{row.canone != null ? formatMoneyEUR(row.canone) : ''}</td>
                   </tr>
                 ))}
               </tbody>

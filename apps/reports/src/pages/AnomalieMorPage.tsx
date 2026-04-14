@@ -1,5 +1,6 @@
 import { Skeleton } from '@mrsmith/ui';
 import { useMorAnomalies } from '../api/queries';
+import { formatMoneyEUR } from '../utils/format';
 import shared from './shared.module.css';
 import styles from './AnomalieMorPage.module.css';
 
@@ -28,7 +29,7 @@ export default function AnomalieMorPage() {
                 <th>Codice ordine</th>
                 <th>Serial number</th>
                 <th>Periodo</th>
-                <th>Importo</th>
+                <th className={shared.numCol}>Importo</th>
                 <th>Stato</th>
                 <th>Tipologia</th>
                 <th>Cliente</th>
@@ -55,7 +56,7 @@ export default function AnomalieMorPage() {
                     <td>{row.codice_ordine}</td>
                     <td>{row.serialnumber}</td>
                     <td>{row.periodo_inizio}</td>
-                    <td>{row.importo != null ? row.importo.toFixed(2) : ''}</td>
+                    <td className={shared.numCol}>{row.importo != null ? formatMoneyEUR(row.importo) : ''}</td>
                     <td>{row.stato}</td>
                     <td>{row.tipologia}</td>
                     <td>{row.id_cliente}</td>

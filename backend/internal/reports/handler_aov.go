@@ -182,7 +182,17 @@ GROUP BY
 o.data_conferma,o.data_documento, o.tipo_ordine, o.nome_testata_ordine, o.sostituito_da, o.sost_ord, o.tipo_documento
 ORDER BY o.tipo_ordine ASC
 ) AS x
-GROUP BY anno, mese, tipo_ordine`, where)
+GROUP BY anno, mese, tipo_ordine
+ORDER BY
+anno ASC,
+mese ASC,
+CASE tipo_ordine
+	WHEN 'NUOVO' THEN 1
+	WHEN 'SOST' THEN 2
+	WHEN 'RINNOVO' THEN 3
+	WHEN 'CESSAZIONE' THEN 4
+	ELSE 99
+END`, where)
 
 	args := h.buildAovArgs(req)
 	rows, err := h.mistraDB.QueryContext(r.Context(), query, args...)
@@ -274,7 +284,8 @@ from loader.v_ordini_ric_spot as o join loader.erp_anagrafiche_clienti eac on o.
 %s
 
 ) AS x
-GROUP BY anno, mese, categoria`, where)
+GROUP BY anno, mese, categoria
+ORDER BY anno ASC, mese ASC, categoria ASC`, where)
 
 	args := h.buildAovArgs(req)
 	rows, err := h.mistraDB.QueryContext(r.Context(), query, args...)
@@ -394,7 +405,17 @@ GROUP BY
 o.data_conferma,o.data_documento, o.tipo_ordine, o.nome_testata_ordine, o.sostituito_da, o.sost_ord, o.tipo_documento
 ORDER BY o.tipo_ordine ASC
 ) AS x
-GROUP BY anno, commerciale, tipo_ordine`, where)
+GROUP BY anno, commerciale, tipo_ordine
+ORDER BY
+anno ASC,
+commerciale ASC,
+CASE tipo_ordine
+	WHEN 'NUOVO' THEN 1
+	WHEN 'SOST' THEN 2
+	WHEN 'RINNOVO' THEN 3
+	WHEN 'CESSAZIONE' THEN 4
+	ELSE 99
+END`, where)
 
 	args := h.buildAovArgs(req)
 	rows, err := h.mistraDB.QueryContext(r.Context(), query, args...)
@@ -514,7 +535,18 @@ from loader.v_ordini_ric_spot as o join loader.erp_anagrafiche_clienti eac on o.
 
 GROUP BY
 o.data_conferma,o.data_documento, o.tipo_ordine, o.nome_testata_ordine, o.sostituito_da, o.sost_ord, o.tipo_documento
-ORDER BY o.tipo_ordine ASC`, where)
+ORDER BY
+anno ASC,
+mese ASC,
+commerciale ASC,
+CASE tipo_ordine
+	WHEN 'NUOVO' THEN 1
+	WHEN 'SOST' THEN 2
+	WHEN 'RINNOVO' THEN 3
+	WHEN 'CESSAZIONE' THEN 4
+	ELSE 99
+END,
+o.nome_testata_ordine ASC`, where)
 
 	args := h.buildAovArgs(req)
 	rows, err := h.mistraDB.QueryContext(r.Context(), query, args...)
