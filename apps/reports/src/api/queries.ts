@@ -55,7 +55,7 @@ export function useUpcomingRenewals(months: number, minMrc: number) {
   return useQuery({
     queryKey: ['upcoming-renewals', months, minMrc],
     queryFn: () => api.get<RenewalSummary[]>(`/reports/v1/upcoming-renewals?months=${months}&minMrc=${minMrc}`),
-    enabled: false,
+    placeholderData: (prev) => prev,
   });
 }
 

@@ -1,26 +1,30 @@
-import { useState, useEffect } from 'react';
-import { Skeleton } from '@mrsmith/ui';
+import { useState } from 'react';
+import { Skeleton, Button, SingleSelect } from '@mrsmith/ui';
 import { useUpcomingRenewals, useRenewalRows } from '../api/queries';
 import shared from './shared.module.css';
 import styles from './RinnoviInArrivoPage.module.css';
 
+const monthsOptions = Array.from({ length: 12 }, (_, i) => ({
+  value: i + 1,
+  label: `${i + 1} ${i === 0 ? 'mese' : 'mesi'}`,
+}));
+
 export default function RinnoviInArrivoPage() {
-  const [months, setMonths] = useState(4);
-  const [minMrc, setMinMrc] = useState(11);
+  const [draftMonths, setDraftMonths] = useState(4);
+  const [draftMinMrc, setDraftMinMrc] = useState(11);
+  const [committedMonths, setCommittedMonths] = useState(4);
+  const [committedMinMrc, setCommittedMinMrc] = useState(11);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
 
-  const renewalsQ = useUpcomingRenewals(months, minMrc);
-  const rowsQ = useRenewalRows(selectedCustomer, months, minMrc);
+  const renewalsQ = useUpcomingRenewals(committedMonths, committedMinMrc);
+  const rowsQ = useRenewalRows(selectedCustomer, committedMonths, committedMinMrc);
 
-  // Fetch on mount
-  useEffect(() => {
-    renewalsQ.refetch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const isDirty = draftMonths !== committedMonths || draftMinMrc !== committedMinMrc;
 
   function handleExecute() {
     setSelectedCustomer(null);
-    renewalsQ.refetch();
+    setCommittedMonths(draftMonths);
+    setCommittedMinMrc(draftMinMrc);
   }
 
   return (
@@ -28,32 +32,34 @@ export default function RinnoviInArrivoPage() {
       <h1 className={shared.title}>Rinnovi in arrivo</h1>
 
       <div className={shared.toolbar}>
-        <div className={`${shared.field} ${styles.field}`}>
+        <div className={shared.field}>
           <label>MRC minimo</label>
           <input
             type="number"
-            value={minMrc}
-            onChange={(e) => setMinMrc(Number(e.target.value))}
+            className={styles.numberInput}
+            value={draftMinMrc}
+            onChange={(e) => setDraftMinMrc(Number(e.target.value))}
           />
         </div>
 
         <div className={shared.field}>
           <label>Rinnovi entro N mesi</label>
-          <div className={styles.rangeWrap}>
-            <input
-              type="range"
-              min={1}
-              max={12}
-              value={months}
-              onChange={(e) => setMonths(Number(e.target.value))}
-            />
-            <span className={styles.rangeValue}>{months}</span>
-          </div>
+          <SingleSelect
+            options={monthsOptions}
+            selected={draftMonths}
+            onChange={(v) => setDraftMonths(v ?? 4)}
+            placeholder="Mesi..."
+          />
         </div>
 
-        <button className={shared.btnPrimary} onClick={handleExecute}>
+        <Button
+          variant="primary"
+          loading={renewalsQ.isFetching}
+          onClick={handleExecute}
+          className={isDirty ? styles.btnDirty : undefined}
+        >
           Esegui
-        </button>
+        </Button>
       </div>
 
       {renewalsQ.isLoading && <Skeleton rows={8} />}
@@ -61,7 +67,7 @@ export default function RinnoviInArrivoPage() {
       {renewalsQ.error && <p>Errore nel caricamento dei dati.</p>}
 
       {renewalsQ.data && (
-        <>
+        <div className={renewalsQ.isFetching ? styles.refetching : undefined}>
           <div className={shared.info}>{renewalsQ.data.length} clienti</div>
           <div className={shared.tableWrap}>
             <table className={`${shared.table} ${styles.table}`}>
@@ -98,7 +104,7 @@ export default function RinnoviInArrivoPage() {
               </tbody>
             </table>
           </div>
-        </>
+        </div>
       )}
 
       {selectedCustomer && (
