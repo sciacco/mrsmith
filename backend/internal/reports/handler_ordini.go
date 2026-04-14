@@ -17,28 +17,28 @@ type ordersRequest struct {
 }
 
 type orderReportRow struct {
-	RagioneSociale   string  `json:"ragione_sociale"`
-	StatoOrdine      string  `json:"stato_ordine"`
-	NumeroOrdine     *string `json:"numero_ordine"`
-	DescrizioneLong  *string `json:"descrizione_long"`
-	Quantita         int     `json:"quantita"`
-	NRC              float64 `json:"nrc"`
-	MRC              float64 `json:"mrc"`
-	TotaleMRC        float64 `json:"totale_mrc"`
-	NumeroAzienda    int     `json:"numero_azienda"`
-	DataDocumento    *string `json:"data_documento"`
-	StatoRiga        *string `json:"stato_riga"`
-	DataUltimaFatt   *string `json:"data_ultima_fatt"`
-	Serialnumber     *string `json:"serialnumber"`
-	MetodoPagamento  *string `json:"metodo_pagamento"`
-	DurataServizio   *string `json:"durata_servizio"`
-	DurataRinnovo    *string `json:"durata_rinnovo"`
-	DataCessazione   *string `json:"data_cessazione"`
-	DataAttivazione  *string `json:"data_attivazione"`
-	NoteLegali       *string `json:"note_legali"`
-	SostOrd          *string `json:"sost_ord"`
-	SostituitoDa     *string `json:"sostituito_da"`
-	ProgressivoRiga  int     `json:"progressivo_riga"`
+	RagioneSociale  string   `json:"ragione_sociale"`
+	StatoOrdine     string   `json:"stato_ordine"`
+	NumeroOrdine    *string  `json:"numero_ordine"`
+	DescrizioneLong *string  `json:"descrizione_long"`
+	Quantita        *float64 `json:"quantita"`
+	NRC             float64  `json:"nrc"`
+	MRC             float64  `json:"mrc"`
+	TotaleMRC       float64  `json:"totale_mrc"`
+	NumeroAzienda   int      `json:"numero_azienda"`
+	DataDocumento   *string  `json:"data_documento"`
+	StatoRiga       *string  `json:"stato_riga"`
+	DataUltimaFatt  *string  `json:"data_ultima_fatt"`
+	Serialnumber    *string  `json:"serialnumber"`
+	MetodoPagamento *string  `json:"metodo_pagamento"`
+	DurataServizio  *string  `json:"durata_servizio"`
+	DurataRinnovo   *string  `json:"durata_rinnovo"`
+	DataCessazione  *string  `json:"data_cessazione"`
+	DataAttivazione *string  `json:"data_attivazione"`
+	NoteLegali      *string  `json:"note_legali"`
+	SostOrd         *string  `json:"sost_ord"`
+	SostituitoDa    *string  `json:"sostituito_da"`
+	ProgressivoRiga int      `json:"progressivo_riga"`
 }
 
 // buildInClause generates a parameterized IN clause like "$1, $2, $3" starting
@@ -91,17 +91,18 @@ ORDER BY eac.ragione_sociale, data_documento, nome_testata_ordine, progressivo_r
 	for rows.Next() {
 		var o orderReportRow
 		var (
-			numeroOrdine, descrizioneLong, statoRiga         sql.NullString
-			dataDocumento, dataUltimaFatt, serialnumber      sql.NullString
-			metodoPagamento, durataServizio, durataRinnovo    sql.NullString
-			dataCessazione, dataAttivazione, noteLegali       sql.NullString
-			sostOrd, sostituitoDa                             sql.NullString
+			numeroOrdine, descrizioneLong, statoRiga       sql.NullString
+			dataDocumento, dataUltimaFatt, serialnumber    sql.NullString
+			metodoPagamento, durataServizio, durataRinnovo sql.NullString
+			dataCessazione, dataAttivazione, noteLegali    sql.NullString
+			sostOrd, sostituitoDa                          sql.NullString
+			quantita                                       sql.NullFloat64
 		)
 
 		if err := rows.Scan(
 			&o.RagioneSociale, &o.StatoOrdine,
 			&numeroOrdine, &descrizioneLong,
-			&o.Quantita, &o.NRC, &o.MRC, &o.TotaleMRC,
+			&quantita, &o.NRC, &o.MRC, &o.TotaleMRC,
 			&o.NumeroAzienda, &dataDocumento, &statoRiga,
 			&dataUltimaFatt, &serialnumber,
 			&metodoPagamento, &durataServizio, &durataRinnovo,
@@ -113,6 +114,7 @@ ORDER BY eac.ragione_sociale, data_documento, nome_testata_ordine, progressivo_r
 
 		o.NumeroOrdine = nullStringPtr(numeroOrdine)
 		o.DescrizioneLong = nullStringPtr(descrizioneLong)
+		o.Quantita = nullFloat64Ptr(quantita)
 		o.DataDocumento = nullStringPtr(dataDocumento)
 		o.StatoRiga = nullStringPtr(statoRiga)
 		o.DataUltimaFatt = nullStringPtr(dataUltimaFatt)

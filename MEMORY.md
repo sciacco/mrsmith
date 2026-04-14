@@ -128,3 +128,17 @@
 - `acl.RequireRole` and launcher visibility filtering now both consume the shared authz helper ([backend/internal/acl/acl.go](backend/internal/acl/acl.go), [backend/internal/platform/applaunch/catalog.go](backend/internal/platform/applaunch/catalog.go)), so `app_devadmin` sees and can access all current/future ACL-protected apps without per-app wiring.
 - Quotes delete authorization now reads claims via `auth.GetClaims` and reuses shared authz logic (including `app_devadmin` bypass) in [backend/internal/quotes/handler_quotes.go](backend/internal/quotes/handler_quotes.go); UI delete affordance now uses the shared frontend role helper in [packages/auth-client/src/roles.ts](packages/auth-client/src/roles.ts) and [apps/quotes/src/components/QuoteTable.tsx](apps/quotes/src/components/QuoteTable.tsx).
 - Canonical superuser role string is now `app_devadmin` across backend authz, frontend auth helpers, tests, and implementation docs; the previous legacy alias is intentionally unsupported and should not appear in new code/tests.
+
+## 2026-04-14
+- `quantita` from loader-backed order/report views must now be treated as nullable decimal end-to-end (Go `sql.NullFloat64` scan + `*float64` JSON fields), not integer.
+- Fixed all affected backend handlers in `reports` and `panoramica` that were scanning `quantita` into `int`/`sql.NullInt64`, including:
+  - `/api/reports/v1/orders/preview` (and export datasource)
+  - `/api/reports/v1/active-lines/preview` (and export datasource)
+  - `/api/reports/v1/pending-activations/{orderNumber}/rows`
+  - `/api/reports/v1/upcoming-renewals/{customerId}/rows`
+  - `/api/panoramica/v1/orders/summary`
+  - `/api/panoramica/v1/orders/detail`
+- Added backend regression coverage in `backend/internal/reports/handler_quantita_test.go` to pin fractional and `NULL` `quantita` behavior on the four Reports endpoints above.
+- Updated existing Panoramica test fixture in `backend/internal/panoramica/handler_orders_test.go` to use fractional `quantita` and assert JSON preservation.
+- Updated Panoramica frontend contracts in `apps/panoramica-cliente/src/types/index.ts` so `quantita` is `number | null` in both summary and detail row types.
+- Added reusable implementation knowledge entry in `docs/IMPLEMENTATION-KNOWLEDGE.md` documenting that loader `quantita` is `double precision` and must remain decimal/nullable in API contracts.

@@ -27,13 +27,14 @@ func TestHandleListOrdersSummaryAllowsNullTextFields(t *testing.T) {
 	}
 
 	var rows []struct {
-		Stato             string  `json:"stato"`
-		NumeroOrdine      string  `json:"numero_ordine"`
-		DescrizioneLong   string  `json:"descrizione_long"`
-		StatoOrdine       string  `json:"stato_ordine"`
-		NomeTestataOrdine string  `json:"nome_testata_ordine"`
-		StatoRiga         string  `json:"stato_riga"`
-		Storico           *string `json:"storico"`
+		Stato             string   `json:"stato"`
+		NumeroOrdine      string   `json:"numero_ordine"`
+		DescrizioneLong   string   `json:"descrizione_long"`
+		Quantita          *float64 `json:"quantita"`
+		StatoOrdine       string   `json:"stato_ordine"`
+		NomeTestataOrdine string   `json:"nome_testata_ordine"`
+		StatoRiga         string   `json:"stato_riga"`
+		Storico           *string  `json:"storico"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &rows); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
@@ -49,6 +50,9 @@ func TestHandleListOrdersSummaryAllowsNullTextFields(t *testing.T) {
 	}
 	if rows[0].DescrizioneLong != "" {
 		t.Fatalf("expected empty descrizione_long for NULL source, got %q", rows[0].DescrizioneLong)
+	}
+	if rows[0].Quantita == nil || *rows[0].Quantita != 2.5 {
+		t.Fatalf("expected fractional quantita 2.5, got %#v", rows[0].Quantita)
 	}
 	if rows[0].StatoOrdine != "" {
 		t.Fatalf("expected empty stato_ordine for NULL source, got %q", rows[0].StatoOrdine)
@@ -125,7 +129,7 @@ func (c *panoramicaTestConn) QueryContext(_ context.Context, query string, _ []d
 				nil,
 				nil,
 				nil,
-				int64(2),
+				float64(2.5),
 				float64(10),
 				float64(20),
 				float64(30),

@@ -47,10 +47,10 @@ order by eac.ragione_sociale, data_documento, nome_testata_ordine`)
 	for rows.Next() {
 		var a activation
 		var (
-			ragioneSociale, numeroOrdine             sql.NullString
-			dataDocumento, durataServizio             sql.NullString
-			durataRinnovo, sostOrd, sostituitoDa     sql.NullString
-			storico                                  sql.NullString
+			ragioneSociale, numeroOrdine         sql.NullString
+			dataDocumento, durataServizio        sql.NullString
+			durataRinnovo, sostOrd, sostituitoDa sql.NullString
+			storico                              sql.NullString
 		)
 
 		if err := rows.Scan(
@@ -107,7 +107,7 @@ order by eac.ragione_sociale, data_documento, nome_testata_ordine`, orderNumber)
 
 	type activationRow struct {
 		DescrizioneLong *string  `json:"descrizione_long"`
-		Quantita        int      `json:"quantita"`
+		Quantita        *float64 `json:"quantita"`
 		NRC             float64  `json:"nrc"`
 		MRC             float64  `json:"mrc"`
 		TotaleMRC       float64  `json:"totale_mrc"`
@@ -121,11 +121,12 @@ order by eac.ragione_sociale, data_documento, nome_testata_ordine`, orderNumber)
 		var row activationRow
 		var (
 			descrizioneLong, statoRiga sql.NullString
-			serialnumber, noteLegali  sql.NullString
+			serialnumber, noteLegali   sql.NullString
+			quantita                   sql.NullFloat64
 		)
 
 		if err := rows.Scan(
-			&descrizioneLong, &row.Quantita, &row.NRC, &row.MRC, &row.TotaleMRC,
+			&descrizioneLong, &quantita, &row.NRC, &row.MRC, &row.TotaleMRC,
 			&statoRiga, &serialnumber, &noteLegali,
 		); err != nil {
 			h.dbFailure(w, r, "pending_activation_rows_scan", err)
@@ -133,6 +134,7 @@ order by eac.ragione_sociale, data_documento, nome_testata_ordine`, orderNumber)
 		}
 
 		row.DescrizioneLong = nullStrPtr(descrizioneLong)
+		row.Quantita = nullFloat64Ptr(quantita)
 		row.StatoRiga = nullStr(statoRiga)
 		row.Serialnumber = nullStrPtr(serialnumber)
 		row.NoteLegali = nullStrPtr(noteLegali)

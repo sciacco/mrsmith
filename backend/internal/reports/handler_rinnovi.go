@@ -42,26 +42,26 @@ order by 2`, months, minMrc)
 	defer rows.Close()
 
 	type renewal struct {
-		RagioneSociale      string   `json:"ragione_sociale"`
-		RinnoviDal          *string  `json:"rinnovi_dal"`
-		RinnoviAl           *string  `json:"rinnovi_al"`
-		NumeroOrdini        int      `json:"numero_ordini"`
-		ServiziAttivi       int      `json:"servizi_attivi"`
-		OrdiniServizi       *string  `json:"ordini_servizi"`
-		SenzaTacitoRinnovo  *bool    `json:"senza_tacito_rinnovo"`
-		Canoni              *float64 `json:"canoni"`
-		NumeroAzienda       int      `json:"numero_azienda"`
+		RagioneSociale     string   `json:"ragione_sociale"`
+		RinnoviDal         *string  `json:"rinnovi_dal"`
+		RinnoviAl          *string  `json:"rinnovi_al"`
+		NumeroOrdini       int      `json:"numero_ordini"`
+		ServiziAttivi      int      `json:"servizi_attivi"`
+		OrdiniServizi      *string  `json:"ordini_servizi"`
+		SenzaTacitoRinnovo *bool    `json:"senza_tacito_rinnovo"`
+		Canoni             *float64 `json:"canoni"`
+		NumeroAzienda      int      `json:"numero_azienda"`
 	}
 
 	var result []renewal
 	for rows.Next() {
 		var ren renewal
 		var (
-			ragioneSociale             sql.NullString
-			rinnoviDal, rinnoviAl      sql.NullString
-			ordiniServizi              sql.NullString
-			senzaTacitoRinnovo         sql.NullBool
-			canoni                     sql.NullFloat64
+			ragioneSociale        sql.NullString
+			rinnoviDal, rinnoviAl sql.NullString
+			ordiniServizi         sql.NullString
+			senzaTacitoRinnovo    sql.NullBool
+			canoni                sql.NullFloat64
 		)
 
 		if err := rows.Scan(
@@ -133,7 +133,7 @@ order by prossimo_rinnovo, nome_testata_ordine`, months, minMrc, customerId)
 		NomeTestataOrdine string   `json:"nome_testata_ordine"`
 		StatoOrdine       string   `json:"stato_ordine"`
 		DescrizioneLong   *string  `json:"descrizione_long"`
-		Quantita          int      `json:"quantita"`
+		Quantita          *float64 `json:"quantita"`
 		NRC               float64  `json:"nrc"`
 		MRC               float64  `json:"mrc"`
 		StatoRiga         string   `json:"stato_riga"`
@@ -155,13 +155,14 @@ order by prossimo_rinnovo, nome_testata_ordine`, months, minMrc, customerId)
 		var (
 			nomeTestataOrdine, statoOrdine, descrizioneLong sql.NullString
 			statoRiga, serialnumber, noteLegali             sql.NullString
-			dataAttivazione, durataServizio, durataRinnovo   sql.NullString
-			durata, prossimoRinnovo                          sql.NullString
-			sostOrd, sostituitoDa                            sql.NullString
+			dataAttivazione, durataServizio, durataRinnovo  sql.NullString
+			durata, prossimoRinnovo                         sql.NullString
+			sostOrd, sostituitoDa                           sql.NullString
+			quantita                                        sql.NullFloat64
 		)
 
 		if err := rows.Scan(
-			&nomeTestataOrdine, &statoOrdine, &descrizioneLong, &row.Quantita,
+			&nomeTestataOrdine, &statoOrdine, &descrizioneLong, &quantita,
 			&row.NRC, &row.MRC, &statoRiga, &serialnumber, &noteLegali,
 			&dataAttivazione, &durataServizio, &durataRinnovo,
 			&durata, &prossimoRinnovo, &sostOrd, &sostituitoDa, &row.TacitoRinnovo,
@@ -173,6 +174,7 @@ order by prossimo_rinnovo, nome_testata_ordine`, months, minMrc, customerId)
 		row.NomeTestataOrdine = nullStr(nomeTestataOrdine)
 		row.StatoOrdine = nullStr(statoOrdine)
 		row.DescrizioneLong = nullStrPtr(descrizioneLong)
+		row.Quantita = nullFloat64Ptr(quantita)
 		row.StatoRiga = nullStr(statoRiga)
 		row.Serialnumber = nullStrPtr(serialnumber)
 		row.NoteLegali = nullStrPtr(noteLegali)

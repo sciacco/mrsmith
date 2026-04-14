@@ -15,26 +15,26 @@ type activeLinesRequest struct {
 }
 
 type activeLineRow struct {
-	RagioneSociale     string  `json:"ragione_sociale"`
-	TipoConn           *string `json:"tipo_conn"`
-	Fornitore          *string `json:"fornitore"`
-	Provincia          *string `json:"provincia"`
-	Comune             *string `json:"comune"`
-	Tipo               *string `json:"tipo"`
-	ProfiloCommerciale *string `json:"profilo_commerciale"`
-	Macro              *string `json:"macro"`
-	Intestatario       *string `json:"intestatario"`
-	Ordine             *string `json:"ordine"`
-	FatturatoFinoAl    *string `json:"fatturato_fino_al"`
-	StatoRiga          *string `json:"stato_riga"`
-	StatoOrdine        *string `json:"stato_ordine"`
-	Stato              *string `json:"stato"`
-	ID                 int     `json:"id"`
-	CodiceOrdine       *string `json:"codice_ordine"`
-	Serialnumber       *string `json:"serialnumber"`
-	IDAnagrafica       *string `json:"id_anagrafica"`
-	Quantita           int     `json:"quantita"`
-	Canone             float64 `json:"canone"`
+	RagioneSociale     string   `json:"ragione_sociale"`
+	TipoConn           *string  `json:"tipo_conn"`
+	Fornitore          *string  `json:"fornitore"`
+	Provincia          *string  `json:"provincia"`
+	Comune             *string  `json:"comune"`
+	Tipo               *string  `json:"tipo"`
+	ProfiloCommerciale *string  `json:"profilo_commerciale"`
+	Macro              *string  `json:"macro"`
+	Intestatario       *string  `json:"intestatario"`
+	Ordine             *string  `json:"ordine"`
+	FatturatoFinoAl    *string  `json:"fatturato_fino_al"`
+	StatoRiga          *string  `json:"stato_riga"`
+	StatoOrdine        *string  `json:"stato_ordine"`
+	Stato              *string  `json:"stato"`
+	ID                 int      `json:"id"`
+	CodiceOrdine       *string  `json:"codice_ordine"`
+	Serialnumber       *string  `json:"serialnumber"`
+	IDAnagrafica       *string  `json:"id_anagrafica"`
+	Quantita           *float64 `json:"quantita"`
+	Canone             float64  `json:"canone"`
 }
 
 func (h *Handler) queryActiveLines(r *http.Request, req activeLinesRequest) ([]activeLineRow, error) {
@@ -80,11 +80,11 @@ ORDER BY cf.intestazione, tipo_conn, fl.fornitore, provincia, comune, p.tipo, p.
 	for rows.Next() {
 		var row activeLineRow
 		var (
-			tipoConn, fornitore, provincia, comune         sql.NullString
-			tipo, profiloComm, macro, intestatario         sql.NullString
-			ordine, fattFinoAl, statoRiga, statoOrdine     sql.NullString
+			tipoConn, fornitore, provincia, comune          sql.NullString
+			tipo, profiloComm, macro, intestatario          sql.NullString
+			ordine, fattFinoAl, statoRiga, statoOrdine      sql.NullString
 			stato, codiceOrdine, serialnumber, idAnagrafica sql.NullString
-			quantita                                        sql.NullInt64
+			quantita                                        sql.NullFloat64
 			canone                                          sql.NullFloat64
 		)
 
@@ -116,9 +116,7 @@ ORDER BY cf.intestazione, tipo_conn, fl.fornitore, provincia, comune, p.tipo, p.
 		row.CodiceOrdine = nullStringPtr(codiceOrdine)
 		row.Serialnumber = nullStringPtr(serialnumber)
 		row.IDAnagrafica = nullStringPtr(idAnagrafica)
-		if quantita.Valid {
-			row.Quantita = int(quantita.Int64)
-		}
+		row.Quantita = nullFloat64Ptr(quantita)
 		if canone.Valid {
 			row.Canone = canone.Float64
 		}

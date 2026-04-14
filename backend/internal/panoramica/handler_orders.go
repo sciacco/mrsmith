@@ -98,30 +98,30 @@ ORDER BY data_documento, nome_testata_ordine, rn`, placeholders)
 	defer rows.Close()
 
 	type orderRow struct {
-		Stato             string  `json:"stato"`
-		NumeroOrdine      string  `json:"numero_ordine"`
-		DescrizioneLong   string  `json:"descrizione_long"`
-		Quantita          int     `json:"quantita"`
-		NRC               float64 `json:"nrc"`
-		MRC               float64 `json:"mrc"`
-		TotaleMRC         float64 `json:"totale_mrc"`
-		StatoOrdine       string  `json:"stato_ordine"`
-		NomeTestataOrdine string  `json:"nome_testata_ordine"`
-		RN                int     `json:"rn"`
-		NumeroAzienda     int     `json:"numero_azienda"`
-		DataDocumento     *string `json:"data_documento"`
-		StatoRiga         string  `json:"stato_riga"`
-		DataUltimaFatt    *string `json:"data_ultima_fatt"`
-		Serialnumber      *string `json:"serialnumber"`
-		MetodoPagamento   *string `json:"metodo_pagamento"`
-		DurataServizio    *string `json:"durata_servizio"`
-		DurataRinnovo     *string `json:"durata_rinnovo"`
-		DataCessazione    *string `json:"data_cessazione"`
-		DataAttivazione   *string `json:"data_attivazione"`
-		NoteLegali        *string `json:"note_legali"`
-		SostOrd           *string `json:"sost_ord"`
-		SostituitoDa      *string `json:"sostituito_da"`
-		Storico           *string `json:"storico"`
+		Stato             string   `json:"stato"`
+		NumeroOrdine      string   `json:"numero_ordine"`
+		DescrizioneLong   string   `json:"descrizione_long"`
+		Quantita          *float64 `json:"quantita"`
+		NRC               float64  `json:"nrc"`
+		MRC               float64  `json:"mrc"`
+		TotaleMRC         float64  `json:"totale_mrc"`
+		StatoOrdine       string   `json:"stato_ordine"`
+		NomeTestataOrdine string   `json:"nome_testata_ordine"`
+		RN                int      `json:"rn"`
+		NumeroAzienda     int      `json:"numero_azienda"`
+		DataDocumento     *string  `json:"data_documento"`
+		StatoRiga         string   `json:"stato_riga"`
+		DataUltimaFatt    *string  `json:"data_ultima_fatt"`
+		Serialnumber      *string  `json:"serialnumber"`
+		MetodoPagamento   *string  `json:"metodo_pagamento"`
+		DurataServizio    *string  `json:"durata_servizio"`
+		DurataRinnovo     *string  `json:"durata_rinnovo"`
+		DataCessazione    *string  `json:"data_cessazione"`
+		DataAttivazione   *string  `json:"data_attivazione"`
+		NoteLegali        *string  `json:"note_legali"`
+		SostOrd           *string  `json:"sost_ord"`
+		SostituitoDa      *string  `json:"sostituito_da"`
+		Storico           *string  `json:"storico"`
 	}
 
 	var result []orderRow
@@ -132,9 +132,10 @@ ORDER BY data_documento, nome_testata_ordine, rn`, placeholders)
 		var metodoPagamento, durataServizio, durataRinnovo sql.NullString
 		var dataCessazione, dataAttivazione, noteLegali sql.NullString
 		var sostOrd, sostituitoDa, storico sql.NullString
+		var quantita sql.NullFloat64
 
 		if err := rows.Scan(
-			&stato, &numeroOrdine, &descrizioneLong, &o.Quantita,
+			&stato, &numeroOrdine, &descrizioneLong, &quantita,
 			&o.NRC, &o.MRC, &o.TotaleMRC, &statoOrdine, &nomeTestataOrdine,
 			&o.RN, &o.NumeroAzienda, &dataDocumento, &statoRiga,
 			&dataUltimaFatt, &serialnumber, &metodoPagamento, &durataServizio,
@@ -148,6 +149,7 @@ ORDER BY data_documento, nome_testata_ordine, rn`, placeholders)
 		o.Stato = nullStringValue(stato)
 		o.NumeroOrdine = nullStringValue(numeroOrdine)
 		o.DescrizioneLong = nullStringValue(descrizioneLong)
+		o.Quantita = nullFloat64Ptr(quantita)
 		o.StatoOrdine = nullStringValue(statoOrdine)
 		o.NomeTestataOrdine = nullStringValue(nomeTestataOrdine)
 		o.StatoRiga = nullStringValue(statoRiga)
@@ -306,31 +308,31 @@ ORDER BY o.nome_testata_ordine, o.data_documento DESC`, placeholders)
 		DataVariazione *string `json:"data_variazione"`
 		SostituitoDa   *string `json:"sostituito_da"`
 		// Riga
-		Quantita                   int     `json:"quantita"`
-		CodiceKit                  *string `json:"codice_kit"`
-		CodiceProdotto             *string `json:"codice_prodotto"`
-		DescrizioneProdotto        *string `json:"descrizione_prodotto"`
-		DescrizioneEstesa          *string `json:"descrizione_estesa"`
-		Serialnumber               *string `json:"serialnumber"`
-		Setup                      float64 `json:"setup"`
-		Canone                     float64 `json:"canone"`
-		Valuta                     *string `json:"valuta"`
-		CostoCessazione            float64 `json:"costo_cessazione"`
-		DataAttivazione            *string `json:"data_attivazione"`
-		DataDisdetta               *string `json:"data_disdetta"`
-		DataCessazione             *string `json:"data_cessazione"`
-		RaggruppamentoFatturazione *string `json:"raggruppamento_fatturazione"`
-		IntervalloFattAttivazione  *string `json:"intervallo_fatt_attivazione"`
-		IntervalloFattCanone       *string `json:"intervallo_fatt_canone"`
-		DataUltimaFatt             *string `json:"data_ultima_fatt"`
-		DataFineFatt               *string `json:"data_fine_fatt"`
-		SystemOdvRow               *string `json:"system_odv_row"`
-		IDGammaTestata             *string `json:"id_gamma_testata"`
-		ProgressivoRiga            int     `json:"progressivo_riga"`
-		Ordine                     *string `json:"ordine"`
-		Annullato                  int     `json:"annullato"`
-		DataScadenzaOrdine         *string `json:"data_scadenza_ordine"`
-		MRC                        float64 `json:"mrc"`
+		Quantita                   *float64 `json:"quantita"`
+		CodiceKit                  *string  `json:"codice_kit"`
+		CodiceProdotto             *string  `json:"codice_prodotto"`
+		DescrizioneProdotto        *string  `json:"descrizione_prodotto"`
+		DescrizioneEstesa          *string  `json:"descrizione_estesa"`
+		Serialnumber               *string  `json:"serialnumber"`
+		Setup                      float64  `json:"setup"`
+		Canone                     float64  `json:"canone"`
+		Valuta                     *string  `json:"valuta"`
+		CostoCessazione            float64  `json:"costo_cessazione"`
+		DataAttivazione            *string  `json:"data_attivazione"`
+		DataDisdetta               *string  `json:"data_disdetta"`
+		DataCessazione             *string  `json:"data_cessazione"`
+		RaggruppamentoFatturazione *string  `json:"raggruppamento_fatturazione"`
+		IntervalloFattAttivazione  *string  `json:"intervallo_fatt_attivazione"`
+		IntervalloFattCanone       *string  `json:"intervallo_fatt_canone"`
+		DataUltimaFatt             *string  `json:"data_ultima_fatt"`
+		DataFineFatt               *string  `json:"data_fine_fatt"`
+		SystemOdvRow               *string  `json:"system_odv_row"`
+		IDGammaTestata             *string  `json:"id_gamma_testata"`
+		ProgressivoRiga            int      `json:"progressivo_riga"`
+		Ordine                     *string  `json:"ordine"`
+		Annullato                  int      `json:"annullato"`
+		DataScadenzaOrdine         *string  `json:"data_scadenza_ordine"`
+		MRC                        float64  `json:"mrc"`
 		// Prodotto
 		Famiglia        *string `json:"famiglia"`
 		SottoFamiglia   *string `json:"sotto_famiglia"`
@@ -361,6 +363,7 @@ ORDER BY o.nome_testata_ordine, o.data_documento DESC`, placeholders)
 			ordine, dataScadenza                                      sql.NullString
 			famiglia, sottoFamiglia, contoRicavo                      sql.NullString
 			intOrdine, descLong, storico                              sql.NullString
+			quantita                                                  sql.NullFloat64
 		)
 
 		if err := rows.Scan(
@@ -373,7 +376,7 @@ ORDER BY o.nome_testata_ordine, o.data_documento DESC`, placeholders)
 			&refTechNome, &refTechMail, &refTechTel,
 			&refAltroNome, &refAltroMail, &refAltroTel,
 			&dataCreazione, &dataVariazione, &sostituitoDa,
-			&d.Quantita, &codiceKit, &codiceProdotto, &descProdotto, &descEstesa,
+			&quantita, &codiceKit, &codiceProdotto, &descProdotto, &descEstesa,
 			&serialnumber, &d.Setup, &d.Canone, &valuta, &d.CostoCessazione,
 			&dataAtt, &dataDisdetta, &dataCess,
 			&raggFatt, &intFattAtt, &intFattCanone,
@@ -414,6 +417,7 @@ ORDER BY o.nome_testata_ordine, o.data_documento DESC`, placeholders)
 		d.DataCreazione = nullStringPtr(dataCreazione)
 		d.DataVariazione = nullStringPtr(dataVariazione)
 		d.SostituitoDa = nullStringPtr(sostituitoDa)
+		d.Quantita = nullFloat64Ptr(quantita)
 		d.CodiceKit = nullStringPtr(codiceKit)
 		d.CodiceProdotto = nullStringPtr(codiceProdotto)
 		d.DescrizioneProdotto = nullStringPtr(descProdotto)
@@ -463,4 +467,11 @@ func nullStringValue(ns sql.NullString) string {
 		return ns.String
 	}
 	return ""
+}
+
+func nullFloat64Ptr(nf sql.NullFloat64) *float64 {
+	if nf.Valid {
+		return &nf.Float64
+	}
+	return nil
 }

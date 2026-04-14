@@ -19,7 +19,7 @@ export interface OrderSummaryRow {
   stato: string;
   numero_ordine: string;
   descrizione_long: string;
-  quantita: number;
+  quantita: number | null;
   nrc: number;
   mrc: number;
   totale_mrc: number;
@@ -80,7 +80,7 @@ export interface OrderDetailRow {
   data_variazione: string | null;
   sostituito_da: string | null;
   // Riga
-  quantita: number;
+  quantita: number | null;
   codice_kit: string | null;
   codice_prodotto: string | null;
   descrizione_prodotto: string | null;

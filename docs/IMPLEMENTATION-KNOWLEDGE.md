@@ -176,6 +176,15 @@ Alyante ERP ID
 - Used by: `apps/panoramica-cliente` recurring orders summary view.
 - Open questions: whether the frontend contract should eventually widen affected summary text fields to `string | null` instead of preserving empty-string fallbacks.
 
+### Loader `quantita` Must Be Treated as Decimal (Nullable) Across Reports and Panoramica
+
+- Context: report/order endpoints reading `quantita` from loader views such as `v_ordini_ric_spot`, `v_ordini_sintesi`, and `v_ordini_ricorrenti_conrinnovo`.
+- Discovery: `quantita` is defined as `double precision` in Mistra loader view contracts and can be fractional (for example `7.5`) and nullable. Scanning into Go `int`/`sql.NullInt64` causes runtime failures (`Scan error ... converting driver.Value type float64 ... to int`) and/or truncation risk.
+- Practical rule: for loader-backed APIs, scan `quantita` with `sql.NullFloat64` and expose it as nullable decimal in JSON/TS contracts (`*float64` in Go responses, `number | null` in TS). Do not cast/round to int unless an explicit business rule requires integer quantities.
+- Evidence: `docs/mistradb/mistra_loader.json` (`quantita` column type `double precision` on loader views), backend failure on `POST /api/reports/v1/orders/preview` on 2026-04-14 with value `7.5`, and follow-up fixes in reports/panoramica handlers.
+- Used by: `apps/reports` (`orders`, `active-lines`, `pending-activations`, `upcoming-renewals`) and `apps/panoramica-cliente` (`orders/summary`, `orders/detail`).
+- Open questions: none.
+
 ### Slow Read Endpoints Must Fit Server Write Timeout
 
 - Context: slow report-style endpoints behind the shared Go HTTP server, including `GET /api/panoramica/v1/iaas/monthly-charges`.
