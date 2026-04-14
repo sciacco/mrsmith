@@ -38,6 +38,7 @@ export default function OrdiniPage() {
   const statiOptions = (statusesQ.data ?? []).map((st) => ({ value: st, label: st }));
 
   const canExecute = dateFrom !== '' && dateTo !== '' && statuses.length > 0;
+  const hasPreviewRows = (previewData?.length ?? 0) > 0;
 
   const handlePreview = useCallback(async () => {
     if (!canExecute) return;
@@ -59,6 +60,7 @@ export default function OrdiniPage() {
   }, [api, canExecute, dateFrom, dateTo, statuses]);
 
   const handleExport = useCallback(async () => {
+    if (!hasPreviewRows) return;
     setExporting(true);
     try {
       const blob = await api.postBlob('/reports/v1/orders/export', {
@@ -77,7 +79,7 @@ export default function OrdiniPage() {
     } finally {
       setExporting(false);
     }
-  }, [api, dateFrom, dateTo, statuses, toast]);
+  }, [api, dateFrom, dateTo, hasPreviewRows, statuses, toast]);
 
   const totalMrc = useMemo(
     () => (previewData ?? []).reduce((sum, r) => sum + (r.totale_mrc ?? 0), 0),
@@ -158,7 +160,7 @@ export default function OrdiniPage() {
           </div>
 
           <div className={styles.actions}>
-            <button className={shared.btnPrimary} onClick={handleExport} disabled={exporting}>
+            <button className={shared.btnPrimary} onClick={handleExport} disabled={!hasPreviewRows || exporting}>
               {exporting ? 'Esportazione…' : 'Esporta XLSX'}
             </button>
           </div>

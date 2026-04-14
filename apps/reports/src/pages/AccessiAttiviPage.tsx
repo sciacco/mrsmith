@@ -34,6 +34,7 @@ export default function AccessiAttiviPage() {
   const connOptions = (connTypesQ.data ?? []).map((t) => ({ value: t, label: t }));
 
   const canExecute = statuses.length > 0 && connectionTypes.length > 0;
+  const hasPreviewRows = (previewData?.length ?? 0) > 0;
 
   const handlePreview = useCallback(async () => {
     if (!canExecute) return;
@@ -54,6 +55,7 @@ export default function AccessiAttiviPage() {
   }, [api, canExecute, connectionTypes, statuses]);
 
   const handleExport = useCallback(async () => {
+    if (!hasPreviewRows) return;
     setExporting(true);
     try {
       const blob = await api.postBlob('/reports/v1/active-lines/export', {
@@ -71,7 +73,7 @@ export default function AccessiAttiviPage() {
     } finally {
       setExporting(false);
     }
-  }, [api, connectionTypes, statuses, toast]);
+  }, [api, connectionTypes, hasPreviewRows, statuses, toast]);
 
   const tipoConnBreakdown = useMemo(() => {
     if (!previewData) return [];
@@ -160,7 +162,7 @@ export default function AccessiAttiviPage() {
           )}
 
           <div className={styles.actions}>
-            <button className={shared.btnPrimary} onClick={handleExport} disabled={exporting}>
+            <button className={shared.btnPrimary} onClick={handleExport} disabled={!hasPreviewRows || exporting}>
               {exporting ? 'Esportazione…' : 'Esporta XLSX'}
             </button>
           </div>
