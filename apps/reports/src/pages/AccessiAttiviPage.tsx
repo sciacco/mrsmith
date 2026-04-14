@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Skeleton, MultiSelect } from '@mrsmith/ui';
+import { Skeleton, MultiSelect, useToast } from '@mrsmith/ui';
 import { useConnectionTypes } from '../api/queries';
 import { useApiClient } from '../api/client';
 import type { ActiveLineRow } from '../types';
@@ -25,10 +25,12 @@ export default function AccessiAttiviPage() {
   const [previewData, setPreviewData] = useState<ActiveLineRow[] | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const connTypesQ = useConnectionTypes();
   const api = useApiClient();
+  const { toast } = useToast();
 
   const connOptions = (connTypesQ.data ?? []).map((t) => ({ value: t, label: t }));
 
@@ -54,6 +56,7 @@ export default function AccessiAttiviPage() {
   }, [api, canExecute, connectionTypes, statuses]);
 
   const handleExport = useCallback(async () => {
+    setExporting(true);
     try {
       const blob = await api.postBlob('/reports/v1/active-lines/export', {
         connectionTypes,
@@ -66,9 +69,11 @@ export default function AccessiAttiviPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      // Export failed silently
+      toast("Errore durante l'esportazione", 'error');
+    } finally {
+      setExporting(false);
     }
-  }, [api, connectionTypes, statuses]);
+  }, [api, connectionTypes, statuses, toast]);
 
   const tipoConnBreakdown = useMemo(() => {
     if (!previewData) return [];
@@ -157,8 +162,8 @@ export default function AccessiAttiviPage() {
           )}
 
           <div className={styles.actions}>
-            <button className={shared.btnPrimary} onClick={handleExport}>
-              Esporta XLSX
+            <button className={shared.btnPrimary} onClick={handleExport} disabled={exporting}>
+              {exporting ? 'Esportazione…' : 'Esporta XLSX'}
             </button>
             <button className={shared.btnLink} onClick={() => setShowDetail((v) => !v)}>
               {showDetail ? 'Nascondi dettaglio' : 'Mostra dettaglio'}

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Skeleton, MultiSelect } from '@mrsmith/ui';
+import { Skeleton, MultiSelect, useToast } from '@mrsmith/ui';
 import { useOrderStatuses } from '../api/queries';
 import { useApiClient } from '../api/client';
 import type { AovPreviewResponse } from '../types';
@@ -15,10 +15,12 @@ export default function AovPage() {
   const [aovData, setAovData] = useState<AovPreviewResponse | null>(null);
   const [activeTab, setActiveTab] = useState<AovTab>('byType');
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const statusesQ = useOrderStatuses();
   const api = useApiClient();
+  const { toast } = useToast();
 
   const statiOptions = (statusesQ.data ?? []).map((st) => ({ value: st, label: st }));
 
@@ -46,6 +48,7 @@ export default function AovPage() {
 
   const handleExport = useCallback(async () => {
     if (!canExecute) return;
+    setExporting(true);
     try {
       const blob = await api.postBlob('/reports/v1/aov/export', {
         dateFrom,
@@ -61,9 +64,11 @@ export default function AovPage() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch {
-      // Export failed silently
+      toast("Errore durante l'esportazione", 'error');
+    } finally {
+      setExporting(false);
     }
-  }, [api, canExecute, dateFrom, dateTo, statuses]);
+  }, [api, canExecute, dateFrom, dateTo, statuses, toast]);
 
   const totalAov = aovData
     ? aovData.detail.reduce((sum, r) => sum + (r.valore_aov ?? 0), 0)
@@ -89,8 +94,8 @@ export default function AovPage() {
         <button className={shared.btnPrimary} onClick={handleExecute} disabled={!canExecute}>
           Esegui
         </button>
-        <button className={shared.btnSecondary} onClick={handleExport} disabled={!canExecute}>
-          Esporta XLSX
+        <button className={shared.btnSecondary} onClick={handleExport} disabled={!canExecute || exporting}>
+          {exporting ? 'Esportazione…' : 'Esporta XLSX'}
         </button>
       </div>
 

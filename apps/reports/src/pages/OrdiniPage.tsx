@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Skeleton, MultiSelect } from '@mrsmith/ui';
+import { Skeleton, MultiSelect, useToast } from '@mrsmith/ui';
 import { useOrderStatuses } from '../api/queries';
 import { useApiClient } from '../api/client';
 import type { OrderRow } from '../types';
@@ -29,10 +29,12 @@ export default function OrdiniPage() {
   const [previewData, setPreviewData] = useState<OrderRow[] | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const statusesQ = useOrderStatuses();
   const api = useApiClient();
+  const { toast } = useToast();
 
   const statiOptions = (statusesQ.data ?? []).map((st) => ({ value: st, label: st }));
 
@@ -59,6 +61,7 @@ export default function OrdiniPage() {
   }, [api, canExecute, dateFrom, dateTo, statuses]);
 
   const handleExport = useCallback(async () => {
+    setExporting(true);
     try {
       const blob = await api.postBlob('/reports/v1/orders/export', {
         dateFrom,
@@ -72,9 +75,11 @@ export default function OrdiniPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      // Export failed silently
+      toast("Errore durante l'esportazione", 'error');
+    } finally {
+      setExporting(false);
     }
-  }, [api, dateFrom, dateTo, statuses]);
+  }, [api, dateFrom, dateTo, statuses, toast]);
 
   const totalMrc = useMemo(
     () => (previewData ?? []).reduce((sum, r) => sum + (r.totale_mrc ?? 0), 0),
@@ -155,8 +160,8 @@ export default function OrdiniPage() {
           </div>
 
           <div className={styles.actions}>
-            <button className={shared.btnPrimary} onClick={handleExport}>
-              Esporta XLSX
+            <button className={shared.btnPrimary} onClick={handleExport} disabled={exporting}>
+              {exporting ? 'Esportazione…' : 'Esporta XLSX'}
             </button>
             <button className={shared.btnLink} onClick={() => setShowDetail((v) => !v)}>
               {showDetail ? 'Nascondi dettaglio' : 'Mostra dettaglio'}
