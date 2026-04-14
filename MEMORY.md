@@ -147,3 +147,9 @@
   - Ordini: `"{X} Righe ordini"` when `X <= 100`, otherwise `"Campione di 100 righe su {Y} in totale"`.
   - Accessi attivi: `"{X} Righe accessi"` when `X <= 100`, otherwise the same sample message.
 - Reports docs were aligned to the new UX in `apps/reports/REPORTS-SPEC.md` and `apps/reports/reports-migspec-phaseB-ux.md` (detail automatico, action list senza toggle).
+- AOV reports alignment fix (frontend + backend): `apps/reports/src/pages/AovPage.tsx`, `apps/reports/src/types/index.ts`, and `backend/internal/reports/handler_aov.go` are now contract-consistent.
+- AOV filter defaults now use current year-to-date on page load (`dateFrom = YYYY-01-01`, `dateTo = today`) while keeping order-status selection explicit.
+- `POST /reports/v1/aov/preview` now returns `numero_ordini` for `byType`, `byCategory`, and `bySales`, computed as `COUNT(DISTINCT nome_testata_ordine)` per aggregate group.
+- AOV aggregate tables now render `Anno/Mese` from `anno` + `mese` and correctly display `N. Ordini` values.
+- AOV detail table is now aligned to the legacy dataset shape (`tipo_documento`, `anno`, `mese`, `nome_testata_ordine`, `tipo_ordine`, `sost_ord`, `commerciale`, `totale_mrc`, `totale_mrc_odv_sost`, `totale_mrc_new`, `totale_nrc`, `valore_aov`) instead of the orders-preview shape.
+- Added backend regression coverage in `backend/internal/reports/handler_quantita_test.go` (`TestHandleAovPreviewIncludesOrderCountsAndDetailFields`) to pin `numero_ordini` and detail-field population for AOV preview responses.

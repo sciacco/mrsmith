@@ -79,8 +79,9 @@ export interface RenewalRow {
 }
 
 export interface AovByTypeRow {
-  anno_mese: string;
-  tipo_ordine: string;
+  anno: string | null;
+  mese: string | null;
+  tipo_ordine: string | null;
   numero_ordini: number;
   valore_aov: number | null;
   totale_mrc: number | null;
@@ -88,7 +89,8 @@ export interface AovByTypeRow {
 }
 
 export interface AovByCategoryRow {
-  anno_mese: string;
+  anno: string | null;
+  mese: string | null;
   categoria: string | null;
   numero_ordini: number;
   valore_aov: number | null;
@@ -97,9 +99,9 @@ export interface AovByCategoryRow {
 }
 
 export interface AovBySalesRow {
-  anno: string;
+  anno: string | null;
   commerciale: string | null;
-  tipo_ordine: string;
+  tipo_ordine: string | null;
   numero_ordini: number;
   valore_aov: number | null;
   totale_mrc: number | null;
@@ -107,15 +109,17 @@ export interface AovBySalesRow {
 }
 
 export interface AovDetailRow {
-  ragione_sociale: string;
-  tipo_ordine: string;
-  numero_ordine: string;
+  tipo_documento: string | null;
+  anno: string | null;
+  mese: string | null;
+  nome_testata_ordine: string | null;
+  tipo_ordine: string | null;
+  sost_ord: string | null;
   commerciale: string | null;
-  data_documento: string | null;
-  descrizione_long: string | null;
-  quantita: number | null;
-  mrc: number | null;
-  nrc: number | null;
+  totale_mrc: number | null;
+  totale_nrc: number | null;
+  totale_mrc_odv_sost: number | null;
+  totale_mrc_new: number | null;
   valore_aov: number | null;
 }
 

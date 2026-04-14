@@ -8,9 +8,37 @@ import styles from './AovPage.module.css';
 
 type AovTab = 'byType' | 'byCategory' | 'bySales' | 'detail';
 
+function formatDateInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function defaultDateFrom(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-01-01`;
+}
+
+function defaultDateTo(): string {
+  return formatDateInput(new Date());
+}
+
+function formatYearMonth(anno: string | null, mese: string | null): string {
+  if (anno && mese) return `${anno}/${mese}`;
+  if (anno) return anno;
+  return mese ?? '';
+}
+
+function formatTipoDocumento(tipoDocumento: string | null): string {
+  if (!tipoDocumento) return '';
+  if (tipoDocumento === 'TSC-ORDINE-RIC') return 'Ordine ricorrente';
+  return 'Ordine Spot';
+}
+
 export default function AovPage() {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(defaultDateFrom);
+  const [dateTo, setDateTo] = useState(defaultDateTo);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [aovData, setAovData] = useState<AovPreviewResponse | null>(null);
   const [activeTab, setActiveTab] = useState<AovTab>('byType');
@@ -153,8 +181,8 @@ function ByTypeTable({ data }: { data: AovPreviewResponse['byType'] }) {
         <tbody>
           {data.map((row, i) => (
             <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
-              <td>{row.anno_mese}</td>
-              <td>{row.tipo_ordine}</td>
+              <td>{formatYearMonth(row.anno, row.mese)}</td>
+              <td>{row.tipo_ordine ?? ''}</td>
               <td className={shared.numCol}>{row.numero_ordini}</td>
               <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
               <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
@@ -185,7 +213,7 @@ function ByCategoryTable({ data }: { data: AovPreviewResponse['byCategory'] }) {
         <tbody>
           {data.map((row, i) => (
             <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
-              <td>{row.anno_mese}</td>
+              <td>{formatYearMonth(row.anno, row.mese)}</td>
               <td>{row.categoria ?? ''}</td>
               <td className={shared.numCol}>{row.numero_ordini}</td>
               <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
@@ -218,9 +246,9 @@ function BySalesTable({ data }: { data: AovPreviewResponse['bySales'] }) {
         <tbody>
           {data.map((row, i) => (
             <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
-              <td>{row.anno}</td>
+              <td>{row.anno ?? ''}</td>
               <td>{row.commerciale ?? ''}</td>
-              <td>{row.tipo_ordine}</td>
+              <td>{row.tipo_ordine ?? ''}</td>
               <td className={shared.numCol}>{row.numero_ordini}</td>
               <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
               <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
@@ -240,14 +268,15 @@ function DetailTable({ data }: { data: AovPreviewResponse['detail'] }) {
       <table className={shared.table}>
         <thead>
           <tr>
-            <th>Cliente</th>
+            <th>Anno/Mese</th>
+            <th>Codice ordine</th>
             <th>Tipo ordine</th>
-            <th>N. Ordine</th>
-            <th>Commerciale</th>
-            <th>Data documento</th>
-            <th>Descrizione</th>
-            <th className={shared.numCol}>Quantita</th>
+            <th>Account</th>
+            <th>Tipo documento</th>
+            <th>Ordine sostituito</th>
             <th className={shared.numCol}>MRC</th>
+            <th className={shared.numCol}>MRC ordine sostituito</th>
+            <th className={shared.numCol}>MRC netto</th>
             <th className={shared.numCol}>NRC</th>
             <th className={shared.numCol}>AOV</th>
           </tr>
@@ -255,15 +284,16 @@ function DetailTable({ data }: { data: AovPreviewResponse['detail'] }) {
         <tbody>
           {data.map((row, i) => (
             <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
-              <td>{row.ragione_sociale}</td>
-              <td>{row.tipo_ordine}</td>
-              <td className={shared.mono}>{row.numero_ordine}</td>
+              <td>{formatYearMonth(row.anno, row.mese)}</td>
+              <td className={shared.mono}>{row.nome_testata_ordine ?? ''}</td>
+              <td>{row.tipo_ordine ?? ''}</td>
               <td>{row.commerciale ?? ''}</td>
-              <td>{row.data_documento?.slice(0, 10) ?? ''}</td>
-              <td>{row.descrizione_long ?? ''}</td>
-              <td className={shared.numCol}>{row.quantita ?? ''}</td>
-              <td className={shared.numCol}>{row.mrc != null ? row.mrc.toFixed(2) : ''}</td>
-              <td className={shared.numCol}>{row.nrc != null ? row.nrc.toFixed(2) : ''}</td>
+              <td>{formatTipoDocumento(row.tipo_documento)}</td>
+              <td className={shared.mono}>{row.sost_ord ?? ''}</td>
+              <td className={shared.numCol}>{row.totale_mrc != null ? row.totale_mrc.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.totale_mrc_odv_sost != null ? row.totale_mrc_odv_sost.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.totale_mrc_new != null ? row.totale_mrc_new.toFixed(2) : ''}</td>
+              <td className={shared.numCol}>{row.totale_nrc != null ? row.totale_nrc.toFixed(2) : ''}</td>
               <td className={shared.numCol}>{row.valore_aov != null ? row.valore_aov.toFixed(2) : ''}</td>
             </tr>
           ))}

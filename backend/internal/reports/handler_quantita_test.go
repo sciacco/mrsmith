@@ -134,6 +134,60 @@ func TestHandleUpcomingRenewalRowsSupportsFractionalAndNullQuantita(t *testing.T
 	}
 }
 
+func TestHandleAovPreviewIncludesOrderCountsAndDetailFields(t *testing.T) {
+	h := &Handler{mistraDB: openReportsTestDB(t, "aov-preview")}
+
+	req := httptest.NewRequest(http.MethodPost, "/reports/v1/aov/preview",
+		strings.NewReader(`{"dateFrom":"2026-01-01","dateTo":"2026-12-31","statuses":["Evaso"]}`))
+	rec := httptest.NewRecorder()
+
+	h.handleAovPreview(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp aovPreviewResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(resp.ByType) != 1 || len(resp.ByCategory) != 1 || len(resp.BySales) != 1 || len(resp.Detail) != 1 {
+		t.Fatalf("unexpected response shape: byType=%d byCategory=%d bySales=%d detail=%d",
+			len(resp.ByType), len(resp.ByCategory), len(resp.BySales), len(resp.Detail))
+	}
+
+	if resp.ByType[0].NumeroOrdini != 3 {
+		t.Fatalf("expected byType numero_ordini=3, got %d", resp.ByType[0].NumeroOrdini)
+	}
+	if resp.ByCategory[0].NumeroOrdini != 2 {
+		t.Fatalf("expected byCategory numero_ordini=2, got %d", resp.ByCategory[0].NumeroOrdini)
+	}
+	if resp.BySales[0].NumeroOrdini != 4 {
+		t.Fatalf("expected bySales numero_ordini=4, got %d", resp.BySales[0].NumeroOrdini)
+	}
+
+	detail := resp.Detail[0]
+	if detail.TipoDocumento == nil || *detail.TipoDocumento != "TSC-ORDINE-RIC" {
+		t.Fatalf("expected detail.tipo_documento to be populated, got %#v", detail.TipoDocumento)
+	}
+	if detail.Anno == nil || *detail.Anno != "2026" {
+		t.Fatalf("expected detail.anno to be populated, got %#v", detail.Anno)
+	}
+	if detail.Mese == nil || *detail.Mese != "04" {
+		t.Fatalf("expected detail.mese to be populated, got %#v", detail.Mese)
+	}
+	if detail.NomeTestataOrdine == nil || *detail.NomeTestataOrdine != "ORD-001" {
+		t.Fatalf("expected detail.nome_testata_ordine to be populated, got %#v", detail.NomeTestataOrdine)
+	}
+	if detail.TotaleMRCNew == nil || *detail.TotaleMRCNew != 120 {
+		t.Fatalf("expected detail.totale_mrc_new to be populated, got %#v", detail.TotaleMRCNew)
+	}
+	if detail.ValoreAOV == nil || *detail.ValoreAOV != 1445 {
+		t.Fatalf("expected detail.valore_aov to be populated, got %#v", detail.ValoreAOV)
+	}
+}
+
 func openReportsTestDB(t *testing.T, mode string) *sql.DB {
 	t.Helper()
 	registerReportsTestDriver()
@@ -259,6 +313,45 @@ func (c *reportsTestConn) QueryContext(_ context.Context, query string, _ []driv
 				values: [][]driver.Value{
 					{"ORD-1", "Evaso", "Rinnovo 1", float64(3.5), float64(7), float64(11), "Attiva", "SN-1", "note", "2026-01-01", "12", "12", "12 / 12", "2026-12-01", "SO1", "SD1", int64(1)},
 					{"ORD-2", "Evaso", "Rinnovo 2", nil, float64(7), float64(11), "Attiva", "SN-2", "note", "2026-01-01", "12", "12", "12 / 12", "2026-12-01", "SO2", "SD2", int64(1)},
+				},
+			}, nil
+		}
+	case "aov-preview":
+		switch {
+		case strings.Contains(query, "GROUP BY anno, mese, tipo_ordine"):
+			return &reportsTestRows{
+				columns: []string{"anno", "mese", "tipo_ordine", "numero_ordini", "totale_mrc", "totale_nrc", "valore_aov"},
+				values: [][]driver.Value{
+					{"2026", "04", "NUOVO", int64(3), float64(1000), float64(200), float64(12200)},
+				},
+			}, nil
+		case strings.Contains(query, "GROUP BY anno, mese, categoria"):
+			return &reportsTestRows{
+				columns: []string{"anno", "mese", "categoria", "numero_ordini", "totale_mrc", "totale_nrc", "valore_aov"},
+				values: [][]driver.Value{
+					{"2026", "04", "Connectivity", int64(2), float64(800), float64(120), float64(9720)},
+				},
+			}, nil
+		case strings.Contains(query, "GROUP BY anno, commerciale, tipo_ordine"):
+			return &reportsTestRows{
+				columns: []string{"anno", "commerciale", "tipo_ordine", "numero_ordini", "totale_mrc", "totale_nrc", "valore_aov"},
+				values: [][]driver.Value{
+					{"2026", "Mario Rossi", "NUOVO", int64(4), float64(1300), float64(260), float64(15860)},
+				},
+			}, nil
+		case strings.Contains(query, "SELECT\no.tipo_documento,"):
+			return &reportsTestRows{
+				columns: []string{
+					"tipo_documento", "anno", "mese", "nome_testata_ordine", "tipo_ordine",
+					"sost_ord", "commerciale", "totale_mrc", "totale_nrc", "totale_mrc_odv_sost",
+					"totale_mrc_new", "valore_aov",
+				},
+				values: [][]driver.Value{
+					{
+						"TSC-ORDINE-RIC", "2026", "04", "ORD-001", "NUOVO",
+						"SOST-000", "Mario Rossi", float64(120), float64(5), float64(0),
+						float64(120), float64(1445),
+					},
 				},
 			}, nil
 		}

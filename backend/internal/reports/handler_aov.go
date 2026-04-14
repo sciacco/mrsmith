@@ -18,30 +18,33 @@ type aovRequest struct {
 // ── AOV response types ──
 
 type aovByType struct {
-	Anno       *string `json:"anno"`
-	Mese       *string `json:"mese"`
-	TipoOrdine *string `json:"tipo_ordine"`
-	TotaleMRC  float64 `json:"totale_mrc"`
-	TotaleNRC  float64 `json:"totale_nrc"`
-	ValoreAOV  float64 `json:"valore_aov"`
+	Anno         *string `json:"anno"`
+	Mese         *string `json:"mese"`
+	TipoOrdine   *string `json:"tipo_ordine"`
+	NumeroOrdini int     `json:"numero_ordini"`
+	TotaleMRC    float64 `json:"totale_mrc"`
+	TotaleNRC    float64 `json:"totale_nrc"`
+	ValoreAOV    float64 `json:"valore_aov"`
 }
 
 type aovByCategory struct {
-	Anno      *string `json:"anno"`
-	Mese      *string `json:"mese"`
-	Categoria *string `json:"categoria"`
-	TotaleMRC float64 `json:"totale_mrc"`
-	TotaleNRC float64 `json:"totale_nrc"`
-	ValoreAOV float64 `json:"valore_aov"`
+	Anno         *string `json:"anno"`
+	Mese         *string `json:"mese"`
+	Categoria    *string `json:"categoria"`
+	NumeroOrdini int     `json:"numero_ordini"`
+	TotaleMRC    float64 `json:"totale_mrc"`
+	TotaleNRC    float64 `json:"totale_nrc"`
+	ValoreAOV    float64 `json:"valore_aov"`
 }
 
 type aovBySales struct {
-	Anno        *string `json:"anno"`
-	Commerciale *string `json:"commerciale"`
-	TipoOrdine  *string `json:"tipo_ordine"`
-	TotaleMRC   float64 `json:"totale_mrc"`
-	TotaleNRC   float64 `json:"totale_nrc"`
-	ValoreAOV   float64 `json:"valore_aov"`
+	Anno         *string `json:"anno"`
+	Commerciale  *string `json:"commerciale"`
+	TipoOrdine   *string `json:"tipo_ordine"`
+	NumeroOrdini int     `json:"numero_ordini"`
+	TotaleMRC    float64 `json:"totale_mrc"`
+	TotaleNRC    float64 `json:"totale_nrc"`
+	ValoreAOV    float64 `json:"valore_aov"`
 }
 
 type aovDetail struct {
@@ -95,6 +98,7 @@ func (h *Handler) queryAovByType(r *http.Request, req aovRequest) ([]aovByType, 
 	where := aovWhereClause(statusPlaceholders, nextIdx, nextIdx+1)
 
 	query := fmt.Sprintf(`SELECT anno, mese, tipo_ordine,
+count(distinct nome_testata_ordine) as numero_ordini,
 SUM(totale_mrc_new) AS totale_mrc,
 sum(totale_nrc) AS totale_nrc,
 sum(valore_aov) AS valore_aov
@@ -191,7 +195,7 @@ GROUP BY anno, mese, tipo_ordine`, where)
 	for rows.Next() {
 		var row aovByType
 		var anno, mese, tipoOrdine sql.NullString
-		if err := rows.Scan(&anno, &mese, &tipoOrdine, &row.TotaleMRC, &row.TotaleNRC, &row.ValoreAOV); err != nil {
+		if err := rows.Scan(&anno, &mese, &tipoOrdine, &row.NumeroOrdini, &row.TotaleMRC, &row.TotaleNRC, &row.ValoreAOV); err != nil {
 			return nil, err
 		}
 		row.Anno = nullStringPtr(anno)
@@ -215,6 +219,7 @@ func (h *Handler) queryAovByCategory(r *http.Request, req aovRequest) ([]aovByCa
 	where := aovWhereClause(statusPlaceholders, nextIdx, nextIdx+1)
 
 	query := fmt.Sprintf(`SELECT anno, mese, categoria,
+count(distinct nome_testata_ordine) as numero_ordini,
 SUM(totale_mrc) AS totale_mrc,
 sum(totale_nrc) AS totale_nrc,
 sum(valore_aov) AS valore_aov
@@ -282,7 +287,7 @@ GROUP BY anno, mese, categoria`, where)
 	for rows.Next() {
 		var row aovByCategory
 		var anno, mese, categoria sql.NullString
-		if err := rows.Scan(&anno, &mese, &categoria, &row.TotaleMRC, &row.TotaleNRC, &row.ValoreAOV); err != nil {
+		if err := rows.Scan(&anno, &mese, &categoria, &row.NumeroOrdini, &row.TotaleMRC, &row.TotaleNRC, &row.ValoreAOV); err != nil {
 			return nil, err
 		}
 		row.Anno = nullStringPtr(anno)
@@ -306,6 +311,7 @@ func (h *Handler) queryAovBySales(r *http.Request, req aovRequest) ([]aovBySales
 	where := aovWhereClause(statusPlaceholders, nextIdx, nextIdx+1)
 
 	query := fmt.Sprintf(`SELECT anno, commerciale,tipo_ordine,
+count(distinct nome_testata_ordine) as numero_ordini,
 SUM(totale_mrc_new) AS totale_mrc,
 sum(totale_nrc) AS totale_nrc,
 sum(valore_aov) AS valore_aov
@@ -401,7 +407,7 @@ GROUP BY anno, commerciale, tipo_ordine`, where)
 	for rows.Next() {
 		var row aovBySales
 		var anno, commerciale, tipoOrdine sql.NullString
-		if err := rows.Scan(&anno, &commerciale, &tipoOrdine, &row.TotaleMRC, &row.TotaleNRC, &row.ValoreAOV); err != nil {
+		if err := rows.Scan(&anno, &commerciale, &tipoOrdine, &row.NumeroOrdini, &row.TotaleMRC, &row.TotaleNRC, &row.ValoreAOV); err != nil {
 			return nil, err
 		}
 		row.Anno = nullStringPtr(anno)
