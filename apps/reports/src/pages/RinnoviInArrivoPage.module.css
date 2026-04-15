@@ -57,14 +57,108 @@
   box-shadow: 0 0 8px var(--color-accent-glow);
 }
 
-.detailSection {
-  margin-top: var(--space-6);
-  animation: sectionEnter 0.5s var(--ease-out) both;
+.drawerAggregates {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
 }
 
-.detailTitle {
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: var(--space-3);
+.drawerAggregates strong {
   color: var(--color-text);
+  font-weight: 600;
+}
+
+.drawerAggregates .sep {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+.detailRow {
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.detailRow:hover {
+  background: var(--color-surface-hover);
+}
+
+.detailRowExpanded {
+  background: var(--color-accent-subtle);
+}
+
+.detailRowExpanded:hover {
+  background: var(--color-accent-subtle);
+}
+
+.noteCell {
+  width: 32px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.noteTrigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.noteIcon {
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  vertical-align: middle;
+}
+
+.detailRow:hover .noteIcon {
+  color: var(--color-accent);
+  opacity: 1;
+}
+
+.noteCellExpanded {
+  min-width: 360px;
+  max-width: 480px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  vertical-align: top;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.detailRow td {
+  border-bottom: none !important;
+}
+
+.descRow {
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.descRow:hover {
+  background: var(--color-surface-hover);
+}
+
+.descCell {
+  padding-top: 2px !important;
+  padding-left: var(--space-6) !important;
+  color: var(--color-text-strong, var(--color-text));
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
