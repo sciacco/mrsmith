@@ -185,6 +185,15 @@ Alyante ERP ID
 - Used by: `apps/reports` (`orders`, `active-lines`, `pending-activations`, `upcoming-renewals`) and `apps/panoramica-cliente` (`orders/summary`, `orders/detail`).
 - Open questions: none.
 
+### Reports Carbone Export Payloads May Need Template-Specific Key Aliases
+
+- Context: XLSX exports in `backend/internal/reports` rendered through Carbone templates.
+- Discovery: Carbone export payload keys do not have to match the preview API contract exactly. `Accessi attivi` preview still exposes `stato`, but the XLSX template expects Grappa-specific aliases, so the backend now rewrites the export payload to emit `stato grappa` and `stato_grappa` instead of `stato`.
+- Practical rule: when a Carbone template is already pinned to legacy field names, adapt the backend export payload in the export path only; do not widen or rename the preview API/frontend contract unless the UI actually needs the new keys too.
+- Evidence: `backend/internal/reports/handler_accessi.go` `activeLinesExportRows`, `backend/internal/reports/handler_quantita_test.go`, reports template references `AccessiTemplateID = a482f92419a0c17bb9bfae00c64d251c6a527f95c67993d86bf2d11d9e2e7a9e`.
+- Used by: `apps/reports` `Accessi attivi` XLSX export.
+- Open questions: none.
+
 ### Slow Read Endpoints Must Fit Server Write Timeout
 
 - Context: slow report-style endpoints behind the shared Go HTTP server, including `GET /api/panoramica/v1/iaas/monthly-charges`.

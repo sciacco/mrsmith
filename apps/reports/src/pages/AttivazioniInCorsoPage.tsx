@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Skeleton } from '@mrsmith/ui';
+import { Fragment, useMemo, useState } from 'react';
+import { Skeleton, Drawer, Icon } from '@mrsmith/ui';
 import { usePendingActivations, usePendingActivationRows } from '../api/queries';
 import { formatMoneyEUR } from '../utils/format';
 import shared from './shared.module.css';
@@ -7,8 +7,24 @@ import styles from './AttivazioniInCorsoPage.module.css';
 
 export default function AttivazioniInCorsoPage() {
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
   const activationsQ = usePendingActivations();
   const rowsQ = usePendingActivationRows(selectedOrder);
+
+  const selectedSummary = useMemo(
+    () => activationsQ.data?.find((r) => r.numero_ordine === selectedOrder),
+    [activationsQ.data, selectedOrder],
+  );
+
+  const totalMrc = useMemo(
+    () => rowsQ.data?.reduce((acc, r) => acc + (r.totale_mrc ?? 0), 0) ?? 0,
+    [rowsQ.data],
+  );
+
+  const orderNote = useMemo(
+    () => rowsQ.data?.find((r) => r.note_legali)?.note_legali ?? null,
+    [rowsQ.data],
+  );
 
   return (
     <div className={shared.page}>
@@ -68,50 +84,105 @@ export default function AttivazioniInCorsoPage() {
         </>
       )}
 
-      {selectedOrder && (
-        <div className={styles.detailSection}>
-          <h2 className={styles.detailTitle}>
-            Righe ordine {selectedOrder}
-          </h2>
+      <Drawer
+        open={!!selectedOrder}
+        onClose={() => {
+          setSelectedOrder(null);
+          setNoteOpen(false);
+        }}
+        size="xl"
+        title={selectedSummary?.ragione_sociale ?? 'Dettaglio ordine'}
+        subtitle={
+          selectedSummary && (
+            <div className={styles.drawerAggregates}>
+              <span className={shared.mono}>{selectedSummary.numero_ordine}</span>
+              <span className={styles.sep}>·</span>
+              <span>{selectedSummary.data_documento?.slice(0, 10) ?? ''}</span>
+              <span className={styles.sep}>·</span>
+              <span>
+                {selectedSummary.durata_servizio ?? '—'}
+                {' / '}
+                {selectedSummary.durata_rinnovo ?? '—'}
+              </span>
+              <span className={styles.sep}>·</span>
+              <span>
+                Totale MRC <strong>{formatMoneyEUR(totalMrc)}</strong>
+              </span>
+              {rowsQ.data && (
+                <>
+                  <span className={styles.sep}>·</span>
+                  <span>{rowsQ.data.length} righe</span>
+                </>
+              )}
+              {orderNote && (
+                <button
+                  type="button"
+                  className={`${styles.noteToggle} ${noteOpen ? styles.noteToggleActive : ''}`}
+                  onClick={() => setNoteOpen((v) => !v)}
+                  title="Note legali"
+                >
+                  <Icon name="file-text" size={16} />
+                  <span>Note</span>
+                </button>
+              )}
+            </div>
+          )
+        }
+      >
+        {orderNote && noteOpen && (
+          <div
+            className={styles.notePanel}
+            dangerouslySetInnerHTML={{ __html: orderNote }}
+          />
+        )}
 
-          {rowsQ.isLoading && <Skeleton rows={4} />}
+        {rowsQ.isLoading && <Skeleton rows={4} />}
 
-          {rowsQ.error && <p>Errore nel caricamento delle righe.</p>}
+        {rowsQ.error && <p>Errore nel caricamento delle righe.</p>}
 
-          {rowsQ.data && (
-            <div className={shared.tableWrap}>
-              <table className={shared.table}>
-                <thead>
-                  <tr>
-                    <th>Descrizione</th>
-                    <th className={shared.numCol}>Quantita</th>
-                    <th className={shared.numCol}>NRC</th>
-                    <th className={shared.numCol}>MRC</th>
-                    <th className={shared.numCol}>Totale MRC</th>
-                    <th>Stato riga</th>
-                    <th>Serial number</th>
-                    <th>Note legali</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rowsQ.data.map((row, i) => (
-                    <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
-                      <td>{row.descrizione_long ?? ''}</td>
+        {rowsQ.data && (
+          <div className={shared.tableWrap}>
+            <table className={shared.table}>
+              <thead>
+                <tr>
+                  <th className={shared.numCol}>Quantita</th>
+                  <th className={shared.numCol}>NRC</th>
+                  <th className={shared.numCol}>MRC</th>
+                  <th className={shared.numCol}>Totale MRC</th>
+                  <th>Stato riga</th>
+                  <th>Serial number</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rowsQ.data.map((row, i) => (
+                  <Fragment key={i}>
+                    <tr
+                      className={styles.detailRow}
+                      style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
+                    >
                       <td className={shared.numCol}>{row.quantita ?? ''}</td>
                       <td className={shared.numCol}>{row.nrc != null ? formatMoneyEUR(row.nrc) : ''}</td>
                       <td className={shared.numCol}>{row.mrc != null ? formatMoneyEUR(row.mrc) : ''}</td>
                       <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
                       <td>{row.stato_riga ?? ''}</td>
                       <td className={shared.mono}>{row.serialnumber ?? ''}</td>
-                      <td>{row.note_legali ?? ''}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+                    <tr className={styles.descRow}>
+                      <td colSpan={6} className={styles.descCell}>
+                        {row.descrizione_long ? (
+                          <span dangerouslySetInnerHTML={{ __html: row.descrizione_long }} />
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    </tr>
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }

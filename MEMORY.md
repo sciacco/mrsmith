@@ -1,3 +1,10 @@
+## 2026-04-15
+- `apps/reports` `Accessi attivi` now keeps the preview/API contract unchanged (`stato`) while rewriting only the Carbone XLSX export payload in `backend/internal/reports/handler_accessi.go`.
+- The export payload sent to Carbone no longer includes `stato`; it now emits both `stato grappa` and `stato_grappa` aliases with the same value to support legacy template placeholders with either spacing style.
+- Added regression coverage in `backend/internal/reports/handler_quantita_test.go` to pin both behaviors: preview still returns `stato`, and export payload conversion preserves other fields while renaming the state key aliases.
+- Added reusable knowledge in `docs/IMPLEMENTATION-KNOWLEDGE.md` that reports export payloads may intentionally diverge from preview JSON keys when an existing Carbone template is already pinned to legacy field names.
+- Added a follow-up TODO in `docs/TODO.md`: Carbone does not reliably accept the space-based `stato grappa` key, so the real fix is to upload/update the `Accessi attivi` Carbone template to use `stato_grappa` (or equivalent space-free key) and then replace the hardcoded `AccessiTemplateID` in reports with the new template ID.
+
 ## 2026-04-05
 - Updated [AGENTS.md](AGENTS.md) to mark `docs/mistra-dist.yaml` as an important reference.
 - Treat `docs/mistra-dist.yaml` as the authoritative Mistra NG Internal API spec for most mini-app integrations, including backend contracts, client generation, and shared types.

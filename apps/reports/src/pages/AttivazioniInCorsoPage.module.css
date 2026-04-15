@@ -29,14 +29,86 @@
   box-shadow: 0 0 8px var(--color-accent-glow);
 }
 
-.detailSection {
-  margin-top: var(--space-6);
-  animation: sectionEnter 0.5s var(--ease-out) both;
+.drawerAggregates {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
 }
 
-.detailTitle {
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: var(--space-3);
+.drawerAggregates strong {
   color: var(--color-text);
+  font-weight: 600;
+}
+
+.drawerAggregates .sep {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+.noteToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  margin-left: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
+}
+
+.noteToggle:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.noteToggleActive {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.notePanel {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-subtle);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.notePanel :global(p) {
+  margin: 0 0 var(--space-2);
+}
+
+.notePanel :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.detailRow td {
+  border-bottom: none !important;
+}
+
+.descRow td {
+  padding-top: 2px !important;
+  padding-left: var(--space-6) !important;
+}
+
+.descCell {
+  color: var(--color-text-strong, var(--color-text));
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: break-word;
 }

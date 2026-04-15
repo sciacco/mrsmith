@@ -67,6 +67,9 @@ Unresolved: what happens to budgets at year-end? Do old-year budgets get archive
 
 ## Reports App
 
+### Accessi attivi — Carbone Template Update + Template ID Swap
+The current Carbone XLSX template used by `Accessi attivi` is pinned to a field name with spaces (`stato grappa`), but Carbone does not accept JSON keys with spaces reliably in this flow. The follow-up task is: (a) update/upload the Carbone template to use a space-free key such as `stato_grappa`, then (b) replace the hardcoded `AccessiTemplateID` in the reports app/backend with the new Carbone template ID. Only after the template swap is complete should the temporary compatibility aliasing in the export payload be simplified or removed.
+
 ### Anomalie MOR — AI Analysis (Phase 2)
 The Anomalie MOR page in Appsmith has a Tab 2 with AI-powered anomaly analysis via OpenRouter (model selector, prompt with 6 Italian-language validation rules, HTML output). This feature is deferred from the V1 migration. When implemented it needs: (a) backend proxy for OpenRouter calls (API key must not be in frontend), (b) AI validation prompt moved to backend (Go constant or config file), (c) proper Keycloak RBAC role (`app_reports_ai_access`) replacing the hardcoded email gate (`sciacco`), (d) model selector UI. The audit details are in `apps/reports/APPSMITH-AUDIT.md` §2.6 (BR8, BR10).
 

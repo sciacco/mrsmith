@@ -37,6 +37,32 @@ type activeLineRow struct {
 	Canone             float64  `json:"canone"`
 }
 
+func activeLinesExportRows(rows []activeLineRow) ([]map[string]any, error) {
+	exportRows := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		body, err := json.Marshal(row)
+		if err != nil {
+			return nil, err
+		}
+
+		var exportRow map[string]any
+		if err := json.Unmarshal(body, &exportRow); err != nil {
+			return nil, err
+		}
+
+		stateValue := exportRow["stato"]
+		delete(exportRow, "stato")
+		exportRow["stato grappa"] = stateValue
+		exportRow["stato_grappa"] = stateValue
+
+		exportRows = append(exportRows, exportRow)
+	}
+	if exportRows == nil {
+		exportRows = []map[string]any{}
+	}
+	return exportRows, nil
+}
+
 func (h *Handler) queryActiveLines(r *http.Request, req activeLinesRequest) ([]activeLineRow, error) {
 	statusPlaceholders, nextIdx := buildInClause(1, len(req.Statuses))
 	connTypePlaceholders, _ := buildInClause(nextIdx, len(req.ConnectionTypes))
@@ -185,7 +211,14 @@ func (h *Handler) handleActiveLinesExport(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	xlsxBytes, err := h.carbone.GenerateXLSX(r.Context(), AccessiTemplateID, result)
+	exportRows, err := activeLinesExportRows(result)
+	if err != nil {
+		httputil.InternalError(w, r, err, "active lines export payload build failed",
+			"component", "reports", "operation", "active_lines_export_payload")
+		return
+	}
+
+	xlsxBytes, err := h.carbone.GenerateXLSX(r.Context(), AccessiTemplateID, exportRows)
 	if err != nil {
 		h.dbFailure(w, r, "active_lines_export_carbone", err)
 		return

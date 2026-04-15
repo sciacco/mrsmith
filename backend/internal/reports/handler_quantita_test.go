@@ -59,6 +59,7 @@ func TestHandleActiveLinesPreviewSupportsFractionalAndNullQuantita(t *testing.T)
 
 	var rows []struct {
 		Quantita *float64 `json:"quantita"`
+		Stato    *string  `json:"stato"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &rows); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
@@ -71,6 +72,64 @@ func TestHandleActiveLinesPreviewSupportsFractionalAndNullQuantita(t *testing.T)
 	}
 	if rows[1].Quantita != nil {
 		t.Fatalf("expected second quantita to be null, got %#v", rows[1].Quantita)
+	}
+	if rows[0].Stato == nil || *rows[0].Stato != "ATTIVA" {
+		t.Fatalf("expected preview stato to stay available, got %#v", rows[0].Stato)
+	}
+}
+
+func TestActiveLinesExportRowsRenamesStatoForCarbone(t *testing.T) {
+	state := "ATTIVA"
+	quantita := 1.25
+
+	exportRows, err := activeLinesExportRows([]activeLineRow{
+		{
+			RagioneSociale: "ACME",
+			Stato:          &state,
+			Quantita:       &quantita,
+			Canone:         49.9,
+		},
+		{
+			RagioneSociale: "BETA",
+			Stato:          nil,
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected export payload conversion to succeed, got %v", err)
+	}
+	if len(exportRows) != 2 {
+		t.Fatalf("expected 2 export rows, got %d", len(exportRows))
+	}
+
+	first := exportRows[0]
+	if _, ok := first["stato"]; ok {
+		t.Fatalf("expected export payload to omit stato, got %#v", first["stato"])
+	}
+	if got, ok := first["stato grappa"].(string); !ok || got != "ATTIVA" {
+		t.Fatalf("expected stato grappa alias, got %#v", first["stato grappa"])
+	}
+	if got, ok := first["stato_grappa"].(string); !ok || got != "ATTIVA" {
+		t.Fatalf("expected stato_grappa alias, got %#v", first["stato_grappa"])
+	}
+	if got, ok := first["ragione_sociale"].(string); !ok || got != "ACME" {
+		t.Fatalf("expected ragione_sociale to be preserved, got %#v", first["ragione_sociale"])
+	}
+	if got, ok := first["quantita"].(float64); !ok || got != 1.25 {
+		t.Fatalf("expected quantita to be preserved, got %#v", first["quantita"])
+	}
+	if got, ok := first["canone"].(float64); !ok || got != 49.9 {
+		t.Fatalf("expected canone to be preserved, got %#v", first["canone"])
+	}
+
+	second := exportRows[1]
+	if _, ok := second["stato"]; ok {
+		t.Fatalf("expected nil-state export payload to omit stato, got %#v", second["stato"])
+	}
+	if value, ok := second["stato grappa"]; !ok || value != nil {
+		t.Fatalf("expected nil stato grappa alias, got %#v", second["stato grappa"])
+	}
+	if value, ok := second["stato_grappa"]; !ok || value != nil {
+		t.Fatalf("expected nil stato_grappa alias, got %#v", second["stato_grappa"])
 	}
 }
 
