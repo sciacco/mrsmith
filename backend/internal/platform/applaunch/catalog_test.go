@@ -1,6 +1,10 @@
 package applaunch
 
-import "testing"
+import (
+	"reflect"
+	"sort"
+	"testing"
+)
 
 func TestVisibleCategoriesFiltersByBudgetRole(t *testing.T) {
 	categories := VisibleCategories(Catalog(nil), []string{"app_budget_access"})
@@ -22,37 +26,19 @@ func TestVisibleCategoriesFiltersByBudgetRole(t *testing.T) {
 	}
 }
 
-func TestVisibleCategoriesDefaultRoleSeesAllPlaceholders(t *testing.T) {
-	catalog := Catalog(nil)
-	categories := VisibleCategories(catalog, []string{"no-default-roles-cdlan"})
-
-	// Should see all 4 categories (acquisti placeholders, mkt-sales, smart-apps, provisioning)
-	if len(categories) != 4 {
-		t.Fatalf("expected 4 categories, got %d", len(categories))
-	}
-
-	// Count total apps across all categories
-	total := 0
-	for _, cat := range categories {
-		total += len(cat.Apps)
-	}
-	// All placeholder apps (excludes budget, compliance, kit-products, listini, panoramica, and quotes which require specific roles)
-	if total != 14 {
-		t.Fatalf("expected 14 placeholder apps, got %d", total)
+func TestVisibleCategoriesDefaultRoleSeesNoActiveApps(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"no-default-roles-cdlan"})
+	if len(categories) != 0 {
+		t.Fatalf("expected 0 categories, got %d", len(categories))
 	}
 }
 
-func TestVisibleCategoriesBothRolesSeesEverything(t *testing.T) {
+func TestVisibleCategoriesAllCatalogRolesSeeAllActiveApps(t *testing.T) {
 	catalog := Catalog(nil)
-	categories := VisibleCategories(catalog, []string{"no-default-roles-cdlan", "app_budget_access", "app_compliance_access", "app_kitproducts_access", "app_listini_access", "app_panoramica_access", "app_quotes_access"})
+	categories := VisibleCategories(catalog, allCatalogRoles(catalog))
 
-	total := 0
-	for _, cat := range categories {
-		total += len(cat.Apps)
-	}
-	// All 20 apps (14 placeholders + 1 budget + 1 compliance + 1 kit-products + 1 listini + 1 panoramica + 1 quotes)
-	if total != 20 {
-		t.Fatalf("expected 20 total apps, got %d", total)
+	if got, want := visibleAppIDs(categories), catalogAppIDs(catalog); !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected all active app IDs %v, got %v", want, got)
 	}
 }
 
@@ -60,12 +46,8 @@ func TestVisibleCategoriesDevAdminSeesEverything(t *testing.T) {
 	catalog := Catalog(nil)
 	categories := VisibleCategories(catalog, []string{"app_devadmin"})
 
-	total := 0
-	for _, cat := range categories {
-		total += len(cat.Apps)
-	}
-	if total != 20 {
-		t.Fatalf("expected 20 total apps for app_devadmin, got %d", total)
+	if got, want := visibleAppIDs(categories), catalogAppIDs(catalog); !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected all active app IDs %v for app_devadmin, got %v", want, got)
 	}
 }
 
@@ -181,6 +163,25 @@ func TestVisibleCategoriesFiltersByQuotesRole(t *testing.T) {
 	}
 }
 
+func TestVisibleCategoriesFiltersByReportsRole(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"app_reports_access"})
+	if len(categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(categories))
+	}
+	if categories[0].ID != "smart-apps" {
+		t.Fatalf("expected smart-apps category, got %q", categories[0].ID)
+	}
+	if len(categories[0].Apps) != 1 {
+		t.Fatalf("expected 1 app, got %d", len(categories[0].Apps))
+	}
+	if categories[0].Apps[0].ID != ReportsAppID {
+		t.Fatalf("expected reports app, got %q", categories[0].Apps[0].ID)
+	}
+	if categories[0].Apps[0].Href != ReportsAppHref {
+		t.Fatalf("expected reports href %q, got %q", ReportsAppHref, categories[0].Apps[0].Href)
+	}
+}
+
 func TestVisibleCategoriesFiltersByKitProductsRole(t *testing.T) {
 	categories := VisibleCategories(Catalog(nil), []string{"app_kitproducts_access"})
 	if len(categories) != 1 {
@@ -198,4 +199,43 @@ func TestVisibleCategoriesFiltersByKitProductsRole(t *testing.T) {
 	if categories[0].Apps[0].Href != KitProductsAppHref {
 		t.Fatalf("expected kit-products href %q, got %q", KitProductsAppHref, categories[0].Apps[0].Href)
 	}
+}
+
+func visibleAppIDs(categories []Category) []string {
+	ids := make([]string, 0)
+	for _, category := range categories {
+		for _, app := range category.Apps {
+			ids = append(ids, app.ID)
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func catalogAppIDs(definitions []Definition) []string {
+	ids := make([]string, 0, len(definitions))
+	for _, definition := range definitions {
+		ids = append(ids, definition.ID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func allCatalogRoles(definitions []Definition) []string {
+	seen := make(map[string]struct{})
+	roles := make([]string, 0)
+	for _, definition := range definitions {
+		for _, role := range definition.AccessRoles {
+			if role == "" {
+				continue
+			}
+			if _, ok := seen[role]; ok {
+				continue
+			}
+			seen[role] = struct{}{}
+			roles = append(roles, role)
+		}
+	}
+	sort.Strings(roles)
+	return roles
 }

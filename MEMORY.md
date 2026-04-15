@@ -1,4 +1,5 @@
 ## 2026-04-15
+- Launcher regression tests in `backend/internal/platform/applaunch/catalog_test.go` and `backend/internal/portal/handler_test.go` must derive expected visible apps from the active catalog definitions, not from historical placeholder counts; the current live catalog has only uncommented entries, and `reports` needs explicit role coverage (`app_reports_access`).
 - `apps/reports` navigation taxonomy is now centralized in `apps/reports/src/navigation.ts` so the header `TabNavGroup` and Home cards cannot drift.
 - Reports groups were reclassified from the legacy `Commerciale/Rete/Contratti/Operativo` split to `Business/Operations/Servizi`, with page distribution fixed to `Business = Ordini + AOV + Rinnovi in arrivo`, `Operations = Attivazioni in corso`, `Servizi = Accessi attivi + Anomalie MOR + Accounting TIMOO`.
 - `apps/reports/REPORTS-SPEC.md` and `apps/reports/reports-migspec-phaseB-ux.md` now document the same three-group taxonomy used by the live app.
