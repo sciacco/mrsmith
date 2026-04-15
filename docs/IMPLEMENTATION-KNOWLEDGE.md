@@ -203,6 +203,17 @@ Alyante ERP ID
 - Used by: `apps/panoramica-cliente` IaaS PPU monthly charges view; shared backend middleware in `backend/pkg/middleware`.
 - Open questions: whether future report endpoints should adopt per-handler query deadlines or asynchronous export flows instead of relying on a larger shared write timeout.
 
+## Deployment and Runtime Integration Rules
+
+### Backend-Served SPAs Must Be Copied Explicitly Into `/static/apps/<slug>`
+
+- Context: production and pre-production deployments where the Go server serves multiple Vite bundles from a shared static root.
+- Discovery: adding an app to the launcher catalog and giving it a Vite `base` like `/apps/reports/` is not enough to make it deployable. The final runtime image must also copy that app's built dist directory into `/static/apps/<slug>`, otherwise the `staticspa` handler has no `index.html` to fall back to and deep links return the backend's plain 404.
+- Practical rule: every new backend-served SPA needs the full pathing chain verified together: launcher/catalog href, Vite build base, local dev override if needed, Docker `COPY --from=frontend /app/apps/<slug>/dist /static/apps/<slug>`, and a `staticspa` deep-link regression test.
+- Evidence: `deploy/Dockerfile`, `backend/internal/platform/staticspa/handler.go`, `backend/internal/platform/applaunch/catalog.go`, and the 2026-04-15 production `reports` regression where `/apps/reports/` 404ed because `/static/apps/reports/index.html` was missing from the image.
+- Used by: `budget`, `compliance`, `kit-products`, `listini-e-sconti`, `panoramica-cliente`, `quotes`, `reports`.
+- Open questions: none.
+
 ## Auth and Transport Behavior
 
 ### Devadmin Must Be Centralized as a Superuser Override
