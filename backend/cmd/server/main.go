@@ -20,18 +20,19 @@ import (
 	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/listini"
 	"github.com/sciacco/mrsmith/internal/panoramica"
-	"github.com/sciacco/mrsmith/internal/reports"
-	"github.com/sciacco/mrsmith/internal/platform/hubspot"
-	"github.com/sciacco/mrsmith/internal/quotes"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/database"
 	"github.com/sciacco/mrsmith/internal/platform/health"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/staticspa"
 	"github.com/sciacco/mrsmith/internal/portal"
+	"github.com/sciacco/mrsmith/internal/quotes"
+	"github.com/sciacco/mrsmith/internal/rdfbackend"
+	"github.com/sciacco/mrsmith/internal/reports"
 	"github.com/sciacco/mrsmith/pkg/middleware"
 )
 
@@ -195,6 +196,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.QuotesAppID] = "http://localhost:5179"
 	}
+	if cfg.RDFBackendAppURL != "" {
+		hrefOverrides[applaunch.RDFBackendAppID] = cfg.RDFBackendAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.RDFBackendAppID] = "http://localhost:5181"
+	}
 	if cfg.ReportsAppURL != "" {
 		hrefOverrides[applaunch.ReportsAppID] = cfg.ReportsAppURL
 	} else if cfg.StaticDir == "" {
@@ -216,6 +222,9 @@ func main() {
 			if definition.ID == applaunch.QuotesAppID && cfg.MistraDSN == "" {
 				continue
 			}
+			if definition.ID == applaunch.RDFBackendAppID && cfg.AnisettaDSN == "" {
+				continue
+			}
 			if definition.ID == applaunch.ReportsAppID && cfg.MistraDSN == "" && cfg.GrappaDSN == "" && cfg.AnisettaDSN == "" {
 				continue
 			}
@@ -234,6 +243,7 @@ func main() {
 	listini.RegisterRoutes(api, mistraDB, grappaDB, hubspotSvc, carboneSvc)
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 	quotes.RegisterRoutes(api, mistraDB, alyanteDB, hubspotCli)
+	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)
 
 	mux.Handle("/api/", middleware.Chain(

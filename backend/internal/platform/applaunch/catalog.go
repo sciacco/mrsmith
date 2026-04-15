@@ -26,6 +26,9 @@ const (
 	QuotesAppID   = "proposte"
 	QuotesAppHref = "/apps/quotes/"
 
+	RDFBackendAppID   = "rdf-backend"
+	RDFBackendAppHref = "/apps/rdf-backend/"
+
 	ReportsAppID   = "reports"
 	ReportsAppHref = "/apps/reports/"
 )
@@ -38,6 +41,7 @@ var (
 	panoramicaAccessRoles  = []string{"app_panoramica_access"}
 	quotesAccessRoles      = []string{"app_quotes_access"}
 	quotesDeleteRoles      = []string{"app_quotes_delete"}
+	rdfBackendAccessRoles  = []string{"app_rdf_backend_access"}
 	reportsAccessRoles     = []string{"app_reports_access"}
 	defaultAccessRoles     = []string{"no-default-roles-cdlan"}
 )
@@ -211,6 +215,16 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryTitle: "SMART APPS",
 			AccessRoles:   ComplianceAccessRoles(),
 		},
+		{
+			ID:            RDFBackendAppID,
+			Name:          "RDF Backend",
+			Icon:          "database",
+			Href:          RDFBackendAppHref,
+			Status:        "ready",
+			CategoryID:    "provisioning",
+			CategoryTitle: "Provisioning",
+			AccessRoles:   RDFBackendAccessRoles(),
+		},
 		// {
 		// 	ID:            "customer-portal-settings",
 		// 	Name:          "Customer Portal settings - APPLICATIONS...",
@@ -343,6 +357,10 @@ func QuotesAccessRoles() []string {
 
 func QuotesDeleteRoles() []string {
 	return slices.Clone(quotesDeleteRoles)
+}
+
+func RDFBackendAccessRoles() []string {
+	return slices.Clone(rdfBackendAccessRoles)
 }
 
 func ReportsAccessRoles() []string {
