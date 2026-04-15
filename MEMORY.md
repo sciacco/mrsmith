@@ -1,4 +1,7 @@
 ## 2026-04-15
+- `apps/reports` navigation taxonomy is now centralized in `apps/reports/src/navigation.ts` so the header `TabNavGroup` and Home cards cannot drift.
+- Reports groups were reclassified from the legacy `Commerciale/Rete/Contratti/Operativo` split to `Business/Operations/Servizi`, with page distribution fixed to `Business = Ordini + AOV + Rinnovi in arrivo`, `Operations = Attivazioni in corso`, `Servizi = Accessi attivi + Anomalie MOR + Accounting TIMOO`.
+- `apps/reports/REPORTS-SPEC.md` and `apps/reports/reports-migspec-phaseB-ux.md` now document the same three-group taxonomy used by the live app.
 - `apps/reports` `Accessi attivi` now keeps the preview/API contract unchanged (`stato`) while rewriting only the Carbone XLSX export payload in `backend/internal/reports/handler_accessi.go`.
 - The export payload sent to Carbone no longer includes `stato`; it now emits both `stato grappa` and `stato_grappa` aliases with the same value to support legacy template placeholders with either spacing style.
 - Added regression coverage in `backend/internal/reports/handler_quantita_test.go` to pin both behaviors: preview still returns `stato`, and export payload conversion preserves other fields while renaming the state key aliases.

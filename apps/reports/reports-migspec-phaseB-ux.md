@@ -24,10 +24,9 @@ Usare `TabNavGroup` raggruppando i 7 report in 3-4 categorie logiche, esattament
 
 | Gruppo | Pagine |
 |--------|--------|
-| Commerciale | Ordini, AOV |
-| Rete | Accessi attivi, Attivazioni in corso |
-| Contratti | Rinnovi in arrivo |
-| Operativo | Anomalie MOR, Accounting TIMOO |
+| Business | Ordini, AOV, Rinnovi in arrivo |
+| Operations | Attivazioni in corso |
+| Servizi | Accessi attivi, Anomalie MOR, Accounting TIMOO |
 
 La Home (`/`) mostra un riepilogo: card compatte con titolo del report, icona (dal sistema Icon esistente: `chart`, `document`, `coins`, etc.), una riga di descrizione e un indicatore di stato (es. "ultimo export: 3 giorni fa" o "12 anomalie rilevate"). Cliccando una card si naviga al report. Ma la navigazione principale resta `TabNavGroup` nell'header.
 

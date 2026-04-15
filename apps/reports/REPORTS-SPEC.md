@@ -134,10 +134,9 @@ No entity separation or abstraction in V1 — all queries use the same flat view
 
 | Group | Pages |
 |---|---|
-| Commerciale | Ordini, AOV |
-| Rete | Accessi attivi, Attivazioni in corso |
-| Contratti | Rinnovi in arrivo |
-| Operativo | Anomalie MOR, Accounting TIMOO |
+| Business | Ordini, AOV, Rinnovi in arrivo |
+| Operations | Attivazioni in corso |
+| Servizi | Accessi attivi, Anomalie MOR, Accounting TIMOO |
 
 - **Card content**: Icon (from Icon system) + report title + one-line description
 - **Design**: `--color-bg-elevated`, `--shadow-sm`→`--shadow-md` on hover, `--radius-lg`, `sectionEnter` animation with stagger

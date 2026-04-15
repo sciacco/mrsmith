@@ -3,37 +3,13 @@ import { AppShell } from '@mrsmith/ui';
 import { TabNavGroup, type TabGroup } from '@mrsmith/ui';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
+import { reportNavSections } from './navigation';
 import styles from './App.module.css';
 
-const navGroups: TabGroup[] = [
-  {
-    label: 'Commerciale',
-    items: [
-      { label: 'Ordini', path: '/ordini' },
-      { label: 'AOV', path: '/aov' },
-    ],
-  },
-  {
-    label: 'Rete',
-    items: [
-      { label: 'Accessi attivi', path: '/accessi-attivi' },
-      { label: 'Attivazioni in corso', path: '/attivazioni-in-corso' },
-    ],
-  },
-  {
-    label: 'Contratti',
-    items: [
-      { label: 'Rinnovi in arrivo', path: '/rinnovi-in-arrivo' },
-    ],
-  },
-  {
-    label: 'Operativo',
-    items: [
-      { label: 'Anomalie MOR', path: '/anomalie-mor' },
-      { label: 'Accounting TIMOO', path: '/accounting-timoo' },
-    ],
-  },
-];
+const navGroups: TabGroup[] = reportNavSections.map((group) => ({
+  label: group.label,
+  items: group.items.map((item) => ({ label: item.label, path: item.path })),
+}));
 
 export function App() {
   const { user, loading, logout, status } = useOptionalAuth();
