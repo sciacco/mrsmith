@@ -5,6 +5,15 @@ import { formatMoneyEUR } from '../utils/format';
 import shared from './shared.module.css';
 import styles from './AttivazioniInCorsoPage.module.css';
 
+function formatDurationMonths(value: string | null | undefined): string {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return '—';
+  }
+
+  return /[a-z]/i.test(normalized) ? normalized : `${normalized}m`;
+}
+
 export default function AttivazioniInCorsoPage() {
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -100,9 +109,9 @@ export default function AttivazioniInCorsoPage() {
               <span>{selectedSummary.data_documento?.slice(0, 10) ?? ''}</span>
               <span className={styles.sep}>·</span>
               <span>
-                {selectedSummary.durata_servizio ?? '—'}
+                Durata Iniziale: {formatDurationMonths(selectedSummary.durata_servizio)}
                 {' / '}
-                {selectedSummary.durata_rinnovo ?? '—'}
+                Rinnovi {formatDurationMonths(selectedSummary.durata_rinnovo)}
               </span>
               <span className={styles.sep}>·</span>
               <span>

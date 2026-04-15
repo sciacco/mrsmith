@@ -1,4 +1,6 @@
 ## 2026-04-15
+- `apps/reports` drawer header for `Attivazioni in corso` should not show raw renewal durations as `X / Y`; the UI now expands them to `Durata Iniziale: Xm / Rinnovi Ym` in `apps/reports/src/pages/AttivazioniInCorsoPage.tsx`.
+- Reports duration-header formatting uses a local frontend rule: blank/null values render as `—`, numeric-only strings get an `m` suffix, and already-unitized strings are preserved as-is.
 - Production packaging for backend-served SPAs is opt-in per app in [deploy/Dockerfile](deploy/Dockerfile): if a new app is added to the catalog/base-path chain but its `dist` folder is not copied into `/static/apps/<slug>`, the shared `staticspa` handler returns plain 404s because `/static/apps/<slug>/index.html` does not exist in the runtime image.
 - Fixed the `reports` deployment regression by copying `apps/reports/dist` to `/static/apps/reports` in [deploy/Dockerfile](deploy/Dockerfile) and adding deep-link fallback coverage in [backend/internal/platform/staticspa/handler_test.go](backend/internal/platform/staticspa/handler_test.go).
 - Added reusable knowledge in [docs/IMPLEMENTATION-KNOWLEDGE.md](docs/IMPLEMENTATION-KNOWLEDGE.md): every backend-served SPA must be wired across launcher href, Vite base, Docker static copy, and `staticspa` regression tests as one deployment contract.
