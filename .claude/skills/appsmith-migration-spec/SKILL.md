@@ -12,6 +12,8 @@ Convert `appsmith-audit` outputs into an implementation-ready, platform-neutral 
 
 This skill is for the expert-in-the-loop Phase 2 workflow. It should extract what the audit proves, surface decisions the audit cannot make, and maintain a structured specification as the conversation progresses.
 
+After the specification is approved, hand it to `portal-miniapp-generator` for repo-specific implementation planning, UI review gates, and mini-app generation.
+
 # When to use
 
 Use this skill when:
@@ -119,4 +121,4 @@ This skill is complete when:
 - all major entities, operations, views, and integrations from the audit have been covered
 - the expert has only been asked to resolve true business or design decisions
 - unresolved gaps are explicit
-- the final Markdown spec can be handed to a downstream implementation phase without needing the raw Appsmith export
+- the final Markdown spec can be handed to `portal-miniapp-generator` for downstream implementation planning without needing the raw Appsmith export

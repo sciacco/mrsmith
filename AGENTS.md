@@ -25,6 +25,7 @@
 
 ## UI/UX
 - [`docs/UI-UX.md`](docs/UI-UX.md) — Reference document for all UI/UX decisions implemented in the codebase. Use this as the foundation when building new mini-apps.
+- For any new portal mini-app or mini-app UI review, use `.claude/skills/portal-miniapp-generator/` as the canonical workflow. For Appsmith migrations, run it after `.claude/skills/appsmith-migration-spec/` and before implementation.
 
 ## TODOs
 - [`docs/TODO.md`](docs/TODO.md) — project-wide open items, deferred decisions, and out-of-scope work tracked for future implementation

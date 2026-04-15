@@ -25,7 +25,7 @@ backend/.env
 
 # Other artifacts
 apps/*/*.zip
-apps/*/*.tar.gz
+apps/*/*.gz
 /.playwright-mcp
 /portal-1920x1080.png
 /portal-option-a-fullpage.png

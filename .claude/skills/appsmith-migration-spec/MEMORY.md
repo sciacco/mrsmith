@@ -20,3 +20,4 @@
 - Verify claims against audit source before writing flags — do not invent evidence the audit doesn't contain (caught on Q1)
 - Design questions benefit from firing a Plan agent for multiple options with pros/cons
 - Italian domain language preserved for compatibility ("Voci di costo" kept as-is)
+- Once the platform-neutral spec is approved, hand off to `portal-miniapp-generator` for repo-fit implementation planning and mini-app review before coding
