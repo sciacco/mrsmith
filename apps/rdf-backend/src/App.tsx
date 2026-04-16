@@ -6,7 +6,7 @@ import styles from './App.module.css';
 
 const navGroups: TabGroup[] = [
   {
-    label: 'Registro',
+    label: 'Fornitori',
     items: [{ label: 'Fornitori', path: '/fornitori' }],
   },
 ];
@@ -23,7 +23,6 @@ export function App() {
         <AppShell.Nav>
           <div className={styles.navRow}>
             <TabNavGroup groups={navGroups} />
-            <span className={styles.navMeta}>Provisioning registry</span>
           </div>
         </AppShell.Nav>
         <AppShell.Content>
@@ -42,7 +41,6 @@ export function App() {
       <AppShell.Nav>
         <div className={styles.navRow}>
           <TabNavGroup groups={navGroups} />
-          <span className={styles.navMeta}>Provisioning registry</span>
         </div>
       </AppShell.Nav>
       <AppShell.Content>{element}</AppShell.Content>

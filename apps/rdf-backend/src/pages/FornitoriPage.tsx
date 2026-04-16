@@ -19,14 +19,14 @@ function getErrorMessage(error: unknown, fallback: string) {
     const body = error.body as ErrorResponse | undefined;
     switch (body?.error) {
       case 'nome_required':
-        return 'Il nome del fornitore e obbligatorio.';
+        return 'Inserisci il nome del fornitore.';
       case 'not_found':
         return 'Il fornitore selezionato non e piu disponibile.';
       case 'anisetta_database_not_configured':
-        return 'La connessione ad Anisetta non e configurata.';
+        return 'Il servizio fornitori non e disponibile.';
       default:
         if (error.status === 401) return 'La sessione non e valida. Ricarica la pagina.';
-        if (error.status === 403) return 'Non hai i permessi per usare RDF Backend.';
+        if (error.status === 403) return 'Non hai i permessi per consultare i fornitori.';
       }
   }
 
@@ -173,239 +173,207 @@ export function FornitoriPage() {
 
   return (
     <div className={styles.page}>
-      <section className={styles.hero}>
-        <div className={styles.heroContent}>
+      <section className={styles.master}>
+        <div className={styles.toolbar}>
           <div>
-            <p className={styles.eyebrow}>Provisioning</p>
-            <h1>RDF Backend</h1>
-            <p className={styles.heroLead}>
-              Registro fornitori su Anisetta con ricerca, ordinamento e paginazione lato server.
-            </p>
+            <h1 className={styles.pageTitle}>Fornitori</h1>
+            <p className={styles.pageSubtitle}>Gestisci l&apos;elenco dei fornitori disponibili.</p>
           </div>
-          <div className={styles.heroStats}>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Totale fornitori</span>
-              <strong className={styles.statValue}>{total}</strong>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Pagina corrente</span>
-              <strong className={styles.statValue}>
-                {pageStart === 0 ? '0' : `${pageStart}-${pageEnd}`}
-              </strong>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Ordinamento</span>
-              <strong className={styles.statValueMono}>
-                {sortKey}.{sortOrder}
-              </strong>
-            </div>
+          <div className={styles.toolbarActions}>
+            <Button
+              variant="secondary"
+              onClick={() => suppliersQuery.refetch()}
+              leftIcon={<Icon name="arrow-right" size={16} />}
+              loading={suppliersQuery.isFetching}
+            >
+              Aggiorna elenco
+            </Button>
+            <Button
+              onClick={() => setCreateOpen(true)}
+              leftIcon={<Icon name="plus" size={16} />}
+            >
+              Nuovo fornitore
+            </Button>
           </div>
         </div>
-        <div className={styles.heroGlow} />
-      </section>
 
-      <div className={styles.workspace}>
-        <section className={styles.registryPanel}>
-          <header className={styles.panelHeader}>
-            <div>
-              <h2>Fornitori</h2>
-              <p>Seleziona una riga per l&apos;aggiornamento inline oppure crea un nuovo record.</p>
-            </div>
-            <div className={styles.liveBadge}>
-              <span className={`${styles.liveDot} ${suppliersQuery.isFetching ? styles.liveDotBusy : ''}`} />
-              {suppliersQuery.isFetching ? 'Sincronizzazione' : 'Allineato'}
-            </div>
-          </header>
-
-          <div className={styles.toolbar}>
+        <div className={styles.tableCard}>
+          <div className={styles.tableTools}>
             <SearchInput
               value={searchInput}
               onChange={handleSearchChange}
-              placeholder="Cerca fornitore..."
+              placeholder="Cerca per nome"
               className={styles.search}
             />
-            <div className={styles.toolbarActions}>
-              <Button
-                variant="ghost"
-                onClick={() => suppliersQuery.refetch()}
-                leftIcon={<Icon name="arrow-right" size={16} />}
-                loading={suppliersQuery.isFetching}
-              >
-                Refresh
-              </Button>
-              <Button
-                onClick={() => setCreateOpen(true)}
-                leftIcon={<Icon name="plus" size={16} />}
-              >
-                Nuovo fornitore
-              </Button>
-            </div>
           </div>
 
-          <div className={styles.tableShell}>
-            <div className={styles.tableHeader}>
-              <SortButton
-                active={sortKey === 'id'}
-                direction={sortOrder}
-                label="ID"
-                onClick={() => handleSort('id')}
-              />
-              <SortButton
-                active={sortKey === 'nome'}
-                direction={sortOrder}
-                label="Nome"
-                onClick={() => handleSort('nome')}
-              />
-              <span className={styles.headerAction}>Azione</span>
+          {suppliersQuery.isLoading ? (
+            <div className={styles.tableLoading}>
+              <Skeleton rows={6} />
             </div>
-
-            {suppliersQuery.isLoading ? (
-              <div className={styles.tableLoading}>
-                <Skeleton rows={6} />
+          ) : suppliersQuery.error ? (
+            <div className={styles.emptyState}>
+              <div className={styles.emptyIcon}>
+                <Icon name="triangle-alert" size={20} />
               </div>
-            ) : suppliersQuery.error ? (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>
-                  <Icon name="triangle-alert" size={20} />
-                </div>
-                <h3>Elenco non disponibile</h3>
-                <p>{getErrorMessage(suppliersQuery.error, 'Impossibile caricare i fornitori.')}</p>
+              <h2 className={styles.emptyTitle}>Elenco non disponibile</h2>
+              <p className={styles.emptyText}>
+                {getErrorMessage(suppliersQuery.error, 'Impossibile caricare i fornitori.')}
+              </p>
+            </div>
+          ) : items.length === 0 ? (
+            <div className={styles.emptyState}>
+              <div className={styles.emptyIcon}>
+                <Icon name="server" size={20} />
               </div>
-            ) : items.length === 0 ? (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>
-                  <Icon name="server" size={20} />
-                </div>
-                <h3>Nessun fornitore trovato</h3>
-                <p>Affina la ricerca oppure crea un nuovo record nel registro RDF.</p>
-              </div>
-            ) : (
-              <div className={styles.tableBody}>
-                <table className={styles.table}>
-                  <tbody>
-                    {items.map((supplier, index) => (
-                      <tr
-                        key={supplier.id}
-                        className={selectedId === supplier.id ? styles.rowSelected : ''}
-                        onClick={() => setSelectedId(supplier.id)}
-                        style={{ animationDelay: `${index * 45}ms` }}
-                      >
-                        <td>
-                          <span className={styles.idPill}>#{supplier.id}</span>
-                        </td>
-                        <td>
-                          <div className={styles.nameCell}>
-                            <span className={styles.name}>{supplier.nome}</span>
-                            {selectedId === supplier.id && (
-                              <span className={styles.selectedTag}>selected</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className={styles.rowActions}>
-                          <button
-                            type="button"
-                            className={styles.deleteButton}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setDeleteTarget(supplier);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <footer className={styles.pagination}>
-              <div className={styles.paginationMeta}>
-                {pageStart === 0 ? '0 risultati' : `${pageStart}-${pageEnd} di ${total} fornitori`}
-              </div>
-              <div className={styles.paginationControls}>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={page <= 1}
-                >
-                  Precedente
-                </Button>
-                <span className={styles.pageBadge}>
-                  Pagina {page} / {totalPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Successiva
-                </Button>
-              </div>
-            </footer>
-          </div>
-        </section>
-
-        <aside className={styles.detailPanel}>
-          {!selectedSupplier ? (
-            <div className={styles.detailEmpty}>
-              <div className={styles.detailIcon}>
-                <Icon name="pencil" size={22} />
-              </div>
-              <h3>Seleziona una riga</h3>
-              <p>Il pannello laterale riproduce l&apos;update inline dell&apos;app originale senza aprire modali.</p>
+              <h2 className={styles.emptyTitle}>Nessun fornitore trovato</h2>
+              <p className={styles.emptyText}>
+                Prova a cambiare ricerca oppure aggiungi un nuovo fornitore.
+              </p>
             </div>
           ) : (
-            <form className={styles.detailCard} onSubmit={handleUpdateSubmit}>
-              <div className={styles.detailHeader}>
-                <div>
-                  <p className={styles.detailLabel}>Record attivo</p>
-                  <h3>{selectedSupplier.nome}</h3>
-                </div>
-                <span className={styles.detailId}>#{selectedSupplier.id}</span>
-              </div>
-
-              <div className={styles.field}>
-                <label htmlFor="supplier-name">Nome</label>
-                <input
-                  id="supplier-name"
-                  type="text"
-                  value={draftName}
-                  onChange={(event) => setDraftName(event.target.value)}
-                  placeholder="Nome fornitore"
-                />
-              </div>
-
-              <div className={styles.changeRow}>
-                <span className={updateDirty ? styles.dirtyTag : styles.cleanTag}>
-                  {updateDirty ? 'Modifiche pronte' : 'Nessuna modifica'}
-                </span>
-              </div>
-
-              <div className={styles.detailActions}>
-                <Button
-                  type="submit"
-                  loading={updateSupplier.isPending}
-                  disabled={!updateDirty || draftName.trim() === ''}
-                  fullWidth
-                >
-                  Aggiorna fornitore
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => setSelectedId(null)}
-                  fullWidth
-                >
-                  Chiudi selezione
-                </Button>
-              </div>
-            </form>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>
+                      <SortButton
+                        active={sortKey === 'id'}
+                        direction={sortOrder}
+                        label="ID"
+                        onClick={() => handleSort('id')}
+                      />
+                    </th>
+                    <th>
+                      <SortButton
+                        active={sortKey === 'nome'}
+                        direction={sortOrder}
+                        label="Nome"
+                        onClick={() => handleSort('nome')}
+                      />
+                    </th>
+                    <th className={styles.actionsHeader}>Azioni</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((supplier, index) => (
+                    <tr
+                      key={supplier.id}
+                      className={selectedId === supplier.id ? styles.rowSelected : ''}
+                      onClick={() => setSelectedId(supplier.id)}
+                      style={{ animationDelay: `${index * 45}ms` }}
+                    >
+                      <td className={styles.idCell}>
+                        <span className={styles.rowId}>#{supplier.id}</span>
+                      </td>
+                      <td>
+                        <span className={styles.rowName}>{supplier.nome}</span>
+                      </td>
+                      <td className={styles.rowActions}>
+                        <button
+                          type="button"
+                          className={styles.deleteButton}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDeleteTarget(supplier);
+                          }}
+                        >
+                          <Icon name="trash" size={14} />
+                          Elimina
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </aside>
-      </div>
+
+          <footer className={styles.pagination}>
+            <div className={styles.paginationMeta}>
+              {pageStart === 0 ? '0 risultati' : `${pageStart}-${pageEnd} di ${total} fornitori`}
+            </div>
+            <div className={styles.paginationControls}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page <= 1}
+              >
+                Precedente
+              </Button>
+              <span className={styles.pageBadge}>
+                Pagina {page} di {totalPages}
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page >= totalPages}
+              >
+                Successiva
+              </Button>
+            </div>
+          </footer>
+        </div>
+      </section>
+
+      <aside className={styles.detailPanel}>
+        {!selectedSupplier ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>
+              <Icon name="pencil" size={22} />
+            </div>
+            <h2 className={styles.emptyTitle}>Seleziona un fornitore</h2>
+            <p className={styles.emptyText}>
+              Scegli un fornitore dall&apos;elenco per modificarne il nome.
+            </p>
+          </div>
+        ) : (
+          <form className={styles.detailCard} onSubmit={handleUpdateSubmit}>
+            <div className={styles.detailHeader}>
+              <div>
+                <p className={styles.detailLabel}>Fornitore selezionato</p>
+                <h2>{selectedSupplier.nome}</h2>
+                <p className={styles.detailMeta}>ID #{selectedSupplier.id}</p>
+              </div>
+            </div>
+
+            <p className={styles.detailDescription}>
+              Aggiorna il nome del fornitore e salva le modifiche.
+            </p>
+
+            <div className={styles.field}>
+              <label htmlFor="supplier-name">Nome</label>
+              <input
+                id="supplier-name"
+                type="text"
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                placeholder="Nome fornitore"
+              />
+            </div>
+
+            <div className={styles.detailActions}>
+              <Button
+                type="submit"
+                loading={updateSupplier.isPending}
+                disabled={!updateDirty || draftName.trim() === ''}
+                fullWidth
+              >
+                Salva modifiche
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setSelectedId(null)}
+                fullWidth
+              >
+                Deseleziona
+              </Button>
+            </div>
+          </form>
+        )}
+      </aside>
 
       <Modal
         open={createOpen}
@@ -455,13 +423,11 @@ export function FornitoriPage() {
         dismissible={!deleteSupplier.isPending}
       >
         <div className={styles.deletePrompt}>
-          <p>
-            Are you sure you want to delete this item?
-          </p>
+          <p>Vuoi eliminare questo fornitore? L&apos;operazione non puo essere annullata.</p>
           {deleteTarget && (
             <div className={styles.deleteCard}>
-              <span className={styles.idPill}>#{deleteTarget.id}</span>
               <strong>{deleteTarget.nome}</strong>
+              <span className={styles.deleteMeta}>ID #{deleteTarget.id}</span>
             </div>
           )}
           <div className={styles.modalActions}>
@@ -470,14 +436,14 @@ export function FornitoriPage() {
               onClick={() => setDeleteTarget(null)}
               disabled={deleteSupplier.isPending}
             >
-              Cancel
+              Annulla
             </Button>
             <Button
               variant="danger"
               onClick={handleDeleteConfirm}
               loading={deleteSupplier.isPending}
             >
-              Confirm
+              Elimina
             </Button>
           </div>
         </div>

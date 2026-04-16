@@ -23,6 +23,12 @@
     - invented KPI cards
     - machine-facing copy such as `server-side`, `inline`, `record`, `id.asc`
     - style not grounded in the current mini-app family
+  - Preferred correction:
+    - compact page title and subtitle
+    - functional toolbar with search plus primary action
+    - single table card with pagination footer
+    - persistent detail panel with business-facing edit copy
+    - no shell metadata pills unless they represent real user-facing meaning
 
 ## Workflow Notes
 
