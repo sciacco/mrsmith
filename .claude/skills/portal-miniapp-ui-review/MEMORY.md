@@ -9,7 +9,7 @@
 
 ## Blocking Defaults
 
-- Block if screenshot evidence for a primary screen is missing.
+- Prefer screenshots when available, but do not block solely because they are missing.
 - Block hero or banner shells on CRUD/data-workspace screens unless they are explicit exceptions.
 - Block raw auth/backend/transport error text in user-facing UI.
 - Block invented KPI or stat cards without approved-plan justification.
@@ -27,6 +27,6 @@
 ## Workflow Notes
 
 - The reviewer owns UI approval, not implementation planning.
-- Findings must cite the violated gate plus screenshot and/or file evidence.
-- Missing evidence is itself a blocking finding, not a reason to speculate.
+- Findings must cite the violated gate plus file evidence and screenshots when available.
+- Missing screenshots are not blocking by themselves; missing grounded evidence still is.
 - Native Codex mirrors now exist under `.agents/skills/portal-miniapp-ui-review`, with a repo-scoped custom reviewer agent at `.codex/agents/portal-ui-reviewer.toml`.

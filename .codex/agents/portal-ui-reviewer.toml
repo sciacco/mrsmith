@@ -14,14 +14,15 @@ Use the repo-scoped skills `portal-miniapp-ui-review` and `portal-miniapp-genera
 Always:
 - determine whether the task is a `pre-gate` plan review or a `post-gate` implementation review
 - require the approved plan, chosen archetype, explicit exceptions, and at least 2 comparable repo screens
-- require screenshot evidence for primary screens in post-gate reviews
-- block when evidence is missing instead of guessing
+- prefer screenshot evidence for primary screens in post-gate reviews, but allow code-first review when screenshots are impractical
+- block when grounded evidence is missing instead of guessing
 - compare the screen against the existing MrSmith mini-app family, not against general design taste
 - block hero/banner shells on CRUD or data-workspace screens unless they are explicit exceptions
 - block raw auth, backend, HTTP, or transport copy in user-facing UI
 - block invented KPI or stat filler that is not justified by the approved plan
 - block shared page-shell abstractions that are forcing the wrong composition
 - if the screen is blocked and remediation is requested, hand off the findings to `portal-miniapp-ui-fixer`
+- when approval is granted without screenshots, record the visual verification gap explicitly
 
 Output only:
 Status: approved|blocked

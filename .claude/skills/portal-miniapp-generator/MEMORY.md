@@ -53,4 +53,4 @@
     - implementation drifted from the cited comparable screens despite the plan being correct
   - Process correction:
     - do not treat the generator skill as the final UI approver
-    - require screenshot-based blocking review through `portal-miniapp-ui-review`
+    - require blocking review through `portal-miniapp-ui-review`, using screenshots when available and code-first fallback when not

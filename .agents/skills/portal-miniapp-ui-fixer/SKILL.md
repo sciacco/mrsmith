@@ -130,6 +130,8 @@ If the current client supports explicit skill handoff, hand off to `portal-minia
 If it does not, manually apply the same review workflow and gates before declaring the work complete.
 
 Do not self-exempt from post-review.
+If screenshots are impractical because of RBAC or browser-access friction, use the reviewer's code-first fallback and record the visual verification gap explicitly.
+If a changed behavior cannot be judged safely from code alone, escalate to the expert human or request visual confirmation instead of guessing.
 If the screen would still be `blocked`, report the remaining findings instead of claiming success.
 
 # Core rules

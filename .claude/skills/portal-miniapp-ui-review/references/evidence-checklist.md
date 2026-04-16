@@ -18,9 +18,10 @@ Block if any of the above is missing.
 Require:
 - the approved plan and exceptions
 - the implementation files for the reviewed screen
-- desktop screenshot of the primary populated or default state
+- the route, screen, or component scope for the review
 
-Also require when applicable:
+Prefer when reasonably obtainable:
+- desktop screenshot of the primary populated or default state
 - empty-state screenshot
 - error-state screenshot
 - destructive-confirm or modal-state screenshot
@@ -28,14 +29,15 @@ Also require when applicable:
 
 ## Evidence discipline
 
-- Do not approve a primary screen from code alone.
+- Approval from code alone is allowed when the reviewed route/component is identifiable and the implementation files expose the relevant behavior clearly.
 - Do not approve a primary screen from a screenshot alone when the implementation files are available.
-- If a state is important to the task and not shown, block with `missing evidence`.
+- If a state is important to the task and cannot be inferred from code or shown visually, block with `missing evidence`.
 - If the UI leaks raw auth/backend errors, capture that as a blocking copy finding, not as a backend-only issue.
+- If screenshots are unavailable because of RBAC or browser-access friction, cite file evidence and record the missing visual verification as a residual risk instead of blocking automatically.
 
 ## Primary-screen defaults
 
-For CRUD or data-workspace screens, treat these as primary states unless the plan says otherwise:
+For CRUD or data-workspace screens, try to cover these as primary states unless the plan says otherwise:
 - main list or workspace state
 - empty state
 - error state

@@ -11,6 +11,7 @@
 - Prefer app-local fixes first; allow shared `packages/` or shared style changes only when the issue clearly belongs there.
 - Ask the expert human only for real ambiguity, not for routine visual corrections.
 - Mandatory post-fix review is part of done; the fixer does not self-exempt from the blocking gates.
+- When screenshots are impractical, use the reviewer's code-first fallback and record the residual visual verification gap explicitly.
 
 ## Seed Regressions
 

@@ -1,6 +1,6 @@
 ---
 name: portal-miniapp-ui-review
-description: Use this skill for blocking UI review of MrSmith portal mini-app screens. It validates planned and implemented screens against repo archetypes, comparable apps, copy rules, and screenshot/code evidence, and it blocks approval when the UI drifts from the mini-app family.
+description: Use this skill for blocking UI review of MrSmith portal mini-app screens. It validates planned and implemented screens against repo archetypes, comparable apps, copy rules, implementation files, and screenshots when available, and it blocks approval when the UI drifts from the mini-app family.
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash
@@ -46,9 +46,9 @@ Do not approve a screen without these inputs:
 
 For post-implementation review, also require:
 - the relevant implementation files for the screen under review
-- rendered screenshot evidence per `references/evidence-checklist.md`
+- screenshots when they are reasonably obtainable per `references/evidence-checklist.md`
 
-If evidence is missing, block the review instead of guessing.
+If evidence is too weak to support a grounded review, block instead of guessing.
 
 # Bundled resources
 
@@ -74,10 +74,12 @@ Read `references/evidence-checklist.md`.
 Block immediately if:
 - comparable repo screens are missing
 - the archetype is not declared
-- a primary screen has no screenshot evidence in post-gate
-- empty/error state evidence is required but missing
+- the reviewed screen or route cannot be identified
+- the relevant implementation files are missing
+- the code does not expose enough behavior to evaluate the relevant state safely
 
-Do not approve a primary CRUD screen from code alone.
+Code-first approval is allowed when the implementation files and route/component scope are sufficient.
+If screenshots are unavailable, record the visual verification gap explicitly instead of pretending certainty.
 
 ## Step 3: Run the blocking gates
 
@@ -91,8 +93,8 @@ Always check:
 - exception handling
 - shared shell abstractions that may be driving the screen in the wrong direction
 
-For post-gate reviews, inspect both screenshot evidence and the implementation files.
-If screenshot and code disagree, trust the rendered UI and treat the mismatch as a finding.
+For post-gate reviews, inspect the implementation files first and screenshots when available.
+If screenshots and code disagree, trust the rendered UI and treat the mismatch as a finding.
 
 ## Step 4: Produce the verdict
 
@@ -103,12 +105,14 @@ Output must be one of:
 Review format:
 - findings first, ordered by severity
 - each finding cites the violated gate
-- each finding cites screenshot and/or file evidence
+- each finding cites file evidence and screenshots when available
 - each finding states the required correction
 
 If there are no findings:
 - say that explicitly
 - mention any residual verification gaps
+
+When approval is granted without screenshots, the residual risks must say that visual verification was not performed and why.
 
 Do not soften a blocking finding into a suggestion.
 If the screen is blocked and remediation is requested, hand off the findings to `portal-miniapp-ui-fixer`.
@@ -124,6 +128,7 @@ If the screen is blocked and remediation is requested, hand off the findings to 
 - KPI or stat cards are blocked unless the approved plan explicitly justifies them with real user value.
 - Do not approve a shared page-shell abstraction until at least one real screen using it passes review.
 - The reviewer never performs the fix itself; blocked screens go to `portal-miniapp-ui-fixer`.
+- Missing screenshots alone are not blocking when RBAC or browser-access friction makes them impractical and the implementation files are sufficient for a grounded review.
 
 # Review output
 
@@ -147,7 +152,7 @@ Keep findings concrete. Avoid generic design commentary.
 
 This skill is complete when:
 - the review phase is explicit
-- the evidence package is complete
+- the evidence package is sufficient for a grounded review
 - blocking gates have been checked against real repo comparables
 - approval is granted only when the screen matches the archetype, copy policy, and mini-app family
 - any deviation is recorded as an explicit exception instead of being hand-waved as creative freedom

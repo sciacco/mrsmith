@@ -8,12 +8,15 @@ Pass only if:
 - the review phase is explicit
 - the approved plan and chosen archetype are available
 - at least 2 comparable repo screens are cited with exact file paths
-- required screenshots and implementation files are present
+- the reviewed screen/route/component is identifiable
+- the implementation files are present
+- screenshots are included when they are reasonably obtainable
 
 Fail if:
 - approval depends on imagination or inferred states
-- a primary screen is reviewed from code only
-- required empty/error/narrow evidence is missing
+- the reviewed screen or route cannot be identified
+- implementation files are missing
+- neither code nor available visuals are sufficient to evaluate the relevant behavior
 
 ## 2. Archetype Gate
 
@@ -87,3 +90,4 @@ Approve only when:
 - no blocking findings remain
 - the primary rendered states match the approved mini-app family
 - residual risks, if any, are verification gaps rather than known UI defects
+- missing screenshots are called out explicitly when approval relied on code-first fallback
