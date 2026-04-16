@@ -1,6 +1,10 @@
+/* ── Page layout ── */
 .page {
   display: grid;
   gap: 1.5rem;
+  max-width: 1400px;
+  margin-inline: auto;
+  width: 100%;
   animation: pageEnter 0.5s var(--ease-out) both;
 }
 
@@ -31,6 +35,18 @@
   flex-wrap: wrap;
 }
 
+.sectionSpacer {
+  display: grid;
+  gap: 1rem;
+}
+
+.contextTitle {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+/* ── Toolbar, filters, tabs ── */
 .filterStack {
   display: grid;
   gap: 0.9rem;
@@ -43,24 +59,28 @@
 }
 
 .statusChip {
-  padding: 0.55rem 0.85rem;
+  min-height: 2rem;
+  padding: 0.4rem 0.9rem;
   border: 1px solid var(--color-border);
   border-radius: 999px;
   background: var(--color-bg-elevated);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .statusChip:hover {
   transform: translateY(-1px);
-  border-color: rgba(99, 91, 255, 0.4);
+  border-color: var(--color-accent-muted);
 }
 
 .statusChipActive {
   color: var(--color-accent);
-  border-color: rgba(99, 91, 255, 0.38);
-  background: rgba(99, 91, 255, 0.12);
+  border-color: var(--color-accent-muted);
+  background: var(--color-accent-subtle);
   box-shadow: var(--shadow-accent);
 }
 
@@ -70,25 +90,39 @@
   gap: 0.75rem;
 }
 
-.inlineInput {
-  min-width: 12rem;
-  padding: 0.8rem 0.95rem;
-  border-radius: var(--radius-md);
+.tabRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.tabButton {
+  padding: 0.72rem 0.95rem;
+  border-radius: var(--radius-full);
   border: 1px solid var(--color-border);
   background: var(--color-bg-elevated);
-  color: var(--color-text);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
-.inlineInput:focus,
-.textArea:focus,
-.fieldInput:focus,
-.numberInput:focus,
-.dateInput:focus {
-  outline: none;
-  border-color: rgba(99, 91, 255, 0.5);
-  box-shadow: 0 0 0 4px rgba(99, 91, 255, 0.12);
+.tabButton:hover {
+  border-color: var(--color-accent-muted);
+  background: var(--color-surface);
 }
 
+.tabButtonActive {
+  color: var(--color-accent);
+  border-color: var(--color-accent-muted);
+  background: var(--color-accent-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Cards & containers ── */
 .cards {
   display: grid;
   gap: 1rem;
@@ -141,89 +175,6 @@
   letter-spacing: -0.02em;
 }
 
-.contextTitle {
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.muted {
-  color: var(--color-text-secondary);
-}
-
-.small {
-  font-size: 0.84rem;
-  color: var(--color-text-secondary);
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.72rem;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background: rgba(148, 163, 184, 0.14);
-  color: var(--color-text-secondary);
-}
-
-.pill[data-status='nuova'],
-.pill[data-status='bozza'] {
-  background: rgba(99, 91, 255, 0.12);
-  color: var(--color-accent);
-}
-
-.pill[data-status='in corso'],
-.pill[data-status='inviata'],
-.pill[data-status='sollecitata'] {
-  background: rgba(245, 158, 11, 0.14);
-  color: #a16207;
-}
-
-.pill[data-status='completata'] {
-  background: rgba(16, 185, 129, 0.14);
-  color: #047857;
-}
-
-.pill[data-status='annullata'] {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
-}
-
-.actionsRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-}
-
-.emptyCard,
-.forbiddenCard {
-  display: grid;
-  gap: 0.6rem;
-  padding: 1.9rem;
-  text-align: center;
-}
-
-.emptyCard h3,
-.forbiddenCard h3 {
-  font-size: 1.05rem;
-}
-
-.gridTwo {
-  display: grid;
-  gap: 1.1rem;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.95fr);
-}
-
-.newGrid {
-  display: grid;
-  gap: 1.1rem;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-}
-
 .panel,
 .listCard,
 .formCard,
@@ -246,9 +197,75 @@
   margin-bottom: 0.95rem;
 }
 
+.heroGrid,
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.95rem;
+}
+
+.metaCardValue {
+  margin-top: 0.32rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.gridTwo {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.95fr);
+}
+
+.newGrid {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+}
+
+.actionCard,
+.valuationCard {
+  padding: 1rem 1.05rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.actionList,
+.valuationList {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.analysisBlock {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+.iframeWrap {
+  height: 72vh;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.iframeWrap iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--color-bg-elevated);
+}
+
+/* ── Selectable list items ── */
 .dealList {
   display: grid;
   gap: 0.85rem;
+}
+
+.listWrap {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .dealCard,
@@ -260,6 +277,7 @@
   border: 1px solid var(--color-border);
   background: var(--color-bg-elevated);
   cursor: pointer;
+  text-align: left;
   transition:
     transform var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-fast) var(--ease-out),
@@ -270,18 +288,19 @@
 .dealCard:hover,
 .listItem:hover {
   transform: translateY(-1px);
-  border-color: rgba(99, 91, 255, 0.28);
+  border-color: var(--color-accent-muted);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
 }
 
 .dealCardSelected,
 .listItemSelected {
-  border-color: rgba(99, 91, 255, 0.4);
+  border-color: var(--color-accent-muted);
   background: var(--color-accent-subtle);
   box-shadow: var(--shadow-sm);
 }
 
+/* ── Forms ── */
 .formGrid {
   display: grid;
   gap: 1rem;
@@ -304,7 +323,8 @@
 .fieldInput,
 .numberInput,
 .dateInput,
-.textArea {
+.textArea,
+.inlineInput {
   width: 100%;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
@@ -314,14 +334,30 @@
 
 .fieldInput,
 .numberInput,
-.dateInput {
+.dateInput,
+.inlineInput {
   padding: 0.8rem 0.95rem;
+}
+
+.inlineInput {
+  min-width: 12rem;
+  width: auto;
 }
 
 .textArea {
   min-height: 7.5rem;
   padding: 0.9rem 0.95rem;
   resize: vertical;
+}
+
+.inlineInput:focus,
+.textArea:focus,
+.fieldInput:focus,
+.numberInput:focus,
+.dateInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-subtle);
 }
 
 .formColumns {
@@ -345,100 +381,60 @@
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text-secondary);
+  cursor: pointer;
 }
 
 .checkChip input {
   accent-color: var(--color-accent);
 }
 
-.heroGrid,
-.metaGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.95rem;
-}
-
-.metaCardValue {
-  margin-top: 0.32rem;
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.listWrap {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.tabRow {
+.actionsRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.7rem;
+  gap: 0.65rem;
 }
 
-.tabButton {
-  padding: 0.72rem 0.95rem;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out);
+/* ── Empty & error states ── */
+.emptyCard,
+.forbiddenCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 2.4rem 1.9rem;
+  text-align: center;
 }
 
-.tabButton:hover {
-  border-color: rgba(99, 91, 255, 0.24);
-  background: var(--color-surface);
+.emptyCard h3,
+.forbiddenCard h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
-.tabButtonActive {
-  color: var(--color-accent);
-  border-color: rgba(99, 91, 255, 0.38);
-  background: var(--color-accent-subtle);
-  box-shadow: var(--shadow-sm);
-}
-
-.analysisBlock {
-  white-space: pre-wrap;
-  line-height: 1.7;
-  color: var(--color-text-secondary);
-}
-
-.iframeWrap {
-  height: 72vh;
+.emptyIcon,
+.emptyIconDanger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 0.4rem;
   border-radius: var(--radius-xl);
-  overflow: hidden;
-  border: 1px solid rgba(226, 232, 240, 0.92);
-}
-
-.iframeWrap iframe {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  background: white;
-}
-
-.actionList,
-.valuationList {
-  display: grid;
-  gap: 0.8rem;
-}
-
-.actionCard,
-.valuationCard {
-  padding: 1rem 1.05rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
   background: var(--color-surface);
+  color: var(--color-text-faint);
 }
 
-.sectionSpacer {
-  display: grid;
-  gap: 1rem;
+.emptyIconDanger {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.emptyIcon svg,
+.emptyIconDanger svg {
+  width: 32px;
+  height: 32px;
 }
 
 .modalBody {
@@ -446,7 +442,36 @@
   gap: 1rem;
 }
 
-@media (max-width: 1080px) {
+/* ── Focus-visible (A11y) ── */
+.dealCard:focus-visible,
+.listItem:focus-visible,
+.statusChip:focus-visible,
+.tabButton:focus-visible,
+.checkChip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.inlineInput:focus-visible,
+.textArea:focus-visible,
+.fieldInput:focus-visible,
+.numberInput:focus-visible,
+.dateInput:focus-visible {
+  outline: none;
+}
+
+/* ── Utilities ── */
+.muted {
+  color: var(--color-text-secondary);
+}
+
+.small {
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+}
+
+/* ── Responsive ── */
+@media (max-width: 1000px) {
   .gridTwo,
   .newGrid,
   .heroGrid,
@@ -476,5 +501,6 @@
 
   .inlineInput {
     min-width: 0;
+    width: 100%;
   }
 }

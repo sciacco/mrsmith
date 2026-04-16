@@ -36,7 +36,7 @@ export function App() {
           <section className={styles.reauthCard}>
             <p className={styles.eyebrow}>Autenticazione</p>
             <h1>Sessione in ripristino</h1>
-            <p>La sessione e scaduta durante l&apos;inattivita. Reindirizzamento a Keycloak in corso.</p>
+            <p>La sessione è scaduta durante l&apos;inattività. Reindirizzamento a Keycloak in corso.</p>
           </section>
         </AppShell.Content>
       </AppShell>

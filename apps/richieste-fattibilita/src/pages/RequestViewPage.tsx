@@ -1,13 +1,21 @@
-import { Button, Skeleton } from '@mrsmith/ui';
+import { Button, Icon, Skeleton } from '@mrsmith/ui';
 import { hasAnyRole } from '@mrsmith/auth-client';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAnalysis, useAnalysisJSON, useRichiestaFull, useRichiestaPdf } from '../api/queries';
+import { StatusPill, statusTone } from '../components/StatusPill';
 import { MANAGER_ROLES, budgetLabel, copyErrorMessage, formatCounts, formatDate, parsePositiveId } from '../lib/format';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
-import styles from './Workspace.module.css';
+import styles from './shared.module.css';
 
 type TabKey = 'riepilogo' | 'analisi' | 'azioni' | 'pdf';
+
+const TAB_DEFS: { key: TabKey; label: string }[] = [
+  { key: 'riepilogo', label: 'Riepilogo' },
+  { key: 'analisi', label: 'Analisi' },
+  { key: 'azioni', label: 'Azioni' },
+  { key: 'pdf', label: 'PDF' },
+];
 
 export function RequestViewPage() {
   const navigate = useNavigate();
@@ -38,8 +46,9 @@ export function RequestViewPage() {
   if (richiestaId === null) {
     return (
       <section className={styles.emptyCard}>
+        <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
         <h3>Identificativo non valido</h3>
-        <p className={styles.muted}>Il dettaglio richiesto non puo essere aperto con questo URL.</p>
+        <p className={styles.muted}>Il dettaglio richiesto non può essere aperto con questo URL.</p>
       </section>
     );
   }
@@ -52,6 +61,7 @@ export function RequestViewPage() {
         </div>
       ) : richiesta.error || !richiesta.data ? (
         <div className={styles.emptyCard}>
+          <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
           <h3>Vista non disponibile</h3>
           <p className={styles.muted}>{copyErrorMessage(richiesta.error, 'Impossibile caricare la richiesta.')}</p>
         </div>
@@ -85,9 +95,9 @@ export function RequestViewPage() {
                 </div>
                 <p className={styles.pageSubtitle}>{richiesta.data.deal_name ?? 'Deal non disponibile'}</p>
               </div>
-              <span className={styles.pill} data-status={richiesta.data.stato}>
+              <StatusPill tone={statusTone(richiesta.data.stato)} aria-label={`Stato ${richiesta.data.stato}`}>
                 {richiesta.data.stato}
-              </span>
+              </StatusPill>
             </div>
 
             <div className={styles.heroMeta}>
@@ -106,21 +116,34 @@ export function RequestViewPage() {
             </div>
           </div>
 
-          <div className={styles.tabRow}>
-            {(['riepilogo', 'analisi', 'azioni', 'pdf'] as TabKey[]).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                className={`${styles.tabButton} ${activeTab === tab ? styles.tabButtonActive : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab === 'riepilogo' ? 'Riepilogo' : tab === 'analisi' ? 'Analisi' : tab === 'azioni' ? 'Azioni' : 'PDF'}
-              </button>
-            ))}
+          <div className={styles.tabRow} role="tablist" aria-label="Sezioni RDF">
+            {TAB_DEFS.map(({ key, label }) => {
+              const active = activeTab === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  id={`tab-${key}`}
+                  aria-selected={active}
+                  aria-controls={`tabpanel-${key}`}
+                  tabIndex={active ? 0 : -1}
+                  className={`${styles.tabButton} ${active ? styles.tabButtonActive : ''}`}
+                  onClick={() => setActiveTab(key)}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
 
           {activeTab === 'riepilogo' && (
-            <div className={styles.sectionSpacer}>
+            <div
+              className={styles.sectionSpacer}
+              role="tabpanel"
+              id="tabpanel-riepilogo"
+              aria-labelledby="tab-riepilogo"
+            >
               <div className={styles.metaGrid}>
                 <div className={styles.metaCard}>
                   <div className={styles.sectionLabel}>Data richiesta</div>
@@ -155,13 +178,11 @@ export function RequestViewPage() {
                         <div className={styles.listHeading}>{item.fornitore_nome}</div>
                         <p className={styles.small}>{item.tecnologia_nome}</p>
                       </div>
-                      <span className={styles.pill} data-status={item.stato}>
-                        {item.stato}
-                      </span>
+                      <StatusPill tone={statusTone(item.stato)}>{item.stato}</StatusPill>
                     </div>
                     <div className={styles.listItemBottom}>
                       <span className={styles.small}>Budget: {budgetLabel(item.aderenza_budget)}</span>
-                      <span className={styles.small}>Copertura: {item.copertura ? 'SI' : 'NO'}</span>
+                      <span className={styles.small}>Copertura: {item.copertura ? 'Sì' : 'No'}</span>
                       <span className={styles.small}>Esito: {formatDate(item.esito_ricevuto_il)}</span>
                     </div>
                     {item.annotazioni && <p className={styles.muted}>{item.annotazioni}</p>}
@@ -172,13 +193,19 @@ export function RequestViewPage() {
           )}
 
           {activeTab === 'analisi' && (
-            <div className={styles.panel}>
+            <div
+              className={styles.panel}
+              role="tabpanel"
+              id="tabpanel-analisi"
+              aria-labelledby="tab-analisi"
+            >
               {analysisText.isLoading ? (
                 <Skeleton rows={10} />
               ) : analysisText.error ? (
                 <div className={styles.emptyCard}>
+                  <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
                   <h3>Analisi non disponibile</h3>
-                  <p className={styles.muted}>{copyErrorMessage(analysisText.error, 'L’analisi non e disponibile in questo momento.')}</p>
+                  <p className={styles.muted}>{copyErrorMessage(analysisText.error, 'L’analisi non è disponibile in questo momento.')}</p>
                 </div>
               ) : (
                 <div className={styles.analysisBlock}>{analysisText.data}</div>
@@ -187,13 +214,19 @@ export function RequestViewPage() {
           )}
 
           {activeTab === 'azioni' && (
-            <div className={styles.sectionSpacer}>
+            <div
+              className={styles.sectionSpacer}
+              role="tabpanel"
+              id="tabpanel-azioni"
+              aria-labelledby="tab-azioni"
+            >
               {analysisJSON.isLoading ? (
                 <div className={styles.panel}><Skeleton rows={10} /></div>
               ) : analysisJSON.error || !analysisJSON.data ? (
                 <div className={styles.emptyCard}>
+                  <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
                   <h3>Azioni non disponibili</h3>
-                  <p className={styles.muted}>{copyErrorMessage(analysisJSON.error, 'Il riepilogo strutturato non e disponibile.')}</p>
+                  <p className={styles.muted}>{copyErrorMessage(analysisJSON.error, 'Il riepilogo strutturato non è disponibile.')}</p>
                 </div>
               ) : (
                 <>
@@ -228,9 +261,7 @@ export function RequestViewPage() {
                               <div className={styles.listHeading}>{item.fornitore}</div>
                               <p className={styles.small}>{item.tecnologia}</p>
                             </div>
-                            <span className={styles.pill} data-status={item.stato}>
-                              {item.stato}
-                            </span>
+                            <StatusPill tone={statusTone(item.stato)}>{item.stato}</StatusPill>
                           </div>
                           <div className={styles.listItemBottom}>
                             {item.copertura && <span className={styles.small}>Copertura: {item.copertura}</span>}
@@ -248,13 +279,19 @@ export function RequestViewPage() {
           )}
 
           {activeTab === 'pdf' && (
-            <div className={styles.panel}>
+            <div
+              className={styles.panel}
+              role="tabpanel"
+              id="tabpanel-pdf"
+              aria-labelledby="tab-pdf"
+            >
               {pdf.isLoading ? (
                 <Skeleton rows={8} />
               ) : pdf.error || !pdfUrl ? (
                 <div className={styles.emptyCard}>
+                  <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
                   <h3>PDF non disponibile</h3>
-                  <p className={styles.muted}>{copyErrorMessage(pdf.error, 'Il PDF non e disponibile in questo momento.')}</p>
+                  <p className={styles.muted}>{copyErrorMessage(pdf.error, 'Il PDF non è disponibile in questo momento.')}</p>
                 </div>
               ) : (
                 <div className={styles.sectionSpacer}>

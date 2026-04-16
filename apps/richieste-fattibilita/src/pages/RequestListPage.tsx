@@ -1,11 +1,12 @@
-import { Button, SearchInput, Skeleton, TableToolbar } from '@mrsmith/ui';
+import { Button, Icon, SearchInput, Skeleton, TableToolbar } from '@mrsmith/ui';
 import { useDeferredValue, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useRichiesteSummary } from '../api/queries';
 import { Pagination } from '../components/Pagination';
+import { StatusPill, statusTone } from '../components/StatusPill';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { DEFAULT_LIST_STATES, copyErrorMessage, formatCounts, formatDate, isManager, RICHIESTA_STATES } from '../lib/format';
-import styles from './Workspace.module.css';
+import styles from './shared.module.css';
 
 interface RequestListPageProps {
   mode: 'consultazione' | 'gestione';
@@ -49,8 +50,9 @@ export function RequestListPage({ mode }: RequestListPageProps) {
   if (mode === 'gestione' && !canManage) {
     return (
       <section className={styles.forbiddenCard}>
+        <div className={styles.emptyIconDanger}><Icon name="lock" /></div>
         <h3>Accesso riservato</h3>
-        <p className={styles.muted}>La gestione carrier e disponibile solo per il ruolo manager RDF.</p>
+        <p className={styles.muted}>La gestione carrier è disponibile solo per il ruolo manager RDF.</p>
       </section>
     );
   }
@@ -97,17 +99,20 @@ export function RequestListPage({ mode }: RequestListPageProps) {
     });
   }
 
+  const filterInputId = mode === 'gestione' ? 'filter-richiedente' : 'filter-cliente';
+  const filterInputLabel = mode === 'gestione' ? 'Filtra per richiedente' : 'Filtra per cliente';
+
   return (
     <section className={styles.page}>
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>
-            {mode === 'gestione' ? 'Gestione RDF Carrier' : 'Consultazione RDF'}
+            {mode === 'gestione' ? 'Gestione RDF Carrier' : 'Consultazione RDF Carrier'}
           </h1>
           <p className={styles.pageSubtitle}>
             {mode === 'gestione'
-              ? 'Monitora le richieste attive, apri il dettaglio e porta avanti le fattibilita dei carrier.'
-              : 'Consulta lo stato delle richieste, apri il riepilogo completo e verifica l’avanzamento delle fattibilita.'}
+              ? 'Monitora le richieste attive, apri il dettaglio e porta avanti le fattibilità dei carrier.'
+              : 'Consulta lo stato delle richieste, apri il riepilogo completo e verifica l’avanzamento delle fattibilità.'}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -119,13 +124,19 @@ export function RequestListPage({ mode }: RequestListPageProps) {
       </div>
 
       <div className={styles.filterStack}>
-        <div className={styles.statusRow}>
+        <div
+          className={styles.statusRow}
+          role="group"
+          aria-label="Filtra per stato richiesta"
+        >
           {RICHIESTA_STATES.map((state) => {
             const active = selectedStates.includes(state);
             return (
               <button
                 key={state}
                 type="button"
+                role="checkbox"
+                aria-checked={active}
                 className={`${styles.statusChip} ${active ? styles.statusChipActive : ''}`}
                 onClick={() => toggleState(state)}
               >
@@ -139,19 +150,26 @@ export function RequestListPage({ mode }: RequestListPageProps) {
           activeFilterCount={hasFilters ? 1 : 0}
           filters={
             <div className={styles.toolbarFilters}>
+              <label htmlFor={filterInputId} className={styles.sectionLabel} style={{ display: 'none' }}>
+                {filterInputLabel}
+              </label>
               {mode === 'gestione' ? (
                 <input
+                  id={filterInputId}
                   className={styles.inlineInput}
                   value={richiedenteFilter}
                   onChange={(event) => updateParam('richiedente', event.target.value)}
                   placeholder="Filtra per richiedente"
+                  aria-label="Filtra per richiedente"
                 />
               ) : (
                 <input
+                  id={filterInputId}
                   className={styles.inlineInput}
                   value={clienteFilter}
                   onChange={(event) => updateParam('cliente', event.target.value)}
                   placeholder="Filtra per cliente"
+                  aria-label="Filtra per cliente"
                 />
               )}
               {hasFilters && (
@@ -176,11 +194,13 @@ export function RequestListPage({ mode }: RequestListPageProps) {
         </div>
       ) : summary.error ? (
         <div className={styles.emptyCard}>
+          <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
           <h3>Elenco non disponibile</h3>
           <p className={styles.muted}>{copyErrorMessage(summary.error, 'Impossibile caricare le richieste RDF.')}</p>
         </div>
       ) : !summary.data || summary.data.items.length === 0 ? (
         <div className={styles.emptyCard}>
+          <div className={styles.emptyIcon}><Icon name="search" /></div>
           <h3>Nessuna richiesta trovata</h3>
           <p className={styles.muted}>Non ci sono richieste che corrispondono ai filtri selezionati.</p>
         </div>
@@ -195,9 +215,9 @@ export function RequestListPage({ mode }: RequestListPageProps) {
                     <h2 className={styles.summaryHeading}>{item.company_name ?? 'Cliente non disponibile'}</h2>
                     <p className={styles.small}>{item.deal_name ?? 'Deal non disponibile'}</p>
                   </div>
-                  <span className={styles.pill} data-status={item.stato}>
+                  <StatusPill tone={statusTone(item.stato)} aria-label={`Stato ${item.stato}`}>
                     {item.stato}
-                  </span>
+                  </StatusPill>
                 </div>
 
                 <div>

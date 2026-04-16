@@ -1,9 +1,9 @@
-import { Button, MultiSelect, SearchInput, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, MultiSelect, SearchInput, Skeleton, useToast } from '@mrsmith/ui';
 import { useDeferredValue, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateRichiesta, useDeals, useFornitori } from '../api/queries';
 import { copyErrorMessage } from '../lib/format';
-import styles from './Workspace.module.css';
+import styles from './shared.module.css';
 
 export function NewRequestPage() {
   const navigate = useNavigate();
@@ -85,6 +85,7 @@ export function NewRequestPage() {
               value={cliente}
               onChange={(event) => { setCliente(event.target.value); setPage(1); }}
               placeholder="Filtra per cliente"
+              aria-label="Filtra per cliente"
             />
           </div>
 
@@ -93,11 +94,13 @@ export function NewRequestPage() {
               <Skeleton rows={6} />
             ) : deals.error ? (
               <div className={styles.emptyCard}>
+                <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
                 <h3>Deal non disponibili</h3>
                 <p className={styles.muted}>{copyErrorMessage(deals.error, 'Impossibile caricare i deal.')}</p>
               </div>
             ) : !deals.data || deals.data.items.length === 0 ? (
               <div className={styles.emptyCard}>
+                <div className={styles.emptyIcon}><Icon name="search" /></div>
                 <h3>Nessun deal trovato</h3>
                 <p className={styles.muted}>Affina la ricerca o il filtro cliente per trovare il deal corretto.</p>
               </div>
@@ -109,6 +112,8 @@ export function NewRequestPage() {
                     <button
                       key={deal.id}
                       type="button"
+                      role="radio"
+                      aria-checked={selected}
                       className={`${styles.dealCard} ${selected ? styles.dealCardSelected : ''}`}
                       onClick={() => setSelectedDeal(deal)}
                     >
@@ -162,8 +167,9 @@ export function NewRequestPage() {
                 </div>
               ) : (
                 <div className={styles.emptyCard}>
+                  <div className={styles.emptyIcon}><Icon name="package" /></div>
                   <h3>Seleziona un deal</h3>
-                  <p className={styles.muted}>La richiesta puo essere inserita solo dopo aver scelto un deal eleggibile.</p>
+                  <p className={styles.muted}>La richiesta può essere inserita solo dopo aver scelto un deal eleggibile.</p>
                 </div>
               )}
             </div>
@@ -186,12 +192,12 @@ export function NewRequestPage() {
                 className={styles.textArea}
                 value={descrizione}
                 onChange={(event) => setDescrizione(event.target.value)}
-                placeholder="Dettagli utili per la fattibilita, vincoli e obiettivi attesi"
+                placeholder="Dettagli utili per la fattibilità, vincoli e obiettivi attesi"
               />
             </div>
 
             <div className={styles.fieldGroup}>
-              <label>Fornitori preferiti</label>
+              <label htmlFor="fornitori-preferiti">Fornitori preferiti</label>
               <MultiSelect
                 options={(fornitori.data ?? []).map((item) => ({ value: item.id, label: item.nome }))}
                 selected={fornitoriPreferiti}

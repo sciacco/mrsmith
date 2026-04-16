@@ -40,7 +40,7 @@ export function formatDateTime(value: string | null | undefined): string {
 }
 
 export function formatCounts(counts: FattibilitaCounts): string {
-  return `Bozza: ${counts.bozza} Inv: ${counts.inviata} Soll: ${counts.sollecitata} Comp: ${counts.completata} Ann: ${counts.annullata}`;
+  return `Bozza ${counts.bozza} · Inviate ${counts.inviata} · Sollecitate ${counts.sollecitata} · Completate ${counts.completata} · Annullate ${counts.annullata}`;
 }
 
 export function budgetLabel(score: number): string {

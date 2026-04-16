@@ -1,12 +1,13 @@
-import { Button, Modal, MultiSelect, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, MultiSelect, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import { hasAnyRole } from '@mrsmith/auth-client';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCreateFattibilita, useFornitori, useRichiestaFull, useTecnologie, useUpdateFattibilita, useUpdateRichiestaStato } from '../api/queries';
 import type { Fattibilita, UpdateFattibilitaBody } from '../api/types';
+import { StatusPill, statusTone } from '../components/StatusPill';
 import { BUDGET_OPTIONS, FATTIBILITA_STATES, MANAGER_ROLES, RICHIESTA_STATES, budgetLabel, copyErrorMessage, formatCounts, formatDate, formatDateTime, parsePositiveId } from '../lib/format';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
-import styles from './Workspace.module.css';
+import styles from './shared.module.css';
 
 interface FattibilitaFormState {
   descrizione: string;
@@ -91,8 +92,9 @@ export function RequestDetailPage() {
   if (!canManage) {
     return (
       <section className={styles.forbiddenCard}>
+        <div className={styles.emptyIconDanger}><Icon name="lock" /></div>
         <h3>Accesso riservato</h3>
-        <p className={styles.muted}>Il dettaglio carrier e disponibile solo per il ruolo manager RDF.</p>
+        <p className={styles.muted}>Il dettaglio carrier è disponibile solo per il ruolo manager RDF.</p>
       </section>
     );
   }
@@ -100,8 +102,9 @@ export function RequestDetailPage() {
   if (richiestaId === null) {
     return (
       <section className={styles.emptyCard}>
+        <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
         <h3>Identificativo non valido</h3>
-        <p className={styles.muted}>Il dettaglio richiesto non puo essere aperto con questo URL.</p>
+        <p className={styles.muted}>Il dettaglio richiesto non può essere aperto con questo URL.</p>
       </section>
     );
   }
@@ -139,7 +142,7 @@ export function RequestDetailPage() {
         body: buildPatchBody(formState),
       },
       {
-        onSuccess: () => toast('Fattibilita aggiornata'),
+        onSuccess: () => toast('Fattibilità aggiornata'),
         onError: (error) => toast(copyErrorMessage(error, 'Aggiornamento non riuscito.'), 'error'),
       },
     );
@@ -172,6 +175,7 @@ export function RequestDetailPage() {
         </div>
       ) : richiesta.error || !richiesta.data ? (
         <div className={styles.emptyCard}>
+          <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
           <h3>Dettaglio non disponibile</h3>
           <p className={styles.muted}>{copyErrorMessage(richiesta.error, 'Impossibile caricare la richiesta.')}</p>
         </div>
@@ -203,9 +207,9 @@ export function RequestDetailPage() {
                 </div>
                 <p className={styles.pageSubtitle}>{richiesta.data.deal_name ?? 'Deal non disponibile'}</p>
               </div>
-              <span className={styles.pill} data-status={richiesta.data.stato}>
+              <StatusPill tone={statusTone(richiesta.data.stato)} aria-label={`Stato ${richiesta.data.stato}`}>
                 {richiesta.data.stato}
-              </span>
+              </StatusPill>
             </div>
 
             <div className={styles.heroMeta}>
@@ -223,25 +227,34 @@ export function RequestDetailPage() {
               </div>
             </div>
 
-            <div className={styles.statusRow}>
-              {RICHIESTA_STATES.map((state) => (
-                <button
-                  key={state}
-                  type="button"
-                  className={`${styles.statusChip} ${richiesta.data?.stato === state ? styles.statusChipActive : ''}`}
-                  onClick={() =>
-                    updateRichiestaStato.mutate(
-                      { richiestaId: richiestaId!, body: { stato: state } },
-                      {
-                        onSuccess: () => toast('Stato richiesta aggiornato'),
-                        onError: (error) => toast(copyErrorMessage(error, 'Aggiornamento stato non riuscito.'), 'error'),
-                      },
-                    )
-                  }
-                >
-                  {state}
-                </button>
-              ))}
+            <div
+              className={styles.statusRow}
+              role="radiogroup"
+              aria-label="Aggiorna stato richiesta"
+            >
+              {RICHIESTA_STATES.map((state) => {
+                const active = richiesta.data?.stato === state;
+                return (
+                  <button
+                    key={state}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    className={`${styles.statusChip} ${active ? styles.statusChipActive : ''}`}
+                    onClick={() =>
+                      updateRichiestaStato.mutate(
+                        { richiestaId: richiestaId!, body: { stato: state } },
+                        {
+                          onSuccess: () => toast('Stato richiesta aggiornato'),
+                          onError: (error) => toast(copyErrorMessage(error, 'Aggiornamento stato non riuscito.'), 'error'),
+                        },
+                      )
+                    }
+                  >
+                    {state}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -249,41 +262,45 @@ export function RequestDetailPage() {
             <div className={styles.listCard}>
               <div className={styles.panelHeader}>
                 <div>
-                  <h2 className={styles.panelTitle}>Righe fattibilita</h2>
+                  <h2 className={styles.panelTitle}>Righe fattibilità</h2>
                   <p className={styles.small}>Seleziona una riga per modificarla oppure aggiungine di nuove in batch.</p>
                 </div>
                 <Button onClick={() => setShowAddModal(true)}>Aggiungi righe</Button>
               </div>
 
-              <div className={styles.listWrap}>
+              <div className={styles.listWrap} role="radiogroup" aria-label="Seleziona fattibilità">
                 {richiesta.data.fattibilita.length === 0 ? (
                   <div className={styles.emptyCard}>
+                    <div className={styles.emptyIcon}><Icon name="package" /></div>
                     <h3>Nessuna riga presente</h3>
                     <p className={styles.muted}>Aggiungi almeno una combinazione fornitore-tecnologia per iniziare.</p>
                   </div>
                 ) : (
-                  richiesta.data.fattibilita.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={`${styles.listItem} ${selectedFattibilitaId === item.id ? styles.listItemSelected : ''}`}
-                      onClick={() => setSelectedFattibilitaId(item.id)}
-                    >
-                      <div className={styles.listItemTop}>
-                        <div>
-                          <div className={styles.listHeading}>{item.fornitore_nome}</div>
-                          <p className={styles.small}>{item.tecnologia_nome}</p>
+                  richiesta.data.fattibilita.map((item) => {
+                    const selected = selectedFattibilitaId === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        className={`${styles.listItem} ${selected ? styles.listItemSelected : ''}`}
+                        onClick={() => setSelectedFattibilitaId(item.id)}
+                      >
+                        <div className={styles.listItemTop}>
+                          <div>
+                            <div className={styles.listHeading}>{item.fornitore_nome}</div>
+                            <p className={styles.small}>{item.tecnologia_nome}</p>
+                          </div>
+                          <StatusPill tone={statusTone(item.stato)}>{item.stato}</StatusPill>
                         </div>
-                        <span className={styles.pill} data-status={item.stato}>
-                          {item.stato}
-                        </span>
-                      </div>
-                      <div className={styles.listItemBottom}>
-                        <span className={styles.small}>Budget: {budgetLabel(item.aderenza_budget)}</span>
-                        <span className={styles.small}>Esito: {formatDate(item.esito_ricevuto_il)}</span>
-                      </div>
-                    </button>
-                  ))
+                        <div className={styles.listItemBottom}>
+                          <span className={styles.small}>Budget: {budgetLabel(item.aderenza_budget)}</span>
+                          <span className={styles.small}>Esito: {formatDate(item.esito_ricevuto_il)}</span>
+                        </div>
+                      </button>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -291,15 +308,16 @@ export function RequestDetailPage() {
             <div className={styles.formCard}>
               <div className={styles.panelHeader}>
                 <div>
-                  <h2 className={styles.panelTitle}>Editor fattibilita</h2>
+                  <h2 className={styles.panelTitle}>Editor fattibilità</h2>
                   <p className={styles.small}>Aggiorna i dati ricevuti dal fornitore e salva le note operative.</p>
                 </div>
               </div>
 
               {!selectedFattibilita || !formState ? (
                 <div className={styles.emptyCard}>
+                  <div className={styles.emptyIcon}><Icon name="pencil" /></div>
                   <h3>Seleziona una riga</h3>
-                  <p className={styles.muted}>Scegli una fattibilita dalla lista per aprire il modulo di modifica.</p>
+                  <p className={styles.muted}>Scegli una fattibilità dalla lista per aprire il modulo di modifica.</p>
                 </div>
               ) : (
                 <div className={styles.formGrid}>
@@ -313,7 +331,7 @@ export function RequestDetailPage() {
                   </div>
 
                   <div className={styles.fieldGroup}>
-                    <label>Stato</label>
+                    <label htmlFor="fattibilita-stato">Stato</label>
                     <SingleSelect
                       options={FATTIBILITA_STATES.map((value) => ({ value, label: value }))}
                       selected={formState.stato}
@@ -423,7 +441,7 @@ export function RequestDetailPage() {
                   </div>
 
                   <div className={styles.fieldGroup}>
-                    <label>Aderenza budget</label>
+                    <label htmlFor="aderenza-budget">Aderenza budget</label>
                     <SingleSelect
                       options={BUDGET_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
                       selected={Number(formState.aderenza_budget)}
@@ -477,10 +495,10 @@ export function RequestDetailPage() {
         </>
       )}
 
-      <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="Aggiungi righe di fattibilita">
+      <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="Aggiungi righe di fattibilità">
         <div className={styles.modalBody}>
           <div className={styles.fieldGroup}>
-            <label>Fornitori</label>
+            <label htmlFor="modal-fornitori">Fornitori</label>
             <MultiSelect
               options={(fornitori.data ?? []).map((item) => ({ value: item.id, label: item.nome }))}
               selected={selectedFornitori}
@@ -489,7 +507,7 @@ export function RequestDetailPage() {
             />
           </div>
           <div className={styles.fieldGroup}>
-            <label>Tecnologie</label>
+            <label htmlFor="modal-tecnologie">Tecnologie</label>
             <MultiSelect
               options={(tecnologie.data ?? []).map((item) => ({ value: item.id, label: item.nome }))}
               selected={selectedTecnologie}
