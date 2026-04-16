@@ -86,6 +86,7 @@ export function SingleSelect<V extends string | number = string | number>({
   );
 
   const selectedOption = options.find((o) => o.value === selected);
+  const renderInline = Boolean(triggerRef.current?.closest('dialog[open]'));
 
   function handleSelect(value: V) {
     onChange(value);
@@ -98,6 +99,63 @@ export function SingleSelect<V extends string | number = string | number>({
     setOpen(false);
     setSearch('');
   }
+
+  const dropdown = (
+    <div
+      ref={dropdownRef}
+      className={`${styles.dropdown} ${renderInline ? styles.dropdownInline : ''}`}
+      style={
+        renderInline
+          ? coords.placeTop
+            ? { bottom: `calc(100% + ${DROPDOWN_GAP}px)` }
+            : { top: `calc(100% + ${DROPDOWN_GAP}px)` }
+          : {
+              top: coords.top,
+              left: coords.left,
+              width: coords.width,
+              transform: coords.placeTop ? 'translateY(-100%)' : undefined,
+            }
+      }
+    >
+      <input
+        className={styles.search}
+        type="text"
+        placeholder="Cerca..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        autoFocus
+      />
+      <div className={styles.options}>
+        {allowClear && !search && (
+          <div
+            className={`${styles.option} ${selected === null ? styles.optionSelected : ''}`}
+            onClick={handleClear}
+          >
+            <span className={styles.radio}>
+              {selected === null && <span className={styles.radioDot} />}
+            </span>
+            <span className={styles.clearLabel}>Tutti</span>
+          </div>
+        )}
+        {filtered.length === 0 ? (
+          <div className={styles.empty}>Nessun risultato</div>
+        ) : (
+          filtered.map((o) => (
+            <div
+              key={o.value}
+              className={`${styles.option} ${o.value === selected ? styles.optionSelected : ''}`}
+              onClick={() => handleSelect(o.value)}
+            >
+              <span className={styles.radio}>
+                {o.value === selected && <span className={styles.radioDot} />}
+              </span>
+              <span>{o.label}</span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className={styles.container}>
@@ -115,58 +173,7 @@ export function SingleSelect<V extends string | number = string | number>({
           &#9660;
         </span>
       </div>
-      {open &&
-        createPortal(
-          <div
-            ref={dropdownRef}
-            className={styles.dropdown}
-            style={{
-              top: coords.top,
-              left: coords.left,
-              width: coords.width,
-              transform: coords.placeTop ? 'translateY(-100%)' : undefined,
-            }}
-          >
-            <input
-              className={styles.search}
-              type="text"
-              placeholder="Cerca..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-            />
-            <div className={styles.options}>
-              {allowClear && !search && (
-                <div
-                  className={`${styles.option} ${selected === null ? styles.optionSelected : ''}`}
-                  onClick={handleClear}
-                >
-                  <span className={styles.radio}>
-                    {selected === null && <span className={styles.radioDot} />}
-                  </span>
-                  <span className={styles.clearLabel}>Tutti</span>
-                </div>
-              )}
-              {filtered.length === 0 ? (
-                <div className={styles.empty}>Nessun risultato</div>
-              ) : (
-                filtered.map((o) => (
-                  <div
-                    key={o.value}
-                    className={`${styles.option} ${o.value === selected ? styles.optionSelected : ''}`}
-                    onClick={() => handleSelect(o.value)}
-                  >
-                    <span className={styles.radio}>
-                      {o.value === selected && <span className={styles.radioDot} />}
-                    </span>
-                    <span>{o.label}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>,
-          document.body,
-        )}
+      {open && (renderInline ? dropdown : createPortal(dropdown, document.body))}
     </div>
   );
 }
