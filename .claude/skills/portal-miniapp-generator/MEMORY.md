@@ -34,3 +34,16 @@
 
 - Appsmith flow is now: `appsmith-audit -> appsmith-migration-spec -> portal-miniapp-generator -> implementation`.
 - The plan produced by this skill is the per-app contract; do not create extra governance files unless the repo explicitly adopts them later.
+
+## Recent Implementations
+
+- **Richieste Fattibilita** — 2026-04-16
+  - Kept the approved `master_detail_crud` shell and handled `Visualizza RDF` as a tabbed exception inside the same mini-app.
+  - Locked repo-fit defaults:
+    - SPA path `/apps/richieste-fattibilita/`
+    - API prefix `/api/rdf/v1/*`
+    - split-server port `5182`
+    - launcher hidden when either `ANISETTA_DSN` or `MISTRA_DSN` is missing
+  - Preserved business-facing copy and avoided KPI/banner drift.
+  - Important implementation nuance:
+    - `rdf_*` lives on Anisetta while HubSpot replica enrichment lives on Mistra, so summary “server-side merge” must happen as two reads plus Go-side merge, not as one SQL join.

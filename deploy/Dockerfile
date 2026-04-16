@@ -24,6 +24,7 @@ COPY --from=frontend /app/apps/kit-products/dist /static/apps/kit-products
 COPY --from=frontend /app/apps/listini-e-sconti/dist /static/apps/listini-e-sconti
 COPY --from=frontend /app/apps/panoramica-cliente/dist /static/apps/panoramica-cliente
 COPY --from=frontend /app/apps/quotes/dist /static/apps/quotes
+COPY --from=frontend /app/apps/richieste-fattibilita/dist /static/apps/richieste-fattibilita
 COPY --from=frontend /app/apps/rdf-backend/dist /static/apps/rdf-backend
 COPY --from=frontend /app/apps/reports/dist /static/apps/reports
 EXPOSE 8080

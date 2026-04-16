@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strconv"
+)
 
 type Config struct {
 	Port              string
@@ -10,14 +13,15 @@ type Config struct {
 	StaticDir         string
 
 	// Optional launcher override for split-server local development.
-	BudgetAppURL      string
-	ComplianceAppURL  string
-	KitProductsAppURL string
-	ListiniAppURL     string
-	PanoramicaAppURL  string
-	QuotesAppURL      string
-	RDFBackendAppURL  string
-	ReportsAppURL     string
+	BudgetAppURL               string
+	ComplianceAppURL           string
+	KitProductsAppURL          string
+	ListiniAppURL              string
+	PanoramicaAppURL           string
+	QuotesAppURL               string
+	RichiesteFattibilitaAppURL string
+	RDFBackendAppURL           string
+	ReportsAppURL              string
 
 	// Anisetta PostgreSQL (compliance module)
 	AnisettaDSN string
@@ -37,6 +41,13 @@ type Config struct {
 	// Carbone PDF generation (optional — listini module)
 	CarboneAPIKey string
 
+	// OpenRouter AI integration (optional)
+	OpenRouterAPIKey string
+
+	// RDF Teams notifications (optional)
+	RDFTeamsWebhookURL           string
+	RDFTeamsNotificationsEnabled bool
+
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
 	KeycloakFrontendRealm    string
@@ -51,25 +62,29 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		Port:              envOr("PORT", "8080"),
-		LogLevel:          envOr("LOG_LEVEL", "info"),
-		KeycloakIssuerURL: envOr("KEYCLOAK_ISSUER_URL", ""),
-		CORSOrigins:       envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181"),
-		StaticDir:         envOr("STATIC_DIR", ""),
-		BudgetAppURL:      envOr("BUDGET_APP_URL", ""),
-		ComplianceAppURL:  envOr("COMPLIANCE_APP_URL", ""),
-		KitProductsAppURL: envOr("KIT_PRODUCTS_APP_URL", ""),
-		ListiniAppURL:     envOr("LISTINI_APP_URL", ""),
-		PanoramicaAppURL:  envOr("PANORAMICA_APP_URL", ""),
-		QuotesAppURL:      envOr("QUOTES_APP_URL", ""),
-		RDFBackendAppURL:  envOr("RDF_BACKEND_APP_URL", ""),
-		ReportsAppURL:     envOr("REPORTS_APP_URL", ""),
-		AnisettaDSN:       envOr("ANISETTA_DSN", ""),
-		MistraDSN:         envOr("MISTRA_DSN", ""),
-		AlyanteDSN:        envOr("ALYANTE_DSN", ""),
-		GrappaDSN:         envOr("GRAPPA_DSN", ""),
-		HubSpotAPIKey:     envOr("HUBSPOT_API_KEY", ""),
-		CarboneAPIKey:     envOr("CARBONE_API_KEY", ""),
+		Port:                         envOr("PORT", "8080"),
+		LogLevel:                     envOr("LOG_LEVEL", "info"),
+		KeycloakIssuerURL:            envOr("KEYCLOAK_ISSUER_URL", ""),
+		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182"),
+		StaticDir:                    envOr("STATIC_DIR", ""),
+		BudgetAppURL:                 envOr("BUDGET_APP_URL", ""),
+		ComplianceAppURL:             envOr("COMPLIANCE_APP_URL", ""),
+		KitProductsAppURL:            envOr("KIT_PRODUCTS_APP_URL", ""),
+		ListiniAppURL:                envOr("LISTINI_APP_URL", ""),
+		PanoramicaAppURL:             envOr("PANORAMICA_APP_URL", ""),
+		QuotesAppURL:                 envOr("QUOTES_APP_URL", ""),
+		RichiesteFattibilitaAppURL:   envOr("RICHIESTE_FATTIBILITA_APP_URL", ""),
+		RDFBackendAppURL:             envOr("RDF_BACKEND_APP_URL", ""),
+		ReportsAppURL:                envOr("REPORTS_APP_URL", ""),
+		AnisettaDSN:                  envOr("ANISETTA_DSN", ""),
+		MistraDSN:                    envOr("MISTRA_DSN", ""),
+		AlyanteDSN:                   envOr("ALYANTE_DSN", ""),
+		GrappaDSN:                    envOr("GRAPPA_DSN", ""),
+		HubSpotAPIKey:                envOr("HUBSPOT_API_KEY", ""),
+		CarboneAPIKey:                envOr("CARBONE_API_KEY", ""),
+		OpenRouterAPIKey:             envOr("OPENROUTER_API_KEY", ""),
+		RDFTeamsWebhookURL:           envOr("RDF_TEAMS_WEBHOOK_URL", ""),
+		RDFTeamsNotificationsEnabled: boolEnvOr("RDF_TEAMS_NOTIFICATIONS_ENABLED", false),
 
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),
@@ -80,6 +95,18 @@ func Load() Config {
 		ArakServiceSecret:   envOr("ARAK_SERVICE_CLIENT_SECRET", ""),
 		ArakServiceTokenURL: envOr("ARAK_SERVICE_TOKEN_URL", ""),
 	}
+}
+
+func boolEnvOr(key string, fallback bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func envOr(key, fallback string) string {

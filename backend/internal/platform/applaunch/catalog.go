@@ -26,6 +26,9 @@ const (
 	QuotesAppID   = "proposte"
 	QuotesAppHref = "/apps/quotes/"
 
+	RichiesteFattibilitaAppID   = "richieste-fattibilita"
+	RichiesteFattibilitaAppHref = "/apps/richieste-fattibilita/"
+
 	RDFBackendAppID   = "rdf-backend"
 	RDFBackendAppHref = "/apps/rdf-backend/"
 
@@ -34,16 +37,18 @@ const (
 )
 
 var (
-	budgetAccessRoles      = []string{"app_budget_access"}
-	complianceAccessRoles  = []string{"app_compliance_access"}
-	kitProductsAccessRoles = []string{"app_kitproducts_access"}
-	listiniAccessRoles     = []string{"app_listini_access"}
-	panoramicaAccessRoles  = []string{"app_panoramica_access"}
-	quotesAccessRoles      = []string{"app_quotes_access"}
-	quotesDeleteRoles      = []string{"app_quotes_delete"}
-	rdfBackendAccessRoles  = []string{"app_rdf_backend_access"}
-	reportsAccessRoles     = []string{"app_reports_access"}
-	defaultAccessRoles     = []string{"no-default-roles-cdlan"}
+	budgetAccessRoles                = []string{"app_budget_access"}
+	complianceAccessRoles            = []string{"app_compliance_access"}
+	kitProductsAccessRoles           = []string{"app_kitproducts_access"}
+	listiniAccessRoles               = []string{"app_listini_access"}
+	panoramicaAccessRoles            = []string{"app_panoramica_access"}
+	quotesAccessRoles                = []string{"app_quotes_access"}
+	quotesDeleteRoles                = []string{"app_quotes_delete"}
+	richiesteFattibilitaAccessRoles  = []string{"app_rdf_access", "app_rdf_manager"}
+	richiesteFattibilitaManagerRoles = []string{"app_rdf_manager"}
+	rdfBackendAccessRoles            = []string{"app_rdf_backend_access"}
+	reportsAccessRoles               = []string{"app_reports_access"}
+	defaultAccessRoles               = []string{"no-default-roles-cdlan"}
 )
 
 type Definition struct {
@@ -138,15 +143,16 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryTitle: "MKT&Sales",
 			AccessRoles:   QuotesAccessRoles(),
 		},
-		// {
-		// 	ID:            "richieste-fattibilita",
-		// 	Name:          "Richieste Fattibilità",
-		// 	Icon:          "clipboard",
-		// 	Href:          "/apps/mkt-sales/richieste-fattibilita",
-		// 	CategoryID:    "mkt-sales",
-		// 	CategoryTitle: "MKT&Sales",
-		// 	AccessRoles:   defaultRoles,
-		// },
+		{
+			ID:            RichiesteFattibilitaAppID,
+			Name:          "Richieste Fattibilita",
+			Icon:          "file-text",
+			Href:          RichiesteFattibilitaAppHref,
+			Status:        "test",
+			CategoryID:    "mkt-sales",
+			CategoryTitle: "MKT&Sales",
+			AccessRoles:   RichiesteFattibilitaAccessRoles(),
+		},
 		{
 			ID:            ListiniAppID,
 			Name:          "Listini e Sconti",
@@ -361,6 +367,14 @@ func QuotesDeleteRoles() []string {
 
 func RDFBackendAccessRoles() []string {
 	return slices.Clone(rdfBackendAccessRoles)
+}
+
+func RichiesteFattibilitaAccessRoles() []string {
+	return slices.Clone(richiesteFattibilitaAccessRoles)
+}
+
+func RichiesteFattibilitaManagerRoles() []string {
+	return slices.Clone(richiesteFattibilitaManagerRoles)
 }
 
 func ReportsAccessRoles() []string {

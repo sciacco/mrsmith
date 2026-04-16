@@ -28,9 +28,11 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
+	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 	"github.com/sciacco/mrsmith/internal/platform/staticspa"
 	"github.com/sciacco/mrsmith/internal/portal"
 	"github.com/sciacco/mrsmith/internal/quotes"
+	"github.com/sciacco/mrsmith/internal/rdf"
 	"github.com/sciacco/mrsmith/internal/rdfbackend"
 	"github.com/sciacco/mrsmith/internal/reports"
 	"github.com/sciacco/mrsmith/pkg/middleware"
@@ -148,6 +150,12 @@ func main() {
 		logger.Info("shared hubspot client configured", "component", "hubspot")
 	}
 
+	var openrouterCli *openrouter.Client
+	if cfg.OpenRouterAPIKey != "" {
+		openrouterCli = openrouter.New(cfg.OpenRouterAPIKey)
+		logger.Info("shared openrouter client configured", "component", "openrouter")
+	}
+
 	// Carbone service (optional — listini module)
 	var carboneSvc *listini.CarboneService
 	if cfg.CarboneAPIKey != "" {
@@ -196,6 +204,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.QuotesAppID] = "http://localhost:5179"
 	}
+	if cfg.RichiesteFattibilitaAppURL != "" {
+		hrefOverrides[applaunch.RichiesteFattibilitaAppID] = cfg.RichiesteFattibilitaAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.RichiesteFattibilitaAppID] = "http://localhost:5182"
+	}
 	if cfg.RDFBackendAppURL != "" {
 		hrefOverrides[applaunch.RDFBackendAppID] = cfg.RDFBackendAppURL
 	} else if cfg.StaticDir == "" {
@@ -222,6 +235,9 @@ func main() {
 			if definition.ID == applaunch.QuotesAppID && cfg.MistraDSN == "" {
 				continue
 			}
+			if definition.ID == applaunch.RichiesteFattibilitaAppID && (cfg.AnisettaDSN == "" || cfg.MistraDSN == "") {
+				continue
+			}
 			if definition.ID == applaunch.RDFBackendAppID && cfg.AnisettaDSN == "" {
 				continue
 			}
@@ -243,6 +259,7 @@ func main() {
 	listini.RegisterRoutes(api, mistraDB, grappaDB, hubspotSvc, carboneSvc)
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 	quotes.RegisterRoutes(api, mistraDB, alyanteDB, hubspotCli)
+	rdf.RegisterRoutes(api, anisettaDB, mistraDB, openrouterCli, cfg.RDFTeamsWebhookURL, cfg.RDFTeamsNotificationsEnabled)
 	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)
 

@@ -1,0 +1,463 @@
+.page {
+  display: grid;
+  gap: 1.4rem;
+  animation: pageEnter 0.5s var(--ease-out) both;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1.6rem 1.75rem;
+  border-radius: var(--radius-2xl);
+  background:
+    linear-gradient(135deg, rgba(99, 91, 255, 0.13), rgba(255, 255, 255, 0.92)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.88));
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  box-shadow: var(--shadow-float);
+}
+
+.pageTitle {
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+}
+
+.pageSubtitle {
+  margin-top: 0.35rem;
+  max-width: 48rem;
+  color: var(--color-text-secondary);
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.filterStack {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.statusChip {
+  padding: 0.55rem 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.statusChip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(99, 91, 255, 0.4);
+}
+
+.statusChipActive {
+  color: var(--color-accent);
+  border-color: rgba(99, 91, 255, 0.38);
+  background: rgba(99, 91, 255, 0.12);
+  box-shadow: var(--shadow-accent);
+}
+
+.toolbarFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.inlineInput {
+  min-width: 12rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--color-text);
+}
+
+.inlineInput:focus,
+.textArea:focus,
+.fieldInput:focus,
+.numberInput:focus,
+.dateInput:focus {
+  outline: none;
+  border-color: rgba(99, 91, 255, 0.5);
+  box-shadow: 0 0 0 4px rgba(99, 91, 255, 0.12);
+}
+
+.cards {
+  display: grid;
+  gap: 1rem;
+}
+
+.summaryCard,
+.panel,
+.heroCard,
+.metaCard,
+.emptyCard,
+.forbiddenCard,
+.listCard,
+.formCard {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.summaryCard {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.35rem;
+}
+
+.summaryTop,
+.summaryBottom,
+.listItemTop,
+.listItemBottom,
+.heroTop,
+.heroMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.summaryCode {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.summaryHeading,
+.listHeading {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.muted {
+  color: var(--color-text-secondary);
+}
+
+.small {
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.72rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--color-text-secondary);
+}
+
+.pill[data-status='nuova'],
+.pill[data-status='bozza'] {
+  background: rgba(99, 91, 255, 0.12);
+  color: var(--color-accent);
+}
+
+.pill[data-status='in corso'],
+.pill[data-status='inviata'],
+.pill[data-status='sollecitata'] {
+  background: rgba(245, 158, 11, 0.14);
+  color: #a16207;
+}
+
+.pill[data-status='completata'] {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+}
+
+.pill[data-status='annullata'] {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.actionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.emptyCard,
+.forbiddenCard {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1.9rem;
+  text-align: center;
+}
+
+.emptyCard h3,
+.forbiddenCard h3 {
+  font-size: 1.05rem;
+}
+
+.gridTwo {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.95fr);
+}
+
+.newGrid {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+}
+
+.panel,
+.listCard,
+.formCard,
+.heroCard,
+.metaCard {
+  padding: 1.2rem 1.3rem;
+}
+
+.panelTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.95rem;
+}
+
+.dealList {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.dealCard,
+.listItem {
+  display: grid;
+  gap: 0.55rem;
+  padding: 1rem 1.05rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.9));
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+
+.dealCard:hover,
+.listItem:hover {
+  transform: translateY(-1px);
+  border-color: rgba(99, 91, 255, 0.34);
+  box-shadow: var(--shadow-accent);
+}
+
+.dealCardSelected,
+.listItemSelected {
+  border-color: rgba(99, 91, 255, 0.45);
+  background: linear-gradient(180deg, rgba(237, 233, 254, 0.9), rgba(255, 255, 255, 0.95));
+  box-shadow: var(--shadow-accent);
+}
+
+.formGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.fieldGroup {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.fieldGroup label,
+.sectionLabel {
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.fieldInput,
+.numberInput,
+.dateInput,
+.textArea {
+  width: 100%;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: #fff;
+  color: var(--color-text);
+}
+
+.fieldInput,
+.numberInput,
+.dateInput {
+  padding: 0.8rem 0.95rem;
+}
+
+.textArea {
+  min-height: 7.5rem;
+  padding: 0.9rem 0.95rem;
+  resize: vertical;
+}
+
+.formColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.toggleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.checkChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(248, 250, 252, 0.72);
+  color: var(--color-text-secondary);
+}
+
+.checkChip input {
+  accent-color: var(--color-accent);
+}
+
+.heroGrid,
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.95rem;
+}
+
+.metaCardValue {
+  margin-top: 0.32rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.listWrap {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.tabRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.tabButton {
+  padding: 0.72rem 0.95rem;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.tabButtonActive {
+  color: var(--color-accent);
+  border-color: rgba(99, 91, 255, 0.38);
+  box-shadow: var(--shadow-accent);
+}
+
+.analysisBlock {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+.iframeWrap {
+  height: 72vh;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.iframeWrap iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: white;
+}
+
+.actionList,
+.valuationList {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.actionCard,
+.valuationCard {
+  padding: 1rem 1.05rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.sectionSpacer {
+  display: grid;
+  gap: 1rem;
+}
+
+.modalBody {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (max-width: 1080px) {
+  .gridTwo,
+  .newGrid,
+  .heroGrid,
+  .metaGrid,
+  .formColumns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .pageHeader,
+  .summaryTop,
+  .summaryBottom,
+  .heroTop,
+  .heroMeta,
+  .panelHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbarFilters,
+  .actionsRow,
+  .headerActions,
+  .toggleRow {
+    flex-direction: column;
+  }
+
+  .inlineInput {
+    min-width: 0;
+  }
+}

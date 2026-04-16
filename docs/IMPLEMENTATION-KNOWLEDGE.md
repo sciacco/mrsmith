@@ -104,6 +104,15 @@ Alyante ERP ID
 
 ## API and Backend Contract Quirks
 
+### Cross-Database Mini-App Summaries Must Merge In Code, Not In One SQL Join
+
+- Context: mini-apps that read business records from one DB and enrich them with replica/loader data from another DB in the same request path.
+- Discovery: the MrSmith backend wires `ANISETTA_DSN`, `MISTRA_DSN`, `GRAPPA_DSN`, and other stores as separate `*sql.DB` handles. A handler cannot issue a single SQL statement that joins tables across those DSN boundaries. `apps/richieste-fattibilita` hit this when `rdf_richieste` (Anisetta) needed HubSpot deal/company enrichment from `loader.hubs_*` (Mistra).
+- Practical rule: when a screen needs cross-DB enrichment, fetch the base rows from the owning DB, batch-load enrichment rows from the secondary DB, merge in Go, and only then apply filters that depend on enriched fields (for example customer/company name filters). Do not plan a “server-side join” as a single SQL query unless the data is confirmed to live behind the same connection.
+- Evidence: separate DB wiring in `backend/cmd/server/main.go`; merge implementation in `backend/internal/rdf/handler.go` for `GET /rdf/v1/richieste/summary`.
+- Used by: `apps/richieste-fattibilita`.
+- Open questions: none.
+
 ### Quotes Create Flow Uses Context-Specific Category Exclusions
 
 - Context: `apps/quotes` service-category loading for Nuova Proposta versus other quotes views.
