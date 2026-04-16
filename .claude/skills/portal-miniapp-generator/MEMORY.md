@@ -32,8 +32,9 @@
 
 ## Workflow Notes
 
-- Appsmith flow is now: `appsmith-audit -> appsmith-migration-spec -> portal-miniapp-generator -> implementation`.
-- The plan produced by this skill is the per-app contract; do not create extra governance files unless the repo explicitly adopts them later.
+- Appsmith flow is now: `appsmith-audit -> appsmith-migration-spec -> portal-miniapp-generator -> portal-miniapp-ui-review pre-gate -> implementation -> portal-miniapp-ui-review post-gate`.
+- The plan produced by this skill is the per-app contract and the handoff artifact for the blocking UI reviewer.
+- Native Codex mirrors now exist under `.agents/skills/portal-miniapp-generator` and `.agents/skills/portal-miniapp-ui-review`, with a repo-scoped custom reviewer agent at `.codex/agents/portal-ui-reviewer.toml`.
 
 ## Recent Implementations
 
@@ -44,6 +45,12 @@
     - API prefix `/api/rdf/v1/*`
     - split-server port `5182`
     - launcher hidden when either `ANISETTA_DSN` or `MISTRA_DSN` is missing
-  - Preserved business-facing copy and avoided KPI/banner drift.
   - Important implementation nuance:
     - `rdf_*` lives on Anisetta while HubSpot replica enrichment lives on Mistra, so summary “server-side merge” must happen as two reads plus Go-side merge, not as one SQL join.
+  - Post-implementation UI regression discovered:
+    - decorative banner shell on the list screen
+    - raw `Unauthorized` visible in the user-facing error state
+    - implementation drifted from the cited comparable screens despite the plan being correct
+  - Process correction:
+    - do not treat the generator skill as the final UI approver
+    - require screenshot-based blocking review through `portal-miniapp-ui-review`

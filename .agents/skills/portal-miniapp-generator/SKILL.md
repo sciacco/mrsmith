@@ -14,6 +14,7 @@ Use it to:
 - plan new mini-apps that fit the existing portal family
 - convert an approved Appsmith migration spec into a repo-fit implementation plan
 - prepare the UI review inputs and exceptions for blocking review
+- hand off implementation to the dedicated UI fixer without leaving visual decisions implicit
 
 This skill is the authority for mini-app generation and repo-fit planning.
 UI approval belongs to `portal-miniapp-ui-review`.
@@ -37,6 +38,7 @@ Use these companion skills first when needed:
 - `appsmith-migration-spec` for expert-in-the-loop specification drafting
 
 Use this companion skill next when needed:
+- `portal-miniapp-ui-fixer` for implementing the app UI once the plan and pre-gate are clear
 - `portal-miniapp-ui-review` for blocking UI approval before coding and before signoff
 
 # Required inputs
@@ -110,11 +112,21 @@ The plan must leave the reviewer with:
 - an `Exceptions` section
 - copy and metric constraints clear enough for blocking review
 
-## Step 5: Require the blocking UI reviewer
+## Step 5: Hand off implementation to the fixer
+
+Hand off to `portal-miniapp-ui-fixer` when moving from the approved plan to code.
+
+The fixer should inherit:
+- the chosen archetype
+- the cited comparable repo screens
+- the `Exceptions` section
+- the copy and metrics constraints
+
+## Step 6: Require the blocking UI reviewer
 
 Hand off to `portal-miniapp-ui-review` twice:
 - pre-gate after the implementation plan is drafted
-- post-gate after the screen is implemented
+- post-gate after `portal-miniapp-ui-fixer` has completed the implementation work
 
 Do not treat coding as complete until the post-gate reviewer approves.
 
@@ -137,4 +149,4 @@ This skill is complete when:
 - repo/runtime fit is specified before implementation
 - any deviation is documented as an explicit exception
 - an Appsmith migration can move from approved spec to implementation without inventing UI behavior ad hoc
-- the plan is ready to be handed to `portal-miniapp-ui-review` as a pre-gate artifact
+- the plan is ready to be handed to `portal-miniapp-ui-fixer` for implementation and `portal-miniapp-ui-review` for approval

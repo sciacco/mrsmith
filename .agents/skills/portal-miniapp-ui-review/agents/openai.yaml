@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portal Mini-App UI Review"
+  short_description: "Blocking UI review for MrSmith mini-app screens"
+  default_prompt: "Use $portal-miniapp-ui-review to run a blocking UI pre-gate or post-gate review for this MrSmith portal mini-app screen."

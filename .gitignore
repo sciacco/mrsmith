@@ -31,3 +31,4 @@ apps/*/*.gz
 /portal-option-a-fullpage.png
 /portal-option-a-viewport.png
 /artifacts/
+/.playwright-cli
