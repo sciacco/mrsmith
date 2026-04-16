@@ -61,7 +61,7 @@ export function RequestViewPage() {
             <div>
               <h1 className={styles.pageTitle}>Visualizza RDF</h1>
               <p className={styles.pageSubtitle}>
-                Consulta il riepilogo, l’analisi AI, il PDF condivisibile e le azioni raccomandate per la richiesta selezionata.
+                Consulta il riepilogo, le valutazioni e il PDF condivisibile della richiesta selezionata.
               </p>
             </div>
             <div className={styles.headerActions}>
@@ -80,7 +80,7 @@ export function RequestViewPage() {
             <div className={styles.heroTop}>
               <div>
                 <div className={styles.summaryCode}>{richiesta.data.codice_deal || `RDF #${richiesta.data.id}`}</div>
-                <div className={styles.pageTitle} style={{ fontSize: '1.55rem' }}>
+                <div className={styles.contextTitle}>
                   {richiesta.data.company_name ?? 'Cliente non disponibile'}
                 </div>
                 <p className={styles.pageSubtitle}>{richiesta.data.deal_name ?? 'Deal non disponibile'}</p>
@@ -178,7 +178,7 @@ export function RequestViewPage() {
               ) : analysisText.error ? (
                 <div className={styles.emptyCard}>
                   <h3>Analisi non disponibile</h3>
-                  <p className={styles.muted}>{copyErrorMessage(analysisText.error, 'Il servizio AI non e disponibile in questo momento.')}</p>
+                  <p className={styles.muted}>{copyErrorMessage(analysisText.error, 'L’analisi non e disponibile in questo momento.')}</p>
                 </div>
               ) : (
                 <div className={styles.analysisBlock}>{analysisText.data}</div>
@@ -254,7 +254,7 @@ export function RequestViewPage() {
               ) : pdf.error || !pdfUrl ? (
                 <div className={styles.emptyCard}>
                   <h3>PDF non disponibile</h3>
-                  <p className={styles.muted}>{copyErrorMessage(pdf.error, 'Il render PDF non e disponibile in questo momento.')}</p>
+                  <p className={styles.muted}>{copyErrorMessage(pdf.error, 'Il PDF non e disponibile in questo momento.')}</p>
                 </div>
               ) : (
                 <div className={styles.sectionSpacer}>

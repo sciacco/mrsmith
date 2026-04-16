@@ -64,7 +64,7 @@ export function NewRequestPage() {
         <div>
           <h1 className={styles.pageTitle}>Nuova RDF</h1>
           <p className={styles.pageSubtitle}>
-            Cerca il deal HubSpot eleggibile, seleziona i fornitori preferiti e inserisci il contesto operativo della richiesta.
+            Cerca il deal corretto, seleziona i fornitori preferiti e inserisci il contesto operativo della richiesta.
           </p>
         </div>
       </div>
@@ -74,7 +74,7 @@ export function NewRequestPage() {
           <div className={styles.panelHeader}>
             <div>
               <h2 className={styles.panelTitle}>Selezione deal</h2>
-              <p className={styles.small}>Ricerca server-side per codice, nome deal, cliente o owner.</p>
+              <p className={styles.small}>Cerca per codice, nome deal, cliente o owner.</p>
             </div>
           </div>
 
@@ -156,7 +156,7 @@ export function NewRequestPage() {
               {selectedDeal ? (
                 <div className={styles.sectionSpacer}>
                   <div className={styles.summaryCode}>{selectedDeal.codice}</div>
-                  <div className={styles.listHeading}>{selectedDeal.company_name ?? 'Cliente non disponibile'}</div>
+                  <div className={styles.contextTitle}>{selectedDeal.company_name ?? 'Cliente non disponibile'}</div>
                   <p>{selectedDeal.deal_name}</p>
                   <p className={styles.small}>{selectedDeal.owner_email ?? 'Owner non disponibile'}</p>
                 </div>

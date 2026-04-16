@@ -1,6 +1,6 @@
 .page {
   display: grid;
-  gap: 1.4rem;
+  gap: 1.5rem;
   animation: pageEnter 0.5s var(--ease-out) both;
 }
 
@@ -9,25 +9,20 @@
   justify-content: space-between;
   gap: 1rem;
   align-items: flex-start;
-  padding: 1.6rem 1.75rem;
-  border-radius: var(--radius-2xl);
-  background:
-    linear-gradient(135deg, rgba(99, 91, 255, 0.13), rgba(255, 255, 255, 0.92)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.88));
-  border: 1px solid rgba(226, 232, 240, 0.88);
-  box-shadow: var(--shadow-float);
 }
 
 .pageTitle {
-  font-size: 1.9rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.04em;
 }
 
 .pageSubtitle {
   margin-top: 0.35rem;
-  max-width: 48rem;
-  color: var(--color-text-secondary);
+  max-width: 44rem;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.55;
 }
 
 .headerActions {
@@ -49,9 +44,9 @@
 
 .statusChip {
   padding: 0.55rem 0.85rem;
-  border: 1px solid rgba(148, 163, 184, 0.26);
+  border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--color-bg-elevated);
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: transform var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
@@ -78,9 +73,9 @@
 .inlineInput {
   min-width: 12rem;
   padding: 0.8rem 0.95rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(226, 232, 240, 0.95);
-  background: rgba(255, 255, 255, 0.94);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
   color: var(--color-text);
 }
 
@@ -107,9 +102,9 @@
 .forbiddenCard,
 .listCard,
 .formCard {
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(226, 232, 240, 0.88);
-  border-radius: var(--radius-2xl);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
 
@@ -144,6 +139,12 @@
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.contextTitle {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .muted {
@@ -255,25 +256,30 @@
   display: grid;
   gap: 0.55rem;
   padding: 1rem 1.05rem;
-  border-radius: var(--radius-xl);
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.9));
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 
 .dealCard:hover,
 .listItem:hover {
   transform: translateY(-1px);
-  border-color: rgba(99, 91, 255, 0.34);
-  box-shadow: var(--shadow-accent);
+  border-color: rgba(99, 91, 255, 0.28);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .dealCardSelected,
 .listItemSelected {
-  border-color: rgba(99, 91, 255, 0.45);
-  background: linear-gradient(180deg, rgba(237, 233, 254, 0.9), rgba(255, 255, 255, 0.95));
-  box-shadow: var(--shadow-accent);
+  border-color: rgba(99, 91, 255, 0.4);
+  background: var(--color-accent-subtle);
+  box-shadow: var(--shadow-sm);
 }
 
 .formGrid {
@@ -300,9 +306,9 @@
 .dateInput,
 .textArea {
   width: 100%;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  background: #fff;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
   color: var(--color-text);
 }
 
@@ -335,9 +341,9 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0.75rem 0.95rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  background: rgba(248, 250, 252, 0.72);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   color: var(--color-text-secondary);
 }
 
@@ -373,16 +379,27 @@
 .tabButton {
   padding: 0.72rem 0.95rem;
   border-radius: var(--radius-full);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
   color: var(--color-text-secondary);
   cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.tabButton:hover {
+  border-color: rgba(99, 91, 255, 0.24);
+  background: var(--color-surface);
 }
 
 .tabButtonActive {
   color: var(--color-accent);
   border-color: rgba(99, 91, 255, 0.38);
-  box-shadow: var(--shadow-accent);
+  background: var(--color-accent-subtle);
+  box-shadow: var(--shadow-sm);
 }
 
 .analysisBlock {
@@ -414,9 +431,9 @@
 .actionCard,
 .valuationCard {
   padding: 1rem 1.05rem;
-  border-radius: var(--radius-xl);
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  background: rgba(248, 250, 252, 0.78);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 
 .sectionSpacer {

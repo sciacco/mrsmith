@@ -198,7 +198,7 @@ export function RequestDetailPage() {
             <div className={styles.heroTop}>
               <div>
                 <div className={styles.summaryCode}>{richiesta.data.codice_deal || `RDF #${richiesta.data.id}`}</div>
-                <div className={styles.pageTitle} style={{ fontSize: '1.55rem' }}>
+                <div className={styles.contextTitle}>
                   {richiesta.data.company_name ?? 'Cliente non disponibile'}
                 </div>
                 <p className={styles.pageSubtitle}>{richiesta.data.deal_name ?? 'Deal non disponibile'}</p>

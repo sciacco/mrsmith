@@ -47,12 +47,23 @@ export function budgetLabel(score: number): string {
   return BUDGET_OPTIONS.find((item) => item.value === score)?.label ?? 'Non valutato';
 }
 
+function isTechnicalErrorCopy(value: string | undefined): boolean {
+  if (!value) return false;
+  return /\b(unauthorized|forbidden|bad gateway|gateway timeout|internal server error|failed to fetch|network(?:error| error)|timeout|json|http|fetch)\b/i.test(value);
+}
+
 export function copyErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
-    const body = error.body as { error?: string } | undefined;
-    return body?.error ?? error.statusText ?? fallback;
+    const body = error.body as { error?: string; message?: string } | undefined;
+    const candidate = body?.message ?? body?.error;
+    if (candidate && !isTechnicalErrorCopy(candidate)) return candidate;
+    if (error.status === 401 || error.status === 403) return 'Non hai accesso a questa operazione.';
+    if (error.status >= 500 || isTechnicalErrorCopy(error.statusText)) return fallback;
+    return error.statusText || fallback;
   }
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    return isTechnicalErrorCopy(error.message) ? fallback : error.message;
+  }
   return fallback;
 }
 
