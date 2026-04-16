@@ -38,6 +38,7 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB *sql.DB, alyante *AlyanteAdapte
 
 	handle("GET /kit-products/v1/lookup/asset-flow", h.handleListAssetFlows)
 	handle("GET /kit-products/v1/lookup/custom-field-key", h.handleListCustomFieldKeys)
+	handle("GET /kit-products/v1/lookup/language", h.handleListLanguages)
 	handle("GET /kit-products/v1/lookup/vocabulary", h.handleListVocabulary)
 
 	handle("GET /kit-products/v1/category", h.handleListCategories)
@@ -47,6 +48,10 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB *sql.DB, alyante *AlyanteAdapte
 	handle("GET /kit-products/v1/customer-group", h.handleListCustomerGroups)
 	handle("POST /kit-products/v1/customer-group", h.handleCreateCustomerGroup)
 	handle("PATCH /kit-products/v1/customer-group", h.handleBatchUpdateCustomerGroups)
+
+	handle("GET /kit-products/v1/product-group", h.handleListProductGroups)
+	handle("POST /kit-products/v1/product-group", h.handleCreateProductGroup)
+	handle("PUT /kit-products/v1/product-group/{translationUUID}", h.handleUpdateProductGroup)
 
 	handle("GET /kit-products/v1/product", h.handleListProducts)
 	handle("POST /kit-products/v1/product", h.handleCreateProduct)

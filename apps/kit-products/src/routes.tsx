@@ -3,6 +3,7 @@ import { Navigate, type RouteObject } from 'react-router-dom';
 import { ProductsPage } from './views/products/ProductsPage';
 import { CategoriesPage } from './views/settings/CategoriesPage';
 import { CustomerGroupsPage } from './views/settings/CustomerGroupsPage';
+import { ProductGroupsPage } from './views/settings/ProductGroupsPage';
 import { KitDetailPage } from './views/kit/KitDetailPage';
 import { KitListPage } from './views/kit/KitListPage';
 import { KitDiscountsPage } from './views/mistra/KitDiscountsPage';
@@ -70,6 +71,10 @@ export const routes: RouteObject[] = [
   {
     path: 'settings/customer-groups',
     element: <CustomerGroupsPage />,
+  },
+  {
+    path: 'settings/product-groups',
+    element: <ProductGroupsPage />,
   },
   { path: '*', element: <Navigate to="/kit" replace /> },
 ];

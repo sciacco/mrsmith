@@ -17,3 +17,5 @@
 - Appsmith flow is now: `appsmith-audit -> appsmith-migration-spec -> portal-miniapp-generator -> portal-miniapp-ui-review pre-gate -> portal-miniapp-ui-fixer -> portal-miniapp-ui-review post-gate`.
 - The plan produced by this skill is the per-app contract and the handoff artifact for both the fixer and the blocking UI reviewer.
 - Keep the `.claude/skills` copy in sync until the repo fully switches to native Codex paths.
+- For `apps/kit-products` settings registries, the repo-fit pattern is a compact `master_detail_crud` page reusing `SettingsPage.module.css`, selection-driven `Modifica`, modal create/edit, and explicit empty/error states rather than a side detail panel.
+- `common.vocabulary` is not universally read-only in mini-apps: `kit_product_group` can be admin-managed from `kit-products`, but runtime consumers may still intentionally keep using `common.vocabulary.name` while translations stay administrative-only for that feature slice.

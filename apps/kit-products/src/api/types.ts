@@ -8,6 +8,11 @@ export interface CustomFieldKey {
   key_description: string;
 }
 
+export interface LanguageOption {
+  iso: string;
+  name: string;
+}
+
 export interface VocabularyItem {
   label: string;
   value: string;
@@ -50,6 +55,31 @@ export interface Translation {
   language: 'it' | 'en';
   short: string;
   long: string;
+}
+
+export interface ProductGroupTranslation {
+  language: string;
+  short: string;
+  long: string;
+}
+
+export interface ProductGroup {
+  name: string;
+  translation_uuid: string;
+  usage_count: number;
+  translations: ProductGroupTranslation[];
+}
+
+export interface ProductGroupWriteRequest {
+  name: string;
+  translations: ProductGroupTranslation[];
+  confirm_propagation?: boolean;
+}
+
+export interface ProductGroupRenameConflict {
+  error: 'rename_confirmation_required';
+  impacted_kit_products: number;
+  quotes_unchanged: boolean;
 }
 
 export interface Product {

@@ -5,6 +5,7 @@ import styles from './SettingsMenu.module.css';
 const items = [
   { label: 'Categorie', path: '/settings/categories' },
   { label: 'Gruppi cliente', path: '/settings/customer-groups' },
+  { label: 'Raggruppamento prodotti', path: '/settings/product-groups' },
 ];
 
 export function SettingsMenu() {

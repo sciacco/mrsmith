@@ -17,6 +17,11 @@ type CustomFieldKey struct {
 	KeyDescription string `json:"key_description"`
 }
 
+type LanguageOption struct {
+	ISO  string `json:"iso"`
+	Name string `json:"name"`
+}
+
 type VocabularyItem struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
@@ -84,6 +89,38 @@ ORDER BY key_description
 	}
 
 	httputil.JSON(w, http.StatusOK, keys)
+}
+
+func (h *Handler) handleListLanguages(w http.ResponseWriter, r *http.Request) {
+	if !h.requireDB(w) {
+		return
+	}
+
+	rows, err := h.mistraDB.QueryContext(r.Context(), `
+SELECT iso, name
+FROM common.language
+ORDER BY iso
+`)
+	if err != nil {
+		h.dbFailure(w, r, "list_languages", err)
+		return
+	}
+	defer rows.Close()
+
+	languages := make([]LanguageOption, 0)
+	for rows.Next() {
+		var language LanguageOption
+		if err := rows.Scan(&language.ISO, &language.Name); err != nil {
+			h.dbFailure(w, r, "list_languages", err)
+			return
+		}
+		languages = append(languages, language)
+	}
+	if !h.rowsDone(w, r, rows, "list_languages") {
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, languages)
 }
 
 func (h *Handler) handleListVocabulary(w http.ResponseWriter, r *http.Request) {

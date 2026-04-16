@@ -6,7 +6,10 @@ import type {
   CustomerGroup,
   CustomerGroupBatchUpdateRequest,
   CustomerGroupCreateRequest,
+  LanguageOption,
   Product,
+  ProductGroup,
+  ProductGroupWriteRequest,
   ProductCreateRequest,
   ProductCategory,
   ProductCategoryWriteRequest,
@@ -19,9 +22,11 @@ import type {
 export const kitProductsKeys = {
   assetFlows: ['kit-products', 'lookup', 'asset-flow'] as const,
   customFieldKeys: ['kit-products', 'lookup', 'custom-field-key'] as const,
+  languages: ['kit-products', 'lookup', 'language'] as const,
   vocabulary: (section: string) => ['kit-products', 'lookup', 'vocabulary', section] as const,
   categories: ['kit-products', 'categories'] as const,
   customerGroups: ['kit-products', 'customer-groups'] as const,
+  productGroups: ['kit-products', 'product-groups'] as const,
   products: ['kit-products', 'products'] as const,
 };
 
@@ -38,6 +43,14 @@ export function useCustomFieldKeys() {
   return useQuery({
     queryKey: kitProductsKeys.customFieldKeys,
     queryFn: () => api.get<CustomFieldKey[]>('/kit-products/v1/lookup/custom-field-key'),
+  });
+}
+
+export function useLanguages() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: kitProductsKeys.languages,
+    queryFn: () => api.get<LanguageOption[]>('/kit-products/v1/lookup/language'),
   });
 }
 
@@ -93,6 +106,14 @@ export function useCustomerGroups() {
   });
 }
 
+export function useProductGroups() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: kitProductsKeys.productGroups,
+    queryFn: () => api.get<ProductGroup[]>('/kit-products/v1/product-group'),
+  });
+}
+
 export function useCreateCustomerGroup() {
   const api = useApiClient();
   const queryClient = useQueryClient();
@@ -113,6 +134,38 @@ export function useBatchUpdateCustomerGroups() {
       api.patch<{ updated: number }>('/kit-products/v1/customer-group', body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: kitProductsKeys.customerGroups });
+    },
+  });
+}
+
+export function useCreateProductGroup() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ProductGroupWriteRequest) =>
+      api.post<ProductGroup>('/kit-products/v1/product-group', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: kitProductsKeys.productGroups });
+      queryClient.invalidateQueries({ queryKey: kitProductsKeys.vocabulary('kit_product_group') });
+    },
+  });
+}
+
+export function useUpdateProductGroup() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      translationUUID,
+      ...body
+    }: { translationUUID: string } & ProductGroupWriteRequest) =>
+      api.put<ProductGroup>(
+        `/kit-products/v1/product-group/${encodeURIComponent(translationUUID)}`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: kitProductsKeys.productGroups });
+      queryClient.invalidateQueries({ queryKey: kitProductsKeys.vocabulary('kit_product_group') });
     },
   });
 }

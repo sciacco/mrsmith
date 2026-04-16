@@ -278,6 +278,14 @@
   gap: var(--space-4);
 }
 
+.confirmCopy {
+  display: grid;
+  gap: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
 .modalActions {
   display: flex;
   justify-content: flex-end;
@@ -312,6 +320,11 @@
   transition: border-color var(--duration-normal) var(--ease-out);
 }
 
+.field textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
@@ -324,6 +337,45 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+}
+
+.translationSummary {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.translationGrid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.translationCard {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.translationHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.translationHeader strong {
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.translationHeader span {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* ── Empty state ── */

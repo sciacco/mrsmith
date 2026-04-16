@@ -370,6 +370,13 @@ func registerKitProductsTestDriver() {
 type kitProductsTxTracker struct {
 	commitCount   int
 	rollbackCount int
+	queries       []kitProductsDBCall
+	execs         []kitProductsDBCall
+}
+
+type kitProductsDBCall struct {
+	Query string
+	Args  []any
 }
 
 type kitProductsTestDriver struct{}
@@ -405,6 +412,8 @@ func (c *kitProductsTestConn) begin() (driver.Tx, error) {
 }
 
 func (c *kitProductsTestConn) QueryContext(_ context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	recordQuery(c.mode, query, args)
+
 	if strings.Contains(query, "SELECT read_only") {
 		id := namedInt(args[0])
 		switch c.mode {
@@ -445,6 +454,65 @@ func (c *kitProductsTestConn) QueryContext(_ context.Context, query string, args
 				return &kitProductsTestRows{columns: []string{"exists"}, values: [][]driver.Value{{false}}}, nil
 			}
 			return &kitProductsTestRows{columns: []string{"exists"}, values: [][]driver.Value{{true}}}, nil
+		}
+	}
+	if strings.Contains(query, "FROM common.language") {
+		return &kitProductsTestRows{
+			columns: []string{"iso", "name"},
+			values:  [][]driver.Value{{"en", "English"}, {"it", "Italiano"}},
+		}, nil
+	}
+	if strings.Contains(query, "SELECT EXISTS") && strings.Contains(query, "FROM common.vocabulary") {
+		switch c.mode {
+		case "product-group-duplicate":
+			return &kitProductsTestRows{columns: []string{"exists"}, values: [][]driver.Value{{true}}}, nil
+		default:
+			return &kitProductsTestRows{columns: []string{"exists"}, values: [][]driver.Value{{false}}}, nil
+		}
+	}
+	if strings.Contains(query, "SELECT COUNT(*)") && strings.Contains(query, "FROM products.kit_product") && strings.Contains(query, "WHERE group_name = $1") {
+		switch c.mode {
+		case "product-group-rename-confirm":
+			return &kitProductsTestRows{columns: []string{"count"}, values: [][]driver.Value{{int64(3)}}}, nil
+		default:
+			return &kitProductsTestRows{columns: []string{"count"}, values: [][]driver.Value{{int64(1)}}}, nil
+		}
+	}
+	if strings.Contains(query, "SELECT name") && strings.Contains(query, "FROM common.vocabulary") && strings.Contains(query, "translation_uuid = $2") {
+		switch c.mode {
+		case "product-group-missing":
+			return &kitProductsTestRows{columns: []string{"name"}}, nil
+		default:
+			return &kitProductsTestRows{columns: []string{"name"}, values: [][]driver.Value{{"Circuito"}}}, nil
+		}
+	}
+	if strings.Contains(query, "INSERT INTO common.vocabulary") && strings.Contains(query, "RETURNING translation_uuid") {
+		return &kitProductsTestRows{
+			columns: []string{"translation_uuid"},
+			values:  [][]driver.Value{{"44444444-4444-4444-4444-444444444444"}},
+		}, nil
+	}
+	if strings.Contains(query, "FROM common.vocabulary v") && strings.Contains(query, "COALESCE(common.get_translations(v.translation_uuid), '[]'::json)") {
+		translations := []byte(`[{"language":"en","short":"Circuit","long":""},{"language":"it","short":"Circuito","long":"Descrizione"}]`)
+		translationUUID := "44444444-4444-4444-4444-444444444444"
+		if strings.Contains(query, "translation_uuid = $2") && len(args) > 1 {
+			translationUUID = namedString(args[1])
+		}
+		switch c.mode {
+		case "product-group-missing":
+			return &kitProductsTestRows{columns: []string{"name", "translation_uuid", "usage_count", "translations"}}, nil
+		case "product-group-list-empty":
+			return &kitProductsTestRows{columns: []string{"name", "translation_uuid", "usage_count", "translations"}}, nil
+		default:
+			return &kitProductsTestRows{
+				columns: []string{"name", "translation_uuid", "usage_count", "translations"},
+				values: [][]driver.Value{{
+					"Circuito",
+					translationUUID,
+					int64(2),
+					translations,
+				}},
+			}, nil
 		}
 	}
 	if strings.Contains(query, "SELECT bundle_prefix") && strings.Contains(query, "FROM products.kit") {
@@ -670,11 +738,20 @@ func (c *kitProductsTestConn) QueryContext(_ context.Context, query string, args
 	return &kitProductsTestRows{columns: []string{"stub"}, values: [][]driver.Value{}}, nil
 }
 
-func (c *kitProductsTestConn) ExecContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Result, error) {
+func (c *kitProductsTestConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	recordExec(c.mode, query, args)
+
 	if c.mode == "exec-fail" {
 		return nil, errors.New("write failed")
 	}
 	switch {
+	case strings.Contains(query, "UPDATE common.vocabulary"):
+		if c.mode == "product-group-missing" {
+			return driver.RowsAffected(0), nil
+		}
+		return driver.RowsAffected(1), nil
+	case strings.Contains(query, "UPDATE products.kit_product") && strings.Contains(query, "SET group_name = $1"):
+		return driver.RowsAffected(3), nil
 	case strings.Contains(query, "UPDATE products.kit SET is_active = false"):
 		if c.mode == "kit-delete-missing" {
 			return driver.RowsAffected(0), nil
@@ -741,6 +818,32 @@ func trackerForMode(mode string) *kitProductsTxTracker {
 	return nil
 }
 
+func recordQuery(mode, query string, args []driver.NamedValue) {
+	if tracker := trackerForMode(mode); tracker != nil {
+		tracker.queries = append(tracker.queries, kitProductsDBCall{
+			Query: query,
+			Args:  namedValues(args),
+		})
+	}
+}
+
+func recordExec(mode, query string, args []driver.NamedValue) {
+	if tracker := trackerForMode(mode); tracker != nil {
+		tracker.execs = append(tracker.execs, kitProductsDBCall{
+			Query: query,
+			Args:  namedValues(args),
+		})
+	}
+}
+
+func namedValues(args []driver.NamedValue) []any {
+	values := make([]any, 0, len(args))
+	for _, arg := range args {
+		values = append(values, arg.Value)
+	}
+	return values
+}
+
 func namedInt(value driver.NamedValue) int64 {
 	switch v := value.Value.(type) {
 	case int64:
@@ -753,8 +856,11 @@ func namedInt(value driver.NamedValue) int64 {
 }
 
 func namedString(value driver.NamedValue) string {
-	if v, ok := value.Value.(string); ok {
+	switch v := value.Value.(type) {
+	case string:
 		return v
+	case interface{ String() string }:
+		return v.String()
 	}
 	return ""
 }
