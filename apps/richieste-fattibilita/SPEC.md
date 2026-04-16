@@ -378,7 +378,7 @@ annotazioni_carrier    text NULL
 created_by             varchar(120) NULL
 created_at             timestamp NOT NULL default CURRENT_TIMESTAMP
 updated_at             timestamp NULL default CURRENT_TIMESTAMP
-fornitori_preferiti    text NOT NULL default ''      -- PG array literal, es. '{5,7}'
+fornitori_preferiti    text NULL default ''          -- PG array literal, es. '{5,7}'
 codice_deal            varchar(64) NULL default ''
 ```
 

@@ -185,6 +185,15 @@ Alyante ERP ID
 - Used by: `apps/panoramica-cliente` recurring orders summary view.
 - Open questions: whether the frontend contract should eventually widen affected summary text fields to `string | null` instead of preserving empty-string fallbacks.
 
+### RDF `fornitori_preferiti` Must Be Treated as Nullable Text
+
+- Context: `GET /api/rdf/v1/richieste/summary`, `GET /api/rdf/v1/richieste/{id}/full`, and any RDF flow that reads `public.rdf_richieste.fornitori_preferiti`.
+- Discovery: the authoritative schema snapshot marks `rdf_richieste.fornitori_preferiti` as nullable `text` with default `''`, so production rows can legitimately contain `NULL`. Scanning that column directly into Go `string` fields causes runtime failures (`converting NULL to string is unsupported`).
+- Practical rule: scan `fornitori_preferiti` with `sql.NullString` in RDF handlers and normalize `NULL`, `''`, and empty array literals to `[]` before encoding JSON. Keep the API contract as `number[]`; do not surface `null` to the frontend for this field.
+- Evidence: `docs/anisetta_schema.json` (`rdf_richieste.fornitori_preferiti` `nullable: true`), backend failure `list_richieste_summary_scan` on 2026-04-16, and fixes in `backend/internal/rdf/handler.go`.
+- Used by: `apps/richieste-fattibilita` summary/detail flows and manager actions that reload a richiesta after writes.
+- Open questions: none.
+
 ### Loader `quantita` Must Be Treated as Decimal (Nullable) Across Reports and Panoramica
 
 - Context: report/order endpoints reading `quantita` from loader views such as `v_ordini_ric_spot`, `v_ordini_sintesi`, and `v_ordini_ricorrenti_conrinnovo`.

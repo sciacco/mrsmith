@@ -922,7 +922,7 @@ func (h *Handler) fetchRichiesta(ctx context.Context, id int) (Richiesta, error)
 		createdBy              sql.NullString
 		createdAt              time.Time
 		updatedAt              sql.NullTime
-		fornitoriPreferitiRaw  string
+		fornitoriPreferitiRaw  sql.NullString
 	)
 
 	err := h.anisettaDB.QueryRowContext(
@@ -959,7 +959,7 @@ func (h *Handler) fetchRichiesta(ctx context.Context, id int) (Richiesta, error)
 	item.CreatedBy = nullStringPtr(createdBy)
 	item.CreatedAt = formatTimestamp(createdAt)
 	item.UpdatedAt = nullTimePtr(updatedAt)
-	item.FornitoriPreferiti = parseIntArrayLiteral(fornitoriPreferitiRaw)
+	item.FornitoriPreferiti = parseNullableIntArrayLiteral(fornitoriPreferitiRaw)
 	return item, nil
 }
 
@@ -1324,7 +1324,7 @@ func scanRichiestaSummary(scanner interface{ Scan(dest ...any) error }) (Richies
 		createdBy              sql.NullString
 		createdAt              time.Time
 		updatedAt              sql.NullTime
-		fornitoriPreferitiRaw  string
+		fornitoriPreferitiRaw  sql.NullString
 	)
 
 	if err := scanner.Scan(
@@ -1358,7 +1358,7 @@ func scanRichiestaSummary(scanner interface{ Scan(dest ...any) error }) (Richies
 	item.CreatedBy = nullStringPtr(createdBy)
 	item.CreatedAt = formatTimestamp(createdAt)
 	item.UpdatedAt = nullTimePtr(updatedAt)
-	item.FornitoriPreferiti = parseIntArrayLiteral(fornitoriPreferitiRaw)
+	item.FornitoriPreferiti = parseNullableIntArrayLiteral(fornitoriPreferitiRaw)
 	return item, nil
 }
 
@@ -1517,6 +1517,13 @@ func parseIntArrayLiteral(raw string) []int {
 		result = append(result, id)
 	}
 	return result
+}
+
+func parseNullableIntArrayLiteral(raw sql.NullString) []int {
+	if !raw.Valid {
+		return []int{}
+	}
+	return parseIntArrayLiteral(raw.String)
 }
 
 func formatIntArrayLiteral(ids []int) string {
