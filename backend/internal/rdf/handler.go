@@ -116,6 +116,7 @@ func RegisterRoutes(
 		mux.Handle(pattern, managerProtect(http.HandlerFunc(handler)))
 	}
 
+	access("GET /rdf/v1/capabilities", h.handleCapabilities)
 	access("GET /rdf/v1/deals", h.handleListDeals)
 	access("GET /rdf/v1/deals/{id}", h.handleGetDeal)
 	access("GET /rdf/v1/fornitori", h.handleListFornitori)
@@ -391,6 +392,12 @@ func (h *Handler) handleListRichiesteSummary(w http.ResponseWriter, r *http.Requ
 		Page:     page,
 		PageSize: pageSize,
 		Total:    total,
+	})
+}
+
+func (h *Handler) handleCapabilities(w http.ResponseWriter, r *http.Request) {
+	httputil.JSON(w, http.StatusOK, map[string]bool{
+		"ai_enabled": h.ai != nil,
 	})
 }
 
@@ -853,10 +860,8 @@ func (h *Handler) handleRenderRichiestaPDF(w http.ResponseWriter, r *http.Reques
 
 	analysis, err := h.analyzeText(r.Context(), id, full)
 	if errors.Is(err, errAIUnavailable) {
-		httputil.Error(w, http.StatusServiceUnavailable, "ai_unavailable")
-		return
-	}
-	if err != nil {
+		analysis = ""
+	} else if err != nil {
 		logging.FromContext(r.Context()).Error("rdf pdf analysis failed", "component", "rdf", "richiesta_id", id, "error", err)
 		httputil.Error(w, http.StatusBadGateway, "ai_request_failed")
 		return

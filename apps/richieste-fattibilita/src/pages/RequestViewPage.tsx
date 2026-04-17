@@ -1,10 +1,11 @@
-import { Button, Drawer, Icon, Skeleton, Tooltip } from '@mrsmith/ui';
+import { Button, Drawer, Icon, Skeleton, TabNav, Tooltip, type TabNavItem } from '@mrsmith/ui';
 import { hasAnyRole } from '@mrsmith/auth-client';
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useAnalysis,
   useAnalysisJSON,
+  useRDFCapabilities,
   useRichiestaFull,
   useRichiestaPdf,
 } from '../api/queries';
@@ -25,12 +26,6 @@ import shared from './shared.module.css';
 import styles from './RequestViewPage.module.css';
 
 type TabKey = 'riepilogo' | 'analisi' | 'pdf';
-
-const TAB_DEFS: { key: TabKey; label: string }[] = [
-  { key: 'riepilogo', label: 'Riepilogo' },
-  { key: 'analisi', label: 'Analisi AI' },
-  { key: 'pdf', label: 'PDF' },
-];
 
 function formatCurrency(value: number | null): string {
   if (value === null || value === undefined) return '—';
@@ -63,9 +58,24 @@ export function RequestViewPage() {
   const [drawerTab, setDrawerTab] = useState<'dettaglio' | 'commenti'>('dettaglio');
 
   const richiesta = useRichiestaFull(richiestaId);
-  const analysisText = useAnalysis(richiestaId, activeTab === 'analisi');
-  const analysisJSON = useAnalysisJSON(richiestaId, activeTab === 'analisi');
+  const capabilities = useRDFCapabilities();
+  const aiEnabled = capabilities.data?.ai_enabled ?? false;
+  const analysisText = useAnalysis(richiestaId, aiEnabled && activeTab === 'analisi');
+  const analysisJSON = useAnalysisJSON(richiestaId, aiEnabled && activeTab === 'analisi');
   const pdf = useRichiestaPdf(richiestaId, activeTab === 'pdf');
+
+  const tabs = useMemo<TabNavItem[]>(
+    () => [
+      { key: 'riepilogo', label: 'Riepilogo' },
+      ...(aiEnabled ? [{ key: 'analisi', label: 'Analisi AI' }] : []),
+      { key: 'pdf', label: 'PDF' },
+    ],
+    [aiEnabled],
+  );
+
+  useEffect(() => {
+    if (!aiEnabled && activeTab === 'analisi') setActiveTab('riepilogo');
+  }, [aiEnabled, activeTab]);
 
   useEffect(() => {
     if (detailOpen) setDrawerTab('dettaglio');
@@ -197,26 +207,12 @@ export function RequestViewPage() {
             </span>
           </div>
 
-          <div className={shared.tabRow} role="tablist" aria-label="Sezioni RDF">
-            {TAB_DEFS.map(({ key, label }) => {
-              const active = activeTab === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  id={`tab-${key}`}
-                  aria-selected={active}
-                  aria-controls={`tabpanel-${key}`}
-                  tabIndex={active ? 0 : -1}
-                  className={`${shared.tabButton} ${active ? shared.tabButtonActive : ''}`}
-                  onClick={() => setActiveTab(key)}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+          <TabNav
+            items={tabs}
+            activeKey={activeTab}
+            onTabChange={(key) => setActiveTab(key as TabKey)}
+          />
+
 
           {activeTab === 'riepilogo' && (
             <div

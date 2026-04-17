@@ -9,6 +9,7 @@ import type {
   Fattibilita,
   LookupItem,
   PagedResponse,
+  RDFCapabilities,
   RichiestaBase,
   RichiestaFull,
   RichiestaSummary,
@@ -41,7 +42,18 @@ const queryKeys = {
   deals: (params: DealsParams) => ['rdf', 'deals', params] as const,
   fornitori: ['rdf', 'fornitori'] as const,
   tecnologie: ['rdf', 'tecnologie'] as const,
+  capabilities: ['rdf', 'capabilities'] as const,
 };
+
+export function useRDFCapabilities() {
+  const api = useRDFApiClient();
+  return useQuery({
+    queryKey: queryKeys.capabilities,
+    queryFn: () => api.get<RDFCapabilities>('/rdf/v1/capabilities'),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+}
 
 export function useRichiesteSummary(params: SummaryParams) {
   const api = useRDFApiClient();

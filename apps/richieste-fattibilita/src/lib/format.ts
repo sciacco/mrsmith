@@ -69,9 +69,9 @@ export function stripCompanyPrefix(
 export function compactAddress(address: string | null | undefined): string {
   if (!address) return '—';
   const match = address.match(/([A-Za-zÀ-ÿ'\- ]+?)\s*\(([A-Z]{2})\)/);
-  const city = match?.[1];
+  const city = match?.[1]?.replace(/^[^A-Za-zÀ-ÿ]+/, '').trim();
   const province = match?.[2];
-  if (city && province) return `${city.trim()} (${province})`;
+  if (city && province) return `${city} (${province})`;
   return address.length > 48 ? `${address.slice(0, 48).trimEnd()}…` : address;
 }
 

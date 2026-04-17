@@ -115,6 +115,10 @@ export interface AnalysisJSON {
   valutazioni: AnalysisValutazione[];
 }
 
+export interface RDFCapabilities {
+  ai_enabled: boolean;
+}
+
 export interface CreateRichiestaBody {
   deal_id: number;
   indirizzo: string;
