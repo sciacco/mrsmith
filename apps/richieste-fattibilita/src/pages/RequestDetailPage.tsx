@@ -1,11 +1,11 @@
-import { Button, Icon, Modal, MultiSelect, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, MultiSelect, SearchInput, SingleSelect, Skeleton, ToggleSwitch, Tooltip, useToast } from '@mrsmith/ui';
 import { hasAnyRole } from '@mrsmith/auth-client';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCreateFattibilita, useFornitori, useRichiestaFull, useTecnologie, useUpdateFattibilita, useUpdateRichiestaStato } from '../api/queries';
 import type { Fattibilita, UpdateFattibilitaBody } from '../api/types';
 import { StatusPill, statusTone } from '../components/StatusPill';
-import { BUDGET_OPTIONS, FATTIBILITA_STATES, MANAGER_ROLES, RICHIESTA_STATES, budgetLabel, copyErrorMessage, formatCounts, formatDate, formatDateTime, parsePositiveId } from '../lib/format';
+import { BUDGET_OPTIONS, FATTIBILITA_STATES, MANAGER_ROLES, RICHIESTA_STATES, budgetLabel, copyErrorMessage, fattibilitaStateLabel, formatCounts, formatCurrencyEuro, parsePositiveId, relativeTime, richiestaStateLabel } from '../lib/format';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import styles from './shared.module.css';
 
@@ -45,6 +45,41 @@ function toFormState(item: Fattibilita): FattibilitaFormState {
   };
 }
 
+function formStatesEqual(a: FattibilitaFormState, b: FattibilitaFormState): boolean {
+  return (
+    a.descrizione === b.descrizione &&
+    a.contatto_fornitore === b.contatto_fornitore &&
+    a.riferimento_fornitore === b.riferimento_fornitore &&
+    a.stato === b.stato &&
+    a.annotazioni === b.annotazioni &&
+    a.esito_ricevuto_il === b.esito_ricevuto_il &&
+    a.da_ordinare === b.da_ordinare &&
+    a.profilo_fornitore === b.profilo_fornitore &&
+    a.nrc === b.nrc &&
+    a.mrc === b.mrc &&
+    a.durata_mesi === b.durata_mesi &&
+    a.aderenza_budget === b.aderenza_budget &&
+    a.copertura === b.copertura &&
+    a.giorni_rilascio === b.giorni_rilascio
+  );
+}
+
+// Transitions that cannot be undone from the UI — require explicit confirm.
+const DESTRUCTIVE_RICHIESTA_TRANSITIONS: Record<string, string[]> = {
+  // from any state → "annullata"
+  '*': ['annullata'],
+  // from completata → earlier states
+  completata: ['nuova', 'in corso'],
+};
+
+function isDestructiveRichiestaTransition(from: string, to: string): boolean {
+  if (from === to) return false;
+  const any = DESTRUCTIVE_RICHIESTA_TRANSITIONS['*'] ?? [];
+  if (any.includes(to)) return true;
+  const specific = DESTRUCTIVE_RICHIESTA_TRANSITIONS[from] ?? [];
+  return specific.includes(to);
+}
+
 export function RequestDetailPage() {
   const navigate = useNavigate();
   const params = useParams();
@@ -65,11 +100,22 @@ export function RequestDetailPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedFornitori, setSelectedFornitori] = useState<number[]>([]);
   const [selectedTecnologie, setSelectedTecnologie] = useState<number[]>([]);
+  const [pendingSelectionId, setPendingSelectionId] = useState<number | null>(null);
+  const [pendingStato, setPendingStato] = useState<string | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [listSearch, setListSearch] = useState('');
 
   const selectedFattibilita = useMemo(
     () => richiesta.data?.fattibilita.find((item) => item.id === selectedFattibilitaId) ?? null,
     [richiesta.data, selectedFattibilitaId],
   );
+
+  const baselineFormState = useMemo(
+    () => (selectedFattibilita ? toFormState(selectedFattibilita) : null),
+    [selectedFattibilita],
+  );
+
+  const isDirty = Boolean(formState && baselineFormState && !formStatesEqual(formState, baselineFormState));
 
   useEffect(() => {
     if (!richiesta.data) return;
@@ -88,6 +134,16 @@ export function RequestDetailPage() {
     if (!selectedFattibilita) return;
     setFormState(toFormState(selectedFattibilita));
   }, [selectedFattibilita]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
 
   if (!canManage) {
     return (
@@ -133,8 +189,9 @@ export function RequestDetailPage() {
     return payload;
   }
 
-  function handleSave() {
-    if (!selectedFattibilita || !formState || !richiesta.data) return;
+  const handleSaveRef = useRef<() => void>(() => {});
+  const handleSave = useCallback(() => {
+    if (!selectedFattibilita || !formState || !richiesta.data || !isDirty) return;
     updateFattibilita.mutate(
       {
         fattibilitaId: selectedFattibilita.id,
@@ -146,18 +203,53 @@ export function RequestDetailPage() {
         onError: (error) => toast(copyErrorMessage(error, 'Aggiornamento non riuscito.'), 'error'),
       },
     );
-  }
+  }, [selectedFattibilita, formState, richiesta.data, isDirty, richiestaId, updateFattibilita, toast]);
+  handleSaveRef.current = handleSave;
 
-  function handleAddFattibilita() {
-    const items = selectedFornitori.flatMap((fornitoreId) =>
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const isSave = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's';
+      if (!isSave) return;
+      event.preventDefault();
+      handleSaveRef.current();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const filteredFattibilita = useMemo(() => {
+    const all = richiesta.data?.fattibilita ?? [];
+    const q = listSearch.trim().toLowerCase();
+    if (!q) return all;
+    return all.filter(
+      (item) =>
+        item.fornitore_nome.toLowerCase().includes(q) ||
+        item.tecnologia_nome.toLowerCase().includes(q) ||
+        item.stato.toLowerCase().includes(q),
+    );
+  }, [richiesta.data, listSearch]);
+
+  const existingPairs = useMemo(() => {
+    const set = new Set<string>();
+    richiesta.data?.fattibilita.forEach((item) => set.add(`${item.fornitore_id}:${item.tecnologia_id}`));
+    return set;
+  }, [richiesta.data]);
+
+  const addPreview = useMemo(() => {
+    const pairs = selectedFornitori.flatMap((fornitoreId) =>
       selectedTecnologie.map((tecnologiaId) => ({ fornitore_id: fornitoreId, tecnologia_id: tecnologiaId })),
     );
-    if (items.length === 0) return;
+    const dedupedItems = pairs.filter((pair) => !existingPairs.has(`${pair.fornitore_id}:${pair.tecnologia_id}`));
+    return { total: pairs.length, duplicates: pairs.length - dedupedItems.length, items: dedupedItems };
+  }, [selectedFornitori, selectedTecnologie, existingPairs]);
+
+  function handleAddFattibilita() {
+    if (addPreview.items.length === 0) return;
     createFattibilita.mutate(
-      { richiestaId: richiestaId!, body: { items } },
+      { richiestaId: richiestaId!, body: { items: addPreview.items } },
       {
         onSuccess: () => {
-          toast('Righe aggiunte');
+          toast(addPreview.items.length === 1 ? 'Riga aggiunta' : `${addPreview.items.length} righe aggiunte`);
           setShowAddModal(false);
           setSelectedFornitori([]);
           setSelectedTecnologie([]);
@@ -165,6 +257,59 @@ export function RequestDetailPage() {
         onError: (error) => toast(copyErrorMessage(error, 'Inserimento non riuscito.'), 'error'),
       },
     );
+  }
+
+  function requestSelect(id: number) {
+    if (id === selectedFattibilitaId) return;
+    if (isDirty) {
+      setPendingSelectionId(id);
+      return;
+    }
+    setSelectedFattibilitaId(id);
+  }
+
+  function confirmSwitchSelection() {
+    if (pendingSelectionId == null) return;
+    setSelectedFattibilitaId(pendingSelectionId);
+    setPendingSelectionId(null);
+  }
+
+  function requestRichiestaStatoChange(nextState: string) {
+    if (!richiesta.data || richiesta.data.stato === nextState) return;
+    if (isDestructiveRichiestaTransition(richiesta.data.stato, nextState)) {
+      setPendingStato(nextState);
+      return;
+    }
+    updateRichiestaStato.mutate(
+      { richiestaId: richiestaId!, body: { stato: nextState } },
+      {
+        onSuccess: () => toast('Stato richiesta aggiornato'),
+        onError: (error) => toast(copyErrorMessage(error, 'Aggiornamento stato non riuscito.'), 'error'),
+      },
+    );
+  }
+
+  function confirmRichiestaStatoChange() {
+    if (!pendingStato) return;
+    const next = pendingStato;
+    setPendingStato(null);
+    updateRichiestaStato.mutate(
+      { richiestaId: richiestaId!, body: { stato: next } },
+      {
+        onSuccess: () => toast('Stato richiesta aggiornato'),
+        onError: (error) => toast(copyErrorMessage(error, 'Aggiornamento stato non riuscito.'), 'error'),
+      },
+    );
+  }
+
+  function requestReset() {
+    if (!isDirty) return;
+    setShowResetConfirm(true);
+  }
+
+  function confirmReset() {
+    if (selectedFattibilita) setFormState(toFormState(selectedFattibilita));
+    setShowResetConfirm(false);
   }
 
   return (
@@ -183,78 +328,61 @@ export function RequestDetailPage() {
         <>
           <div className={styles.pageHeader}>
             <div>
+              <button
+                type="button"
+                className={styles.breadcrumbLink}
+                onClick={() => navigate('/richieste/gestione')}
+              >
+                ‹ Tutte le richieste
+              </button>
               <h1 className={styles.pageTitle}>Dettaglio RDF Carrier</h1>
               <p className={styles.pageSubtitle}>
-                Gestisci lo stato della richiesta, aggiungi le combinazioni fornitore-tecnologia e aggiorna i dati ricevuti dai carrier.
+                Aggiorna i dati ricevuti dai carrier e gestisci lo stato della richiesta.
               </p>
             </div>
             <div className={styles.headerActions}>
-              <Button variant="secondary" onClick={() => navigate('/richieste/gestione')}>
-                Torna alla gestione
-              </Button>
-              <Button onClick={() => navigate(`/richieste/${richiestaId}/view`)}>
+              <Button className={styles.flatBtn} onClick={() => navigate(`/richieste/${richiestaId}/view`)}>
                 Visualizza RDF
               </Button>
             </div>
           </div>
 
           <div className={styles.heroCard}>
-            <div className={styles.heroTop}>
-              <div>
-                <div className={styles.summaryCode}>{richiesta.data.codice_deal || `RDF #${richiesta.data.id}`}</div>
+            <div className={styles.heroLead}>
+              <div className={styles.heroTitleStack}>
+                <span className={styles.summaryCode}>{richiesta.data.codice_deal || `RDF #${richiesta.data.id}`}</span>
                 <div className={styles.contextTitle}>
                   {richiesta.data.company_name ?? 'Cliente non disponibile'}
                 </div>
-                <p className={styles.pageSubtitle}>{richiesta.data.deal_name ?? 'Deal non disponibile'}</p>
+                <span className={styles.heroDeal}>{richiesta.data.deal_name ?? 'Deal non disponibile'}</span>
               </div>
-              <StatusPill tone={statusTone(richiesta.data.stato)} aria-label={`Stato ${richiesta.data.stato}`}>
-                {richiesta.data.stato}
-              </StatusPill>
+              <div
+                className={styles.statusRow}
+                role="radiogroup"
+                aria-label="Stato richiesta"
+              >
+                {RICHIESTA_STATES.map((state) => {
+                  const active = richiesta.data?.stato === state;
+                  return (
+                    <button
+                      key={state}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      className={`${styles.statusChip} ${active ? styles.statusChipActive : ''}`}
+                      onClick={() => requestRichiestaStatoChange(state)}
+                    >
+                      {richiestaStateLabel(state)}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className={styles.heroMeta}>
-              <div>
-                <p className={styles.small}>Richiesta #{richiesta.data.id}</p>
-                <p>{richiesta.data.indirizzo}</p>
-              </div>
-              <div>
-                <p className={styles.small}>Richiedente</p>
-                <p>{richiesta.data.created_by ?? 'Non disponibile'}</p>
-              </div>
-              <div>
-                <p className={styles.small}>Contatori</p>
-                <p>{formatCounts(richiesta.data.counts)}</p>
-              </div>
-            </div>
-
-            <div
-              className={styles.statusRow}
-              role="radiogroup"
-              aria-label="Aggiorna stato richiesta"
-            >
-              {RICHIESTA_STATES.map((state) => {
-                const active = richiesta.data?.stato === state;
-                return (
-                  <button
-                    key={state}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    className={`${styles.statusChip} ${active ? styles.statusChipActive : ''}`}
-                    onClick={() =>
-                      updateRichiestaStato.mutate(
-                        { richiestaId: richiestaId!, body: { stato: state } },
-                        {
-                          onSuccess: () => toast('Stato richiesta aggiornato'),
-                          onError: (error) => toast(copyErrorMessage(error, 'Aggiornamento stato non riuscito.'), 'error'),
-                        },
-                      )
-                    }
-                  >
-                    {state}
-                  </button>
-                );
-              })}
+            <div className={styles.heroInlineMeta}>
+              <span><strong>Indirizzo</strong>{richiesta.data.indirizzo}</span>
+              <span><strong>Richiedente</strong>{richiesta.data.created_by ?? 'Non disponibile'}</span>
+              <span><strong>Avanzamento</strong>{formatCounts(richiesta.data.counts)}</span>
             </div>
           </div>
 
@@ -262,41 +390,104 @@ export function RequestDetailPage() {
             <div className={styles.listCard}>
               <div className={styles.panelHeader}>
                 <div>
-                  <h2 className={styles.panelTitle}>Righe fattibilità</h2>
-                  <p className={styles.small}>Seleziona una riga per modificarla oppure aggiungine di nuove in batch.</p>
+                  <h2 className={styles.panelTitle}>Carriers</h2>
+                  <p className={styles.small}>
+                    {richiesta.data.fattibilita.length === 0
+                      ? 'Aggiungi almeno un fornitore per iniziare.'
+                      : `${richiesta.data.fattibilita.length} righe · ${richiesta.data.counts.completata} completate`}
+                  </p>
                 </div>
-                <Button onClick={() => setShowAddModal(true)}>Aggiungi righe</Button>
+                <Tooltip content="Aggiungi Fornitori">
+                  <button
+                    type="button"
+                    className={styles.iconBtn}
+                    onClick={() => setShowAddModal(true)}
+                    aria-label="Aggiungi Fornitori"
+                  >
+                    <Icon name="plus" />
+                  </button>
+                </Tooltip>
               </div>
 
-              <div className={styles.listWrap} role="radiogroup" aria-label="Seleziona fattibilità">
+              {richiesta.data.fattibilita.length > 3 && (
+                <div className={styles.listToolbar}>
+                  <SearchInput
+                    value={listSearch}
+                    onChange={setListSearch}
+                    placeholder="Filtra per fornitore, tecnologia o stato…"
+                  />
+                </div>
+              )}
+
+              <div
+                className={styles.listWrap}
+                role="radiogroup"
+                aria-label="Seleziona fattibilità"
+                onKeyDown={(event) => {
+                  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+                  if (filteredFattibilita.length === 0) return;
+                  event.preventDefault();
+                  const currentIndex = filteredFattibilita.findIndex((item) => item.id === selectedFattibilitaId);
+                  const delta = event.key === 'ArrowDown' ? 1 : -1;
+                  const nextIndex = currentIndex === -1
+                    ? (delta === 1 ? 0 : filteredFattibilita.length - 1)
+                    : (currentIndex + delta + filteredFattibilita.length) % filteredFattibilita.length;
+                  const target = filteredFattibilita[nextIndex];
+                  if (target) requestSelect(target.id);
+                }}
+              >
                 {richiesta.data.fattibilita.length === 0 ? (
                   <div className={styles.emptyCard}>
                     <div className={styles.emptyIcon}><Icon name="package" /></div>
                     <h3>Nessuna riga presente</h3>
                     <p className={styles.muted}>Aggiungi almeno una combinazione fornitore-tecnologia per iniziare.</p>
                   </div>
+                ) : filteredFattibilita.length === 0 ? (
+                  <div className={styles.emptyCard}>
+                    <p className={styles.muted}>Nessun risultato per «{listSearch}».</p>
+                  </div>
                 ) : (
-                  richiesta.data.fattibilita.map((item) => {
+                  filteredFattibilita.map((item) => {
                     const selected = selectedFattibilitaId === item.id;
+                    const rowIsDirty = selected && isDirty;
+                    const needsAttention = item.stato === 'bozza' || item.stato === 'sollecitata';
+                    const hasNrc = item.nrc != null && item.nrc > 0;
+                    const hasMrc = item.mrc != null && item.mrc > 0;
+                    const hasBudget = item.aderenza_budget > 0;
+                    const relative = relativeTime(item.esito_ricevuto_il);
+                    const metaParts: string[] = [];
+                    if (hasNrc) metaParts.push(`NRC ${formatCurrencyEuro(item.nrc)}`);
+                    if (hasMrc) metaParts.push(`MRC ${formatCurrencyEuro(item.mrc)}/mese`);
+                    if (hasBudget) metaParts.push(`Budget ${budgetLabel(item.aderenza_budget)}`);
+                    if (relative) metaParts.push(`Esito ${relative}`);
                     return (
                       <button
                         key={item.id}
                         type="button"
                         role="radio"
                         aria-checked={selected}
-                        className={`${styles.listItem} ${selected ? styles.listItemSelected : ''}`}
-                        onClick={() => setSelectedFattibilitaId(item.id)}
+                        className={`${styles.listItem} ${selected ? styles.listItemSelected : ''} ${needsAttention ? styles.listItemAttention : ''}`}
+                        onClick={() => requestSelect(item.id)}
+                        aria-label={rowIsDirty ? `${item.fornitore_nome} — modifiche non salvate` : undefined}
                       >
                         <div className={styles.listItemTop}>
                           <div>
                             <div className={styles.listHeading}>{item.fornitore_nome}</div>
                             <p className={styles.small}>{item.tecnologia_nome}</p>
                           </div>
-                          <StatusPill tone={statusTone(item.stato)}>{item.stato}</StatusPill>
+                          <div className={styles.listItemStatus}>
+                            <StatusPill tone={statusTone(item.stato)}>{fattibilitaStateLabel(item.stato)}</StatusPill>
+                            {rowIsDirty && (
+                              <span className={styles.dirtyBadge} aria-label="Modifiche non salvate">Non salvata</span>
+                            )}
+                          </div>
                         </div>
-                        <div className={styles.listItemBottom}>
-                          <span className={styles.small}>Budget: {budgetLabel(item.aderenza_budget)}</span>
-                          <span className={styles.small}>Esito: {formatDate(item.esito_ricevuto_il)}</span>
+                        <div className={styles.listItemMeta}>
+                          {metaParts.length > 0 ? (
+                            metaParts.map((part) => <span key={part}>{part}</span>)
+                          ) : (
+                            <span className={styles.muted}>Dati non ancora ricevuti</span>
+                          )}
                         </div>
                       </button>
                     );
@@ -308,7 +499,7 @@ export function RequestDetailPage() {
             <div className={styles.formCard}>
               <div className={styles.panelHeader}>
                 <div>
-                  <h2 className={styles.panelTitle}>Editor fattibilità</h2>
+                  <h2 className={styles.panelTitle}>Scheda di fattibilità</h2>
                   <p className={styles.small}>Aggiorna i dati ricevuti dal fornitore e salva le note operative.</p>
                 </div>
               </div>
@@ -321,67 +512,54 @@ export function RequestDetailPage() {
                 </div>
               ) : (
                 <div className={styles.formGrid}>
-                  <div className={styles.fieldGroup}>
-                    <label>Fornitore / Tecnologia</label>
-                    <div className={styles.metaCard}>
-                      <div className={styles.metaCardValue}>{selectedFattibilita.fornitore_nome}</div>
-                      <p className={styles.small}>{selectedFattibilita.tecnologia_nome}</p>
-                      <p className={styles.small}>Richiesta inviata il {formatDate(selectedFattibilita.data_richiesta)}</p>
-                    </div>
-                  </div>
+                  <section className={styles.formSection} aria-labelledby="rdf-section-esito">
+                    <header className={styles.formSectionHeader}>
+                      <span id="rdf-section-esito" className={styles.formSectionTitle}>Esito</span>
+                    </header>
 
-                  <div className={styles.fieldGroup}>
-                    <label htmlFor="fattibilita-stato">Stato</label>
-                    <SingleSelect
-                      options={FATTIBILITA_STATES.map((value) => ({ value, label: value }))}
-                      selected={formState.stato}
-                      onChange={(value) => handleUpdateField('stato', value ?? formState.stato)}
-                    />
-                  </div>
-
-                  <div className={styles.fieldGroup}>
-                    <label htmlFor="descrizione_ff">Descrizione</label>
-                    <textarea
-                      id="descrizione_ff"
-                      className={styles.textArea}
-                      value={formState.descrizione}
-                      onChange={(event) => handleUpdateField('descrizione', event.target.value)}
-                    />
-                  </div>
-
-                  <div className={styles.formColumns}>
-                    <div className={styles.fieldGroup}>
-                      <label htmlFor="contatto_fornitore">Contatto fornitore</label>
-                      <input
-                        id="contatto_fornitore"
-                        className={styles.fieldInput}
-                        value={formState.contatto_fornitore}
-                        onChange={(event) => handleUpdateField('contatto_fornitore', event.target.value)}
+                    <div className={styles.toggleRow}>
+                      <ToggleSwitch
+                        id="copertura"
+                        checked={formState.copertura}
+                        onChange={(checked) => handleUpdateField('copertura', checked)}
+                        label="Copertura presente"
+                      />
+                      <ToggleSwitch
+                        id="da_ordinare"
+                        checked={formState.da_ordinare}
+                        onChange={(checked) => handleUpdateField('da_ordinare', checked)}
+                        label="Da ordinare"
                       />
                     </div>
-                    <div className={styles.fieldGroup}>
-                      <label htmlFor="riferimento_fornitore">Riferimento fornitore</label>
-                      <input
-                        id="riferimento_fornitore"
-                        className={styles.fieldInput}
-                        value={formState.riferimento_fornitore}
-                        onChange={(event) => handleUpdateField('riferimento_fornitore', event.target.value)}
-                      />
-                    </div>
-                  </div>
 
-                  <div className={styles.formColumns}>
-                    <div className={styles.fieldGroup}>
-                      <label htmlFor="esito_ricevuto_il">Esito ricevuto il</label>
-                      <input
-                        id="esito_ricevuto_il"
-                        type="date"
-                        className={styles.dateInput}
-                        value={formState.esito_ricevuto_il}
-                        onChange={(event) => handleUpdateField('esito_ricevuto_il', event.target.value)}
-                      />
+                    <div className={styles.fieldRowPair}>
+                      <div className={styles.fieldRow}>
+                        <label htmlFor="fattibilita-stato">Stato</label>
+                        <SingleSelect
+                          options={FATTIBILITA_STATES.map((value) => ({ value, label: fattibilitaStateLabel(value) }))}
+                          selected={formState.stato}
+                          onChange={(value) => handleUpdateField('stato', value ?? formState.stato)}
+                        />
+                      </div>
+                      <div className={styles.fieldRow}>
+                        <label htmlFor="esito_ricevuto_il">Esito ricevuto il</label>
+                        <input
+                          id="esito_ricevuto_il"
+                          type="date"
+                          className={styles.dateInput}
+                          value={formState.esito_ricevuto_il}
+                          onChange={(event) => handleUpdateField('esito_ricevuto_il', event.target.value)}
+                        />
+                      </div>
                     </div>
-                    <div className={styles.fieldGroup}>
+                  </section>
+
+                  <section className={styles.formSection} aria-labelledby="rdf-section-offerta">
+                    <header className={styles.formSectionHeader}>
+                      <span id="rdf-section-offerta" className={styles.formSectionTitle}>Offerta commerciale</span>
+                    </header>
+
+                    <div className={styles.fieldRow}>
                       <label htmlFor="profilo_fornitore">Profilo fornitore</label>
                       <input
                         id="profilo_fornitore"
@@ -390,104 +568,142 @@ export function RequestDetailPage() {
                         onChange={(event) => handleUpdateField('profilo_fornitore', event.target.value)}
                       />
                     </div>
-                  </div>
+                    <div className={styles.commercialGrid}>
+                      <div className={styles.fieldGroup}>
+                        <label htmlFor="nrc">NRC (€)</label>
+                        <input
+                          id="nrc"
+                          type="number"
+                          step="0.01"
+                          className={styles.numberInput}
+                          value={formState.nrc}
+                          onChange={(event) => handleUpdateField('nrc', event.target.value)}
+                        />
+                      </div>
+                      <div className={styles.fieldGroup}>
+                        <label htmlFor="mrc">MRC (€/mese)</label>
+                        <input
+                          id="mrc"
+                          type="number"
+                          step="0.01"
+                          className={styles.numberInput}
+                          value={formState.mrc}
+                          onChange={(event) => handleUpdateField('mrc', event.target.value)}
+                        />
+                      </div>
+                      <div className={styles.fieldGroup}>
+                        <label htmlFor="durata_mesi">Durata (mesi)</label>
+                        <input
+                          id="durata_mesi"
+                          type="number"
+                          className={styles.numberInput}
+                          value={formState.durata_mesi}
+                          onChange={(event) => handleUpdateField('durata_mesi', event.target.value)}
+                        />
+                      </div>
+                      <div className={styles.fieldGroup}>
+                        <label htmlFor="giorni_rilascio">Giorni rilascio</label>
+                        <input
+                          id="giorni_rilascio"
+                          type="number"
+                          className={styles.numberInput}
+                          value={formState.giorni_rilascio}
+                          onChange={(event) => handleUpdateField('giorni_rilascio', event.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className={styles.fieldRow}>
+                      <label id="aderenza-budget-label">Aderenza budget</label>
+                      <div
+                        className={styles.segmented}
+                        role="radiogroup"
+                        aria-labelledby="aderenza-budget-label"
+                      >
+                        {BUDGET_OPTIONS.map((option) => {
+                          const active = Number(formState.aderenza_budget) === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={active}
+                              className={`${styles.segmentedOption} ${active ? styles.segmentedOptionActive : ''}`}
+                              onClick={() => handleUpdateField('aderenza_budget', String(option.value))}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </section>
 
-                  <div className={styles.formColumns}>
-                    <div className={styles.fieldGroup}>
-                      <label htmlFor="nrc">NRC</label>
+                  <section className={styles.formSection} aria-labelledby="rdf-section-contatto">
+                    <header className={styles.formSectionHeader}>
+                      <span id="rdf-section-contatto" className={styles.formSectionTitle}>Contatto carrier</span>
+                    </header>
+
+                    <div className={styles.fieldRow}>
+                      <label htmlFor="contatto_fornitore">Contatto fornitore</label>
                       <input
-                        id="nrc"
-                        type="number"
-                        step="0.01"
-                        className={styles.numberInput}
-                        value={formState.nrc}
-                        onChange={(event) => handleUpdateField('nrc', event.target.value)}
+                        id="contatto_fornitore"
+                        className={styles.fieldInput}
+                        value={formState.contatto_fornitore}
+                        onChange={(event) => handleUpdateField('contatto_fornitore', event.target.value)}
                       />
                     </div>
-                    <div className={styles.fieldGroup}>
-                      <label htmlFor="mrc">MRC</label>
+                    <div className={styles.fieldRow}>
+                      <label htmlFor="riferimento_fornitore">Riferimento fornitore</label>
                       <input
-                        id="mrc"
-                        type="number"
-                        step="0.01"
-                        className={styles.numberInput}
-                        value={formState.mrc}
-                        onChange={(event) => handleUpdateField('mrc', event.target.value)}
+                        id="riferimento_fornitore"
+                        className={styles.fieldInput}
+                        value={formState.riferimento_fornitore}
+                        onChange={(event) => handleUpdateField('riferimento_fornitore', event.target.value)}
                       />
                     </div>
-                  </div>
+                  </section>
 
-                  <div className={styles.formColumns}>
+                  <section className={styles.formSection} aria-labelledby="rdf-section-note">
+                    <header className={styles.formSectionHeader}>
+                      <span id="rdf-section-note" className={styles.formSectionTitle}>Note</span>
+                    </header>
+
                     <div className={styles.fieldGroup}>
-                      <label htmlFor="durata_mesi">Durata mesi</label>
-                      <input
-                        id="durata_mesi"
-                        type="number"
-                        className={styles.numberInput}
-                        value={formState.durata_mesi}
-                        onChange={(event) => handleUpdateField('durata_mesi', event.target.value)}
+                      <label htmlFor="descrizione_ff">Descrizione</label>
+                      <textarea
+                        id="descrizione_ff"
+                        className={styles.textArea}
+                        value={formState.descrizione}
+                        onChange={(event) => handleUpdateField('descrizione', event.target.value)}
                       />
                     </div>
+
                     <div className={styles.fieldGroup}>
-                      <label htmlFor="giorni_rilascio">Giorni rilascio</label>
-                      <input
-                        id="giorni_rilascio"
-                        type="number"
-                        className={styles.numberInput}
-                        value={formState.giorni_rilascio}
-                        onChange={(event) => handleUpdateField('giorni_rilascio', event.target.value)}
+                      <label htmlFor="annotazioni">Annotazioni</label>
+                      <textarea
+                        id="annotazioni"
+                        className={styles.textArea}
+                        value={formState.annotazioni}
+                        onChange={(event) => handleUpdateField('annotazioni', event.target.value)}
                       />
                     </div>
-                  </div>
+                  </section>
 
-                  <div className={styles.fieldGroup}>
-                    <label htmlFor="aderenza-budget">Aderenza budget</label>
-                    <SingleSelect
-                      options={BUDGET_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
-                      selected={Number(formState.aderenza_budget)}
-                      onChange={(value) => handleUpdateField('aderenza_budget', String(value ?? 0))}
-                    />
+                  <div className={styles.stickyActionBar}>
+                    <div className={styles.stickyActionBarHint} aria-live="polite">
+                      {isDirty
+                        ? 'Modifiche non salvate · premi ⌘S per salvare'
+                        : 'Tutte le modifiche salvate'}
+                    </div>
+                    <div className={styles.stickyActionBarButtons}>
+                      <Button variant="secondary" className={styles.flatBtn} onClick={requestReset} disabled={!isDirty}>
+                        Ripristina
+                      </Button>
+                      <Button className={styles.flatBtn} onClick={handleSave} loading={updateFattibilita.isPending} disabled={!isDirty}>
+                        Salva modifiche
+                      </Button>
+                    </div>
                   </div>
-
-                  <div className={styles.toggleRow}>
-                    <label className={styles.checkChip}>
-                      <input
-                        type="checkbox"
-                        checked={formState.copertura}
-                        onChange={(event) => handleUpdateField('copertura', event.target.checked)}
-                      />
-                      Copertura presente
-                    </label>
-                    <label className={styles.checkChip}>
-                      <input
-                        type="checkbox"
-                        checked={formState.da_ordinare}
-                        onChange={(event) => handleUpdateField('da_ordinare', event.target.checked)}
-                      />
-                      Da ordinare
-                    </label>
-                  </div>
-
-                  <div className={styles.fieldGroup}>
-                    <label htmlFor="annotazioni">Annotazioni</label>
-                    <textarea
-                      id="annotazioni"
-                      className={styles.textArea}
-                      value={formState.annotazioni}
-                      onChange={(event) => handleUpdateField('annotazioni', event.target.value)}
-                    />
-                  </div>
-
-                  <div className={styles.actionsRow}>
-                    <Button onClick={handleSave} loading={updateFattibilita.isPending}>
-                      Salva modifiche
-                    </Button>
-                    <Button variant="secondary" onClick={() => setFormState(toFormState(selectedFattibilita))}>
-                      Ripristina
-                    </Button>
-                  </div>
-
-                  <p className={styles.small}>Ultimo aggiornamento richiesta: {formatDateTime(richiesta.data.updated_at)}</p>
                 </div>
               )}
             </div>
@@ -515,13 +731,79 @@ export function RequestDetailPage() {
               placeholder={tecnologie.isLoading ? 'Caricamento tecnologie...' : 'Seleziona tecnologie'}
             />
           </div>
+          {addPreview.total > 0 && (
+            <p className={styles.small} aria-live="polite">
+              {addPreview.duplicates > 0
+                ? `Verranno create ${addPreview.items.length} righe · ${addPreview.duplicates} duplicati verranno ignorati`
+                : `Verranno create ${addPreview.items.length} righe`}
+            </p>
+          )}
           <div className={styles.actionsRow}>
-            <Button onClick={handleAddFattibilita} loading={createFattibilita.isPending} disabled={selectedFornitori.length === 0 || selectedTecnologie.length === 0}>
+            <Button className={styles.flatBtn} onClick={handleAddFattibilita} loading={createFattibilita.isPending} disabled={addPreview.items.length === 0}>
               Crea combinazioni
             </Button>
-            <Button variant="secondary" onClick={() => setShowAddModal(false)}>
+            <Button variant="secondary" className={styles.flatBtn} onClick={() => setShowAddModal(false)}>
               Annulla
             </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={pendingSelectionId !== null}
+        onClose={() => setPendingSelectionId(null)}
+        title="Scartare le modifiche?"
+        size="sm"
+      >
+        <div className={styles.modalBody}>
+          <p className={styles.muted}>
+            Le modifiche alla riga selezionata non sono state salvate. Continuando andranno perse.
+          </p>
+          <div className={styles.actionsRow}>
+            <Button variant="danger" className={styles.flatBtn} onClick={confirmSwitchSelection}>
+              Scarta e cambia riga
+            </Button>
+            <Button variant="secondary" className={styles.flatBtn} onClick={() => setPendingSelectionId(null)}>
+              Continua a modificare
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={pendingStato !== null}
+        onClose={() => setPendingStato(null)}
+        title={pendingStato === 'annullata' ? 'Annullare la richiesta?' : 'Confermare il cambio di stato?'}
+        size="sm"
+      >
+        <div className={styles.modalBody}>
+          <p className={styles.muted}>
+            {pendingStato === 'annullata'
+              ? 'La richiesta verrà annullata. I carrier non riceveranno ulteriori aggiornamenti.'
+              : `La richiesta tornerà allo stato "${pendingStato}". Confermi?`}
+          </p>
+          <div className={styles.actionsRow}>
+            <Button variant="danger" className={styles.flatBtn} onClick={confirmRichiestaStatoChange} loading={updateRichiestaStato.isPending}>
+              {pendingStato === 'annullata' ? 'Annulla richiesta' : 'Conferma'}
+            </Button>
+            <Button variant="secondary" className={styles.flatBtn} onClick={() => setPendingStato(null)}>
+              Chiudi
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        title="Ripristinare i valori originali?"
+        size="sm"
+      >
+        <div className={styles.modalBody}>
+          <p className={styles.muted}>Tutte le modifiche non salvate di questa riga verranno perse.</p>
+          <div className={styles.actionsRow}>
+            <Button variant="danger" className={styles.flatBtn} onClick={confirmReset}>Ripristina</Button>
+            <Button variant="secondary" className={styles.flatBtn} onClick={() => setShowResetConfirm(false)}>Continua a modificare</Button>
           </div>
         </div>
       </Modal>

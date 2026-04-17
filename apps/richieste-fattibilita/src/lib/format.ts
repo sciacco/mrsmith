@@ -6,6 +6,29 @@ export const MANAGER_ROLES = ['app_rdf_manager'];
 export const DEFAULT_LIST_STATES = ['nuova', 'in corso'];
 export const RICHIESTA_STATES = ['nuova', 'in corso', 'completata', 'annullata'];
 export const FATTIBILITA_STATES = ['bozza', 'inviata', 'sollecitata', 'completata', 'annullata'];
+
+const RICHIESTA_STATE_LABELS: Record<string, string> = {
+  nuova: 'Nuova',
+  'in corso': 'In corso',
+  completata: 'Completata',
+  annullata: 'Annullata',
+};
+
+const FATTIBILITA_STATE_LABELS: Record<string, string> = {
+  bozza: 'Bozza',
+  inviata: 'Inviata',
+  sollecitata: 'Sollecitata',
+  completata: 'Completata',
+  annullata: 'Annullata',
+};
+
+export function richiestaStateLabel(state: string): string {
+  return RICHIESTA_STATE_LABELS[state] ?? state;
+}
+
+export function fattibilitaStateLabel(state: string): string {
+  return FATTIBILITA_STATE_LABELS[state] ?? state;
+}
 export const BUDGET_OPTIONS = [
   { value: 0, label: 'Non valutato' },
   { value: 1, label: 'Pessima' },
@@ -37,6 +60,27 @@ export function formatDateTime(value: string | null | undefined): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+const RELATIVE_TIME_FMT = new Intl.RelativeTimeFormat('it-IT', { numeric: 'auto' });
+
+export function relativeTime(value: string | null | undefined, now: Date = new Date()): string | null {
+  if (!value) return null;
+  const then = new Date(value);
+  if (Number.isNaN(then.getTime())) return null;
+  const diffMs = then.getTime() - now.getTime();
+  const absSec = Math.abs(diffMs) / 1000;
+  if (absSec < 60) return RELATIVE_TIME_FMT.format(Math.round(diffMs / 1000), 'second');
+  if (absSec < 3600) return RELATIVE_TIME_FMT.format(Math.round(diffMs / 60000), 'minute');
+  if (absSec < 86400) return RELATIVE_TIME_FMT.format(Math.round(diffMs / 3600000), 'hour');
+  if (absSec < 604800) return RELATIVE_TIME_FMT.format(Math.round(diffMs / 86400000), 'day');
+  if (absSec < 2629800) return RELATIVE_TIME_FMT.format(Math.round(diffMs / 604800000), 'week');
+  return RELATIVE_TIME_FMT.format(Math.round(diffMs / 2629800000), 'month');
+}
+
+export function formatCurrencyEuro(value: number | null | undefined): string | null {
+  if (value == null) return null;
+  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(value);
 }
 
 export function formatCounts(counts: FattibilitaCounts): string {
