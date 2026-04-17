@@ -19,7 +19,7 @@ export type TierKey =
 export type DistancePerf = 'ottimali' | 'buone' | 'degradate' | 'inutilizzabili';
 
 export const TIER_LABEL: Record<TierKey, string> = {
-  premium_dedicated: 'Fibra dedicata premium',
+  premium_dedicated: 'Fibra dedicata',
   other_dedicated: 'Fibra dedicata',
   shared_fiber: 'Fibra condivisa',
   copper_fiber: 'Fibra misto rame',

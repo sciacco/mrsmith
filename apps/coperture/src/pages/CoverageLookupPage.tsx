@@ -215,7 +215,7 @@ function HeroGroup({ premium }: { premium: RankedCoverage[] }) {
     <section className={styles.hero} aria-label="Offerte premium equivalenti">
       <div className={styles.heroGlow} aria-hidden="true" />
       <div className={styles.heroHeader}>
-        <span className={styles.heroEyebrow}>Fibra dedicata premium · Offerte equivalenti</span>
+        <span className={styles.heroEyebrow}>Fibra dedicata · Offerte equivalenti</span>
       </div>
       <div className={styles.premiumGrid}>
         {premium.map((r, i) => (
