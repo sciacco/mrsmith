@@ -14,6 +14,9 @@ const (
 	ComplianceAppID   = "compliance"
 	ComplianceAppHref = "/apps/compliance/"
 
+	CopertureAppID   = "coperture"
+	CopertureAppHref = "/apps/coperture/"
+
 	KitProductsAppID   = "kit-e-prodotti"
 	KitProductsAppHref = "/apps/kit-products/"
 
@@ -39,6 +42,7 @@ const (
 var (
 	budgetAccessRoles                = []string{"app_budget_access"}
 	complianceAccessRoles            = []string{"app_compliance_access"}
+	copertureAccessRoles             = []string{"app_coperture_access"}
 	kitProductsAccessRoles           = []string{"app_kitproducts_access"}
 	listiniAccessRoles               = []string{"app_listini_access"}
 	panoramicaAccessRoles            = []string{"app_panoramica_access"}
@@ -182,6 +186,16 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryID:    "smart-apps",
 			CategoryTitle: "SMART APPS",
 			AccessRoles:   ReportsAccessRoles(),
+		},
+		{
+			ID:            CopertureAppID,
+			Name:          "Coperture",
+			Icon:          "shield",
+			Href:          CopertureAppHref,
+			Status:        "ready",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   CopertureAccessRoles(),
 		},
 		{
 			ID:            PanoramicaAppID,
@@ -343,6 +357,10 @@ func BudgetAccessRoles() []string {
 
 func ComplianceAccessRoles() []string {
 	return slices.Clone(complianceAccessRoles)
+}
+
+func CopertureAccessRoles() []string {
+	return slices.Clone(copertureAccessRoles)
 }
 
 func KitProductsAccessRoles() []string {

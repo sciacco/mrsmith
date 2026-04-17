@@ -20,6 +20,7 @@ COPY --from=backend /app/server /server
 COPY --from=frontend /app/apps/portal/dist /static
 COPY --from=frontend /app/apps/budget/dist /static/apps/budget
 COPY --from=frontend /app/apps/compliance/dist /static/apps/compliance
+COPY --from=frontend /app/apps/coperture/dist /static/apps/coperture
 COPY --from=frontend /app/apps/kit-products/dist /static/apps/kit-products
 COPY --from=frontend /app/apps/listini-e-sconti/dist /static/apps/listini-e-sconti
 COPY --from=frontend /app/apps/panoramica-cliente/dist /static/apps/panoramica-cliente

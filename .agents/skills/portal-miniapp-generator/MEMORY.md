@@ -26,3 +26,10 @@
 - For Appsmith migrations that read database functions/views with JSON payloads, exact shapes must be pinned before implementation and turned into narrow contract tests; "confirm during implementation" is not enough.
 - For `apps/kit-products` settings registries, the repo-fit pattern is a compact `master_detail_crud` page reusing `SettingsPage.module.css`, selection-driven `Modifica`, modal create/edit, and explicit empty/error states rather than a side detail panel.
 - `common.vocabulary` is not universally read-only in mini-apps: `kit_product_group` can be admin-managed from `kit-products`, but runtime consumers may still intentionally keep using `common.vocabulary.name` while translations stay administrative-only for that feature slice.
+
+## Recent Implementations
+
+- **Coperture** — 2026-04-17
+  - The approved `report_explorer` shape stayed intentionally compact: page title, 4 cascading `SingleSelect` filters, explicit `Cerca` and `Reimposta filtri`, one submitted-address summary line, and one 4-column results table. No KPI cards, no export CTA, no launcher-style banner.
+  - The full repo-fit touchpoint list for a new DSN-backed mini-app is now proven in code: root `package.json`, `Makefile`, `docker-compose.dev.yaml`, `deploy/Dockerfile`, `backend/.env.example`, root `.env.preprod.example`, `backend/internal/platform/config/config.go`, `backend/cmd/server/main.go`, `backend/internal/platform/applaunch/catalog.go`, `backend/internal/platform/applaunch/catalog_test.go`, `backend/internal/portal/handler_test.go`, `backend/internal/platform/staticspa/handler_test.go`, and `pnpm-lock.yaml`.
+  - When live DB access is unavailable during an Appsmith migration, checked-in fixtures derived from the approved source app can unblock implementation if they are pinned under `backend/internal/<app>/testdata` and guarded by query-shape/decoder regression tests. They still need later revalidation against live DB artifacts when the DSN becomes available.

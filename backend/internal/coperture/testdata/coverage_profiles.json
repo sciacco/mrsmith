@@ -1,0 +1,14 @@
+[
+  {
+    "id": 2,
+    "name": "GEA 1000/1000",
+    "upstream_bandwidth": 1000,
+    "downstream_bandwidth": 1000
+  },
+  {
+    "id": 18,
+    "name": "GEA 100/100",
+    "upstream_bandwidth": 100,
+    "downstream_bandwidth": 100
+  }
+]

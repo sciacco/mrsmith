@@ -70,6 +70,25 @@ func TestVisibleCategoriesFiltersByComplianceRole(t *testing.T) {
 	}
 }
 
+func TestVisibleCategoriesFiltersByCopertureRole(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"app_coperture_access"})
+	if len(categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(categories))
+	}
+	if categories[0].ID != "smart-apps" {
+		t.Fatalf("expected smart-apps category, got %q", categories[0].ID)
+	}
+	if len(categories[0].Apps) != 1 {
+		t.Fatalf("expected 1 app, got %d", len(categories[0].Apps))
+	}
+	if categories[0].Apps[0].ID != CopertureAppID {
+		t.Fatalf("expected coperture app, got %q", categories[0].Apps[0].ID)
+	}
+	if categories[0].Apps[0].Href != CopertureAppHref {
+		t.Fatalf("expected coperture href %q, got %q", CopertureAppHref, categories[0].Apps[0].Href)
+	}
+}
+
 func TestCatalogAppliesComplianceHrefOverride(t *testing.T) {
 	catalog := Catalog(map[string]string{ComplianceAppID: "http://localhost:5175"})
 
@@ -84,6 +103,22 @@ func TestCatalogAppliesComplianceHrefOverride(t *testing.T) {
 	}
 
 	t.Fatal("expected compliance definition in catalog")
+}
+
+func TestCatalogAppliesCopertureHrefOverride(t *testing.T) {
+	catalog := Catalog(map[string]string{CopertureAppID: "http://localhost:5183"})
+
+	for _, definition := range catalog {
+		if definition.ID != CopertureAppID {
+			continue
+		}
+		if definition.Href != "http://localhost:5183" {
+			t.Fatalf("expected dev override href, got %q", definition.Href)
+		}
+		return
+	}
+
+	t.Fatal("expected coperture definition in catalog")
 }
 
 func TestVisibleCategoriesHidesAppsWithoutRole(t *testing.T) {

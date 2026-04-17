@@ -223,6 +223,15 @@ Alyante ERP ID
 
 ## Deployment and Runtime Integration Rules
 
+### New DSN-Backed Mini-Apps Must Update Both Dev and Preprod Env Templates
+
+- Context: introducing a new launcher-backed mini-app that needs backend DSNs and optional split-server frontend URL overrides.
+- Discovery: contributor defaults and deployment defaults are documented in two different places: local/backend-facing samples live in `backend/.env.example`, while the repo's pre-production sample lives at the root `.env.preprod.example`. Updating only the backend-local example leaves the real deploy template stale.
+- Practical rule: when a new mini-app adds config such as `<APP>_APP_URL` or `<DB>_DSN`, update `backend/internal/platform/config/config.go`, `backend/.env.example`, and the root `.env.preprod.example` in the same change set. Treat both env examples as part of repo-fit wiring, not optional documentation.
+- Evidence: Coperture rollout on 2026-04-17 added `COPERTURE_APP_URL` / `DBCOPERTURE_DSN` in `backend/internal/platform/config/config.go`, `backend/.env.example`, and `.env.preprod.example`.
+- Used by: `apps/coperture`; future DSN-backed mini-apps.
+- Open questions: none.
+
 ### Backend-Served SPAs Must Be Copied Explicitly Into `/static/apps/<slug>`
 
 - Context: production and pre-production deployments where the Go server serves multiple Vite bundles from a shared static root.

@@ -102,6 +102,22 @@ func TestHandlerFallsBackToReportsIndexForDeepLinks(t *testing.T) {
 	}
 }
 
+func TestHandlerFallsBackToCopertureIndexForDeepLinks(t *testing.T) {
+	root := buildStaticFixture(t)
+	handler := New(root)
+
+	req := httptest.NewRequest(http.MethodGet, "/apps/coperture/coperture", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "coperture-shell") {
+		t.Fatalf("expected coperture index, got %q", body)
+	}
+}
+
 func buildStaticFixture(t *testing.T) string {
 	t.Helper()
 
@@ -110,6 +126,7 @@ func buildStaticFixture(t *testing.T) string {
 	writeFixtureFile(t, filepath.Join(root, "apps", "budget", "index.html"), "<html>budget-shell</html>")
 	writeFixtureFile(t, filepath.Join(root, "apps", "budget", "assets", "app.js"), "budget-asset")
 	writeFixtureFile(t, filepath.Join(root, "apps", "compliance", "index.html"), "<html>compliance-shell</html>")
+	writeFixtureFile(t, filepath.Join(root, "apps", "coperture", "index.html"), "<html>coperture-shell</html>")
 	writeFixtureFile(t, filepath.Join(root, "apps", "reports", "index.html"), "<html>reports-shell</html>")
 	return root
 }

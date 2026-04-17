@@ -17,6 +17,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/budget"
 	"github.com/sciacco/mrsmith/internal/compliance"
+	"github.com/sciacco/mrsmith/internal/coperture"
 	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/listini"
 	"github.com/sciacco/mrsmith/internal/panoramica"
@@ -108,6 +109,18 @@ func main() {
 		logger.Info("mistra database connected", "component", "kitproducts")
 	}
 
+	// Coperture DB
+	var dbCoperture *sql.DB
+	if cfg.DBCopertureDSN != "" {
+		var err error
+		dbCoperture, err = database.New(database.Config{Driver: "postgres", DSN: cfg.DBCopertureDSN})
+		if err != nil {
+			logger.Error("failed to connect to dbcoperture", "component", "coperture", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("dbcoperture database connected", "component", "coperture")
+	}
+
 	// Alyante ERP (optional)
 	var alyanteDB *sql.DB
 	if cfg.AlyanteDSN != "" {
@@ -184,6 +197,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.ComplianceAppID] = "http://localhost:5175"
 	}
+	if cfg.CopertureAppURL != "" {
+		hrefOverrides[applaunch.CopertureAppID] = cfg.CopertureAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.CopertureAppID] = "http://localhost:5183"
+	}
 	if cfg.KitProductsAppURL != "" {
 		hrefOverrides[applaunch.KitProductsAppID] = cfg.KitProductsAppURL
 	} else if cfg.StaticDir == "" {
@@ -223,6 +241,9 @@ func main() {
 	{
 		filtered := make([]applaunch.Definition, 0, len(appCatalog))
 		for _, definition := range appCatalog {
+			if definition.ID == applaunch.CopertureAppID && cfg.DBCopertureDSN == "" {
+				continue
+			}
 			if definition.ID == applaunch.KitProductsAppID && cfg.MistraDSN == "" {
 				continue
 			}
@@ -251,6 +272,7 @@ func main() {
 	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
 	compliance.RegisterRoutes(api, anisettaDB)
+	coperture.RegisterRoutes(api, dbCoperture)
 	var alyanteAdapter *kitproducts.AlyanteAdapter
 	if alyanteDB != nil {
 		alyanteAdapter = kitproducts.NewAlyanteAdapter(alyanteDB)

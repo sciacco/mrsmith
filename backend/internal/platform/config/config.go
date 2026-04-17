@@ -15,6 +15,7 @@ type Config struct {
 	// Optional launcher override for split-server local development.
 	BudgetAppURL               string
 	ComplianceAppURL           string
+	CopertureAppURL            string
 	KitProductsAppURL          string
 	ListiniAppURL              string
 	PanoramicaAppURL           string
@@ -34,6 +35,9 @@ type Config struct {
 
 	// Grappa MySQL (listini module)
 	GrappaDSN string
+
+	// Coperture PostgreSQL
+	DBCopertureDSN string
 
 	// HubSpot integration (optional — listini module)
 	HubSpotAPIKey string
@@ -65,10 +69,11 @@ func Load() Config {
 		Port:                         envOr("PORT", "8080"),
 		LogLevel:                     envOr("LOG_LEVEL", "info"),
 		KeycloakIssuerURL:            envOr("KEYCLOAK_ISSUER_URL", ""),
-		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182"),
+		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183"),
 		StaticDir:                    envOr("STATIC_DIR", ""),
 		BudgetAppURL:                 envOr("BUDGET_APP_URL", ""),
 		ComplianceAppURL:             envOr("COMPLIANCE_APP_URL", ""),
+		CopertureAppURL:              envOr("COPERTURE_APP_URL", ""),
 		KitProductsAppURL:            envOr("KIT_PRODUCTS_APP_URL", ""),
 		ListiniAppURL:                envOr("LISTINI_APP_URL", ""),
 		PanoramicaAppURL:             envOr("PANORAMICA_APP_URL", ""),
@@ -80,6 +85,7 @@ func Load() Config {
 		MistraDSN:                    envOr("MISTRA_DSN", ""),
 		AlyanteDSN:                   envOr("ALYANTE_DSN", ""),
 		GrappaDSN:                    envOr("GRAPPA_DSN", ""),
+		DBCopertureDSN:               envOr("DBCOPERTURE_DSN", ""),
 		HubSpotAPIKey:                envOr("HUBSPOT_API_KEY", ""),
 		CarboneAPIKey:                envOr("CARBONE_API_KEY", ""),
 		OpenRouterAPIKey:             envOr("OPENROUTER_API_KEY", ""),
