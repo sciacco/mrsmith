@@ -8,7 +8,7 @@ const navItems = [
 ];
 
 export function App() {
-  const { user, loading, logout, status } = useOptionalAuth();
+  const { user, authenticated, loading, logout, status } = useOptionalAuth();
   const element = useRoutes(routes);
 
   if (loading) return null;
@@ -22,6 +22,22 @@ export function App() {
         <AppShell.Content>
           <section style={{ padding: '2rem', textAlign: 'center' }}>
             <p>Sessione in ripristino</p>
+          </section>
+        </AppShell.Content>
+      </AppShell>
+    );
+  }
+
+  if (!authenticated) {
+    return (
+      <AppShell userName={user?.name ?? 'MrSmith'} onLogout={logout}>
+        <AppShell.Nav>
+          <TabNav items={navItems} />
+        </AppShell.Nav>
+        <AppShell.Content>
+          <section style={{ padding: '2rem', textAlign: 'center' }}>
+            <h1>Accesso richiesto</h1>
+            <p>La sessione Keycloak non e disponibile. Ricarica la pagina o riapri l&apos;app dal portale.</p>
           </section>
         </AppShell.Content>
       </AppShell>

@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 
 export function useApiClient(): ApiClient {
-  const { getAccessToken, forceRefreshToken, login } = useOptionalAuth();
+  const { getAccessToken, forceRefreshToken } = useOptionalAuth();
 
   return useMemo(
     () =>
@@ -11,10 +11,7 @@ export function useApiClient(): ApiClient {
         baseUrl: '/api',
         getToken: getAccessToken,
         forceRefreshToken,
-        onUnauthorized: () => {
-          login();
-        },
       }),
-    [forceRefreshToken, getAccessToken, login],
+    [forceRefreshToken, getAccessToken],
   );
 }

@@ -86,6 +86,7 @@ export function AuthProvider({ keycloakUrl, realm, clientId, children }: AuthPro
     user: null,
   });
   const loginTriggeredRef = useRef(false);
+  const pendingRefreshRef = useRef<Promise<string | undefined> | null>(null);
 
   const syncAuthState = useCallback(
     (nextStatus?: AuthStatus) => {
@@ -138,37 +139,70 @@ export function AuthProvider({ keycloakUrl, realm, clientId, children }: AuthPro
     void keycloak.logout();
   }, [keycloak]);
 
-  const getAccessToken = useCallback(
-    async (minValidity = 30) => {
+  const refreshToken = useCallback(
+    async ({
+      minValidity,
+      force = false,
+      loginOnFailure = false,
+    }: {
+      minValidity: number;
+      force?: boolean;
+      loginOnFailure?: boolean;
+    }): Promise<string | undefined> => {
       if (!keycloak.authenticated) return undefined;
-      const token = keycloak.token;
-      if (token && getTokenValiditySeconds(keycloak.tokenParsed) > minValidity) {
-        return token;
+      const currentToken = keycloak.token;
+      if (!force && currentToken && getTokenValiditySeconds(keycloak.tokenParsed) > minValidity) {
+        return currentToken;
       }
-      try {
-        await keycloak.updateToken(minValidity);
-        loginTriggeredRef.current = false;
-        syncAuthState();
-        return keycloak.token;
-      } catch {
-        return undefined;
+      if (pendingRefreshRef.current) {
+        if (!loginOnFailure) return pendingRefreshRef.current;
+        return pendingRefreshRef.current.then((token) => {
+          if (token) return token;
+          if (keycloak.authenticated && !loginTriggeredRef.current) {
+            login();
+          }
+          return undefined;
+        });
       }
+
+      pendingRefreshRef.current = (async () => {
+        try {
+          await keycloak.updateToken(force ? -1 : minValidity);
+          loginTriggeredRef.current = false;
+          syncAuthState();
+          return keycloak.token;
+        } catch {
+          if (loginOnFailure && keycloak.authenticated && !loginTriggeredRef.current) {
+            login();
+          }
+          return undefined;
+        } finally {
+          pendingRefreshRef.current = null;
+        }
+      })();
+
+      return pendingRefreshRef.current;
     },
-    [keycloak, syncAuthState],
+    [keycloak, login, syncAuthState],
   );
 
-  const forceRefreshToken = useCallback(async () => {
-    if (!keycloak.authenticated) return undefined;
-    try {
-      // -1 forces keycloak-js to always refresh, ignoring current validity.
-      await keycloak.updateToken(-1);
-      loginTriggeredRef.current = false;
-      syncAuthState();
-      return keycloak.token;
-    } catch {
-      return undefined;
-    }
-  }, [keycloak, syncAuthState]);
+  const getAccessToken = useCallback(
+    (minValidity = 30) =>
+      refreshToken({
+        minValidity,
+      }),
+    [refreshToken],
+  );
+
+  const forceRefreshToken = useCallback(
+    () =>
+      refreshToken({
+        minValidity: 0,
+        force: true,
+        loginOnFailure: true,
+      }),
+    [refreshToken],
+  );
 
   useEffect(() => {
     keycloak.onAuthSuccess = () => {

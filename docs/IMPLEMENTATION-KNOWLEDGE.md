@@ -243,6 +243,24 @@ Alyante ERP ID
 - Used by: portal app visibility, all ACL-protected backend app routes, quotes delete authorization.
 - Open questions: none.
 
+### Shared SPA Clients Must Not Hit Protected APIs Before a Bearer Token Exists
+
+- Context: frontend mini-apps using `@mrsmith/auth-client` plus `@mrsmith/api-client` for Keycloak-protected `/api/*` requests.
+- Discovery: if the shared API client sends a request when `getAccessToken()` returns `undefined`, the backend logs a noisy `401 missing_bearer`, then a forced refresh-and-retry can immediately succeed with `200`. When app wrappers also call `login()` from request-level 401 handlers, that pattern can escalate into visible remount/refetch loops.
+- Practical rule: shared API clients must acquire a bearer token before the first network request, treat "no token available" as a local unauthorized error, and reserve backend retries for true stale-token 401s. Reauthentication should be driven centrally by `AuthProvider` refresh failure handling, not per-app query error callbacks.
+- Evidence: `packages/api-client/src/client.ts`, `packages/auth-client/src/AuthProvider.tsx`, and the 2026-04-17 `apps/richieste-fattibilita` loop on `GET /api/rdf/v1/richieste/summary` alternating `401 missing_bearer` and `200`.
+- Used by: portal and all mini-apps using the shared API/auth client stack.
+- Open questions: none.
+
+### Mini-App Auth Fallbacks Must Fail Closed and Retry Local Preflight Unauthorized Errors
+
+- Context: Vite mini-app bootstraps using `useOptionalAuth()`, app-shell auth gates, and React Query startup fetches.
+- Discovery: if an app-local auth fallback reports `authenticated: true` without a token, routed pages mount before Keycloak state is usable. Once the shared API client correctly refuses to send bearerless requests, those startup fetches fail locally with no backend logs; if React Query also disables retries for every `401`, the page can freeze in a false "not authorized" state.
+- Practical rule: optional-auth fallbacks must default to `unauthenticated`, mini-app shells must gate route rendering on `authenticated` rather than `loading` alone, and query retry policies must keep retry disabled for real backend ACL failures while allowing retries for local auth-preflight `401`s.
+- Evidence: `apps/*/src/hooks/useOptionalAuth.ts`, `apps/*/src/App.tsx`, `apps/*/src/main.tsx`, `apps/richieste-fattibilita/src/lib/format.ts`, and the 2026-04-17 first-load `richieste-fattibilita` empty-state error with no matching backend request.
+- Used by: all mini-apps consuming `@mrsmith/auth-client` and `@mrsmith/api-client`.
+- Open questions: none.
+
 ## Legacy Data Model Constraints
 
 ### Alyante Product Translation Write Contract

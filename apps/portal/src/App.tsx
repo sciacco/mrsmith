@@ -5,14 +5,15 @@ import { Portal } from './components/Portal';
 import type { Category, PortalUser } from './types';
 
 export function App() {
-  const { authenticated, loading, status, getAccessToken, logout } = useAuth();
+  const { authenticated, loading, status, getAccessToken, forceRefreshToken, logout } = useAuth();
   const api = useMemo(
     () =>
       createApiClient({
         baseUrl: '/api',
         getToken: getAccessToken,
+        forceRefreshToken,
       }),
-    [getAccessToken],
+    [forceRefreshToken, getAccessToken],
   );
 
   const [user, setUser] = useState<PortalUser | null>(null);

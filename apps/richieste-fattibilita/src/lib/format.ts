@@ -1,4 +1,4 @@
-import { ApiError } from '@mrsmith/api-client';
+import { ApiError, isLocalAuthPreflightUnauthorized } from '@mrsmith/api-client';
 import { hasAnyRole } from '@mrsmith/auth-client';
 import type { FattibilitaCounts } from '../api/types';
 
@@ -130,6 +130,7 @@ function isTechnicalErrorCopy(value: string | undefined): boolean {
 
 export function copyErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
+    if (isLocalAuthPreflightUnauthorized(error)) return fallback;
     const body = error.body as { error?: string; message?: string } | undefined;
     const candidate = body?.message ?? body?.error;
     if (candidate && !isTechnicalErrorCopy(candidate)) return candidate;

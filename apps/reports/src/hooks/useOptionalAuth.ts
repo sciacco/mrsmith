@@ -1,8 +1,8 @@
 import { useAuth, type AuthContextValue } from '@mrsmith/auth-client';
 
 const noAuth: AuthContextValue = {
-  status: 'authenticated',
-  authenticated: true,
+  status: 'unauthenticated',
+  authenticated: false,
   token: undefined,
   user: null,
   login: () => {},

@@ -9,6 +9,11 @@ export class ApiError extends Error {
   }
 }
 
+export interface LocalAuthPreflightUnauthorizedBody {
+  local: true;
+  reason: 'missing_token';
+}
+
 export interface ApiClientOptions {
   baseUrl: string;
   getToken: () => Promise<string | undefined> | string | undefined;
@@ -35,6 +40,28 @@ export interface ApiClient {
 }
 
 type BodyMode = 'json' | 'blob';
+
+function isLocalAuthPreflightBody(value: unknown): value is LocalAuthPreflightUnauthorizedBody {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'local' in value &&
+    'reason' in value &&
+    value.local === true &&
+    value.reason === 'missing_token'
+  );
+}
+
+export function isLocalAuthPreflightUnauthorized(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401 && isLocalAuthPreflightBody(error.body);
+}
+
+function makeUnauthorizedError(path: string, reason: LocalAuthPreflightUnauthorizedBody['reason']): ApiError {
+  return new ApiError(401, 'Unauthorized', path, {
+    local: true,
+    reason,
+  } satisfies LocalAuthPreflightUnauthorizedBody);
+}
 
 export function createApiClient({
   baseUrl,
@@ -79,13 +106,23 @@ export function createApiClient({
     return fetch(`${baseUrl}${path}`, init);
   }
 
+  async function getTokenForRequest(path: string): Promise<string> {
+    const token = await getToken();
+    if (token) return token;
+
+    const fresh = await refreshOnce();
+    if (fresh) return fresh;
+
+    throw makeUnauthorizedError(path, 'missing_token');
+  }
+
   async function sendWithRetry(
     path: string,
     method: string,
     body: unknown,
     mode: BodyMode,
   ): Promise<Response> {
-    const token = await getToken();
+    const token = await getTokenForRequest(path);
     let res = await doFetch(path, method, token, body, mode);
 
     if (res.status === 401 && forceRefreshToken) {
@@ -106,26 +143,36 @@ export function createApiClient({
   }
 
   async function requestJSON<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await sendWithRetry(path, method, body, 'json');
-    if (!res.ok) {
-      const payload = await readErrorBody(res);
-      const error = new ApiError(res.status, res.statusText, path, payload);
-      if (res.status === 401) await onUnauthorized?.(error);
+    try {
+      const res = await sendWithRetry(path, method, body, 'json');
+      if (!res.ok) {
+        const payload = await readErrorBody(res);
+        throw new ApiError(res.status, res.statusText, path, payload);
+      }
+      if (res.status === 204) return undefined as T;
+      return res.json() as Promise<T>;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await onUnauthorized?.(error);
+      }
       throw error;
     }
-    if (res.status === 204) return undefined as T;
-    return res.json() as Promise<T>;
   }
 
   async function requestBlob(method: string, path: string, body?: unknown): Promise<Blob> {
-    const res = await sendWithRetry(path, method, body, body === undefined ? 'blob' : 'json');
-    if (!res.ok) {
-      const payload = await readErrorBody(res);
-      const error = new ApiError(res.status, res.statusText, path, payload);
-      if (res.status === 401) await onUnauthorized?.(error);
+    try {
+      const res = await sendWithRetry(path, method, body, body === undefined ? 'blob' : 'json');
+      if (!res.ok) {
+        const payload = await readErrorBody(res);
+        throw new ApiError(res.status, res.statusText, path, payload);
+      }
+      return res.blob();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await onUnauthorized?.(error);
+      }
       throw error;
     }
-    return res.blob();
   }
 
   // POST/PUT/PATCH without an explicit body default to `{}` so the backend

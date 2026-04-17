@@ -1,1 +1,8 @@
-export { createApiClient, ApiError, type ApiClient, type ApiClientOptions } from './client';
+export {
+  createApiClient,
+  ApiError,
+  isLocalAuthPreflightUnauthorized,
+  type ApiClient,
+  type ApiClientOptions,
+  type LocalAuthPreflightUnauthorizedBody,
+} from './client';

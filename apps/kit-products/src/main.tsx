@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AuthProvider } from '@mrsmith/auth-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ApiError } from '@mrsmith/api-client';
+import { ApiError, isLocalAuthPreflightUnauthorized } from '@mrsmith/api-client';
 import { BrowserRouter } from 'react-router-dom';
 import { ToastProvider } from '@mrsmith/ui';
 import { App } from './App';
@@ -20,8 +20,9 @@ const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
       retry: (failureCount, error) => {
-        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-          return false;
+        if (error instanceof ApiError) {
+          if (error.status === 403) return false;
+          if (error.status === 401 && !isLocalAuthPreflightUnauthorized(error)) return false;
         }
         return failureCount < 3;
       },

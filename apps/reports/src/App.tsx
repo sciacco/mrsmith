@@ -12,7 +12,7 @@ const navGroups: TabGroup[] = reportNavSections.map((group) => ({
 }));
 
 export function App() {
-  const { user, loading, logout, status } = useOptionalAuth();
+  const { user, authenticated, loading, logout, status } = useOptionalAuth();
   const element = useRoutes(routes);
 
   if (loading) return null;
@@ -30,6 +30,25 @@ export function App() {
             <p className={styles.eyebrow}>Autenticazione</p>
             <h1>Sessione in ripristino</h1>
             <p>La sessione e scaduta durante l&apos;inattivita. Reindirizzamento a Keycloak in corso.</p>
+          </section>
+        </AppShell.Content>
+      </AppShell>
+    );
+  }
+
+  if (!authenticated) {
+    return (
+      <AppShell userName={user?.name ?? 'MrSmith'} onLogout={logout}>
+        <AppShell.Nav>
+          <div className={styles.navRow}>
+            <TabNavGroup groups={navGroups} />
+          </div>
+        </AppShell.Nav>
+        <AppShell.Content>
+          <section className={styles.reauthCard}>
+            <p className={styles.eyebrow}>Autenticazione</p>
+            <h1>Accesso richiesto</h1>
+            <p>La sessione Keycloak non è disponibile. Ricarica la pagina o riapri l&apos;app dal portale.</p>
           </section>
         </AppShell.Content>
       </AppShell>
