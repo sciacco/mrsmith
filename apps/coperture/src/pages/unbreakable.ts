@@ -96,6 +96,9 @@ export function buildUnbreakableCombos(sellable: RankedCoverage[]): UnbreakableC
       if (d.result.operator_id === s.result.operator_id) {
         warnings.push('Stesso vendor per entrambe le linee');
       }
+      if (isDeprecatedTech(s.result.tech)) {
+        warnings.push('Include una tecnologia deprecata (ADSL)');
+      }
       core.push({ a: d, b: s, optimal: warnings.length === 0, warnings });
     }
   }
@@ -113,6 +116,9 @@ export function buildUnbreakableCombos(sellable: RankedCoverage[]): UnbreakableC
       const warnings: string[] = [];
       if (sameOp) warnings.push('Stesso vendor per entrambe le linee');
       if (sameTech) warnings.push('Stessa tecnologia per entrambe le linee');
+      if (isDeprecatedTech(a.result.tech) || isDeprecatedTech(b.result.tech)) {
+        warnings.push('Include una tecnologia deprecata (ADSL)');
+      }
       essence.push({ a, b, optimal: warnings.length === 0, warnings });
     }
   }
