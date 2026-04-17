@@ -55,10 +55,22 @@ export function MultiSelect<T extends number | string = number>({
       const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_PAD;
       const spaceAbove = rect.top - VIEWPORT_PAD;
       const placeTop = spaceBelow < DROPDOWN_MAX_HEIGHT && spaceAbove > spaceBelow;
+      // When portaled into a <dialog> (which has a transform), position:fixed
+      // resolves against the dialog's containing block, not the viewport — so
+      // we must subtract the dialog's viewport offset from the coordinates.
+      const dialog = trigger.closest('dialog');
+      const offset = dialog
+        ? dialog.getBoundingClientRect()
+        : { top: 0, left: 0 };
       const top = placeTop
-        ? rect.top - DROPDOWN_GAP
-        : rect.bottom + DROPDOWN_GAP;
-      setCoords({ top, left: rect.left, width: rect.width, placeTop });
+        ? rect.top - DROPDOWN_GAP - offset.top
+        : rect.bottom + DROPDOWN_GAP - offset.top;
+      setCoords({
+        top,
+        left: rect.left - offset.left,
+        width: rect.width,
+        placeTop,
+      });
     };
 
     update();
@@ -162,7 +174,7 @@ export function MultiSelect<T extends number | string = number>({
               )}
             </div>
           </div>,
-          document.body,
+          triggerRef.current?.closest('dialog') ?? document.body,
         )}
     </div>
   );
