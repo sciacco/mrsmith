@@ -40,6 +40,18 @@ export const icons: Record<string, JSX.Element> = {
     </svg>
   ),
 
+  'file-text': (
+    <svg {...svgProps}>
+      <path d="M12 4 L32 4 L38 10 L38 44 L10 44 L10 4 Z" />
+      <polyline points="32 4 32 10 38 10" />
+      <line x1="16" y1="14" x2="32" y2="14" />
+      <line x1="16" y1="20" x2="32" y2="20" />
+      <line x1="16" y1="26" x2="26" y2="26" />
+      <line x1="16" y1="32" x2="30" y2="32" />
+      <line x1="16" y1="38" x2="22" y2="38" />
+    </svg>
+  ),
+
   handshake: (
     <svg {...svgProps}>
       <path d="M6 28 C6 28 10 22 16 22 C18 22 20 24 22 24" />
