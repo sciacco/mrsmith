@@ -1,0 +1,313 @@
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.8rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.filterSearch {
+  flex: 1 1 18rem;
+  min-width: 14rem;
+}
+
+.stateSelect {
+  min-width: 11rem;
+  flex: 0 0 auto;
+}
+
+.dateRange {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+
+.dateInput {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  min-width: 9.5rem;
+}
+
+.dateInput:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-subtle);
+}
+
+.dateSep {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.clearLink {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-md);
+}
+
+.clearLink:hover {
+  background: var(--color-accent-subtle);
+}
+
+/* ── Table ── */
+.tableWrap {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-surface);
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid var(--color-border-subtle, var(--color-border));
+  vertical-align: middle;
+  color: var(--color-text);
+}
+
+.row {
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.row:hover {
+  background: var(--color-accent-subtle);
+}
+
+.row[data-expanded='true'] {
+  background: var(--color-accent-subtle);
+}
+
+.row[data-expanded='true'] td {
+  border-bottom-color: transparent;
+}
+
+.colExpand {
+  width: 2.2rem;
+}
+
+.expandBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.expandBtn:hover {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.idLabel {
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.clienteCell {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 12rem;
+}
+
+.clienteName {
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+
+.dealName {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 22rem;
+}
+
+.addrText {
+  display: inline-block;
+  max-width: 16rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text-secondary);
+  cursor: help;
+}
+
+.dateCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.countCell {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.countBadge {
+  display: inline-flex;
+  min-width: 2.5rem;
+  justify-content: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full, 999px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  cursor: help;
+}
+
+.actionsCell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.iconAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin-left: 0.35rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.iconAction:hover {
+  border-color: var(--color-accent-muted);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.iconActionPrimary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.iconActionPrimary:hover {
+  background: var(--color-accent-hover, var(--color-accent));
+  border-color: var(--color-accent-hover, var(--color-accent));
+  color: #fff;
+}
+
+.iconAction:focus-visible,
+.expandBtn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ── Expanded detail row ── */
+.detailRow td {
+  padding: 0 0.85rem 1rem;
+  background: var(--color-accent-subtle);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.85rem 1.4rem;
+  padding: 0.4rem 0.6rem 0.6rem 3rem;
+}
+
+.detailLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.detailText {
+  white-space: pre-wrap;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .filterBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filterSearch,
+  .stateSelect,
+  .dateRange {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .dateInput {
+    flex: 1 1 0;
+  }
+
+  .clearLink {
+    margin-left: 0;
+    align-self: flex-start;
+  }
+
+  .detailGrid {
+    padding-left: 0.6rem;
+  }
+}

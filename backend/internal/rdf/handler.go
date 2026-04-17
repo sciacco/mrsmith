@@ -292,15 +292,25 @@ func (h *Handler) handleListRichiesteSummary(w http.ResponseWriter, r *http.Requ
 	}
 
 	stati := queryCSV(r, "stato")
-	dealFilter := strings.TrimSpace(r.URL.Query().Get("deal"))
-	richiedenteFilter := strings.TrimSpace(r.URL.Query().Get("richiedente"))
-	clienteFilter := strings.TrimSpace(r.URL.Query().Get("cliente"))
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	dataDa := strings.TrimSpace(r.URL.Query().Get("data_da"))
+	dataA := strings.TrimSpace(r.URL.Query().Get("data_a"))
 	page := queryPositiveInt(r, "page", 1)
 	pageSize := queryPositiveInt(r, "page_size", 12)
 	offset := (page - 1) * pageSize
 
+	var dealIDsForCompany []int64
+	if q != "" {
+		matchedIDs, err := h.fetchDealIDsByCompany(r.Context(), q)
+		if err != nil {
+			h.dbFailure(w, r, "list_richieste_summary_company_search", err)
+			return
+		}
+		dealIDsForCompany = matchedIDs
+	}
+
 	args := []any{}
-	whereClause := buildRichiestaWhereClause(&args, stati, dealFilter, richiedenteFilter)
+	whereClause := buildRichiestaWhereClause(&args, stati, q, dealIDsForCompany, dataDa, dataA)
 
 	query := `WITH counts AS (
 		SELECT richiesta_id,
@@ -363,20 +373,6 @@ func (h *Handler) handleListRichiesteSummary(w http.ResponseWriter, r *http.Requ
 		items[i].DealName = stringPointer(deal.DealName)
 		items[i].CompanyName = deal.CompanyName
 		items[i].OwnerEmail = deal.OwnerEmail
-	}
-
-	if clienteFilter != "" {
-		filtered := make([]RichiestaSummary, 0, len(items))
-		needle := strings.ToLower(clienteFilter)
-		for _, item := range items {
-			if item.CompanyName == nil {
-				continue
-			}
-			if strings.Contains(strings.ToLower(*item.CompanyName), needle) {
-				filtered = append(filtered, item)
-			}
-		}
-		items = filtered
 	}
 
 	total := len(items)
@@ -1293,7 +1289,7 @@ func (h *Handler) notificationsEnabled() bool {
 	return h.teamsNotificationsEnabled && h.teamsWebhookURL != ""
 }
 
-func buildRichiestaWhereClause(args *[]any, stati []string, dealFilter, richiedenteFilter string) string {
+func buildRichiestaWhereClause(args *[]any, stati []string, q string, dealIDsForCompany []int64, dataDa, dataA string) string {
 	parts := make([]string, 0, 4)
 	if len(stati) > 0 {
 		holders := make([]string, 0, len(stati))
@@ -1302,16 +1298,58 @@ func buildRichiestaWhereClause(args *[]any, stati []string, dealFilter, richiede
 		}
 		parts = append(parts, "r.stato IN ("+strings.Join(holders, ", ")+")")
 	}
-	if dealFilter != "" {
-		parts = append(parts, "COALESCE(r.codice_deal, '') ILIKE "+placeholder(args, "%"+dealFilter+"%"))
+	if q != "" {
+		pattern := "%" + q + "%"
+		orParts := []string{
+			"COALESCE(r.codice_deal, '') ILIKE " + placeholder(args, pattern),
+			"COALESCE(r.indirizzo, '') ILIKE " + placeholder(args, pattern),
+			"COALESCE(r.created_by, '') ILIKE " + placeholder(args, pattern),
+		}
+		if len(dealIDsForCompany) > 0 {
+			idHolders := make([]string, 0, len(dealIDsForCompany))
+			for _, id := range dealIDsForCompany {
+				idHolders = append(idHolders, placeholder(args, id))
+			}
+			orParts = append(orParts, "r.deal_id IN ("+strings.Join(idHolders, ", ")+")")
+		}
+		parts = append(parts, "("+strings.Join(orParts, " OR ")+")")
 	}
-	if richiedenteFilter != "" {
-		parts = append(parts, "COALESCE(r.created_by, '') ILIKE "+placeholder(args, "%"+richiedenteFilter+"%"))
+	if dataDa != "" {
+		parts = append(parts, "r.data_richiesta >= "+placeholder(args, dataDa))
+	}
+	if dataA != "" {
+		parts = append(parts, "r.data_richiesta <= "+placeholder(args, dataA))
 	}
 	if len(parts) == 0 {
 		return ""
 	}
 	return " WHERE " + strings.Join(parts, " AND ")
+}
+
+func (h *Handler) fetchDealIDsByCompany(ctx context.Context, q string) ([]int64, error) {
+	if h.mistraDB == nil {
+		return nil, nil
+	}
+	rows, err := h.mistraDB.QueryContext(ctx, `
+		SELECT d.id
+		FROM loader.hubs_deal d
+		LEFT JOIN loader.hubs_company c ON c.id = d.company_id
+		WHERE COALESCE(c.name, '') ILIKE $1
+		LIMIT 5000
+	`, "%"+q+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := make([]int64, 0)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func scanRichiestaSummary(scanner interface{ Scan(dest ...any) error }) (RichiestaSummary, error) {

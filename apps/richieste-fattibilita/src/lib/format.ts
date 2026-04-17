@@ -43,6 +43,38 @@ export function formatCounts(counts: FattibilitaCounts): string {
   return `Bozza ${counts.bozza} · Inviate ${counts.inviata} · Sollecitate ${counts.sollecitata} · Completate ${counts.completata} · Annullate ${counts.annullata}`;
 }
 
+export function formatCountsBreakdown(counts: FattibilitaCounts): string {
+  const parts: string[] = [];
+  if (counts.bozza) parts.push(`${counts.bozza} bozza`);
+  if (counts.inviata) parts.push(`${counts.inviata} inviate`);
+  if (counts.sollecitata) parts.push(`${counts.sollecitata} sollecitate`);
+  if (counts.completata) parts.push(`${counts.completata} completate`);
+  if (counts.annullata) parts.push(`${counts.annullata} annullate`);
+  return parts.length ? parts.join(' · ') : 'Nessuna RDF';
+}
+
+export function stripCompanyPrefix(
+  dealName: string | null | undefined,
+  companyName: string | null | undefined,
+): string {
+  if (!dealName) return '';
+  if (!companyName) return dealName;
+  for (const sep of [' – ', ' - ']) {
+    const prefix = `${companyName}${sep}`;
+    if (dealName.startsWith(prefix)) return dealName.slice(prefix.length);
+  }
+  return dealName;
+}
+
+export function compactAddress(address: string | null | undefined): string {
+  if (!address) return '—';
+  const match = address.match(/([A-Za-zÀ-ÿ'\- ]+?)\s*\(([A-Z]{2})\)/);
+  const city = match?.[1];
+  const province = match?.[2];
+  if (city && province) return `${city.trim()} (${province})`;
+  return address.length > 48 ? `${address.slice(0, 48).trimEnd()}…` : address;
+}
+
 export function budgetLabel(score: number): string {
   return BUDGET_OPTIONS.find((item) => item.value === score)?.label ?? 'Non valutato';
 }

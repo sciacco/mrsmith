@@ -1,0 +1,453 @@
+/* ── Back link ── */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+  padding: 0.25rem 0.4rem 0.25rem 0;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.backLink:hover {
+  color: var(--color-accent);
+}
+
+.backLink:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ── Title row ── */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.titleMain {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.titleCode {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.titleSep {
+  color: var(--color-text-faint, var(--color-text-muted));
+  font-weight: 400;
+}
+
+.titleActions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.6rem;
+}
+
+.dealSubtitle {
+  margin-top: 0.3rem;
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+}
+
+/* ── Info bar ── */
+.infoBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  align-items: center;
+  padding: 0.65rem 0.9rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  font-size: 0.875rem;
+}
+
+.infoItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.infoItem + .infoItem::before {
+  content: '·';
+  color: var(--color-text-faint, var(--color-text-muted));
+  margin-right: 0.25rem;
+  font-weight: 600;
+}
+
+.infoIcon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.infoLabel {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.infoValue {
+  color: var(--color-text);
+}
+
+.infoAddress {
+  max-width: 28rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.countsBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full, 999px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: help;
+}
+
+/* ── Fattibilità table ── */
+.tableWrap {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table thead th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid var(--color-border-subtle, var(--color-border));
+  vertical-align: middle;
+  color: var(--color-text);
+}
+
+.row {
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.row:hover {
+  background: var(--color-accent-subtle);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.fornitoreCell {
+  font-weight: 600;
+}
+
+.tecnologiaCell {
+  color: var(--color-text-secondary);
+}
+
+.numCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.actionsCell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.iconAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.iconAction:hover {
+  border-color: var(--color-accent-muted);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+/* ── Drawer ── */
+.drawerTabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.6rem 1.6rem 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+.drawerTab {
+  position: relative;
+  padding: 0.7rem 0.9rem;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.drawerTab:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+.drawerTab[aria-selected='true'] {
+  color: var(--color-accent);
+}
+
+.drawerTab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: 0.4rem;
+  right: 0.4rem;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-accent);
+  border-radius: 2px;
+}
+
+.drawerTab:disabled {
+  color: var(--color-text-faint, var(--color-text-muted));
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.drawerTabBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full, 999px);
+}
+
+.drawerBody {
+  padding: 1.4rem 1.6rem 2rem;
+  display: grid;
+  gap: 1.6rem;
+}
+
+.drawerSectionGroup {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.drawerSectionHeading {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.drawerSectionHeading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.drawerGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1.8rem;
+  row-gap: 1rem;
+}
+
+.drawerGrid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 1.4rem;
+  row-gap: 1rem;
+}
+
+.drawerSubgrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.drawerField {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.drawerLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.drawerValue {
+  color: var(--color-text);
+  word-break: break-word;
+  font-size: 0.95rem;
+}
+
+.drawerFull {
+  grid-column: 1 / -1;
+}
+
+.drawerText {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  padding: 0.7rem 0.9rem;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.drawerEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.drawerEmpty h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+@media (max-width: 720px) {
+  .drawerGrid,
+  .drawerGrid3 {
+    grid-template-columns: 1fr;
+  }
+
+  .drawerBody {
+    padding: 1rem 1.1rem 1.5rem;
+  }
+
+  .drawerTabs {
+    padding: 0.5rem 1.1rem 0;
+  }
+}
+
+/* ── AI tab ── */
+.aiStack {
+  display: grid;
+  gap: 1rem;
+}
+
+.actionList {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.actionItem {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.actionTitle {
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 0.1rem;
+}
+
+.actionTarget {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.actionReason {
+  margin-top: 0.3rem;
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* ── Responsive ── */
+@media (max-width: 720px) {
+  .titleActions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .infoBar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .infoItem + .infoItem::before {
+    display: none;
+  }
+}

@@ -18,9 +18,9 @@ import type {
 
 export interface SummaryParams {
   stato: string[];
-  deal?: string;
-  richiedente?: string;
-  cliente?: string;
+  q?: string;
+  data_da?: string;
+  data_a?: string;
   page?: number;
   page_size?: number;
 }
@@ -47,9 +47,9 @@ export function useRichiesteSummary(params: SummaryParams) {
   const api = useRDFApiClient();
   const search = new URLSearchParams();
   if (params.stato.length) search.set('stato', params.stato.join(','));
-  if (params.deal) search.set('deal', params.deal);
-  if (params.richiedente) search.set('richiedente', params.richiedente);
-  if (params.cliente) search.set('cliente', params.cliente);
+  if (params.q) search.set('q', params.q);
+  if (params.data_da) search.set('data_da', params.data_da);
+  if (params.data_a) search.set('data_a', params.data_a);
   if (params.page) search.set('page', String(params.page));
   if (params.page_size) search.set('page_size', String(params.page_size));
 
