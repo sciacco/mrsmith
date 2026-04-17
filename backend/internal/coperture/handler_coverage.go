@@ -60,7 +60,7 @@ func (h *Handler) handleListCoverage(w http.ResponseWriter, r *http.Request) {
   COALESCE(v.profiles::text, '[]') AS profiles,
   COALESCE(v.details::text, '[]') AS details
 FROM coperture.v_get_coverage AS v
-LEFT JOIN coperture.network_coverage_operators AS o ON o.id = v.operator_id
+LEFT JOIN coperture.network_operators AS o ON o.id = v.operator_id
 WHERE v.house_number_id = $1
 ORDER BY v.operator, v.tech`
 

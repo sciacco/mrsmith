@@ -1,10 +1,10 @@
-CREATE TABLE IF NOT EXISTS coperture.network_coverage_operators (
+CREATE TABLE IF NOT EXISTS coperture.network_operators (
   id integer PRIMARY KEY,
   name text NOT NULL,
   logo_url text NOT NULL
 );
 
-INSERT INTO coperture.network_coverage_operators (id, name, logo_url)
+INSERT INTO coperture.network_operators (id, name, logo_url)
 VALUES
   (1, 'TIM', 'https://static.cdlan.business/x/logo_tim.png'),
   (2, 'Fastweb', 'https://static.cdlan.business/x/logo_fastweb.png'),

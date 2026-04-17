@@ -137,12 +137,12 @@
 - **Active-vs-include-inactive defaults:** not applicable — the spec describes no "active" flag.
 - **Nullable-text scan risk:** apply `sql.NullString` scanning to any text column that the schema marks nullable (per the precedent in `IMPLEMENTATION-KNOWLEDGE.md` for `fornitori_preferiti` and Panoramica summary fields). Confirm schema for `network_coverage_*` tables during implementation.
 - **Operator master data migration:**
-  - Final location: new table `coperture.network_coverage_operators` in `dbcoperture`.
-  - Migration file: checked-in manual SQL `deploy/migrations/003_coperture_network_coverage_operators.sql`.
+  - Final location: new table `coperture.network_operators` in `dbcoperture`.
+  - Migration file: checked-in manual SQL `deploy/migrations/003_coperture_network_operators.sql`.
   - Apply rule: manual execution before deployment and before any live-DB/manual verification. There is no migration runner in this repo for this slice.
   - Dev/preprod contract: `DBCOPERTURE_DSN` must point to an instance where the SQL above has already been applied.
   - Seed rows: TIM (id 1), Fastweb (id 2), OpenFiber (id 3), OpenFiber CD (id 4) with `logo_url` pointing at the existing `static.cdlan.business` CDN assets.
-  - Read-path join: `CoverageResult.operator_id -> network_coverage_operators.id`; backend returns `{operator_name, logo_url}` denormalized so the frontend has no hardcoded operator map.
+  - Read-path join: `CoverageResult.operator_id -> network_operators.id`; backend returns `{operator_name, logo_url}` denormalized so the frontend has no hardcoded operator map.
 - **Detail-type inlining:** default to inlining `type_name` into each `CoverageResult.details[]` item so the frontend has zero lookup step. Expose `GET /api/coperture/v1/detail-types` only if a later need emerges.
 
 ## Exceptions
@@ -189,7 +189,7 @@
   - Component test: empty pre-search and empty post-search states render distinct copy.
   - Component test: error toast/state renders without crashing on 5xx.
 - **Integration / manual:**
-  - End-to-end run of the 4-step cascade in both `make dev-coperture` and `make dev-docker` against a `DBCOPERTURE_DSN` where `deploy/migrations/003_coperture_network_coverage_operators.sql` has already been applied.
+  - End-to-end run of the 4-step cascade in both `make dev-coperture` and `make dev-docker` against a `DBCOPERTURE_DSN` where `deploy/migrations/003_coperture_network_operators.sql` has already been applied.
   - Verify that the operator logo renders from the backend-supplied URL (not a frontend constant).
   - Confirm no CSP / mixed-content warning when loading logos from `static.cdlan.business`.
 
