@@ -5,6 +5,8 @@ import { useAddresses, useCities, useCoverage, useHouseNumbers, useStates } from
 import { ServiceUnavailable } from '../components/ServiceUnavailable';
 import type { CoverageResult, LocationOption } from '../types';
 import { DISTANCE_LABEL, rankCoverage, type DistancePerf, type RankedCoverage } from './ranking';
+import { buildUnbreakableCombos } from './unbreakable';
+import { UnbreakableModal } from './UnbreakableModal';
 import shared from './shared.module.css';
 import styles from './CoverageLookupPage.module.css';
 
@@ -382,6 +384,7 @@ export function CoverageLookupPage() {
   const [addressId, setAddressId] = useState<number | null>(null);
   const [houseNumberId, setHouseNumberId] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState<SubmittedSearch | null>(null);
+  const [unbreakableOpen, setUnbreakableOpen] = useState(false);
 
   const statesQ = useStates();
   const citiesQ = useCities(stateId);
@@ -497,6 +500,12 @@ export function CoverageLookupPage() {
 
   const submittedAddress = submitted?.labels.filter(Boolean).join(' · ') ?? '';
 
+  const unbreakableCombos = buildUnbreakableCombos(sellable);
+  const unbreakableTotal =
+    unbreakableCombos.extreme.length +
+    unbreakableCombos.core.length +
+    unbreakableCombos.essence.length;
+
   return (
     <div className={shared.page}>
       <h1 className={shared.title}>Ricerca copertura</h1>
@@ -565,17 +574,38 @@ export function CoverageLookupPage() {
             <span className={styles.breadcrumbEyebrow}>Indirizzo</span>
             <span className={styles.breadcrumbValue}>{submittedAddress}</span>
           </div>
-          <button
-            type="button"
-            className={styles.breadcrumbEdit}
-            onClick={handleEditAddress}
-            aria-label="Modifica indirizzo"
-          >
-            <Icon name="pencil" size={14} />
-            Modifica
-          </button>
+          <div className={styles.breadcrumbActions}>
+            {unbreakableTotal > 0 && (
+              <button
+                type="button"
+                className={styles.unbreakableTrigger}
+                onClick={() => setUnbreakableOpen(true)}
+                aria-label="Apri combinazioni Unbreakable"
+              >
+                <Icon name="lock" size={14} />
+                Unbreakable
+                <span className={styles.unbreakableCount}>{unbreakableTotal}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className={styles.breadcrumbEdit}
+              onClick={handleEditAddress}
+              aria-label="Modifica indirizzo"
+            >
+              <Icon name="pencil" size={14} />
+              Modifica
+            </button>
+          </div>
         </div>
       )}
+
+      <UnbreakableModal
+        open={unbreakableOpen}
+        onClose={() => setUnbreakableOpen(false)}
+        combos={unbreakableCombos}
+        address={submittedAddress}
+      />
 
       {liveErrors?.status === 503 && <ServiceUnavailable service="Coperture" />}
       {liveErrors !== null && liveErrors.status !== 503 && (

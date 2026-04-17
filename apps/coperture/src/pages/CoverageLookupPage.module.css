@@ -184,6 +184,48 @@
   text-overflow: ellipsis;
 }
 
+.breadcrumbActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.unbreakableTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #4338ca 0%, #7c3aed 100%);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 150ms var(--ease-spring), box-shadow 200ms;
+}
+
+.unbreakableTrigger:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.unbreakableCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .breadcrumbEdit {
   display: inline-flex;
   align-items: center;
@@ -714,6 +756,7 @@
   background: #e2e8f0;
   color: #475569;
 }
+
 
 /* ─────────── Distance performance ─────────── */
 .perfOttimali {
