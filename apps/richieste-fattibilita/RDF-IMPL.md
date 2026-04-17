@@ -41,7 +41,7 @@
   - hid the launcher card when either `ANISETTA_DSN` or `MISTRA_DSN` is missing
 - Frontend:
   - scaffolded `apps/richieste-fattibilita` as a standard Vite mini-app
-  - added routes for `/richieste`, `/richieste/new`, `/richieste/gestione`, `/richieste/:id`, `/richieste/:id/view`
+  - added routes for `/richieste`, `/richieste/new`, `/richieste/:id`, `/richieste/:id/view`
   - implemented typed local API client with `PATCH` and authenticated blob download
   - added list, create, detail, and tabbed view pages
 - Runtime and deploy:

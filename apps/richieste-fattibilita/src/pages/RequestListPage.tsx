@@ -17,16 +17,12 @@ import {
 import shared from './shared.module.css';
 import styles from './RequestListPage.module.css';
 
-interface RequestListPageProps {
-  mode: 'consultazione' | 'gestione';
-}
-
 const STATE_OPTIONS: { value: string; label: string }[] = RICHIESTA_STATES.map((value) => ({
   value,
   label: value.charAt(0).toUpperCase() + value.slice(1),
 }));
 
-export function RequestListPage({ mode }: RequestListPageProps) {
+export function RequestListPage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { user } = useOptionalAuth();
@@ -60,18 +56,6 @@ export function RequestListPage({ mode }: RequestListPageProps) {
     selectedStates.every((value, index) => value === DEFAULT_LIST_STATES[index]);
   const hasFilters =
     qFilter !== '' || dataDaFilter !== '' || dataAFilter !== '' || !statesMatchDefault;
-
-  if (mode === 'gestione' && !canManage) {
-    return (
-      <section className={shared.forbiddenCard}>
-        <div className={shared.emptyIconDanger}>
-          <Icon name="lock" />
-        </div>
-        <h3>Accesso riservato</h3>
-        <p className={shared.muted}>La gestione carrier è disponibile solo per il ruolo manager RDF.</p>
-      </section>
-    );
-  }
 
   function updateParam(key: string, value: string) {
     setParams((prev) => {
@@ -112,13 +96,9 @@ export function RequestListPage({ mode }: RequestListPageProps) {
     <section className={shared.page}>
       <div className={shared.pageHeader}>
         <div>
-          <h1 className={shared.pageTitle}>
-            {mode === 'gestione' ? 'Gestione RDF Carrier' : 'Consultazione RDF Carrier'}
-          </h1>
+          <h1 className={shared.pageTitle}>Richieste Di Fattibilità</h1>
           <p className={shared.pageSubtitle}>
-            {mode === 'gestione'
-              ? 'Monitora le richieste attive, apri il dettaglio e porta avanti le fattibilità dei carrier.'
-              : 'Consulta lo stato delle richieste, apri il riepilogo completo e verifica l’avanzamento delle fattibilità.'}
+            Consulta lo stato delle richieste, apri il dettaglio e porta avanti le fattibilità dei carrier.
           </p>
         </div>
         <div className={shared.headerActions}>

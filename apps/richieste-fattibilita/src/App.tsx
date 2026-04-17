@@ -1,22 +1,17 @@
-import { hasAnyRole } from '@mrsmith/auth-client';
 import { AppShell, TabNavGroup, type TabGroup } from '@mrsmith/ui';
 import { useRoutes } from 'react-router-dom';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 import styles from './App.module.css';
 
-const managerRoles = ['app_rdf_manager'];
-
 export function App() {
   const { user, loading, logout, status } = useOptionalAuth();
-  const canManage = hasAnyRole(user?.roles, managerRoles);
   const navGroups: TabGroup[] = [
     {
       label: 'Richieste',
       items: [
-        { label: 'Consultazione RDF', path: '/richieste' },
+        { label: 'Elenco RDF', path: '/richieste' },
         { label: 'Nuova RDF', path: '/richieste/new' },
-        ...(canManage ? [{ label: 'Gestione RDF Carrier', path: '/richieste/gestione' }] : []),
       ],
     },
   ];
