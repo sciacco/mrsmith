@@ -37,14 +37,21 @@ function operatorInitials(name: string): string {
   return (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '');
 }
 
+function displayTech(tech: string): string {
+  const key = tech.trim().toUpperCase();
+  if (key === 'FTTO') return 'FIBRA DEDICATA';
+  return tech;
+}
+
 function techChipClass(tech: string): string {
   const key = tech.trim().toUpperCase();
-  if (key === 'FTTH' || key === 'XGSPON') return styles.chipFtth ?? '';
   if (key === 'FTTO' || key === 'FIBRA DEDICATA') return styles.chipFtto ?? '';
+  if (key === 'FTTH') return styles.chipFtth ?? '';
+  if (key === 'XGSPON') return styles.chipXgspon ?? '';
   if (key === 'FTTC' || key === 'EVDSL' || key === 'VULA_EVDSL') return styles.chipFttc ?? '';
   if (key === 'VDSL' || key === 'VULA_VDSL') return styles.chipVdsl ?? '';
-  if (key === 'SHDSL') return styles.chipShdsl ?? '';
   if (key === 'FWA') return styles.chipFwa ?? '';
+  if (key === 'SHDSL') return styles.chipShdsl ?? '';
   return styles.chipAdsl ?? '';
 }
 
@@ -129,22 +136,111 @@ function SpeedBar({
   );
 }
 
-function HeroCard({ ranked, address }: { ranked: RankedCoverage; address: string }) {
+function AllProfiles({ result, compact }: { result: CoverageResult; compact?: boolean }) {
+  if (result.profiles.length <= 1) return null;
+  return (
+    <details className={`${styles.cardProfiles} ${compact ? styles.cardProfilesCompact : ''}`}>
+      <summary className={styles.profilesSummary}>
+        Tutti i profili ({result.profiles.length})
+      </summary>
+      <ul className={styles.profilesList}>
+        {result.profiles.map((profile, i) => (
+          <li key={`${result.coverage_id}-p-${i}`}>{profile.name}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function HeroBadges({ metrics }: { metrics: RankedCoverage['metrics'] }) {
+  return (
+    <div className={styles.heroFooter}>
+      {metrics.stato && (
+        <span className={`${styles.heroBadge} ${statoChipClass(metrics.stato)}`}>
+          <Icon name="wifi" size={14} />
+          Stato: {metrics.stato}
+        </span>
+      )}
+      {metrics.fascia && (
+        <span className={styles.heroBadge}>Fascia {metrics.fascia}</span>
+      )}
+      {metrics.distanza !== null && (
+        <span className={styles.heroBadge}>
+          Armadio a {formatMeters(metrics.distanza)}
+        </span>
+      )}
+      {metrics.distancePerf && (
+        <span className={`${styles.heroBadge} ${distancePerfClass(metrics.distancePerf)}`}>
+          {DISTANCE_LABEL[metrics.distancePerf]}
+        </span>
+      )}
+      {metrics.statusNote && (
+        <span className={`${styles.heroBadge} ${styles.badgeWarn}`}>{metrics.statusNote}</span>
+      )}
+    </div>
+  );
+}
+
+function PremiumItem({ ranked }: { ranked: RankedCoverage }) {
+  const { result, metrics } = ranked;
+  const profileName = metrics.selectedProfile?.profile.name;
+  return (
+    <div className={styles.premiumItem}>
+      <div className={styles.premiumHeader}>
+        <OperatorLogo result={result} size="lg" />
+        <div className={styles.premiumHeaderText}>
+          <span className={styles.premiumOperator}>{result.operator_name}</span>
+          <div className={styles.cardHeaderMeta}>
+            <span className={`${styles.chip} ${techChipClass(result.tech)}`}>{displayTech(result.tech)}</span>
+            {profileName && <span className={styles.heroProfile}>{profileName}</span>}
+          </div>
+        </div>
+      </div>
+      <div className={styles.premiumSpeed}>
+        <span className={styles.premiumSpeedNumber}>
+          {formatMbps(metrics.maxDown)}
+          <span className={styles.heroSpeedSlash}> / </span>
+          {formatMbps(metrics.maxUp)}
+        </span>
+        <span className={styles.heroSpeedUnit}>Mbps &nbsp;·&nbsp; Down / Up</span>
+      </div>
+      <HeroBadges metrics={metrics} />
+      <AllProfiles result={result} compact />
+    </div>
+  );
+}
+
+function HeroGroup({ premium }: { premium: RankedCoverage[] }) {
+  return (
+    <section className={styles.hero} aria-label="Offerte premium equivalenti">
+      <div className={styles.heroGlow} aria-hidden="true" />
+      <div className={styles.heroHeader}>
+        <span className={styles.heroEyebrow}>Fibra dedicata premium · Offerte equivalenti</span>
+      </div>
+      <div className={styles.premiumGrid}>
+        {premium.map((r, i) => (
+          <PremiumItem key={`${r.result.coverage_id}-prem-${i}`} ranked={r} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HeroCard({ ranked }: { ranked: RankedCoverage }) {
   const { result, metrics } = ranked;
   const profileName = metrics.selectedProfile?.profile.name;
   return (
     <section className={styles.hero} aria-label="Miglior profilo disponibile">
       <div className={styles.heroGlow} aria-hidden="true" />
       <div className={styles.heroHeader}>
-        <span className={styles.heroEyebrow}>{metrics.tierLabel} · Miglior scelta per</span>
-        <span className={styles.heroAddress}>{address}</span>
+        <span className={styles.heroEyebrow}>{metrics.tierLabel} · Miglior scelta</span>
       </div>
       <div className={styles.heroBody}>
         <div className={styles.heroOperator}>
           <OperatorLogo result={result} size="lg" />
           <div className={styles.heroOperatorText}>
             <span className={styles.heroOperatorName}>{result.operator_name}</span>
-            <span className={`${styles.chip} ${techChipClass(result.tech)}`}>{result.tech}</span>
+            <span className={`${styles.chip} ${techChipClass(result.tech)}`}>{displayTech(result.tech)}</span>
             {profileName && <span className={styles.heroProfile}>{profileName}</span>}
           </div>
         </div>
@@ -157,30 +253,8 @@ function HeroCard({ ranked, address }: { ranked: RankedCoverage; address: string
           <span className={styles.heroSpeedUnit}>Mbps &nbsp;·&nbsp; Down / Up</span>
         </div>
       </div>
-      <div className={styles.heroFooter}>
-        {metrics.stato && (
-          <span className={`${styles.heroBadge} ${statoChipClass(metrics.stato)}`}>
-            <Icon name="wifi" size={14} />
-            Stato: {metrics.stato}
-          </span>
-        )}
-        {metrics.fascia && (
-          <span className={styles.heroBadge}>Fascia {metrics.fascia}</span>
-        )}
-        {metrics.distanza !== null && (
-          <span className={styles.heroBadge}>
-            Armadio a {formatMeters(metrics.distanza)}
-          </span>
-        )}
-        {metrics.distancePerf && (
-          <span className={`${styles.heroBadge} ${distancePerfClass(metrics.distancePerf)}`}>
-            {DISTANCE_LABEL[metrics.distancePerf]}
-          </span>
-        )}
-        {metrics.statusNote && (
-          <span className={`${styles.heroBadge} ${styles.badgeWarn}`}>{metrics.statusNote}</span>
-        )}
-      </div>
+      <HeroBadges metrics={metrics} />
+      <AllProfiles result={result} />
     </section>
   );
 }
@@ -207,7 +281,7 @@ function OperatorCard({
         <div className={styles.cardHeaderText}>
           <span className={styles.cardOperator}>{result.operator_name}</span>
           <div className={styles.cardHeaderMeta}>
-            <span className={`${styles.chip} ${techChipClass(result.tech)}`}>{result.tech}</span>
+            <span className={`${styles.chip} ${techChipClass(result.tech)}`}>{displayTech(result.tech)}</span>
             <span className={styles.cardTier}>{metrics.tierLabel}</span>
           </div>
         </div>
@@ -270,18 +344,7 @@ function OperatorCard({
         <div className={styles.cardNote}>{metrics.statusNote}</div>
       )}
 
-      {result.profiles.length > 1 && !unavailable && (
-        <details className={styles.cardProfiles}>
-          <summary className={styles.profilesSummary}>
-            Tutti i profili ({result.profiles.length})
-          </summary>
-          <ul className={styles.profilesList}>
-            {result.profiles.map((profile, i) => (
-              <li key={`${result.coverage_id}-p-${i}`}>{profile.name}</li>
-            ))}
-          </ul>
-        </details>
-      )}
+      {!unavailable && <AllProfiles result={result} />}
     </article>
   );
 }
@@ -396,8 +459,42 @@ export function CoverageLookupPageV2() {
   const ranked = rankCoverage(results);
   const sellable = ranked.filter((r) => r.metrics.sellable);
   const unavailable = ranked.filter((r) => !r.metrics.sellable);
-  const hero = sellable[0] ?? null;
-  const alternatives = sellable.slice(1);
+
+  const EQUIVALENCE_DELTA = 5;
+  const premium = sellable.filter((r) => r.metrics.tier === 'premium_dedicated');
+  const obsolete = sellable.filter((r) => r.metrics.tier === 'last_resort');
+  const intermediate = sellable.filter(
+    (r) => r.metrics.tier !== 'premium_dedicated' && r.metrics.tier !== 'last_resort',
+  );
+
+  const topPremiumScore = premium[0]?.metrics.score ?? -Infinity;
+  const premiumTop = premium.filter(
+    (r) => topPremiumScore - r.metrics.score <= EQUIVALENCE_DELTA,
+  );
+  const premiumBelow = premium.filter(
+    (r) => topPremiumScore - r.metrics.score > EQUIVALENCE_DELTA,
+  );
+
+  let hero: RankedCoverage | null = null;
+  let heroGroup: RankedCoverage[] | null = null;
+  let alternatives: RankedCoverage[] = [];
+  let obsoleteToShow: RankedCoverage[] = obsolete;
+
+  if (premiumTop.length >= 2) {
+    heroGroup = premiumTop;
+    alternatives = [...premiumBelow, ...intermediate];
+  } else if (premiumTop.length === 1) {
+    hero = premiumTop[0] ?? null;
+    alternatives = [...premiumBelow, ...intermediate];
+  } else if (intermediate.length > 0) {
+    hero = intermediate[0] ?? null;
+    alternatives = intermediate.slice(1);
+  } else if (obsolete.length > 0) {
+    hero = obsolete[0] ?? null;
+    alternatives = obsolete.slice(1);
+    obsoleteToShow = [];
+  }
+
   const submittedAddress = submitted?.labels.filter(Boolean).join(' · ') ?? '';
 
   return (
@@ -509,7 +606,8 @@ export function CoverageLookupPageV2() {
 
       {submitted && !coverageQ.isLoading && liveErrors === null && ranked.length > 0 && (
         <div className={styles.results}>
-          {hero && <HeroCard ranked={hero} address={submittedAddress} />}
+          {heroGroup && <HeroGroup premium={heroGroup} />}
+          {!heroGroup && hero && <HeroCard ranked={hero} />}
 
           {alternatives.length > 0 && (
             <div className={styles.alternatives}>
@@ -523,6 +621,27 @@ export function CoverageLookupPageV2() {
                 {alternatives.map((r, i) => (
                   <OperatorCard
                     key={`${r.result.coverage_id}-${i}`}
+                    ranked={r}
+                    index={i}
+                    variant="alternative"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {obsoleteToShow.length > 0 && (
+            <div className={`${styles.alternatives} ${styles.obsoleteSection}`}>
+              <div className={styles.alternativesHeader}>
+                <span className={styles.alternativesTitle}>Tecnologie obsolete</span>
+                <span className={styles.alternativesCount}>
+                  {obsoleteToShow.length} voc{obsoleteToShow.length === 1 ? 'e' : 'i'}
+                </span>
+              </div>
+              <div className={styles.grid}>
+                {obsoleteToShow.map((r, i) => (
+                  <OperatorCard
+                    key={`${r.result.coverage_id}-obs-${i}`}
                     ranked={r}
                     index={i}
                     variant="alternative"
@@ -553,7 +672,7 @@ export function CoverageLookupPageV2() {
             </div>
           )}
 
-          {!hero && unavailable.length === 0 && (
+          {!hero && !heroGroup && unavailable.length === 0 && (
             <div className={styles.emptyState}>
               <span className={styles.emptyKicker}>Nessun profilo vendibile</span>
               <p className={styles.emptyTitle}>Nessuna copertura commercializzabile per questo civico.</p>

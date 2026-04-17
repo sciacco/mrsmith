@@ -38,8 +38,8 @@ export const DISTANCE_LABEL: Record<DistancePerf, string> = {
  * Speed parsing
  * ──────────────────────────────── */
 
-const SPEED_PAIR_RE = /(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/;
-const SPEED_SINGLE_RE = /(\d+(?:\.\d+)?)/;
+const SPEED_PAIR_RE = /(\d+(?:\.\d+)?)\s*(G)?\s*\/\s*(\d+(?:\.\d+)?)\s*(G)?/i;
+const SPEED_SINGLE_RE = /(\d+(?:\.\d+)?)\s*(G)?/i;
 
 export interface ProfileSpeeds {
   down: number | null;
@@ -48,12 +48,24 @@ export interface ProfileSpeeds {
 
 function parseProfileSpeeds(profileName: string): ProfileSpeeds {
   const pair = profileName.match(SPEED_PAIR_RE);
-  if (pair && pair[1] !== undefined && pair[2] !== undefined) {
-    return { down: parseFloat(pair[1]), up: parseFloat(pair[2]) };
+  if (pair && pair[1] !== undefined && pair[3] !== undefined) {
+    let down = parseFloat(pair[1]);
+    let up = parseFloat(pair[3]);
+    const matchEnd = (pair.index ?? 0) + pair[0].length;
+    const trailingG = /^\s*G\b/i.test(profileName.slice(matchEnd));
+    // Any G anywhere in/after the pair means the whole pair is in Gbps.
+    const inGbps = pair[2] !== undefined || pair[4] !== undefined || trailingG;
+    if (inGbps) {
+      down *= 1000;
+      up *= 1000;
+    }
+    return { down, up };
   }
   const single = profileName.match(SPEED_SINGLE_RE);
   if (single && single[1] !== undefined) {
-    return { down: parseFloat(single[1]), up: null };
+    let down = parseFloat(single[1]);
+    if (single[2] !== undefined) down *= 1000;
+    return { down, up: null };
   }
   return { down: null, up: null };
 }
@@ -66,7 +78,7 @@ function findDetail(result: CoverageResult, needle: string): string | null {
 
 function parseNumericDetail(raw: string | null): number | null {
   if (raw === null) return null;
-  const match = raw.match(SPEED_SINGLE_RE);
+  const match = raw.match(/(\d+(?:\.\d+)?)/);
   if (match && match[1] !== undefined) return parseFloat(match[1]);
   return null;
 }
@@ -153,6 +165,23 @@ function selectBestProfile(profiles: CoverageProfile[], tech: string): SelectedP
   }));
 
   const t = tech.trim().toUpperCase();
+  const isDedicated = t === 'FTTO' || t === 'FIBRA DEDICATA' || t === 'FIBRA_DEDICATA';
+
+  if (isDedicated) {
+    // Dedicated: always suggest 1000 (cap) — never the 10G profile.
+    const capped = parsed.filter(
+      (x) => x.speeds.down !== null && x.speeds.down <= 1000,
+    );
+    const pool =
+      capped.length > 0
+        ? capped
+        : parsed.filter((x) => x.speeds.down !== null && x.speeds.down < 10000);
+    if (pool.length > 0) {
+      return pool.reduce((a, b) =>
+        (a.speeds.down ?? 0) >= (b.speeds.down ?? 0) ? a : b,
+      );
+    }
+  }
 
   if (t === 'FTTH' || t === 'XGSPON') {
     const sweet = parsed.find((x) => x.speeds.down === 2500);

@@ -375,6 +375,68 @@
   font-weight: 500;
 }
 
+/* ─────────── Premium equivalents group ─────────── */
+.premiumGrid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--space-5);
+}
+
+.premiumItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-accent-muted);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.premiumHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.premiumHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.premiumOperator {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-text);
+}
+
+.premiumSpeed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.premiumSpeedNumber {
+  font-size: 2.25rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--color-text);
+}
+
+.obsoleteSection .alternativesTitle {
+  color: var(--color-text-muted);
+}
+
+.obsoleteSection .grid :global(article) {
+  opacity: 0.85;
+}
+
 /* ─────────── Alternatives section ─────────── */
 .alternatives {
   display: flex;
@@ -595,39 +657,52 @@
   width: fit-content;
 }
 
+/* Premium dedicata — indigo profondo */
+.chipFtto {
+  background: #4338ca;
+  color: #fff;
+}
+
+/* FTTH condivisa — indigo accent */
 .chipFtth {
   background: var(--color-accent);
   color: #fff;
 }
 
-.chipFtto {
-  background: #5046e5;
+/* XGSPON — violetto (10G shared) */
+.chipXgspon {
+  background: #7c3aed;
   color: #fff;
 }
 
+/* FTTC / EVDSL / VULA_EVDSL — teal (fibra-rame migliore) */
 .chipFttc {
-  background: rgba(99, 91, 255, 0.18);
-  color: var(--color-accent-hover);
+  background: #0d9488;
+  color: #fff;
 }
 
+/* VDSL / VULA_VDSL — ambra (fibra-rame base) */
 .chipVdsl {
-  background: #e2e8f0;
-  color: #334155;
+  background: #d97706;
+  color: #fff;
 }
 
-.chipShdsl {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.chipAdsl {
-  background: #f1f5f9;
-  color: var(--color-text-muted);
-}
-
+/* FWA — sky (wireless) */
 .chipFwa {
-  background: rgba(245, 158, 11, 0.18);
-  color: var(--color-warning-strong);
+  background: #0284c7;
+  color: #fff;
+}
+
+/* SHDSL — stone (rame dedicato, obsoleto) */
+.chipShdsl {
+  background: #78716c;
+  color: #fff;
+}
+
+/* ADSL — slate chiaro (rame condiviso, obsoleto) */
+.chipAdsl {
+  background: #e2e8f0;
+  color: #475569;
 }
 
 /* ─────────── Distance performance ─────────── */
@@ -812,6 +887,11 @@ details[open] > .profilesSummary::before {
   gap: 6px;
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border-subtle);
+}
+
+.cardProfilesCompact {
+  padding-top: var(--space-2);
+  font-size: 0.78rem;
 }
 
 .profilesEyebrow {
