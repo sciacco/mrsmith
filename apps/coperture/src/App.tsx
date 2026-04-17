@@ -5,7 +5,8 @@ import { useOptionalAuth } from './hooks/useOptionalAuth';
 import styles from './App.module.css';
 
 const navItems = [
-  { label: 'Coperture', path: '/coperture' },
+  { label: 'Ricerca old', path: '/coperture/old' },
+  { label: 'Ricerca', path: '/coperture' },
 ];
 
 export function App() {
