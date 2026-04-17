@@ -9,6 +9,7 @@ const noAuth: AuthContextValue = {
   logout: () => {},
   loading: false,
   getAccessToken: async () => undefined,
+  forceRefreshToken: async () => undefined,
 };
 
 export function useOptionalAuth(): AuthContextValue {

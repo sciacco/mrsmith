@@ -23,6 +23,12 @@ export interface AuthContextValue {
   logout: () => void;
   loading: boolean;
   getAccessToken: (minValidity?: number) => Promise<string | undefined>;
+  /**
+   * Forces a token refresh regardless of current validity.
+   * Returns the new token, or undefined if the refresh token is no longer valid
+   * (in which case callers should surface the error or trigger `login()`).
+   */
+  forceRefreshToken: () => Promise<string | undefined>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -151,6 +157,19 @@ export function AuthProvider({ keycloakUrl, realm, clientId, children }: AuthPro
     [keycloak, syncAuthState],
   );
 
+  const forceRefreshToken = useCallback(async () => {
+    if (!keycloak.authenticated) return undefined;
+    try {
+      // -1 forces keycloak-js to always refresh, ignoring current validity.
+      await keycloak.updateToken(-1);
+      loginTriggeredRef.current = false;
+      syncAuthState();
+      return keycloak.token;
+    } catch {
+      return undefined;
+    }
+  }, [keycloak, syncAuthState]);
+
   useEffect(() => {
     keycloak.onAuthSuccess = () => {
       loginTriggeredRef.current = false;
@@ -165,6 +184,9 @@ export function AuthProvider({ keycloakUrl, realm, clientId, children }: AuthPro
       syncAuthState('unauthenticated');
     };
     keycloak.onAuthRefreshError = () => {
+      // Refresh token no longer valid — redirect to the Keycloak login page.
+      // (Silent SSO via prompt=none was attempted but caused a redirect loop
+      // when the refresh grant kept failing while SSO login succeeded.)
       login();
     };
     keycloak.onTokenExpired = () => {
@@ -184,11 +206,26 @@ export function AuthProvider({ keycloakUrl, realm, clientId, children }: AuthPro
 
     const interval = setInterval(() => {
       if (!keycloak.authenticated) return;
+      if (loginTriggeredRef.current) return;
       void getAccessToken(30);
     }, 30_000);
 
+    // Tabs are throttled while hidden and skipped entirely while the device is
+    // asleep. Refresh on visibility return so the next user action doesn't 401.
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!keycloak.authenticated) return;
+      // Skip if a login redirect is already in flight to avoid refresh storms.
+      if (loginTriggeredRef.current) return;
+      void getAccessToken(60);
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onVisibilityChange);
+
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onVisibilityChange);
       keycloak.onAuthSuccess = undefined;
       keycloak.onAuthRefreshSuccess = undefined;
       keycloak.onAuthLogout = undefined;
@@ -207,8 +244,9 @@ export function AuthProvider({ keycloakUrl, realm, clientId, children }: AuthPro
       logout,
       loading: authState.status === 'loading',
       getAccessToken,
+      forceRefreshToken,
     }),
-    [authState, getAccessToken, login, logout],
+    [authState, forceRefreshToken, getAccessToken, login, logout],
   );
 
   return (

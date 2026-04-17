@@ -148,7 +148,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			Name:          "Richieste Fattibilita",
 			Icon:          "file-text",
 			Href:          RichiesteFattibilitaAppHref,
-			Status:        "test",
+			Status:        "ready",
 			CategoryID:    "mkt-sales",
 			CategoryTitle: "MKT&Sales",
 			AccessRoles:   RichiesteFattibilitaAccessRoles(),
