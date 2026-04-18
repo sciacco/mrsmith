@@ -1,7 +1,7 @@
 .page {
   max-width: 1440px;
   margin: 0 auto;
-  padding: var(--space-6);
+  padding-inline: var(--space-6);
   display: grid;
   gap: var(--space-5);
   animation: pageEnter 0.45s var(--ease-out) both;
@@ -162,6 +162,40 @@
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(241, 245, 249, 0.9);
+  border: 1px solid var(--color-border-subtle);
+  gap: 2px;
+}
+
+.segmentedItem {
+  border: none;
+  background: transparent;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-normal) var(--ease-out),
+    color var(--duration-normal) var(--ease-out);
+}
+
+.segmentedItem:hover {
+  color: var(--color-text);
+}
+
+.segmentedItemActive,
+.segmentedItemActive:hover {
+  background: #fff;
+  color: var(--color-text);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .sectionMeta {
@@ -479,7 +513,7 @@
 
 @media (max-width: 720px) {
   .page {
-    padding: var(--space-4);
+    padding-inline: var(--space-4);
   }
 
   .table {

@@ -4,6 +4,7 @@ import { SingleSelect } from '@mrsmith/ui';
 import {
   CartesianGrid,
   ComposedChart,
+  Legend,
   Line,
   ResponsiveContainer,
   Tooltip,
@@ -92,6 +93,7 @@ export function SituazioneRackPage() {
   const [to, setTo] = useState(initialRange.to);
   const [page, setPage] = useState(1);
   const [submitted, setSubmitted] = useState<SubmittedRackFilters | null>(null);
+  const [view, setView] = useState<'chart' | 'history'>('chart');
 
   const customersQ = useCustomers();
   const sitesQ = useSites(customerId);
@@ -182,9 +184,6 @@ export function SituazioneRackPage() {
       <div className={styles.header}>
         <div className={styles.titleBlock}>
           <h1 className={styles.title}>Situazione rack</h1>
-          <p className={styles.subtitle}>
-            Seleziona il percorso Cliente, Edificio, Sala e Rack per consultare Socket, storico assorbimenti e andamento degli ultimi due giorni.
-          </p>
         </div>
       </div>
 
@@ -397,15 +396,39 @@ export function SituazioneRackPage() {
                     </section>
                   </div>
 
-                  <div className={styles.gridWide}>
-                    <section className={styles.card}>
-                      <div className={styles.sectionHeader}>
-                        <h2 className={styles.sectionTitle}>Assorbimenti ultimi due giorni</h2>
-                        <div className={styles.sectionMeta}>
-                          {formatCount(rackStatsQ.data?.length ?? 0, 'punto', 'punti orari')}
-                        </div>
+                  <section className={styles.card}>
+                    <div className={styles.sectionHeader}>
+                      <div className={styles.segmented} role="tablist" aria-label="Vista assorbimenti">
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={view === 'chart'}
+                          className={`${styles.segmentedItem} ${view === 'chart' ? styles.segmentedItemActive : ''}`}
+                          onClick={() => setView('chart')}
+                        >
+                          Andamento (ultimi 2 giorni)
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={view === 'history'}
+                          className={`${styles.segmentedItem} ${view === 'history' ? styles.segmentedItemActive : ''}`}
+                          onClick={() => setView('history')}
+                        >
+                          Storico assorbimenti
+                        </button>
                       </div>
-                      {(rackStatsQ.data ?? []).length === 0 ? (
+                      <div className={styles.sectionMeta}>
+                        {view === 'chart'
+                          ? formatCount(rackStatsQ.data?.length ?? 0, 'punto', 'punti orari')
+                          : powerReadingsQ.data
+                            ? formatCount(powerReadingsQ.data.total, 'lettura', 'letture')
+                            : '0 letture'}
+                      </div>
+                    </div>
+
+                    {view === 'chart' ? (
+                      (rackStatsQ.data ?? []).length === 0 ? (
                         <ViewState
                           title="Nessun andamento disponibile"
                           message="Il rack selezionato non ha serie storiche utili negli ultimi due giorni."
@@ -413,11 +436,22 @@ export function SituazioneRackPage() {
                       ) : (
                         <div className={styles.chartWrapTall}>
                           <ResponsiveContainer>
-                            <ComposedChart data={rackStatsQ.data}>
+                            <ComposedChart data={rackStatsQ.data} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                               <XAxis dataKey="bucket" tick={{ fontSize: 11 }} tickFormatter={(value) => value.slice(5)} />
-                              <YAxis yAxisId="ampere" tick={{ fontSize: 11 }} />
-                              <YAxis yAxisId="kw" orientation="right" tick={{ fontSize: 11 }} />
+                              <YAxis
+                                yAxisId="ampere"
+                                tick={{ fontSize: 11, fill: '#0ea5e9' }}
+                                tickFormatter={(value) => `${value} A`}
+                                label={{ value: 'Ampere (A)', angle: -90, position: 'insideLeft', offset: 10, style: { fill: '#0ea5e9', fontSize: 11, fontWeight: 600 } }}
+                              />
+                              <YAxis
+                                yAxisId="kw"
+                                orientation="right"
+                                tick={{ fontSize: 11, fill: '#f59e0b' }}
+                                tickFormatter={(value) => `${value} kW`}
+                                label={{ value: 'Potenza (kW)', angle: 90, position: 'insideRight', offset: 10, style: { fill: '#f59e0b', fontSize: 11, fontWeight: 600 } }}
+                              />
                               <Tooltip
                                 formatter={(value: number, name: string) => (
                                   name === 'Ampere' ? formatAmpere(value) : formatKw(value)
@@ -429,6 +463,7 @@ export function SituazioneRackPage() {
                                   borderRadius: 12,
                                 }}
                               />
+                              <Legend verticalAlign="top" height={28} iconType="plainline" wrapperStyle={{ fontSize: 12 }} />
                               <Line
                                 yAxisId="ampere"
                                 type="monotone"
@@ -450,72 +485,62 @@ export function SituazioneRackPage() {
                             </ComposedChart>
                           </ResponsiveContainer>
                         </div>
-                      )}
-                    </section>
-
-                    <section className={styles.card}>
-                      <div className={styles.sectionHeader}>
-                        <h2 className={styles.sectionTitle}>Storico assorbimenti</h2>
-                        <div className={styles.sectionMeta}>
-                          {powerReadingsQ.data ? formatCount(powerReadingsQ.data.total, 'lettura', 'letture') : '0 letture'}
-                        </div>
-                      </div>
-                      {(powerReadingsQ.data?.items ?? []).length === 0 ? (
-                        <ViewState
-                          title="Nessuna lettura disponibile"
-                          message="Il periodo selezionato non restituisce letture per il rack confermato."
-                        />
-                      ) : (
-                        <>
-                          <div className={styles.tableWrap}>
-                            <table className={styles.table}>
-                              <thead>
-                                <tr>
-                                  <th>Socket rack</th>
-                                  <th>Data</th>
-                                  <th>OID</th>
-                                  <th className={styles.alignRight}>Ampere</th>
+                      )
+                    ) : (powerReadingsQ.data?.items ?? []).length === 0 ? (
+                      <ViewState
+                        title="Nessuna lettura disponibile"
+                        message="Il periodo selezionato non restituisce letture per il rack confermato."
+                      />
+                    ) : (
+                      <>
+                        <div className={styles.tableWrap}>
+                          <table className={styles.table}>
+                            <thead>
+                              <tr>
+                                <th>Socket rack</th>
+                                <th>Data</th>
+                                <th>OID</th>
+                                <th className={styles.alignRight}>Ampere</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(powerReadingsQ.data?.items ?? []).map((row) => (
+                                <tr key={row.id}>
+                                  <td>{row.socketLabel}</td>
+                                  <td>{formatDateTime(row.date)}</td>
+                                  <td className={styles.mono}>{row.oid}</td>
+                                  <td className={styles.alignRight}>{formatAmpere(row.ampere)}</td>
                                 </tr>
-                              </thead>
-                              <tbody>
-                                {(powerReadingsQ.data?.items ?? []).map((row) => (
-                                  <tr key={row.id}>
-                                    <td>{row.socketLabel}</td>
-                                    <td>{formatDateTime(row.date)}</td>
-                                    <td className={styles.mono}>{row.oid}</td>
-                                    <td className={styles.alignRight}>{formatAmpere(row.ampere)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className={styles.pagination}>
+                          <div className={styles.paginationInfo}>
+                            Pagina {powerReadingsQ.data?.page ?? 1} di {totalPages}
                           </div>
-                          <div className={styles.pagination}>
-                            <div className={styles.paginationInfo}>
-                              Pagina {powerReadingsQ.data?.page ?? 1} di {totalPages}
-                            </div>
-                            <div className={styles.actions}>
-                              <button
-                                type="button"
-                                className={styles.btnSecondary}
-                                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                                disabled={page <= 1}
-                              >
-                                Precedente
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.btnSecondary}
-                                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                                disabled={page >= totalPages}
-                              >
-                                Successiva
-                              </button>
-                            </div>
+                          <div className={styles.actions}>
+                            <button
+                              type="button"
+                              className={styles.btnSecondary}
+                              onClick={() => setPage((current) => Math.max(1, current - 1))}
+                              disabled={page <= 1}
+                            >
+                              Precedente
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.btnSecondary}
+                              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                              disabled={page >= totalPages}
+                            >
+                              Successiva
+                            </button>
                           </div>
-                        </>
-                      )}
-                    </section>
-                  </div>
+                        </div>
+                      </>
+                    )}
+                  </section>
                 </>
               )}
             </>
