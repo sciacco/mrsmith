@@ -113,6 +113,7 @@ func (h *Handler) handleListRackSocketStatus(w http.ResponseWriter, r *http.Requ
 			rs.id,
 			rs.magnetotermico,
 			rs.snmp_monitoring_device,
+			rs.detector_ip,
 			rs.posizione,
 			rs.posizione2,
 			rs.posizione3,
@@ -127,6 +128,7 @@ func (h *Handler) handleListRackSocketStatus(w http.ResponseWriter, r *http.Requ
 			rs.id,
 			rs.magnetotermico,
 			rs.snmp_monitoring_device,
+			rs.detector_ip,
 			rs.posizione,
 			rs.posizione2,
 			rs.posizione3,
@@ -143,6 +145,7 @@ func (h *Handler) handleListRackSocketStatus(w http.ResponseWriter, r *http.Requ
 		var item rackSocketStatusResponse
 		var breaker sql.NullString
 		var powerMeter sql.NullString
+		var detectorIP sql.NullString
 		var posizione sql.NullString
 		var posizione2 sql.NullString
 		var posizione3 sql.NullString
@@ -151,6 +154,7 @@ func (h *Handler) handleListRackSocketStatus(w http.ResponseWriter, r *http.Requ
 			&item.SocketID,
 			&breaker,
 			&powerMeter,
+			&detectorIP,
 			&posizione,
 			&posizione2,
 			&posizione3,
@@ -163,11 +167,16 @@ func (h *Handler) handleListRackSocketStatus(w http.ResponseWriter, r *http.Requ
 
 		item.Breaker = cleanString(breaker)
 		item.PowerMeter = cleanString(powerMeter)
+		item.DetectorIP = cleanString(detectorIP)
+		item.Position1 = cleanString(posizione)
+		item.Position2 = cleanString(posizione2)
+		item.Position3 = cleanString(posizione3)
+		item.Position4 = cleanString(posizione4)
 		item.Positions = composePositions(
-			cleanString(posizione),
-			cleanString(posizione2),
-			cleanString(posizione3),
-			cleanString(posizione4),
+			item.Position1,
+			item.Position2,
+			item.Position3,
+			item.Position4,
 		)
 		item.Label = socketLabel(item.SocketID, item.Positions)
 		item.MaxAmpere = breakerCapacity(item.Breaker)

@@ -30,8 +30,13 @@ type rackSocketStatusResponse struct {
 	MaxAmpere    float64  `json:"maxAmpere"`
 	UsagePercent float64  `json:"usagePercent"`
 	PowerMeter   string   `json:"powerMeter"`
+	DetectorIP   string   `json:"detectorIp"`
 	Breaker      string   `json:"breaker"`
 	Positions    []string `json:"positions"`
+	Position1    string   `json:"position1"`
+	Position2    string   `json:"position2"`
+	Position3    string   `json:"position3"`
+	Position4    string   `json:"position4"`
 }
 
 type powerReadingRowResponse struct {

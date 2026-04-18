@@ -28,8 +28,13 @@ export interface RackSocketStatus {
   maxAmpere: number;
   usagePercent: number;
   powerMeter: string;
+  detectorIp: string;
   breaker: string;
   positions: string[];
+  position1: string;
+  position2: string;
+  position3: string;
+  position4: string;
 }
 
 export interface PowerReadingRow {

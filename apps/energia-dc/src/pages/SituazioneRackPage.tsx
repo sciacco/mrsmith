@@ -29,7 +29,6 @@ import {
   formatDateTime,
   formatKw,
   formatMaybeText,
-  formatPercent,
   toDateTimeLocalInput,
 } from '../utils/format';
 import type { LookupItem } from '../api/types';
@@ -294,18 +293,6 @@ export function SituazioneRackPage() {
                       </div>
                       <div className={styles.metaGrid}>
                         <div className={styles.metaItem}>
-                          <span className={styles.metaLabel}>Cliente</span>
-                          <span className={styles.metaValue}>{formatMaybeText(rackDetailQ.data?.customerName)}</span>
-                        </div>
-                        <div className={styles.metaItem}>
-                          <span className={styles.metaLabel}>Edificio</span>
-                          <span className={styles.metaValue}>{formatMaybeText(rackDetailQ.data?.buildingName)}</span>
-                        </div>
-                        <div className={styles.metaItem}>
-                          <span className={styles.metaLabel}>Sala</span>
-                          <span className={styles.metaValue}>{formatMaybeText(rackDetailQ.data?.roomName)}</span>
-                        </div>
-                        <div className={styles.metaItem}>
                           <span className={styles.metaLabel}>Floor</span>
                           <span className={styles.metaValue}>{formatMaybeText(rackDetailQ.data?.floor)}</span>
                         </div>
@@ -345,6 +332,12 @@ export function SituazioneRackPage() {
                           <span className={styles.metaLabel}>Inizio Fatturazione</span>
                           <span className={styles.metaValue}>{formatDate(rackDetailQ.data?.billingStartDate)}</span>
                         </div>
+                        <div className={styles.metaItem}>
+                          <span className={styles.metaLabel}>Tipo fatturazione</span>
+                          <span className={styles.metaValue}>
+                            {rackDetailQ.data ? (rackDetailQ.data.variableBilling ? 'Variabile' : 'Fissa') : formatMaybeText(undefined)}
+                          </span>
+                        </div>
                       </div>
                     </section>
 
@@ -364,9 +357,29 @@ export function SituazioneRackPage() {
                         <div className={styles.gaugeGrid}>
                           {(socketStatusQ.data ?? []).map((socket) => {
                             const dialFill = `${Math.max(0, Math.min(socket.usagePercent, 100))}%`;
-                            const dialColor = socket.usagePercent > 90 ? 'var(--color-danger)' : 'var(--color-accent)';
+                            const dialColor =
+                              socket.usagePercent > 90
+                                ? 'var(--color-danger)'
+                                : socket.usagePercent > 80
+                                ? 'var(--color-warning)'
+                                : 'var(--color-success)';
+                            const positionsLabel =
+                              socket.positions.length > 0 ? socket.positions.join(' ') : '-';
+                            const positionsTitle =
+                              socket.positions.length === 1 ? 'Posizione' : 'Posizioni';
+                            const deviceMeta = [socket.powerMeter, socket.detectorIp]
+                              .filter((value) => value && value.trim().length > 0)
+                              .join(' · ');
                             return (
                               <article key={socket.socketId} className={styles.gaugeCard}>
+                                <div className={styles.gaugeInfo}>
+                                  <div className={styles.gaugeTitle}>Socket #{socket.socketId}</div>
+                                  <div className={styles.gaugeMeta}>{socket.breaker || 'Breaker non disponibile'}</div>
+                                  {deviceMeta && <div className={styles.gaugeMeta}>{deviceMeta}</div>}
+                                  <div className={styles.gaugeMeta}>
+                                    {positionsTitle}: {positionsLabel}
+                                  </div>
+                                </div>
                                 <div
                                   className={styles.gaugeDial}
                                   style={{
@@ -374,13 +387,8 @@ export function SituazioneRackPage() {
                                     ['--dial-color' as string]: dialColor,
                                   }}
                                 >
-                                  <span className={styles.gaugeValue}>{formatPercent(socket.usagePercent)}</span>
+                                  <span className={styles.gaugeValue}>{formatAmpere(socket.ampere)}</span>
                                 </div>
-                                <div className={styles.gaugeTitle}>{socket.label}</div>
-                                <div className={styles.gaugeMeta}>
-                                  {formatAmpere(socket.ampere)} / soglia {formatAmpere(socket.maxAmpere / 2)}
-                                </div>
-                                <div className={styles.gaugeMeta}>{socket.breaker || 'Breaker non disponibile'}</div>
                               </article>
                             );
                           })}
