@@ -57,22 +57,23 @@ type rackStatPointResponse struct {
 }
 
 type kwPointResponse struct {
-	Bucket   string  `json:"bucket"`
-	Label    string  `json:"label"`
-	Kilowatt float64 `json:"kilowatt"`
+	Bucket     string  `json:"bucket"`
+	Label      string  `json:"label"`
+	RangeLabel string  `json:"rangeLabel"`
+	Kilowatt   float64 `json:"kilowatt"`
 }
 
 type billingChargeResponse struct {
-	ID                int      `json:"id"`
-	StartPeriod       string   `json:"startPeriod,omitempty"`
-	EndPeriod         string   `json:"endPeriod,omitempty"`
-	Ampere            float64  `json:"ampere"`
-	Eccedenti         float64  `json:"eccedenti"`
-	Amount            *float64 `json:"amount,omitempty"`
-	PUN               float64  `json:"pun"`
-	Coefficiente      float64  `json:"coefficiente"`
-	FissoCU           float64  `json:"fissoCu"`
-	ImportoEccedenti  float64  `json:"importoEccedenti"`
+	ID               int      `json:"id"`
+	StartPeriod      string   `json:"startPeriod,omitempty"`
+	EndPeriod        string   `json:"endPeriod,omitempty"`
+	Ampere           float64  `json:"ampere"`
+	Eccedenti        float64  `json:"eccedenti"`
+	Amount           *float64 `json:"amount,omitempty"`
+	PUN              float64  `json:"pun"`
+	Coefficiente     float64  `json:"coefficiente"`
+	FissoCU          float64  `json:"fissoCu"`
+	ImportoEccedenti float64  `json:"importoEccedenti"`
 }
 
 type noVariableRackResponse struct {

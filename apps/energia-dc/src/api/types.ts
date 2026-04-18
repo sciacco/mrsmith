@@ -59,6 +59,7 @@ export type KWPeriod = 'day' | 'month';
 export interface KWPoint {
   bucket: string;
   label: string;
+  rangeLabel: string;
   kilowatt: number;
 }
 

@@ -30,5 +30,7 @@
 ## TODOs
 - [`docs/TODO.md`](docs/TODO.md) — project-wide open items, deferred decisions, and out-of-scope work tracked for future implementation
 
-## Memory Rule
-ALWAYS update the relevant skill's `MEMORY.md` when making substantive changes to code, tests, fixtures, heuristics, or contributor workflow. The memory file is the persisted handoff state for future work.
+## Test Rule
+Add tests only when they protect a reproduced bug, a business-critical rule, or non-trivial query/data transformation.
+Do not add tests for routine UI copy changes, obvious wiring, low-risk refactors, or speculative regressions unless explicitly requested.
+Prefer the smallest useful test surface: update existing tests first, and avoid custom fixtures/harnesses unless strictly necessary.

@@ -3,10 +3,10 @@ import { ApiError } from '@mrsmith/api-client';
 import { SingleSelect } from '@mrsmith/ui';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useCustomerKWSeries, useCustomers } from '../api/queries';
-import type { KWPeriod, LookupItem } from '../api/types';
+import type { KWPeriod, KWPoint, LookupItem } from '../api/types';
 import { ServiceUnavailable } from '../components/ServiceUnavailable';
 import { ViewState } from '../components/ViewState';
-import { formatCount, formatKw } from '../utils/format';
+import { formatKw } from '../utils/format';
 import styles from './shared.module.css';
 
 function isServiceUnavailable(error: unknown) {
@@ -16,6 +16,14 @@ function isServiceUnavailable(error: unknown) {
 function resolveCustomerName(options: LookupItem[], customerId: number | null) {
   if (customerId === null) return '';
   return options.find((option) => option.id === customerId)?.name ?? '';
+}
+
+function formatKWTooltipLabel(_value: string | number, payload: Array<{ payload?: KWPoint }>) {
+  return payload[0]?.payload?.rangeLabel ?? '-';
+}
+
+function formatCosfiDecimal(value: number) {
+  return (value / 100).toFixed(2);
 }
 
 export function ConsumiKwPage() {
@@ -53,7 +61,7 @@ export function ConsumiKwPage() {
         <div className={styles.titleBlock}>
           <h1 className={styles.title}>Consumi kW</h1>
           <p className={styles.subtitle}>
-            Analizza l&apos;andamento giornaliero o mensile del cliente selezionato e aggiorna il grafico con il valore di Cos fi desiderato.
+            Analizza l&apos;andamento giornaliero o mensile del cliente selezionato e aggiorna il grafico con il valore di Cos fi espresso in centesimi.
           </p>
         </div>
       </div>
@@ -93,7 +101,7 @@ export function ConsumiKwPage() {
                 />
               </div>
               <div className={`${styles.field} ${styles.fieldWide}`}>
-                <label>Cos fi</label>
+                <label>COS FI (centesimi)</label>
                 <div className={styles.rangeWrap}>
                   <input
                     className={styles.rangeInput}
@@ -104,7 +112,7 @@ export function ConsumiKwPage() {
                     value={cosfi}
                     onChange={(event) => setCosfi(Number(event.target.value))}
                   />
-                  <span className={styles.rangeValue}>{cosfi}%</span>
+                  <span className={styles.rangeValue}>{cosfi}</span>
                 </div>
               </div>
               <div className={styles.actions}>
@@ -118,7 +126,7 @@ export function ConsumiKwPage() {
           {submitted === null ? (
             <ViewState
               title="Grafico in attesa"
-              message="Seleziona cliente, periodo e Cos fi per caricare l&apos;andamento dei consumi."
+              message="Seleziona cliente, periodo e centesimi per caricare l&apos;andamento dei consumi."
             />
           ) : null}
 
@@ -135,11 +143,9 @@ export function ConsumiKwPage() {
             <section className={styles.card}>
               <div className={styles.sectionHeader}>
                 <div>
-                  <h2 className={styles.sectionTitle}>
-                    {submitted.customerName} · Cos fi {submitted.cosfi}%
-                  </h2>
+                  <h2 className={styles.sectionTitle}>{submitted.customerName}</h2>
                   <div className={styles.sectionMeta}>
-                    {submitted.period === 'day' ? 'Serie giornaliera' : 'Serie mensile'} · {formatCount(seriesQ.data?.length ?? 0, 'rilevazione', 'rilevazioni')}
+                    {submitted.period === 'day' ? 'Serie giornaliera' : 'Serie mensile'} - COS FI {formatCosfiDecimal(submitted.cosfi)}
                   </div>
                 </div>
               </div>
@@ -163,9 +169,10 @@ export function ConsumiKwPage() {
                   <ResponsiveContainer>
                     <BarChart data={seriesQ.data}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" minTickGap={16} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <Tooltip
+                        labelFormatter={formatKWTooltipLabel}
                         formatter={(value: number) => formatKw(value)}
                         contentStyle={{
                           background: 'var(--color-bg-elevated)',

@@ -1,10 +1,19 @@
 package energiadc
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
+
+const maxDailyKWPoints = 40
+
+type kwSourcePoint struct {
+	Day      string
+	Kilowatt float64
+}
 
 func (h *Handler) handleListCustomerKW(w http.ResponseWriter, r *http.Request) {
 	if !h.requireDB(w) {
@@ -37,20 +46,23 @@ func (h *Handler) handleListCustomerKW(w http.ResponseWriter, r *http.Request) {
 		args  []any
 	)
 	if period == "day" {
-		query = `
-			SELECT
-				DATE_FORMAT(giorno, '%Y-%m-%d') AS bucket,
-				DATE_FORMAT(giorno, '%d/%m/%Y') AS label,
-				ROUND(COALESCE(kilowatt, 0) * ?, 2) AS kilowatt
-			FROM rack_power_daily_summary
-			WHERE id_anagrafica = ?
-			ORDER BY giorno ASC`
+		query = fmt.Sprintf(`
+			SELECT day, kilowatt
+			FROM (
+				SELECT
+					DATE_FORMAT(giorno, '%%Y-%%m-%%d') AS day,
+					ROUND(COALESCE(kilowatt, 0) * ?, 2) AS kilowatt
+				FROM rack_power_daily_summary
+				WHERE id_anagrafica = ?
+				ORDER BY giorno DESC
+				LIMIT %d
+			) recent_days
+			ORDER BY day ASC`, maxDailyKWPoints)
 		args = []any{multiplier, customerID}
 	} else {
 		query = `
 			SELECT
-				DATE_FORMAT(giorno, '%Y-%m') AS bucket,
-				DATE_FORMAT(MIN(giorno), '%m/%Y') AS label,
+				DATE_FORMAT(MIN(giorno), '%Y-%m-01') AS month_start,
 				ROUND(AVG(COALESCE(kilowatt, 0)) * ?, 2) AS kilowatt
 			FROM rack_power_daily_summary
 			WHERE id_anagrafica = ?
@@ -66,18 +78,75 @@ func (h *Handler) handleListCustomerKW(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	result := make([]kwPointResponse, 0)
+	source := make([]kwSourcePoint, 0)
 	for rows.Next() {
-		var item kwPointResponse
-		if err := rows.Scan(&item.Bucket, &item.Label, &item.Kilowatt); err != nil {
+		var item kwSourcePoint
+		if err := rows.Scan(&item.Day, &item.Kilowatt); err != nil {
 			h.dbFailure(w, r, "list_customer_kw_scan", err, "customer_id", customerID, "period", period)
 			return
 		}
-		result = append(result, item)
+		source = append(source, item)
 	}
 	if !h.rowsDone(w, r, rows, "list_customer_kw") {
 		return
 	}
 
+	var (
+		result   []kwPointResponse
+		shapeErr error
+	)
+	if period == "day" {
+		result, shapeErr = buildDailyKWSeries(source)
+	} else {
+		result, shapeErr = buildMonthlyKWSeries(source)
+	}
+	if shapeErr != nil {
+		h.dbFailure(w, r, "list_customer_kw_shape", shapeErr, "customer_id", customerID, "period", period)
+		return
+	}
+
 	httputil.JSON(w, http.StatusOK, result)
+}
+
+func buildDailyKWSeries(source []kwSourcePoint) ([]kwPointResponse, error) {
+	result := make([]kwPointResponse, 0, len(source))
+	for _, item := range source {
+		day, err := parseKWDay(item.Day)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, kwPointResponse{
+			Bucket:     item.Day,
+			Label:      day.Format("02/01"),
+			RangeLabel: day.Format("02/01/2006"),
+			Kilowatt:   item.Kilowatt,
+		})
+	}
+	return result, nil
+}
+
+func buildMonthlyKWSeries(source []kwSourcePoint) ([]kwPointResponse, error) {
+	result := make([]kwPointResponse, 0, len(source))
+	for _, item := range source {
+		monthStart, err := parseKWDay(item.Day)
+		if err != nil {
+			return nil, err
+		}
+		label := monthStart.Format("01/2006")
+		result = append(result, kwPointResponse{
+			Bucket:     monthStart.Format("2006-01"),
+			Label:      label,
+			RangeLabel: label,
+			Kilowatt:   item.Kilowatt,
+		})
+	}
+	return result, nil
+}
+
+func parseKWDay(raw string) (time.Time, error) {
+	day, err := time.Parse(dateLayout, raw)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse kw day %q: %w", raw, err)
+	}
+	return day, nil
 }

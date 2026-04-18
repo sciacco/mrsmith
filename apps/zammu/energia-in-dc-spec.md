@@ -109,8 +109,9 @@
 - **Operations:** `kwByCustomer(customer_id, period = day|month, cosfi)`.
 - **Fields:** `id`, `giorno` (date), `kilowatt` (numeric), `id_anagrafica` (FK).
 - **Constraints and business rules:**
-  - `cosfi` is an integer percent value (range 70–100); the SQL must apply `cosfi / 100` as a multiplier.
+  - `cosfi` is an integer centesimi value (range 70–100); the SQL must apply `cosfi / 100` as a multiplier.
   - Only `day` and `month` periods are supported (weekly dropped).
+  - `period=day` returns the latest 40 literal daily rows, ordered chronologically for the chart; the backend does not average or resample days.
 
 ### Entity: BillingCharge (Addebito)
 - **Purpose:** Billing line item for variable-power charges.
@@ -131,7 +132,7 @@
 - **User intent:** Chart a customer's kW over time at a given cos φ.
 - **Interaction pattern:** Parameterized analytic chart.
 - **Main data shown:** Bar chart (log-2 y-axis) of kW per day or month, titled with customer + cos φ.
-- **Key actions:** Select customer, period (day/month), cos φ (70–100 slider, default 95), "Aggiorna".
+- **Key actions:** Select customer, period (day/month), centesimi slider (70–100, default 95), "Aggiorna".
 - **Current vs intended:** Remove the unreachable "Settimanale" option and its buggy branch.
 
 ### View 3: "Addebiti"
@@ -217,7 +218,7 @@ See the view specs above; each view is a single-screen workflow. No cross-view n
 - `GET /api/energia-dc/v1/racks/{id}/socket-status`
 - `GET /api/energia-dc/v1/racks/{id}/power-readings?from=&to=&page=&size=` — returns `{items, total, page, size}`.
 - `GET /api/energia-dc/v1/racks/{id}/stats-last-days`
-- `GET /api/energia-dc/v1/customers/{id}/kw?period=day|month&cosfi=`
+- `GET /api/energia-dc/v1/customers/{id}/kw?period=day|month&cosfi=` — `period=day` returns the latest 40 daily rows, ordered chronologically.
 - `GET /api/energia-dc/v1/customers/{id}/addebiti`
 - `GET /api/energia-dc/v1/no-variable-billing/customers`
 - `GET /api/energia-dc/v1/no-variable-billing/customers/{id}/racks`

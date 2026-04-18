@@ -240,10 +240,10 @@
 
 - **Routing:** `/consumi-kw`
 - **Layout:** compact title + controls row + bar chart surface.
-- **Controls:** customer select, period select (`day|month` only), `Cos φ` slider 70-100, `Aggiorna`.
-- **Data contract:** one endpoint `GET /api/energia-dc/v1/customers/{id}/kw?period=day|month&cosfi=`.
+- **Controls:** customer select, period select (`day|month` only), centesimi slider 70-100, `Aggiorna`.
+- **Data contract:** one endpoint `GET /api/energia-dc/v1/customers/{id}/kw?period=day|month&cosfi=`. For `period=day`, the backend returns the latest 40 literal daily rows, ordered chronologically.
 - **Chart behavior:**
-  - Title/subtitle reflect customer and selected `Cos φ`.
+  - Title/subtitle reflect customer and selected centesimi value (no `%` presentation).
   - Day/month share one response shape.
   - Weekly option is not rendered anywhere.
 - **View state:** pre-submit empty copy plus loading/error/service-unavailable handling.
