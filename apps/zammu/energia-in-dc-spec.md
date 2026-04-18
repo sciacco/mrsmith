@@ -9,6 +9,13 @@
   - Keep the existing `kW = SUM(ampere) * 225 / 1000` formula as an accepted approximation (do not introduce per-phase computation in this rewrite).
   - Drop the unreachable "Settimanale" period branch (dead code + cosfi scale bug).
   - Replace the display-name-keyed lookup in the "Racks no variable" flow with an ID-keyed endpoint.
+- **Open-question resolutions (2026-04-18):**
+  - Q1 — Active-customer predicate confirmed (see Entity: Customer).
+  - Q2 — `maxampere / 2` is an intentional safety margin; keep as-is.
+  - Q3 — "Addebiti" supports CSV export in v1 (PDF deferred).
+  - Q4 — Bulk actions on low-consumption results deferred; tracked in `docs/TODO.md`.
+  - Q5 — Single endpoint with `period=day|month` param (payloads identical today; revisit if they diverge).
+  - Q6 — All timestamps are `Europe/Rome`.
 
 ## Current-State Evidence
 - **Source pages/views:** One Appsmith page with 5 tabs: "Situazione per rack", "Consumi in kW", "Addebiti", "Racks no variable", "Consumi < 1A".
@@ -25,13 +32,35 @@
 ### Entity: Customer
 - **Purpose:** Billing customer for colocation services.
 - **Operations:**
-  - `listActive()` — customers with at least one rack socket.
-  - `listWithoutVariableBilling()` — customers whose racks all have `variable_billing = false`, excluding the company self-row (`id_anagrafica = 3`).
+  - `listActive()` — customers having at least one `stato = 'attivo'` rack that has at least one `rack_sockets` row. Confirmed SQL:
+    ```sql
+    SELECT id, intestazione
+    FROM cli_fatturazione
+    WHERE id IN (
+      SELECT DISTINCT id_anagrafica
+      FROM racks
+      JOIN grappa.rack_sockets rs ON racks.id_rack = rs.rack_id
+      WHERE racks.stato = 'attivo'
+    )
+    ORDER BY intestazione;
+    ```
+  - `listWithoutVariableBilling()` — customers whose active racks all have `variable_billing` null or 0, excluding the company self-row (`id_anagrafica = 3`). Confirmed SQL (backs the `anagrafiche_no_variable` view):
+    ```sql
+    SELECT DISTINCT c.intestazione, r.id_anagrafica
+    FROM racks r
+    JOIN grappa.datacenter d ON r.id_datacenter = d.id_datacenter
+    JOIN cli_fatturazione c ON r.id_anagrafica = c.id
+    JOIN grappa.dc_build db ON db.id = d.dc_build_id
+    WHERE r.stato = 'attivo'
+      AND (variable_billing IS NULL OR variable_billing = 0)
+      AND r.id_anagrafica <> 3
+    ORDER BY c.intestazione;
+    ```
 - **Fields and inferred types:** `id` (int — aliased `id_anagrafica` in joins), `intestazione` (string), `codice_aggancio_gest` (string — Alyante ERP id per `docs/IMPLEMENTATION-KNOWLEDGE.md`; cross-DB mapping constant).
 - **Relationships:** 1 → N Rack; 1 → N BillingCharge; 1 → N DailySummary.
 - **Constraints and business rules:**
   - `id_anagrafica <> 3` self-exclusion is to be surfaced as a backend config flag, not hardcoded.
-- **Open questions:** Confirm precise "active with rack sockets" predicate before porting.
+- **Open questions:** None — "active with rack sockets" predicate confirmed above.
 
 ### Entity: Site (Building)
 - **Purpose:** Physical building hosting datacenter rooms for a customer.
@@ -65,7 +94,7 @@
 - **Fields:** `id` (int PK), `rack_id` (int FK), `magnetotermico` (string, e.g. `trifase 32A` / `monofase 16A`), `snmp_monitoring_device`, `detector_ip`, `posizione`, `posizione2`, `posizione3`, `posizione4`.
 - **Constraints and business rules:**
   - Breaker capacity derivation: `trifase 32A` → 63, `monofase 16A` → 16, else → 32. Keep this mapping in the backend; consider a lookup table so new breaker types can be added without code change.
-  - Gauge formula `ampere / (maxampere / 2) * 100` ported as-is (see open question Q2).
+  - Gauge formula `ampere / (maxampere / 2) * 100` ported as-is. The `maxampere / 2` denominator is an intentional **safety margin** (confirmed 2026-04-18) — the gauge shows utilization vs. half the breaker rating so that 100% on the UI corresponds to the policy-safe ceiling, not the electrical maximum.
 
 ### Entity: PowerReading
 - **Purpose:** Raw per-socket power reading timeseries.
@@ -107,8 +136,8 @@
 - **User intent:** View billing records for a customer.
 - **Interaction pattern:** Filter-select → table.
 - **Main data shown:** Billing rows with period, ampere, eccedenti, amount, PUN, coefficiente, fisso CU, importo eccedenti.
-- **Key actions:** Select customer.
-- **Current vs intended:** No change in capability; rewrite as a proper table component.
+- **Key actions:** Select customer; export current result set to CSV.
+- **Current vs intended:** No change in capability other than CSV export (v1 scope); rewrite as a proper table component. PDF export deferred.
 
 ### View 4: "Racks no variable"
 - **User intent:** Audit customers and racks not on variable billing.
@@ -208,6 +237,7 @@ See the view specs above; each view is a single-screen workflow. No cross-view n
 
 ### Operational constraints
 - Backend must connect to `grappa` MySQL.
+- All timestamp fields (`rack_power_readings.date`, `rack_power_daily_summary.giorno`, `importi_corrente_colocation.start_period` / `end_period`) are stored and interpreted as **Europe/Rome**. Range filters must convert client inputs to Europe/Rome before binding.
 
 ### UX or accessibility expectations
 - Follow portal Matrix/Stripe-level design per `docs/UI-UX.md`.
@@ -215,23 +245,18 @@ See the view specs above; each view is a single-screen workflow. No cross-view n
 
 ## Open Questions and Deferred Decisions
 
-- **Q1.** Precise predicate for "active customers with rack sockets" in `listActive()`.
-  - *Needed input:* review current SQL or ask billing/ops.
-  - *Decision owner:* Backend implementer + domain expert.
-- **Q2.** Is the gauge denominator `maxampere / 2` an intentional safety-margin policy or a porting error?
-  - *Needed input:* domain confirmation.
-  - *Decision owner:* Domain expert.
-- **Q3.** Should "Addebiti" table support CSV/PDF export in this release?
-  - *Decision owner:* Product.
-- **Q4.** Any bulk actions on low-consumption search results (ticketing, notify)?
-  - *Decision owner:* Product.
-- **Q5.** kW endpoint shape — single endpoint with `period=` or two endpoints?
-  - *Decision owner:* Backend implementer (cosmetic).
-- **Q6.** Time zone convention for timestamps (`date`, `giorno`, `start_period`).
-  - *Decision owner:* Backend implementer.
+All V1 open questions resolved on 2026-04-18:
+
+- **Q1.** ✅ Active-customer predicate confirmed (see `Customer.listActive()` SQL).
+- **Q2.** ✅ `maxampere / 2` is an intentional safety margin; gauge formula ported verbatim.
+- **Q3.** ✅ CSV export in v1 for "Addebiti"; PDF deferred.
+- **Q4.** ✅ No bulk actions on low-consumption in v1; deferred task recorded in `docs/TODO.md` (Energia in DC App → "Bulk Actions on Low-Consumption Search").
+- **Q5.** ✅ Single endpoint `GET /customers/{id}/kw?period=day|month&cosfi=` (payloads identical between day/month; revisit if they diverge).
+- **Q6.** ✅ All timestamps are `Europe/Rome`.
 
 ## Acceptance Notes
 
 - **What the audit proved directly:** Query SQL, widget configuration, JSObject methods, embedded rules (self-exclusion, breaker mapping, gauge formula, 225V coefficient), bugs (cosfi scale in weekly branch, fire-and-forget loads, SQL-injection-risk unprepared queries).
 - **What the expert confirmed (2026-04-17):** 225V formula stays; weekly period dropped; no-variable-billing detail query switches to ID-keyed.
-- **What still needs validation:** Active-customer predicate (Q1), `maxampere/2` intent (Q2), export & bulk-action UX (Q3, Q4), time zone (Q6).
+- **What the expert confirmed (2026-04-18):** Active-customer SQL (Q1); `maxampere/2` is an intentional safety margin (Q2); CSV-only export in v1 (Q3); low-consumption bulk actions deferred (Q4); single `period=` kW endpoint (Q5); Europe/Rome TZ (Q6).
+- **What still needs validation:** None blocking. Minor items to lock during implementation: self-exclusion config key name, breaker-mapping storage (inline CASE vs lookup table), pagination defaults for `/power-readings`, shared-types package location.

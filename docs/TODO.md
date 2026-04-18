@@ -27,6 +27,14 @@ Currently rack energy discounts (0–20%) are saved immediately without approval
 ### Dashboard Page
 The Dashboard page (revenue charts per client: revenue by account, historical billing in K EUR, active services) is a work in progress in Appsmith and is not included in the initial migration scope. It should be migrated once the Appsmith version is stabilized and the remaining pages are live. The audit is captured in `apps/panoramica-cliente/PANORAMICA-AUDIT.md` (page 1).
 
+## Energia in DC App
+
+### Bulk Actions on Low-Consumption Search (deferred from v1)
+The "Consumi < 1A" view lists rack sockets whose average ampere falls below a threshold. Today the user can only read the list. A future enhancement should add bulk actions on selected rows — e.g. open a ticket per socket (for on-site verification), notify the owning customer/account manager, or flag the rack for decommissioning review. Requires: (a) a selection model on the results table, (b) backend endpoints for the chosen actions, (c) integration with the async HubSpot queue (see "Cross-App Infrastructure → Async HubSpot Request Queue") for any CRM-side side effects. Scope and exact action set to be defined with Product.
+
+### Addebiti PDF Export (deferred from v1)
+The "Addebiti" view ships CSV export in v1. A future pass should add a PDF export option — likely via the shared Carbone template manager (see "Listini e Sconti App → Portal Admin Module — Carbone Template Management") so the template ID isn't hardcoded in this app.
+
 ## Quotes App
 
 ### Multi-Product Selection per Group
