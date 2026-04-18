@@ -287,6 +287,25 @@ func TestVisibleCategoriesFiltersByReportsRole(t *testing.T) {
 	}
 }
 
+func TestVisibleCategoriesFiltersByAFCToolsRole(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"app_afctools_access"})
+	if len(categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(categories))
+	}
+	if categories[0].ID != "smart-apps" {
+		t.Fatalf("expected smart-apps category, got %q", categories[0].ID)
+	}
+	if len(categories[0].Apps) != 1 {
+		t.Fatalf("expected 1 app, got %d", len(categories[0].Apps))
+	}
+	if categories[0].Apps[0].ID != AFCToolsAppID {
+		t.Fatalf("expected afc-tools app, got %q", categories[0].Apps[0].ID)
+	}
+	if categories[0].Apps[0].Href != AFCToolsAppHref {
+		t.Fatalf("expected afc-tools href %q, got %q", AFCToolsAppHref, categories[0].Apps[0].Href)
+	}
+}
+
 func TestVisibleCategoriesFiltersByKitProductsRole(t *testing.T) {
 	categories := VisibleCategories(Catalog(nil), []string{"app_kitproducts_access"})
 	if len(categories) != 1 {

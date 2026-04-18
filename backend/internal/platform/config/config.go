@@ -28,6 +28,7 @@ type Config struct {
 	RDFBackendAppURL           string
 	ReportsAppURL              string
 	SimulatoriVenditaAppURL    string
+	AFCToolsAppURL             string
 
 	// Anisetta PostgreSQL (compliance module)
 	AnisettaDSN string
@@ -40,6 +41,12 @@ type Config struct {
 
 	// Grappa MySQL (listini module)
 	GrappaDSN string
+
+	// Vodka/daiquiri MySQL (AFC Tools — Sales/CRM orders DB)
+	VodkaDSN string
+
+	// WHMCS (Prometeus) MySQL (AFC Tools — billing transactions and invoice feed)
+	WhmcsDSN string
 
 	// Energia in DC exclusions for the "Senza variabile" flow.
 	EnergiaDCExcludedCustomerIDs []int
@@ -54,6 +61,8 @@ type Config struct {
 	CarboneAPIKey string
 	// Simulatori di Vendita Carbone template override.
 	SimulatoriVenditaIaaSTemplateID string
+	// AFC Tools — Transazioni WHMCS Carbone template id.
+	CarboneAFCToolsTransazioniTemplateID string
 
 	// OpenRouter AI integration (optional)
 	OpenRouterAPIKey string
@@ -79,7 +88,7 @@ func Load() Config {
 		Port:                         envOr("PORT", "8080"),
 		LogLevel:                     envOr("LOG_LEVEL", "info"),
 		KeycloakIssuerURL:            envOr("KEYCLOAK_ISSUER_URL", ""),
-		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185"),
+		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185,http://localhost:5186"),
 		StaticDir:                    envOr("STATIC_DIR", ""),
 		BudgetAppURL:                 envOr("BUDGET_APP_URL", ""),
 		ComplianceAppURL:             envOr("COMPLIANCE_APP_URL", ""),
@@ -93,10 +102,13 @@ func Load() Config {
 		RDFBackendAppURL:             envOr("RDF_BACKEND_APP_URL", ""),
 		ReportsAppURL:                envOr("REPORTS_APP_URL", ""),
 		SimulatoriVenditaAppURL:      envOr("SIMULATORI_VENDITA_APP_URL", ""),
+		AFCToolsAppURL:               envOr("AFCTOOLS_APP_URL", ""),
 		AnisettaDSN:                  envOr("ANISETTA_DSN", ""),
 		MistraDSN:                    envOr("MISTRA_DSN", ""),
 		AlyanteDSN:                   envOr("ALYANTE_DSN", ""),
 		GrappaDSN:                    envOr("GRAPPA_DSN", ""),
+		VodkaDSN:                     envOr("VODKA_DSN", ""),
+		WhmcsDSN:                     envOr("WHMCS_DSN", ""),
 		EnergiaDCExcludedCustomerIDs: intListEnvOr("ENERGIA_DC_EXCLUDED_CUSTOMER_IDS", []int{3}),
 		DBCopertureDSN:               envOr("DBCOPERTURE_DSN", ""),
 		HubSpotAPIKey:                envOr("HUBSPOT_API_KEY", ""),
@@ -105,6 +117,7 @@ func Load() Config {
 			"SIMULATORI_VENDITA_IAAS_TEMPLATE_ID",
 			simulatorivendita.DefaultIaaSTemplateID,
 		),
+		CarboneAFCToolsTransazioniTemplateID: envOr("CARBONE_AFCTOOLS_TRANSAZIONI_TEMPLATE_ID", ""),
 		OpenRouterAPIKey:             envOr("OPENROUTER_API_KEY", ""),
 		RDFTeamsWebhookURL:           envOr("RDF_TEAMS_WEBHOOK_URL", ""),
 		RDFTeamsNotificationsEnabled: boolEnvOr("RDF_TEAMS_NOTIFICATIONS_ENABLED", false),

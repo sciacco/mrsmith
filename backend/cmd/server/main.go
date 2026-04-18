@@ -14,6 +14,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/microsoft/go-mssqldb"
 
+	"github.com/sciacco/mrsmith/internal/afctools"
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/budget"
 	"github.com/sciacco/mrsmith/internal/compliance"
@@ -149,6 +150,30 @@ func main() {
 		logger.Info("grappa database connected", "component", "listini")
 	}
 
+	// Vodka/daiquiri DB (afc-tools — MySQL, Sales/CRM orders)
+	var vodkaDB *sql.DB
+	if cfg.VodkaDSN != "" {
+		var err error
+		vodkaDB, err = database.New(database.Config{Driver: "mysql", DSN: cfg.VodkaDSN})
+		if err != nil {
+			logger.Error("failed to connect to vodka", "component", "afctools", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("vodka database connected", "component", "afctools")
+	}
+
+	// WHMCS (Prometeus) DB (afc-tools — MySQL, billing transactions + invoice feed)
+	var whmcsDB *sql.DB
+	if cfg.WhmcsDSN != "" {
+		var err error
+		whmcsDB, err = database.New(database.Config{Driver: "mysql", DSN: cfg.WhmcsDSN})
+		if err != nil {
+			logger.Error("failed to connect to whmcs", "component", "afctools", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("whmcs database connected", "component", "afctools")
+	}
+
 	// HubSpot service (optional — listini module)
 	var hubspotSvc *listini.HubSpotService
 	if cfg.HubSpotAPIKey != "" && grappaDB != nil && mistraDB != nil {
@@ -192,6 +217,15 @@ func main() {
 			cfg.SimulatoriVenditaIaaSTemplateID,
 		)
 		logger.Info("carbone service configured", "component", "simulatori-vendita")
+	}
+
+	var afcToolsCarboneSvc *afctools.CarboneService
+	if cfg.CarboneAPIKey != "" && cfg.CarboneAFCToolsTransazioniTemplateID != "" {
+		afcToolsCarboneSvc = afctools.NewCarboneService(
+			cfg.CarboneAPIKey,
+			cfg.CarboneAFCToolsTransazioniTemplateID,
+		)
+		logger.Info("carbone service configured", "component", "afctools")
 	}
 
 	// API routes (with auth)
@@ -258,6 +292,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.SimulatoriVenditaAppID] = "http://localhost:5185"
 	}
+	if cfg.AFCToolsAppURL != "" {
+		hrefOverrides[applaunch.AFCToolsAppID] = cfg.AFCToolsAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.AFCToolsAppID] = "http://localhost:5186"
+	}
 	appCatalog := applaunch.Catalog(hrefOverrides)
 	{
 		filtered := make([]applaunch.Definition, 0, len(appCatalog))
@@ -289,6 +328,11 @@ func main() {
 			if definition.ID == applaunch.ReportsAppID && cfg.MistraDSN == "" && cfg.GrappaDSN == "" && cfg.AnisettaDSN == "" {
 				continue
 			}
+			if definition.ID == applaunch.AFCToolsAppID &&
+				cfg.VodkaDSN == "" && cfg.WhmcsDSN == "" &&
+				cfg.MistraDSN == "" && cfg.GrappaDSN == "" && cfg.AlyanteDSN == "" {
+				continue
+			}
 			filtered = append(filtered, definition)
 		}
 		appCatalog = filtered
@@ -312,6 +356,15 @@ func main() {
 	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)
 	simulatorivendita.RegisterRoutes(api, simulatoriVenditaCarboneSvc)
+	afctools.RegisterRoutes(api, afctools.Deps{
+		Vodka:   vodkaDB,
+		Whmcs:   whmcsDB,
+		Mistra:  mistraDB,
+		Grappa:  grappaDB,
+		Alyante: alyanteDB,
+		Carbone: afcToolsCarboneSvc,
+		Arak:    arakCli,
+	})
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),

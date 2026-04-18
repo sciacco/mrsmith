@@ -143,6 +143,20 @@ services:
     depends_on:
       - backend
 
+  afc-tools:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @mrsmith/afc-tools dev --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - afc_tools_node_modules:/app/node_modules
+    environment:
+      - VITE_DEV_BACKEND_URL=http://backend:8080
+    ports:
+      - "5186:5186"
+    depends_on:
+      - backend
+
 volumes:
   portal_node_modules:
   budget_node_modules:
@@ -154,3 +168,4 @@ volumes:
   coperture_node_modules:
   energia_dc_node_modules:
   simulatori_vendita_node_modules:
+  afc_tools_node_modules:

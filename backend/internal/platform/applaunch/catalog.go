@@ -43,6 +43,9 @@ const (
 
 	ReportsAppID   = "reports"
 	ReportsAppHref = "/apps/reports/"
+
+	AFCToolsAppID   = "afc-tools"
+	AFCToolsAppHref = "/apps/afc-tools/"
 )
 
 var (
@@ -60,6 +63,7 @@ var (
 	richiesteFattibilitaManagerRoles = []string{"app_rdf_manager"}
 	rdfBackendAccessRoles            = []string{"app_rdf_backend_access"}
 	reportsAccessRoles               = []string{"app_reports_access"}
+	afcToolsAccessRoles              = []string{"app_afctools_access"}
 	defaultAccessRoles               = []string{"no-default-roles-cdlan"}
 )
 
@@ -301,15 +305,16 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		// 	CategoryTitle: "SMART APPS",
 		// 	AccessRoles:   defaultRoles,
 		// },
-		// {
-		// 	ID:            "afc-tools",
-		// 	Name:          "AFC Tools",
-		// 	Icon:          "settings",
-		// 	Href:          "/apps/smart-apps/afc-tools",
-		// 	CategoryID:    "smart-apps",
-		// 	CategoryTitle: "SMART APPS",
-		// 	AccessRoles:   defaultRoles,
-		// },
+		{
+			ID:            AFCToolsAppID,
+			Name:          "AFC Tools",
+			Icon:          "settings",
+			Href:          AFCToolsAppHref,
+			Status:        "ready",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   AFCToolsAccessRoles(),
+		},
 		// {
 		// 	ID:            "coperture",
 		// 	Name:          "Coperture",
@@ -433,6 +438,10 @@ func RichiesteFattibilitaManagerRoles() []string {
 
 func ReportsAccessRoles() []string {
 	return slices.Clone(reportsAccessRoles)
+}
+
+func AFCToolsAccessRoles() []string {
+	return slices.Clone(afcToolsAccessRoles)
 }
 
 func DefaultAccessRoles() []string {

@@ -78,6 +78,14 @@ Audit logging for budget and approval rule changes (create, edit, delete) is not
 ### Budget Year-End Lifecycle
 Unresolved: what happens to budgets at year-end? Do old-year budgets get archived, copied forward, or accumulate indefinitely in the list? This affects long-term UX of the budget list view. Needs a decision from the domain owner before the budget app grows historical data.
 
+## AFC Tools App
+
+### Dettaglio ordini — Codifica Quadrimestrale divergente (`cdlan_dur_rin` vs `cdlan_int_fatturazione`)
+In Appsmith la label "Quadrimestrale" viene mappata al codice **4** per `cdlan_dur_rin` (durata rinnovo, widget-side) e al codice **5** per `cdlan_int_fatturazione` (intervallo di fatturazione, SQL-side). Non è chiaro se i due campi sul DB Vodka/daiquiri usino codifiche genuinamente diverse o se uno dei due sia un bug. Portato verbatim nella migrazione 1:1 — verificare con il dominio sales/fatturazione quale codifica è autoritativa e allineare se necessario.
+
+### Dettaglio DDT per cespiti — Paginazione e filtri
+La pagina `Report DDT per cespiti` esegue `SELECT * FROM Tsmi_DDT_Verifica_Cespiti` (MSSQL Alyante) senza WHERE, LIMIT o ORDER BY ad ogni caricamento. Oggi funziona ma è la pagina più fragile lato performance: al crescere della view porta a timeout. Portata verbatim nella migrazione 1:1 — un follow-up dovrà aggiungere paginazione server-side + filtri minimi (almeno date range e codice cespite) prima che il volume cresca.
+
 ## Reports App
 
 ### Accessi attivi — Carbone Template Update + Template ID Swap
