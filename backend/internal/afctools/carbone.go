@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+// DefaultTransazioniTemplateID is the carbone.io template id used by the legacy
+// Appsmith app (extracted verbatim from utils.templateId in AFC-Tools.json.gz).
+// The env var CARBONE_AFCTOOLS_TRANSAZIONI_TEMPLATE_ID overrides it.
+const DefaultTransazioniTemplateID = "71ff521573c2369576d7203212cff61a82ce0164c493b1435bce3eca0e5bdaa3"
+
 // CarboneService renders templates via the Carbone Cloud API and returns
 // just the renderId — the frontend opens the resulting URL in a new tab
 // (decision A.5.4 = 4a). The template id never reaches the browser.
@@ -19,11 +24,14 @@ type CarboneService struct {
 	httpCli               *http.Client
 }
 
-// NewCarboneService returns nil when either parameter is empty so callers
-// can treat the service as "not configured" without an extra flag.
+// NewCarboneService returns nil when the API key is empty. If templateID is
+// empty the default extracted from the Appsmith export is used.
 func NewCarboneService(apiKey, transazioniTemplateID string) *CarboneService {
-	if apiKey == "" || transazioniTemplateID == "" {
+	if apiKey == "" {
 		return nil
+	}
+	if transazioniTemplateID == "" {
+		transazioniTemplateID = DefaultTransazioniTemplateID
 	}
 	return &CarboneService{
 		apiKey:                apiKey,

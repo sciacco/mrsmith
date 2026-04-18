@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sciacco/mrsmith/internal/afctools"
 	"github.com/sciacco/mrsmith/internal/simulatorivendita"
 )
 
@@ -117,7 +118,10 @@ func Load() Config {
 			"SIMULATORI_VENDITA_IAAS_TEMPLATE_ID",
 			simulatorivendita.DefaultIaaSTemplateID,
 		),
-		CarboneAFCToolsTransazioniTemplateID: envOr("CARBONE_AFCTOOLS_TRANSAZIONI_TEMPLATE_ID", ""),
+		CarboneAFCToolsTransazioniTemplateID: envOr(
+			"CARBONE_AFCTOOLS_TRANSAZIONI_TEMPLATE_ID",
+			afctools.DefaultTransazioniTemplateID,
+		),
 		OpenRouterAPIKey:             envOr("OPENROUTER_API_KEY", ""),
 		RDFTeamsWebhookURL:           envOr("RDF_TEAMS_WEBHOOK_URL", ""),
 		RDFTeamsNotificationsEnabled: boolEnvOr("RDF_TEAMS_NOTIFICATIONS_ENABLED", false),

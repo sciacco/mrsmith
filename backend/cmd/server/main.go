@@ -220,7 +220,7 @@ func main() {
 	}
 
 	var afcToolsCarboneSvc *afctools.CarboneService
-	if cfg.CarboneAPIKey != "" && cfg.CarboneAFCToolsTransazioniTemplateID != "" {
+	if cfg.CarboneAPIKey != "" {
 		afcToolsCarboneSvc = afctools.NewCarboneService(
 			cfg.CarboneAPIKey,
 			cfg.CarboneAFCToolsTransazioniTemplateID,
