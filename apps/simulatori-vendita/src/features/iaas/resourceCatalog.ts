@@ -29,11 +29,11 @@ export const resourceOrder: ResourceKey[] = [
 ];
 
 export const defaultQuantities: ResourceValues = {
-  vcpu: 1,
+  vcpu: 0,
   ram_vmware: 0,
   ram_os: 0,
-  storage_pri: 100,
-  storage_sec: 100,
+  storage_pri: 0,
+  storage_sec: 0,
   fw_std: 0,
   fw_adv: 0,
   priv_net: 0,
@@ -46,9 +46,9 @@ export const resourceCatalog: Record<ResourceKey, ResourceDefinition> = {
     key: 'vcpu',
     label: 'vCPU (1 GHz min)',
     group: 'Computing',
-    min: 1,
+    min: 0,
     step: 1,
-    defaultValue: 1,
+    defaultValue: 0,
   },
   ram_vmware: {
     key: 'ram_vmware',
@@ -70,9 +70,9 @@ export const resourceCatalog: Record<ResourceKey, ResourceDefinition> = {
     key: 'storage_pri',
     label: 'Primary Storage (GB)',
     group: 'Storage',
-    min: 10,
+    min: 0,
     step: 1,
-    defaultValue: 100,
+    defaultValue: 0,
   },
   storage_sec: {
     key: 'storage_sec',
@@ -80,7 +80,7 @@ export const resourceCatalog: Record<ResourceKey, ResourceDefinition> = {
     group: 'Storage',
     min: 0,
     step: 1,
-    defaultValue: 100,
+    defaultValue: 0,
   },
   fw_std: {
     key: 'fw_std',
@@ -162,3 +162,4 @@ export function createQuantityFormValues(values: ResourceValues = defaultQuantit
     ms_sql_std: String(values.ms_sql_std),
   };
 }
+

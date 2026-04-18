@@ -40,7 +40,7 @@ test('calculateQuote groups line totals and monthly total for Diretta', () => {
   assert.equal(result.monthlyTotal, 342.9);
 });
 
-test('normalizeQuantityForm clamps required minimums and fw_adv max', () => {
+test('normalizeQuantityForm defaults empty fields to 0 and clamps fw_adv max', () => {
   const normalized = normalizeQuantityForm({
     vcpu: '',
     ram_vmware: '',
@@ -55,10 +55,10 @@ test('normalizeQuantityForm clamps required minimums and fw_adv max', () => {
   });
 
   assert.deepEqual(normalized, {
-    vcpu: '1',
+    vcpu: '0',
     ram_vmware: '0',
     ram_os: '3',
-    storage_pri: '10',
+    storage_pri: '0',
     storage_sec: '25',
     fw_std: '0',
     fw_adv: '1',
