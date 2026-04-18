@@ -35,6 +35,11 @@ The "Consumi < 1A" view lists rack sockets whose average ampere falls below a th
 ### Addebiti PDF Export (deferred from v1)
 The "Addebiti" view ships CSV export in v1. A future pass should add a PDF export option — likely via the shared Carbone template manager (see "Listini e Sconti App → Portal Admin Module — Carbone Template Management") so the template ID isn't hardcoded in this app.
 
+## Simulatori di Vendita App
+
+### DB-Backed Pricing + Admin View (deferred from v1)
+The v1 migration is intentionally narrowed to a source-faithful port of the Appsmith IaaS calculator. The two pricing tiers stay in app-local code for now, there is no pricing database table, and there is no in-app admin route for editing rates. A later phase should move pricing into a backend-owned source of truth and add a dedicated maintenance UI. That follow-up must decide the real host store, introduce read/write pricing endpoints, make PDF generation use server-authoritative pricing, and reopen whether the Appsmith-style `Calcola` interaction should evolve into live recompute.
+
 ## Quotes App
 
 ### Multi-Product Selection per Group

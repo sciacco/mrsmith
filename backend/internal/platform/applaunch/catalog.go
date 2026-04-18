@@ -32,6 +32,9 @@ const (
 	QuotesAppID   = "proposte"
 	QuotesAppHref = "/apps/quotes/"
 
+	SimulatoriVenditaAppID   = "simulatori-vendita"
+	SimulatoriVenditaAppHref = "/apps/simulatori-vendita/"
+
 	RichiesteFattibilitaAppID   = "richieste-fattibilita"
 	RichiesteFattibilitaAppHref = "/apps/richieste-fattibilita/"
 
@@ -52,6 +55,7 @@ var (
 	panoramicaAccessRoles            = []string{"app_panoramica_access"}
 	quotesAccessRoles                = []string{"app_quotes_access"}
 	quotesDeleteRoles                = []string{"app_quotes_delete"}
+	simulatoriVenditaAccessRoles     = []string{"app_simulatorivendita_access"}
 	richiesteFattibilitaAccessRoles  = []string{"app_rdf_access", "app_rdf_manager"}
 	richiesteFattibilitaManagerRoles = []string{"app_rdf_manager"}
 	rdfBackendAccessRoles            = []string{"app_rdf_backend_access"}
@@ -150,6 +154,16 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryID:    "mkt-sales",
 			CategoryTitle: "MKT&Sales",
 			AccessRoles:   QuotesAccessRoles(),
+		},
+		{
+			ID:            SimulatoriVenditaAppID,
+			Name:          "Simulatori di Vendita",
+			Icon:          "briefcase",
+			Href:          SimulatoriVenditaAppHref,
+			Status:        "ready",
+			CategoryID:    "mkt-sales",
+			CategoryTitle: "MKT&Sales",
+			AccessRoles:   SimulatoriVenditaAccessRoles(),
 		},
 		{
 			ID:            RichiesteFattibilitaAppID,
@@ -399,6 +413,10 @@ func QuotesAccessRoles() []string {
 
 func QuotesDeleteRoles() []string {
 	return slices.Clone(quotesDeleteRoles)
+}
+
+func SimulatoriVenditaAccessRoles() []string {
+	return slices.Clone(simulatoriVenditaAccessRoles)
 }
 
 func RDFBackendAccessRoles() []string {

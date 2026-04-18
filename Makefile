@@ -57,6 +57,9 @@ dev-coperture:        ## Solo coperture app
 dev-energia-dc:       ## Solo energia-dc app
 	pnpm --filter mrsmith-energia-dc dev
 
+dev-simulatori-vendita: ## Solo simulatori-vendita app
+	pnpm --filter mrsmith-simulatori-vendita dev
+
 # Build ────────────────────────────────────────
 build:                ## Build completo (frontend + backend)
 	pnpm -r --if-present build
@@ -117,5 +120,5 @@ tidy:                 ## go mod tidy
 help:                 ## Mostra questo help
 	@grep -h -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget dev-compliance dev-kit-products dev-listini dev-panoramica dev-quotes dev-richieste-fattibilita dev-rdf-backend dev-reports dev-coperture dev-energia-dc build build-frontend build-backend docker-build docker-build-amd64 package-prod-amd64 deploy-prod rollback-prod test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
+.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget dev-compliance dev-kit-products dev-listini dev-panoramica dev-quotes dev-richieste-fattibilita dev-rdf-backend dev-reports dev-coperture dev-energia-dc dev-simulatori-vendita build build-frontend build-backend docker-build docker-build-amd64 package-prod-amd64 deploy-prod rollback-prod test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
 .DEFAULT_GOAL := help

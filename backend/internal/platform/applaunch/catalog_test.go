@@ -156,6 +156,22 @@ func TestCatalogAppliesEnergiaDCHrefOverride(t *testing.T) {
 	t.Fatal("expected energia-dc definition in catalog")
 }
 
+func TestCatalogAppliesSimulatoriVenditaHrefOverride(t *testing.T) {
+	catalog := Catalog(map[string]string{SimulatoriVenditaAppID: "http://localhost:5185"})
+
+	for _, definition := range catalog {
+		if definition.ID != SimulatoriVenditaAppID {
+			continue
+		}
+		if definition.Href != "http://localhost:5185" {
+			t.Fatalf("expected dev override href, got %q", definition.Href)
+		}
+		return
+	}
+
+	t.Fatal("expected simulatori-vendita definition in catalog")
+}
+
 func TestVisibleCategoriesHidesAppsWithoutRole(t *testing.T) {
 	categories := VisibleCategories(Catalog(nil), []string{"viewer"})
 	if len(categories) != 0 {
@@ -230,6 +246,25 @@ func TestVisibleCategoriesFiltersByQuotesRole(t *testing.T) {
 	}
 	if categories[0].Apps[0].Href != QuotesAppHref {
 		t.Fatalf("expected quotes href %q, got %q", QuotesAppHref, categories[0].Apps[0].Href)
+	}
+}
+
+func TestVisibleCategoriesFiltersBySimulatoriVenditaRole(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"app_simulatorivendita_access"})
+	if len(categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(categories))
+	}
+	if categories[0].ID != "mkt-sales" {
+		t.Fatalf("expected mkt-sales category, got %q", categories[0].ID)
+	}
+	if len(categories[0].Apps) != 1 {
+		t.Fatalf("expected 1 app, got %d", len(categories[0].Apps))
+	}
+	if categories[0].Apps[0].ID != SimulatoriVenditaAppID {
+		t.Fatalf("expected simulatori-vendita app, got %q", categories[0].Apps[0].ID)
+	}
+	if categories[0].Apps[0].Href != SimulatoriVenditaAppHref {
+		t.Fatalf("expected simulatori-vendita href %q, got %q", SimulatoriVenditaAppHref, categories[0].Apps[0].Href)
 	}
 }
 

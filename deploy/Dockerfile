@@ -29,6 +29,7 @@ COPY --from=frontend /app/apps/quotes/dist /static/apps/quotes
 COPY --from=frontend /app/apps/richieste-fattibilita/dist /static/apps/richieste-fattibilita
 COPY --from=frontend /app/apps/rdf-backend/dist /static/apps/rdf-backend
 COPY --from=frontend /app/apps/reports/dist /static/apps/reports
+COPY --from=frontend /app/apps/simulatori-vendita/dist /static/apps/simulatori-vendita
 EXPOSE 8080
 USER nonroot:nonroot
 CMD ["/server"]

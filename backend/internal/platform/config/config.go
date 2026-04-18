@@ -4,6 +4,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/sciacco/mrsmith/internal/simulatorivendita"
 )
 
 type Config struct {
@@ -25,6 +27,7 @@ type Config struct {
 	RichiesteFattibilitaAppURL string
 	RDFBackendAppURL           string
 	ReportsAppURL              string
+	SimulatoriVenditaAppURL    string
 
 	// Anisetta PostgreSQL (compliance module)
 	AnisettaDSN string
@@ -47,8 +50,10 @@ type Config struct {
 	// HubSpot integration (optional — listini module)
 	HubSpotAPIKey string
 
-	// Carbone PDF generation (optional — listini module)
+	// Carbone PDF generation (optional — listini and simulatori modules)
 	CarboneAPIKey string
+	// Simulatori di Vendita Carbone template override.
+	SimulatoriVenditaIaaSTemplateID string
 
 	// OpenRouter AI integration (optional)
 	OpenRouterAPIKey string
@@ -74,7 +79,7 @@ func Load() Config {
 		Port:                         envOr("PORT", "8080"),
 		LogLevel:                     envOr("LOG_LEVEL", "info"),
 		KeycloakIssuerURL:            envOr("KEYCLOAK_ISSUER_URL", ""),
-		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184"),
+		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185"),
 		StaticDir:                    envOr("STATIC_DIR", ""),
 		BudgetAppURL:                 envOr("BUDGET_APP_URL", ""),
 		ComplianceAppURL:             envOr("COMPLIANCE_APP_URL", ""),
@@ -87,6 +92,7 @@ func Load() Config {
 		RichiesteFattibilitaAppURL:   envOr("RICHIESTE_FATTIBILITA_APP_URL", ""),
 		RDFBackendAppURL:             envOr("RDF_BACKEND_APP_URL", ""),
 		ReportsAppURL:                envOr("REPORTS_APP_URL", ""),
+		SimulatoriVenditaAppURL:      envOr("SIMULATORI_VENDITA_APP_URL", ""),
 		AnisettaDSN:                  envOr("ANISETTA_DSN", ""),
 		MistraDSN:                    envOr("MISTRA_DSN", ""),
 		AlyanteDSN:                   envOr("ALYANTE_DSN", ""),
@@ -95,6 +101,10 @@ func Load() Config {
 		DBCopertureDSN:               envOr("DBCOPERTURE_DSN", ""),
 		HubSpotAPIKey:                envOr("HUBSPOT_API_KEY", ""),
 		CarboneAPIKey:                envOr("CARBONE_API_KEY", ""),
+		SimulatoriVenditaIaaSTemplateID: envOr(
+			"SIMULATORI_VENDITA_IAAS_TEMPLATE_ID",
+			simulatorivendita.DefaultIaaSTemplateID,
+		),
 		OpenRouterAPIKey:             envOr("OPENROUTER_API_KEY", ""),
 		RDFTeamsWebhookURL:           envOr("RDF_TEAMS_WEBHOOK_URL", ""),
 		RDFTeamsNotificationsEnabled: boolEnvOr("RDF_TEAMS_NOTIFICATIONS_ENABLED", false),

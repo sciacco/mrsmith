@@ -129,6 +129,20 @@ services:
     depends_on:
       - backend
 
+  simulatori-vendita:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter mrsmith-simulatori-vendita dev --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - simulatori_vendita_node_modules:/app/node_modules
+    environment:
+      - VITE_DEV_BACKEND_URL=http://backend:8080
+    ports:
+      - "5185:5185"
+    depends_on:
+      - backend
+
 volumes:
   portal_node_modules:
   budget_node_modules:
@@ -139,3 +153,4 @@ volumes:
   quotes_node_modules:
   coperture_node_modules:
   energia_dc_node_modules:
+  simulatori_vendita_node_modules:

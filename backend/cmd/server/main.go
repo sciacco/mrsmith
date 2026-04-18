@@ -37,6 +37,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/rdf"
 	"github.com/sciacco/mrsmith/internal/rdfbackend"
 	"github.com/sciacco/mrsmith/internal/reports"
+	"github.com/sciacco/mrsmith/internal/simulatorivendita"
 	"github.com/sciacco/mrsmith/pkg/middleware"
 )
 
@@ -184,6 +185,15 @@ func main() {
 		logger.Info("carbone service configured", "component", "reports")
 	}
 
+	var simulatoriVenditaCarboneSvc *simulatorivendita.CarboneService
+	if cfg.CarboneAPIKey != "" {
+		simulatoriVenditaCarboneSvc = simulatorivendita.NewCarboneService(
+			cfg.CarboneAPIKey,
+			cfg.SimulatoriVenditaIaaSTemplateID,
+		)
+		logger.Info("carbone service configured", "component", "simulatori-vendita")
+	}
+
 	// API routes (with auth)
 	api := http.NewServeMux()
 	hrefOverrides := map[string]string{}
@@ -243,6 +253,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.ReportsAppID] = "http://localhost:5180"
 	}
+	if cfg.SimulatoriVenditaAppURL != "" {
+		hrefOverrides[applaunch.SimulatoriVenditaAppID] = cfg.SimulatoriVenditaAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.SimulatoriVenditaAppID] = "http://localhost:5185"
+	}
 	appCatalog := applaunch.Catalog(hrefOverrides)
 	{
 		filtered := make([]applaunch.Definition, 0, len(appCatalog))
@@ -296,6 +311,7 @@ func main() {
 	rdf.RegisterRoutes(api, anisettaDB, mistraDB, openrouterCli, cfg.RDFTeamsWebhookURL, cfg.RDFTeamsNotificationsEnabled)
 	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)
+	simulatorivendita.RegisterRoutes(api, simulatoriVenditaCarboneSvc)
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),

@@ -134,6 +134,22 @@ func TestHandlerFallsBackToEnergiaDCIndexForDeepLinks(t *testing.T) {
 	}
 }
 
+func TestHandlerFallsBackToSimulatoriVenditaIndexForDeepLinks(t *testing.T) {
+	root := buildStaticFixture(t)
+	handler := New(root)
+
+	req := httptest.NewRequest(http.MethodGet, "/apps/simulatori-vendita/preventivo", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "simulatori-vendita-shell") {
+		t.Fatalf("expected simulatori-vendita index, got %q", body)
+	}
+}
+
 func buildStaticFixture(t *testing.T) string {
 	t.Helper()
 
@@ -145,6 +161,7 @@ func buildStaticFixture(t *testing.T) string {
 	writeFixtureFile(t, filepath.Join(root, "apps", "coperture", "index.html"), "<html>coperture-shell</html>")
 	writeFixtureFile(t, filepath.Join(root, "apps", "energia-dc", "index.html"), "<html>energia-dc-shell</html>")
 	writeFixtureFile(t, filepath.Join(root, "apps", "reports", "index.html"), "<html>reports-shell</html>")
+	writeFixtureFile(t, filepath.Join(root, "apps", "simulatori-vendita", "index.html"), "<html>simulatori-vendita-shell</html>")
 	return root
 }
 
