@@ -118,6 +118,22 @@ func TestHandlerFallsBackToCopertureIndexForDeepLinks(t *testing.T) {
 	}
 }
 
+func TestHandlerFallsBackToEnergiaDCIndexForDeepLinks(t *testing.T) {
+	root := buildStaticFixture(t)
+	handler := New(root)
+
+	req := httptest.NewRequest(http.MethodGet, "/apps/energia-dc/consumi-kw", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "energia-dc-shell") {
+		t.Fatalf("expected energia-dc index, got %q", body)
+	}
+}
+
 func buildStaticFixture(t *testing.T) string {
 	t.Helper()
 
@@ -127,6 +143,7 @@ func buildStaticFixture(t *testing.T) string {
 	writeFixtureFile(t, filepath.Join(root, "apps", "budget", "assets", "app.js"), "budget-asset")
 	writeFixtureFile(t, filepath.Join(root, "apps", "compliance", "index.html"), "<html>compliance-shell</html>")
 	writeFixtureFile(t, filepath.Join(root, "apps", "coperture", "index.html"), "<html>coperture-shell</html>")
+	writeFixtureFile(t, filepath.Join(root, "apps", "energia-dc", "index.html"), "<html>energia-dc-shell</html>")
 	writeFixtureFile(t, filepath.Join(root, "apps", "reports", "index.html"), "<html>reports-shell</html>")
 	return root
 }

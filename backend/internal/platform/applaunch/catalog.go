@@ -17,6 +17,9 @@ const (
 	CopertureAppID   = "coperture"
 	CopertureAppHref = "/apps/coperture/"
 
+	EnergiaDCAppID   = "energia-dc"
+	EnergiaDCAppHref = "/apps/energia-dc/"
+
 	KitProductsAppID   = "kit-e-prodotti"
 	KitProductsAppHref = "/apps/kit-products/"
 
@@ -43,6 +46,7 @@ var (
 	budgetAccessRoles                = []string{"app_budget_access"}
 	complianceAccessRoles            = []string{"app_compliance_access"}
 	copertureAccessRoles             = []string{"app_coperture_access"}
+	energiaDCAccessRoles             = []string{"app_energiadc_access"}
 	kitProductsAccessRoles           = []string{"app_kitproducts_access"}
 	listiniAccessRoles               = []string{"app_listini_access"}
 	panoramicaAccessRoles            = []string{"app_panoramica_access"}
@@ -196,6 +200,16 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryID:    "smart-apps",
 			CategoryTitle: "SMART APPS",
 			AccessRoles:   CopertureAccessRoles(),
+		},
+		{
+			ID:            EnergiaDCAppID,
+			Name:          "Energia in DC",
+			Icon:          "chart",
+			Href:          EnergiaDCAppHref,
+			Status:        "ready",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   EnergiaDCAccessRoles(),
 		},
 		{
 			ID:            PanoramicaAppID,
@@ -361,6 +375,10 @@ func ComplianceAccessRoles() []string {
 
 func CopertureAccessRoles() []string {
 	return slices.Clone(copertureAccessRoles)
+}
+
+func EnergiaDCAccessRoles() []string {
+	return slices.Clone(energiaDCAccessRoles)
 }
 
 func KitProductsAccessRoles() []string {

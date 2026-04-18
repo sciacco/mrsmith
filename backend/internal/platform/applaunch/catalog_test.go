@@ -89,6 +89,25 @@ func TestVisibleCategoriesFiltersByCopertureRole(t *testing.T) {
 	}
 }
 
+func TestVisibleCategoriesFiltersByEnergiaDCRole(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"app_energiadc_access"})
+	if len(categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(categories))
+	}
+	if categories[0].ID != "smart-apps" {
+		t.Fatalf("expected smart-apps category, got %q", categories[0].ID)
+	}
+	if len(categories[0].Apps) != 1 {
+		t.Fatalf("expected 1 app, got %d", len(categories[0].Apps))
+	}
+	if categories[0].Apps[0].ID != EnergiaDCAppID {
+		t.Fatalf("expected energia-dc app, got %q", categories[0].Apps[0].ID)
+	}
+	if categories[0].Apps[0].Href != EnergiaDCAppHref {
+		t.Fatalf("expected energia-dc href %q, got %q", EnergiaDCAppHref, categories[0].Apps[0].Href)
+	}
+}
+
 func TestCatalogAppliesComplianceHrefOverride(t *testing.T) {
 	catalog := Catalog(map[string]string{ComplianceAppID: "http://localhost:5175"})
 
@@ -119,6 +138,22 @@ func TestCatalogAppliesCopertureHrefOverride(t *testing.T) {
 	}
 
 	t.Fatal("expected coperture definition in catalog")
+}
+
+func TestCatalogAppliesEnergiaDCHrefOverride(t *testing.T) {
+	catalog := Catalog(map[string]string{EnergiaDCAppID: "http://localhost:5184"})
+
+	for _, definition := range catalog {
+		if definition.ID != EnergiaDCAppID {
+			continue
+		}
+		if definition.Href != "http://localhost:5184" {
+			t.Fatalf("expected dev override href, got %q", definition.Href)
+		}
+		return
+	}
+
+	t.Fatal("expected energia-dc definition in catalog")
 }
 
 func TestVisibleCategoriesHidesAppsWithoutRole(t *testing.T) {

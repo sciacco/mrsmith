@@ -37,3 +37,8 @@
   - Code-first post-gate approval was grounded by the implemented route and screen files (`apps/coperture/src/routes.tsx`, `apps/coperture/src/App.tsx`, `apps/coperture/src/pages/CoverageLookupPage.tsx`, and shared CSS), even without screenshots.
   - The screen passed because the approved `report_explorer` composition remained intact: compact title, working toolbar as the primary surface, explicit search/reset flow, submitted-only address summary, one dominant results table, and business-user copy for empty/error/503 states.
   - Subtle page/surface gradients were acceptable because they did not become a hero shell or compete with the working surface. The blocking threshold remains decorative framing that dominates the workspace, not any use of texture or depth.
+- **Energia in DC** — 2026-04-18
+  - Code-first post-gate approval was grounded by the approved plan, the cited comparables (`apps/coperture/src/pages/CoverageLookupPage.tsx`, `apps/reports/src/pages/AovPage.tsx`, `apps/panoramica-cliente/src/pages/IaaSPayPerUsePage.tsx`), and the implemented route/app/page files under `apps/energia-dc/src/`.
+  - The app passed because the working surfaces stayed primary on every route: compact headers, filter-first toolbars, one dominant chart/table/master-detail area, no KPI cards, and no launcher-style hero shell.
+  - Bootstrap/startup fallbacks are part of the reviewed UI surface; raw auth/bootstrap/config text there should block approval until it is replaced with business-facing copy.
+  - Screenshots were not available during this review, so final approval relied on code evidence and still carries a visual-verification gap for populated and narrow states.

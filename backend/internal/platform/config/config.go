@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -16,6 +17,7 @@ type Config struct {
 	BudgetAppURL               string
 	ComplianceAppURL           string
 	CopertureAppURL            string
+	EnergiaDCAppURL            string
 	KitProductsAppURL          string
 	ListiniAppURL              string
 	PanoramicaAppURL           string
@@ -35,6 +37,9 @@ type Config struct {
 
 	// Grappa MySQL (listini module)
 	GrappaDSN string
+
+	// Energia in DC exclusions for the "Senza variabile" flow.
+	EnergiaDCExcludedCustomerIDs []int
 
 	// Coperture PostgreSQL
 	DBCopertureDSN string
@@ -69,11 +74,12 @@ func Load() Config {
 		Port:                         envOr("PORT", "8080"),
 		LogLevel:                     envOr("LOG_LEVEL", "info"),
 		KeycloakIssuerURL:            envOr("KEYCLOAK_ISSUER_URL", ""),
-		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183"),
+		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184"),
 		StaticDir:                    envOr("STATIC_DIR", ""),
 		BudgetAppURL:                 envOr("BUDGET_APP_URL", ""),
 		ComplianceAppURL:             envOr("COMPLIANCE_APP_URL", ""),
 		CopertureAppURL:              envOr("COPERTURE_APP_URL", ""),
+		EnergiaDCAppURL:              envOr("ENERGIA_DC_APP_URL", ""),
 		KitProductsAppURL:            envOr("KIT_PRODUCTS_APP_URL", ""),
 		ListiniAppURL:                envOr("LISTINI_APP_URL", ""),
 		PanoramicaAppURL:             envOr("PANORAMICA_APP_URL", ""),
@@ -85,6 +91,7 @@ func Load() Config {
 		MistraDSN:                    envOr("MISTRA_DSN", ""),
 		AlyanteDSN:                   envOr("ALYANTE_DSN", ""),
 		GrappaDSN:                    envOr("GRAPPA_DSN", ""),
+		EnergiaDCExcludedCustomerIDs: intListEnvOr("ENERGIA_DC_EXCLUDED_CUSTOMER_IDS", []int{3}),
 		DBCopertureDSN:               envOr("DBCOPERTURE_DSN", ""),
 		HubSpotAPIKey:                envOr("HUBSPOT_API_KEY", ""),
 		CarboneAPIKey:                envOr("CARBONE_API_KEY", ""),
@@ -120,4 +127,28 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func intListEnvOr(key string, fallback []int) []int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return append([]int(nil), fallback...)
+	}
+
+	result := make([]int, 0)
+	for _, raw := range strings.Split(value, ",") {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			return append([]int(nil), fallback...)
+		}
+		result = append(result, parsed)
+	}
+	if len(result) == 0 {
+		return append([]int(nil), fallback...)
+	}
+	return result
 }

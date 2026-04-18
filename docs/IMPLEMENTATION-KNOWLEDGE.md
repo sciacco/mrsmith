@@ -241,6 +241,15 @@ Alyante ERP ID
 - Used by: `budget`, `compliance`, `kit-products`, `listini-e-sconti`, `panoramica-cliente`, `quotes`, `reports`.
 - Open questions: none.
 
+### Portal Launcher Tiles Must Use Supported Portal Icon Keys
+
+- Context: adding or changing entries in `backend/internal/platform/applaunch/catalog.go`.
+- Discovery: launcher tile icons are rendered from the portal-local registry in `apps/portal/src/components/Icon/icons.tsx`, not from an open-ended icon namespace. Reusing a string that is not in that registry leaves the tile without a matching portal icon; during Energia in DC wiring, `bolt` was rejected and the tile used the already-supported `chart` key instead.
+- Practical rule: when wiring a new launcher tile, verify the icon key against `apps/portal/src/components/Icon/icons.tsx` or reuse an already-proven key from `apps/portal/src/data/apps.ts`. Do not invent icon names in `catalog.go` without checking portal support first.
+- Evidence: `apps/portal/src/components/Icon/icons.tsx`, `apps/portal/src/data/apps.ts`, `backend/internal/platform/applaunch/catalog.go`.
+- Used by: launcher-backed apps including `reports`, `coperture`, and `energia-dc`.
+- Open questions: none.
+
 ## Auth and Transport Behavior
 
 ### Devadmin Must Be Centralized as a Superuser Override

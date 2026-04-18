@@ -43,3 +43,8 @@
 - **Energia in DC planning** — 2026-04-18
   - A five-view analytical app can stay within one explicit `data_workspace` archetype even when individual routes resemble `report_explorer` or master-detail screens; the key is to keep the app shell unified and document the mixed internal surfaces instead of silently mixing archetypes.
   - For five peer routes, `TabNav` is acceptable if the app plan also calls out a horizontally scrollable narrow-viewport nav wrapper; this preserves source-tab parity without forcing grouped dropdown navigation.
+- **Energia in DC implementation** — 2026-04-18
+  - The approved plan translated cleanly into one repo-fit bundle: `apps/energia-dc`, `backend/internal/energiadc`, launcher/catalog wiring, env/config wiring, Docker static copy, split-server dev wiring, deep-link/static tests, portal visibility tests, and a new `pnpm-lock.yaml` importer entry all moved together in one change set.
+  - The backend contract was safest as one module-local config plus narrow handler splits (`lookups`, `rack`, `kw`, `billing`, `audit`) with regression tests pinning nested-resource invariants, Europe/Rome local datetime parsing, `503 energia_dc_database_not_configured`, excluded-customer behavior, and the rack/kW helper formulas.
+  - For a five-route data-workspace app that mixes chart-heavy and table-heavy pages, lazy-loading the route pages is a practical repo-fit default; it kept Energia DC’s production build split into route chunks instead of shipping one oversized initial bundle.
+  - Launcher planning should now explicitly verify icon support against `apps/portal/src/components/Icon/icons.tsx`; Energia DC reused `chart` because unsupported icon keys are not rendered by the portal launcher.
