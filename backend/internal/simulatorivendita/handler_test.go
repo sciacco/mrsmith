@@ -131,6 +131,9 @@ func TestHandleGenerateQuoteProxiesPayloadToRenderer(t *testing.T) {
 	if captured.Data.DailyTotal.Totale != 11.43 || captured.Data.DailyTotal.AddOn != 6.33 {
 		t.Fatalf("unexpected totals payload: %#v", captured.Data.DailyTotal)
 	}
+	if captured.Data.DailyTotal.Mese != 342.9 {
+		t.Fatalf("unexpected monthly total payload: %#v", captured.Data.DailyTotal.Mese)
+	}
 }
 
 func TestHandleGenerateQuoteReturnsInternalErrorOnRendererFailure(t *testing.T) {
@@ -199,7 +202,8 @@ func validQuoteRequestJSON() string {
 			"storage": 0.2,
 			"sicurezza": 1.8,
 			"addon": 6.33,
-			"totale": 11.43
+			"totale": 11.43,
+			"mese": 342.9
 		}
 	}`
 }

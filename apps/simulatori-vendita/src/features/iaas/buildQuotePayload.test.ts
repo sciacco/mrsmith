@@ -48,8 +48,9 @@ test('buildQuotePayload preserves Appsmith-compatible keys', () => {
     ms_sql_std: 6.33,
   });
   assert.equal(payload.totale_giornaliero.computing, 1.54);
-  assert.ok(Math.abs(payload.totale_giornaliero.storage - 0.15) < 1e-9);
+  assert.equal(payload.totale_giornaliero.storage, 0.15);
   assert.equal(payload.totale_giornaliero.sicurezza, 0);
   assert.equal(payload.totale_giornaliero.addon, 1);
   assert.equal(payload.totale_giornaliero.totale, 2.69);
+  assert.equal(payload.totale_giornaliero.mese, 80.7);
 });

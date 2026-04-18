@@ -37,10 +37,14 @@ export interface DailyTotals {
   totale: number;
 }
 
+export interface PayloadTotals extends DailyTotals {
+  mese: number;
+}
+
 export interface QuotePayload {
   qta: ResourceValues;
   prezzi: ResourceValues;
-  totale_giornaliero: DailyTotals;
+  totale_giornaliero: PayloadTotals;
 }
 
 export interface CalculationResult {

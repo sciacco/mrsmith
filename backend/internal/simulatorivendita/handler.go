@@ -38,6 +38,7 @@ type dailyTotalsFields struct {
 	Sicurezza *float64 `json:"sicurezza"`
 	AddOn     *float64 `json:"addon"`
 	Totale    *float64 `json:"totale"`
+	Mese      *float64 `json:"mese"`
 }
 
 type quoteRequestFields struct {
@@ -65,6 +66,7 @@ type dailyTotals struct {
 	Sicurezza float64 `json:"sicurezza"`
 	AddOn     float64 `json:"addon"`
 	Totale    float64 `json:"totale"`
+	Mese      float64 `json:"mese"`
 }
 
 type quotePayload struct {
@@ -229,6 +231,10 @@ func normalizeDailyTotals(fields dailyTotalsFields) (dailyTotals, bool) {
 	if !ok {
 		return dailyTotals{}, false
 	}
+	mese, ok := normalizeNumber(fields.Mese)
+	if !ok {
+		return dailyTotals{}, false
+	}
 
 	return dailyTotals{
 		Computing: computing,
@@ -236,6 +242,7 @@ func normalizeDailyTotals(fields dailyTotalsFields) (dailyTotals, bool) {
 		Sicurezza: sicurezza,
 		AddOn:     addOn,
 		Totale:    totale,
+		Mese:      mese,
 	}, true
 }
 
