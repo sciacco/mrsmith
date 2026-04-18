@@ -288,6 +288,16 @@
   font-weight: 600;
 }
 
+.chipFull {
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
+}
+
+.chipHalf {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
 .gaugeGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

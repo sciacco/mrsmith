@@ -55,6 +55,21 @@ function resolveLabel(options: LookupItem[], selectedId: number | null): string 
   return options.find((option) => option.id === selectedId)?.name ?? '';
 }
 
+function rackTypeChip(
+  rackType: string | undefined,
+  position: string | undefined,
+): { text: string; variant: 'full' | 'half' } | null {
+  const type = (rackType ?? '').trim().toUpperCase();
+  if (!type) return null;
+  if (type === 'HALF') {
+    const pos = (position ?? '').trim();
+    return { text: pos ? `HALF posizione ${pos}` : 'HALF', variant: 'half' };
+  }
+  if (type === 'FULL') return { text: 'FULL', variant: 'full' };
+  const pos = (position ?? '').trim();
+  return { text: pos ? `${type} posizione ${pos}` : type, variant: 'full' };
+}
+
 function defaultDateRange() {
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -169,7 +184,7 @@ export function SituazioneRackPage() {
         <div className={styles.titleBlock}>
           <h1 className={styles.title}>Situazione rack</h1>
           <p className={styles.subtitle}>
-            Seleziona il percorso Cliente, Edificio, Sala e Rack per consultare prese, storico assorbimenti e andamento degli ultimi due giorni.
+            Seleziona il percorso Cliente, Edificio, Sala e Rack per consultare Socket, storico assorbimenti e andamento degli ultimi due giorni.
           </p>
         </div>
       </div>
@@ -248,7 +263,7 @@ export function SituazioneRackPage() {
           {submitted === null ? (
             <ViewState
               title="Workspace pronto"
-              message="Completa il percorso di selezione e conferma con Aggiorna per caricare prese rack, storico assorbimenti e andamento degli ultimi due giorni."
+              message="Completa il percorso di selezione e conferma con Aggiorna per caricare Socket rack, storico assorbimenti e andamento degli ultimi due giorni."
             />
           ) : null}
 
@@ -264,18 +279,6 @@ export function SituazioneRackPage() {
 
           {submitted !== null && !workspaceError ? (
             <>
-              <section className={styles.card}>
-                <div className={styles.chipRow}>
-                  <span className={styles.chip}>{submitted.labels.customer}</span>
-                  <span className={styles.chip}>{submitted.labels.site}</span>
-                  <span className={styles.chip}>{submitted.labels.room}</span>
-                  <span className={styles.chip}>{submitted.labels.rack}</span>
-                  <span className={styles.chip}>
-                    {formatDateTime(submitted.from.replace('T', ' '))} - {formatDateTime(submitted.to.replace('T', ' '))}
-                  </span>
-                </div>
-              </section>
-
               {workspaceLoading ? (
                 <ViewState
                   title="Caricamento in corso"
@@ -303,18 +306,28 @@ export function SituazioneRackPage() {
                           <span className={styles.metaValue}>{formatMaybeText(rackDetailQ.data?.roomName)}</span>
                         </div>
                         <div className={styles.metaItem}>
-                          <span className={styles.metaLabel}>Posizione</span>
-                          <span className={styles.metaValue}>{formatMaybeText(rackDetailQ.data?.position)}</span>
+                          <span className={styles.metaLabel}>Floor</span>
+                          <span className={styles.metaValue}>{formatMaybeText(rackDetailQ.data?.floor)}</span>
                         </div>
                         <div className={styles.metaItem}>
-                          <span className={styles.metaLabel}>Floor / Island</span>
-                          <span className={styles.metaValue}>
-                            {formatMaybeText(rackDetailQ.data?.floor)} / {formatMaybeText(rackDetailQ.data?.island)}
-                          </span>
+                          <span className={styles.metaLabel}>Island</span>
+                          <span className={styles.metaValue}>{formatMaybeText(rackDetailQ.data?.island)}</span>
                         </div>
                         <div className={styles.metaItem}>
                           <span className={styles.metaLabel}>Tipo rack</span>
-                          <span className={styles.metaValue}>{formatMaybeText(rackDetailQ.data?.rackType)}</span>
+                          <span className={styles.metaValue}>
+                            {(() => {
+                              const chip = rackTypeChip(rackDetailQ.data?.rackType, rackDetailQ.data?.position);
+                              if (!chip) return formatMaybeText(undefined);
+                              return (
+                                <span
+                                  className={`${styles.chip} ${chip.variant === 'full' ? styles.chipFull : styles.chipHalf}`}
+                                >
+                                  {chip.text}
+                                </span>
+                              );
+                            })()}
+                          </span>
                         </div>
                         <div className={styles.metaItem}>
                           <span className={styles.metaLabel}>Codice ordine</span>
@@ -325,11 +338,11 @@ export function SituazioneRackPage() {
                           <span className={styles.metaValue}>{formatMaybeText(rackDetailQ.data?.serialNumber)}</span>
                         </div>
                         <div className={styles.metaItem}>
-                          <span className={styles.metaLabel}>Potenza impegnata</span>
-                          <span className={styles.metaValue}>{formatKw(rackDetailQ.data?.committedPower)}</span>
+                          <span className={styles.metaLabel}>Committed Ampere</span>
+                          <span className={styles.metaValue}>{formatAmpere(rackDetailQ.data?.committedPower)}</span>
                         </div>
                         <div className={styles.metaItem}>
-                          <span className={styles.metaLabel}>Avvio addebito</span>
+                          <span className={styles.metaLabel}>Inizio Fatturazione</span>
                           <span className={styles.metaValue}>{formatDate(rackDetailQ.data?.billingStartDate)}</span>
                         </div>
                       </div>
@@ -337,15 +350,15 @@ export function SituazioneRackPage() {
 
                     <section className={styles.card}>
                       <div className={styles.sectionHeader}>
-                        <h2 className={styles.sectionTitle}>Prese rack</h2>
+                        <h2 className={styles.sectionTitle}>Socket rack</h2>
                         <div className={styles.sectionMeta}>
-                          {formatCount(socketStatusQ.data?.length ?? 0, 'presa', 'prese trovate')}
+                          {formatCount(socketStatusQ.data?.length ?? 0, 'Socket trovato', 'Socket trovati')}
                         </div>
                       </div>
                       {(socketStatusQ.data ?? []).length === 0 ? (
                         <ViewState
-                          title="Nessuna presa rilevata"
-                          message="Il rack selezionato non restituisce prese monitorate nel periodo corrente."
+                          title="Nessun Socket rilevato"
+                          message="Il rack selezionato non restituisce Socket monitorati nel periodo corrente."
                         />
                       ) : (
                         <div className={styles.gaugeGrid}>
@@ -450,7 +463,7 @@ export function SituazioneRackPage() {
                             <table className={styles.table}>
                               <thead>
                                 <tr>
-                                  <th>Presa rack</th>
+                                  <th>Socket rack</th>
                                   <th>Data</th>
                                   <th>OID</th>
                                   <th className={styles.alignRight}>Ampere</th>
