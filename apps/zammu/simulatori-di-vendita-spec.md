@@ -9,6 +9,13 @@
   - Pricing moves to a backend database table and a dedicated admin UI within the app.
   - Generated quotes are **not persisted**; the app is stateless aside from the pricing master data.
   - Carbone.io PDF rendering is proxied through the backend (API key and template ID live in backend config).
+- **Resolved decisions (2026-04-18):**
+  - Display names: reuse the existing Appsmith strings — merge `decodifica` (5 entries) with form widget `label` props (the other 5: `Firewall standard`, `Firewall advanced`, `Private network`, `O.S. Windows Server`, `MS SQL Server std`); fix the `"1 GB Primary Storage}"` typo.
+  - `fw_adv` cap (and all min/max constraints) is **UI-only** — no server-side rejection beyond basic numeric/non-negative validation.
+  - Monthly total uses **30 days exact** (matches current behavior).
+  - **No audit metadata** on the pricing table — this is a simple internal simulator with two rows of rates, not a regulated record. Edits overwrite in place.
+  - Carbone template hash is **unchanged** from the source value captured in the audit; it lives in backend config.
+  - **Live recompute** on every input change; the "Calcola" button is dropped (or kept as a no-op visual cue, TBD by UX).
 - **v1 scope note:** This app is named "Simulatori di Vendita" (plural) to anticipate additional sales simulators in future iterations. v1 contains exactly one simulator (IaaS) plus a pricing admin view.
 
 ## Current-State Evidence
@@ -33,11 +40,10 @@
   - `display_name` (string).
   - 10 per-resource daily rates (EUR, numeric with 3 decimals sufficient):
     - `vcpu`, `ram_vmware`, `ram_os`, `storage_pri`, `storage_sec`, `fw_std`, `fw_adv`, `priv_net`, `os_windows`, `ms_sql_std`.
-  - `updated_at`, `updated_by` (audit metadata).
 - **Relationships:** 1 → N quotes computed at runtime; not persisted.
 - **Constraints and business rules:**
   - Current rates (from audit §2.5) are the v1 seed.
-  - All rate changes are logged with `updated_at` / `updated_by` for audit.
+  - No audit metadata on rate edits — overwrite in place (resolved 2026-04-18).
 
 ### Entity: ResourceQuantity
 - **Purpose:** User-supplied quantities per resource.
@@ -53,7 +59,7 @@
   - `priv_net` (int, ≥0)
   - `os_windows` (int, ≥0) — fix from TEXT widget.
   - `ms_sql_std` (int, ≥0)
-- **Open questions:** Confirm whether `fw_adv` cap 1 is a hard constraint or a UI default.
+- **Constraints (resolved 2026-04-18):** All min/max (incl. `fw_adv` ≤ 1) are UI-only; backend validates only numeric type and non-negative values.
 
 ### Entity: CostCalculation
 - **Purpose:** Derived daily and monthly totals given quantities and a tier.
@@ -64,9 +70,8 @@
   - `totale_giornaliero` — sum of all line totals.
   - `totale_mensile` — `totale_giornaliero × 30`.
 - **Constraints and business rules:**
-  - Monthly multiplier fixed at 30 (matching current behavior); revisit only if Product requests a change.
+  - Monthly multiplier fixed at 30 (matching current behavior; confirmed 2026-04-18).
   - `toFixed(2)` is a display concern only; never round before final summation.
-- **Open questions:** Confirm monthly = 30 days vs average (Q3).
 
 ### Entity: PDFQuote
 - **Purpose:** One-shot rendered PDF from the calculation payload.
@@ -84,7 +89,7 @@
 - **Main data shown or edited:** Form inputs on the right; dynamic price table, daily breakdown, prominent monthly total on the left.
 - **Key actions:**
   - Toggle tier → refresh price table.
-  - "Calcola" → recompute totals (recommended change: recompute on input change as well, confirm in Q4).
+  - Any input change → live recompute totals (resolved 2026-04-18; "Calcola" button is removed).
   - "Genera PDF" → POST to backend proxy; browser opens the returned PDF.
   - "Azzera" → reset form.
 - **Entry and exit:** Entry from portal sidebar. Exit on PDF download (optional) or navigation away.
@@ -98,7 +103,6 @@
 - **Main data shown or edited:** For each tier: the 10 per-resource daily rates in EUR.
 - **Key actions:**
   - Edit cell → Save → confirmation.
-  - View last-update metadata.
 - **Entry and exit:** Entry from within the app, behind a role check (`app_simulatorivendita_admin` proposed).
 - **Current vs intended:** **New** — no equivalent in the source.
 
@@ -155,7 +159,7 @@
 - `GET /api/simulatori-vendita/iaas/pricing` — returns both tiers with metadata.
 
 ### Write commands or mutations
-- `PUT /api/simulatori-vendita/iaas/pricing/{tier_code}` — admin only (`app_simulatorivendita_admin`). Accepts the 10 rates; returns updated tier with audit metadata.
+- `PUT /api/simulatori-vendita/iaas/pricing/{tier_code}` — admin only (`app_simulatorivendita_admin`). Accepts the 10 rates; returns the updated tier.
 - `POST /api/simulatori-vendita/iaas/quote` — user role (`app_simulatorivendita_access`). Accepts quantities + tier; returns a PDF stream (or `application/pdf` with `Content-Disposition: attachment`).
 
 ### Derived or workflow-specific operations
@@ -176,7 +180,7 @@
 
 ### Operational constraints
 - Backend requires outbound access to Carbone.io.
-- New DB migration for the pricing table (and its audit metadata).
+- New DB migration for the pricing table.
 
 ### UX or accessibility expectations
 - Portal conventions per `docs/UI-UX.md`.
@@ -185,22 +189,16 @@
 
 ## Open Questions and Deferred Decisions
 
-- **Q1.** Complete list of display names for all 10 resources (current app only shows 5 names).
-  - *Needed input:* product copy.
-  - *Decision owner:* Product.
-- **Q2.** Final min/max per input (especially whether `fw_adv` ≤ 1 is a hard rule).
-  - *Decision owner:* Product.
-- **Q3.** Monthly total: 30 days exact vs 730/24 average?
-  - *Decision owner:* Product / Finance.
-- **Q4.** Live recompute on every input change vs require the "Calcola" button (current behavior).
-  - *Decision owner:* Product.
-- **Q5.** Should pricing admin track a full changelog (per-field before/after), or just `updated_at` + `updated_by`?
-  - *Decision owner:* Product / Compliance.
-- **Q6.** Carbone template versioning: is the current template still the canonical one? Where is it edited?
-  - *Decision owner:* Product / Marketing.
+- **Q1. ~~Display names~~ (resolved 2026-04-18).** Use existing Appsmith strings: `decodifica` map (5) + form widget `label` props (the other 5). Fix the `"1 GB Primary Storage}"` typo. No Product input required.
+- **Q2. ~~Input constraints~~ (resolved 2026-04-18).** All min/max are UI-only; backend validates only numeric type and non-negativity.
+- **Q3. ~~Monthly multiplier~~ (resolved 2026-04-18).** 30 days exact.
+- **Q4. ~~Recompute UX~~ (resolved 2026-04-18).** Live recompute on every input change; "Calcola" button removed.
+- **Q5. ~~Audit depth~~ (resolved 2026-04-18).** No audit on the pricing table — this is an internal simulator, not a regulated record. Edits overwrite in place.
+- **Q6. ~~Carbone template hash~~ (resolved 2026-04-18).** Hash unchanged from the source value captured in the audit; backend config seeds it directly. Carbone Studio account ownership remains a runbook concern, not a code-shape concern.
 
 ## Acceptance Notes
 
 - **What the audit proved directly:** Widget tree, hardcoded pricing, calculation logic, Carbone.io request shape, template hash, incomplete `decodifica`, TEXT widget bugs.
 - **What the expert confirmed (2026-04-17):** Pricing → backend DB + admin UI; no quote persistence; Carbone proxied by backend.
-- **What still needs validation:** Display-name completion (Q1), input constraints (Q2), monthly multiplier semantics (Q3), recompute UX (Q4), changelog depth (Q5), Carbone template ownership (Q6).
+- **What the expert confirmed (2026-04-18):** Display names sourced from existing Appsmith strings (Q1); UI-only input constraints (Q2); 30-day monthly multiplier (Q3); live-recompute UX (Q4); no audit on pricing edits (Q5); Carbone template hash unchanged (Q6).
+- **What still needs validation:** None — all spec-level questions resolved. Remaining open items belong to the implementation plan (DB choice, backend module location, error contracts, role provisioning, New App Checklist edits).

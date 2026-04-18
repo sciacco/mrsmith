@@ -9,23 +9,25 @@
   - Keep the existing `kW = SUM(ampere) * 225 / 1000` formula as an accepted approximation (do not introduce per-phase computation in this rewrite).
   - Drop the unreachable "Settimanale" period branch (dead code + cosfi scale bug).
   - Replace the display-name-keyed lookup in the "Racks no variable" flow with an ID-keyed endpoint.
+- **Contract clarifications (2026-04-18):**
+  - Standardize the repo API namespace to `/api/energia-dc/v1/...`.
+  - Keep rack-reading date/time filters in Europe/Rome local time end-to-end. Frontend sends `YYYY-MM-DDTHH:mm` without timezone offset; backend parses the same local values without timezone conversion.
+  - For rack readings, both `from` and `to` bounds are inclusive.
 - **Open-question resolutions (2026-04-18):**
   - Q1 — Active-customer predicate confirmed (see Entity: Customer).
   - Q2 — `maxampere / 2` is an intentional safety margin; keep as-is.
   - Q3 — "Addebiti" supports CSV export in v1 (PDF deferred).
   - Q4 — Bulk actions on low-consumption results deferred; tracked in `docs/TODO.md`.
   - Q5 — Single endpoint with `period=day|month` param (payloads identical today; revisit if they diverge).
-  - Q6 — All timestamps are `Europe/Rome`.
+  - Q6 — All timestamps stay in `Europe/Rome` local time end-to-end; no timezone conversion layer is introduced.
 
 ## Current-State Evidence
 - **Source pages/views:** One Appsmith page with 5 tabs: "Situazione per rack", "Consumi in kW", "Addebiti", "Racks no variable", "Consumi < 1A".
 - **Source entities and operations:** Customer, Site, Room, Rack, RackSocket, PowerReading, DailySummary (kW), BillingCharge; plus derived views "no-variable-billing customers" and "low-consumption sockets".
 - **Source integrations and datasources:** `grappa` MySQL only. Tables: `cli_fatturazione`, `racks`, `rack_sockets`, `rack_power_readings`, `rack_power_daily_summary`, `datacenter`, `dc_build`, `importi_corrente_colocation`.
 - **Known audit gaps or ambiguities:**
-  - Exact SQL for `get_customers` "active customers with rack sockets" criterion not visible.
-  - Exact columns of `anagrafiche_no_variable` view not detailed.
-  - The `maxampere / 2` factor in the socket gauge could be a safety-margin policy or a bug — not confirmed.
-  - DB time zone for timestamp fields not audit-visible.
+  - Exact SQL text for some Appsmith queries (`get_rack_details`, `get_socket_status`, `stats_last_days`, `get_addebiti_by_cli`, `rack_basso_consumo`) is not fully extracted in the audit.
+  - The schema for all relevant Grappa tables is already documented under `docs/grappa/`; implementation can proceed from that documentation plus a few narrow regression checks on the drift-prone query behaviors.
 
 ## Entity Catalog
 
@@ -123,7 +125,7 @@
 - **Main data shown:** Rack metadata; per-socket gauges (with red >90%); paginated power readings table; dual-axis ampere/kW trend chart.
 - **Key actions:** Cascade filters; "Aggiorna"; paginate readings.
 - **Entry/exit:** Top-level app view.
-- **Current vs intended:** Current fires some data fetches as fire-and-forget; rewrite uses per-hook loading states so widgets cannot render stale.
+- **Current vs intended:** Current fires some data fetches as fire-and-forget; rewrite uses per-hook loading states so widgets cannot render stale. The paginated readings table follows the submitted `from` / `to` range, while the ampere/kW chart remains a fixed "ultimi due giorni" surface.
 
 ### View 2: "Consumi in kW"
 - **User intent:** Chart a customer's kW over time at a given cos φ.
@@ -159,12 +161,14 @@
 - Apply the `id_anagrafica <> 3` self-exclusion via config, not hardcoded in SQL.
 - Compute `maxampere` from `magnetotermico` (backend-owned mapping — lookup table preferred over inline CASE).
 - Compute live kW in the ampere/kW trend query using the accepted 225V formula.
+- Enforce lookup invariants explicitly: `site + customer -> rooms` and `room + customer -> racks` must be verified in SQL, not assumed from frontend cascade state.
+- Parse rack-reading `from` / `to` filters as Europe/Rome local datetimes with no timezone conversion.
 - Enforce Keycloak access role `app_energiadc_access` on every route.
 - Merge `count_power_reading` into the `list power readings` endpoint response.
 
 ### Frontend responsibilities
 - Cascading-select UX (shared pattern with Coperture).
-- Chart rendering (ECharts): dual-axis line (ampere/kW) and log-2 bar chart.
+- Chart rendering for the dual-axis line (ampere/kW) and the log-2 kW bar chart. Library choice is implementation-owned.
 - Per-view loading and error states.
 - Progress gauge with red >90% threshold (keep the `maxampere/2` factor).
 
@@ -205,25 +209,42 @@ See the view specs above; each view is a single-screen workflow. No cross-view n
 - Low-consumption sockets search.
 
 ### Read endpoints or queries (proposed shape)
-- `GET /api/energia-dc/customers` — active customers.
-- `GET /api/energia-dc/customers/{id}/sites`
-- `GET /api/energia-dc/sites/{id}/rooms?customerId=`
-- `GET /api/energia-dc/rooms/{id}/racks?customerId=`
-- `GET /api/energia-dc/racks/{id}`
-- `GET /api/energia-dc/racks/{id}/socket-status`
-- `GET /api/energia-dc/racks/{id}/power-readings?from=&to=&page=&size=` — returns `{items, total, page, size}`.
-- `GET /api/energia-dc/racks/{id}/stats-last-days`
-- `GET /api/energia-dc/customers/{id}/kw?period=day|month&cosfi=`
-- `GET /api/energia-dc/customers/{id}/addebiti`
-- `GET /api/energia-dc/no-variable-billing/customers`
-- `GET /api/energia-dc/no-variable-billing/customers/{id}/racks`
-- `GET /api/energia-dc/low-consumption?min=&customerId=`
+- `GET /api/energia-dc/v1/customers` — active customers.
+- `GET /api/energia-dc/v1/customers/{id}/sites`
+- `GET /api/energia-dc/v1/sites/{id}/rooms?customerId=`
+- `GET /api/energia-dc/v1/rooms/{id}/racks?customerId=`
+- `GET /api/energia-dc/v1/racks/{id}`
+- `GET /api/energia-dc/v1/racks/{id}/socket-status`
+- `GET /api/energia-dc/v1/racks/{id}/power-readings?from=&to=&page=&size=` — returns `{items, total, page, size}`.
+- `GET /api/energia-dc/v1/racks/{id}/stats-last-days`
+- `GET /api/energia-dc/v1/customers/{id}/kw?period=day|month&cosfi=`
+- `GET /api/energia-dc/v1/customers/{id}/addebiti`
+- `GET /api/energia-dc/v1/no-variable-billing/customers`
+- `GET /api/energia-dc/v1/no-variable-billing/customers/{id}/racks`
+- `GET /api/energia-dc/v1/low-consumption?min=&customerId=`
+- Rack-reading datetime filters use local Europe/Rome `YYYY-MM-DDTHH:mm` values without timezone offset. Backend performs no timezone conversion; both bounds are inclusive.
 
 ### Write commands or mutations
 - None in v1.
 
 ### Derived or workflow-specific operations
 - Server-side pagination on power readings (unify count + page fetch).
+
+## Lightweight Validation Gate
+
+Use the Appsmith audit plus the documented Grappa schema in `docs/grappa/` as the primary source of truth.
+
+Before final implementation signoff, pin only the behaviors most likely to drift:
+
+- `get_power_readings` + `count_power_reading`: pagination, ordering, merged total count, and local `from` / `to` behavior.
+- `racks_no_variable`: rewritten detail route must stay keyed by customer ID, not display name.
+- `rack_basso_consumo`: empty-customer behavior must mean "all eligible customers", not "no results".
+- Local rack-reading datetime parsing must accept Europe/Rome `YYYY-MM-DDTHH:mm` values without timezone conversion.
+
+Execution rule:
+
+- The app does not need a heavy fixture phase before implementation.
+- Use `docs/grappa/*.json` to drive schema-safe handler work, then add the narrow regression checks above before signoff.
 
 ## Constraints and Non-Functional Requirements
 
@@ -237,7 +258,8 @@ See the view specs above; each view is a single-screen workflow. No cross-view n
 
 ### Operational constraints
 - Backend must connect to `grappa` MySQL.
-- All timestamp fields (`rack_power_readings.date`, `rack_power_daily_summary.giorno`, `importi_corrente_colocation.start_period` / `end_period`) are stored and interpreted as **Europe/Rome**. Range filters must convert client inputs to Europe/Rome before binding.
+- All timestamp fields (`rack_power_readings.date`, `rack_power_daily_summary.giorno`, `importi_corrente_colocation.start_period` / `end_period`) are stored and interpreted as **Europe/Rome** local time.
+- Rack-reading filters use local Europe/Rome datetimes in `YYYY-MM-DDTHH:mm` format with no timezone offset. Backend parses those values as Europe/Rome local time and performs no timezone conversion.
 
 ### UX or accessibility expectations
 - Follow portal Matrix/Stripe-level design per `docs/UI-UX.md`.
@@ -251,12 +273,13 @@ All V1 open questions resolved on 2026-04-18:
 - **Q2.** ✅ `maxampere / 2` is an intentional safety margin; gauge formula ported verbatim.
 - **Q3.** ✅ CSV export in v1 for "Addebiti"; PDF deferred.
 - **Q4.** ✅ No bulk actions on low-consumption in v1; deferred task recorded in `docs/TODO.md` (Energia in DC App → "Bulk Actions on Low-Consumption Search").
-- **Q5.** ✅ Single endpoint `GET /customers/{id}/kw?period=day|month&cosfi=` (payloads identical between day/month; revisit if they diverge).
-- **Q6.** ✅ All timestamps are `Europe/Rome`.
+- **Q5.** ✅ Single endpoint `GET /api/energia-dc/v1/customers/{id}/kw?period=day|month&cosfi=` (payloads identical between day/month; revisit if they diverge).
+- **Q6.** ✅ All timestamps stay in `Europe/Rome` local time end-to-end; no timezone conversion layer is introduced.
 
 ## Acceptance Notes
 
 - **What the audit proved directly:** Query SQL, widget configuration, JSObject methods, embedded rules (self-exclusion, breaker mapping, gauge formula, 225V coefficient), bugs (cosfi scale in weekly branch, fire-and-forget loads, SQL-injection-risk unprepared queries).
 - **What the expert confirmed (2026-04-17):** 225V formula stays; weekly period dropped; no-variable-billing detail query switches to ID-keyed.
 - **What the expert confirmed (2026-04-18):** Active-customer SQL (Q1); `maxampere/2` is an intentional safety margin (Q2); CSV-only export in v1 (Q3); low-consumption bulk actions deferred (Q4); single `period=` kW endpoint (Q5); Europe/Rome TZ (Q6).
-- **What still needs validation:** None blocking. Minor items to lock during implementation: self-exclusion config key name, breaker-mapping storage (inline CASE vs lookup table), pagination defaults for `/power-readings`, shared-types package location.
+- **What still needs lightweight validation before signoff:** merged power-readings pagination/order, ID-keyed no-variable detail loading, optional-customer behavior in low-consumption search, and the local Europe/Rome datetime parsing contract.
+- **What can still be decided during implementation:** self-exclusion config key name, breaker-mapping storage (inline CASE vs lookup table), pagination defaults for `/power-readings`, shared-types package location.
