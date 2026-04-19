@@ -1,0 +1,11 @@
+.instructions {
+  max-width: 640px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-4);
+  line-height: 1.6;
+}

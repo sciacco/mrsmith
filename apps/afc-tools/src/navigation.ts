@@ -22,7 +22,8 @@ export const afcToolsNavSections: NavSection[] = [
     label: 'Ordini & XConnect',
     items: [
       { label: 'Ordini Sales', path: '/ordini-sales' },
-      { label: 'XConnect & Remote Hands', path: '/report-xconnect-rh' },
+      { label: 'Ticket Remote Hands', path: '/ticket-remote-hands' },
+      { label: 'Ordini XConnect', path: '/report-xconnect-rh' },
     ],
   },
   {
