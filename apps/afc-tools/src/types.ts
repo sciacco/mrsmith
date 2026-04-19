@@ -69,18 +69,30 @@ export interface XConnectOrder {
 
 export interface EnergiaColoPivotRow {
   customer: string | null;
-  gennaio: number | null;
-  febbraio: number | null;
-  marzo: number | null;
-  aprile: number | null;
-  maggio: number | null;
-  giugno: number | null;
-  luglio: number | null;
-  agosto: number | null;
-  settembre: number | null;
-  ottobre: number | null;
-  novembre: number | null;
-  dicembre: number | null;
+  gennaio_a: number | null;
+  gennaio_kw: number | null;
+  febbraio_a: number | null;
+  febbraio_kw: number | null;
+  marzo_a: number | null;
+  marzo_kw: number | null;
+  aprile_a: number | null;
+  aprile_kw: number | null;
+  maggio_a: number | null;
+  maggio_kw: number | null;
+  giugno_a: number | null;
+  giugno_kw: number | null;
+  luglio_a: number | null;
+  luglio_kw: number | null;
+  agosto_a: number | null;
+  agosto_kw: number | null;
+  settembre_a: number | null;
+  settembre_kw: number | null;
+  ottobre_a: number | null;
+  ottobre_kw: number | null;
+  novembre_a: number | null;
+  novembre_kw: number | null;
+  dicembre_a: number | null;
+  dicembre_kw: number | null;
 }
 
 export interface EnergiaColoDetailRow {

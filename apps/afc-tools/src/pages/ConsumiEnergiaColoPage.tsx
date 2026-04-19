@@ -5,6 +5,7 @@ import {
   SearchInput,
   SingleSelect,
   Skeleton,
+  TabNav,
   Tooltip,
   useTableFilter,
 } from '@mrsmith/ui';
@@ -38,6 +39,50 @@ const DETAIL_TOOLTIPS: Partial<Record<keyof EnergiaColoDetailRow, string>> = {
   tipo_variabile: 'Regime di variabilità del corrispettivo applicato.',
 };
 
+type MonthKey =
+  | 'gennaio'
+  | 'febbraio'
+  | 'marzo'
+  | 'aprile'
+  | 'maggio'
+  | 'giugno'
+  | 'luglio'
+  | 'agosto'
+  | 'settembre'
+  | 'ottobre'
+  | 'novembre'
+  | 'dicembre';
+
+const MONTHS: { key: MonthKey; label: string }[] = [
+  { key: 'gennaio', label: 'Gennaio' },
+  { key: 'febbraio', label: 'Febbraio' },
+  { key: 'marzo', label: 'Marzo' },
+  { key: 'aprile', label: 'Aprile' },
+  { key: 'maggio', label: 'Maggio' },
+  { key: 'giugno', label: 'Giugno' },
+  { key: 'luglio', label: 'Luglio' },
+  { key: 'agosto', label: 'Agosto' },
+  { key: 'settembre', label: 'Settembre' },
+  { key: 'ottobre', label: 'Ottobre' },
+  { key: 'novembre', label: 'Novembre' },
+  { key: 'dicembre', label: 'Dicembre' },
+];
+
+function monthValues(row: EnergiaColoPivotRow, key: MonthKey): { a: number | null; kw: number | null } {
+  return {
+    a: row[`${key}_a` as keyof EnergiaColoPivotRow] as number | null,
+    kw: row[`${key}_kw` as keyof EnergiaColoPivotRow] as number | null,
+  };
+}
+
+function isPresent(v: number | null | undefined): v is number {
+  return v != null && v !== 0;
+}
+
+function consumoUnit(tipoVariabile: string | null | undefined): 'A' | 'kW' {
+  return tipoVariabile === '2' ? 'kW' : 'A';
+}
+
 function HeaderInfo({ label, hint }: { label: string; hint: string }) {
   return (
     <span className={styles.headerWithInfo}>
@@ -55,11 +100,63 @@ function Unit({ children }: { children: string }) {
   return <span className={styles.unit}>({children})</span>;
 }
 
+function MonthCell({ a, kw }: { a: number | null; kw: number | null }) {
+  const hasA = isPresent(a);
+  const hasKw = isPresent(kw);
+  if (!hasA && !hasKw) {
+    return <span className={styles.dash}>—</span>;
+  }
+  return (
+    <div className={styles.monthStack}>
+      {hasA && (
+        <span className={styles.monthValue}>
+          {formatNumber(a)}
+          <span className={styles.monthUnit}>A</span>
+        </span>
+      )}
+      {hasKw && (
+        <span className={`${styles.monthValue} ${styles.monthValueMuted}`}>
+          {formatNumber(kw)}
+          <span className={styles.monthUnit}>kW</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+type TabKey = 'riepilogo' | 'dettaglio';
+
+const TABS = [
+  { key: 'riepilogo', label: 'Riepilogo mensile' },
+  { key: 'dettaglio', label: 'Dettaglio per periodo' },
+];
+
+type DetailSortKey = 'cliente' | 'periodo';
+type SortDir = 'asc' | 'desc';
+
+function compareStr(a: string | null | undefined, b: string | null | undefined): number {
+  return (a ?? '').localeCompare(b ?? '');
+}
+
+function compareDate(a: string | null | undefined, b: string | null | undefined): number {
+  const at = a ? new Date(a).getTime() : NaN;
+  const bt = b ? new Date(b).getTime() : NaN;
+  const aNull = Number.isNaN(at);
+  const bNull = Number.isNaN(bt);
+  if (aNull && bNull) return 0;
+  if (aNull) return 1;
+  if (bNull) return -1;
+  return at - bt;
+}
+
 export default function ConsumiEnergiaColoPage() {
   const yearOptions = useMemo(() => buildYearOptions(), []);
   const [year, setYear] = useState(yearOptions[0].value);
+  const [activeTab, setActiveTab] = useState<TabKey>('riepilogo');
   const [pivotSearch, setPivotSearch] = useState('');
   const [detailSearch, setDetailSearch] = useState('');
+  const [detailSortKey, setDetailSortKey] = useState<DetailSortKey>('cliente');
+  const [detailSortDir, setDetailSortDir] = useState<SortDir>('asc');
 
   const pivotQ = useEnergiaColoPivot(year, true);
   const detailQ = useEnergiaColoDetail(year, true);
@@ -79,40 +176,67 @@ export default function ConsumiEnergiaColoPage() {
     searchFields: ['customer'],
   });
 
+  const detailSorted = useMemo(() => {
+    const arr = [...detailFiltered];
+    const dir = detailSortDir === 'asc' ? 1 : -1;
+    arr.sort((a, b) => {
+      if (detailSortKey === 'cliente') {
+        const primary = compareStr(a.customer, b.customer) * dir;
+        if (primary !== 0) return primary;
+        return compareDate(a.start_period, b.start_period);
+      }
+      const primary = compareDate(a.start_period, b.start_period) * dir;
+      if (primary !== 0) return primary;
+      return compareStr(a.customer, b.customer);
+    });
+    return arr;
+  }, [detailFiltered, detailSortKey, detailSortDir]);
+
+  function toggleDetailSort(key: DetailSortKey) {
+    if (detailSortKey === key) {
+      setDetailSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setDetailSortKey(key);
+      setDetailSortDir('asc');
+    }
+  }
+
+  function ariaDetailSort(key: DetailSortKey): 'ascending' | 'descending' | 'none' {
+    if (detailSortKey !== key) return 'none';
+    return detailSortDir === 'asc' ? 'ascending' : 'descending';
+  }
+
+  function detailSortHeader(key: DetailSortKey, label: string) {
+    const active = detailSortKey === key;
+    const arrow = active ? (detailSortDir === 'asc' ? '▲' : '▼') : '↕';
+    return (
+      <button
+        type="button"
+        className={`${styles.sortBtn} ${active ? styles.sortBtnActive : ''}`}
+        onClick={() => toggleDetailSort(key)}
+      >
+        {label}
+        <span className={styles.sortArrow}>{arrow}</span>
+      </button>
+    );
+  }
+
   const pivotHasFilter = pivotSearch.trim() !== '';
   const detailHasFilter = detailSearch.trim() !== '';
 
   function handleExportPivot() {
-    const headers = [
-      'Cliente',
-      'Gennaio',
-      'Febbraio',
-      'Marzo',
-      'Aprile',
-      'Maggio',
-      'Giugno',
-      'Luglio',
-      'Agosto',
-      'Settembre',
-      'Ottobre',
-      'Novembre',
-      'Dicembre',
-    ];
-    const rows = pivotFiltered.map((p) => [
-      p.customer ?? '',
-      p.gennaio,
-      p.febbraio,
-      p.marzo,
-      p.aprile,
-      p.maggio,
-      p.giugno,
-      p.luglio,
-      p.agosto,
-      p.settembre,
-      p.ottobre,
-      p.novembre,
-      p.dicembre,
-    ]);
+    const headers = ['Cliente'];
+    for (const m of MONTHS) {
+      headers.push(`${m.label} A`, `${m.label} kW`);
+    }
+    const rows = pivotFiltered.map((p) => {
+      const row: (string | number | null)[] = [p.customer ?? ''];
+      for (const m of MONTHS) {
+        const { a, kw } = monthValues(p, m.key);
+        row.push(a, kw);
+      }
+      return row;
+    });
     downloadCsv(`consumi-energia-colo_riepilogo_${year}.csv`, headers, rows);
   }
 
@@ -122,6 +246,7 @@ export default function ConsumiEnergiaColoPage() {
       'Inizio periodo',
       'Fine periodo',
       'Consumo',
+      'Unità',
       'Importo (€)',
       'PUN (€/MWh)',
       'Coefficiente',
@@ -130,11 +255,12 @@ export default function ConsumiEnergiaColoPage() {
       'Importo eccedenti (€)',
       'Tipo variabile',
     ];
-    const rows = detailFiltered.map((d) => [
+    const rows = detailSorted.map((d) => [
       d.customer ?? '',
       d.start_period ?? '',
       d.end_period ?? '',
       d.consumo,
+      d.consumo == null ? '' : consumoUnit(d.tipo_variabile),
       d.amount,
       d.pun,
       d.coefficiente,
@@ -148,43 +274,44 @@ export default function ConsumiEnergiaColoPage() {
 
   return (
     <div className={shared.page}>
-      <h1 className={shared.title}>Consumi energia colocation</h1>
-      <p className={styles.subtitle}>Consumi elettrici per clienti in colocation data center.</p>
-
-      <div className={shared.toolbar}>
-        <div className={shared.field}>
-          <label>Anno</label>
-          <div className={styles.yearSelect}>
-            <SingleSelect
-              options={yearOptions}
-              selected={year}
-              onChange={(v) => setYear((v as string | null) ?? yearOptions[0].value)}
-            />
-          </div>
+      <div className={styles.pageHead}>
+        <h1 className={shared.title}>Consumi energia colocation</h1>
+        <div className={styles.yearSelect}>
+          <SingleSelect
+            options={yearOptions}
+            selected={year}
+            onChange={(v) => setYear((v as string | null) ?? yearOptions[0].value)}
+          />
         </div>
       </div>
 
-      <section className={styles.section}>
-        <div className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Riepilogo mensile per cliente</h2>
-          <div className={styles.sectionTools}>
-            <div className={styles.search}>
-              <SearchInput
-                value={pivotSearch}
-                onChange={setPivotSearch}
-                placeholder="Filtra per cliente…"
-              />
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleExportPivot}
-              disabled={pivotFiltered.length === 0}
-              leftIcon={<Icon name="download" size={14} />}
-            >
-              Esporta CSV
-            </Button>
+      <div className={styles.tabBar}>
+        <TabNav
+          items={TABS}
+          activeKey={activeTab}
+          onTabChange={(k) => setActiveTab(k as TabKey)}
+        />
+      </div>
+
+      {activeTab === 'riepilogo' && (
+      <section>
+        <div className={styles.tabTools}>
+          <div className={styles.search}>
+            <SearchInput
+              value={pivotSearch}
+              onChange={setPivotSearch}
+              placeholder="Filtra per cliente…"
+            />
           </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportPivot}
+            disabled={pivotFiltered.length === 0}
+            leftIcon={<Icon name="download" size={14} />}
+          >
+            Esporta CSV
+          </Button>
         </div>
 
         {pivotQ.isLoading && <Skeleton rows={6} />}
@@ -204,36 +331,23 @@ export default function ConsumiEnergiaColoPage() {
               <thead>
                 <tr>
                   <th>Cliente</th>
-                  <th className={shared.numCol}>Gennaio</th>
-                  <th className={shared.numCol}>Febbraio</th>
-                  <th className={shared.numCol}>Marzo</th>
-                  <th className={shared.numCol}>Aprile</th>
-                  <th className={shared.numCol}>Maggio</th>
-                  <th className={shared.numCol}>Giugno</th>
-                  <th className={shared.numCol}>Luglio</th>
-                  <th className={shared.numCol}>Agosto</th>
-                  <th className={shared.numCol}>Settembre</th>
-                  <th className={shared.numCol}>Ottobre</th>
-                  <th className={shared.numCol}>Novembre</th>
-                  <th className={shared.numCol}>Dicembre</th>
+                  {MONTHS.map((m) => (
+                    <th key={m.key} className={shared.numCol}>{m.label}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {pivotFiltered.map((p, i) => (
                   <tr key={`${p.customer ?? 'row'}-${i}`} style={{ animationDelay: `${Math.min(i * 10, 300)}ms` }}>
                     <td title={p.customer ?? ''}>{p.customer ?? ''}</td>
-                    <td className={shared.numCol}>{formatNumber(p.gennaio)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.febbraio)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.marzo)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.aprile)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.maggio)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.giugno)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.luglio)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.agosto)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.settembre)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.ottobre)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.novembre)}</td>
-                    <td className={shared.numCol}>{formatNumber(p.dicembre)}</td>
+                    {MONTHS.map((m) => {
+                      const { a, kw } = monthValues(p, m.key);
+                      return (
+                        <td key={m.key} className={shared.numCol}>
+                          <MonthCell a={a} kw={kw} />
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -259,28 +373,27 @@ export default function ConsumiEnergiaColoPage() {
           </div>
         )}
       </section>
+      )}
 
-      <section className={styles.section}>
-        <div className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Dettaglio per periodo</h2>
-          <div className={styles.sectionTools}>
-            <div className={styles.search}>
-              <SearchInput
-                value={detailSearch}
-                onChange={setDetailSearch}
-                placeholder="Filtra per cliente…"
-              />
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleExportDetail}
-              disabled={detailFiltered.length === 0}
-              leftIcon={<Icon name="download" size={14} />}
-            >
-              Esporta CSV
-            </Button>
+      {activeTab === 'dettaglio' && (
+      <section>
+        <div className={styles.tabTools}>
+          <div className={styles.search}>
+            <SearchInput
+              value={detailSearch}
+              onChange={setDetailSearch}
+              placeholder="Filtra per cliente…"
+            />
           </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportDetail}
+            disabled={detailSorted.length === 0}
+            leftIcon={<Icon name="download" size={14} />}
+          >
+            Esporta CSV
+          </Button>
         </div>
 
         {detailQ.isLoading && <Skeleton rows={6} />}
@@ -294,13 +407,13 @@ export default function ConsumiEnergiaColoPage() {
           </div>
         )}
 
-        {detailQ.data && detailFiltered.length > 0 && (
+        {detailQ.data && detailSorted.length > 0 && (
           <div className={shared.tableWrap}>
             <table className={shared.table}>
               <thead>
                 <tr>
-                  <th>Cliente</th>
-                  <th>Inizio periodo</th>
+                  <th aria-sort={ariaDetailSort('cliente')}>{detailSortHeader('cliente', 'Cliente')}</th>
+                  <th aria-sort={ariaDetailSort('periodo')}>{detailSortHeader('periodo', 'Inizio periodo')}</th>
                   <th>Fine periodo</th>
                   <th className={shared.numCol}>Consumo</th>
                   <th className={shared.numCol}>Importo<Unit>€</Unit></th>
@@ -317,7 +430,7 @@ export default function ConsumiEnergiaColoPage() {
                   </th>
                   <th className={shared.numCol}>
                     <HeaderInfo label="Eccedenti" hint={DETAIL_TOOLTIPS.eccedenti!} />
-                                      </th>
+                  </th>
                   <th className={shared.numCol}>
                     <HeaderInfo label="Importo eccedenti" hint={DETAIL_TOOLTIPS.importo_eccedenti!} />
                     <Unit>€</Unit>
@@ -328,12 +441,19 @@ export default function ConsumiEnergiaColoPage() {
                 </tr>
               </thead>
               <tbody>
-                {detailFiltered.map((d, i) => (
+                {detailSorted.map((d, i) => (
                   <tr key={`${d.customer ?? 'row'}-${d.start_period ?? ''}-${i}`} style={{ animationDelay: `${Math.min(i * 10, 300)}ms` }}>
                     <td title={d.customer ?? ''}>{d.customer ?? ''}</td>
                     <td>{formatDate(d.start_period)}</td>
                     <td>{formatDate(d.end_period)}</td>
-                    <td className={shared.numCol}>{formatNumber(d.consumo)}</td>
+                    <td className={`${shared.numCol} ${styles.consumoCell}`}>
+                      {d.consumo == null ? '' : (
+                        <>
+                          {formatNumber(d.consumo)}
+                          <span className={styles.consumoUnit}>{consumoUnit(d.tipo_variabile)}</span>
+                        </>
+                      )}
+                    </td>
                     <td className={shared.numCol}>{formatNumber(d.amount)}</td>
                     <td className={shared.numCol}>{formatNumber(d.pun)}</td>
                     <td className={shared.numCol}>{formatNumber(d.coefficiente)}</td>
@@ -348,7 +468,7 @@ export default function ConsumiEnergiaColoPage() {
           </div>
         )}
 
-        {detailQ.data && detailFiltered.length === 0 && (
+        {detailQ.data && detailSorted.length === 0 && (
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}>
               <Icon name="file-text" size={24} />
@@ -366,6 +486,7 @@ export default function ConsumiEnergiaColoPage() {
           </div>
         )}
       </section>
+      )}
     </div>
   );
 }

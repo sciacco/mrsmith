@@ -8,21 +8,33 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
-// EnergiaColoPivotRow: one row per customer, twelve monthly sums.
+// EnergiaColoPivotRow: one row per customer, twelve monthly sums split by unit (ampere and kw).
 type EnergiaColoPivotRow struct {
-	Customer *string  `json:"customer"`
-	Gennaio  *float64 `json:"gennaio"`
-	Febbraio *float64 `json:"febbraio"`
-	Marzo    *float64 `json:"marzo"`
-	Aprile   *float64 `json:"aprile"`
-	Maggio   *float64 `json:"maggio"`
-	Giugno   *float64 `json:"giugno"`
-	Luglio   *float64 `json:"luglio"`
-	Agosto   *float64 `json:"agosto"`
-	Settembre *float64 `json:"settembre"`
-	Ottobre  *float64 `json:"ottobre"`
-	Novembre *float64 `json:"novembre"`
-	Dicembre *float64 `json:"dicembre"`
+	Customer     *string  `json:"customer"`
+	GennaioA     *float64 `json:"gennaio_a"`
+	GennaioKw    *float64 `json:"gennaio_kw"`
+	FebbraioA    *float64 `json:"febbraio_a"`
+	FebbraioKw   *float64 `json:"febbraio_kw"`
+	MarzoA       *float64 `json:"marzo_a"`
+	MarzoKw      *float64 `json:"marzo_kw"`
+	AprileA      *float64 `json:"aprile_a"`
+	AprileKw     *float64 `json:"aprile_kw"`
+	MaggioA      *float64 `json:"maggio_a"`
+	MaggioKw     *float64 `json:"maggio_kw"`
+	GiugnoA      *float64 `json:"giugno_a"`
+	GiugnoKw     *float64 `json:"giugno_kw"`
+	LuglioA      *float64 `json:"luglio_a"`
+	LuglioKw     *float64 `json:"luglio_kw"`
+	AgostoA      *float64 `json:"agosto_a"`
+	AgostoKw     *float64 `json:"agosto_kw"`
+	SettembreA   *float64 `json:"settembre_a"`
+	SettembreKw  *float64 `json:"settembre_kw"`
+	OttobreA     *float64 `json:"ottobre_a"`
+	OttobreKw    *float64 `json:"ottobre_kw"`
+	NovembreA    *float64 `json:"novembre_a"`
+	NovembreKw   *float64 `json:"novembre_kw"`
+	DicembreA    *float64 `json:"dicembre_a"`
+	DicembreKw   *float64 `json:"dicembre_kw"`
 }
 
 // EnergiaColoDetailRow mirrors Q_select_consumi_colo output verbatim.
@@ -53,39 +65,35 @@ func parseYear(s string) (int, bool) {
 
 func (h *Handler) listEnergiaColoPivot(r *http.Request, year int) ([]EnergiaColoPivotRow, error) {
 	const query = `
-SELECT customer,
-       SUM(January)   AS Gennaio,
-       SUM(February)  AS Febbraio,
-       SUM(March)     AS Marzo,
-       SUM(April)     AS Aprile,
-       SUM(May)       AS Maggio,
-       SUM(June)      AS Giugno,
-       SUM(July)      AS Luglio,
-       SUM(August)    AS Agosto,
-       SUM(September) AS Settembre,
-       SUM(October)   AS Ottobre,
-       SUM(November)  AS Novembre,
-       SUM(December)  AS Dicembre
-FROM (
-    SELECT c.intestazione AS customer,
-           CASE WHEN MONTH(i.start_period) = 1  THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS January,
-           CASE WHEN MONTH(i.start_period) = 2  THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS February,
-           CASE WHEN MONTH(i.start_period) = 3  THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS March,
-           CASE WHEN MONTH(i.start_period) = 4  THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS April,
-           CASE WHEN MONTH(i.start_period) = 5  THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS May,
-           CASE WHEN MONTH(i.start_period) = 6  THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS June,
-           CASE WHEN MONTH(i.start_period) = 7  THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS July,
-           CASE WHEN MONTH(i.start_period) = 8  THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS August,
-           CASE WHEN MONTH(i.start_period) = 9  THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS September,
-           CASE WHEN MONTH(i.start_period) = 10 THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS October,
-           CASE WHEN MONTH(i.start_period) = 11 THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS November,
-           CASE WHEN MONTH(i.start_period) = 12 THEN IF(i.ampere > 0, i.ampere, i.Kw) ELSE 0 END AS December
-    FROM importi_corrente_colocation AS i
-    JOIN cli_fatturazione AS c ON c.id = i.customer_id
-    WHERE YEAR(i.start_period) = ?
-    GROUP BY c.intestazione, i.start_period
-) AS A2
-GROUP BY customer
+SELECT c.intestazione AS customer,
+       SUM(CASE WHEN MONTH(i.start_period) = 1  THEN i.ampere ELSE 0 END) AS gennaio_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 1  THEN i.kw     ELSE 0 END) AS gennaio_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 2  THEN i.ampere ELSE 0 END) AS febbraio_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 2  THEN i.kw     ELSE 0 END) AS febbraio_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 3  THEN i.ampere ELSE 0 END) AS marzo_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 3  THEN i.kw     ELSE 0 END) AS marzo_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 4  THEN i.ampere ELSE 0 END) AS aprile_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 4  THEN i.kw     ELSE 0 END) AS aprile_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 5  THEN i.ampere ELSE 0 END) AS maggio_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 5  THEN i.kw     ELSE 0 END) AS maggio_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 6  THEN i.ampere ELSE 0 END) AS giugno_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 6  THEN i.kw     ELSE 0 END) AS giugno_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 7  THEN i.ampere ELSE 0 END) AS luglio_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 7  THEN i.kw     ELSE 0 END) AS luglio_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 8  THEN i.ampere ELSE 0 END) AS agosto_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 8  THEN i.kw     ELSE 0 END) AS agosto_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 9  THEN i.ampere ELSE 0 END) AS settembre_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 9  THEN i.kw     ELSE 0 END) AS settembre_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 10 THEN i.ampere ELSE 0 END) AS ottobre_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 10 THEN i.kw     ELSE 0 END) AS ottobre_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 11 THEN i.ampere ELSE 0 END) AS novembre_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 11 THEN i.kw     ELSE 0 END) AS novembre_kw,
+       SUM(CASE WHEN MONTH(i.start_period) = 12 THEN i.ampere ELSE 0 END) AS dicembre_a,
+       SUM(CASE WHEN MONTH(i.start_period) = 12 THEN i.kw     ELSE 0 END) AS dicembre_kw
+FROM importi_corrente_colocation AS i
+JOIN cli_fatturazione AS c ON c.id = i.customer_id
+WHERE YEAR(i.start_period) = ?
+GROUP BY c.intestazione
 `
 	rows, err := h.deps.Grappa.QueryContext(r.Context(), query, year)
 	if err != nil {
@@ -97,9 +105,19 @@ GROUP BY customer
 	for rows.Next() {
 		var p EnergiaColoPivotRow
 		if err := rows.Scan(
-			&p.Customer, &p.Gennaio, &p.Febbraio, &p.Marzo, &p.Aprile,
-			&p.Maggio, &p.Giugno, &p.Luglio, &p.Agosto,
-			&p.Settembre, &p.Ottobre, &p.Novembre, &p.Dicembre,
+			&p.Customer,
+			&p.GennaioA, &p.GennaioKw,
+			&p.FebbraioA, &p.FebbraioKw,
+			&p.MarzoA, &p.MarzoKw,
+			&p.AprileA, &p.AprileKw,
+			&p.MaggioA, &p.MaggioKw,
+			&p.GiugnoA, &p.GiugnoKw,
+			&p.LuglioA, &p.LuglioKw,
+			&p.AgostoA, &p.AgostoKw,
+			&p.SettembreA, &p.SettembreKw,
+			&p.OttobreA, &p.OttobreKw,
+			&p.NovembreA, &p.NovembreKw,
+			&p.DicembreA, &p.DicembreKw,
 		); err != nil {
 			return nil, err
 		}
@@ -116,7 +134,7 @@ func (h *Handler) listEnergiaColoDetail(r *http.Request, year int) ([]EnergiaCol
 SELECT c.intestazione AS customer,
        i.start_period,
        i.end_period,
-       IF(i.ampere > 0, i.ampere, i.Kw) AS consumo,
+       IF(i.tipo_variabile = 2, i.kw, i.ampere) AS consumo,
        i.amount,
        i.pun,
        i.coefficiente,
