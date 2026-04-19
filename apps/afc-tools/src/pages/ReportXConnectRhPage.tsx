@@ -1,20 +1,35 @@
 import { useCallback, useState } from 'react';
-import { Skeleton, useToast } from '@mrsmith/ui';
+import { Icon, Skeleton, StatusBadge, useToast } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { useApiClient } from '../api/client';
 import { useXConnectOrders } from '../api/queries';
 import { formatDate } from '../utils/format';
+import { getOrderPdfNotReadyMessage } from './orderPdfState';
 import shared from './shared.module.css';
 import styles from './ReportXConnectRhPage.module.css';
 
 type Tab = 'ticket' | 'orders';
 type Lang = 'it' | 'en';
+type OrderPdfState =
+  | { status: 'downloading' }
+  | { status: 'not_ready'; message: string };
+
+function getOrderPdfErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && typeof error.body === 'object' && error.body !== null) {
+    const body = error.body as { message?: unknown; error?: unknown };
+    if (typeof body.message === 'string' && body.message.trim() !== '') return body.message;
+    if (typeof body.error === 'string' && body.error.trim() !== '') return body.error;
+  }
+
+  return error instanceof Error ? error.message : 'Errore durante il download';
+}
 
 export default function ReportXConnectRhPage() {
   const [tab, setTab] = useState<Tab>('ticket');
   const [ticketId, setTicketId] = useState('');
   const [lang, setLang] = useState<Lang>('it');
   const [downloading, setDownloading] = useState(false);
+  const [orderPdfStates, setOrderPdfStates] = useState<Record<number, OrderPdfState>>({});
 
   const { toast } = useToast();
   const api = useApiClient();
@@ -51,19 +66,73 @@ export default function ReportXConnectRhPage() {
     }
   }, [api, lang, ticketId, toast]);
 
+  const setOrderPdfState = useCallback((orderId: number, next: OrderPdfState | null) => {
+    setOrderPdfStates((current) => {
+      if (next == null) {
+        if (!(orderId in current)) return current;
+        const { [orderId]: _discarded, ...rest } = current;
+        return rest;
+      }
+      return { ...current, [orderId]: next };
+    });
+  }, []);
+
   const handleDownloadOrderPDF = useCallback(async (orderId: number) => {
+    setOrderPdfState(orderId, { status: 'downloading' });
     try {
       const blob = await api.getBlob(`/afc-tools/v1/orders/${orderId}/pdf`);
       triggerDownload(blob, `order_${orderId}.pdf`);
+      setOrderPdfState(orderId, null);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 404) {
-        const body = e.body as { error?: string } | null;
-        toast(body?.error ?? 'Il PDF non è ancora pronto.', 'warning');
-        return;
+      if (e instanceof ApiError) {
+        const notReadyMessage = getOrderPdfNotReadyMessage(e.status, e.body);
+        if (notReadyMessage) {
+          setOrderPdfState(orderId, { status: 'not_ready', message: notReadyMessage });
+          return;
+        }
       }
-      toast(e instanceof Error ? e.message : 'Errore durante il download', 'error');
+
+      setOrderPdfState(orderId, null);
+      toast(getOrderPdfErrorMessage(e), 'error');
     }
-  }, [api, toast]);
+  }, [api, setOrderPdfState, toast]);
+
+  const renderOrderPdfAction = (orderId: number) => {
+    const state = orderPdfStates[orderId];
+    const loading = state?.status === 'downloading';
+
+    return (
+      <div className={styles.orderPdfCell}>
+        {state?.status === 'not_ready' && (
+          <div className={styles.orderPdfStatus} aria-live="polite">
+            <StatusBadge
+              value="pdf_not_ready"
+              label="PDF non disponibile"
+              variant="warning"
+            />
+            <span className={styles.orderPdfHint}>{state.message}</span>
+          </div>
+        )}
+        <button
+          className={`${shared.btnLink} ${styles.orderPdfButton}`}
+          onClick={() => handleDownloadOrderPDF(orderId)}
+          disabled={loading}
+          aria-busy={loading || undefined}
+        >
+          {loading ? (
+            <>
+              <Icon name="loader" size={14} className={styles.spin} />
+              <span>Verifica…</span>
+            </>
+          ) : state?.status === 'not_ready' ? (
+            <span>Riprova</span>
+          ) : (
+            <span>Scarica PDF</span>
+          )}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className={shared.page}>
@@ -144,14 +213,7 @@ export default function ReportXConnectRhPage() {
                       <td className={shared.mono}>{o.codice_ordine ?? ''}</td>
                       <td>{o.cliente ?? ''}</td>
                       <td>{formatDate(o.data_creazione)}</td>
-                      <td>
-                        <button
-                          className={shared.btnLink}
-                          onClick={() => handleDownloadOrderPDF(o.id_ordine)}
-                        >
-                          Scarica PDF
-                        </button>
-                      </td>
+                      <td>{renderOrderPdfAction(o.id_ordine)}</td>
                     </tr>
                   ))}
                 </tbody>
