@@ -2,7 +2,9 @@ package afctools
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,96 +12,136 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
+// NullTime scans VARCHAR date columns (YYYY-MM-DD) and marshals to JSON as RFC3339.
+type NullTime struct {
+	time.Time
+	Valid bool
+}
+
+func (nt *NullTime) Scan(value any) error {
+	if value == nil {
+		nt.Valid = false
+		return nil
+	}
+	var s string
+	switch v := value.(type) {
+	case []byte:
+		s = string(v)
+	case string:
+		s = v
+	default:
+		return fmt.Errorf("unsupported type %T", value)
+	}
+	if s == "" {
+		nt.Valid = false
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return err
+	}
+	nt.Time = t
+	nt.Valid = true
+	return nil
+}
+
+func (nt NullTime) MarshalJSON() ([]byte, error) {
+	if !nt.Valid {
+		return []byte("null"), nil
+	}
+	return json.Marshal(nt.Time.Format(time.RFC3339))
+}
+
 // SalesOrderSummary mirrors Select_Orders_Table (spec §B.4.9).
 type SalesOrderSummary struct {
-	ID             int64      `json:"id"`
-	CdlanTipodoc   *string    `json:"cdlan_tipodoc"`
-	CdlanNdoc      *string    `json:"cdlan_ndoc"`
-	CdlanAnno      *int64     `json:"cdlan_anno"`
-	CodiceOrdine   *string    `json:"codice_ordine"`
-	CdlanSostOrd   *string    `json:"cdlan_sost_ord"`
-	CdlanCliente   *string    `json:"cdlan_cliente"`
-	CdlanDatadoc   *time.Time `json:"cdlan_datadoc"`
-	TipoDiServizi  *string    `json:"tipo_di_servizi"`
-	TipoDiOrdine   *string    `json:"tipo_di_ordine"`
-	CdlanDataconf  *time.Time `json:"cdlan_dataconferma"`
-	CdlanStato     *string    `json:"cdlan_stato"`
-	DalCP          *string    `json:"dal_cp"`
+	ID            int64    `json:"id"`
+	CdlanTipodoc  *string  `json:"cdlan_tipodoc"`
+	CdlanNdoc     *string  `json:"cdlan_ndoc"`
+	CdlanAnno     *int64   `json:"cdlan_anno"`
+	CodiceOrdine  *string  `json:"codice_ordine"`
+	CdlanSostOrd  *string  `json:"cdlan_sost_ord"`
+	CdlanCliente  *string  `json:"cdlan_cliente"`
+	CdlanDatadoc  NullTime `json:"cdlan_datadoc"`
+	TipoDiServizi *string  `json:"tipo_di_servizi"`
+	TipoDiOrdine  *string  `json:"tipo_di_ordine"`
+	CdlanDataconf NullTime `json:"cdlan_dataconferma"`
+	CdlanStato    *string  `json:"cdlan_stato"`
+	DalCP         *string  `json:"dal_cp"`
 }
 
 // OrderHeader mirrors the Dettaglio ordini "Order" query (spec §B.4.10).
 type OrderHeader struct {
-	ID                          int64      `json:"id"`
-	CdlanSystemodv              *string    `json:"cdlan_systemodv"`
-	CdlanTipodoc                *string    `json:"cdlan_tipodoc"`
-	CdlanNdoc                   *string    `json:"cdlan_ndoc"`
-	CdlanDatadoc                *time.Time `json:"cdlan_datadoc"`
-	CdlanCliente                *string    `json:"cdlan_cliente"`
-	CdlanCommerciale            *string    `json:"cdlan_commerciale"`
-	CdlanCodTerminiPag          *int64     `json:"cdlan_cod_termini_pag"`
-	CdlanNote                   *string    `json:"cdlan_note"`
-	CdlanTipoOrd                *string    `json:"cdlan_tipo_ord"`
-	CdlanDurRin                 *int64     `json:"cdlan_dur_rin"`
-	CdlanTacitoRin              *int64     `json:"cdlan_tacito_rin"`
-	CdlanSostOrd                *string    `json:"cdlan_sost_ord"`
-	CdlanTempiRil               *string    `json:"cdlan_tempi_ril"`
-	CdlanDurataServizio         *string    `json:"cdlan_durata_servizio"`
-	CdlanDataconferma           *time.Time `json:"cdlan_dataconferma"`
-	CdlanRifOrdcli              *string    `json:"cdlan_rif_ordcli"`
-	CdlanRifTechNom             *string    `json:"cdlan_rif_tech_nom"`
-	CdlanRifTechTel             *string    `json:"cdlan_rif_tech_tel"`
-	CdlanRifTechEmail           *string    `json:"cdlan_rif_tech_email"`
-	CdlanRifAltroTechNom        *string    `json:"cdlan_rif_altro_tech_nom"`
-	CdlanRifAltroTechTel        *string    `json:"cdlan_rif_altro_tech_tel"`
-	CdlanRifAltroTechEmail      *string    `json:"cdlan_rif_altro_tech_email"`
-	CdlanRifAdmNom              *string    `json:"cdlan_rif_adm_nom"`
-	CdlanRifAdmTechTel          *string    `json:"cdlan_rif_adm_tech_tel"`
-	CdlanRifAdmTechEmail        *string    `json:"cdlan_rif_adm_tech_email"`
-	CdlanIntFatturazioneDesc    *string    `json:"cdlan_int_fatturazione_desc"`
-	CdlanIntFatturazione        *int64     `json:"cdlan_int_fatturazione"`
-	CdlanIntFatturazioneAttDesc *string    `json:"cdlan_int_fatturazione_att_desc"`
-	CdlanIntFatturazioneAtt     *int64     `json:"cdlan_int_fatturazione_att"`
-	CdlanStato                  *string    `json:"cdlan_stato"`
-	CdlanEvaso                  *int64     `json:"cdlan_evaso"`
-	CdlanChiuso                 *int64     `json:"cdlan_chiuso"`
-	CdlanAnno                   *int64     `json:"cdlan_anno"`
-	CdlanValuta                 *string    `json:"cdlan_valuta"`
-	WrittenBy                   *string    `json:"written_by"`
-	ProfileIVA                  *string    `json:"profile_iva"`
-	ProfileCF                   *string    `json:"profile_cf"`
-	ProfileAddress              *string    `json:"profile_address"`
-	ProfileCity                 *string    `json:"profile_city"`
-	ProfileCAP                  *string    `json:"profile_cap"`
-	ProfilePV                   *string    `json:"profile_pv"`
-	ProfileSDI                  *string    `json:"profile_sdi"`
-	ProfileLang                 *string    `json:"profile_lang"`
-	CdlanClienteID              *int64     `json:"cdlan_cliente_id"`
-	ServiceType                 *string    `json:"service_type"`
-	DataDecorrenza              *string    `json:"data_decorrenza"`
-	CdlanTacitoRinInPdf         *int64     `json:"cdlan_tacito_rin_in_pdf"`
-	IsColo                      *string    `json:"is_colo"`
-	OriginCodTerminiPag         *int64     `json:"origin_cod_termini_pag"`
-	IsArxivar                   *int64     `json:"is_arxivar"`
-	FromCP                      *int64     `json:"from_cp"`
-	ArxDocNumber                *string    `json:"arx_doc_number"`
+	ID                          int64    `json:"id"`
+	CdlanSystemodv              *string  `json:"cdlan_systemodv"`
+	CdlanTipodoc                *string  `json:"cdlan_tipodoc"`
+	CdlanNdoc                   *string  `json:"cdlan_ndoc"`
+	CdlanDatadoc                NullTime `json:"cdlan_datadoc"`
+	CdlanCliente                *string  `json:"cdlan_cliente"`
+	CdlanCommerciale            *string  `json:"cdlan_commerciale"`
+	CdlanCodTerminiPag          *int64   `json:"cdlan_cod_termini_pag"`
+	CdlanNote                   *string  `json:"cdlan_note"`
+	CdlanTipoOrd                *string  `json:"cdlan_tipo_ord"`
+	CdlanDurRin                 *int64   `json:"cdlan_dur_rin"`
+	CdlanTacitoRin              *int64   `json:"cdlan_tacito_rin"`
+	CdlanSostOrd                *string  `json:"cdlan_sost_ord"`
+	CdlanTempiRil               *string  `json:"cdlan_tempi_ril"`
+	CdlanDurataServizio         *string  `json:"cdlan_durata_servizio"`
+	CdlanDataconferma           NullTime `json:"cdlan_dataconferma"`
+	CdlanRifOrdcli              *string  `json:"cdlan_rif_ordcli"`
+	CdlanRifTechNom             *string  `json:"cdlan_rif_tech_nom"`
+	CdlanRifTechTel             *string  `json:"cdlan_rif_tech_tel"`
+	CdlanRifTechEmail           *string  `json:"cdlan_rif_tech_email"`
+	CdlanRifAltroTechNom        *string  `json:"cdlan_rif_altro_tech_nom"`
+	CdlanRifAltroTechTel        *string  `json:"cdlan_rif_altro_tech_tel"`
+	CdlanRifAltroTechEmail      *string  `json:"cdlan_rif_altro_tech_email"`
+	CdlanRifAdmNom              *string  `json:"cdlan_rif_adm_nom"`
+	CdlanRifAdmTechTel          *string  `json:"cdlan_rif_adm_tech_tel"`
+	CdlanRifAdmTechEmail        *string  `json:"cdlan_rif_adm_tech_email"`
+	CdlanIntFatturazioneDesc    *string  `json:"cdlan_int_fatturazione_desc"`
+	CdlanIntFatturazione        *int64   `json:"cdlan_int_fatturazione"`
+	CdlanIntFatturazioneAttDesc *string  `json:"cdlan_int_fatturazione_att_desc"`
+	CdlanIntFatturazioneAtt     *int64   `json:"cdlan_int_fatturazione_att"`
+	CdlanStato                  *string  `json:"cdlan_stato"`
+	CdlanEvaso                  *int64   `json:"cdlan_evaso"`
+	CdlanChiuso                 *int64   `json:"cdlan_chiuso"`
+	CdlanAnno                   *int64   `json:"cdlan_anno"`
+	CdlanValuta                 *string  `json:"cdlan_valuta"`
+	WrittenBy                   *string  `json:"written_by"`
+	ProfileIVA                  *string  `json:"profile_iva"`
+	ProfileCF                   *string  `json:"profile_cf"`
+	ProfileAddress              *string  `json:"profile_address"`
+	ProfileCity                 *string  `json:"profile_city"`
+	ProfileCAP                  *string  `json:"profile_cap"`
+	ProfilePV                   *string  `json:"profile_pv"`
+	ProfileSDI                  *string  `json:"profile_sdi"`
+	ProfileLang                 *string  `json:"profile_lang"`
+	CdlanClienteID              *int64   `json:"cdlan_cliente_id"`
+	ServiceType                 *string  `json:"service_type"`
+	DataDecorrenza              *string  `json:"data_decorrenza"`
+	CdlanTacitoRinInPdf         *int64   `json:"cdlan_tacito_rin_in_pdf"`
+	IsColo                      *string  `json:"is_colo"`
+	OriginCodTerminiPag         *int64   `json:"origin_cod_termini_pag"`
+	IsArxivar                   *int64   `json:"is_arxivar"`
+	FromCP                      *int64   `json:"from_cp"`
+	ArxDocNumber                *string  `json:"arx_doc_number"`
 }
 
 // OrderRow mirrors RigheOrdine (spec §B.4.11).
 type OrderRow struct {
-	IDRiga                   int64      `json:"id_riga"`
-	SystemODVRiga            *string    `json:"system_odv_riga"`
-	CodiceArticoloBundle     *string    `json:"codice_articolo_bundle"`
-	CodiceArticolo           *string    `json:"codice_articolo"`
-	DescrizioneArticolo      *string    `json:"descrizione_articolo"`
-	Canone                   *float64   `json:"canone"`
-	Attivazione              *float64   `json:"attivazione"`
-	Quantita                 *float64   `json:"quantita"`
-	PrezzoCessazione         *float64   `json:"prezzo_cessazione"`
-	CodRaggFatt              *string    `json:"codice_raggruppamento_fatturazione"`
-	DataAttivazione          *time.Time `json:"data_attivazione"`
-	NumeroSeriale            *string    `json:"numero_seriale"`
-	ConfirmDataAttivazione   *time.Time `json:"confirm_data_attivazione"`
-	DataAnnullamento         *time.Time `json:"data_annullamento"`
+	IDRiga                 int64    `json:"id_riga"`
+	SystemODVRiga          *string  `json:"system_odv_riga"`
+	CodiceArticoloBundle   *string  `json:"codice_articolo_bundle"`
+	CodiceArticolo         *string  `json:"codice_articolo"`
+	DescrizioneArticolo    *string  `json:"descrizione_articolo"`
+	Canone                 *float64 `json:"canone"`
+	Attivazione            *float64 `json:"attivazione"`
+	Quantita               *float64 `json:"quantita"`
+	PrezzoCessazione       *float64 `json:"prezzo_cessazione"`
+	CodRaggFatt            *string  `json:"codice_raggruppamento_fatturazione"`
+	DataAttivazione        NullTime `json:"data_attivazione"`
+	NumeroSeriale          *string  `json:"numero_seriale"`
+	ConfirmDataAttivazione NullTime `json:"confirm_data_attivazione"`
+	DataAnnullamento       NullTime `json:"data_annullamento"`
 }
 
 func (h *Handler) listOrders(r *http.Request) ([]SalesOrderSummary, error) {
