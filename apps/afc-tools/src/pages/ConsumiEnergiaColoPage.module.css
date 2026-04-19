@@ -1,0 +1,137 @@
+.section {
+  margin-top: var(--space-8);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.sectionTools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.search {
+  flex: 1 1 240px;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+.unit {
+  font-weight: 400;
+  color: var(--color-text-faint);
+  margin-left: 4px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.headerWithInfo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.infoIcon {
+  color: var(--color-text-faint);
+  display: inline-flex;
+  cursor: help;
+}
+
+.pivotWrap {
+  position: relative;
+  overflow-x: auto;
+}
+
+.pivotTable th:first-child,
+.pivotTable td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--color-bg);
+  z-index: 1;
+  box-shadow: 1px 0 0 var(--color-border-subtle);
+}
+
+.pivotTable thead th:first-child {
+  background: var(--color-bg);
+  z-index: 2;
+}
+
+.pivotTable tbody tr:hover td:first-child {
+  background: var(--color-accent-subtle);
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger-hover);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-3);
+}
+
+.errorBanner button {
+  flex-shrink: 0;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+}
+
+.emptyIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.emptyDesc {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  max-width: 360px;
+}
+
+.subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: calc(var(--space-2) * -1) 0 var(--space-6);
+}
+
+.yearSelect {
+  min-width: 120px;
+}
