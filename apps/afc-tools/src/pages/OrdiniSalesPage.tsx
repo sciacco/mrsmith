@@ -169,7 +169,7 @@ export default function OrdiniSalesPage() {
 
   return (
     <div className={shared.page}>
-      <h1 className={shared.title}>Ordini Sales</h1>
+      <h1 className={shared.title}>Ordini di vendita</h1>
 
       <TableToolbar
         activeFilterCount={activeFilterCount}

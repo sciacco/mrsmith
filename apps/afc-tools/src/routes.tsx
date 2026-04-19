@@ -10,7 +10,7 @@ import OrdiniSalesDetailPage from './pages/OrdiniSalesDetailPage';
 import ReportDdtCespitiPage from './pages/ReportDdtCespitiPage';
 
 export const routes: RouteObject[] = [
-  { index: true, element: <Navigate to="/transazioni-whmcs" replace /> },
+  { index: true, element: <Navigate to="/ordini-sales" replace /> },
   { path: 'transazioni-whmcs', element: <TransazioniWhmcsPage /> },
   { path: 'fatture-prometeus', element: <FatturePrometeusPage /> },
   { path: 'nuovi-articoli', element: <NuoviArticoliPage /> },
@@ -20,5 +20,5 @@ export const routes: RouteObject[] = [
   { path: 'ordini-sales', element: <OrdiniSalesPage /> },
   { path: 'ordini-sales/:id', element: <OrdiniSalesDetailPage /> },
   { path: 'report-ddt-cespiti', element: <ReportDdtCespitiPage /> },
-  { path: '*', element: <Navigate to="/transazioni-whmcs" replace /> },
+  { path: '*', element: <Navigate to="/ordini-sales" replace /> },
 ];

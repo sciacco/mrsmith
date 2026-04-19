@@ -10,26 +10,26 @@ export interface NavSection {
 
 export const afcToolsNavSections: NavSection[] = [
   {
-    label: 'Billing',
+    label: 'Ordini',
     items: [
-      { label: 'Transazioni WHMCS', path: '/transazioni-whmcs' },
-      { label: 'Fatture Prometeus', path: '/fatture-prometeus' },
-      { label: 'Nuovi articoli', path: '/nuovi-articoli' },
-      { label: 'DDT per cespiti', path: '/report-ddt-cespiti' },
-    ],
-  },
-  {
-    label: 'Ordini & XConnect',
-    items: [
-      { label: 'Ordini Sales', path: '/ordini-sales' },
+      { label: 'Ordini di vendita', path: '/ordini-sales' },
       { label: 'Ticket Remote Hands', path: '/ticket-remote-hands' },
       { label: 'Ordini XConnect', path: '/report-xconnect-rh' },
     ],
   },
   {
-    label: 'Energia',
+    label: 'Fatturazione',
     items: [
       { label: 'Consumi Energia Colo', path: '/consumi-energia-colo' },
+      { label: 'Transazioni WHMCS', path: '/transazioni-whmcs' },
+      { label: 'Fatture Prometeus', path: '/fatture-prometeus' },
+    ],
+  },
+  {
+    label: 'Articoli e Cespiti',
+    items: [
+      { label: 'Nuovi articoli', path: '/nuovi-articoli' },
+      { label: 'DDT per cespiti', path: '/report-ddt-cespiti' },
     ],
   },
 ];
