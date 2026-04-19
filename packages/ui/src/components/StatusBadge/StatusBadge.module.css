@@ -1,0 +1,72 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.label {
+  display: inline-block;
+}
+
+.success {
+  background: var(--color-success-bg);
+  color: var(--color-success-strong);
+  border-color: rgba(16, 185, 129, 0.24);
+}
+.success .dot {
+  background: var(--color-success);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.45);
+}
+
+.accent {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-hover);
+  border-color: rgba(99, 91, 255, 0.24);
+}
+.accent .dot {
+  background: var(--color-accent);
+  box-shadow: 0 0 6px var(--color-accent-glow);
+}
+
+.warning {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+.warning .dot {
+  background: var(--color-warning);
+}
+
+.danger {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger-hover);
+  border-color: rgba(239, 68, 68, 0.26);
+}
+.danger .dot {
+  background: var(--color-danger);
+}
+
+.neutral {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+}
+.neutral .dot {
+  background: var(--color-text-faint);
+}

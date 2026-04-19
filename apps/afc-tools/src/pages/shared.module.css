@@ -230,3 +230,10 @@
 .rowAction:hover {
   background: var(--color-accent-muted);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .page,
+  .table tbody tr {
+    animation: none;
+  }
+}

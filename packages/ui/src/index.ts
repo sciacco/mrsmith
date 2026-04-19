@@ -19,6 +19,8 @@ export { SingleSelect } from './components/SingleSelect/SingleSelect';
 export { SearchInput } from './components/SearchInput/SearchInput';
 export { TableToolbar } from './components/TableToolbar/TableToolbar';
 export { Skeleton } from './components/Skeleton/Skeleton';
+export { StatusBadge } from './components/StatusBadge';
+export type { StatusBadgeVariant } from './components/StatusBadge';
 export { ToggleSwitch } from './components/ToggleSwitch/ToggleSwitch';
 export { ToastProvider, useToast } from './components/Toast/ToastProvider';
 export { useTableFilter } from './hooks/useTableFilter';
