@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
@@ -52,6 +53,48 @@ func (nt NullTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(nt.Time.Format(time.RFC3339))
 }
 
+// NullFloat64 scans VARCHAR numeric columns, normalizes "," → ".", and marshals to JSON.
+type NullFloat64 struct {
+	float64
+	Valid bool
+}
+
+func (nf *NullFloat64) Scan(value any) error {
+	if value == nil {
+		nf.Valid = false
+		return nil
+	}
+	var s string
+	switch v := value.(type) {
+	case []byte:
+		s = string(v)
+	case string:
+		s = v
+	default:
+		return fmt.Errorf("unsupported type %T", value)
+	}
+	s = strings.TrimSpace(s)
+	if s == "" {
+		nf.Valid = false
+		return nil
+	}
+	s = strings.ReplaceAll(s, ",", ".")
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return err
+	}
+	nf.float64 = f
+	nf.Valid = true
+	return nil
+}
+
+func (nf NullFloat64) MarshalJSON() ([]byte, error) {
+	if !nf.Valid {
+		return []byte("null"), nil
+	}
+	return json.Marshal(nf.float64)
+}
+
 // SalesOrderSummary mirrors Select_Orders_Table (spec §B.4.9).
 type SalesOrderSummary struct {
 	ID            int64    `json:"id"`
@@ -78,11 +121,11 @@ type OrderHeader struct {
 	CdlanDatadoc                NullTime `json:"cdlan_datadoc"`
 	CdlanCliente                *string  `json:"cdlan_cliente"`
 	CdlanCommerciale            *string  `json:"cdlan_commerciale"`
-	CdlanCodTerminiPag          *int64   `json:"cdlan_cod_termini_pag"`
+	CdlanCodTerminiPag          *string  `json:"cdlan_cod_termini_pag"`
 	CdlanNote                   *string  `json:"cdlan_note"`
 	CdlanTipoOrd                *string  `json:"cdlan_tipo_ord"`
-	CdlanDurRin                 *int64   `json:"cdlan_dur_rin"`
-	CdlanTacitoRin              *int64   `json:"cdlan_tacito_rin"`
+	CdlanDurRin                 *string  `json:"cdlan_dur_rin"`
+	CdlanTacitoRin              *string  `json:"cdlan_tacito_rin"`
 	CdlanSostOrd                *string  `json:"cdlan_sost_ord"`
 	CdlanTempiRil               *string  `json:"cdlan_tempi_ril"`
 	CdlanDurataServizio         *string  `json:"cdlan_durata_servizio"`
@@ -98,9 +141,9 @@ type OrderHeader struct {
 	CdlanRifAdmTechTel          *string  `json:"cdlan_rif_adm_tech_tel"`
 	CdlanRifAdmTechEmail        *string  `json:"cdlan_rif_adm_tech_email"`
 	CdlanIntFatturazioneDesc    *string  `json:"cdlan_int_fatturazione_desc"`
-	CdlanIntFatturazione        *int64   `json:"cdlan_int_fatturazione"`
+	CdlanIntFatturazione        *string  `json:"cdlan_int_fatturazione"`
 	CdlanIntFatturazioneAttDesc *string  `json:"cdlan_int_fatturazione_att_desc"`
-	CdlanIntFatturazioneAtt     *int64   `json:"cdlan_int_fatturazione_att"`
+	CdlanIntFatturazioneAtt     *string  `json:"cdlan_int_fatturazione_att"`
 	CdlanStato                  *string  `json:"cdlan_stato"`
 	CdlanEvaso                  *int64   `json:"cdlan_evaso"`
 	CdlanChiuso                 *int64   `json:"cdlan_chiuso"`
@@ -118,9 +161,9 @@ type OrderHeader struct {
 	CdlanClienteID              *int64   `json:"cdlan_cliente_id"`
 	ServiceType                 *string  `json:"service_type"`
 	DataDecorrenza              *string  `json:"data_decorrenza"`
-	CdlanTacitoRinInPdf         *int64   `json:"cdlan_tacito_rin_in_pdf"`
+	CdlanTacitoRinInPdf         *string  `json:"cdlan_tacito_rin_in_pdf"`
 	IsColo                      *string  `json:"is_colo"`
-	OriginCodTerminiPag         *int64   `json:"origin_cod_termini_pag"`
+	OriginCodTerminiPag         *string  `json:"origin_cod_termini_pag"`
 	IsArxivar                   *int64   `json:"is_arxivar"`
 	FromCP                      *int64   `json:"from_cp"`
 	ArxDocNumber                *string  `json:"arx_doc_number"`
@@ -128,20 +171,20 @@ type OrderHeader struct {
 
 // OrderRow mirrors RigheOrdine (spec §B.4.11).
 type OrderRow struct {
-	IDRiga                 int64    `json:"id_riga"`
-	SystemODVRiga          *string  `json:"system_odv_riga"`
-	CodiceArticoloBundle   *string  `json:"codice_articolo_bundle"`
-	CodiceArticolo         *string  `json:"codice_articolo"`
-	DescrizioneArticolo    *string  `json:"descrizione_articolo"`
-	Canone                 *float64 `json:"canone"`
-	Attivazione            *float64 `json:"attivazione"`
-	Quantita               *float64 `json:"quantita"`
-	PrezzoCessazione       *float64 `json:"prezzo_cessazione"`
-	CodRaggFatt            *string  `json:"codice_raggruppamento_fatturazione"`
-	DataAttivazione        NullTime `json:"data_attivazione"`
-	NumeroSeriale          *string  `json:"numero_seriale"`
-	ConfirmDataAttivazione NullTime `json:"confirm_data_attivazione"`
-	DataAnnullamento       NullTime `json:"data_annullamento"`
+	IDRiga                 int64       `json:"id_riga"`
+	SystemODVRiga          *string     `json:"system_odv_riga"`
+	CodiceArticoloBundle   *string     `json:"codice_articolo_bundle"`
+	CodiceArticolo         *string     `json:"codice_articolo"`
+	DescrizioneArticolo    *string     `json:"descrizione_articolo"`
+	Canone                 NullFloat64 `json:"canone"`
+	Attivazione            NullFloat64 `json:"attivazione"`
+	Quantita               NullFloat64 `json:"quantita"`
+	PrezzoCessazione       NullFloat64 `json:"prezzo_cessazione"`
+	CodRaggFatt            *string     `json:"codice_raggruppamento_fatturazione"`
+	DataAttivazione        NullTime    `json:"data_attivazione"`
+	NumeroSeriale          *string     `json:"numero_seriale"`
+	ConfirmDataAttivazione *int64      `json:"confirm_data_attivazione"`
+	DataAnnullamento       NullTime    `json:"data_annullamento"`
 }
 
 func (h *Handler) listOrders(r *http.Request) ([]SalesOrderSummary, error) {
