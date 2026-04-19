@@ -88,7 +88,8 @@ func (h *Handler) listTransactions(r *http.Request, from, to string) ([]WhmcsTra
 		return nil, err
 	}
 
-	const query = `SELECT cliente, fattura, invoiceid, userid, payment_method,
+	const query = `SELECT CONVERT(CAST(cliente AS BINARY) USING utf8mb4) AS cliente,
+	                      fattura, invoiceid, userid, payment_method,
                           date_format(date, '%Y-%m-%d') AS date,
                           description, amountin, fees, amountout, rate,
                           transid, refundid, accountsid
@@ -114,6 +115,14 @@ func (h *Handler) listTransactions(r *http.Request, from, to string) ([]WhmcsTra
 		); err != nil {
 			return nil, err
 		}
+		normalizeWHMCSTextPtrs(
+			t.Cliente,
+			t.Fattura,
+			t.PaymentMethod,
+			t.Date,
+			t.Description,
+			t.TransID,
+		)
 		out = append(out, t)
 	}
 	if err := rows.Err(); err != nil {
@@ -174,6 +183,31 @@ func (h *Handler) listInvoiceLines(r *http.Request) ([]WhmcsInvoiceLine, error) 
 		); err != nil {
 			return nil, err
 		}
+		normalizeWHMCSTextPtrs(
+			l.Raggruppamento,
+			l.RagioneSocialeCliente,
+			l.NomeCliente,
+			l.CognomeCliente,
+			l.PartitaIVA,
+			l.CodiceFiscale,
+			l.CodiceISO,
+			l.FlagPersonaFisica,
+			l.Indirizzo,
+			l.NumeroCivico,
+			l.CAP,
+			l.Comune,
+			l.Provincia,
+			l.Nazione,
+			l.NumeroDocumento,
+			l.DataDocumento,
+			l.Causale,
+			l.DescrizioneRiga,
+			l.DataInizioPeriodo,
+			l.DataFinePeriodo,
+			l.ModalitaPagamento,
+			l.CodiceClienteERP,
+			l.Tipo,
+		)
 		out = append(out, l)
 	}
 	if err := rows.Err(); err != nil {
@@ -246,4 +280,3 @@ func (h *Handler) handleTransactionsExport(w http.ResponseWriter, r *http.Reques
 		ReportName: reportName,
 	})
 }
-
