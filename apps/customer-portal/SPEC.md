@@ -205,7 +205,7 @@ Following `docs/API-CONVENTIONS.md` §"Namespacing": `/api/<app-prefix>/v1/...`.
 | GET | `/api/cp-backoffice/v1/customers` | Mistra NG `GET /customers/v2/customer?page_number=1&disable_pagination=true` | — → `{ items: customer[] }` |
 | GET | `/api/cp-backoffice/v1/customer-states` | Mistra NG `GET /customers/v2/customer-state?page_number=1&disable_pagination=true` | — → `{ items: customer-state[] }` |
 | PUT | `/api/cp-backoffice/v1/customers/{id}/state` | Mistra NG `PUT /customers/v2/customer/{id}` with `{ state_id }` | `{ state_id: int }` → Mistra `message` |
-| GET | `/api/cp-backoffice/v1/users?customer_id=…` | Mistra NG `GET /users/v2/user?customer_id=…&disable_pagination=true` | `customer_id` → `{ items: user-brief[] }` |
+| GET | `/api/cp-backoffice/v1/users?customer_id=…` | Mistra NG `GET /users/v2/user?customer_id=…&page_number=1&disable_pagination=true` | `customer_id` → `{ items: user-brief[] }` |
 | POST | `/api/cp-backoffice/v1/admins` | Mistra NG `POST /users/v2/admin` | `user-admin-new` → `{ id }` |
 | GET | `/api/cp-backoffice/v1/biometric-requests` | Mistra PostgreSQL (same SELECT as source) | — → `{ items: BiometricRequestRow[] }` |
 | POST | `/api/cp-backoffice/v1/biometric-requests/{id}/completion` | Mistra PostgreSQL `SELECT customers.biometric_request_set_completed($1::bigint, $2::boolean)` | `{ completed: bool }` → `{ ok: true }` |

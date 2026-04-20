@@ -43,7 +43,7 @@
 1. Operator opens **Gestione Utenti**.
 2. Frontend fetches the customer list. **No user fetch yet** (1:1-plus-correctness: we wait for a customer).
 3. Operator picks a customer in `select_customer`.
-4. Frontend fetches `/users/v2/user?customer_id={id}&disable_pagination=true` via the backend.
+4. Frontend fetches `/users/v2/user?customer_id={id}&page_number=1&disable_pagination=true` via the backend.
 5. Operator optionally clicks `Nuovo Admin` → modal opens.
 6. Operator fills: first/last name, email, phone, two notification checkboxes, `Non creare account su KC` switch.
 7. On `Crea`: frontend → backend → `POST /users/v2/admin` with the composed body.
@@ -80,7 +80,7 @@ Living in `backend/internal/cpbackoffice/`. Paths follow `docs/API-CONVENTIONS.m
 | GET | `/api/cp-backoffice/v1/customers` | list customers | Mistra NG `GET /customers/v2/customer?page_number=1&disable_pagination=true` | none → `{items: customer[]}` — `customer` per spec (`id, name, language, group{…}, state{…}, variables[]`). |
 | GET | `/api/cp-backoffice/v1/customer-states` | list lifecycle states | Mistra NG `GET /customers/v2/customer-state?page_number=1&disable_pagination=true` | none → `{items: customer-state[]}` (`id, name, enabled`). |
 | PUT | `/api/cp-backoffice/v1/customers/{id}/state` | change customer state | Mistra NG `PUT /customers/v2/customer/{id}` with `{state_id}` | `{state_id: int}` → Mistra `message`. |
-| GET | `/api/cp-backoffice/v1/users?customer_id=…` | list users for a customer | Mistra NG `GET /users/v2/user?customer_id=…&disable_pagination=true` | `customer_id` query → `{items: user-brief[]}`. |
+| GET | `/api/cp-backoffice/v1/users?customer_id=…` | list users for a customer | Mistra NG `GET /users/v2/user?customer_id=…&page_number=1&disable_pagination=true` | `customer_id` query → `{items: user-brief[]}`. |
 | POST | `/api/cp-backoffice/v1/admins` | create admin user | Mistra NG `POST /users/v2/admin` | `user-admin-new` body → `{id}`. |
 | GET | `/api/cp-backoffice/v1/biometric-requests` | list biometric requests | Mistra PostgreSQL (same SELECT as source) | none → `{items: BiometricRequestRow[]}` where `BiometricRequestRow = {id, nome, cognome, email, azienda, tipo_richiesta, stato_richiesta:bool, data_richiesta:timestamptz, data_approvazione:timestamptz?, is_biometric_lenel:bool}`. Order: `data_richiesta DESC`. |
 | POST | `/api/cp-backoffice/v1/biometric-requests/{id}/completion` | set `request_completed` | Mistra PostgreSQL `SELECT customers.biometric_request_set_completed($1, $2)` | `{completed: bool}` → `{ok: true}` (or 4xx/5xx with message). |
