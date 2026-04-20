@@ -1,17 +1,20 @@
+import type { CustomerState } from './customerStates';
+
 // Wire contract for the customer list surface.
 // Shape comes unwrapped from GET /api/cp-backoffice/v1/customers: the backend
 // strips the upstream `items` envelope and forwards the row array as-is
 // (see backend/internal/cpbackoffice/arak.go writeItemsPassthrough).
-export interface CustomerState {
+export interface CustomerGroup {
   id: number;
   name: string;
-  enabled: boolean;
 }
 
 export interface Customer {
   id: number;
   name: string;
+  group: CustomerGroup;
   state: CustomerState;
+  language: string;
 }
 
 // Body shape accepted by PUT /api/cp-backoffice/v1/customers/{id}/state.

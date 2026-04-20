@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Skeleton } from '@mrsmith/ui';
+import { useDeferredValue, useMemo, useState } from 'react';
+import { SearchInput, Skeleton } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
+import type { Customer } from '../../api/customers';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useCustomerStates } from '../../hooks/useCustomerStates';
 import { UpdateStateModal } from './UpdateStateModal';
@@ -24,6 +25,8 @@ export function StatoAziendePage() {
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearch = useDeferredValue(searchQuery);
 
   const customers = customersQuery.data;
 
@@ -31,6 +34,12 @@ export function StatoAziendePage() {
     () => customers?.find((c) => c.id === selectedCustomerId) ?? null,
     [customers, selectedCustomerId],
   );
+
+  const filteredCustomers = useMemo(
+    () => filterCustomers(customers, deferredSearch),
+    [customers, deferredSearch],
+  );
+  const hasSearch = deferredSearch.trim().length > 0;
 
   const ctaDisabled = selectedCustomer == null;
   // CTA label is EXACTLY `Aggiorna {selectedCustomer.name}` when a row is
@@ -106,32 +115,59 @@ export function StatoAziendePage() {
             <p className={styles.stateText}>Non ci sono aziende da mostrare.</p>
           </div>
         ) : (
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.idCol}>ID</th>
-                  <th>Azienda</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((c) => {
-                  const isSelected = c.id === selectedCustomerId;
-                  return (
-                    <tr
-                      key={c.id}
-                      className={isSelected ? styles.rowSelected : undefined}
-                      onClick={() => setSelectedCustomerId(c.id)}
-                      aria-selected={isSelected}
-                    >
-                      <td className={styles.idCol}>{c.id}</td>
-                      <td>{c.name}</td>
+          <>
+            <div className={styles.tableTools}>
+              <SearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Cerca per ID, ragione sociale, tipologia, stato, lingua..."
+                className={styles.search}
+              />
+            </div>
+            {filteredCustomers.length === 0 ? (
+              <div className={styles.stateBox}>
+                <p className={styles.stateTitle}>Nessun risultato</p>
+                <p className={styles.stateText}>
+                  {hasSearch
+                    ? 'Nessuna azienda corrisponde alla ricerca.'
+                    : 'Non ci sono aziende da mostrare.'}
+                </p>
+              </div>
+            ) : (
+              <div className={styles.tableScroll}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th className={styles.idCol}>ID</th>
+                      <th>Ragione sociale</th>
+                      <th>Tipologia</th>
+                      <th>Stato</th>
+                      <th className={styles.langCol}>Lingua</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {filteredCustomers.map((c) => {
+                      const isSelected = c.id === selectedCustomerId;
+                      return (
+                        <tr
+                          key={c.id}
+                          className={isSelected ? styles.rowSelected : undefined}
+                          onClick={() => setSelectedCustomerId(c.id)}
+                          aria-selected={isSelected}
+                        >
+                          <td className={styles.idCol}>{c.id}</td>
+                          <td>{c.name}</td>
+                          <td>{c.group?.name ?? ''}</td>
+                          <td>{c.state?.name ?? ''}</td>
+                          <td className={styles.langCol}>{c.language ?? ''}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -146,6 +182,24 @@ export function StatoAziendePage() {
         />
       )}
     </section>
+  );
+}
+
+function filterCustomers(
+  customers: ReadonlyArray<Customer> | undefined,
+  query: string,
+): ReadonlyArray<Customer> {
+  if (!customers) return [];
+  const needle = query.trim().toLocaleLowerCase();
+  if (!needle) return customers;
+  return customers.filter((c) =>
+    [
+      String(c.id),
+      c.name,
+      c.group?.name ?? '',
+      c.state?.name ?? '',
+      c.language ?? '',
+    ].some((value) => value.toLocaleLowerCase().includes(needle)),
   );
 }
 
