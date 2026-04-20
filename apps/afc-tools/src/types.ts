@@ -133,11 +133,11 @@ export interface OrderHeader {
   cdlan_datadoc: string | null;
   cdlan_cliente: string | null;
   cdlan_commerciale: string | null;
-  cdlan_cod_termini_pag: number | null;
+  cdlan_cod_termini_pag: string | null;
   cdlan_note: string | null;
   cdlan_tipo_ord: string | null;
-  cdlan_dur_rin: number | null;
-  cdlan_tacito_rin: number | null;
+  cdlan_dur_rin: string | null;
+  cdlan_tacito_rin: string | null;
   cdlan_sost_ord: string | null;
   cdlan_tempi_ril: string | null;
   cdlan_durata_servizio: string | null;
@@ -153,9 +153,9 @@ export interface OrderHeader {
   cdlan_rif_adm_tech_tel: string | null;
   cdlan_rif_adm_tech_email: string | null;
   cdlan_int_fatturazione_desc: string | null;
-  cdlan_int_fatturazione: number | null;
+  cdlan_int_fatturazione: string | null;
   cdlan_int_fatturazione_att_desc: string | null;
-  cdlan_int_fatturazione_att: number | null;
+  cdlan_int_fatturazione_att: string | null;
   cdlan_stato: string | null;
   cdlan_evaso: number | null;
   cdlan_chiuso: number | null;
@@ -173,9 +173,9 @@ export interface OrderHeader {
   cdlan_cliente_id: number | null;
   service_type: string | null;
   data_decorrenza: string | null;
-  cdlan_tacito_rin_in_pdf: number | null;
+  cdlan_tacito_rin_in_pdf: string | null;
   is_colo: string | null;
-  origin_cod_termini_pag: number | null;
+  origin_cod_termini_pag: string | null;
   is_arxivar: number | null;
   from_cp: number | null;
   arx_doc_number: string | null;
