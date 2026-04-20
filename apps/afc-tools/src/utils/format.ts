@@ -55,8 +55,9 @@ export function formatNumber(value: number | null | undefined): string {
   return numberFormatter.format(value);
 }
 
-export function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '';
+export function formatDate(iso: string | number | null | undefined): string {
+  if (iso == null || iso === '') return '';
+  if (typeof iso !== 'string') return String(iso);
   const t = iso.slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return iso;
   const [y, m, d] = t.split('-');

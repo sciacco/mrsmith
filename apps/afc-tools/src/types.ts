@@ -194,7 +194,7 @@ export interface OrderRow {
   codice_raggruppamento_fatturazione: string | null;
   data_attivazione: string | null;
   numero_seriale: string | null;
-  confirm_data_attivazione: string | null;
+  confirm_data_attivazione: number | null;
   data_annullamento: string | null;
 }
 

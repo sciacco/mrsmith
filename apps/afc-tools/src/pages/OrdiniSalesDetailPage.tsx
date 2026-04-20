@@ -351,7 +351,13 @@ export default function OrdiniSalesDetailPage() {
                         <td className={shared.numCol}>{money(r.prezzo_cessazione)}</td>
                         <td>{r.codice_raggruppamento_fatturazione ?? ''}</td>
                         <td className={shared.mono}>{r.numero_seriale ?? ''}</td>
-                        <td>{formatDate(r.confirm_data_attivazione)}</td>
+                        <td>
+                          {r.confirm_data_attivazione == null
+                            ? ''
+                            : r.confirm_data_attivazione === 1
+                              ? 'Sì'
+                              : 'No'}
+                        </td>
                       </>
                     )}
                   </tr>
