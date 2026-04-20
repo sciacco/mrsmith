@@ -1,0 +1,238 @@
+/* ═══ Page layout ═══
+ * Table-first. No KPI row, no summary tiles, no hero.
+ * Anchored in apps/compliance/src/views/blocks/BlocksPage.module.css
+ * (master column only) and apps/listini-e-sconti/src/pages/FormPage.module.css
+ * (scrollable table card).
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6, 24px);
+  animation: pageEnter 0.4s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  min-height: 0;
+}
+
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4, 16px);
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+.pageTitle {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+}
+
+.pageSubtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #94a3b8);
+  letter-spacing: -0.01em;
+}
+
+/* ═══ CTA ═══ */
+.primaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius-md, 10px);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-accent, #635bff);
+  color: #fff;
+  letter-spacing: -0.01em;
+  box-shadow: var(--shadow-accent), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: all var(--duration-normal, 250ms) var(--ease-out);
+  max-width: 360px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.primaryBtn:hover:not(:disabled) { background: var(--color-accent-hover, #5046e5); transform: translateY(-1px); }
+.primaryBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ═══ Table card ═══ */
+.tableCard {
+  background: var(--color-bg-elevated, #fff);
+  border-radius: var(--radius-lg, 14px);
+  border: 1px solid var(--color-border, #e2e8f0);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100dvh - 220px);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-surface, #f1f5f9);
+  text-align: left;
+  padding: var(--space-3, 12px) var(--space-5, 20px);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted, #94a3b8);
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.table tbody td {
+  padding: var(--space-3, 12px) var(--space-5, 20px);
+  color: var(--color-text, #0f172a);
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  cursor: pointer;
+  transition: background var(--duration-fast, 150ms) var(--ease-out);
+}
+.table tbody tr:hover { background: var(--color-surface, #f1f5f9); }
+
+.rowSelected {
+  background: var(--color-accent-subtle, rgba(99, 91, 255, 0.06));
+}
+.rowSelected:hover { background: var(--color-accent-muted, rgba(99, 91, 255, 0.1)); }
+
+.rowSelected td:first-child {
+  color: var(--color-accent, #635bff);
+  font-weight: 600;
+}
+
+.idCol {
+  color: var(--color-text-muted, #94a3b8);
+  font-variant-numeric: tabular-nums;
+  width: 1%;
+}
+
+/* ═══ Empty / unavailable states ═══ */
+.stateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16, 64px) var(--space-8, 32px);
+  text-align: center;
+}
+
+.stateIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-xl, 20px);
+  background: var(--color-surface, #f1f5f9);
+  color: var(--color-text-faint, #cbd5e1);
+  margin-bottom: var(--space-5, 20px);
+}
+
+.stateTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #334155);
+  letter-spacing: -0.01em;
+}
+
+.stateText {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #94a3b8);
+  margin-top: var(--space-1, 4px);
+}
+
+.skeletonWrap { padding: var(--space-4, 16px); }
+
+/* ═══ Modal form ═══ */
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+  padding-top: var(--space-2, 8px);
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted, #94a3b8);
+  margin-bottom: var(--space-2, 8px);
+}
+
+.customerBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  background: var(--color-surface, #f1f5f9);
+  border-radius: var(--radius-md, 10px);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3, 12px);
+  margin-top: var(--space-6, 24px);
+  padding-top: var(--space-5, 20px);
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: 8px 16px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-md, 10px);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--color-bg-elevated, #fff);
+  color: var(--color-text-secondary, #334155);
+  box-shadow: var(--shadow-xs);
+  transition: all var(--duration-normal, 250ms) var(--ease-out);
+}
+.btnSecondary:hover { background: var(--color-surface, #f1f5f9); transform: translateY(-1px); }
+
+.selectWrapper {
+  /* SingleSelect owns its own visual chrome; the wrapper just reserves space
+   * for the dropdown in-flow so the modal body does not jump. */
+  position: relative;
+}
+
+.modalHelp {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #94a3b8);
+  margin-top: var(--space-1, 4px);
+}

@@ -32,3 +32,4 @@ apps/*/*.gz
 /portal-option-a-viewport.png
 /artifacts/
 /.playwright-cli
+.tmp/

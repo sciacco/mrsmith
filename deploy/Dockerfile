@@ -21,6 +21,7 @@ COPY --from=frontend /app/apps/portal/dist /static
 COPY --from=frontend /app/apps/budget/dist /static/apps/budget
 COPY --from=frontend /app/apps/compliance/dist /static/apps/compliance
 COPY --from=frontend /app/apps/coperture/dist /static/apps/coperture
+COPY --from=frontend /app/apps/cp-backoffice/dist /static/apps/cp-backoffice
 COPY --from=frontend /app/apps/energia-dc/dist /static/apps/energia-dc
 COPY --from=frontend /app/apps/kit-products/dist /static/apps/kit-products
 COPY --from=frontend /app/apps/listini-e-sconti/dist /static/apps/listini-e-sconti

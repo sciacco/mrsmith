@@ -1,0 +1,105 @@
+.page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  margin-bottom: var(--space-2);
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-6);
+}
+
+/* Horizontal scroll wrapper: required on narrow viewports per FINAL.md §S5c;
+   no cardification. */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  min-width: 960px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+  background: var(--color-bg-elevated);
+  position: sticky;
+  top: 0;
+}
+
+.table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: var(--color-accent-subtle);
+}
+
+.checkboxCell {
+  text-align: center;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.rowActions {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--space-10);
+  font-size: 0.875rem;
+}
+
+.error {
+  padding: var(--space-4);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger-hover);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-4);
+}
+
+.loading {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--space-10);
+  font-size: 0.875rem;
+}

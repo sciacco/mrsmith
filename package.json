@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "concurrently --names backend,portal,budget,compliance,kit-products,listini,panoramica,quotes,reports,rdf-backend,richieste-fattibilita,coperture,energia-dc,simulatori-vendita,afc-tools --prefix-colors blue,green,magenta,cyan,yellow,red,white,gray,blueBright,magentaBright,cyanBright,greenBright,yellowBright,redBright,whiteBright \"cd backend && air\" \"pnpm --filter mrsmith-portal dev\" \"pnpm --filter mrsmith-budget dev\" \"pnpm --filter mrsmith-compliance dev\" \"pnpm --filter mrsmith-kit-products dev\" \"pnpm --filter mrsmith-listini-e-sconti dev\" \"pnpm --filter mrsmith-panoramica-cliente dev\" \"pnpm --filter mrsmith-quotes dev\" \"pnpm --filter mrsmith-reports dev\" \"pnpm --filter mrsmith-rdf-backend dev\" \"pnpm --filter mrsmith-richieste-fattibilita dev\" \"pnpm --filter mrsmith-coperture dev\" \"pnpm --filter mrsmith-energia-dc dev\" \"pnpm --filter mrsmith-simulatori-vendita dev\" \"pnpm --filter @mrsmith/afc-tools dev\"",
+    "dev": "concurrently --names backend,portal,budget,compliance,kit-products,listini,panoramica,quotes,reports,rdf-backend,richieste-fattibilita,coperture,energia-dc,simulatori-vendita,afc-tools,cp-backoffice --prefix-colors blue,green,magenta,cyan,yellow,red,white,gray,blueBright,magentaBright,cyanBright,greenBright,yellowBright,redBright,whiteBright,blackBright \"cd backend && air\" \"pnpm --filter mrsmith-portal dev\" \"pnpm --filter mrsmith-budget dev\" \"pnpm --filter mrsmith-compliance dev\" \"pnpm --filter mrsmith-kit-products dev\" \"pnpm --filter mrsmith-listini-e-sconti dev\" \"pnpm --filter mrsmith-panoramica-cliente dev\" \"pnpm --filter mrsmith-quotes dev\" \"pnpm --filter mrsmith-reports dev\" \"pnpm --filter mrsmith-rdf-backend dev\" \"pnpm --filter mrsmith-richieste-fattibilita dev\" \"pnpm --filter mrsmith-coperture dev\" \"pnpm --filter mrsmith-energia-dc dev\" \"pnpm --filter mrsmith-simulatori-vendita dev\" \"pnpm --filter @mrsmith/afc-tools dev\" \"pnpm --filter mrsmith-cp-backoffice dev\"",
     "dev:backend": "cd backend && air",
     "dev:portal": "pnpm --filter mrsmith-portal dev",
     "dev:budget": "pnpm --filter mrsmith-budget dev",
@@ -19,6 +19,7 @@
     "dev:energia-dc": "pnpm --filter mrsmith-energia-dc dev",
     "dev:simulatori-vendita": "pnpm --filter mrsmith-simulatori-vendita dev",
     "dev:afc-tools": "pnpm --filter @mrsmith/afc-tools dev",
+    "dev:cp-backoffice": "pnpm --filter mrsmith-cp-backoffice dev",
     "build": "pnpm -r --if-present build && cd backend && go build -o bin/server ./cmd/server",
     "build:frontend": "pnpm -r --if-present build",
     "build:backend": "cd backend && go build -o bin/server ./cmd/server",

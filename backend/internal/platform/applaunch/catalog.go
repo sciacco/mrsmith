@@ -17,6 +17,9 @@ const (
 	CopertureAppID   = "coperture"
 	CopertureAppHref = "/apps/coperture/"
 
+	CPBackofficeAppID   = "cp-backoffice"
+	CPBackofficeAppHref = "/apps/cp-backoffice/"
+
 	EnergiaDCAppID   = "energia-dc"
 	EnergiaDCAppHref = "/apps/energia-dc/"
 
@@ -52,6 +55,7 @@ var (
 	budgetAccessRoles                = []string{"app_budget_access"}
 	complianceAccessRoles            = []string{"app_compliance_access"}
 	copertureAccessRoles             = []string{"app_coperture_access"}
+	cpBackofficeAccessRoles          = []string{"app_cpbackoffice_access"}
 	energiaDCAccessRoles             = []string{"app_energiadc_access"}
 	kitProductsAccessRoles           = []string{"app_kitproducts_access"}
 	listiniAccessRoles               = []string{"app_listini_access"}
@@ -239,15 +243,17 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryTitle: "SMART APPS",
 			AccessRoles:   PanoramicaAccessRoles(),
 		},
-		// {
-		// 	ID:            "customer-portal",
-		// 	Name:          "Customer Portal",
-		// 	Icon:          "chat",
-		// 	Href:          "/apps/smart-apps/customer-portal",
-		// 	CategoryID:    "smart-apps",
-		// 	CategoryTitle: "SMART APPS",
-		// 	AccessRoles:   defaultRoles,
-		// },
+		{
+			ID:            CPBackofficeAppID,
+			Name:          "CP Backoffice",
+			Description:   "Gestione aziende, utenti e accessi biometrico per il back-office clienti.",
+			Icon:          "users",
+			Href:          CPBackofficeAppHref,
+			Status:        "ready",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   CPBackofficeAccessRoles(),
+		},
 		// {
 		// 	ID:            "zammu",
 		// 	Name:          "Zammù",
@@ -394,6 +400,10 @@ func ComplianceAccessRoles() []string {
 
 func CopertureAccessRoles() []string {
 	return slices.Clone(copertureAccessRoles)
+}
+
+func CPBackofficeAccessRoles() []string {
+	return slices.Clone(cpBackofficeAccessRoles)
 }
 
 func EnergiaDCAccessRoles() []string {

@@ -19,6 +19,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/budget"
 	"github.com/sciacco/mrsmith/internal/compliance"
 	"github.com/sciacco/mrsmith/internal/coperture"
+	"github.com/sciacco/mrsmith/internal/cpbackoffice"
 	"github.com/sciacco/mrsmith/internal/energiadc"
 	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/listini"
@@ -247,6 +248,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.CopertureAppID] = "http://localhost:5183"
 	}
+	if cfg.CPBackofficeAppURL != "" {
+		hrefOverrides[applaunch.CPBackofficeAppID] = cfg.CPBackofficeAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.CPBackofficeAppID] = "http://localhost:5187"
+	}
 	if cfg.EnergiaDCAppURL != "" {
 		hrefOverrides[applaunch.EnergiaDCAppID] = cfg.EnergiaDCAppURL
 	} else if cfg.StaticDir == "" {
@@ -304,6 +310,9 @@ func main() {
 			if definition.ID == applaunch.CopertureAppID && cfg.DBCopertureDSN == "" {
 				continue
 			}
+			if definition.ID == applaunch.CPBackofficeAppID && (arakCli == nil || cfg.MistraDSN == "") {
+				continue
+			}
 			if definition.ID == applaunch.EnergiaDCAppID && cfg.GrappaDSN == "" {
 				continue
 			}
@@ -341,6 +350,11 @@ func main() {
 	budget.RegisterRoutes(api, arakCli)
 	compliance.RegisterRoutes(api, anisettaDB)
 	coperture.RegisterRoutes(api, dbCoperture)
+	cpbackoffice.RegisterRoutes(api, cpbackoffice.Deps{
+		Arak:   arakCli,
+		Mistra: mistraDB,
+		Logger: logger,
+	})
 	energiadc.RegisterRoutes(api, grappaDB, energiadc.ModuleConfig{
 		ExcludedCustomerIDs: cfg.EnergiaDCExcludedCustomerIDs,
 	})
