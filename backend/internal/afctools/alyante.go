@@ -2,18 +2,42 @@ package afctools
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
-// DdtCespitoRow: the MSSQL view Tsmi_DDT_Verifica_Cespiti exposes an open-ended
-// set of columns; for a strict 1:1 port we scan them generically as map[string]any
-// so the frontend can render whatever the view returns, matching Appsmith's
-// dynamic table binding. Preserves the `SELECT *` semantics (decision A.5.1e).
-type DdtCespitoRow = map[string]any
+// DdtCespitoRow represents one row from the Alyante MSSQL view
+// Tsmi_DDT_Verifica_Cespiti with its fixed schema.
+type DdtCespitoRow struct {
+	CodiceDocUscita string     `json:"Codice_doc_uscita"`
+	TipoDocUscita   *string    `json:"Tipo_doc_uscita"`
+	NumDocUscita    *string    `json:"Num_doc_uscita"`
+	DataDocUscita   time.Time  `json:"Data_doc_uscita"`
+	Quantita        float64    `json:"Quantita"`
+	CodiceArticolo  *string    `json:"Codice_articolo"`
+	Descrizione     *string    `json:"Descrizione"`
+	ImportoUnitario float64    `json:"Importo_unitario"`
+	ImportoTotale   *float64   `json:"Importo_totale"`
+	Seriali         *string    `json:"Seriali"`
+	NumDocIngresso  *string    `json:"Num_doc_ingresso"`
+	DataDocIngresso *string    `json:"Data_doc_ingresso"`
+}
 
 func (h *Handler) listDdtCespiti(r *http.Request) ([]DdtCespitoRow, error) {
-	const query = `SELECT * FROM Tsmi_DDT_Verifica_Cespiti`
+	const query = `SELECT Codice_doc_uscita,
+       Tipo_doc_uscita,
+       Num_doc_uscita,
+       Data_doc_uscita,
+       Quantita,
+       Codice_articolo,
+       Descrizione,
+       Importo_unitario,
+       Importo_totale,
+       Seriali,
+       Num_doc_ingresso,
+       Data_doc_ingresso
+FROM Tsmi_DDT_Verifica_Cespiti`
 
 	rows, err := h.deps.Alyante.QueryContext(r.Context(), query)
 	if err != nil {
@@ -21,25 +45,24 @@ func (h *Handler) listDdtCespiti(r *http.Request) ([]DdtCespitoRow, error) {
 	}
 	defer rows.Close()
 
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
-
 	out := make([]DdtCespitoRow, 0)
 	for rows.Next() {
-		values := make([]any, len(cols))
-		scanTargets := make([]any, len(cols))
-		for i := range values {
-			scanTargets[i] = &values[i]
-		}
-		if err := rows.Scan(scanTargets...); err != nil {
+		var row DdtCespitoRow
+		if err := rows.Scan(
+			&row.CodiceDocUscita,
+			&row.TipoDocUscita,
+			&row.NumDocUscita,
+			&row.DataDocUscita,
+			&row.Quantita,
+			&row.CodiceArticolo,
+			&row.Descrizione,
+			&row.ImportoUnitario,
+			&row.ImportoTotale,
+			&row.Seriali,
+			&row.NumDocIngresso,
+			&row.DataDocIngresso,
+		); err != nil {
 			return nil, err
-		}
-
-		row := make(DdtCespitoRow, len(cols))
-		for i, c := range cols {
-			row[c] = normalizeScanValue(values[i])
 		}
 		out = append(out, row)
 	}
@@ -47,17 +70,6 @@ func (h *Handler) listDdtCespiti(r *http.Request) ([]DdtCespitoRow, error) {
 		return nil, err
 	}
 	return out, nil
-}
-
-// normalizeScanValue coerces driver-specific Go types (byte slices for text,
-// time.Time for datetime) into JSON-friendly values. Nil remains nil.
-func normalizeScanValue(v any) any {
-	switch x := v.(type) {
-	case []byte:
-		return string(x)
-	default:
-		return x
-	}
 }
 
 func (h *Handler) handleDdtCespiti(w http.ResponseWriter, r *http.Request) {
