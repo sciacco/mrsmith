@@ -2,12 +2,25 @@
 // Shape comes unwrapped from GET /api/cp-backoffice/v1/users?customer_id=...
 // (the backend strips the upstream `items` envelope and pins
 // disable_pagination=true upstream — see backend/internal/cpbackoffice/arak.go).
+// This matches the upstream `user-brief` DTO; the frontend unwraps `role.name`
+// for the legacy Appsmith-visible column.
+export interface UserRole {
+  id: number;
+  name: string;
+  color?: string;
+}
+
 export interface User {
   id: number;
-  nome: string;
-  cognome: string;
+  customer_id: number;
+  first_name: string;
+  last_name: string;
   email: string;
-  is_admin: boolean;
+  enabled: boolean;
+  role: UserRole;
+  phone?: string;
+  created: string;
+  last_login?: string;
 }
 
 // Query key factory for every user-list cache entry. Kept scoped by

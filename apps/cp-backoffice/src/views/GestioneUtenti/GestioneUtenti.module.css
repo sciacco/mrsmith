@@ -47,6 +47,23 @@
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: var(--radius-md, 10px);
   background: var(--color-bg-elevated, #fff);
+  overflow: hidden;
+}
+
+.tableTools {
+  padding: var(--space-4, 16px);
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.tableToolbar {
+  width: 100%;
+}
+
+.search {
+  width: min(100%, 26rem);
+}
+
+.tableScroll {
   overflow-x: auto;
 }
 
@@ -73,10 +90,23 @@
   padding: var(--space-3, 12px) var(--space-4, 16px);
   border-bottom: 1px solid var(--color-border, #e2e8f0);
   color: var(--color-text, #0f172a);
+  white-space: nowrap;
 }
 
 .table tr:last-child td {
   border-bottom: none;
+}
+
+.checkboxHeader,
+.checkboxCell {
+  text-align: center;
+}
+
+.readOnlyCheckbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent, #635bff);
+  pointer-events: none;
 }
 
 .emptyState {
@@ -166,4 +196,14 @@
   margin-top: var(--space-6, 24px);
   padding-top: var(--space-5, 20px);
   border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+@media (max-width: 720px) {
+  .tableTools {
+    padding: var(--space-3, 12px);
+  }
+
+  .search {
+    width: 100%;
+  }
 }

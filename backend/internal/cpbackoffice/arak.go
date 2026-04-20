@@ -24,9 +24,19 @@ const (
 	upstreamCreateAdminPath    = "/users/v2/admin"
 )
 
-// disablePaginationQuery is pinned on every list upstream call so the
-// caller always gets the full set (v1 locks out frontend pagination).
-const disablePaginationQuery = "disable_pagination=true"
+// pinnedListQuery builds the list-query contract expected by Mistra NG.
+// Every list endpoint requires page_number, even when pagination is disabled.
+func pinnedListQuery(extra url.Values) string {
+	q := url.Values{}
+	q.Set("page_number", "1")
+	q.Set("disable_pagination", "true")
+	for key, values := range extra {
+		for _, value := range values {
+			q.Add(key, value)
+		}
+	}
+	return q.Encode()
+}
 
 // upstreamItemsEnvelope is the shape returned by every Mistra NG list
 // endpoint. We unwrap `items` and surface only that array to the SPA;
@@ -89,7 +99,7 @@ func compactBody(body []byte) string {
 }
 
 // ═══ GET /cp-backoffice/v1/customers ═══
-// Upstream: GET /customers/v2/customer?disable_pagination=true.
+// Upstream: GET /customers/v2/customer?page_number=1&disable_pagination=true.
 
 func handleListCustomers(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +109,7 @@ func handleListCustomers(deps Deps) http.HandlerFunc {
 		}
 		const op = "list_customers"
 
-		resp, err := deps.Arak.Do(http.MethodGet, upstreamCustomersPath, disablePaginationQuery, nil)
+		resp, err := deps.Arak.Do(http.MethodGet, upstreamCustomersPath, pinnedListQuery(nil), nil)
 		if err != nil {
 			upstreamFailure(w, r, err, op)
 			return
@@ -122,7 +132,7 @@ func handleListCustomers(deps Deps) http.HandlerFunc {
 }
 
 // ═══ GET /cp-backoffice/v1/customer-states ═══
-// Upstream: GET /customers/v2/customer-state?disable_pagination=true.
+// Upstream: GET /customers/v2/customer-state?page_number=1&disable_pagination=true.
 
 func handleListCustomerStates(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +142,7 @@ func handleListCustomerStates(deps Deps) http.HandlerFunc {
 		}
 		const op = "list_customer_states"
 
-		resp, err := deps.Arak.Do(http.MethodGet, upstreamCustomerStatesPath, disablePaginationQuery, nil)
+		resp, err := deps.Arak.Do(http.MethodGet, upstreamCustomerStatesPath, pinnedListQuery(nil), nil)
 		if err != nil {
 			upstreamFailure(w, r, err, op)
 			return
@@ -242,7 +252,7 @@ func handleUpdateCustomerState(deps Deps) http.HandlerFunc {
 }
 
 // ═══ GET /cp-backoffice/v1/users?customer_id=... ═══
-// Upstream: GET /users/v2/user?customer_id={id}&disable_pagination=true.
+// Upstream: GET /users/v2/user?customer_id={id}&page_number=1&disable_pagination=true.
 // Hard backend guard: missing or empty customer_id rejected with 400 and never
 // proxied. The FE also gates the fetch on selection, but the backend is the
 // source of truth for this rule.
@@ -260,13 +270,10 @@ func handleListUsers(deps Deps) http.HandlerFunc {
 			httputil.Error(w, http.StatusBadRequest, "customer_id_required")
 			return
 		}
-		// Normalizing via url.Values guarantees correct encoding and a stable
-		// param order (customer_id before disable_pagination).
 		q := url.Values{}
 		q.Set("customer_id", customerID)
-		q.Set("disable_pagination", "true")
 
-		resp, err := deps.Arak.Do(http.MethodGet, upstreamUsersPath, q.Encode(), nil)
+		resp, err := deps.Arak.Do(http.MethodGet, upstreamUsersPath, pinnedListQuery(q), nil)
 		if err != nil {
 			upstreamFailure(w, r, err, op)
 			return

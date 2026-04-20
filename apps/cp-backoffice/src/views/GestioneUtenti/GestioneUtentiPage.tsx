@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Button } from '@mrsmith/ui';
+import { useDeferredValue, useState } from 'react';
+import { Button, SearchInput, TableToolbar } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
+import type { User } from '../../api/users';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useUsersByCustomer } from '../../hooks/useUsersByCustomer';
 import { useOptionalAuth } from '../../hooks/useOptionalAuth';
@@ -14,14 +15,25 @@ export function GestioneUtentiPage() {
     null,
   );
   const [modalOpen, setModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const customersQuery = useCustomers();
   const usersQuery = useUsersByCustomer(selectedCustomerId);
+  const deferredSearch = useDeferredValue(searchQuery);
 
   const operatorLabel = user?.name ?? user?.email ?? '';
   const greeting = `Ciao ${operatorLabel}, in questa applicazione vengono visualizzati tutti gli utenti inseriti per l'azienda selezionata - da indicare tramite la select`;
 
   const selectionMade = selectedCustomerId != null;
+  const allUsers = usersQuery.data ?? [];
+  const filteredUsers = filterUsers(allUsers, deferredSearch);
+  const hasUsers = allUsers.length > 0;
+  const hasSearch = deferredSearch.trim().length > 0;
+
+  function handleCustomerChange(customerId: number | null) {
+    setSelectedCustomerId(customerId);
+    setSearchQuery('');
+  }
 
   return (
     <section className={styles.page}>
@@ -33,7 +45,7 @@ export function GestioneUtentiPage() {
           <CustomerSelector
             customers={customersQuery.data}
             selectedId={selectedCustomerId}
-            onChange={setSelectedCustomerId}
+            onChange={handleCustomerChange}
             loading={customersQuery.isLoading}
             error={customersQuery.isError}
           />
@@ -59,32 +71,74 @@ export function GestioneUtentiPage() {
         <div className={styles.errorState}>
           {formatUsersError(usersQuery.error)}
         </div>
-      ) : !usersQuery.data || usersQuery.data.length === 0 ? (
+      ) : !hasUsers ? (
         <div className={styles.emptyState}>
           Nessun utente associato a questa azienda.
         </div>
       ) : (
         <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Cognome</th>
-                <th>Em@il</th>
-                <th>Admin</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usersQuery.data.map((u) => (
-                <tr key={u.id}>
-                  <td>{u.nome}</td>
-                  <td>{u.cognome}</td>
-                  <td>{u.email}</td>
-                  <td>{u.is_admin ? 'Sì' : 'No'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className={styles.tableTools}>
+            <TableToolbar className={styles.tableToolbar}>
+              <SearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Cerca utenti..."
+                className={styles.search}
+              />
+            </TableToolbar>
+          </div>
+
+          {filteredUsers.length === 0 ? (
+            <div className={styles.emptyState}>
+              {hasSearch
+                ? 'Nessun risultato per la ricerca inserita.'
+                : 'Nessun utente associato a questa azienda.'}
+            </div>
+          ) : (
+            <div className={styles.tableScroll}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>email</th>
+                    <th>Nome</th>
+                    <th>Cognome</th>
+                    <th>nome ruolo</th>
+                    <th className={styles.checkboxHeader}>
+                      Accesso CP abilitato
+                    </th>
+                    <th>Creato il</th>
+                    <th>last_login</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((u) => (
+                    <tr key={u.id}>
+                      <td>{u.email}</td>
+                      <td>{u.first_name}</td>
+                      <td>{u.last_name}</td>
+                      <td>{u.role.name}</td>
+                      <td className={styles.checkboxCell}>
+                        <input
+                          className={styles.readOnlyCheckbox}
+                          type="checkbox"
+                          checked={u.enabled}
+                          readOnly
+                          tabIndex={-1}
+                          aria-label={
+                            u.enabled
+                              ? 'Accesso CP abilitato'
+                              : 'Accesso CP non abilitato'
+                          }
+                        />
+                      </td>
+                      <td>{u.created}</td>
+                      <td>{u.last_login ?? ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -114,4 +168,27 @@ function extractMessage(body: unknown): string | undefined {
     if (typeof raw === 'string' && raw.trim().length > 0) return raw.trim();
   }
   return undefined;
+}
+
+function filterUsers(
+  users: ReadonlyArray<User>,
+  query: string,
+) {
+  const normalizedQuery = normalize(query);
+  if (!normalizedQuery) return users;
+
+  return users.filter((user) =>
+    [
+      user.email,
+      user.first_name,
+      user.last_name,
+      user.role.name,
+      user.created,
+      user.last_login ?? '',
+    ].some((value) => normalize(value).includes(normalizedQuery)),
+  );
+}
+
+function normalize(value: string) {
+  return value.trim().toLocaleLowerCase();
 }

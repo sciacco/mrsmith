@@ -120,6 +120,9 @@ func TestListCustomersPassesThroughItems(t *testing.T) {
 	if got.Path != "/customers/v2/customer" {
 		t.Errorf("expected path /customers/v2/customer, got %s", got.Path)
 	}
+	if !strings.Contains(got.Query, "page_number=1") {
+		t.Errorf("expected query to contain page_number=1, got %q", got.Query)
+	}
 	if !strings.Contains(got.Query, "disable_pagination=true") {
 		t.Errorf("expected query to contain disable_pagination=true, got %q", got.Query)
 	}
@@ -150,6 +153,9 @@ func TestListCustomerStatesPassesThroughItems(t *testing.T) {
 	}
 	if got.Path != "/customers/v2/customer-state" {
 		t.Errorf("expected path /customers/v2/customer-state, got %s", got.Path)
+	}
+	if !strings.Contains(got.Query, "page_number=1") {
+		t.Errorf("expected query to contain page_number=1, got %q", got.Query)
 	}
 	if !strings.Contains(got.Query, "disable_pagination=true") {
 		t.Errorf("expected query to contain disable_pagination=true, got %q", got.Query)
@@ -259,6 +265,9 @@ func TestListUsersWithValidCustomerIDForwardsBoth(t *testing.T) {
 	}
 	if !strings.Contains(got.Query, "customer_id=77") {
 		t.Errorf("expected query to contain customer_id=77, got %q", got.Query)
+	}
+	if !strings.Contains(got.Query, "page_number=1") {
+		t.Errorf("expected query to contain page_number=1, got %q", got.Query)
 	}
 	if !strings.Contains(got.Query, "disable_pagination=true") {
 		t.Errorf("expected query to contain disable_pagination=true, got %q", got.Query)

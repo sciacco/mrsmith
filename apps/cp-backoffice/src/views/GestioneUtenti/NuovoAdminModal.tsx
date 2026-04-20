@@ -22,8 +22,8 @@ interface NotificationOption {
 }
 
 const NOTIFICATION_OPTIONS: readonly NotificationOption[] = [
-  { key: 'maintenance', label: 'Comunicazioni di manutenzione' },
-  { key: 'marketing', label: 'Comunicazioni marketing' },
+  { key: 'maintenance', label: 'Manutenzioni' },
+  { key: 'marketing', label: 'Marketing' },
 ];
 
 export function NuovoAdminModal({
