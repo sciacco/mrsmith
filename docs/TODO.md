@@ -99,3 +99,14 @@ The AOV page has 4 SQL queries sharing ~80% identical logic. The `get_report_dat
 
 ### AOV Query Consolidation (Post-Coexistence)
 The 4 AOV SQL queries (`get_report_data`, `get_report_data_tipo_ord`, `get_report_data_area`, `get_report_data_sales`) share ~80% identical SQL with different GROUP BY/SELECT. They are kept as 4 separate verbatim queries in the V1 backend to guarantee 1:1 correspondence with Appsmith and avoid LLM-introduced drift during migration. Consolidation into a single parameterized query or stored procedure should happen post-coexistence, validated by diffing query results against the original.
+
+## Customer Portal Back-office App
+
+### Expose `skip_keycloak` toggle in Nuovo Admin modal (hidden in source, omitted in port)
+The Appsmith source carries a `new_user_skip_kc` SWITCH_WIDGET in the `Nuovo Admin` modal (Gestione Utenti page) wired to `skip_keycloak` on the `user-admin-new` DTO. Its DSL has `isVisible: false` and `defaultSwitchState: false` with no dynamic binding on either, so operators never see it and every admin creation sends `skip_keycloak: false`. The widget is kept in the source on purpose, so an Appsmith editor can flip `isVisible: true` the day the capability is needed without re-wiring the modal. The React port omits the switch entirely and pins `skip_keycloak: false` in request assembly, which matches observed operator behavior but loses the "flip one property to expose it" affordance Appsmith provided. Follow-up when product asks to surface the toggle: add a `ToggleSwitch` to the `Nuovo Admin` modal bound to a `skipKeycloak` form field, include it in the `createAdmin` request body, and verify Mistra NG enforces a server-side role check on `skip_keycloak=true` before shipping — if it does not, introduce a dedicated backend role (e.g. `app_cpbackoffice_admin_create_bypass_kc`) on the BFF that gates the field and silently forces `false` for callers without it.
+
+### Accessi Biometrico — Label Polish After 1:1 Port
+The Appsmith source uses raw lowercase labels in the biometric table (`nome`, `cognome`, `tipo_richiesta`, `stato_richiesta`, etc.). The v1 React port keeps those labels verbatim for strict parity, but the audit flags them as presentation debt. Post-port follow-up: update the visible labels to cleaner business Italian (for example `Nome`, `Cognome`, `Tipo richiesta`, `Stato`) without changing the DTO keys or table behavior.
+
+### Accessi Biometrico — Defensive Ceiling / Filters
+The biometric-request list is ported 1:1 with `ORDER BY data_richiesta DESC` and no pagination or filters. That matches the source, but it leaves the endpoint unbounded as volumes grow. Follow-up: decide the smallest safe mitigation for the backend and UI — server-side limit with truncation signal, minimal filters, or true pagination — and validate the chosen contract against operator workflow before shipping it as a post-v1 improvement.
