@@ -1,14 +1,96 @@
-import { Skeleton } from '@mrsmith/ui';
+import { Button, Icon, Skeleton } from '@mrsmith/ui';
 import { useInvoiceLines } from '../api/queries';
+import { downloadCsv } from '../utils/csv';
 import { formatMoneyEUR } from '../utils/format';
 import shared from './shared.module.css';
 
 export default function FatturePrometeusPage() {
   const q = useInvoiceLines();
 
+  function handleExport() {
+    downloadCsv(
+      'fatture-prometeus.csv',
+      [
+        'Raggruppamento',
+        'Ragione sociale',
+        'Nome',
+        'Cognome',
+        'Partita IVA',
+        'Codice fiscale',
+        'Iso',
+        'PF',
+        'Indirizzo',
+        'Civico',
+        'CAP',
+        'Comune',
+        'PV',
+        'Nazione',
+        'Documento',
+        'Data doc.',
+        'Causale',
+        'Linea',
+        'Qtà',
+        'Descrizione',
+        'Prezzo',
+        'Inizio periodo',
+        'Fine periodo',
+        'Modalità pagamento',
+        'IVA',
+        'Bollo',
+        'Codice cliente ERP',
+        'Tipo',
+        'Invoice ID',
+        'ID',
+      ],
+      (q.data ?? []).map((l) => [
+        l.raggruppamento ?? '',
+        l.ragionesocialecliente ?? '',
+        l.nomecliente ?? '',
+        l.cognomecliente ?? '',
+        l.partitaiva ?? '',
+        l.codicefiscale ?? '',
+        l.codiceiso ?? '',
+        l.flagpersonafisica ?? '',
+        l.indirizzo ?? '',
+        l.numerocivico ?? '',
+        l.cap ?? '',
+        l.comune ?? '',
+        l.provincia ?? '',
+        l.nazione ?? '',
+        l.numerodocumento ?? '',
+        l.datadocumento ?? '',
+        l.causale ?? '',
+        l.numerolinea ?? '',
+        l.quantita ?? '',
+        l.descrizioneriga ?? '',
+        formatMoneyEUR(l.prezzo),
+        l.datainizioperiodo ?? '',
+        l.datafineperiodo ?? '',
+        l.modalitapagamento ?? '',
+        l.ivariga ?? '',
+        l.bollo ?? '',
+        l.codiceclienteerp ?? '',
+        l.tipo ?? '',
+        l.invoiceid ?? '',
+        l.id,
+      ]),
+    );
+  }
+
   return (
     <div className={shared.page}>
-      <h1 className={shared.title}>Fatture Prometeus</h1>
+      <div className={shared.titleRow}>
+        <h1 className={`${shared.title} ${shared.titleCompact}`}>Fatture Prometeus</h1>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleExport}
+          disabled={!q.data || q.data.length === 0}
+          leftIcon={<Icon name="download" size={14} />}
+        >
+          Esporta CSV
+        </Button>
+      </div>
       <p className={shared.info}>Ultime 2000 righe fattura trasmesse da WHMCS ad Alyante.</p>
 
       {q.isLoading && <Skeleton rows={10} />}
