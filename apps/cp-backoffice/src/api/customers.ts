@@ -2,9 +2,16 @@
 // Shape comes unwrapped from GET /api/cp-backoffice/v1/customers: the backend
 // strips the upstream `items` envelope and forwards the row array as-is
 // (see backend/internal/cpbackoffice/arak.go writeItemsPassthrough).
+export interface CustomerState {
+  id: number;
+  name: string;
+  enabled: boolean;
+}
+
 export interface Customer {
   id: number;
   name: string;
+  state: CustomerState;
 }
 
 // Body shape accepted by PUT /api/cp-backoffice/v1/customers/{id}/state.

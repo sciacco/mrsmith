@@ -1,16 +1,39 @@
 import { useDeferredValue, useState } from 'react';
-import { Button, SearchInput, TableToolbar } from '@mrsmith/ui';
+import { Button, Icon, SearchInput, Tooltip } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import type { User } from '../../api/users';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useUsersByCustomer } from '../../hooks/useUsersByCustomer';
-import { useOptionalAuth } from '../../hooks/useOptionalAuth';
 import { CustomerSelector } from './CustomerSelector';
 import { NuovoAdminModal } from './NuovoAdminModal';
 import styles from './GestioneUtenti.module.css';
 
+const HELP_CONTENT = (
+  <div className={styles.helpContent}>
+    <p>
+      In questa applicazione vengono visualizzati tutti gli utenti inseriti
+      sul Customer Portal per l&apos;azienda selezionata — da indicare
+      tramite la select che trovi qui sotto.
+    </p>
+    <ul>
+      <li>
+        Se non trovi utenti in lista, non sono stati aggiunti al portale
+        oppure sono stati aggiunti e poi eliminati.
+      </li>
+      <li>
+        La colonna &laquo;Ultimo login&raquo; permette di vedere se è stato
+        fatto almeno un login sul portale — funzione attiva da settembre
+        &apos;25, quindi non sempre veritiera (lo sarà a tendere).
+      </li>
+      <li>
+        Accesso CP abilitato: se non è presente il flag, l&apos;utente è
+        stato disabilitato con un soft delete dal proprio admin.
+      </li>
+    </ul>
+  </div>
+);
+
 export function GestioneUtentiPage() {
-  const { user } = useOptionalAuth();
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(
     null,
   );
@@ -20,9 +43,6 @@ export function GestioneUtentiPage() {
   const customersQuery = useCustomers();
   const usersQuery = useUsersByCustomer(selectedCustomerId);
   const deferredSearch = useDeferredValue(searchQuery);
-
-  const operatorLabel = user?.name ?? user?.email ?? '';
-  const greeting = `Ciao ${operatorLabel}, in questa applicazione vengono visualizzati tutti gli utenti inseriti per l'azienda selezionata - da indicare tramite la select`;
 
   const selectionMade = selectedCustomerId != null;
   const allUsers = usersQuery.data ?? [];
@@ -37,7 +57,18 @@ export function GestioneUtentiPage() {
 
   return (
     <section className={styles.page}>
-      <p className={styles.greeting}>{greeting}</p>
+      <header className={styles.header}>
+        <h1 className={styles.pageTitle}>Gestione utenti per azienda</h1>
+        <Tooltip content={HELP_CONTENT} placement="bottom" maxWidth={480}>
+          <button
+            type="button"
+            className={styles.helpButton}
+            aria-label="Aiuto"
+          >
+            <Icon name="info" size={18} />
+          </button>
+        </Tooltip>
+      </header>
 
       <div className={styles.toolbar}>
         <div className={styles.selector}>
@@ -50,45 +81,43 @@ export function GestioneUtentiPage() {
             error={customersQuery.isError}
           />
         </div>
-        <div className={styles.ctaSlot}>
-          <Button
-            variant="primary"
-            disabled={!selectionMade}
-            onClick={() => setModalOpen(true)}
-          >
-            Nuovo Admin
-          </Button>
-        </div>
       </div>
 
       {!selectionMade ? (
         <div className={styles.emptyState}>
-          Seleziona un'azienda per visualizzare gli utenti.
-        </div>
-      ) : usersQuery.isLoading ? (
-        <div className={styles.loadingState}>Caricamento utenti...</div>
-      ) : usersQuery.isError ? (
-        <div className={styles.errorState}>
-          {formatUsersError(usersQuery.error)}
-        </div>
-      ) : !hasUsers ? (
-        <div className={styles.emptyState}>
-          Nessun utente associato a questa azienda.
+          Seleziona un&apos;azienda per visualizzare gli utenti.
         </div>
       ) : (
         <div className={styles.tableWrapper}>
           <div className={styles.tableTools}>
-            <TableToolbar className={styles.tableToolbar}>
+            {hasUsers ? (
               <SearchInput
                 value={searchQuery}
                 onChange={setSearchQuery}
                 placeholder="Cerca utenti..."
                 className={styles.search}
               />
-            </TableToolbar>
+            ) : null}
+            <Button
+              variant="primary"
+              className={styles.newAdminBtn}
+              onClick={() => setModalOpen(true)}
+            >
+              Nuovo Admin
+            </Button>
           </div>
 
-          {filteredUsers.length === 0 ? (
+          {usersQuery.isLoading ? (
+            <div className={styles.loadingState}>Caricamento utenti...</div>
+          ) : usersQuery.isError ? (
+            <div className={styles.errorState}>
+              {formatUsersError(usersQuery.error)}
+            </div>
+          ) : !hasUsers ? (
+            <div className={styles.emptyState}>
+              Nessun utente associato a questa azienda.
+            </div>
+          ) : filteredUsers.length === 0 ? (
             <div className={styles.emptyState}>
               {hasSearch
                 ? 'Nessun risultato per la ricerca inserita.'

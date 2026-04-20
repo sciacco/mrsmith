@@ -6,11 +6,63 @@
   padding: var(--space-6, 24px);
 }
 
-.greeting {
-  font-size: 0.9375rem;
-  color: var(--color-text-secondary, #334155);
-  line-height: 1.6;
-  max-width: 60rem;
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.pageTitle {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.helpButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 50%;
+  background: var(--color-bg-elevated, #fff);
+  color: var(--color-text-muted, #94a3b8);
+  cursor: help;
+  transition: all var(--duration-normal, 250ms) var(--ease-out);
+}
+.helpButton:hover {
+  border-color: var(--color-accent, #635bff);
+  color: var(--color-accent, #635bff);
+}
+.helpButton:focus-visible {
+  outline: none;
+  border-color: var(--color-accent, #635bff);
+  box-shadow: 0 0 0 3px var(--color-accent-glow, rgba(99, 91, 255, 0.15));
+}
+
+.helpContent {
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  text-align: left;
+  color: var(--color-text, #0f172a);
+}
+.helpContent p {
+  margin: 0 0 var(--space-3, 12px);
+}
+.helpContent ul {
+  margin: 0;
+  padding-left: var(--space-4, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+.helpContent li {
+  margin: 0;
 }
 
 .toolbar {
@@ -37,11 +89,6 @@
   color: var(--color-text-muted, #94a3b8);
 }
 
-.ctaSlot {
-  display: flex;
-  align-items: center;
-}
-
 /* ═══ Table ═══ */
 .tableWrapper {
   border: 1px solid var(--color-border, #e2e8f0);
@@ -51,16 +98,21 @@
 }
 
 .tableTools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
   padding: var(--space-4, 16px);
   border-bottom: 1px solid var(--color-border, #e2e8f0);
 }
 
-.tableToolbar {
-  width: 100%;
-}
-
 .search {
   width: min(100%, 26rem);
+  flex: 1;
+}
+
+.newAdminBtn {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .tableScroll {

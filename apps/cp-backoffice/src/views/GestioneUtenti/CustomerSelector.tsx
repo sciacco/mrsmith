@@ -38,7 +38,6 @@ export function CustomerSelector({
       selected={selectedId}
       onChange={(value) => onChange(value as number | null)}
       placeholder="Seleziona un'azienda"
-      allowClear
     />
   );
 }
