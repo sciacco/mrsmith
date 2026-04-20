@@ -1,18 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Button, useToast } from '@mrsmith/ui';
+import { useDeferredValue, useMemo, useState } from 'react';
+import { Button, Modal, SearchInput, Skeleton, useToast } from '@mrsmith/ui';
 import { useBiometricRequests } from '../../hooks/useBiometricRequests';
 import { useSetBiometricCompleted } from '../../hooks/useSetBiometricCompleted';
 import type { BiometricRequestRow } from '../../api/biometric';
 import styles from './AccessiBiometricoPage.module.css';
 
-// Column labels are preserved VERBATIM in v1 for operator-facing parity
-// (FINAL.md §Slice S5c / PROMPT.md "User Copy Rules"). Do not capitalize.
-// The label `data conferma` intentionally contains a space and maps to the
-// `data_approvazione` backend field; `data della richiesta` maps to
-// `data_richiesta`.
-interface ColumnDef {
-  label: string;
-  render: (row: BiometricRequestRow) => string;
+type TabKey = 'pending' | 'done';
+
+interface ConfirmTarget {
+  row: BiometricRequestRow;
+  nextCompleted: boolean;
 }
 
 function formatTimestamp(value: string | null): string {
@@ -27,82 +24,65 @@ function formatTimestamp(value: string | null): string {
   return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
 
-const TEXT_COLUMNS: ColumnDef[] = [
-  { label: 'nome', render: (r) => r.nome },
-  { label: 'cognome', render: (r) => r.cognome },
-  { label: 'email', render: (r) => r.email },
-  { label: 'azienda', render: (r) => r.azienda },
-  { label: 'tipo_richiesta', render: (r) => r.tipo_richiesta },
-];
+function filterRows(
+  rows: ReadonlyArray<BiometricRequestRow>,
+  query: string,
+): ReadonlyArray<BiometricRequestRow> {
+  const needle = query.trim().toLocaleLowerCase();
+  if (!needle) return rows;
+  return rows.filter((r) =>
+    [r.nome, r.cognome, r.email, r.azienda, r.tipo_richiesta].some((v) =>
+      v.toLocaleLowerCase().includes(needle),
+    ),
+  );
+}
 
 export function AccessiBiometricoPage() {
-  const { data, isLoading, isError } = useBiometricRequests();
+  const { data, isLoading, isError, refetch } = useBiometricRequests();
   const mutation = useSetBiometricCompleted();
   const { toast } = useToast();
 
-  // Local per-row edit state for the editable `stato_richiesta` checkbox.
-  // Keyed by row id; presence indicates the row is dirty.
-  const [pendingByRow, setPendingByRow] = useState<Record<number, boolean>>({});
+  const [tab, setTab] = useState<TabKey>('pending');
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearch = useDeferredValue(searchQuery);
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
 
-  // When a server refetch lands (or rows disappear), drop stale dirty state
-  // so Discard always reverts to the authoritative server value.
-  useEffect(() => {
-    if (!data) return;
-    setPendingByRow((prev) => {
-      const validIds = new Set(data.map((r) => r.id));
-      let changed = false;
-      const next: Record<number, boolean> = {};
-      for (const [key, value] of Object.entries(prev)) {
-        const idNum = Number(key);
-        if (validIds.has(idNum)) {
-          next[idNum] = value;
-        } else {
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [data]);
+  const rows = data ?? [];
+  const pendingRows = useMemo(
+    () => rows.filter((r) => !r.stato_richiesta),
+    [rows],
+  );
+  const doneRows = useMemo(
+    () => rows.filter((r) => r.stato_richiesta),
+    [rows],
+  );
 
-  const rows = useMemo<BiometricRequestRow[]>(() => data ?? [], [data]);
+  const visibleRows = useMemo(() => {
+    const base = tab === 'pending' ? pendingRows : doneRows;
+    return filterRows(base, deferredSearch);
+  }, [tab, pendingRows, doneRows, deferredSearch]);
 
-  function onToggle(row: BiometricRequestRow, nextValue: boolean) {
-    setPendingByRow((prev) => {
-      // If the new value matches the server value, clear the dirty flag.
-      if (nextValue === row.stato_richiesta) {
-        if (!(row.id in prev)) return prev;
-        const { [row.id]: _removed, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [row.id]: nextValue };
-    });
-  }
+  const hasSearch = deferredSearch.trim().length > 0;
 
-  function onDiscard(rowId: number) {
-    setPendingByRow((prev) => {
-      if (!(rowId in prev)) return prev;
-      const { [rowId]: _removed, ...rest } = prev;
-      return rest;
-    });
-  }
-
-  function onSave(row: BiometricRequestRow) {
-    const pending = pendingByRow[row.id];
-    if (pending === undefined) return;
+  function handleConfirm() {
+    if (!confirmTarget) return;
+    const { row, nextCompleted } = confirmTarget;
     mutation.mutate(
-      { id: row.id, completed: pending },
+      { id: row.id, completed: nextCompleted },
       {
         onSuccess: () => {
-          // Clear dirty state optimistically; list refetch will reconcile.
-          setPendingByRow((prev) => {
-            if (!(row.id in prev)) return prev;
-            const { [row.id]: _removed, ...rest } = prev;
-            return rest;
-          });
-          toast('Perfetto, stato biometrico cambiato', 'success');
+          setConfirmTarget(null);
+          toast(
+            nextCompleted ? 'Richiesta confermata' : 'Richiesta riaperta',
+            'success',
+          );
         },
         onError: () => {
-          toast("Qualcosa e' andato storto", 'error');
+          setConfirmTarget(null);
+          toast(
+            nextCompleted ? 'Conferma non riuscita' : 'Riapertura non riuscita',
+            'error',
+          );
         },
       },
     );
@@ -110,91 +90,275 @@ export function AccessiBiometricoPage() {
 
   return (
     <section className={styles.page}>
-      <h1 className={styles.title}>Accessi Biometrico</h1>
-      <p className={styles.subtitle}>
-        Elenco delle richieste di accesso biometrico. Modifica lo stato e conferma riga per riga.
-      </p>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Accessi biometrici</h1>
+        <p className={styles.subtitle}>
+          Conferma le richieste di accesso approvate.
+        </p>
+      </div>
 
-      {isError && (
-        <div className={styles.error} role="alert">
-          Impossibile caricare l&apos;elenco delle richieste. Riprova piu tardi.
-        </div>
-      )}
+      <div className={styles.card}>
+        {isLoading ? (
+          <div className={styles.skeletonWrap}>
+            <Skeleton rows={6} />
+          </div>
+        ) : isError ? (
+          <div className={styles.stateBox}>
+            <div className={styles.stateIcon}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <p className={styles.stateTitle}>Impossibile caricare le richieste</p>
+            <p className={styles.stateText}>Riprova tra qualche minuto.</p>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => refetch()}
+              className={styles.stateCta}
+            >
+              Riprova
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className={styles.toolbar}>
+              <div className={styles.tabs} role="tablist" aria-label="Filtro richieste">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === 'pending'}
+                  className={`${styles.tab} ${tab === 'pending' ? styles.tabActive : ''}`}
+                  onClick={() => setTab('pending')}
+                >
+                  Da confermare
+                  {pendingRows.length > 0 && (
+                    <span className={styles.tabCount}>{pendingRows.length}</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === 'done'}
+                  className={`${styles.tab} ${tab === 'done' ? styles.tabActive : ''}`}
+                  onClick={() => setTab('done')}
+                >
+                  Confermate
+                </button>
+              </div>
+              <SearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Cerca per nome, email, azienda..."
+                className={styles.search}
+              />
+            </div>
 
-      {isLoading && !isError && (
-        <div className={styles.loading}>Caricamento in corso.</div>
-      )}
+            {visibleRows.length === 0 ? (
+              <EmptyState tab={tab} hasSearch={hasSearch} query={deferredSearch} />
+            ) : (
+              <div className={styles.tableScroll}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Richiedente</th>
+                      <th>Azienda</th>
+                      <th>Tipo</th>
+                      <th>{tab === 'pending' ? 'Richiesta' : 'Confermata'}</th>
+                      <th className={styles.actionCol} aria-label="Azione" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleRows.map((row) => {
+                      const isDone = row.stato_richiesta;
+                      return (
+                        <tr key={row.id}>
+                          <td>
+                            <div className={styles.personName}>
+                              {row.nome} {row.cognome}
+                            </div>
+                            <div className={styles.personEmail}>{row.email}</div>
+                          </td>
+                          <td>{row.azienda}</td>
+                          <td>{row.tipo_richiesta}</td>
+                          <td className={styles.timeCell}>
+                            {tab === 'pending' ? (
+                              formatTimestamp(row.data_richiesta)
+                            ) : (
+                              <>
+                                <div>{formatTimestamp(row.data_approvazione)}</div>
+                                <div className={styles.timeSub}>
+                                  Richiesta {formatTimestamp(row.data_richiesta)}
+                                </div>
+                              </>
+                            )}
+                          </td>
+                          <td className={styles.actionCol}>
+                            {isDone ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() =>
+                                  setConfirmTarget({ row, nextCompleted: false })
+                                }
+                              >
+                                Riapri
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                onClick={() =>
+                                  setConfirmTarget({ row, nextCompleted: true })
+                                }
+                              >
+                                Conferma
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
-      {!isLoading && !isError && rows.length === 0 && (
-        <div className={styles.empty}>Nessuna richiesta da mostrare.</div>
-      )}
-
-      {!isLoading && !isError && rows.length > 0 && (
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                {TEXT_COLUMNS.map((col) => (
-                  <th key={col.label}>{col.label}</th>
-                ))}
-                <th>stato_richiesta</th>
-                <th>data conferma</th>
-                <th>data della richiesta</th>
-                <th aria-label="azioni" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const pending = pendingByRow[row.id];
-                const isDirty = pending !== undefined;
-                const checked = isDirty ? pending : row.stato_richiesta;
-                const isSavingThisRow =
-                  mutation.isPending && mutation.variables?.id === row.id;
-                return (
-                  <tr key={row.id}>
-                    {TEXT_COLUMNS.map((col) => (
-                      <td key={col.label}>{col.render(row)}</td>
-                    ))}
-                    <td className={styles.checkboxCell}>
-                      <input
-                        type="checkbox"
-                        className={styles.checkbox}
-                        checked={checked}
-                        onChange={(e) => onToggle(row, e.target.checked)}
-                        aria-label={`stato_richiesta ${row.nome} ${row.cognome}`}
-                      />
-                    </td>
-                    <td>{formatTimestamp(row.data_approvazione)}</td>
-                    <td>{formatTimestamp(row.data_richiesta)}</td>
-                    <td>
-                      {isDirty && (
-                        <div className={styles.rowActions}>
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            onClick={() => onSave(row)}
-                            loading={isSavingThisRow}
-                          >
-                            Salva
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => onDiscard(row.id)}
-                            disabled={isSavingThisRow}
-                          >
-                            Annulla
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <ConfirmDialog
+        target={confirmTarget}
+        pending={mutation.isPending}
+        onCancel={() => {
+          if (!mutation.isPending) setConfirmTarget(null);
+        }}
+        onConfirm={handleConfirm}
+      />
     </section>
+  );
+}
+
+interface ConfirmDialogProps {
+  target: ConfirmTarget | null;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+function ConfirmDialog({ target, pending, onCancel, onConfirm }: ConfirmDialogProps) {
+  const isConfirm = target?.nextCompleted ?? true;
+  const title = isConfirm ? 'Conferma richiesta' : 'Riapri richiesta';
+  const body = target
+    ? isConfirm
+      ? `La richiesta di ${target.row.nome} ${target.row.cognome} per ${target.row.azienda} sarà contrassegnata come confermata.`
+      : `La richiesta di ${target.row.nome} ${target.row.cognome} per ${target.row.azienda} tornerà tra quelle da confermare.`
+    : '';
+
+  return (
+    <Modal open={target != null} onClose={onCancel} title={title} size="sm" dismissible={!pending}>
+      <div className={styles.confirmBody}>
+        <p className={styles.confirmText}>{body}</p>
+      </div>
+      <div className={styles.confirmActions}>
+        <Button size="md" variant="secondary" onClick={onCancel} disabled={pending}>
+          Annulla
+        </Button>
+        <Button
+          size="md"
+          variant={isConfirm ? 'primary' : 'secondary'}
+          onClick={onConfirm}
+          loading={pending}
+        >
+          {isConfirm ? 'Conferma' : 'Riapri'}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+interface EmptyStateProps {
+  tab: TabKey;
+  hasSearch: boolean;
+  query: string;
+}
+
+function EmptyState({ tab, hasSearch, query }: EmptyStateProps) {
+  if (hasSearch) {
+    return (
+      <div className={styles.stateBox}>
+        <div className={styles.stateIcon}>
+          <SearchIcon />
+        </div>
+        <p className={styles.stateTitle}>Nessun risultato</p>
+        <p className={styles.stateText}>
+          Nessuna richiesta corrisponde a «{query.trim()}».
+        </p>
+      </div>
+    );
+  }
+  if (tab === 'pending') {
+    return (
+      <div className={styles.stateBox}>
+        <div className={styles.stateIcon}>
+          <CheckCircleIcon />
+        </div>
+        <p className={styles.stateTitle}>Nessuna richiesta in sospeso</p>
+        <p className={styles.stateText}>Tutte le richieste sono state evase.</p>
+      </div>
+    );
+  }
+  return (
+    <div className={styles.stateBox}>
+      <div className={styles.stateIcon}>
+        <InboxIcon />
+      </div>
+      <p className={styles.stateTitle}>Nessuna richiesta confermata</p>
+      <p className={styles.stateText}>Le conferme appariranno qui.</p>
+    </div>
+  );
+}
+
+function CheckCircleIcon() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="m8 12 3 3 5-6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function InboxIcon() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 13h4l2 3h4l2-3h4M5 13 7 5h10l2 8v5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.5" />
+      <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
   );
 }
