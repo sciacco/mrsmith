@@ -90,6 +90,19 @@ function formatMoneyEUR(value: number | null | undefined) {
   return moneyFormatter.format(value);
 }
 
+function HtmlDescription({
+  value,
+  className,
+  fallback = '',
+}: {
+  value: string | null | undefined;
+  className?: string;
+  fallback?: string;
+}) {
+  if (!value) return <>{fallback}</>;
+  return <span className={className} dangerouslySetInnerHTML={{ __html: value }} />;
+}
+
 export function OrdiniDettaglioPage() {
   const [cliente, setCliente] = useState<number | null>(null);
   const [stati, setStati] = useState<string[]>(defaultStati);
@@ -240,9 +253,10 @@ export function OrdiniDettaglioPage() {
                           }}
                         >
                           <td>
-                            <div className={os.lineDescription}>
-                              {row.descrizione_long ?? row.descrizione_prodotto ?? ''}
-                            </div>
+                            <HtmlDescription
+                              value={row.descrizione_long ?? row.descrizione_prodotto}
+                              className={os.lineDescription}
+                            />
                           </td>
                           <td>{row.tipo_ordine ?? ''}</td>
                           <td>{shortDate(row.data_ordine)}</td>
@@ -341,8 +355,12 @@ export function OrdiniDettaglioPage() {
                   <DL>
                     <DI label="Codice prodotto">{selectedRow.codice_prodotto ?? '-'}</DI>
                     <DI label="Codice kit">{selectedRow.codice_kit ?? '-'}</DI>
-                    <DI label="Descrizione">{selectedRow.descrizione_prodotto ?? '-'}</DI>
-                    <DI label="Desc. estesa">{selectedRow.descrizione_estesa ?? '-'}</DI>
+                    <DI label="Descrizione">
+                      <HtmlDescription value={selectedRow.descrizione_prodotto} fallback="-" />
+                    </DI>
+                    <DI label="Desc. estesa">
+                      <HtmlDescription value={selectedRow.descrizione_estesa} fallback="-" />
+                    </DI>
                     <DI label="Famiglia">{selectedRow.famiglia ?? '-'}</DI>
                     <DI label="Sotto famiglia">{selectedRow.sotto_famiglia ?? '-'}</DI>
                     <DI label="Conto ricavo">{selectedRow.conto_ricavo ?? '-'}</DI>
@@ -352,7 +370,6 @@ export function OrdiniDettaglioPage() {
                   <DL>
                     <DI label="Quantita">{selectedRow.quantita}</DI>
                     <DI label="NRC">{formatMoneyEUR(selectedRow.setup)}</DI>
-                    <DI label="Canone">{formatMoneyEUR(selectedRow.canone)}</DI>
                     <DI label="MRC">{formatMoneyEUR(selectedRow.mrc)}</DI>
                     <DI label="Costo cessazione">{formatMoneyEUR(selectedRow.costo_cessazione)}</DI>
                     <DI label="Valuta">{selectedRow.valuta ?? '-'}</DI>
@@ -402,7 +419,9 @@ export function OrdiniDettaglioPage() {
                           onClick={() => { setSelectedRow(r); setActiveTab('riga'); }}
                         >
                           <td>{r.progressivo_riga}</td>
-                          <td>{r.descrizione_long ?? r.descrizione_prodotto ?? ''}</td>
+                          <td>
+                            <HtmlDescription value={r.descrizione_long ?? r.descrizione_prodotto} />
+                          </td>
                           <td className={s.numCol}>{formatMoneyEUR(r.setup)}</td>
                           <td className={s.numCol}>{formatMoneyEUR(r.mrc)}</td>
                           <td>{statoBadge(r.stato_riga)}</td>

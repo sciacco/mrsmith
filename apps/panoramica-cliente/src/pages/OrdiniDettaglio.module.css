@@ -99,7 +99,34 @@
 }
 
 .lineDescription {
+  display: block;
   color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.lineDescription p {
+  margin: 0 0 var(--space-1);
+}
+
+.lineDescription p:last-child {
+  margin-bottom: 0;
+}
+
+.lineDescription br {
+  display: block;
+  content: '';
+  margin-top: var(--space-1);
+}
+
+.lineDescription strong,
+.lineDescription b {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.lineDescription em,
+.lineDescription i {
+  font-style: italic;
 }
 
 /* ── Tabs ── */
