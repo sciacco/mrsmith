@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { Fragment, useState, useCallback, useMemo } from 'react';
 import { SingleSelect, MultiSelect, SearchInput, useTableFilter } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { useCustomersWithOrders, useOrderStatuses, useOrdersDetail } from '../api/queries';
@@ -37,6 +37,46 @@ function statoBadge(stato: string) {
 
 type TabId = 'testata' | 'riga' | 'righe' | 'storico';
 
+type OrderGroup = {
+  key: string;
+  rows: OrderDetailRow[];
+  allRows: OrderDetailRow[];
+  first: OrderDetailRow;
+  totalMrc: number;
+};
+
+function orderGroupKey(row: OrderDetailRow) {
+  return row.id_gamma_testata ?? row.id_gamma ?? row.nome_testata_ordine;
+}
+
+function groupRowsByOrder(rows: OrderDetailRow[]) {
+  const groups = new Map<string, OrderDetailRow[]>();
+
+  rows.forEach(row => {
+    const key = orderGroupKey(row);
+    const current = groups.get(key);
+    if (current) {
+      current.push(row);
+    } else {
+      groups.set(key, [row]);
+    }
+  });
+
+  return groups;
+}
+
+function rowCountLabel(count: number) {
+  return `${count} ${count === 1 ? 'riga' : 'righe'}`;
+}
+
+function orderCountLabel(count: number) {
+  return `${count} ${count === 1 ? 'ordine' : 'ordini'}`;
+}
+
+function shortDate(value: string | null) {
+  return value?.slice(0, 10) ?? '-';
+}
+
 export function OrdiniDettaglioPage() {
   const [cliente, setCliente] = useState<number | null>(null);
   const [stati, setStati] = useState<string[]>(defaultStati);
@@ -60,6 +100,25 @@ export function OrdiniDettaglioPage() {
 
   const exportCsv = useCsvExport(csvColumns, 'ordini-dettaglio');
 
+  const allRowsByOrder = useMemo(
+    () => groupRowsByOrder(ordersQ.data ?? []),
+    [ordersQ.data],
+  );
+
+  const orderGroups = useMemo(() => {
+    const visibleGroups = groupRowsByOrder(filtered);
+
+    return Array.from(visibleGroups, ([key, rows]): OrderGroup | null => {
+      const allRows = allRowsByOrder.get(key) ?? rows;
+      const first = allRows[0] ?? rows[0];
+      if (!first) return null;
+
+      const totalMrc = allRows.reduce((sum, row) => sum + row.mrc, 0);
+
+      return { key, rows, allRows, first, totalMrc };
+    }).filter((group): group is OrderGroup => group !== null);
+  }, [allRowsByOrder, filtered]);
+
   const handleSearch = useCallback(() => {
     setSearchTriggered(true);
   }, []);
@@ -75,10 +134,8 @@ export function OrdiniDettaglioPage() {
 
   const statiOptions = (statusesQ.data ?? []).map(st => ({ value: st, label: st }));
 
-  // All rows for this order
-  const orderRows = selectedRow
-    ? filtered.filter(r => r.nome_testata_ordine === selectedRow.nome_testata_ordine)
-    : [];
+  const selectedOrderKey = selectedRow ? orderGroupKey(selectedRow) : null;
+  const orderRows = selectedOrderKey ? allRowsByOrder.get(selectedOrderKey) ?? [] : [];
 
   // Parse storico string into timeline steps
   const storicoSteps = selectedRow?.storico
@@ -108,7 +165,7 @@ export function OrdiniDettaglioPage() {
 
       {searchTriggered && filtered.length > 0 && (
         <>
-          <div className={s.info}>{filtered.length} righe</div>
+          <div className={s.info}>{rowCountLabel(filtered.length)} · {orderCountLabel(orderGroups.length)}</div>
           <div className={s.tableWrap}>
             <table className={s.table}>
               <thead>
@@ -126,28 +183,65 @@ export function OrdiniDettaglioPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row, i) => (
-                  <tr
-                    key={`${row.nome_testata_ordine}-${row.progressivo_riga}-${i}`}
-                    className={selectedRow === row ? os.selected : undefined}
-                    onClick={() => { setSelectedRow(row); setActiveTab('testata'); }}
-                    style={{ animationDelay: `${Math.min(i * 10, 300)}ms`, cursor: 'pointer' }}
-                  >
-                    <td>{statoBadge(row.stato_ordine)}</td>
-                    <td>
-                      {row.ordine && <div style={{ fontWeight: 700, color: 'var(--color-text)' }}>{row.ordine}</div>}
-                      <div>{row.descrizione_long ?? row.descrizione_prodotto ?? ''}</div>
-                    </td>
-                    <td>{row.tipo_ordine ?? ''}</td>
-                    <td>{row.commerciale ?? ''}</td>
-                    <td>{row.data_ordine?.slice(0, 10) ?? ''}</td>
-                    <td className={s.numCol}>{row.quantita}</td>
-                    <td className={s.numCol}>{row.mrc.toFixed(2)}</td>
-                    <td>{statoBadge(row.stato_riga)}</td>
-                    <td className={s.mono}>{row.serialnumber ?? ''}</td>
-                    <td className={s.mono}>{row.codice_prodotto ?? ''}</td>
-                  </tr>
-                ))}
+                {orderGroups.map((group, groupIndex) => {
+                  const first = group.first;
+                  const groupSelected = selectedOrderKey === group.key;
+                  const hasPartialFilter = group.rows.length !== group.allRows.length;
+
+                  return (
+                    <Fragment key={group.key}>
+                      <tr
+                        key={`${group.key}-header`}
+                        className={`${os.orderGroupHeader} ${groupSelected ? os.orderGroupSelected : ''}`}
+                        onClick={() => { setSelectedRow(first); setActiveTab('testata'); }}
+                        style={{ animationDelay: `${Math.min(groupIndex * 20, 300)}ms`, cursor: 'pointer' }}
+                      >
+                        <td colSpan={10}>
+                          <div className={os.orderHeaderContent}>
+                            <div className={os.orderHeaderMain}>
+                              <span className={os.orderLabel}>Ordine</span>
+                              <span className={os.orderTitle}>{first.nome_testata_ordine}</span>
+                              {statoBadge(first.stato_ordine)}
+                            </div>
+                            <div className={os.orderHeaderMeta}>
+                              <span>{rowCountLabel(group.allRows.length)}</span>
+                              {hasPartialFilter && <span>{group.rows.length} visibili</span>}
+                              <span>{shortDate(first.data_ordine)}</span>
+                              {first.commerciale && <span>{first.commerciale}</span>}
+                              <span className={os.orderHeaderTotal}>MRC {group.totalMrc.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      {group.rows.map((row, rowIndex) => (
+                        <tr
+                          key={`${group.key}-${row.progressivo_riga}-${rowIndex}`}
+                          className={`${os.orderLine} ${selectedRow === row ? os.selected : ''}`}
+                          onClick={() => { setSelectedRow(row); setActiveTab('riga'); }}
+                          style={{
+                            animationDelay: `${Math.min((groupIndex + rowIndex) * 10, 300)}ms`,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <td>{statoBadge(row.stato_ordine)}</td>
+                          <td>
+                            <div className={os.lineDescription}>
+                              {row.descrizione_long ?? row.descrizione_prodotto ?? ''}
+                            </div>
+                          </td>
+                          <td>{row.tipo_ordine ?? ''}</td>
+                          <td>{row.commerciale ?? ''}</td>
+                          <td>{shortDate(row.data_ordine)}</td>
+                          <td className={s.numCol}>{row.quantita}</td>
+                          <td className={s.numCol}>{row.mrc.toFixed(2)}</td>
+                          <td>{statoBadge(row.stato_riga)}</td>
+                          <td className={s.mono}>{row.serialnumber ?? ''}</td>
+                          <td className={s.mono}>{row.codice_prodotto ?? ''}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

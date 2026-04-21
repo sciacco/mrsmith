@@ -2,6 +2,88 @@
   background: var(--color-accent-subtle) !important;
 }
 
+.orderGroupHeader td {
+  padding: var(--space-3);
+  border-top: 2px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.orderGroupHeader:hover td {
+  background: var(--color-surface-hover);
+}
+
+.orderGroupSelected td {
+  background: var(--color-accent-subtle);
+}
+
+.orderHeaderContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.orderHeaderMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.orderLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.orderTitle {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.orderHeaderMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.orderHeaderTotal {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.orderLine td:first-child {
+  border-left: 3px solid var(--color-border-subtle);
+}
+
+.lineDescription {
+  position: relative;
+  padding-left: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.lineDescription::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 0.2rem;
+  bottom: 0.2rem;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-border);
+}
+
 /* ── Tabs ── */
 
 .tabs {

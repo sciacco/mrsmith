@@ -262,7 +262,7 @@ FROM loader.erp_ordini o
 WHERE c.numero_azienda = $1
   AND o.stato_ordine IN (%s)
   AND r.codice_prodotto <> 'CDL-AUTO'
-ORDER BY o.nome_testata_ordine, o.data_documento DESC`, placeholders)
+ORDER BY data_ordine DESC NULLS LAST, o.nome_testata_ordine, r.progressivo_riga`, placeholders)
 
 	rows, err := h.mistraDB.QueryContext(r.Context(), query, args...)
 	if err != nil {
