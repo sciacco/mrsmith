@@ -173,7 +173,6 @@ export function OrdiniDettaglioPage() {
                   <th>Stato ordine</th>
                   <th>Ordine / Descrizione</th>
                   <th>Tipo ordine</th>
-                  <th>Commerciale</th>
                   <th>Data ordine</th>
                   <th className={s.numCol}>Qta</th>
                   <th className={s.numCol}>MRC</th>
@@ -196,7 +195,7 @@ export function OrdiniDettaglioPage() {
                         onClick={() => { setSelectedRow(first); setActiveTab('testata'); }}
                         style={{ animationDelay: `${Math.min(groupIndex * 20, 300)}ms`, cursor: 'pointer' }}
                       >
-                        <td colSpan={10}>
+                        <td colSpan={9}>
                           <div className={os.orderHeaderContent}>
                             <div className={os.orderHeaderMain}>
                               <span className={os.orderLabel}>Ordine</span>
@@ -230,7 +229,6 @@ export function OrdiniDettaglioPage() {
                             </div>
                           </td>
                           <td>{row.tipo_ordine ?? ''}</td>
-                          <td>{row.commerciale ?? ''}</td>
                           <td>{shortDate(row.data_ordine)}</td>
                           <td className={s.numCol}>{row.quantita}</td>
                           <td className={s.numCol}>{row.mrc.toFixed(2)}</td>
