@@ -95,6 +95,10 @@
   color: var(--color-text);
 }
 
+.table th.numCol {
+  text-align: right;
+}
+
 .sortIndicator {
   margin-left: 4px;
   opacity: 0.5;

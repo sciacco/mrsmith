@@ -1,4 +1,4 @@
-import { Fragment, useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { SingleSelect, MultiSelect, SearchInput, useTableFilter } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { useCustomersWithOrders, useOrderStatuses, useOrdersDetail } from '../api/queries';
@@ -10,6 +10,13 @@ import s from './shared.module.css';
 import os from './OrdiniDettaglio.module.css';
 
 const defaultStati = ['Evaso', 'Confermato'];
+
+const moneyFormatter = new Intl.NumberFormat('it-IT', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 const csvColumns: { key: keyof OrderDetailRow; label: string }[] = [
   { key: 'stato_ordine', label: 'Stato Ordine' },
@@ -42,6 +49,7 @@ type OrderGroup = {
   rows: OrderDetailRow[];
   allRows: OrderDetailRow[];
   first: OrderDetailRow;
+  totalNrc: number;
   totalMrc: number;
 };
 
@@ -75,6 +83,11 @@ function orderCountLabel(count: number) {
 
 function shortDate(value: string | null) {
   return value?.slice(0, 10) ?? '-';
+}
+
+function formatMoneyEUR(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) return '';
+  return moneyFormatter.format(value);
 }
 
 export function OrdiniDettaglioPage() {
@@ -113,9 +126,10 @@ export function OrdiniDettaglioPage() {
       const first = allRows[0] ?? rows[0];
       if (!first) return null;
 
+      const totalNrc = allRows.reduce((sum, row) => sum + row.setup, 0);
       const totalMrc = allRows.reduce((sum, row) => sum + row.mrc, 0);
 
-      return { key, rows, allRows, first, totalMrc };
+      return { key, rows, allRows, first, totalNrc, totalMrc };
     }).filter((group): group is OrderGroup => group !== null);
   }, [allRowsByOrder, filtered]);
 
@@ -174,27 +188,30 @@ export function OrdiniDettaglioPage() {
                   <th>Tipo ordine</th>
                   <th>Data ordine</th>
                   <th className={s.numCol}>Qta</th>
+                  <th className={s.numCol}>NRC</th>
                   <th className={s.numCol}>MRC</th>
                   <th>Stato riga</th>
                   <th>Serialnumber</th>
                   <th>Cod. prodotto</th>
                 </tr>
               </thead>
-              <tbody>
-                {orderGroups.map((group, groupIndex) => {
+              {orderGroups.map((group, groupIndex) => {
                   const first = group.first;
                   const groupSelected = selectedOrderKey === group.key;
                   const hasPartialFilter = group.rows.length !== group.allRows.length;
 
                   return (
-                    <Fragment key={group.key}>
+                    <tbody
+                      key={group.key}
+                      className={`${os.orderGroupBody} ${groupSelected ? os.orderGroupBodySelected : ''}`}
+                    >
                       <tr
                         key={`${group.key}-header`}
                         className={`${os.orderGroupHeader} ${groupSelected ? os.orderGroupSelected : ''}`}
                         onClick={() => { setSelectedRow(first); setActiveTab('testata'); }}
                         style={{ animationDelay: `${Math.min(groupIndex * 20, 300)}ms`, cursor: 'pointer' }}
                       >
-                        <td colSpan={8}>
+                        <td colSpan={9}>
                           <div className={os.orderHeaderContent}>
                             <div className={os.orderHeaderMain}>
                               <span className={os.orderLabel}>Ordine</span>
@@ -206,7 +223,8 @@ export function OrdiniDettaglioPage() {
                               {hasPartialFilter && <span>{group.rows.length} visibili</span>}
                               <span>{shortDate(first.data_ordine)}</span>
                               {first.commerciale && <span>{first.commerciale}</span>}
-                              <span className={os.orderHeaderTotal}>MRC {group.totalMrc.toFixed(2)}</span>
+                              <span className={os.orderHeaderTotal}>NRC {formatMoneyEUR(group.totalNrc)}</span>
+                              <span className={os.orderHeaderTotal}>MRC {formatMoneyEUR(group.totalMrc)}</span>
                             </div>
                           </div>
                         </td>
@@ -229,16 +247,16 @@ export function OrdiniDettaglioPage() {
                           <td>{row.tipo_ordine ?? ''}</td>
                           <td>{shortDate(row.data_ordine)}</td>
                           <td className={s.numCol}>{row.quantita}</td>
-                          <td className={s.numCol}>{row.mrc.toFixed(2)}</td>
+                          <td className={s.numCol}>{formatMoneyEUR(row.setup)}</td>
+                          <td className={s.numCol}>{formatMoneyEUR(row.mrc)}</td>
                           <td>{statoBadge(row.stato_riga)}</td>
                           <td className={s.mono}>{row.serialnumber ?? ''}</td>
                           <td className={s.mono}>{row.codice_prodotto ?? ''}</td>
                         </tr>
                       ))}
-                    </Fragment>
+                    </tbody>
                   );
                 })}
-              </tbody>
             </table>
           </div>
         </>
@@ -333,10 +351,10 @@ export function OrdiniDettaglioPage() {
                 <Section title="Importi">
                   <DL>
                     <DI label="Quantita">{selectedRow.quantita}</DI>
-                    <DI label="Setup">{selectedRow.setup.toFixed(2)}</DI>
-                    <DI label="Canone">{selectedRow.canone.toFixed(2)}</DI>
-                    <DI label="MRC">{selectedRow.mrc.toFixed(2)}</DI>
-                    <DI label="Costo cessazione">{selectedRow.costo_cessazione.toFixed(2)}</DI>
+                    <DI label="NRC">{formatMoneyEUR(selectedRow.setup)}</DI>
+                    <DI label="Canone">{formatMoneyEUR(selectedRow.canone)}</DI>
+                    <DI label="MRC">{formatMoneyEUR(selectedRow.mrc)}</DI>
+                    <DI label="Costo cessazione">{formatMoneyEUR(selectedRow.costo_cessazione)}</DI>
                     <DI label="Valuta">{selectedRow.valuta ?? '-'}</DI>
                   </DL>
                 </Section>
@@ -369,6 +387,7 @@ export function OrdiniDettaglioPage() {
                       <tr>
                         <th>#</th>
                         <th>Prodotto</th>
+                        <th className={s.numCol}>NRC</th>
                         <th className={s.numCol}>MRC</th>
                         <th>Stato</th>
                         <th>Serial</th>
@@ -384,7 +403,8 @@ export function OrdiniDettaglioPage() {
                         >
                           <td>{r.progressivo_riga}</td>
                           <td>{r.descrizione_long ?? r.descrizione_prodotto ?? ''}</td>
-                          <td className={s.numCol}>{r.mrc.toFixed(2)}</td>
+                          <td className={s.numCol}>{formatMoneyEUR(r.setup)}</td>
+                          <td className={s.numCol}>{formatMoneyEUR(r.mrc)}</td>
                           <td>{statoBadge(r.stato_riga)}</td>
                           <td className={s.mono}>{r.serialnumber ?? ''}</td>
                         </tr>
