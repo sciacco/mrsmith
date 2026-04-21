@@ -8,8 +8,8 @@ const navGroups: TabGroup[] = [
   {
     label: 'Ordini',
     items: [
-      { label: 'Ordini ricorrenti', path: '/ordini-ricorrenti' },
       { label: 'Ordini Ricorrenti e Spot', path: '/ordini-dettaglio' },
+      { label: 'Ordini Ricorrenti (OLD)', path: '/ordini-ricorrenti' },
     ],
   },
   {

@@ -8,7 +8,7 @@ import { TimooTenantsPage } from './pages/TimooTenantsPage';
 import { LicenzeWindowsPage } from './pages/LicenzeWindowsPage';
 
 export const routes: RouteObject[] = [
-  { index: true, element: <Navigate to="/ordini-ricorrenti" replace /> },
+  { index: true, element: <Navigate to="/ordini-dettaglio" replace /> },
   { path: 'ordini-ricorrenti', element: <OrdiniRicorrentiPage /> },
   { path: 'ordini-dettaglio', element: <OrdiniDettaglioPage /> },
   { path: 'fatture', element: <FatturePage /> },
@@ -16,5 +16,5 @@ export const routes: RouteObject[] = [
   { path: 'iaas-ppu', element: <IaaSPayPerUsePage /> },
   { path: 'timoo', element: <TimooTenantsPage /> },
   { path: 'licenze-windows', element: <LicenzeWindowsPage /> },
-  { path: '*', element: <Navigate to="/ordini-ricorrenti" replace /> },
+  { path: '*', element: <Navigate to="/ordini-dettaglio" replace /> },
 ];
