@@ -170,7 +170,6 @@ export function OrdiniDettaglioPage() {
             <table className={s.table}>
               <thead>
                 <tr>
-                  <th>Stato ordine</th>
                   <th>Ordine / Descrizione</th>
                   <th>Tipo ordine</th>
                   <th>Data ordine</th>
@@ -195,7 +194,7 @@ export function OrdiniDettaglioPage() {
                         onClick={() => { setSelectedRow(first); setActiveTab('testata'); }}
                         style={{ animationDelay: `${Math.min(groupIndex * 20, 300)}ms`, cursor: 'pointer' }}
                       >
-                        <td colSpan={9}>
+                        <td colSpan={8}>
                           <div className={os.orderHeaderContent}>
                             <div className={os.orderHeaderMain}>
                               <span className={os.orderLabel}>Ordine</span>
@@ -222,7 +221,6 @@ export function OrdiniDettaglioPage() {
                             cursor: 'pointer',
                           }}
                         >
-                          <td>{statoBadge(row.stato_ordine)}</td>
                           <td>
                             <div className={os.lineDescription}>
                               {row.descrizione_long ?? row.descrizione_prodotto ?? ''}
