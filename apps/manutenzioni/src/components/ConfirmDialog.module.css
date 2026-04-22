@@ -1,0 +1,11 @@
+.body {
+  display: grid;
+  gap: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}

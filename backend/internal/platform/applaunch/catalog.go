@@ -29,6 +29,9 @@ const (
 	ListiniAppID   = "listini-e-sconti"
 	ListiniAppHref = "/apps/listini-e-sconti/"
 
+	ManutenzioniAppID   = "manutenzioni"
+	ManutenzioniAppHref = "/apps/manutenzioni/"
+
 	PanoramicaAppID   = "panoramica-cliente"
 	PanoramicaAppHref = "/apps/panoramica-cliente/"
 
@@ -59,6 +62,9 @@ var (
 	energiaDCAccessRoles             = []string{"app_energiadc_access"}
 	kitProductsAccessRoles           = []string{"app_kitproducts_access"}
 	listiniAccessRoles               = []string{"app_listini_access"}
+	manutenzioniAccessRoles          = []string{"app_manutenzioni_access"}
+	manutenzioniManagerRoles         = []string{"app_manutenzioni_manager"}
+	manutenzioniApproverRoles        = []string{"app_manutenzioni_approver"}
 	panoramicaAccessRoles            = []string{"app_panoramica_access"}
 	quotesAccessRoles                = []string{"app_quotes_access"}
 	quotesDeleteRoles                = []string{"app_quotes_delete"}
@@ -232,6 +238,16 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryID:    "smart-apps",
 			CategoryTitle: "SMART APPS",
 			AccessRoles:   EnergiaDCAccessRoles(),
+		},
+		{
+			ID:            ManutenzioniAppID,
+			Name:          "Manutenzioni",
+			Icon:          "wrench",
+			Href:          ManutenzioniAppHref,
+			Status:        "ready",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   ManutenzioniAccessRoles(),
 		},
 		{
 			ID:            PanoramicaAppID,
@@ -417,6 +433,18 @@ func KitProductsAccessRoles() []string {
 
 func ListiniAccessRoles() []string {
 	return slices.Clone(listiniAccessRoles)
+}
+
+func ManutenzioniAccessRoles() []string {
+	return slices.Clone(manutenzioniAccessRoles)
+}
+
+func ManutenzioniManagerRoles() []string {
+	return slices.Clone(manutenzioniManagerRoles)
+}
+
+func ManutenzioniApproverRoles() []string {
+	return slices.Clone(manutenzioniApproverRoles)
 }
 
 func PanoramicaAccessRoles() []string {

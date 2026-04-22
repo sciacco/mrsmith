@@ -24,6 +24,7 @@ type Config struct {
 	EnergiaDCAppURL            string
 	KitProductsAppURL          string
 	ListiniAppURL              string
+	ManutenzioniAppURL         string
 	PanoramicaAppURL           string
 	QuotesAppURL               string
 	RichiesteFattibilitaAppURL string
@@ -37,6 +38,9 @@ type Config struct {
 
 	// Mistra / Kit Products PostgreSQL
 	MistraDSN string
+
+	// Manutenzioni PostgreSQL
+	ManutenzioniDSN string
 
 	// Alyante ERP MSSQL
 	AlyanteDSN string
@@ -90,7 +94,7 @@ func Load() Config {
 		Port:                         envOr("PORT", "8080"),
 		LogLevel:                     envOr("LOG_LEVEL", "info"),
 		KeycloakIssuerURL:            envOr("KEYCLOAK_ISSUER_URL", ""),
-		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185,http://localhost:5186,http://localhost:5187"),
+		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185,http://localhost:5186,http://localhost:5187,http://localhost:5188"),
 		StaticDir:                    envOr("STATIC_DIR", ""),
 		BudgetAppURL:                 envOr("BUDGET_APP_URL", ""),
 		ComplianceAppURL:             envOr("COMPLIANCE_APP_URL", ""),
@@ -99,6 +103,7 @@ func Load() Config {
 		EnergiaDCAppURL:              envOr("ENERGIA_DC_APP_URL", ""),
 		KitProductsAppURL:            envOr("KIT_PRODUCTS_APP_URL", ""),
 		ListiniAppURL:                envOr("LISTINI_APP_URL", ""),
+		ManutenzioniAppURL:           envOr("MANUTENZIONI_APP_URL", ""),
 		PanoramicaAppURL:             envOr("PANORAMICA_APP_URL", ""),
 		QuotesAppURL:                 envOr("QUOTES_APP_URL", ""),
 		RichiesteFattibilitaAppURL:   envOr("RICHIESTE_FATTIBILITA_APP_URL", ""),
@@ -108,6 +113,7 @@ func Load() Config {
 		AFCToolsAppURL:               envOr("AFCTOOLS_APP_URL", ""),
 		AnisettaDSN:                  envOr("ANISETTA_DSN", ""),
 		MistraDSN:                    envOr("MISTRA_DSN", ""),
+		ManutenzioniDSN:              envOr("MANUTENZIONI_DSN", ""),
 		AlyanteDSN:                   envOr("ALYANTE_DSN", ""),
 		GrappaDSN:                    envOr("GRAPPA_DSN", ""),
 		VodkaDSN:                     envOr("VODKA_DSN", ""),

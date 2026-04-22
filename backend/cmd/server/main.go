@@ -23,6 +23,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/energiadc"
 	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/listini"
+	"github.com/sciacco/mrsmith/internal/manutenzioni"
 	"github.com/sciacco/mrsmith/internal/panoramica"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
@@ -151,6 +152,18 @@ func main() {
 		logger.Info("grappa database connected", "component", "listini")
 	}
 
+	// Manutenzioni DB
+	var manutenzioniDB *sql.DB
+	if cfg.ManutenzioniDSN != "" {
+		var err error
+		manutenzioniDB, err = database.New(database.Config{Driver: "postgres", DSN: cfg.ManutenzioniDSN})
+		if err != nil {
+			logger.Error("failed to connect to manutenzioni", "component", "manutenzioni", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("manutenzioni database connected", "component", "manutenzioni")
+	}
+
 	// Vodka/daiquiri DB (afc-tools — MySQL, Sales/CRM orders)
 	var vodkaDB *sql.DB
 	if cfg.VodkaDSN != "" {
@@ -268,6 +281,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.ListiniAppID] = "http://localhost:5177"
 	}
+	if cfg.ManutenzioniAppURL != "" {
+		hrefOverrides[applaunch.ManutenzioniAppID] = cfg.ManutenzioniAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.ManutenzioniAppID] = "http://localhost:5188"
+	}
 	if cfg.PanoramicaAppURL != "" {
 		hrefOverrides[applaunch.PanoramicaAppID] = cfg.PanoramicaAppURL
 	} else if cfg.StaticDir == "" {
@@ -322,6 +340,9 @@ func main() {
 			if definition.ID == applaunch.ListiniAppID && (cfg.MistraDSN == "" || cfg.GrappaDSN == "") {
 				continue
 			}
+			if definition.ID == applaunch.ManutenzioniAppID && cfg.ManutenzioniDSN == "" {
+				continue
+			}
 			if definition.ID == applaunch.PanoramicaAppID && cfg.MistraDSN == "" && cfg.GrappaDSN == "" && cfg.AnisettaDSN == "" {
 				continue
 			}
@@ -364,6 +385,11 @@ func main() {
 	}
 	kitproducts.RegisterRoutes(api, mistraDB, alyanteAdapter, arakCli)
 	listini.RegisterRoutes(api, mistraDB, grappaDB, hubspotSvc, carboneSvc)
+	manutenzioni.RegisterRoutes(api, manutenzioni.Deps{
+		Maintenance: manutenzioniDB,
+		Mistra:      mistraDB,
+		Logger:      logger,
+	})
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 	quotes.RegisterRoutes(api, mistraDB, alyanteDB, hubspotCli)
 	rdf.RegisterRoutes(api, anisettaDB, mistraDB, openrouterCli, cfg.RDFTeamsWebhookURL, cfg.RDFTeamsNotificationsEnabled)
