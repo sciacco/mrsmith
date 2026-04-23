@@ -1,20 +1,21 @@
 package openrouter
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	openai "github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/shared"
 )
 
 type Client struct {
-	apiKey  string
-	baseURL string
-	httpCli *http.Client
+	sdk openai.Client
 }
 
 type Message struct {
@@ -71,39 +72,19 @@ func NewWithBaseURL(apiKey, baseURL string, httpCli *http.Client) *Client {
 		httpCli = &http.Client{Timeout: 60 * time.Second}
 	}
 	return &Client{
-		apiKey:  apiKey,
-		baseURL: strings.TrimRight(baseURL, "/"),
-		httpCli: httpCli,
+		sdk: openai.NewClient(
+			option.WithAPIKey(apiKey),
+			option.WithBaseURL(strings.TrimRight(baseURL, "/")),
+			option.WithHTTPClient(httpCli),
+			option.WithMaxRetries(2),
+		),
 	}
 }
 
 func (c *Client) Chat(ctx context.Context, reqBody ChatRequest) (ChatResponse, error) {
-	payload, err := json.Marshal(reqBody)
+	params, err := buildChatCompletionParams(reqBody)
 	if err != nil {
-		return ChatResponse{}, fmt.Errorf("openrouter: marshal body: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(payload))
-	if err != nil {
-		return ChatResponse{}, fmt.Errorf("openrouter: create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.httpCli.Do(req)
-	if err != nil {
-		return ChatResponse{}, fmt.Errorf("openrouter: request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return ChatResponse{}, fmt.Errorf("openrouter: read response: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return ChatResponse{}, &APIError{StatusCode: resp.StatusCode, Body: string(body)}
+		return ChatResponse{}, fmt.Errorf("openrouter: build request: %w", err)
 	}
 
 	var decoded struct {
@@ -116,8 +97,12 @@ func (c *Client) Chat(ctx context.Context, reqBody ChatRequest) (ChatResponse, e
 		} `json:"choices"`
 		Usage Usage `json:"usage"`
 	}
-	if err := json.Unmarshal(body, &decoded); err != nil {
-		return ChatResponse{}, fmt.Errorf("openrouter: decode response: %w", err)
+	if err := c.sdk.Post(ctx, "chat/completions", params, &decoded); err != nil {
+		var apiErr *openai.Error
+		if errors.As(err, &apiErr) {
+			return ChatResponse{}, &APIError{StatusCode: apiErr.StatusCode, Body: errorBody(apiErr)}
+		}
+		return ChatResponse{}, fmt.Errorf("openrouter: request failed: %w", err)
 	}
 	if len(decoded.Choices) == 0 {
 		return ChatResponse{}, fmt.Errorf("openrouter: missing choices")
@@ -134,6 +119,72 @@ func (c *Client) Chat(ctx context.Context, reqBody ChatRequest) (ChatResponse, e
 		Content: content,
 		Usage:   decoded.Usage,
 	}, nil
+}
+
+func buildChatCompletionParams(reqBody ChatRequest) (openai.ChatCompletionNewParams, error) {
+	params := openai.ChatCompletionNewParams{
+		Model:    openai.ChatModel(reqBody.Model),
+		Messages: make([]openai.ChatCompletionMessageParamUnion, 0, len(reqBody.Messages)),
+	}
+	for _, message := range reqBody.Messages {
+		mapped, err := mapMessage(message)
+		if err != nil {
+			return openai.ChatCompletionNewParams{}, err
+		}
+		params.Messages = append(params.Messages, mapped)
+	}
+	if reqBody.Temperature != 0 {
+		params.Temperature = openai.Float(reqBody.Temperature)
+	}
+	if reqBody.MaxTokens > 0 {
+		params.MaxTokens = openai.Int(int64(reqBody.MaxTokens))
+	}
+	if reqBody.ResponseFormat != nil {
+		responseFormat, err := mapResponseFormat(*reqBody.ResponseFormat)
+		if err != nil {
+			return openai.ChatCompletionNewParams{}, err
+		}
+		params.ResponseFormat = responseFormat
+	}
+	return params, nil
+}
+
+func mapMessage(message Message) (openai.ChatCompletionMessageParamUnion, error) {
+	switch strings.TrimSpace(message.Role) {
+	case "system":
+		return openai.SystemMessage(message.Content), nil
+	case "developer":
+		return openai.DeveloperMessage(message.Content), nil
+	case "user":
+		return openai.UserMessage(message.Content), nil
+	case "assistant":
+		return openai.AssistantMessage(message.Content), nil
+	default:
+		return openai.ChatCompletionMessageParamUnion{}, fmt.Errorf("unsupported role %q", message.Role)
+	}
+}
+
+func mapResponseFormat(responseFormat ResponseFormat) (openai.ChatCompletionNewParamsResponseFormatUnion, error) {
+	switch strings.TrimSpace(responseFormat.Type) {
+	case "json_object":
+		jsonObject := shared.NewResponseFormatJSONObjectParam()
+		return openai.ChatCompletionNewParamsResponseFormatUnion{OfJSONObject: &jsonObject}, nil
+	default:
+		return openai.ChatCompletionNewParamsResponseFormatUnion{}, fmt.Errorf("unsupported response format %q", responseFormat.Type)
+	}
+}
+
+func errorBody(err *openai.Error) string {
+	body := err.RawJSON()
+	if body != "" {
+		return body
+	}
+	if err.Response != nil && err.Response.Body != nil {
+		if raw, readErr := io.ReadAll(err.Response.Body); readErr == nil && len(raw) > 0 {
+			return string(raw)
+		}
+	}
+	return err.Error()
 }
 
 func flattenContent(value any) (string, error) {

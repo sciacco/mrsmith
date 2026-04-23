@@ -120,7 +120,7 @@ func TestGenerateAssistanceDraftSendsResolvedModelToOpenRouter(t *testing.T) {
 		llmModelScopeDefault:         "default-model",
 		llmModelScopeAssistanceDraft: "dynamic-draft-model",
 	})
-	var capturedModel string
+	var capturedRequest openrouter.ChatRequest
 	var serverMu sync.Mutex
 	var serverErr error
 	setServerErr := func(err error) {
@@ -142,7 +142,7 @@ func TestGenerateAssistanceDraftSendsResolvedModelToOpenRouter(t *testing.T) {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
-		capturedModel = req.Model
+		capturedRequest = req
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"id":    "chatcmpl-test",
@@ -190,8 +190,35 @@ func TestGenerateAssistanceDraftSendsResolvedModelToOpenRouter(t *testing.T) {
 	if serverErr != nil {
 		t.Fatalf("openrouter test server error: %v", serverErr)
 	}
-	if capturedModel != "dynamic-draft-model" {
-		t.Fatalf("captured model = %q, want dynamic-draft-model", capturedModel)
+	if capturedRequest.Model != "dynamic-draft-model" {
+		t.Fatalf("captured model = %q, want dynamic-draft-model", capturedRequest.Model)
+	}
+	if len(capturedRequest.Messages) != 2 {
+		t.Fatalf("captured %d messages, want 2", len(capturedRequest.Messages))
+	}
+	if capturedRequest.Messages[0].Role != "system" {
+		t.Fatalf("first message role = %q, want system", capturedRequest.Messages[0].Role)
+	}
+	if strings.TrimSpace(capturedRequest.Messages[0].Content) == "" {
+		t.Fatalf("first message content should not be empty")
+	}
+	if capturedRequest.Messages[1].Role != "user" {
+		t.Fatalf("second message role = %q, want user", capturedRequest.Messages[1].Role)
+	}
+	if !strings.Contains(capturedRequest.Messages[1].Content, `"maintenance"`) {
+		t.Fatalf("second message content = %q, want maintenance payload", capturedRequest.Messages[1].Content)
+	}
+	if capturedRequest.Temperature != 0.2 {
+		t.Fatalf("temperature = %v, want 0.2", capturedRequest.Temperature)
+	}
+	if capturedRequest.MaxTokens != 4096 {
+		t.Fatalf("max_tokens = %d, want 4096", capturedRequest.MaxTokens)
+	}
+	if capturedRequest.ResponseFormat == nil {
+		t.Fatalf("response_format should be set")
+	}
+	if capturedRequest.ResponseFormat.Type != "json_object" {
+		t.Fatalf("response_format.type = %q, want json_object", capturedRequest.ResponseFormat.Type)
 	}
 	if response.Audit.Model != "dynamic-draft-model" {
 		t.Fatalf("audit model = %q, want dynamic-draft-model", response.Audit.Model)

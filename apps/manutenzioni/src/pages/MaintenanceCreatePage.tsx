@@ -313,7 +313,7 @@ export function MaintenanceCreatePage() {
         <div className={shared.titleBlock}>
           <h1 className={shared.pageTitle}>Nuova manutenzione</h1>
           <p className={shared.pageSubtitle}>
-            Incolla un brief e compila i campi essenziali. I testi sono provvisori: si affineranno nei prossimi step.
+            Incolla un brief oppure compila i campi essenziali. I testi sono provvisori: si affineranno nei prossimi step.
           </p>
         </div>
       </div>
