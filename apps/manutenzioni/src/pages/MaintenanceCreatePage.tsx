@@ -1,17 +1,28 @@
 import { Button, Icon, MultiSelect, Skeleton, useToast } from '@mrsmith/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCreateMaintenance, useReferenceData } from '../api/queries';
+import {
+  useCreateMaintenance,
+  useMaintenanceAssistancePreview,
+  useReferenceData,
+} from '../api/queries';
 import type {
   AdhocSiteInput,
+  AssistancePreviewResponse,
   ClassificationInput,
   MaintenanceFormBody,
   ReferenceItem,
   WindowBody,
 } from '../api/types';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { SiteSelectField } from '../components/SiteSelectField';
 import { errorMessage } from '../lib/format';
 import shared from './shared.module.css';
+
+const BRIEF_MIN_LENGTH = 30;
+const BRIEF_MAX_LENGTH = 2000;
+
+type AiState = 'idle' | 'loading' | 'applied' | 'error';
 
 interface FormState {
   summary_it: string;
@@ -49,13 +60,27 @@ const initialForm: FormState = {
   expected_downtime_minutes: '',
 };
 
+const REQUIRED_FIELD_IDS = {
+  summary_it: 'mcp-field-summary',
+  maintenance_kind_id: 'mcp-field-kind',
+  technical_domain_id: 'mcp-field-domain',
+  customer_scope_id: 'mcp-field-scope',
+} as const;
+
 export function MaintenanceCreatePage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const reference = useReferenceData();
   const create = useCreateMaintenance();
+  const assistancePreview = useMaintenanceAssistancePreview();
   const [form, setForm] = useState<FormState>(initialForm);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const [leaveTarget, setLeaveTarget] = useState<string | null>(null);
+  const [aiState, setAiState] = useState<AiState>('idle');
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [preAiSnapshot, setPreAiSnapshot] = useState<FormState | null>(null);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initialForm), [form]);
 
   useEffect(() => {
@@ -77,7 +102,7 @@ export function MaintenanceCreatePage() {
 
   const missing = useMemo(() => {
     const reasons: string[] = [];
-    if (!form.summary_it.trim()) reasons.push('sintesi operativa');
+    if (!form.summary_it.trim()) reasons.push('titolo');
     if (!form.maintenance_kind_id) reasons.push('tipo');
     if (!form.technical_domain_id) reasons.push('dominio tecnico');
     if (!form.customer_scope_id) reasons.push('ambito clienti');
@@ -99,14 +124,111 @@ export function MaintenanceCreatePage() {
             return item?.technical_domain_id === domainId;
           })
         : current.service_taxonomy_ids;
+      const removed = current.service_taxonomy_ids.length - nextServices.length;
+      if (removed > 0) {
+        toast(
+          `Rimosso ${removed} servizio${removed > 1 ? ' non compatibile' : ' non compatibile'} con il nuovo dominio.`,
+          'warning',
+        );
+      }
       return { ...current, technical_domain_id: value, service_taxonomy_ids: nextServices };
     });
+  }
+
+  function focusFirstInvalid() {
+    if (!form.summary_it.trim()) {
+      document.getElementById(REQUIRED_FIELD_IDS.summary_it)?.focus();
+      return;
+    }
+    if (!form.maintenance_kind_id) {
+      document.getElementById(REQUIRED_FIELD_IDS.maintenance_kind_id)?.focus();
+      return;
+    }
+    if (!form.technical_domain_id) {
+      document.getElementById(REQUIRED_FIELD_IDS.technical_domain_id)?.focus();
+      return;
+    }
+    if (!form.customer_scope_id) {
+      document.getElementById(REQUIRED_FIELD_IDS.customer_scope_id)?.focus();
+    }
+  }
+
+  function hasClassificationsOrTitle(): boolean {
+    if (form.summary_it.trim()) return true;
+    if (form.service_taxonomy_ids.length > 0) return true;
+    if (form.reason_class_ids.length > 0) return true;
+    if (form.impact_effect_ids.length > 0) return true;
+    if (form.quality_flag_ids.length > 0) return true;
+    return false;
+  }
+
+  async function runAiApply() {
+    const brief = form.assistance_context.trim();
+    if (brief.length < BRIEF_MIN_LENGTH) return;
+    setAiState('loading');
+    setAiError(null);
+    try {
+      const response = await assistancePreview.mutateAsync({
+        brief,
+        maintenance_kind_id: form.maintenance_kind_id ? Number(form.maintenance_kind_id) : null,
+        technical_domain_id: form.technical_domain_id ? Number(form.technical_domain_id) : null,
+        customer_scope_id: form.customer_scope_id ? Number(form.customer_scope_id) : null,
+      });
+      applyAssistance(response);
+      setAiState('applied');
+    } catch (error) {
+      setAiError(errorMessage(error, 'Compilazione non disponibile. Inserisci i campi manualmente.'));
+      setAiState('error');
+    }
+  }
+
+  function handleAiApplyClick() {
+    if (aiState === 'applied' && hasClassificationsOrTitle()) {
+      setConfirmRegenerate(true);
+      return;
+    }
+    setPreAiSnapshot(form);
+    runAiApply();
+  }
+
+  function applyAssistance(response: AssistancePreviewResponse) {
+    setForm((current) => ({
+      ...current,
+      summary_it: response.texts.title_it?.trim() || current.summary_it,
+      service_taxonomy_ids:
+        response.service_taxonomy_ids.length > 0
+          ? response.service_taxonomy_ids
+          : current.service_taxonomy_ids,
+      reason_class_ids:
+        response.reason_class_ids.length > 0 ? response.reason_class_ids : current.reason_class_ids,
+      impact_effect_ids:
+        response.impact_effect_ids.length > 0
+          ? response.impact_effect_ids
+          : current.impact_effect_ids,
+      quality_flag_ids:
+        response.quality_flag_ids.length > 0 ? response.quality_flag_ids : current.quality_flag_ids,
+    }));
+  }
+
+  function handleAiUndo() {
+    if (preAiSnapshot) {
+      setForm(preAiSnapshot);
+    }
+    setAiState('idle');
+    setAiError(null);
+    setPreAiSnapshot(null);
+  }
+
+  function confirmRegenerateNow() {
+    setConfirmRegenerate(false);
+    setPreAiSnapshot(form);
+    runAiApply();
   }
 
   async function submit() {
     setAttemptedSubmit(true);
     if (!canSubmit) {
-      toast(`Per creare la bozza completa: ${missing.join(', ')}.`, 'error');
+      focusFirstInvalid();
       return;
     }
     if ((form.scheduled_start_at && !form.scheduled_end_at) || (!form.scheduled_start_at && form.scheduled_end_at)) {
@@ -168,17 +290,30 @@ export function MaintenanceCreatePage() {
     }
   }
 
+  function requestLeave(target: string) {
+    if (dirty && !create.isPending) {
+      setLeaveTarget(target);
+      return;
+    }
+    navigate(target);
+  }
+
+  function handleBackClick(event: React.MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    requestLeave('/manutenzioni');
+  }
+
   return (
-    <section className={shared.page}>
-      <button type="button" className={shared.backLink} onClick={() => navigate('/manutenzioni')}>
+    <section className={`${shared.page} ${shared.pageNarrow}`}>
+      <a className={shared.backLink} href="/manutenzioni" onClick={handleBackClick}>
         <Icon name="chevron-left" size={16} />
         Torna al registro
-      </button>
+      </a>
       <div className={shared.header}>
         <div className={shared.titleBlock}>
           <h1 className={shared.pageTitle}>Nuova manutenzione</h1>
           <p className={shared.pageSubtitle}>
-            Raccogli il contesto essenziale e crea una bozza da completare nel dettaglio.
+            Incolla un brief e compila i campi essenziali. I testi sono provvisori: si affineranno nei prossimi step.
           </p>
         </div>
       </div>
@@ -197,104 +332,87 @@ export function MaintenanceCreatePage() {
         </div>
       ) : (
         <>
-          <div className={shared.wizardLayout}>
-            <aside className={`${shared.panel} ${shared.wizardAside}`}>
-              <div className={shared.stepList} aria-label="Avanzamento creazione">
-                <span className={shared.stepItemActive}>1. Contesto</span>
-                <span className={shared.stepItem}>2. Classificazione</span>
-                <span className={shared.stepItem}>3. Finestra</span>
-              </div>
-              <div className={shared.summaryList}>
-                <div>
-                  <span>Pronto per bozza</span>
-                  <strong>{canSubmit ? 'Sì' : 'No'}</strong>
-                </div>
-                <div>
-                  <span>Servizi</span>
-                  <strong>{selectionLabel(form.service_taxonomy_ids, reference.data.service_taxonomy)}</strong>
-                </div>
-                <div>
-                  <span>Prima finestra</span>
-                  <strong>{form.scheduled_start_at && form.scheduled_end_at ? 'Indicata' : 'Da definire'}</strong>
-                </div>
-              </div>
-              {!canSubmit && attemptedSubmit && (
-                <p className={shared.fieldError}>Completa: {missing.join(', ')}.</p>
-              )}
-            </aside>
+          <div ref={formRef} className={shared.tabsSpacer}>
+            <BriefBlock
+              value={form.assistance_context}
+              onChange={(value) => update('assistance_context', value)}
+              aiState={aiState}
+              aiError={aiError}
+              onApply={handleAiApplyClick}
+              onUndo={handleAiUndo}
+            />
 
-            <div className={shared.wizardMain}>
-              <div className={shared.panel}>
-                <div className={shared.sectionHeader}>
-                  <h2 className={shared.sectionTitle}>Contesto</h2>
-                  <span className={shared.small}>Dati obbligatori</span>
-                </div>
-                <div className={shared.formGrid}>
-                  <label className={`${shared.label} ${shared.formGridSpan}`}>
-                    <span className={shared.labelText}>
-                      Sintesi operativa <span className={shared.required}>*</span>
-                    </span>
-                    <input
-                      className={`${shared.field} ${attemptedSubmit && !form.summary_it.trim() ? shared.fieldInvalid : ''}`}
-                      value={form.summary_it}
-                      onChange={(event) => update('summary_it', event.target.value)}
-                      required
-                    />
-                  </label>
-                  <label className={`${shared.label} ${shared.formGridSpan}`}>
-                    Contesto per assistenza
-                    <textarea
-                      className={shared.textarea}
-                      value={form.assistance_context}
-                      onChange={(event) => update('assistance_context', event.target.value)}
-                    />
-                  </label>
-                  <SelectField
-                    label="Tipo"
-                    required
-                    value={form.maintenance_kind_id}
-                    items={reference.data.maintenance_kinds}
-                    invalid={attemptedSubmit && !form.maintenance_kind_id}
-                    onChange={(value) => update('maintenance_kind_id', value)}
-                  />
-                  <SelectField
-                    label="Dominio tecnico"
-                    required
-                    value={form.technical_domain_id}
-                    items={reference.data.technical_domains}
-                    invalid={attemptedSubmit && !form.technical_domain_id}
-                    onChange={updateDomain}
-                  />
-                  <SelectField
-                    label="Ambito clienti"
-                    required
-                    value={form.customer_scope_id}
-                    items={reference.data.customer_scopes}
-                    invalid={attemptedSubmit && !form.customer_scope_id}
-                    onChange={(value) => update('customer_scope_id', value)}
-                  />
-                  <SiteSelectField
-                    sites={reference.data.sites}
-                    value={{
-                      site_id: form.site_id ? Number(form.site_id) : null,
-                      adhoc_site: form.adhoc_site,
-                    }}
-                    onChange={(next) =>
-                      setForm((current) => ({
-                        ...current,
-                        site_id: next.site_id != null ? String(next.site_id) : '',
-                        adhoc_site: next.adhoc_site,
-                      }))
-                    }
-                  />
-                </div>
+            <div className={shared.panel}>
+              <div className={shared.sectionHeader}>
+                <h2 className={shared.sectionTitle}>Contesto</h2>
+                <span className={shared.sectionBadge}>Obbligatorio</span>
               </div>
+              <div className={shared.formGrid}>
+                <label className={`${shared.label} ${shared.formGridSpan}`}>
+                  <span className={shared.labelText}>
+                    Titolo <span className={shared.required}>*</span>
+                  </span>
+                  <input
+                    id={REQUIRED_FIELD_IDS.summary_it}
+                    className={`${shared.field} ${attemptedSubmit && !form.summary_it.trim() ? shared.fieldInvalid : ''}`}
+                    value={form.summary_it}
+                    onChange={(event) => update('summary_it', event.target.value)}
+                    required
+                  />
+                </label>
+                <SelectField
+                  label="Tipo"
+                  required
+                  id={REQUIRED_FIELD_IDS.maintenance_kind_id}
+                  value={form.maintenance_kind_id}
+                  items={reference.data.maintenance_kinds}
+                  invalid={attemptedSubmit && !form.maintenance_kind_id}
+                  onChange={(value) => update('maintenance_kind_id', value)}
+                />
+                <SelectField
+                  label="Dominio tecnico"
+                  required
+                  id={REQUIRED_FIELD_IDS.technical_domain_id}
+                  value={form.technical_domain_id}
+                  items={reference.data.technical_domains}
+                  invalid={attemptedSubmit && !form.technical_domain_id}
+                  onChange={updateDomain}
+                />
+                <SelectField
+                  label="Ambito clienti"
+                  required
+                  id={REQUIRED_FIELD_IDS.customer_scope_id}
+                  value={form.customer_scope_id}
+                  items={reference.data.customer_scopes}
+                  invalid={attemptedSubmit && !form.customer_scope_id}
+                  onChange={(value) => update('customer_scope_id', value)}
+                />
+                <SiteSelectField
+                  sites={reference.data.sites}
+                  value={{
+                    site_id: form.site_id ? Number(form.site_id) : null,
+                    adhoc_site: form.adhoc_site,
+                  }}
+                  onChange={(next) =>
+                    setForm((current) => ({
+                      ...current,
+                      site_id: next.site_id != null ? String(next.site_id) : '',
+                      adhoc_site: next.adhoc_site,
+                    }))
+                  }
+                />
+              </div>
+            </div>
 
-              <div className={shared.panel}>
-                <div className={shared.sectionHeader}>
-                  <h2 className={shared.sectionTitle}>Classificazione iniziale</h2>
-                  <span className={shared.small}>Facoltativa</span>
-                </div>
+            <details className={shared.collapsiblePanel} open>
+              <summary className={shared.collapsibleSummary}>
+                <span className={shared.collapsibleSummaryLeft}>
+                  <Icon name="chevron-right" size={16} className={shared.collapsibleChevron} />
+                  <h2 className={shared.sectionTitle}>Classificazione</h2>
+                </span>
+                <span className={shared.sectionBadge}>Opzionale</span>
+              </summary>
+              <div className={shared.collapsibleContent}>
                 <div className={shared.formGrid}>
                   <MultiSelectField
                     label="Servizi coinvolti"
@@ -330,12 +448,17 @@ export function MaintenanceCreatePage() {
                   </label>
                 </div>
               </div>
+            </details>
 
-              <div className={shared.panel}>
-                <div className={shared.sectionHeader}>
+            <details className={shared.collapsiblePanel}>
+              <summary className={shared.collapsibleSummary}>
+                <span className={shared.collapsibleSummaryLeft}>
+                  <Icon name="chevron-right" size={16} className={shared.collapsibleChevron} />
                   <h2 className={shared.sectionTitle}>Prima finestra</h2>
-                  <span className={shared.small}>Facoltativa</span>
-                </div>
+                </span>
+                <span className={shared.sectionBadge}>Opzionale</span>
+              </summary>
+              <div className={shared.collapsibleContent}>
                 <div className={shared.formGridThree}>
                   <label className={shared.label}>
                     Inizio previsto
@@ -345,6 +468,7 @@ export function MaintenanceCreatePage() {
                       value={form.scheduled_start_at}
                       onChange={(event) => update('scheduled_start_at', event.target.value)}
                     />
+                    <span className={shared.fieldHelper}>Ora locale del browser.</span>
                   </label>
                   <label className={shared.label}>
                     Fine prevista
@@ -354,9 +478,10 @@ export function MaintenanceCreatePage() {
                       value={form.scheduled_end_at}
                       onChange={(event) => update('scheduled_end_at', event.target.value)}
                     />
+                    <span className={shared.fieldHelper}>Ora locale del browser.</span>
                   </label>
                   <label className={shared.label}>
-                    Downtime previsto
+                    Downtime previsto (minuti)
                     <input
                       className={shared.field}
                       type="number"
@@ -367,15 +492,15 @@ export function MaintenanceCreatePage() {
                   </label>
                 </div>
               </div>
-            </div>
+            </details>
           </div>
 
           <div className={shared.stickyActionBar}>
             <span className={shared.small}>
-              {canSubmit ? 'Tutto pronto per creare la bozza.' : `Per completare: ${missing.join(', ')}.`}
+              {canSubmit ? 'Pronta per la bozza.' : `Mancano: ${missing.join(', ')}.`}
             </span>
             <div className={shared.formActions}>
-              <Button variant="secondary" onClick={() => navigate('/manutenzioni')}>
+              <Button variant="secondary" onClick={() => requestLeave('/manutenzioni')}>
                 Annulla
               </Button>
               <Button onClick={submit} loading={create.isPending}>
@@ -383,9 +508,92 @@ export function MaintenanceCreatePage() {
               </Button>
             </div>
           </div>
+
+          <ConfirmDialog
+            open={leaveTarget !== null}
+            title="Uscire senza salvare?"
+            message="La bozza non è stata creata. Le modifiche andranno perse."
+            confirmLabel="Esci senza salvare"
+            variant="danger"
+            onConfirm={() => {
+              const target = leaveTarget;
+              setLeaveTarget(null);
+              if (target) navigate(target);
+            }}
+            onClose={() => setLeaveTarget(null)}
+          />
+
+          <ConfirmDialog
+            open={confirmRegenerate}
+            title="Sovrascrivere i campi compilati?"
+            message="Il brief è cambiato. La compilazione sostituirà titolo e classificazioni attuali."
+            confirmLabel="Sovrascrivi"
+            variant="primary"
+            onConfirm={confirmRegenerateNow}
+            onClose={() => setConfirmRegenerate(false)}
+          />
         </>
       )}
     </section>
+  );
+}
+
+function BriefBlock({
+  value,
+  onChange,
+  aiState,
+  aiError,
+  onApply,
+  onUndo,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  aiState: AiState;
+  aiError: string | null;
+  onApply: () => void;
+  onUndo: () => void;
+}) {
+  const length = value.length;
+  const canApply = value.trim().length >= BRIEF_MIN_LENGTH && length <= BRIEF_MAX_LENGTH;
+  const overLimit = length > BRIEF_MAX_LENGTH;
+
+  return (
+    <div className={shared.briefPanel}>
+      <div className={shared.briefHeader}>
+        <h2 className={shared.briefTitle}>Brief</h2>
+        <span className={`${shared.briefCounter} ${overLimit ? shared.briefCounterWarn : ''}`}>
+          {length}/{BRIEF_MAX_LENGTH}
+        </span>
+      </div>
+      <textarea
+        className={shared.briefTextarea}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Descrizione libera dell'intervento: apparati, finestra prevista, impatto atteso, motivo."
+      />
+      <div className={shared.briefActions}>
+        <Button
+          onClick={onApply}
+          loading={aiState === 'loading'}
+          disabled={!canApply || aiState === 'loading'}
+        >
+          {aiState === 'loading' ? 'Analisi in corso…' : 'Compila dal brief'}
+        </Button>
+      </div>
+      {aiState === 'applied' && (
+        <div className={`${shared.briefBanner} ${shared.briefBannerSuccess}`}>
+          <span>Campi compilati dal brief. Verifica e crea la bozza.</span>
+          <button type="button" className={shared.briefBannerAction} onClick={onUndo}>
+            Annulla compilazione
+          </button>
+        </div>
+      )}
+      {aiState === 'error' && aiError && (
+        <div className={`${shared.briefBanner} ${shared.briefBannerError}`}>
+          <span>{aiError}</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -397,6 +605,7 @@ function SelectField({
   emptyLabel = 'Seleziona',
   required = false,
   invalid = false,
+  id,
 }: {
   label: string;
   value: string;
@@ -405,6 +614,7 @@ function SelectField({
   emptyLabel?: string;
   required?: boolean;
   invalid?: boolean;
+  id?: string;
 }) {
   return (
     <label className={shared.label}>
@@ -412,6 +622,7 @@ function SelectField({
         {label} {required && <span className={shared.required}>*</span>}
       </span>
       <select
+        id={id}
         className={`${shared.select} ${invalid ? shared.fieldInvalid : ''}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -463,14 +674,4 @@ function classificationInputs(ids: number[], hasPrimary: boolean): Classificatio
     confidence: null,
     is_primary: hasPrimary && index === 0,
   }));
-}
-
-function selectionLabel(ids: number[], items: ReferenceItem[]): string {
-  if (ids.length === 0) return '-';
-  const names = ids
-    .map((id) => items.find((item) => item.id === id)?.name_it)
-    .filter(Boolean);
-  if (names.length === 0) return `${ids.length}`;
-  if (names.length === 1) return names[0] ?? '-';
-  return `${names[0]} +${names.length - 1}`;
 }

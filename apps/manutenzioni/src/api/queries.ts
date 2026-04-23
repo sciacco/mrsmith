@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useManutenzioniApiClient } from './client';
 import type {
+  AssistancePreviewRequest,
+  AssistancePreviewResponse,
   ClassificationInput,
   CustomerSearchItem,
   ImpactedCustomerBody,
@@ -109,6 +111,17 @@ export function useMaintenanceAssistanceDraft(id: number) {
     mutationFn: (body: MaintenanceAssistanceDraftBody) =>
       api.post<MaintenanceAssistanceDraft>(
         `/manutenzioni/v1/maintenances/${id}/assistance/draft`,
+        body,
+      ),
+  });
+}
+
+export function useMaintenanceAssistancePreview() {
+  const api = useManutenzioniApiClient();
+  return useMutation({
+    mutationFn: (body: AssistancePreviewRequest) =>
+      api.post<AssistancePreviewResponse>(
+        '/manutenzioni/v1/maintenances/assistance/preview',
         body,
       ),
   });

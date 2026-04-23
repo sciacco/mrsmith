@@ -1,7 +1,6 @@
+import { SingleSelect } from '@mrsmith/ui';
 import type { AdhocSiteInput, ReferenceItem } from '../api/types';
 import shared from '../pages/shared.module.css';
-
-const NEW_SENTINEL = '__new__';
 
 export interface SiteSelectValue {
   site_id: number | null;
@@ -25,25 +24,16 @@ export function SiteSelectField({
   currentScope,
 }: SiteSelectFieldProps) {
   const isAdhocMode = value.adhoc_site !== null;
-  const selectValue = isAdhocMode
-    ? NEW_SENTINEL
-    : value.site_id != null
-    ? String(value.site_id)
-    : '';
 
-  function handleSelect(raw: string) {
-    if (raw === NEW_SENTINEL) {
-      onChange({
-        site_id: null,
-        adhoc_site: { name: '', city: null, country_code: null },
-      });
-      return;
-    }
-    if (raw === '') {
-      onChange({ site_id: null, adhoc_site: null });
-      return;
-    }
-    onChange({ site_id: Number(raw), adhoc_site: null });
+  function enterAdhoc() {
+    onChange({
+      site_id: null,
+      adhoc_site: { name: '', city: null, country_code: null },
+    });
+  }
+
+  function exitAdhoc() {
+    onChange({ site_id: null, adhoc_site: null });
   }
 
   function patchAdhoc(patch: Partial<AdhocSiteInput>) {
@@ -56,93 +46,71 @@ export function SiteSelectField({
 
   const scopedBadge =
     !isAdhocMode && value.site_id != null && currentScope === 'scoped' ? (
-      <span
-        style={{
-          marginLeft: '0.4rem',
-          padding: '0.05rem 0.45rem',
-          borderRadius: '999px',
-          background: 'rgba(56, 189, 248, 0.15)',
-          color: 'rgb(125, 211, 252)',
-          fontSize: '0.7rem',
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}
-      >
-        Ad-hoc
-      </span>
+      <span className={shared.siteScopedBadge}>Ad-hoc</span>
     ) : null;
 
+  const options = sites.map((item) => ({ value: item.id, label: item.name_it }));
+
   return (
-    <label className={shared.label}>
-      <span>
+    <div className={shared.fieldGroup}>
+      <span className={shared.fieldLabel}>
         {label}
         {scopedBadge}
       </span>
-      <select
-        className={shared.select}
-        value={selectValue}
-        onChange={(event) => handleSelect(event.target.value)}
-      >
-        <option value="">Nessun sito</option>
-        {sites.map((item) => (
-          <option key={item.id} value={item.id}>
-            {item.name_it}
-          </option>
-        ))}
-        <option value={NEW_SENTINEL}>+ Aggiungi un sito solo per questa manutenzione</option>
-      </select>
+
       {isAdhocMode && value.adhoc_site ? (
-        <div
-          style={{
-            display: 'grid',
-            gap: '0.5rem',
-            padding: '0.75rem',
-            border: '1px solid var(--border-muted, #1f2937)',
-            borderRadius: '6px',
-            marginTop: '0.35rem',
-          }}
-        >
+        <div className={shared.siteAdhocBlock}>
+          <div className={shared.siteAdhocHeader}>
+            <span className={shared.siteAdhocTitle}>Sito ad-hoc</span>
+            <button type="button" className={shared.siteAdhocBackLink} onClick={exitAdhoc}>
+              ← Torna all'elenco siti
+            </button>
+          </div>
           <input
             className={shared.field}
-            placeholder="Nome del sito (obbligatorio)"
+            placeholder="Nome del sito"
             value={value.adhoc_site.name}
             onChange={(event) => patchAdhoc({ name: event.target.value })}
             autoFocus
           />
-          <input
-            className={shared.field}
-            placeholder="Città"
-            value={value.adhoc_site.city ?? ''}
-            onChange={(event) => patchAdhoc({ city: event.target.value || null })}
-          />
-          <input
-            className={shared.field}
-            placeholder="Country code (ISO 2, es: IT)"
-            maxLength={2}
-            value={value.adhoc_site.country_code ?? ''}
-            onChange={(event) =>
-              patchAdhoc({ country_code: event.target.value.toUpperCase() || null })
-            }
-          />
-          <button
-            type="button"
-            style={{
-              justifySelf: 'start',
-              fontSize: '0.85rem',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-accent, #60a5fa)',
-              cursor: 'pointer',
-              padding: 0,
-              textDecoration: 'underline',
-            }}
-            onClick={() => onChange({ site_id: null, adhoc_site: null })}
-          >
-            Annulla sito ad-hoc
-          </button>
+          <div className={shared.siteAdhocGrid}>
+            <input
+              className={shared.field}
+              placeholder="Città"
+              value={value.adhoc_site.city ?? ''}
+              onChange={(event) => patchAdhoc({ city: event.target.value || null })}
+            />
+            <input
+              className={shared.field}
+              placeholder="Paese (ISO 2)"
+              maxLength={2}
+              value={value.adhoc_site.country_code ?? ''}
+              onChange={(event) =>
+                patchAdhoc({ country_code: event.target.value.toUpperCase() || null })
+              }
+            />
+          </div>
+          <span className={shared.fieldHelper}>
+            Il sito resterà agganciato solo a questa manutenzione.
+          </span>
         </div>
-      ) : null}
-    </label>
+      ) : (
+        <>
+          <SingleSelect<number>
+            options={options}
+            selected={value.site_id}
+            onChange={(next) => onChange({ site_id: next, adhoc_site: null })}
+            placeholder="Cerca un sito…"
+            allowClear
+          />
+          <span className={shared.siteAdhocLink}>
+            Il sito non è in elenco?{' '}
+            <button type="button" onClick={enterAdhoc}>
+              Aggiungi un sito ad-hoc
+            </button>
+          </span>
+        </>
+      )}
+    </div>
   );
 }

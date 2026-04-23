@@ -75,6 +75,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	manager("POST /manutenzioni/v1/maintenances", h.handleCreateMaintenance)
 	manager("PATCH /manutenzioni/v1/maintenances/{id}", h.handleUpdateMaintenance)
 	manager("POST /manutenzioni/v1/maintenances/{id}/assistance/draft", h.handleDraftAssistance)
+	manager("POST /manutenzioni/v1/maintenances/assistance/preview", h.handlePreviewAssistance)
 	action("POST /manutenzioni/v1/maintenances/{id}/status", h.handleMaintenanceStatus)
 
 	manager("POST /manutenzioni/v1/maintenances/{id}/windows", h.handleCreateWindow)

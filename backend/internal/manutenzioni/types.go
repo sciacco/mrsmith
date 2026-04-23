@@ -376,6 +376,27 @@ type assistanceDraftResponse struct {
 	Usage           assistanceUsage                    `json:"usage"`
 }
 
+type assistancePreviewRequest struct {
+	Brief             string `json:"brief"`
+	MaintenanceKindID *int64 `json:"maintenance_kind_id,omitempty"`
+	TechnicalDomainID *int64 `json:"technical_domain_id,omitempty"`
+	CustomerScopeID   *int64 `json:"customer_scope_id,omitempty"`
+}
+
+type assistancePreviewResponse struct {
+	Texts              assistanceTextProposal             `json:"texts"`
+	ServiceTaxonomyIDs []int64                            `json:"service_taxonomy_ids"`
+	ReasonClassIDs     []int64                            `json:"reason_class_ids"`
+	ImpactEffectIDs    []int64                            `json:"impact_effect_ids"`
+	QualityFlagIDs     []int64                            `json:"quality_flag_ids"`
+	ServiceTaxonomy    []assistanceClassificationProposal `json:"service_taxonomy"`
+	ReasonClasses      []assistanceClassificationProposal `json:"reason_classes"`
+	ImpactEffects      []assistanceClassificationProposal `json:"impact_effects"`
+	QualityFlags       []assistanceClassificationProposal `json:"quality_flags"`
+	Audit              assistanceAudit                    `json:"audit"`
+	Usage              assistanceUsage                    `json:"usage"`
+}
+
 type noticeRequest struct {
 	MaintenanceWindowID *int64          `json:"maintenance_window_id"`
 	NoticeType          string          `json:"notice_type"`
