@@ -12,7 +12,7 @@ export function App() {
 
   if (status === 'reauthenticating') {
     return (
-      <AppShell userName={user?.name ?? 'John Doe'} onLogout={logout}>
+      <AppShell appName="Simulatori di Vendita" userName={user?.name ?? 'John Doe'} onLogout={logout}>
         <AppShell.Content>
           <section className={styles.reauthCard}>
             <p className={styles.eyebrow}>Autenticazione</p>
@@ -26,7 +26,7 @@ export function App() {
 
   if (!authenticated) {
     return (
-      <AppShell userName={user?.name ?? 'MrSmith'} onLogout={logout}>
+      <AppShell appName="Simulatori di Vendita" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
         <AppShell.Content>
           <section className={styles.reauthCard}>
             <p className={styles.eyebrow}>Autenticazione</p>
@@ -39,7 +39,7 @@ export function App() {
   }
 
   return (
-    <AppShell userName={user?.name ?? 'John Doe'} onLogout={logout}>
+    <AppShell appName="Simulatori di Vendita" userName={user?.name ?? 'John Doe'} onLogout={logout}>
       <AppShell.Content>{element}</AppShell.Content>
     </AppShell>
   );

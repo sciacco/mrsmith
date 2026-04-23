@@ -383,5 +383,33 @@ export function useConfigMutations(resource: string) {
         api.post<ReferenceItem>(`/manutenzioni/v1/config/${resource}/${id}/reactivate`),
       onSuccess: invalidate,
     }),
+    reorder: useMutation({
+      mutationFn: (items: Array<{ id: number; sort_order: number }>) =>
+        api.post<{ ok: boolean }>(`/manutenzioni/v1/config/${resource}/reorder`, { items }),
+      onMutate: async (items) => {
+        await queryClient.cancelQueries({ queryKey: ['manutenzioni', 'config', resource] });
+        const orderById = new Map(items.map((it, index) => [it.id, index]));
+        const snapshots = queryClient
+          .getQueriesData<ReferenceItem[]>({ queryKey: ['manutenzioni', 'config', resource] })
+          .map(([key, data]) => {
+            if (!data) return [key, data] as const;
+            const next = [...data].sort((a, b) => {
+              const ai = orderById.get(a.id);
+              const bi = orderById.get(b.id);
+              if (ai === undefined && bi === undefined) return 0;
+              if (ai === undefined) return 1;
+              if (bi === undefined) return -1;
+              return ai - bi;
+            });
+            queryClient.setQueryData(key, next);
+            return [key, data] as const;
+          });
+        return { snapshots };
+      },
+      onError: (_err, _vars, context) => {
+        context?.snapshots.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      },
+      onSettled: invalidate,
+    }),
   };
 }

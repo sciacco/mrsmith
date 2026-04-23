@@ -36,3 +36,4 @@ apps/*/*.gz
 /artifacts/
 /.playwright-cli
 .tmp/
+/backend/.playwright-cli

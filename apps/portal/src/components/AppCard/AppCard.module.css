@@ -41,6 +41,43 @@
   letter-spacing: 0.12em;
 }
 
+.badgeDev {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.4rem 0.1rem 0.35rem;
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.12);
+  color: #7de9f5;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+}
+
+.badgeDevDot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: #22d3ee;
+  box-shadow: 0 0 6px rgba(34, 211, 238, 0.8);
+  animation: badgeDevPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes badgeDevPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+}
+
 .card:hover,
 .card:focus-visible {
   border-color: var(--green-primary);
@@ -85,5 +122,9 @@
   .card:hover,
   .card:focus-visible {
     transform: none;
+  }
+
+  .badgeDevDot {
+    animation: none;
   }
 }

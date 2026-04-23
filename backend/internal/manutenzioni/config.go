@@ -134,6 +134,17 @@ func (h *Handler) handleConfigMutation(w http.ResponseWriter, r *http.Request, i
 	sortOrder := 100
 	if body.SortOrder != nil {
 		sortOrder = *body.SortOrder
+	} else if meta.Kind != resourceSite {
+		resolved, err := h.resolveDefaultSortOrder(r, meta, id)
+		if errors.Is(err, sql.ErrNoRows) {
+			appError(w, http.StatusNotFound, "config_item_not_found")
+			return
+		}
+		if err != nil {
+			h.dbFailure(w, r, "config_default_sort_order", err, "resource", meta.Key, "config_id", id)
+			return
+		}
+		sortOrder = resolved
 	}
 	isActive := true
 	if body.IsActive != nil {
@@ -389,6 +400,84 @@ func (h *Handler) loadConfigCounts(r *http.Request, meta resourceMeta) (int, int
 		return 0, 0, err
 	}
 	return active, inactive, nil
+}
+
+func (h *Handler) resolveDefaultSortOrder(r *http.Request, meta resourceMeta, id int64) (int, error) {
+	if id == 0 {
+		var maxOrder int
+		query := fmt.Sprintf(`SELECT COALESCE(MAX(sort_order), 0) FROM %s`, meta.Table)
+		if err := h.maintenance.QueryRowContext(r.Context(), query).Scan(&maxOrder); err != nil {
+			return 0, err
+		}
+		return maxOrder + 10, nil
+	}
+	var existing int
+	query := fmt.Sprintf(`SELECT sort_order FROM %s WHERE %s = $1`, meta.Table, meta.IDColumn)
+	if err := h.maintenance.QueryRowContext(r.Context(), query, id).Scan(&existing); err != nil {
+		return 0, err
+	}
+	return existing, nil
+}
+
+func (h *Handler) handleReorderConfig(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMaintenanceDB(w) {
+		return
+	}
+	meta, ok := resourceMetas[r.PathValue("resource")]
+	if !ok {
+		appError(w, http.StatusNotFound, "config_resource_not_found")
+		return
+	}
+	if meta.Kind == resourceSite {
+		appError(w, http.StatusBadRequest, "reorder_not_supported")
+		return
+	}
+	var body configReorderRequest
+	if err := decodeBody(r, &body); err != nil {
+		appError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	if len(body.Items) == 0 {
+		appError(w, http.StatusBadRequest, "invalid_reorder_payload")
+		return
+	}
+	seen := make(map[int64]struct{}, len(body.Items))
+	for _, it := range body.Items {
+		if it.ID <= 0 || it.SortOrder < 0 {
+			appError(w, http.StatusBadRequest, "invalid_reorder_payload")
+			return
+		}
+		if _, dup := seen[it.ID]; dup {
+			appError(w, http.StatusBadRequest, "invalid_reorder_payload")
+			return
+		}
+		seen[it.ID] = struct{}{}
+	}
+
+	tx, err := h.maintenance.BeginTx(r.Context(), nil)
+	if err != nil {
+		h.dbFailure(w, r, "config_reorder_begin", err, "resource", meta.Key)
+		return
+	}
+	defer tx.Rollback()
+	stmtSQL := fmt.Sprintf(`UPDATE %s SET sort_order = $1 WHERE %s = $2`, meta.Table, meta.IDColumn)
+	stmt, err := tx.PrepareContext(r.Context(), stmtSQL)
+	if err != nil {
+		h.dbFailure(w, r, "config_reorder_prepare", err, "resource", meta.Key)
+		return
+	}
+	defer stmt.Close()
+	for _, it := range body.Items {
+		if _, err := stmt.ExecContext(r.Context(), it.SortOrder, it.ID); err != nil {
+			h.dbFailure(w, r, "config_reorder_exec", err, "resource", meta.Key, "config_id", it.ID)
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		h.dbFailure(w, r, "config_reorder_commit", err, "resource", meta.Key)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (h *Handler) handleConfigUsage(w http.ResponseWriter, r *http.Request) {

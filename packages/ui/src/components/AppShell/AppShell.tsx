@@ -4,6 +4,7 @@ import styles from './AppShell.module.css';
 
 interface AppShellProps {
   userName?: string;
+  appName?: string;
   onLogout?: () => void;
   children: ReactNode;
 }
@@ -16,7 +17,7 @@ function Content({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-export function AppShell({ userName, onLogout, children }: AppShellProps) {
+export function AppShell({ userName, appName, onLogout, children }: AppShellProps) {
   let nav: ReactNode = null;
   let content: ReactNode = null;
 
@@ -35,6 +36,12 @@ export function AppShell({ userName, onLogout, children }: AppShellProps) {
           <span className={styles.logoIcon}>S</span>
           <span className={styles.logoText}>MrSmith</span>
         </a>
+        {appName && (
+          <>
+            <span className={styles.separator} aria-hidden="true">╱</span>
+            <span className={styles.appName}>{appName}</span>
+          </>
+        )}
         <nav className={styles.nav}>{nav}</nav>
         {userName && <UserMenu userName={userName} onLogout={onLogout} />}
       </header>

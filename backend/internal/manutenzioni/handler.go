@@ -104,6 +104,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	manager("GET /manutenzioni/v1/config/summary", h.handleConfigSummary)
 	manager("GET /manutenzioni/v1/config/{resource}", h.handleListConfig)
 	manager("POST /manutenzioni/v1/config/{resource}", h.handleCreateConfig)
+	manager("POST /manutenzioni/v1/config/{resource}/reorder", h.handleReorderConfig)
 	manager("PATCH /manutenzioni/v1/config/{resource}/{id}", h.handleUpdateConfig)
 	manager("POST /manutenzioni/v1/config/{resource}/{id}/deactivate", h.handleDeactivateConfig)
 	manager("POST /manutenzioni/v1/config/{resource}/{id}/reactivate", h.handleReactivateConfig)

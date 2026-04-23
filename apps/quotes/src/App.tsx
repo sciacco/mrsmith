@@ -15,7 +15,7 @@ export function App() {
 
   if (status === 'reauthenticating') {
     return (
-      <AppShell userName={user?.name ?? 'John Doe'} onLogout={logout}>
+      <AppShell appName="Proposte" userName={user?.name ?? 'John Doe'} onLogout={logout}>
         <AppShell.Nav>
           <TabNav items={navItems} />
         </AppShell.Nav>
@@ -30,7 +30,7 @@ export function App() {
 
   if (!authenticated) {
     return (
-      <AppShell userName={user?.name ?? 'MrSmith'} onLogout={logout}>
+      <AppShell appName="Proposte" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
         <AppShell.Nav>
           <TabNav items={navItems} />
         </AppShell.Nav>
@@ -45,7 +45,7 @@ export function App() {
   }
 
   return (
-    <AppShell userName={user?.name ?? 'John Doe'} onLogout={logout}>
+    <AppShell appName="Proposte" userName={user?.name ?? 'John Doe'} onLogout={logout}>
       <AppShell.Nav>
         <TabNav items={navItems} />
       </AppShell.Nav>

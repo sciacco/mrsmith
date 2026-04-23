@@ -342,6 +342,68 @@
   white-space: nowrap;
 }
 
+.dragHandleCell {
+  width: 40px;
+  padding: 0.4rem 0.5rem !important;
+  text-align: center !important;
+}
+
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: grab;
+  border: none;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  touch-action: none;
+}
+
+.dragHandle:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.dragHandle[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.rowDragging {
+  opacity: 0.55;
+  background: var(--color-surface) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  position: relative;
+  z-index: 1;
+}
+
+.dragHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.85rem;
+  margin: 0 0 0.6rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
 .inlineActions {
   display: inline-flex;
   gap: 0.45rem;

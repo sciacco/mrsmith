@@ -6,7 +6,7 @@ type AppCardProps = {
   name: string;
   description?: string;
   href?: string;
-  status?: 'default' | 'test' | 'ready';
+  status?: 'default' | 'test' | 'ready' | 'dev';
   onClick?: () => void;
 };
 
@@ -44,6 +44,12 @@ export function AppCard({
     >
       {status === 'test' ? <span className={styles.badge}>TEST</span> : null}
       {status === 'ready' ? <span className={styles.badgeReady}>READY</span> : null}
+      {status === 'dev' ? (
+        <span className={styles.badgeDev}>
+          <span className={styles.badgeDevDot} aria-hidden="true" />
+          DEV
+        </span>
+      ) : null}
       <Icon name={icon} />
       <div className={styles.name}>{name}</div>
       {description ? <div className={styles.desc}>{description}</div> : null}

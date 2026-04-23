@@ -1,5 +1,22 @@
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Button, Icon, Modal, SearchInput, Skeleton, ToggleSwitch, useToast } from '@mrsmith/ui';
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   useConfigCounts,
@@ -18,8 +35,8 @@ import shared from './shared.module.css';
 type ActiveFilter = 'active' | 'inactive' | 'all';
 
 function parseActive(value: string | null): ActiveFilter {
-  if (value === 'inactive' || value === 'all') return value;
-  return 'active';
+  if (value === 'active' || value === 'inactive') return value;
+  return 'all';
 }
 
 const clockFormatter = new Intl.DateTimeFormat('it-IT', {
@@ -68,7 +85,7 @@ export function ConfigurationResourcePage() {
   }
 
   function setActive(value: ActiveFilter) {
-    updateParam('active', value === 'active' ? '' : value);
+    updateParam('active', value === 'all' ? '' : value);
   }
 
   function clearSearch() {
@@ -109,6 +126,32 @@ export function ConfigurationResourcePage() {
   const isEmpty = !list.isLoading && !list.error && (!list.data || list.data.length === 0);
   const hasSearch = q.trim().length > 0;
   const lastUpdated = list.dataUpdatedAt ? formatClockTime(list.dataUpdatedAt) : null;
+
+  const supportsReorder = meta.fields.sort_order !== 'hidden';
+  const canReorder = supportsReorder && !hasSearch;
+  const sortableIds = useMemo(() => (list.data ?? []).map((item) => item.id), [list.data]);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active: dragged, over } = event;
+      if (!over || dragged.id === over.id) return;
+      const items = list.data;
+      if (!items) return;
+      const oldIndex = items.findIndex((it) => it.id === Number(dragged.id));
+      const newIndex = items.findIndex((it) => it.id === Number(over.id));
+      if (oldIndex < 0 || newIndex < 0) return;
+      const reordered = arrayMove(items, oldIndex, newIndex);
+      const payload = reordered.map((it, index) => ({ id: it.id, sort_order: (index + 1) * 10 }));
+      mutations.reorder.mutate(payload, {
+        onError: (error) => toast.toast(errorMessage(error, 'Riordino non riuscito.'), 'error'),
+      });
+    },
+    [list.data, mutations.reorder, toast],
+  );
 
   return (
     <section className={shared.page}>
@@ -194,60 +237,46 @@ export function ConfigurationResourcePage() {
         />
       ) : (
         <div className={shared.tableCard}>
+          {supportsReorder && hasSearch ? (
+            <div className={shared.dragHint}>
+              <Icon name="info" size={14} />
+              Cancella la ricerca per riordinare le voci.
+            </div>
+          ) : null}
           <div className={shared.tableScroll}>
-            <table className={shared.table}>
-              <thead>
-                <tr>
-                  <th>Codice</th>
-                  <th>Nome</th>
-                  {resource === 'service-taxonomy' && <th>Dominio</th>}
-                  {resource === 'sites' && <th>Città</th>}
-                  <th>Stato</th>
-                  <th className={shared.actionsCell}>Azioni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.data!.map((item) => (
-                  <tr key={item.id}>
-                    <td className={shared.mono}>{item.code}</td>
-                    <td>
-                      <div className={shared.rowTitle}>
-                        <strong>{item.name_it}</strong>
-                        {item.description && <span className={shared.small}>{item.description}</span>}
-                      </div>
-                    </td>
-                    {resource === 'service-taxonomy' && <td>{item.technical_domain_name ?? '-'}</td>}
-                    {resource === 'sites' && <td>{item.city ?? '-'}</td>}
-                    <td>
-                      <StatusPill tone={item.is_active ? 'success' : 'neutral'}>
-                        {item.is_active ? 'Attivo' : 'Non attivo'}
-                      </StatusPill>
-                    </td>
-                    <td className={shared.actionsCell}>
-                      <div className={shared.inlineActions}>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => {
-                            setEditing(item);
-                            setModalOpen(true);
-                          }}
-                        >
-                          Modifica
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={item.is_active ? 'danger' : 'secondary'}
-                          onClick={() => setConfirm(item)}
-                        >
-                          {item.is_active ? 'Disattiva' : 'Riattiva'}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                <table className={shared.table}>
+                  <thead>
+                    <tr>
+                      {supportsReorder ? <th className={shared.dragHandleCell} aria-label="Riordina" /> : null}
+                      <th>Codice</th>
+                      <th>Nome</th>
+                      {resource === 'service-taxonomy' && <th>Dominio</th>}
+                      {resource === 'sites' && <th>Città</th>}
+                      <th>Stato</th>
+                      <th className={shared.actionsCell}>Azioni</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.data!.map((item) => (
+                      <SortableConfigRow
+                        key={item.id}
+                        item={item}
+                        resource={resource}
+                        supportsReorder={supportsReorder}
+                        canReorder={canReorder}
+                        onEdit={() => {
+                          setEditing(item);
+                          setModalOpen(true);
+                        }}
+                        onToggle={() => setConfirm(item)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </SortableContext>
+            </DndContext>
           </div>
           <div className={shared.tableFooter}>
             <span>
@@ -297,6 +326,78 @@ export function ConfigurationResourcePage() {
         onConfirm={toggleActive}
       />
     </section>
+  );
+}
+
+function SortableConfigRow({
+  item,
+  resource,
+  supportsReorder,
+  canReorder,
+  onEdit,
+  onToggle,
+}: {
+  item: ReferenceItem;
+  resource: string;
+  supportsReorder: boolean;
+  canReorder: boolean;
+  onEdit: () => void;
+  onToggle: () => void;
+}) {
+  const sortable = useSortable({ id: item.id, disabled: !canReorder });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = sortable;
+  const style = supportsReorder
+    ? {
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }
+    : undefined;
+
+  return (
+    <tr
+      ref={supportsReorder ? setNodeRef : undefined}
+      style={style}
+      className={isDragging ? shared.rowDragging : undefined}
+    >
+      {supportsReorder ? (
+        <td className={shared.dragHandleCell}>
+          <button
+            type="button"
+            className={shared.dragHandle}
+            aria-label={canReorder ? 'Trascina per riordinare' : 'Riordinamento non disponibile con filtri attivi'}
+            title={canReorder ? 'Trascina per riordinare' : 'Cancella la ricerca per riordinare'}
+            {...attributes}
+            {...(canReorder ? listeners : {})}
+          >
+            <Icon name="grip-vertical" size={16} />
+          </button>
+        </td>
+      ) : null}
+      <td className={shared.mono}>{item.code}</td>
+      <td>
+        <div className={shared.rowTitle}>
+          <strong>{item.name_it}</strong>
+          {item.description && <span className={shared.small}>{item.description}</span>}
+        </div>
+      </td>
+      {resource === 'service-taxonomy' && <td>{item.technical_domain_name ?? '-'}</td>}
+      {resource === 'sites' && <td>{item.city ?? '-'}</td>}
+      <td>
+        <StatusPill tone={item.is_active ? 'success' : 'neutral'}>
+          {item.is_active ? 'Attivo' : 'Non attivo'}
+        </StatusPill>
+      </td>
+      <td className={shared.actionsCell}>
+        <div className={shared.inlineActions}>
+          <Button size="sm" variant="secondary" onClick={onEdit}>
+            Modifica
+          </Button>
+          <Button size="sm" variant={item.is_active ? 'danger' : 'secondary'} onClick={onToggle}>
+            {item.is_active ? 'Disattiva' : 'Riattiva'}
+          </Button>
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -419,7 +520,6 @@ type FormState = {
   description: string;
   city: string;
   country_code: string;
-  sort_order: string;
   technical_domain_id: string;
   is_active: boolean;
 };
@@ -471,12 +571,6 @@ function ConfigModal({
     const next: FormErrors = {};
     if (!item && !form.code.trim()) next.code = 'Il codice è obbligatorio.';
     if (!form.name_it.trim()) next.name_it = 'Il nome è obbligatorio.';
-    if (meta.fields.sort_order === 'required') {
-      const parsed = Number(form.sort_order);
-      if (!form.sort_order.trim() || Number.isNaN(parsed)) {
-        next.sort_order = "L'ordine di visualizzazione è obbligatorio.";
-      }
-    }
     if (meta.fields.technical_domain_id === 'required' && !form.technical_domain_id) {
       next.technical_domain_id = 'Seleziona un dominio tecnico.';
     }
@@ -504,7 +598,6 @@ function ConfigModal({
       description: form.description.trim() || null,
       city: form.city.trim() || null,
       country_code: form.country_code.trim() || null,
-      sort_order: form.sort_order ? Number(form.sort_order) : 100,
       technical_domain_id: form.technical_domain_id ? Number(form.technical_domain_id) : undefined,
       is_active: form.is_active,
     };
@@ -519,7 +612,6 @@ function ConfigModal({
   }
 
   const showNameEn = meta.fields.name_en !== 'hidden';
-  const showSortOrder = meta.fields.sort_order !== 'hidden';
   const showTechnicalDomain = meta.fields.technical_domain_id !== undefined;
   const showCity = meta.fields.city !== undefined;
   const showCountry = meta.fields.country_code !== undefined;
@@ -625,27 +717,6 @@ function ConfigModal({
             {errors.country_code ? <span className={shared.fieldError}>{errors.country_code}</span> : null}
           </label>
         ) : null}
-        {showSortOrder ? (
-          <label className={shared.label}>
-            <span className={shared.labelText}>
-              Ordine di visualizzazione
-              {meta.fields.sort_order === 'required' ? <span className={shared.required}>*</span> : null}
-            </span>
-            <input
-              className={`${shared.field} ${errors.sort_order ? shared.fieldInvalid : ''}`}
-              type="number"
-              value={form.sort_order}
-              onChange={(event) => update('sort_order', event.target.value)}
-            />
-            {errors.sort_order ? (
-              <span className={shared.fieldError}>{errors.sort_order}</span>
-            ) : (
-              <span className={shared.fieldHelper}>
-                Numeri più bassi compaiono prima. Lascia 100 per un ordinamento neutro.
-              </span>
-            )}
-          </label>
-        ) : null}
         <label className={`${shared.label} ${shared.formGridSpan}`}>
           <span className={shared.labelText}>Descrizione</span>
           <textarea
@@ -691,7 +762,6 @@ function formFromItem(item: ReferenceItem | null): FormState {
     description: item?.description ?? '',
     city: item?.city ?? '',
     country_code: item?.country_code ?? '',
-    sort_order: item ? String(item.sort_order) : '100',
     technical_domain_id: item?.technical_domain_id ? String(item.technical_domain_id) : '',
     is_active: item ? item.is_active : true,
   };

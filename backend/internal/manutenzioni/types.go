@@ -418,3 +418,12 @@ type configItemRequest struct {
 	CountryCode       *string `json:"country_code"`
 	TechnicalDomainID *int64  `json:"technical_domain_id"`
 }
+
+type configReorderRequest struct {
+	Items []configReorderItem `json:"items"`
+}
+
+type configReorderItem struct {
+	ID        int64 `json:"id"`
+	SortOrder int   `json:"sort_order"`
+}
