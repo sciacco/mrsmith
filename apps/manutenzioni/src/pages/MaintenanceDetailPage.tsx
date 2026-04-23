@@ -16,6 +16,7 @@ import {
   useWindowMutations,
 } from '../api/queries';
 import type {
+  AdhocSiteInput,
   ClassificationInput,
   AssistanceClassificationProposal,
   MaintenanceAssistanceDraft,
@@ -28,6 +29,7 @@ import type {
   WindowBody,
 } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { SiteSelectField } from '../components/SiteSelectField';
 import { StatusPill, statusTone } from '../components/StatusPill';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import {
@@ -226,11 +228,21 @@ function SummaryTab({
     technical_domain_id: String(detail.technical_domain.id),
     customer_scope_id: String(detail.customer_scope.id),
     site_id: detail.site ? String(detail.site.id) : '',
+    adhoc_site: null as AdhocSiteInput | null,
     reason_it: detail.reason_it ?? '',
     residual_service_it: detail.residual_service_it ?? '',
   }));
 
   async function save() {
+    if (form.adhoc_site && !form.adhoc_site.name.trim()) {
+      toast.toast('Indica il nome del sito ad-hoc.', 'error');
+      return;
+    }
+    const sitePatch = buildSitePatch({
+      previousSiteId: detail.site?.id ?? null,
+      siteIdRaw: form.site_id,
+      adhocSite: form.adhoc_site,
+    });
     try {
       await update.mutateAsync({
         id: detail.maintenance_id,
@@ -242,8 +254,7 @@ function SummaryTab({
           maintenance_kind_id: Number(form.maintenance_kind_id),
           technical_domain_id: Number(form.technical_domain_id),
           customer_scope_id: Number(form.customer_scope_id),
-          site_id: form.site_id ? Number(form.site_id) : undefined,
-          clear_site: !form.site_id,
+          ...sitePatch,
           reason_it: form.reason_it || null,
           residual_service_it: form.residual_service_it || null,
         },
@@ -394,12 +405,20 @@ function SummaryTab({
               items={reference.customer_scopes}
               onChange={(value) => setForm({ ...form, customer_scope_id: value })}
             />
-            <SelectField
-              label="Sito"
-              value={form.site_id}
-              items={reference.sites}
-              emptyLabel="Nessun sito"
-              onChange={(value) => setForm({ ...form, site_id: value })}
+            <SiteSelectField
+              sites={reference.sites}
+              currentScope={detail.site?.scope ?? null}
+              value={{
+                site_id: form.site_id ? Number(form.site_id) : null,
+                adhoc_site: form.adhoc_site,
+              }}
+              onChange={(next) =>
+                setForm({
+                  ...form,
+                  site_id: next.site_id != null ? String(next.site_id) : '',
+                  adhoc_site: next.adhoc_site,
+                })
+              }
             />
             <label className={shared.label}>
               Descrizione
@@ -432,7 +451,29 @@ function SummaryTab({
           <DetailItem label="Tipo" value={detail.maintenance_kind.name_it} />
           <DetailItem label="Dominio" value={detail.technical_domain.name_it} />
           <DetailItem label="Ambito clienti" value={detail.customer_scope.name_it} />
-          <DetailItem label="Sito" value={detail.site?.name_it ?? '-'} />
+          <div className={shared.detailItem}>
+            <span>Sito</span>
+            <strong>
+              {detail.site?.name_it ?? '-'}
+              {detail.site?.scope === 'scoped' ? (
+                <span
+                  style={{
+                    marginLeft: '0.4rem',
+                    padding: '0.05rem 0.45rem',
+                    borderRadius: '999px',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    color: 'rgb(125, 211, 252)',
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Ad-hoc
+                </span>
+              ) : null}
+            </strong>
+          </div>
           <DetailItem label="Creata" value={formatDateTime(detail.created_at)} />
           <DetailItem label="Aggiornata" value={formatDateTime(detail.updated_at)} />
           <DetailItem label="Descrizione" value={detail.description_it ?? '-'} />
@@ -646,6 +687,36 @@ function assistanceInputs(items: AssistanceClassificationProposal[]): Classifica
 function proposedOrCurrent(value: string | null | undefined, current: string | null): string | null {
   const trimmed = value?.trim();
   return trimmed || current;
+}
+
+function buildSitePatch(input: {
+  previousSiteId: number | null;
+  siteIdRaw: string;
+  adhocSite: AdhocSiteInput | null;
+}): {
+  site_id?: number | null;
+  adhoc_site?: AdhocSiteInput;
+  clear_site?: boolean;
+} {
+  if (input.adhocSite) {
+    return {
+      adhoc_site: {
+        ...input.adhocSite,
+        name: input.adhocSite.name.trim(),
+        city: input.adhocSite.city?.trim() || null,
+        country_code: input.adhocSite.country_code?.trim() || null,
+        code: input.adhocSite.code?.trim() || null,
+      },
+    };
+  }
+  if (input.siteIdRaw) {
+    return { site_id: Number(input.siteIdRaw) };
+  }
+  // Niente sito scelto: clear solo se prima ce n'era uno.
+  if (input.previousSiteId != null) {
+    return { clear_site: true };
+  }
+  return {};
 }
 
 function assistanceTextsMetadata(texts: MaintenanceAssistanceDraft['texts']): JsonObject {

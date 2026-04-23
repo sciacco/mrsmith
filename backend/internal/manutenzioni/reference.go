@@ -179,21 +179,26 @@ func (h *Handler) loadReferenceItems(ctx context.Context, meta resourceMeta, act
 	case resourceSite:
 		query = `SELECT * FROM (
 			SELECT site_id AS id, code, name AS name_it, NULL::text AS name_en, NULL::text AS description,
-				100 AS sort_order, is_active, city, country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name
+				100 AS sort_order, is_active, city, country_code,
+				NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				scope, owner_maintenance_id
 			FROM maintenance.site
+			WHERE scope = 'global'
 		) x` + where + ` ORDER BY x.code, x.name_it, x.id`
 	case resourceService:
 		query = `SELECT * FROM (
 			SELECT st.service_taxonomy_id AS id, st.code, st.name_it, st.name_en, st.description,
 				st.sort_order, st.is_active, NULL::text AS city, NULL::text AS country_code,
-				st.technical_domain_id, td.name_it AS technical_domain_name
+				st.technical_domain_id, td.name_it AS technical_domain_name,
+				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM maintenance.service_taxonomy st
 			JOIN maintenance.technical_domain td ON td.technical_domain_id = st.technical_domain_id
 		) x` + where + ` ORDER BY x.sort_order, x.name_it, x.id`
 	default:
 		query = fmt.Sprintf(`SELECT * FROM (
 			SELECT %s AS id, code, name_it, name_en, description, sort_order, is_active,
-				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name
+				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM %s
 		) x`, meta.IDColumn, meta.Table) + where + ` ORDER BY x.sort_order, x.name_it, x.id`
 	}
@@ -242,8 +247,8 @@ func scanReferenceItem(scanner interface {
 	Scan(dest ...any) error
 }) (ReferenceItem, error) {
 	var item ReferenceItem
-	var nameEN, description, city, country, domainName sql.NullString
-	var domainID sql.NullInt64
+	var nameEN, description, city, country, domainName, scope sql.NullString
+	var domainID, ownerID sql.NullInt64
 	err := scanner.Scan(
 		&item.ID,
 		&item.Code,
@@ -256,6 +261,8 @@ func scanReferenceItem(scanner interface {
 		&country,
 		&domainID,
 		&domainName,
+		&scope,
+		&ownerID,
 	)
 	if err != nil {
 		return item, err
@@ -266,6 +273,8 @@ func scanReferenceItem(scanner interface {
 	item.CountryCode = nullStringValue(country)
 	item.TechnicalDomainID = nullInt64Value(domainID)
 	item.TechnicalDomainName = nullStringValue(domainName)
+	item.Scope = nullStringValue(scope)
+	item.OwnerMaintenanceID = nullInt64Value(ownerID)
 	return item, nil
 }
 

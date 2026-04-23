@@ -35,6 +35,8 @@ type ReferenceItem struct {
 	CountryCode         *string `json:"country_code,omitempty"`
 	TechnicalDomainID   *int64  `json:"technical_domain_id,omitempty"`
 	TechnicalDomainName *string `json:"technical_domain_name,omitempty"`
+	Scope               *string `json:"scope,omitempty"`
+	OwnerMaintenanceID  *int64  `json:"owner_maintenance_id,omitempty"`
 }
 
 type ReferenceData struct {
@@ -231,6 +233,7 @@ type createMaintenanceRequest struct {
 	TechnicalDomainID      int64                 `json:"technical_domain_id"`
 	CustomerScopeID        int64                 `json:"customer_scope_id"`
 	SiteID                 *int64                `json:"site_id"`
+	AdhocSite              *adhocSiteInput       `json:"adhoc_site"`
 	ReasonIT               *string               `json:"reason_it"`
 	ReasonEN               *string               `json:"reason_en"`
 	ResidualServiceIT      *string               `json:"residual_service_it"`
@@ -244,6 +247,13 @@ type createMaintenanceRequest struct {
 	Metadata               json.RawMessage       `json:"metadata"`
 }
 
+type adhocSiteInput struct {
+	Name        string  `json:"name"`
+	City        *string `json:"city"`
+	CountryCode *string `json:"country_code"`
+	Code        *string `json:"code"`
+}
+
 type updateMaintenanceRequest struct {
 	TitleIT           *string         `json:"title_it"`
 	TitleEN           *string         `json:"title_en"`
@@ -253,6 +263,7 @@ type updateMaintenanceRequest struct {
 	TechnicalDomainID *int64          `json:"technical_domain_id"`
 	CustomerScopeID   *int64          `json:"customer_scope_id"`
 	SiteID            *int64          `json:"site_id"`
+	AdhocSite         *adhocSiteInput `json:"adhoc_site"`
 	ClearSite         bool            `json:"clear_site"`
 	ReasonIT          *string         `json:"reason_it"`
 	ReasonEN          *string         `json:"reason_en"`

@@ -2,7 +2,14 @@ import { Button, Icon, MultiSelect, Skeleton, useToast } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateMaintenance, useReferenceData } from '../api/queries';
-import type { ClassificationInput, MaintenanceFormBody, ReferenceItem, WindowBody } from '../api/types';
+import type {
+  AdhocSiteInput,
+  ClassificationInput,
+  MaintenanceFormBody,
+  ReferenceItem,
+  WindowBody,
+} from '../api/types';
+import { SiteSelectField } from '../components/SiteSelectField';
 import { errorMessage } from '../lib/format';
 import shared from './shared.module.css';
 
@@ -13,6 +20,7 @@ interface FormState {
   technical_domain_id: string;
   customer_scope_id: string;
   site_id: string;
+  adhoc_site: AdhocSiteInput | null;
   service_taxonomy_ids: number[];
   reason_class_ids: number[];
   impact_effect_ids: number[];
@@ -30,6 +38,7 @@ const initialForm: FormState = {
   technical_domain_id: '',
   customer_scope_id: '',
   site_id: '',
+  adhoc_site: null,
   service_taxonomy_ids: [],
   reason_class_ids: [],
   impact_effect_ids: [],
@@ -114,13 +123,25 @@ export function MaintenanceCreatePage() {
               : null,
           }
         : null;
+    if (form.adhoc_site && !form.adhoc_site.name.trim()) {
+      toast('Indica il nome del sito ad-hoc.', 'error');
+      return;
+    }
     const body: MaintenanceFormBody = {
       title_it: form.summary_it.trim(),
       description_it: form.assistance_context.trim() || null,
       maintenance_kind_id: Number(form.maintenance_kind_id),
       technical_domain_id: Number(form.technical_domain_id),
       customer_scope_id: Number(form.customer_scope_id),
-      site_id: form.site_id ? Number(form.site_id) : null,
+      site_id: form.adhoc_site ? null : form.site_id ? Number(form.site_id) : null,
+      adhoc_site: form.adhoc_site
+        ? {
+            name: form.adhoc_site.name.trim(),
+            city: form.adhoc_site.city?.trim() || null,
+            country_code: form.adhoc_site.country_code?.trim() || null,
+            code: form.adhoc_site.code?.trim() || null,
+          }
+        : null,
       residual_service_it: form.residual_service_it.trim() || null,
       first_window: firstWindow,
       initial_service_taxonomy: classificationInputs(form.service_taxonomy_ids, true),
@@ -252,12 +273,19 @@ export function MaintenanceCreatePage() {
                     invalid={attemptedSubmit && !form.customer_scope_id}
                     onChange={(value) => update('customer_scope_id', value)}
                   />
-                  <SelectField
-                    label="Sito"
-                    value={form.site_id}
-                    items={reference.data.sites}
-                    emptyLabel="Nessun sito"
-                    onChange={(value) => update('site_id', value)}
+                  <SiteSelectField
+                    sites={reference.data.sites}
+                    value={{
+                      site_id: form.site_id ? Number(form.site_id) : null,
+                      adhoc_site: form.adhoc_site,
+                    }}
+                    onChange={(next) =>
+                      setForm((current) => ({
+                        ...current,
+                        site_id: next.site_id != null ? String(next.site_id) : '',
+                        adhoc_site: next.adhoc_site,
+                      }))
+                    }
                   />
                 </div>
               </div>

@@ -69,21 +69,26 @@ func configListQuery(meta resourceMeta, whereSQL string) string {
 	case resourceSite:
 		return `SELECT * FROM (
 			SELECT site_id AS id, code, name AS name_it, NULL::text AS name_en, NULL::text AS description,
-				100 AS sort_order, is_active, city, country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name
+				100 AS sort_order, is_active, city, country_code,
+				NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				scope, owner_maintenance_id
 			FROM maintenance.site
+			WHERE scope = 'global'
 		) x` + whereSQL + ` ORDER BY x.code, x.name_it, x.id`
 	case resourceService:
 		return `SELECT * FROM (
 			SELECT st.service_taxonomy_id AS id, st.code, st.name_it, st.name_en, st.description,
 				st.sort_order, st.is_active, NULL::text AS city, NULL::text AS country_code,
-				st.technical_domain_id, td.name_it AS technical_domain_name
+				st.technical_domain_id, td.name_it AS technical_domain_name,
+				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM maintenance.service_taxonomy st
 			JOIN maintenance.technical_domain td ON td.technical_domain_id = st.technical_domain_id
 		) x` + whereSQL + ` ORDER BY x.sort_order, x.name_it, x.id`
 	default:
 		return fmt.Sprintf(`SELECT * FROM (
 			SELECT %s AS id, code, name_it, name_en, description, sort_order, is_active,
-				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name
+				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM %s
 		) x`, meta.IDColumn, meta.Table) + whereSQL + ` ORDER BY x.sort_order, x.name_it, x.id`
 	}
@@ -166,10 +171,12 @@ func (h *Handler) insertConfigItem(r *http.Request, meta resourceMeta, body conf
 	case resourceSite:
 		return h.queryConfigItem(
 			r,
-			`INSERT INTO maintenance.site (code, name, city, country_code, is_active)
-			VALUES ($1, $2, $3, $4, $5)
+			`INSERT INTO maintenance.site (code, name, city, country_code, is_active, scope)
+			VALUES ($1, $2, $3, $4, $5, 'global')
 			RETURNING site_id AS id, code, name AS name_it, NULL::text AS name_en, NULL::text AS description,
-				100 AS sort_order, is_active, city, country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name`,
+				100 AS sort_order, is_active, city, country_code,
+				NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				scope, owner_maintenance_id`,
 			body.Code,
 			body.NameIT,
 			nullStringPtr(body.City),
@@ -188,7 +195,8 @@ func (h *Handler) insertConfigItem(r *http.Request, meta resourceMeta, body conf
 				RETURNING *
 			)
 			SELECT i.service_taxonomy_id AS id, i.code, i.name_it, i.name_en, i.description, i.sort_order, i.is_active,
-				NULL::text AS city, NULL::text AS country_code, i.technical_domain_id, td.name_it AS technical_domain_name
+				NULL::text AS city, NULL::text AS country_code, i.technical_domain_id, td.name_it AS technical_domain_name,
+				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM inserted i
 			JOIN maintenance.technical_domain td ON td.technical_domain_id = i.technical_domain_id`,
 			body.Code,
@@ -205,7 +213,8 @@ func (h *Handler) insertConfigItem(r *http.Request, meta resourceMeta, body conf
 			fmt.Sprintf(`INSERT INTO %s (code, name_it, name_en, description, sort_order, is_active)
 			VALUES ($1, $2, $3, $4, $5, $6)
 			RETURNING %s AS id, code, name_it, name_en, description, sort_order, is_active,
-				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name`, meta.Table, meta.IDColumn),
+				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::text AS scope, NULL::bigint AS owner_maintenance_id`, meta.Table, meta.IDColumn),
 			body.Code,
 			body.NameIT,
 			nullStringPtr(body.NameEN),
@@ -222,9 +231,11 @@ func (h *Handler) updateConfigItem(r *http.Request, meta resourceMeta, id int64,
 		return h.queryConfigItem(
 			r,
 			`UPDATE maintenance.site SET name = $1, city = $2, country_code = $3, is_active = $4
-			WHERE site_id = $5
+			WHERE site_id = $5 AND scope = 'global'
 			RETURNING site_id AS id, code, name AS name_it, NULL::text AS name_en, NULL::text AS description,
-				100 AS sort_order, is_active, city, country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name`,
+				100 AS sort_order, is_active, city, country_code,
+				NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				scope, owner_maintenance_id`,
 			body.NameIT,
 			nullStringPtr(body.City),
 			nullStringPtr(body.CountryCode),
@@ -244,7 +255,8 @@ func (h *Handler) updateConfigItem(r *http.Request, meta resourceMeta, id int64,
 				RETURNING *
 			)
 			SELECT u.service_taxonomy_id AS id, u.code, u.name_it, u.name_en, u.description, u.sort_order, u.is_active,
-				NULL::text AS city, NULL::text AS country_code, u.technical_domain_id, td.name_it AS technical_domain_name
+				NULL::text AS city, NULL::text AS country_code, u.technical_domain_id, td.name_it AS technical_domain_name,
+				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM updated u
 			JOIN maintenance.technical_domain td ON td.technical_domain_id = u.technical_domain_id`,
 			*body.TechnicalDomainID,
@@ -262,7 +274,8 @@ func (h *Handler) updateConfigItem(r *http.Request, meta resourceMeta, id int64,
 			SET name_it = $1, name_en = $2, description = $3, sort_order = $4, is_active = $5
 			WHERE %s = $6
 			RETURNING %s AS id, code, name_it, name_en, description, sort_order, is_active,
-				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name`, meta.Table, meta.IDColumn, meta.IDColumn),
+				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::text AS scope, NULL::bigint AS owner_maintenance_id`, meta.Table, meta.IDColumn, meta.IDColumn),
 			body.NameIT,
 			nullStringPtr(body.NameEN),
 			nullStringPtr(body.Description),
@@ -302,21 +315,25 @@ func (h *Handler) handleConfigActive(w http.ResponseWriter, r *http.Request, act
 	var query string
 	switch meta.Kind {
 	case resourceSite:
-		query = `UPDATE maintenance.site SET is_active = $1 WHERE site_id = $2
+		query = `UPDATE maintenance.site SET is_active = $1 WHERE site_id = $2 AND scope = 'global'
 			RETURNING site_id AS id, code, name AS name_it, NULL::text AS name_en, NULL::text AS description,
-				100 AS sort_order, is_active, city, country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name`
+				100 AS sort_order, is_active, city, country_code,
+				NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				scope, owner_maintenance_id`
 	case resourceService:
 		query = `WITH updated AS (
 				UPDATE maintenance.service_taxonomy SET is_active = $1 WHERE service_taxonomy_id = $2 RETURNING *
 			)
 			SELECT u.service_taxonomy_id AS id, u.code, u.name_it, u.name_en, u.description, u.sort_order, u.is_active,
-				NULL::text AS city, NULL::text AS country_code, u.technical_domain_id, td.name_it AS technical_domain_name
+				NULL::text AS city, NULL::text AS country_code, u.technical_domain_id, td.name_it AS technical_domain_name,
+				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM updated u
 			JOIN maintenance.technical_domain td ON td.technical_domain_id = u.technical_domain_id`
 	default:
 		query = fmt.Sprintf(`UPDATE %s SET is_active = $1 WHERE %s = $2
 			RETURNING %s AS id, code, name_it, name_en, description, sort_order, is_active,
-				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name`, meta.Table, meta.IDColumn, meta.IDColumn)
+				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::text AS scope, NULL::bigint AS owner_maintenance_id`, meta.Table, meta.IDColumn, meta.IDColumn)
 	}
 	item, err := h.queryConfigItem(r, query, active, id)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -356,12 +373,16 @@ func (h *Handler) handleConfigSummary(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) loadConfigCounts(r *http.Request, meta resourceMeta) (int, int, error) {
+	where := ""
+	if meta.Kind == resourceSite {
+		where = " WHERE scope = 'global'"
+	}
 	query := fmt.Sprintf(
 		`SELECT
 			COALESCE(SUM(CASE WHEN is_active THEN 1 ELSE 0 END), 0) AS active,
 			COALESCE(SUM(CASE WHEN is_active THEN 0 ELSE 1 END), 0) AS inactive
-		FROM %s`,
-		meta.Table,
+		FROM %s%s`,
+		meta.Table, where,
 	)
 	var active, inactive int
 	if err := h.maintenance.QueryRowContext(r.Context(), query).Scan(&active, &inactive); err != nil {

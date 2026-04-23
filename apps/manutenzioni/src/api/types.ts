@@ -27,6 +27,17 @@ export interface ReferenceItem {
   country_code?: string | null;
   technical_domain_id?: number | null;
   technical_domain_name?: string | null;
+  /** Solo per sites: 'global' (anagrafica condivisa) o 'scoped' (ad-hoc per una manutenzione). */
+  scope?: string | null;
+  /** Solo per sites scoped: id della manutenzione proprietaria. */
+  owner_maintenance_id?: number | null;
+}
+
+export interface AdhocSiteInput {
+  name: string;
+  city?: string | null;
+  country_code?: string | null;
+  code?: string | null;
 }
 
 export interface ReferenceData {
@@ -230,6 +241,7 @@ export interface MaintenanceFormBody {
   technical_domain_id: number;
   customer_scope_id: number;
   site_id?: number | null;
+  adhoc_site?: AdhocSiteInput | null;
   reason_it?: string | null;
   reason_en?: string | null;
   residual_service_it?: string | null;

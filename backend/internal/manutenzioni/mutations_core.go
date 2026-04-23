@@ -23,6 +23,14 @@ func (h *Handler) handleCreateMaintenance(w http.ResponseWriter, r *http.Request
 		appError(w, http.StatusBadRequest, "required_fields_missing")
 		return
 	}
+	if body.SiteID != nil && body.AdhocSite != nil {
+		appError(w, http.StatusBadRequest, "site_conflict")
+		return
+	}
+	if body.AdhocSite != nil && strings.TrimSpace(body.AdhocSite.Name) == "" {
+		appError(w, http.StatusBadRequest, "invalid_adhoc_site")
+		return
+	}
 
 	tx, err := h.maintenance.BeginTx(r.Context(), nil)
 	if err != nil {
@@ -30,6 +38,17 @@ func (h *Handler) handleCreateMaintenance(w http.ResponseWriter, r *http.Request
 		return
 	}
 	defer tx.Rollback()
+
+	if body.SiteID != nil {
+		if err := validateGlobalSiteTx(r.Context(), tx, *body.SiteID); err != nil {
+			if errors.Is(err, errBadRequest) {
+				appError(w, http.StatusBadRequest, "invalid_site")
+				return
+			}
+			h.dbFailure(w, r, "create_maintenance_site_check", err)
+			return
+		}
+	}
 
 	var id int64
 	var createdAt sql.NullTime
@@ -67,6 +86,22 @@ func (h *Handler) handleCreateMaintenance(w http.ResponseWriter, r *http.Request
 	).Scan(&id, &createdAt); err != nil {
 		h.dbFailure(w, r, "create_maintenance_insert", err)
 		return
+	}
+
+	if body.AdhocSite != nil {
+		scopedID, err := insertScopedSiteTx(r.Context(), tx, id, *body.AdhocSite)
+		if err != nil {
+			if errors.Is(err, errBadRequest) {
+				appError(w, http.StatusBadRequest, "invalid_adhoc_site")
+				return
+			}
+			h.dbFailure(w, r, "create_maintenance_adhoc_site", err, "maintenance_id", id)
+			return
+		}
+		if _, err := tx.ExecContext(r.Context(), `UPDATE maintenance.maintenance SET site_id = $1 WHERE maintenance_id = $2`, scopedID, id); err != nil {
+			h.dbFailure(w, r, "create_maintenance_adhoc_link", err, "maintenance_id", id)
+			return
+		}
 	}
 	year := createdAt.Time.Year()
 	if !createdAt.Valid {
@@ -147,6 +182,25 @@ func (h *Handler) handleUpdateMaintenance(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	siteInputs := 0
+	if body.AdhocSite != nil {
+		siteInputs++
+	}
+	if body.SiteID != nil {
+		siteInputs++
+	}
+	if body.ClearSite {
+		siteInputs++
+	}
+	if siteInputs > 1 {
+		appError(w, http.StatusBadRequest, "site_conflict")
+		return
+	}
+	if body.AdhocSite != nil && strings.TrimSpace(body.AdhocSite.Name) == "" {
+		appError(w, http.StatusBadRequest, "invalid_adhoc_site")
+		return
+	}
+
 	args := []any{}
 	sets := []string{}
 	addString := func(column string, value *string, required bool) bool {
@@ -192,6 +246,35 @@ func (h *Handler) handleUpdateMaintenance(w http.ResponseWriter, r *http.Request
 		}
 		sets = append(sets, "customer_scope_id = "+placeholder(&args, *body.CustomerScopeID))
 	}
+	tx, err := h.maintenance.BeginTx(r.Context(), nil)
+	if err != nil {
+		h.dbFailure(w, r, "update_maintenance_begin", err, "maintenance_id", id)
+		return
+	}
+	defer tx.Rollback()
+
+	// Sito corrente: serve per decidere se lasciare orfano un sito scoped di questa manutenzione.
+	var currentSiteID sql.NullInt64
+	var currentSiteScope sql.NullString
+	var currentOwner sql.NullInt64
+	if err := tx.QueryRowContext(r.Context(),
+		`SELECT m.site_id, s.scope, s.owner_maintenance_id
+		 FROM maintenance.maintenance m
+		 LEFT JOIN maintenance.site s ON s.site_id = m.site_id
+		 WHERE m.maintenance_id = $1 FOR UPDATE OF m`, id).
+		Scan(&currentSiteID, &currentSiteScope, &currentOwner); errors.Is(err, sql.ErrNoRows) {
+		appError(w, http.StatusNotFound, "maintenance_not_found")
+		return
+	} else if err != nil {
+		h.dbFailure(w, r, "update_maintenance_site_load", err, "maintenance_id", id)
+		return
+	}
+	currentScopedOwned := currentSiteID.Valid &&
+		currentSiteScope.Valid && currentSiteScope.String == "scoped" &&
+		currentOwner.Valid && currentOwner.Int64 == id
+
+	siteChanging := body.ClearSite || body.SiteID != nil || body.AdhocSite != nil
+
 	if body.ClearSite {
 		sets = append(sets, "site_id = NULL")
 	} else if body.SiteID != nil {
@@ -199,7 +282,26 @@ func (h *Handler) handleUpdateMaintenance(w http.ResponseWriter, r *http.Request
 			appError(w, http.StatusBadRequest, "invalid_site")
 			return
 		}
+		if err := validateAssignableSiteTx(r.Context(), tx, *body.SiteID, id); err != nil {
+			if errors.Is(err, errBadRequest) {
+				appError(w, http.StatusBadRequest, "invalid_site")
+				return
+			}
+			h.dbFailure(w, r, "update_maintenance_site_check", err, "maintenance_id", id)
+			return
+		}
 		sets = append(sets, "site_id = "+placeholder(&args, *body.SiteID))
+	} else if body.AdhocSite != nil {
+		scopedID, err := insertScopedSiteTx(r.Context(), tx, id, *body.AdhocSite)
+		if err != nil {
+			if errors.Is(err, errBadRequest) {
+				appError(w, http.StatusBadRequest, "invalid_adhoc_site")
+				return
+			}
+			h.dbFailure(w, r, "update_maintenance_adhoc_site", err, "maintenance_id", id)
+			return
+		}
+		sets = append(sets, "site_id = "+placeholder(&args, scopedID))
 	}
 	if len(body.Metadata) > 0 {
 		sets = append(sets, "metadata = "+placeholder(&args, rawJSONOrDefault(body.Metadata))+"::jsonb")
@@ -212,15 +314,30 @@ func (h *Handler) handleUpdateMaintenance(w http.ResponseWriter, r *http.Request
 	args = append(args, id)
 	query := `UPDATE maintenance.maintenance SET ` + strings.Join(sets, ", ") + ` WHERE maintenance_id = $` + strconv.Itoa(len(args)) + ` RETURNING maintenance_id`
 	var updatedID int64
-	if err := h.maintenance.QueryRowContext(r.Context(), query, args...).Scan(&updatedID); errors.Is(err, sql.ErrNoRows) {
+	if err := tx.QueryRowContext(r.Context(), query, args...).Scan(&updatedID); errors.Is(err, sql.ErrNoRows) {
 		appError(w, http.StatusNotFound, "maintenance_not_found")
 		return
 	} else if err != nil {
 		h.dbFailure(w, r, "update_maintenance", err, "maintenance_id", id)
 		return
 	}
-	if err := writeEvent(r.Context(), h.maintenance, id, nil, "updated", "Riepilogo aggiornato", claimsActor(r), nil); err != nil {
+	// Cleanup orfano: se il sito precedente era uno scoped di questa manutenzione e
+	// ora punta altrove (o a nessuno), lo eliminiamo. Se l'utente ha passato un
+	// adhoc_site nuovo, il precedente scoped va comunque sostituito.
+	if siteChanging && currentScopedOwned {
+		if _, err := tx.ExecContext(r.Context(),
+			`DELETE FROM maintenance.site WHERE site_id = $1 AND scope = 'scoped' AND owner_maintenance_id = $2`,
+			currentSiteID.Int64, id); err != nil {
+			h.dbFailure(w, r, "update_maintenance_cleanup_scoped", err, "maintenance_id", id)
+			return
+		}
+	}
+	if err := writeEvent(r.Context(), tx, id, nil, "updated", "Riepilogo aggiornato", claimsActor(r), nil); err != nil {
 		h.dbFailure(w, r, "update_maintenance_event", err, "maintenance_id", id)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		h.dbFailure(w, r, "update_maintenance_commit", err, "maintenance_id", id)
 		return
 	}
 	respondMutationDetail(h, w, r, id, http.StatusOK)

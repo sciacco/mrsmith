@@ -6,13 +6,27 @@ create schema if not exists maintenance;
 
 create table maintenance.site (
     site_id              bigint generated always as identity primary key,
-    code                 text not null unique,            -- es: C21, E100, PRATO
+    code                 text not null,                   -- es: C21, E100, PRATO; unico per scope
     name                 text not null,                   -- es: Data Center C21
     city                 text,
     country_code         char(2),
     is_active            boolean not null default true,
-    metadata             jsonb not null default '{}'::jsonb
+    scope                text not null default 'global'
+                              check (scope in ('global','scoped')),
+    owner_maintenance_id bigint,                          -- FK aggiunta piu' sotto per evitare forward-reference
+    metadata             jsonb not null default '{}'::jsonb,
+    constraint site_scope_consistency check (
+        (scope = 'global' and owner_maintenance_id is null)
+        or (scope = 'scoped' and owner_maintenance_id is not null)
+    )
 );
+
+create unique index site_code_global_unique
+    on maintenance.site (code) where scope = 'global';
+create unique index site_code_scoped_unique
+    on maintenance.site (owner_maintenance_id, code) where scope = 'scoped';
+create index idx_site_owner_maintenance
+    on maintenance.site (owner_maintenance_id) where scope = 'scoped';
 
 create table maintenance.technical_domain (
     technical_domain_id  bigint generated always as identity primary key,
@@ -346,6 +360,14 @@ create index idx_maintenance_kind on maintenance.maintenance(maintenance_kind_id
 create index idx_maintenance_technical_domain on maintenance.maintenance(technical_domain_id);
 create index idx_maintenance_customer_scope on maintenance.maintenance(customer_scope_id);
 create index idx_maintenance_site on maintenance.maintenance(site_id);
+
+-- FK site.owner_maintenance_id -> maintenance.maintenance (aggiunta qui per evitare
+-- forward-reference, visto che maintenance e' creata dopo site).
+alter table maintenance.site
+    add constraint site_owner_maintenance_fkey
+    foreign key (owner_maintenance_id)
+    references maintenance.maintenance(maintenance_id)
+    on delete cascade;
 
 create table maintenance.maintenance_service_taxonomy (
     maintenance_service_taxonomy_id bigint generated always as identity primary key,

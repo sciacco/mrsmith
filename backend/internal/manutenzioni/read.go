@@ -51,7 +51,7 @@ func (h *Handler) handleListMaintenances(w http.ResponseWriter, r *http.Request)
 			mk.maintenance_kind_id, mk.code, mk.name_it, mk.name_en, mk.description, mk.sort_order, mk.is_active,
 			td.technical_domain_id, td.code, td.name_it, td.name_en, td.description, td.sort_order, td.is_active,
 			cs.customer_scope_id, cs.code, cs.name_it, cs.name_en, cs.description, cs.sort_order, cs.is_active,
-			s.site_id, s.code, s.name, s.city, s.country_code, s.is_active,
+			s.site_id, s.code, s.name, s.city, s.country_code, s.is_active, s.scope,
 			vcw.maintenance_window_id, vcw.seq_no, vcw.window_status, vcw.scheduled_start_at, vcw.scheduled_end_at, vcw.expected_downtime_minutes,
 			COALESCE(primary_service.name_it, primary_impact.name_it, ''),
 			COALESCE(notice_counts.statuses, '[]'::jsonb),
@@ -193,7 +193,7 @@ func scanMaintenanceListItem(rows *sql.Rows) (MaintenanceListItem, error) {
 	var kindSort, domainSort, scopeSort int
 	var kindActive, domainActive, scopeActive bool
 	var siteID sql.NullInt64
-	var siteCode, siteName, siteCity, siteCountry sql.NullString
+	var siteCode, siteName, siteCity, siteCountry, siteScope sql.NullString
 	var siteActive sql.NullBool
 	var windowID sql.NullInt64
 	var seqNo sql.NullInt64
@@ -212,7 +212,7 @@ func scanMaintenanceListItem(rows *sql.Rows) (MaintenanceListItem, error) {
 		&kindID, &kindCode, &kindName, &kindNameEN, &kindDescription, &kindSort, &kindActive,
 		&domainID, &domainCode, &domainName, &domainNameEN, &domainDescription, &domainSort, &domainActive,
 		&scopeID, &scopeCode, &scopeName, &scopeNameEN, &scopeDescription, &scopeSort, &scopeActive,
-		&siteID, &siteCode, &siteName, &siteCity, &siteCountry, &siteActive,
+		&siteID, &siteCode, &siteName, &siteCity, &siteCountry, &siteActive, &siteScope,
 		&windowID, &seqNo, &windowStatus, &scheduledStart, &scheduledEnd, &expectedDowntime,
 		&primaryImpact,
 		&noticeRaw,
@@ -235,6 +235,7 @@ func scanMaintenanceListItem(rows *sql.Rows) (MaintenanceListItem, error) {
 			City:        nullStringValue(siteCity),
 			CountryCode: nullStringValue(siteCountry),
 			SortOrder:   100,
+			Scope:       nullStringValue(siteScope),
 		}
 	}
 	if windowID.Valid && scheduledStart.Valid && scheduledEnd.Valid {
@@ -288,7 +289,7 @@ func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (Maintena
 	var kindSort, domainSort, scopeSort int
 	var kindActive, domainActive, scopeActive bool
 	var siteID sql.NullInt64
-	var siteCode, siteName, siteCity, siteCountry sql.NullString
+	var siteCode, siteName, siteCity, siteCountry, siteScope sql.NullString
 	var siteActive sql.NullBool
 	var windowID sql.NullInt64
 	var seqNo sql.NullInt64
@@ -309,7 +310,7 @@ func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (Maintena
 			mk.maintenance_kind_id, mk.code, mk.name_it, mk.name_en, mk.description, mk.sort_order, mk.is_active,
 			td.technical_domain_id, td.code, td.name_it, td.name_en, td.description, td.sort_order, td.is_active,
 			cs.customer_scope_id, cs.code, cs.name_it, cs.name_en, cs.description, cs.sort_order, cs.is_active,
-			s.site_id, s.code, s.name, s.city, s.country_code, s.is_active,
+			s.site_id, s.code, s.name, s.city, s.country_code, s.is_active, s.scope,
 			m.reason_it,
 			m.reason_en,
 			m.residual_service_it,
@@ -337,7 +338,7 @@ func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (Maintena
 		&kindID, &kindCode, &kindName, &kindNameEN, &kindDescription, &kindSort, &kindActive,
 		&domainID, &domainCode, &domainName, &domainNameEN, &domainDescription, &domainSort, &domainActive,
 		&scopeID, &scopeCode, &scopeName, &scopeNameEN, &scopeDescription, &scopeSort, &scopeActive,
-		&siteID, &siteCode, &siteName, &siteCity, &siteCountry, &siteActive,
+		&siteID, &siteCode, &siteName, &siteCity, &siteCountry, &siteActive, &siteScope,
 		&reasonIT,
 		&reasonEN,
 		&residualIT,
@@ -371,6 +372,7 @@ func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (Maintena
 			City:        nullStringValue(siteCity),
 			CountryCode: nullStringValue(siteCountry),
 			SortOrder:   100,
+			Scope:       nullStringValue(siteScope),
 		}
 	}
 	if windowID.Valid && scheduledStart.Valid && scheduledEnd.Valid {

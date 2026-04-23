@@ -44,9 +44,9 @@ export const RESOURCE_META: Record<ResourceKey, ResourceMeta> = {
     shortDescription: 'Sedi e data center usati nelle manutenzioni.',
     group: 'impact',
     fields: {
-      name_en: 'optional',
-      description: 'optional',
-      sort_order: 'required',
+      name_en: 'hidden',
+      description: 'hidden',
+      sort_order: 'hidden',
       city: 'required',
       country_code: 'required',
     },
