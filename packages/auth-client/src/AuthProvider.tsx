@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import Keycloak from 'keycloak-js';
+import { DEVADMIN_ROLE } from './roles';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'reauthenticating' | 'unauthenticated';
 
@@ -47,6 +48,30 @@ interface AuthState {
   user: AuthUser | null;
 }
 
+// Dev-only: when VITE_DEV_AUTH_BYPASS="true" the provider skips Keycloak
+// entirely and injects a fake authenticated user. Roles come from
+// VITE_DEV_FAKE_ROLES (comma-separated) or default to [DEVADMIN_ROLE] which
+// makes hasAnyRole() return true for every app.
+const DEV_BYPASS_ENABLED =
+  (import.meta.env.VITE_DEV_AUTH_BYPASS ?? '').toString().toLowerCase() === 'true';
+
+function parseRolesEnv(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function buildDevUser(): AuthUser {
+  const envRoles = parseRolesEnv(import.meta.env.VITE_DEV_FAKE_ROLES);
+  return {
+    name: (import.meta.env.VITE_DEV_FAKE_NAME as string | undefined) ?? 'Dev User',
+    email: (import.meta.env.VITE_DEV_FAKE_EMAIL as string | undefined) ?? 'dev@local',
+    roles: envRoles.length > 0 ? envRoles : [DEVADMIN_ROLE],
+  };
+}
+
 function sameUser(left: AuthUser | null, right: AuthUser | null): boolean {
   if (left === right) return true;
   if (!left || !right) return false;
@@ -70,7 +95,50 @@ function getUser(tokenParsed: Keycloak['tokenParsed']): AuthUser | null {
   };
 }
 
-export function AuthProvider({ keycloakUrl, realm, clientId, children }: AuthProviderProps) {
+export function AuthProvider(props: AuthProviderProps) {
+  if (DEV_BYPASS_ENABLED) {
+    return <DevBypassAuthProvider>{props.children}</DevBypassAuthProvider>;
+  }
+  return <KeycloakAuthProvider {...props} />;
+}
+
+function DevBypassAuthProvider({ children }: { children: ReactNode }) {
+  const [user] = useState<AuthUser>(() => buildDevUser());
+  const warnedRef = useRef(false);
+
+  useEffect(() => {
+    if (warnedRef.current) return;
+    warnedRef.current = true;
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[auth-client] VITE_DEV_AUTH_BYPASS=true — Keycloak is bypassed. Fake user:',
+      user,
+    );
+  }, [user]);
+
+  const value = useMemo<AuthContextValue>(() => {
+    const token = 'dev-token';
+    const noop = () => {
+      // eslint-disable-next-line no-console
+      console.warn('[auth-client] login/logout invoked while dev bypass is active — ignored.');
+    };
+    return {
+      status: 'authenticated',
+      authenticated: true,
+      token,
+      user,
+      login: noop,
+      logout: noop,
+      loading: false,
+      getAccessToken: async () => token,
+      forceRefreshToken: async () => token,
+    };
+  }, [user]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function KeycloakAuthProvider({ keycloakUrl, realm, clientId, children }: AuthProviderProps) {
   const [keycloak] = useState(
     () =>
       new Keycloak({

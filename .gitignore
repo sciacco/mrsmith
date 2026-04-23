@@ -14,6 +14,9 @@ extracted/
 .env
 backend/.env
 .env.deploy.prod
+.env.local
+.env.*.local
+!.env.local.example
 
 # IDE
 .idea/

@@ -487,6 +487,46 @@ func DefaultAccessRoles() []string {
 	return slices.Clone(defaultAccessRoles)
 }
 
+// AllRoles returns the concatenation of every known app_* role declared
+// in the catalog, deduplicated. Intended for dev-only scenarios (noop auth
+// middleware, dev auth bypass on the frontend) where the caller needs to
+// simulate an omnipotent user.
+func AllRoles() []string {
+	groups := [][]string{
+		budgetAccessRoles,
+		complianceAccessRoles,
+		copertureAccessRoles,
+		cpBackofficeAccessRoles,
+		energiaDCAccessRoles,
+		kitProductsAccessRoles,
+		listiniAccessRoles,
+		manutenzioniAccessRoles,
+		manutenzioniManagerRoles,
+		manutenzioniApproverRoles,
+		panoramicaAccessRoles,
+		quotesAccessRoles,
+		quotesDeleteRoles,
+		simulatoriVenditaAccessRoles,
+		richiesteFattibilitaAccessRoles,
+		richiesteFattibilitaManagerRoles,
+		rdfBackendAccessRoles,
+		reportsAccessRoles,
+		afcToolsAccessRoles,
+	}
+	seen := map[string]struct{}{}
+	result := make([]string, 0)
+	for _, group := range groups {
+		for _, role := range group {
+			if _, ok := seen[role]; ok {
+				continue
+			}
+			seen[role] = struct{}{}
+			result = append(result, role)
+		}
+	}
+	return result
+}
+
 func VisibleCategories(definitions []Definition, roles []string) []Category {
 	categories := make([]Category, 0)
 	categoryIdx := make(map[string]int)

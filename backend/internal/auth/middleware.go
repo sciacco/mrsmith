@@ -3,10 +3,12 @@ package auth
 import (
 	"context"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 
+	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
@@ -23,7 +25,8 @@ type Claims struct {
 }
 
 type Middleware struct {
-	verifier *oidc.IDTokenVerifier
+	verifier       *oidc.IDTokenVerifier
+	noopFakeClaims *Claims
 }
 
 func NewMiddleware(issuerURL string) (*Middleware, error) {
@@ -37,8 +40,52 @@ func NewMiddleware(issuerURL string) (*Middleware, error) {
 
 // NewNoopMiddleware returns a middleware that skips token validation
 // and injects fake claims. Only for local development.
+//
+// Roles injected into the fake claims are resolved in this order:
+//  1. DEV_FAKE_ROLES env var (comma-separated), if set.
+//  2. DEV_FAKE_FULL_ACCESS=true (default) → applaunch.AllRoles() so that
+//     every mini-app endpoint is reachable.
+//  3. Fallback: {"admin", "manager"} for backward compatibility with
+//     callers that never set the env var.
+//
+// DEV_FAKE_SUBJECT, DEV_FAKE_EMAIL, DEV_FAKE_NAME override the identity
+// fields when set.
 func NewNoopMiddleware() *Middleware {
-	return &Middleware{verifier: nil}
+	claims := Claims{
+		Subject:  envOr("DEV_FAKE_SUBJECT", "dev-user-001"),
+		Email:    envOr("DEV_FAKE_EMAIL", "john.doe@acme.com"),
+		Name:     envOr("DEV_FAKE_NAME", "John Doe"),
+		Roles:    resolveNoopRoles(),
+		RawToken: "dev-token",
+	}
+	return &Middleware{verifier: nil, noopFakeClaims: &claims}
+}
+
+func envOr(key, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func resolveNoopRoles() []string {
+	if raw := strings.TrimSpace(os.Getenv("DEV_FAKE_ROLES")); raw != "" {
+		parts := strings.Split(raw, ",")
+		roles := make([]string, 0, len(parts))
+		for _, part := range parts {
+			trimmed := strings.TrimSpace(part)
+			if trimmed != "" {
+				roles = append(roles, trimmed)
+			}
+		}
+		return roles
+	}
+	// Default: inject every app_* role so the dev user can exercise any
+	// mini-app endpoint. Keep legacy "admin"/"manager" for anything that
+	// still checks for them.
+	roles := applaunch.AllRoles()
+	return append(roles, "admin", "manager")
 }
 
 func (m *Middleware) Handler(next http.Handler) http.Handler {
@@ -46,13 +93,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		logger := logging.FromContext(r.Context()).With("component", "auth")
 		// Dev mode: skip token validation, inject fake claims
 		if m.verifier == nil {
-			claims := Claims{
-				Subject:  "dev-user-001",
-				Email:    "john.doe@acme.com",
-				Name:     "John Doe",
-				Roles:    []string{"admin", "manager"},
-				RawToken: "dev-token",
-			}
+			claims := *m.noopFakeClaims
 			ctx := context.WithValue(r.Context(), ClaimsKey, claims)
 			ctx = logging.WithAttrs(ctx, "auth_subject", claims.Subject)
 			next.ServeHTTP(w, r.WithContext(ctx))
