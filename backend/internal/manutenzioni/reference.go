@@ -229,13 +229,13 @@ func includeIDCondition(args *[]any, column string, ids []int64) string {
 		clean = append(clean, id)
 	}
 	if len(clean) == 0 {
-		return ")"
+		return ""
 	}
 	holders := make([]string, 0, len(clean))
 	for _, id := range clean {
 		holders = append(holders, placeholder(args, id))
 	}
-	return " OR " + column + " IN (" + strings.Join(holders, ", ") + "))"
+	return " OR " + column + " IN (" + strings.Join(holders, ", ") + ")"
 }
 
 func scanReferenceItem(scanner interface {
