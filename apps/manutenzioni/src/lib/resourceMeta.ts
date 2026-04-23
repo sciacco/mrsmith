@@ -23,6 +23,9 @@ export interface ResourceMeta {
   subtitle: string;
   shortDescription: string;
   group: ResourceGroup;
+  hiddenFromIndex?: boolean;
+  indexTitle?: string;
+  indexDescription?: string;
   fields: {
     name_en: FieldRequirement;
     description: FieldRequirement;
@@ -57,9 +60,11 @@ export const RESOURCE_META: Record<ResourceKey, ResourceMeta> = {
     singular: 'dominio tecnico',
     singularArticle: 'il',
     plural: 'domini tecnici',
-    subtitle: 'Aree tecniche usate per classificare le manutenzioni.',
+    subtitle: 'Aree tecniche e servizi associati.',
     shortDescription: 'Aree tecniche e operative.',
     group: 'classification',
+    indexTitle: 'Domini e servizi',
+    indexDescription: 'Aree tecniche e servizi associati.',
     fields: { name_en: 'optional', description: 'optional', sort_order: 'required' },
   },
   'maintenance-kinds': {
@@ -93,6 +98,7 @@ export const RESOURCE_META: Record<ResourceKey, ResourceMeta> = {
     subtitle: 'Tassonomia servizi collegata ai domini tecnici.',
     shortDescription: 'Tassonomia servizi collegata ai domini.',
     group: 'impact',
+    hiddenFromIndex: true,
     fields: {
       name_en: 'optional',
       description: 'optional',

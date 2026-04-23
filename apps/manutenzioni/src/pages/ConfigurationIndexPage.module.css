@@ -128,3 +128,27 @@
   color: var(--color-danger);
   font-size: 0.8rem;
 }
+
+.groupFooter {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0.25rem;
+}
+
+.secondaryLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  text-decoration: none;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+  transition: color 150ms var(--ease-out);
+}
+
+.secondaryLink:hover,
+.secondaryLink:focus-visible {
+  color: var(--color-accent);
+  outline: none;
+}

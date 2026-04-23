@@ -17,7 +17,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Button, Icon, Modal, SearchInput, Skeleton, ToggleSwitch, useToast } from '@mrsmith/ui';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   useConfigCounts,
   useConfigList,
@@ -57,6 +57,12 @@ export function ConfigurationResourcePage() {
   const active = parseActive(searchParams.get('active'));
   const q = searchParams.get('q') ?? '';
   const deferredQ = useDeferredValue(q);
+  const domainParam = searchParams.get('domain');
+  const domainFilter = useMemo(() => {
+    if (!domainParam) return null;
+    const parsed = Number(domainParam);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }, [domainParam]);
   const [editing, setEditing] = useState<ReferenceItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirm, setConfirm] = useState<ReferenceItem | null>(null);
@@ -66,6 +72,29 @@ export function ConfigurationResourcePage() {
   const mutations = useConfigMutations(resource);
   const usage = useConfigUsage(resource, confirm?.is_active ? confirm.id : null);
   const toast = useToast();
+
+  const filterActive = resource === 'service-taxonomy' && domainFilter !== null;
+  const selectedDomain = useMemo(() => {
+    if (!filterActive) return null;
+    return reference.data?.technical_domains.find((d) => d.id === domainFilter) ?? null;
+  }, [filterActive, domainFilter, reference.data?.technical_domains]);
+  const displayItems = useMemo(() => {
+    const items = list.data ?? [];
+    if (!filterActive) return items;
+    return items.filter((item) => item.technical_domain_id === domainFilter);
+  }, [list.data, filterActive, domainFilter]);
+  const serviceCountByDomain = useMemo(() => {
+    if (resource !== 'technical-domains') return null;
+    const services = reference.data?.service_taxonomy ?? [];
+    const counts = new Map<number, number>();
+    for (const service of services) {
+      if (!service.is_active) continue;
+      const domainId = service.technical_domain_id ?? 0;
+      if (!domainId) continue;
+      counts.set(domainId, (counts.get(domainId) ?? 0) + 1);
+    }
+    return counts;
+  }, [resource, reference.data?.service_taxonomy]);
 
   const confirmActive = useMemo(() => {
     if (!confirm) return false;
@@ -123,13 +152,13 @@ export function ConfigurationResourcePage() {
   const totalActive = counts.data?.active ?? 0;
   const totalInactive = counts.data?.inactive ?? 0;
   const totalAll = totalActive + totalInactive;
-  const isEmpty = !list.isLoading && !list.error && (!list.data || list.data.length === 0);
+  const isEmpty = !list.isLoading && !list.error && displayItems.length === 0;
   const hasSearch = q.trim().length > 0;
   const lastUpdated = list.dataUpdatedAt ? formatClockTime(list.dataUpdatedAt) : null;
 
   const supportsReorder = meta.fields.sort_order !== 'hidden';
-  const canReorder = supportsReorder && !hasSearch;
-  const sortableIds = useMemo(() => (list.data ?? []).map((item) => item.id), [list.data]);
+  const canReorder = supportsReorder && !hasSearch && !filterActive;
+  const sortableIds = useMemo(() => displayItems.map((item) => item.id), [displayItems]);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -153,12 +182,34 @@ export function ConfigurationResourcePage() {
     [list.data, mutations.reorder, toast],
   );
 
+  const breadcrumbLabel = filterActive ? selectedDomain?.name_it ?? 'Dominio' : null;
+
   return (
     <section className={shared.page}>
-      <button type="button" className={shared.backLink} onClick={() => navigate('/manutenzioni/configurazione')}>
-        <Icon name="chevron-left" size={16} />
-        Torna alla configurazione
-      </button>
+      {filterActive ? (
+        <nav className={shared.breadcrumb} aria-label="Percorso">
+          <button
+            type="button"
+            className={shared.breadcrumbLink}
+            onClick={() => navigate('/manutenzioni/configurazione/technical-domains')}
+          >
+            Domini tecnici
+          </button>
+          <Icon name="chevron-right" size={14} />
+          <span className={shared.breadcrumbCurrent}>{breadcrumbLabel}</span>
+          <Icon name="chevron-right" size={14} />
+          <span className={shared.breadcrumbCurrent}>Servizi</span>
+        </nav>
+      ) : (
+        <button
+          type="button"
+          className={shared.backLink}
+          onClick={() => navigate('/manutenzioni/configurazione')}
+        >
+          <Icon name="chevron-left" size={16} />
+          Torna alla configurazione
+        </button>
+      )}
       <div className={shared.header}>
         <div className={shared.titleBlock}>
           <h1 className={shared.pageTitle}>{meta.title}</h1>
@@ -188,12 +239,29 @@ export function ConfigurationResourcePage() {
         </div>
       </div>
 
-      <div className={shared.filterBar} style={{ gridTemplateColumns: 'minmax(240px, 1fr) auto' }}>
+      <div
+        className={shared.filterBar}
+        style={{
+          gridTemplateColumns: filterActive
+            ? 'minmax(240px, 1fr) auto auto'
+            : 'minmax(240px, 1fr) auto',
+        }}
+      >
         <SearchInput
           value={q}
           onChange={(value) => updateParam('q', value)}
           placeholder="Cerca per codice, nome o descrizione..."
         />
+        {filterActive ? (
+          <button
+            type="button"
+            className={shared.filterChip}
+            onClick={() => updateParam('domain', '')}
+          >
+            Dominio: {breadcrumbLabel}
+            <Icon name="x" size={14} />
+          </button>
+        ) : null}
         <div className={shared.segmented}>
           {([
             ['active', 'Attivi'],
@@ -227,8 +295,9 @@ export function ConfigurationResourcePage() {
       ) : isEmpty ? (
         <EmptyState
           meta={meta}
-          context={emptyContext({ totalAll, hasSearch, active })}
+          context={emptyContext({ totalAll, hasSearch, active, filterActive })}
           searchValue={q}
+          domainLabel={breadcrumbLabel}
           onCreate={() => {
             setEditing(null);
             setModalOpen(true);
@@ -237,10 +306,12 @@ export function ConfigurationResourcePage() {
         />
       ) : (
         <div className={shared.tableCard}>
-          {supportsReorder && hasSearch ? (
+          {supportsReorder && (hasSearch || filterActive) ? (
             <div className={shared.dragHint}>
               <Icon name="info" size={14} />
-              Cancella la ricerca per riordinare le voci.
+              {hasSearch
+                ? 'Cancella la ricerca per riordinare le voci.'
+                : 'Rimuovi il filtro dominio per riordinare le voci.'}
             </div>
           ) : null}
           <div className={shared.tableScroll}>
@@ -252,20 +323,27 @@ export function ConfigurationResourcePage() {
                       {supportsReorder ? <th className={shared.dragHandleCell} aria-label="Riordina" /> : null}
                       <th>Codice</th>
                       <th>Nome</th>
-                      {resource === 'service-taxonomy' && <th>Dominio</th>}
+                      {resource === 'technical-domains' && <th>Servizi</th>}
+                      {resource === 'service-taxonomy' && !filterActive && <th>Dominio</th>}
                       {resource === 'sites' && <th>Città</th>}
                       <th>Stato</th>
                       <th className={shared.actionsCell}>Azioni</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {list.data!.map((item) => (
+                    {displayItems.map((item) => (
                       <SortableConfigRow
                         key={item.id}
                         item={item}
                         resource={resource}
                         supportsReorder={supportsReorder}
                         canReorder={canReorder}
+                        hideDomainColumn={filterActive}
+                        serviceCount={
+                          resource === 'technical-domains'
+                            ? serviceCountByDomain?.get(item.id) ?? 0
+                            : null
+                        }
                         onEdit={() => {
                           setEditing(item);
                           setModalOpen(true);
@@ -296,6 +374,7 @@ export function ConfigurationResourcePage() {
         meta={meta}
         item={editing}
         technicalDomains={reference.data?.technical_domains ?? []}
+        defaultTechnicalDomainId={filterActive ? domainFilter : null}
         onClose={() => setModalOpen(false)}
         onSaved={() => {
           setModalOpen(false);
@@ -334,6 +413,8 @@ function SortableConfigRow({
   resource,
   supportsReorder,
   canReorder,
+  hideDomainColumn,
+  serviceCount,
   onEdit,
   onToggle,
 }: {
@@ -341,6 +422,8 @@ function SortableConfigRow({
   resource: string;
   supportsReorder: boolean;
   canReorder: boolean;
+  hideDomainColumn: boolean;
+  serviceCount: number | null;
   onEdit: () => void;
   onToggle: () => void;
 }) {
@@ -380,7 +463,18 @@ function SortableConfigRow({
           {item.description && <span className={shared.small}>{item.description}</span>}
         </div>
       </td>
-      {resource === 'service-taxonomy' && <td>{item.technical_domain_name ?? '-'}</td>}
+      {resource === 'technical-domains' && serviceCount !== null ? (
+        <td>
+          <Link
+            to={`/manutenzioni/configurazione/service-taxonomy?domain=${item.id}`}
+            className={shared.cellLink}
+          >
+            {serviceCount > 0 ? `${serviceCount}` : 'Aggiungi'}
+            <Icon name="chevron-right" size={12} />
+          </Link>
+        </td>
+      ) : null}
+      {resource === 'service-taxonomy' && !hideDomainColumn && <td>{item.technical_domain_name ?? '-'}</td>}
       {resource === 'sites' && <td>{item.city ?? '-'}</td>}
       <td>
         <StatusPill tone={item.is_active ? 'success' : 'neutral'}>
@@ -426,18 +520,26 @@ function UsageHint({
   );
 }
 
-type EmptyContext = 'firstRun' | 'noSearchMatch' | 'inactiveTabEmpty' | 'activeTabEmpty';
+type EmptyContext =
+  | 'firstRun'
+  | 'noSearchMatch'
+  | 'inactiveTabEmpty'
+  | 'activeTabEmpty'
+  | 'domainScopedEmpty';
 
 function emptyContext({
   totalAll,
   hasSearch,
   active,
+  filterActive,
 }: {
   totalAll: number;
   hasSearch: boolean;
   active: ActiveFilter;
+  filterActive: boolean;
 }): EmptyContext {
   if (hasSearch) return 'noSearchMatch';
+  if (filterActive) return 'domainScopedEmpty';
   if (totalAll === 0) return 'firstRun';
   if (active === 'inactive') return 'inactiveTabEmpty';
   return 'activeTabEmpty';
@@ -447,12 +549,14 @@ function EmptyState({
   meta,
   context,
   searchValue,
+  domainLabel,
   onCreate,
   onClearSearch,
 }: {
   meta: ResourceMeta;
   context: EmptyContext;
   searchValue: string;
+  domainLabel: string | null;
   onCreate: () => void;
   onClearSearch: () => void;
 }) {
@@ -467,6 +571,22 @@ function EmptyState({
         <div style={{ marginTop: '1rem' }}>
           <Button onClick={onCreate} leftIcon={<Icon name="plus" size={16} />}>
             Nuovo {meta.singular}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  if (context === 'domainScopedEmpty') {
+    return (
+      <div className={shared.emptyCard}>
+        <div className={shared.emptyIcon}>
+          <Icon name="package" />
+        </div>
+        <h3>Nessun servizio in {domainLabel ?? 'questo dominio'}</h3>
+        <p>Aggiungi il primo servizio associato al dominio selezionato.</p>
+        <div style={{ marginTop: '1rem' }}>
+          <Button onClick={onCreate} leftIcon={<Icon name="plus" size={16} />}>
+            Aggiungi servizio
           </Button>
         </div>
       </div>
@@ -531,6 +651,7 @@ function ConfigModal({
   meta,
   item,
   technicalDomains,
+  defaultTechnicalDomainId,
   onClose,
   onSaved,
 }: {
@@ -538,22 +659,23 @@ function ConfigModal({
   meta: ResourceMeta;
   item: ReferenceItem | null;
   technicalDomains: ReferenceItem[];
+  defaultTechnicalDomainId: number | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const mutations = useConfigMutations(meta.key);
   const toast = useToast();
-  const [form, setForm] = useState<FormState>(() => formFromItem(item));
+  const [form, setForm] = useState<FormState>(() => formFromItem(item, defaultTechnicalDomainId));
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(formFromItem(item));
+      setForm(formFromItem(item, defaultTechnicalDomainId));
       setErrors({});
       setSubmitted(false);
     }
-  }, [item, open]);
+  }, [item, open, defaultTechnicalDomainId]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -754,7 +876,12 @@ function ConfigModal({
   );
 }
 
-function formFromItem(item: ReferenceItem | null): FormState {
+function formFromItem(
+  item: ReferenceItem | null,
+  defaultTechnicalDomainId: number | null = null,
+): FormState {
+  const defaultDomain =
+    !item && defaultTechnicalDomainId ? String(defaultTechnicalDomainId) : '';
   return {
     code: item?.code ?? '',
     name_it: item?.name_it ?? '',
@@ -762,7 +889,9 @@ function formFromItem(item: ReferenceItem | null): FormState {
     description: item?.description ?? '',
     city: item?.city ?? '',
     country_code: item?.country_code ?? '',
-    technical_domain_id: item?.technical_domain_id ? String(item.technical_domain_id) : '',
+    technical_domain_id: item?.technical_domain_id
+      ? String(item.technical_domain_id)
+      : defaultDomain,
     is_active: item ? item.is_active : true,
   };
 }

@@ -11,7 +11,8 @@
       "Bash(GOINSECURE=github.com/go-sql-driver/mysql go get github.com/go-sql-driver/mysql)",
       "Bash(GOINSECURE=github.com/go-sql-driver/mysql go mod:*)",
       "mcp__plugin_playwright_playwright__browser_console_messages",
-      "mcp__plugin_playwright_playwright__browser_close"
+      "mcp__plugin_playwright_playwright__browser_close",
+      "Skill(playwright-cli)"
     ]
   },
   "spinnerTipsEnabled": false

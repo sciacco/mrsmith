@@ -1,6 +1,6 @@
 import { Icon } from '@mrsmith/ui';
 import { Link } from 'react-router-dom';
-import { useConfigSummary, useLLMModels } from '../api/queries';
+import { useConfigSummary, useLLMModels, type ConfigSummary } from '../api/queries';
 import { errorMessage } from '../lib/format';
 import {
   RESOURCE_GROUPS,
@@ -52,13 +52,14 @@ function ResourceGroupSection({
   summaryLoading,
 }: {
   group: { id: ResourceGroup; label: string };
-  summary: Record<string, { active: number; inactive: number }> | null;
+  summary: ConfigSummary | null;
   summaryLoading: boolean;
 }) {
   const items = RESOURCE_KEYS.map((key) => RESOURCE_META[key]).filter(
-    (meta) => meta.group === group.id,
+    (meta) => meta.group === group.id && !meta.hiddenFromIndex,
   );
   const isAutomationGroup = group.id === 'automation';
+  const hasDomainsCard = items.some((meta) => meta.key === 'technical-domains');
   return (
     <div className={styles.group}>
       <h2 className={styles.groupTitle}>{group.label}</h2>
@@ -68,11 +69,20 @@ function ResourceGroupSection({
             key={meta.key}
             meta={meta}
             counts={summary?.[meta.key] ?? null}
+            summary={summary}
             loading={summaryLoading}
           />
         ))}
         {isAutomationGroup ? <LLMModelsCard /> : null}
       </div>
+      {hasDomainsCard ? (
+        <div className={styles.groupFooter}>
+          <Link to="/manutenzioni/configurazione/service-taxonomy" className={styles.secondaryLink}>
+            Elenco servizi completo
+            <Icon name="chevron-right" size={14} />
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -80,17 +90,23 @@ function ResourceGroupSection({
 function ResourceCard({
   meta,
   counts,
+  summary,
   loading,
 }: {
   meta: ResourceMeta;
   counts: { active: number; inactive: number } | null;
+  summary: ConfigSummary | null;
   loading: boolean;
 }) {
   const isEmpty = counts !== null && counts.active === 0 && counts.inactive === 0;
+  const isDomainsCard = meta.key === 'technical-domains';
+  const serviceCounts = summary?.['service-taxonomy'] ?? null;
+  const title = meta.indexTitle ?? meta.title;
+  const description = meta.indexDescription ?? meta.shortDescription;
   return (
     <Link to={`/manutenzioni/configurazione/${meta.key}`} className={styles.card}>
       <div className={styles.cardHeader}>
-        <h3 className={styles.cardTitle}>{meta.title}</h3>
+        <h3 className={styles.cardTitle}>{title}</h3>
         {isEmpty ? (
           <span className={styles.emptyBadge}>
             <Icon name="triangle-alert" size={12} />
@@ -98,15 +114,25 @@ function ResourceCard({
           </span>
         ) : null}
       </div>
-      <p className={styles.cardDescription}>{meta.shortDescription}</p>
+      <p className={styles.cardDescription}>{description}</p>
       <div className={styles.cardFooter}>
         {loading ? (
           <span className={styles.counterSkeleton} aria-hidden="true" />
         ) : counts ? (
           <span className={styles.counters}>
-            {counts.active} attivi
-            <span className={styles.dot}>·</span>
-            {counts.inactive} non attivi
+            {isDomainsCard && serviceCounts ? (
+              <>
+                {counts.active} domini
+                <span className={styles.dot}>·</span>
+                {serviceCounts.active} servizi
+              </>
+            ) : (
+              <>
+                {counts.active} attivi
+                <span className={styles.dot}>·</span>
+                {counts.inactive} non attivi
+              </>
+            )}
           </span>
         ) : (
           <span className={styles.counters}>—</span>
