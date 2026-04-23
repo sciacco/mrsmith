@@ -96,11 +96,13 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	manager("POST /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/status", h.handleNoticeStatus)
 	manager("PUT /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/quality-flags", h.handleReplaceNoticeQualityFlags)
 
+	manager("GET /manutenzioni/v1/config/summary", h.handleConfigSummary)
 	manager("GET /manutenzioni/v1/config/{resource}", h.handleListConfig)
 	manager("POST /manutenzioni/v1/config/{resource}", h.handleCreateConfig)
 	manager("PATCH /manutenzioni/v1/config/{resource}/{id}", h.handleUpdateConfig)
 	manager("POST /manutenzioni/v1/config/{resource}/{id}/deactivate", h.handleDeactivateConfig)
 	manager("POST /manutenzioni/v1/config/{resource}/{id}/reactivate", h.handleReactivateConfig)
+	manager("GET /manutenzioni/v1/config/{resource}/{id}/usage", h.handleConfigUsage)
 }
 
 func combineRoles(groups ...[]string) []string {

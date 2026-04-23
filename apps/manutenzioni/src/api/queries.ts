@@ -24,7 +24,14 @@ const queryKeys = {
   customers: (q: string) => ['manutenzioni', 'customers', q] as const,
   config: (resource: string, active: string, q: string) =>
     ['manutenzioni', 'config', resource, active, q] as const,
+  configSummary: () => ['manutenzioni', 'config-summary'] as const,
+  configUsage: (resource: string, id: number) =>
+    ['manutenzioni', 'config-usage', resource, id] as const,
 };
+
+export type ConfigResourceCounts = { active: number; inactive: number };
+export type ConfigSummary = Record<string, ConfigResourceCounts>;
+export type ConfigUsage = { active_maintenances: number };
 
 function searchParams(params: MaintenanceFilters): string {
   const search = new URLSearchParams();
@@ -304,11 +311,42 @@ export function useConfigList(resource: string, active: string, q: string) {
   });
 }
 
+export function useConfigSummary() {
+  const api = useManutenzioniApiClient();
+  return useQuery({
+    queryKey: queryKeys.configSummary(),
+    queryFn: () => api.get<ConfigSummary>('/manutenzioni/v1/config/summary'),
+  });
+}
+
+export function useConfigCounts(resource: string) {
+  const summary = useConfigSummary();
+  const data = summary.data?.[resource];
+  return {
+    data: data ?? null,
+    isLoading: summary.isLoading,
+    error: summary.error,
+    refetch: summary.refetch,
+  };
+}
+
+export function useConfigUsage(resource: string, id: number | null) {
+  const api = useManutenzioniApiClient();
+  return useQuery({
+    queryKey: id !== null ? queryKeys.configUsage(resource, id) : ['manutenzioni', 'config-usage', 'empty'],
+    enabled: id !== null,
+    queryFn: () =>
+      api.get<ConfigUsage>(`/manutenzioni/v1/config/${resource}/${id}/usage`),
+  });
+}
+
 export function useConfigMutations(resource: string) {
   const api = useManutenzioniApiClient();
   const queryClient = useQueryClient();
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'config', resource] });
+    await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'config-summary'] });
+    await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'config-usage', resource] });
     await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'reference'] });
   };
   return {

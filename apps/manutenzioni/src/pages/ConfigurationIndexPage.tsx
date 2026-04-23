@@ -1,65 +1,116 @@
-import { Button, Icon } from '@mrsmith/ui';
-import { useNavigate } from 'react-router-dom';
+import { Icon } from '@mrsmith/ui';
+import { Link } from 'react-router-dom';
+import { useConfigSummary } from '../api/queries';
+import { errorMessage } from '../lib/format';
+import {
+  RESOURCE_GROUPS,
+  RESOURCE_KEYS,
+  RESOURCE_META,
+  type ResourceGroup,
+  type ResourceMeta,
+} from '../lib/resourceMeta';
+import styles from './ConfigurationIndexPage.module.css';
 import shared from './shared.module.css';
 
-const resources = [
-  { key: 'sites', title: 'Siti', description: 'Sedi e data center usati nelle manutenzioni.' },
-  { key: 'technical-domains', title: 'Domini tecnici', description: 'Aree tecniche e operative.' },
-  { key: 'maintenance-kinds', title: 'Tipi manutenzione', description: 'Classificazione principale della manutenzione.' },
-  { key: 'customer-scopes', title: 'Ambiti clienti', description: 'Perimetro clienti coinvolto.' },
-  { key: 'service-taxonomy', title: 'Servizi', description: 'Tassonomia servizi collegata ai domini.' },
-  { key: 'reason-classes', title: 'Motivi', description: 'Motivazioni operative ricorrenti.' },
-  { key: 'impact-effects', title: 'Effetti impatto', description: 'Effetti attesi sui servizi.' },
-  { key: 'quality-flags', title: 'Segnali qualità', description: 'Controlli e indicatori editoriali.' },
-  { key: 'target-types', title: 'Tipi target', description: 'Categorie di oggetti impattati.' },
-  { key: 'notice-channels', title: 'Canali comunicazione', description: 'Canali disponibili per le comunicazioni.' },
-];
-
 export function ConfigurationIndexPage() {
-  const navigate = useNavigate();
+  const summary = useConfigSummary();
+
   return (
     <section className={shared.page}>
       <div className={shared.header}>
         <div className={shared.titleBlock}>
           <h1 className={shared.pageTitle}>Configurazione</h1>
           <p className={shared.pageSubtitle}>
-            Gestisci valori attivi e non attivi usati nel registro manutenzioni.
+            Tabelle di riferimento usate nel registro manutenzioni.
           </p>
         </div>
       </div>
-      <div className={shared.tableCard}>
-        <div className={shared.tableScroll}>
-          <table className={shared.table}>
-            <thead>
-              <tr>
-                <th>Risorsa</th>
-                <th>Descrizione</th>
-                <th className={shared.actionsCell}>Azioni</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resources.map((resource) => (
-                <tr key={resource.key}>
-                  <td>
-                    <strong>{resource.title}</strong>
-                  </td>
-                  <td className={shared.muted}>{resource.description}</td>
-                  <td className={shared.actionsCell}>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => navigate(`/manutenzioni/configurazione/${resource.key}`)}
-                      rightIcon={<Icon name="chevron-right" size={16} />}
-                    >
-                      Apri
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+      {summary.error ? (
+        <div className={styles.summaryError}>
+          {errorMessage(summary.error, 'Conteggi non disponibili. Le risorse sono comunque accessibili.')}
         </div>
-      </div>
+      ) : null}
+
+      <nav className={styles.groups} aria-label="Risorse di configurazione">
+        {RESOURCE_GROUPS.map((group) => (
+          <ResourceGroupSection
+            key={group.id}
+            group={group}
+            summary={summary.data ?? null}
+            summaryLoading={summary.isLoading}
+          />
+        ))}
+      </nav>
     </section>
+  );
+}
+
+function ResourceGroupSection({
+  group,
+  summary,
+  summaryLoading,
+}: {
+  group: { id: ResourceGroup; label: string };
+  summary: Record<string, { active: number; inactive: number }> | null;
+  summaryLoading: boolean;
+}) {
+  const items = RESOURCE_KEYS.map((key) => RESOURCE_META[key]).filter(
+    (meta) => meta.group === group.id,
+  );
+  return (
+    <div className={styles.group}>
+      <h2 className={styles.groupTitle}>{group.label}</h2>
+      <div className={styles.grid}>
+        {items.map((meta) => (
+          <ResourceCard
+            key={meta.key}
+            meta={meta}
+            counts={summary?.[meta.key] ?? null}
+            loading={summaryLoading}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ResourceCard({
+  meta,
+  counts,
+  loading,
+}: {
+  meta: ResourceMeta;
+  counts: { active: number; inactive: number } | null;
+  loading: boolean;
+}) {
+  const isEmpty = counts !== null && counts.active === 0 && counts.inactive === 0;
+  return (
+    <Link to={`/manutenzioni/configurazione/${meta.key}`} className={styles.card}>
+      <div className={styles.cardHeader}>
+        <h3 className={styles.cardTitle}>{meta.title}</h3>
+        {isEmpty ? (
+          <span className={styles.emptyBadge}>
+            <Icon name="triangle-alert" size={12} />
+            Da configurare
+          </span>
+        ) : null}
+      </div>
+      <p className={styles.cardDescription}>{meta.shortDescription}</p>
+      <div className={styles.cardFooter}>
+        {loading ? (
+          <span className={styles.counterSkeleton} aria-hidden="true" />
+        ) : counts ? (
+          <span className={styles.counters}>
+            {counts.active} attivi
+            <span className={styles.dot}>·</span>
+            {counts.inactive} non attivi
+          </span>
+        ) : (
+          <span className={styles.counters}>—</span>
+        )}
+        <Icon name="chevron-right" size={18} className={styles.chevron} />
+      </div>
+    </Link>
   );
 }

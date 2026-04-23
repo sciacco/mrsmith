@@ -333,3 +333,125 @@ func (h *Handler) handleConfigActive(w http.ResponseWriter, r *http.Request, act
 func configIDPlaceholder(id int64) string {
 	return strconv.FormatInt(id, 10)
 }
+
+type configResourceSummary struct {
+	Active   int `json:"active"`
+	Inactive int `json:"inactive"`
+}
+
+func (h *Handler) handleConfigSummary(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMaintenanceDB(w) {
+		return
+	}
+	summary := make(map[string]configResourceSummary, len(resourceMetas))
+	for key, meta := range resourceMetas {
+		active, inactive, err := h.loadConfigCounts(r, meta)
+		if err != nil {
+			h.dbFailure(w, r, "config_summary", err, "resource", meta.Key)
+			return
+		}
+		summary[key] = configResourceSummary{Active: active, Inactive: inactive}
+	}
+	httputil.JSON(w, http.StatusOK, summary)
+}
+
+func (h *Handler) loadConfigCounts(r *http.Request, meta resourceMeta) (int, int, error) {
+	query := fmt.Sprintf(
+		`SELECT
+			COALESCE(SUM(CASE WHEN is_active THEN 1 ELSE 0 END), 0) AS active,
+			COALESCE(SUM(CASE WHEN is_active THEN 0 ELSE 1 END), 0) AS inactive
+		FROM %s`,
+		meta.Table,
+	)
+	var active, inactive int
+	if err := h.maintenance.QueryRowContext(r.Context(), query).Scan(&active, &inactive); err != nil {
+		return 0, 0, err
+	}
+	return active, inactive, nil
+}
+
+func (h *Handler) handleConfigUsage(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMaintenanceDB(w) {
+		return
+	}
+	meta, ok := resourceMetas[r.PathValue("resource")]
+	if !ok {
+		appError(w, http.StatusNotFound, "config_resource_not_found")
+		return
+	}
+	id, err := pathInt64(r, "id")
+	if err != nil {
+		appError(w, http.StatusBadRequest, "invalid_config_id")
+		return
+	}
+	count, err := h.countActiveMaintenanceUsage(r, meta, id)
+	if err != nil {
+		h.dbFailure(w, r, "config_usage", err, "resource", meta.Key, "config_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]int{"active_maintenances": count})
+}
+
+func (h *Handler) countActiveMaintenanceUsage(r *http.Request, meta resourceMeta, id int64) (int, error) {
+	query := buildConfigUsageQuery(meta)
+	if query == "" {
+		return 0, nil
+	}
+	var count int
+	if err := h.maintenance.QueryRowContext(r.Context(), query, id).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// activeMaintenanceStatuses é la lista di stati non terminali:
+// manutenzioni con questi stati sono considerate "correnti".
+const activeMaintenanceStatusesSQL = `'draft', 'announced', 'approved', 'scheduled', 'in_progress'`
+
+func buildConfigUsageQuery(meta resourceMeta) string {
+	switch meta.Key {
+	case "sites":
+		return `SELECT COUNT(*) FROM maintenance.maintenance
+			WHERE site_id = $1 AND status IN (` + activeMaintenanceStatusesSQL + `)`
+	case "technical-domains":
+		return `SELECT COUNT(*) FROM maintenance.maintenance
+			WHERE technical_domain_id = $1 AND status IN (` + activeMaintenanceStatusesSQL + `)`
+	case "maintenance-kinds":
+		return `SELECT COUNT(*) FROM maintenance.maintenance
+			WHERE maintenance_kind_id = $1 AND status IN (` + activeMaintenanceStatusesSQL + `)`
+	case "customer-scopes":
+		return `SELECT COUNT(*) FROM maintenance.maintenance
+			WHERE customer_scope_id = $1 AND status IN (` + activeMaintenanceStatusesSQL + `)`
+	case "service-taxonomy":
+		return `SELECT COUNT(DISTINCT m.maintenance_id)
+			FROM maintenance.maintenance_service_taxonomy ms
+			JOIN maintenance.maintenance m ON m.maintenance_id = ms.maintenance_id
+			WHERE ms.service_taxonomy_id = $1 AND m.status IN (` + activeMaintenanceStatusesSQL + `)`
+	case "reason-classes":
+		return `SELECT COUNT(DISTINCT m.maintenance_id)
+			FROM maintenance.maintenance_reason_class mr
+			JOIN maintenance.maintenance m ON m.maintenance_id = mr.maintenance_id
+			WHERE mr.reason_class_id = $1 AND m.status IN (` + activeMaintenanceStatusesSQL + `)`
+	case "impact-effects":
+		return `SELECT COUNT(DISTINCT m.maintenance_id)
+			FROM maintenance.maintenance_impact_effect mi
+			JOIN maintenance.maintenance m ON m.maintenance_id = mi.maintenance_id
+			WHERE mi.impact_effect_id = $1 AND m.status IN (` + activeMaintenanceStatusesSQL + `)`
+	case "quality-flags":
+		return `SELECT COUNT(DISTINCT m.maintenance_id)
+			FROM maintenance.maintenance_quality_flag mq
+			JOIN maintenance.maintenance m ON m.maintenance_id = mq.maintenance_id
+			WHERE mq.quality_flag_id = $1 AND m.status IN (` + activeMaintenanceStatusesSQL + `)`
+	case "target-types":
+		return `SELECT COUNT(DISTINCT m.maintenance_id)
+			FROM maintenance.maintenance_target mt
+			JOIN maintenance.maintenance m ON m.maintenance_id = mt.maintenance_id
+			WHERE mt.target_type_id = $1 AND m.status IN (` + activeMaintenanceStatusesSQL + `)`
+	case "notice-channels":
+		return `SELECT COUNT(DISTINCT m.maintenance_id)
+			FROM maintenance.notice n
+			JOIN maintenance.maintenance m ON m.maintenance_id = n.maintenance_id
+			WHERE n.notice_channel_id = $1 AND m.status IN (` + activeMaintenanceStatusesSQL + `)`
+	}
+	return ""
+}

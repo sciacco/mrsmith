@@ -132,6 +132,35 @@
   gap: 0.9rem;
 }
 
+.formGridSpan {
+  grid-column: 1 / -1;
+}
+
+.fieldHelper {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.fieldError {
+  color: var(--color-danger);
+  font-size: 0.72rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.required {
+  color: var(--color-danger);
+  margin-left: 0.15rem;
+}
+
+.fieldInvalid {
+  border-color: var(--color-danger) !important;
+}
+
 .formActions {
   display: flex;
   justify-content: flex-end;
@@ -140,6 +169,22 @@
 
 .tableScroll {
   overflow-x: auto;
+}
+
+.tableFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.tableFooter .dot {
+  margin: 0 0.35rem;
+  opacity: 0.6;
 }
 
 .table {
