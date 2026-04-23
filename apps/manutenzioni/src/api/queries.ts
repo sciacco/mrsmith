@@ -4,6 +4,8 @@ import type {
   ClassificationInput,
   CustomerSearchItem,
   ImpactedCustomerBody,
+  MaintenanceAssistanceDraft,
+  MaintenanceAssistanceDraftBody,
   MaintenanceDetail,
   MaintenanceFilters,
   MaintenanceFormBody,
@@ -98,6 +100,17 @@ export function useCreateMaintenance() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'list'] });
     },
+  });
+}
+
+export function useMaintenanceAssistanceDraft(id: number) {
+  const api = useManutenzioniApiClient();
+  return useMutation({
+    mutationFn: (body: MaintenanceAssistanceDraftBody) =>
+      api.post<MaintenanceAssistanceDraft>(
+        `/manutenzioni/v1/maintenances/${id}/assistance/draft`,
+        body,
+      ),
   });
 }
 

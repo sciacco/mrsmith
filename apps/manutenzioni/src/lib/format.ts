@@ -138,6 +138,8 @@ export function errorMessage(error: unknown, fallback: string): string {
         maintenance_window_required: 'Aggiungi una finestra prima di continuare.',
         notice_content_required: 'Completa i testi richiesti prima di cambiare stato.',
         sent_at_required: 'Indica la data di invio.',
+        assistance_not_configured: 'Assistenza non disponibile. Puoi completare la bozza manualmente.',
+        assistance_generation_failed: 'Assistenza non riuscita. Riprova o completa la bozza manualmente.',
       };
       return known[code] ?? fallback;
     }

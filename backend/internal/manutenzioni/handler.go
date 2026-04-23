@@ -19,17 +19,20 @@ import (
 	"github.com/sciacco/mrsmith/internal/authz"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 )
 
 type Deps struct {
 	Maintenance *sql.DB
 	Mistra      *sql.DB
+	AI          *openrouter.Client
 	Logger      *slog.Logger
 }
 
 type Handler struct {
 	maintenance *sql.DB
 	mistra      *sql.DB
+	ai          *openrouter.Client
 	logger      *slog.Logger
 }
 
@@ -42,6 +45,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	h := &Handler{
 		maintenance: deps.Maintenance,
 		mistra:      deps.Mistra,
+		ai:          deps.AI,
 		logger:      deps.Logger,
 	}
 
@@ -70,6 +74,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	manager("GET /manutenzioni/v1/customers", h.handleSearchCustomers)
 	manager("POST /manutenzioni/v1/maintenances", h.handleCreateMaintenance)
 	manager("PATCH /manutenzioni/v1/maintenances/{id}", h.handleUpdateMaintenance)
+	manager("POST /manutenzioni/v1/maintenances/{id}/assistance/draft", h.handleDraftAssistance)
 	action("POST /manutenzioni/v1/maintenances/{id}/status", h.handleMaintenanceStatus)
 
 	manager("POST /manutenzioni/v1/maintenances/{id}/windows", h.handleCreateWindow)

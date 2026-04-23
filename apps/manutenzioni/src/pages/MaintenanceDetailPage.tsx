@@ -6,6 +6,7 @@ import {
   useCustomerImpactMutations,
   useCustomerSearch,
   useMaintenance,
+  useMaintenanceAssistanceDraft,
   useNoticeMutations,
   useReferenceData,
   useReplaceClassifications,
@@ -16,7 +17,10 @@ import {
 } from '../api/queries';
 import type {
   ClassificationInput,
+  AssistanceClassificationProposal,
+  MaintenanceAssistanceDraft,
   ImpactedCustomerBody,
+  JsonObject,
   MaintenanceDetail,
   NoticeBody,
   ReferenceData,
@@ -204,8 +208,15 @@ function SummaryTab({
   canManage: boolean;
 }) {
   const update = useUpdateMaintenance();
+  const assistance = useMaintenanceAssistanceDraft(detail.maintenance_id);
+  const serviceTaxonomyMutation = useReplaceClassifications(detail.maintenance_id, 'service-taxonomy');
+  const reasonClassesMutation = useReplaceClassifications(detail.maintenance_id, 'reason-classes');
+  const impactEffectsMutation = useReplaceClassifications(detail.maintenance_id, 'impact-effects');
+  const qualityFlagsMutation = useReplaceClassifications(detail.maintenance_id, 'quality-flags');
   const toast = useToast();
   const [editing, setEditing] = useState(false);
+  const [assistanceNote, setAssistanceNote] = useState('');
+  const [assistanceDraft, setAssistanceDraft] = useState<MaintenanceAssistanceDraft | null>(null);
   const [form, setForm] = useState(() => ({
     title_it: detail.title_it,
     title_en: detail.title_en ?? '',
@@ -244,14 +255,106 @@ function SummaryTab({
     }
   }
 
+  async function generateAssistance() {
+    try {
+      const result = await assistance.mutateAsync({
+        regenerate: true,
+        note: assistanceNote.trim() || null,
+      });
+      setAssistanceDraft(result);
+      toast.toast('Proposte generate.');
+    } catch (error) {
+      toast.toast(errorMessage(error, 'Assistenza non disponibile.'), 'error');
+    }
+  }
+
+  async function applyAssistance() {
+    if (!assistanceDraft) return;
+    const texts = assistanceDraft.texts;
+    const nextTitleIT = texts.title_it?.trim() || detail.title_it;
+    const nextTitleEN = proposedOrCurrent(texts.title_en, detail.title_en ?? null);
+    const nextDescriptionIT = proposedOrCurrent(texts.description_it, detail.description_it ?? null);
+    const nextDescriptionEN = proposedOrCurrent(texts.description_en, detail.description_en ?? null);
+    const nextReasonEN = proposedOrCurrent(texts.reason_en, detail.reason_en ?? null);
+    const nextResidualServiceEN = proposedOrCurrent(texts.residual_service_en, detail.residual_service_en ?? null);
+    const approvedAt = new Date().toISOString();
+    try {
+      await update.mutateAsync({
+        id: detail.maintenance_id,
+        body: {
+          title_it: nextTitleIT,
+          title_en: nextTitleEN,
+          description_it: nextDescriptionIT,
+          description_en: nextDescriptionEN,
+          reason_en: nextReasonEN,
+          residual_service_en: nextResidualServiceEN,
+          metadata: mergeMetadata(detail.metadata, {
+            assistance: {
+              last_approved_at: approvedAt,
+              last_audit: {
+                generated_at: assistanceDraft.audit.generated_at,
+                model: assistanceDraft.audit.model,
+                summary: assistanceDraft.audit.summary,
+              },
+              approved_texts: assistanceTextsMetadata(texts),
+            },
+          }),
+        },
+      });
+      if (assistanceDraft.service_taxonomy.length > 0) {
+        await serviceTaxonomyMutation.mutateAsync(assistanceInputs(assistanceDraft.service_taxonomy));
+      }
+      if (assistanceDraft.reason_classes.length > 0) {
+        await reasonClassesMutation.mutateAsync(assistanceInputs(assistanceDraft.reason_classes));
+      }
+      if (assistanceDraft.impact_effects.length > 0) {
+        await impactEffectsMutation.mutateAsync(assistanceInputs(assistanceDraft.impact_effects));
+      }
+      if (assistanceDraft.quality_flags.length > 0) {
+        await qualityFlagsMutation.mutateAsync(assistanceInputs(assistanceDraft.quality_flags));
+      }
+      setForm((current) => ({
+        ...current,
+        title_it: nextTitleIT,
+        title_en: nextTitleEN ?? '',
+        description_it: nextDescriptionIT ?? '',
+        description_en: nextDescriptionEN ?? '',
+      }));
+      setAssistanceDraft(null);
+      setEditing(false);
+      toast.toast('Proposte applicate.');
+    } catch (error) {
+      toast.toast(errorMessage(error, 'Applicazione non riuscita.'), 'error');
+    }
+  }
+
+  const applyPending =
+    update.isPending ||
+    serviceTaxonomyMutation.isPending ||
+    reasonClassesMutation.isPending ||
+    impactEffectsMutation.isPending ||
+    qualityFlagsMutation.isPending;
+
   return (
     <div className={shared.panel}>
       <div className={shared.sectionHeader}>
         <h2 className={shared.sectionTitle}>Riepilogo</h2>
         {canManage && (
-          <Button size="sm" variant="secondary" onClick={() => setEditing((value) => !value)}>
-            {editing ? 'Chiudi' : 'Modifica'}
-          </Button>
+          <div className={shared.inlineActions}>
+            {!editing && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={generateAssistance}
+                loading={assistance.isPending}
+              >
+                Genera testi e classificazione
+              </Button>
+            )}
+            <Button size="sm" variant="secondary" onClick={() => setEditing((value) => !value)}>
+              {editing ? 'Chiudi' : 'Modifica'}
+            </Button>
+          </div>
         )}
       </div>
       {editing && reference ? (
@@ -337,6 +440,18 @@ function SummaryTab({
           <DetailItem label="Servizio residuo" value={detail.residual_service_it ?? '-'} />
         </div>
       )}
+      {canManage && !editing && (
+        <AssistancePanel
+          draft={assistanceDraft}
+          note={assistanceNote}
+          onNoteChange={setAssistanceNote}
+          onGenerate={generateAssistance}
+          generating={assistance.isPending}
+          applying={applyPending}
+          onApply={applyAssistance}
+          onDiscard={() => setAssistanceDraft(null)}
+        />
+      )}
     </div>
   );
 }
@@ -376,6 +491,179 @@ function DetailItem({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function AssistancePanel({
+  draft,
+  note,
+  onNoteChange,
+  onGenerate,
+  generating,
+  applying,
+  onApply,
+  onDiscard,
+}: {
+  draft: MaintenanceAssistanceDraft | null;
+  note: string;
+  onNoteChange: (value: string) => void;
+  onGenerate: () => void;
+  generating: boolean;
+  applying: boolean;
+  onApply: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <div className={shared.assistancePanel}>
+      <div className={shared.sectionHeader}>
+        <div>
+          <h3 className={shared.sectionTitle}>Assistenza</h3>
+          {draft && <p className={shared.small}>{draft.audit.summary}</p>}
+        </div>
+        <div className={shared.inlineActions}>
+          {draft && (
+            <Button size="sm" variant="secondary" onClick={onDiscard}>
+              Scarta
+            </Button>
+          )}
+          {draft ? (
+            <Button size="sm" onClick={onApply} loading={applying}>
+              Applica proposte
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={onGenerate} loading={generating}>
+              Genera testi e classificazione
+            </Button>
+          )}
+        </div>
+      </div>
+      {!draft && (
+        <label className={shared.label}>
+          Indicazioni aggiuntive
+          <textarea
+            className={shared.textarea}
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+          />
+        </label>
+      )}
+      {draft && (
+        <div className={shared.proposalGrid}>
+          <ProposalBlock
+            title="Testi proposti"
+            rows={textProposalRows(draft)}
+          />
+          <ClassificationProposalBlock title="Servizi coinvolti" items={draft.service_taxonomy} />
+          <ClassificationProposalBlock title="Motivi" items={draft.reason_classes} />
+          <ClassificationProposalBlock title="Effetti attesi" items={draft.impact_effects} />
+          <ClassificationProposalBlock title="Segnali qualità" items={draft.quality_flags} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProposalBlock({ title, rows }: { title: string; rows: Array<{ label: string; value: string }> }) {
+  return (
+    <div className={shared.proposalBlock}>
+      <h4>{title}</h4>
+      {rows.length === 0 ? (
+        <p className={shared.small}>Nessuna proposta.</p>
+      ) : (
+        <div className={shared.proposalList}>
+          {rows.map((row) => (
+            <div className={shared.proposalItem} key={row.label}>
+              <span>{row.label}</span>
+              <strong>{row.value}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClassificationProposalBlock({
+  title,
+  items,
+}: {
+  title: string;
+  items: AssistanceClassificationProposal[];
+}) {
+  return (
+    <div className={shared.proposalBlock}>
+      <h4>{title}</h4>
+      {items.length === 0 ? (
+        <p className={shared.small}>Nessuna proposta.</p>
+      ) : (
+        <div className={shared.proposalList}>
+          {items.map((item) => (
+            <div className={shared.proposalItem} key={`${title}-${item.reference_id}`}>
+              <span>{item.label}</span>
+              <strong>{sourceLabel(item.source)}</strong>
+              <p className={shared.proposalMeta}>
+                Affidabilità {confidenceLabel(item.confidence)}
+                {item.is_primary ? ' · Principale' : ''}
+              </p>
+              {item.rationale && <p className={shared.small}>{item.rationale}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function textProposalRows(draft: MaintenanceAssistanceDraft): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = [];
+  addTextRow(rows, 'Titolo', draft.texts.title_it);
+  addTextRow(rows, 'Titolo EN', draft.texts.title_en);
+  addTextRow(rows, 'Descrizione', draft.texts.description_it);
+  addTextRow(rows, 'Descrizione EN', draft.texts.description_en);
+  addTextRow(rows, 'Motivo EN', draft.texts.reason_en);
+  addTextRow(rows, 'Servizio residuo EN', draft.texts.residual_service_en);
+  return rows;
+}
+
+function addTextRow(rows: Array<{ label: string; value: string }>, label: string, value?: string | null) {
+  const clean = value?.trim();
+  if (clean) rows.push({ label, value: clean });
+}
+
+function assistanceInputs(items: AssistanceClassificationProposal[]): ClassificationInput[] {
+  return items.map((item) => ({
+    reference_id: item.reference_id,
+    source: 'ai_extracted',
+    confidence: item.confidence ?? null,
+    is_primary: item.is_primary,
+    metadata: {
+      assistance: {
+        rationale: item.rationale ?? null,
+      },
+    },
+  }));
+}
+
+function proposedOrCurrent(value: string | null | undefined, current: string | null): string | null {
+  const trimmed = value?.trim();
+  return trimmed || current;
+}
+
+function assistanceTextsMetadata(texts: MaintenanceAssistanceDraft['texts']): JsonObject {
+  return {
+    title_it: texts.title_it ?? null,
+    title_en: texts.title_en ?? null,
+    description_it: texts.description_it ?? null,
+    description_en: texts.description_en ?? null,
+    reason_en: texts.reason_en ?? null,
+    residual_service_en: texts.residual_service_en ?? null,
+  };
+}
+
+function mergeMetadata(current: JsonObject | undefined, patch: JsonObject): JsonObject {
+  return {
+    ...(current ?? {}),
+    ...patch,
+  };
 }
 
 function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManage: boolean }) {

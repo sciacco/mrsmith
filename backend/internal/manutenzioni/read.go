@@ -281,6 +281,7 @@ func (h *Handler) handleGetMaintenance(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (MaintenanceDetail, error) {
 	var detail MaintenanceDetail
 	var titleEN, descriptionIT, descriptionEN, reasonIT, reasonEN, residualIT, residualEN sql.NullString
+	var metadata []byte
 	var kindID, domainID, scopeID int64
 	var kindCode, kindName, domainCode, domainName, scopeCode, scopeName string
 	var kindNameEN, kindDescription, domainNameEN, domainDescription, scopeNameEN, scopeDescription sql.NullString
@@ -315,7 +316,8 @@ func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (Maintena
 			m.residual_service_en,
 			vcw.maintenance_window_id, vcw.seq_no, vcw.window_status, vcw.scheduled_start_at, vcw.scheduled_end_at, vcw.expected_downtime_minutes,
 			m.created_at,
-			m.updated_at
+			m.updated_at,
+			m.metadata
 		FROM maintenance.maintenance m
 		JOIN maintenance.maintenance_kind mk ON mk.maintenance_kind_id = m.maintenance_kind_id
 		JOIN maintenance.technical_domain td ON td.technical_domain_id = m.technical_domain_id
@@ -343,6 +345,7 @@ func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (Maintena
 		&windowID, &seqNo, &windowStatus, &scheduledStart, &scheduledEnd, &expectedDowntime,
 		&detail.CreatedAt,
 		&detail.UpdatedAt,
+		&metadata,
 	)
 	if err != nil {
 		return detail, err
@@ -355,6 +358,7 @@ func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (Maintena
 	detail.ReasonEN = nullStringValue(reasonEN)
 	detail.ResidualServiceIT = nullStringValue(residualIT)
 	detail.ResidualServiceEN = nullStringValue(residualEN)
+	detail.Metadata = rawJSONFromBytes(metadata)
 	detail.MaintenanceKind = ReferenceItem{ID: kindID, Code: kindCode, NameIT: kindName, NameEN: nullStringValue(kindNameEN), Description: nullStringValue(kindDescription), SortOrder: kindSort, IsActive: kindActive}
 	detail.TechnicalDomain = ReferenceItem{ID: domainID, Code: domainCode, NameIT: domainName, NameEN: nullStringValue(domainNameEN), Description: nullStringValue(domainDescription), SortOrder: domainSort, IsActive: domainActive}
 	detail.CustomerScope = ReferenceItem{ID: scopeID, Code: scopeCode, NameIT: scopeName, NameEN: nullStringValue(scopeNameEN), Description: nullStringValue(scopeDescription), SortOrder: scopeSort, IsActive: scopeActive}

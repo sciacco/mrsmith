@@ -5,6 +5,16 @@ export interface PagedResponse<T> {
   total: number;
 }
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export type JsonObject = { [key: string]: JsonValue };
+
 export interface ReferenceItem {
   id: number;
   code: string;
@@ -184,6 +194,7 @@ export interface MaintenanceDetail {
   events: MaintenanceEvent[];
   created_at: string;
   updated_at: string;
+  metadata?: JsonObject;
 }
 
 export interface MaintenanceFilters {
@@ -224,6 +235,11 @@ export interface MaintenanceFormBody {
   residual_service_it?: string | null;
   residual_service_en?: string | null;
   first_window?: WindowBody | null;
+  initial_service_taxonomy?: ClassificationInput[];
+  initial_reason_classes?: ClassificationInput[];
+  initial_impact_effects?: ClassificationInput[];
+  initial_quality_flags?: ClassificationInput[];
+  metadata?: JsonObject;
 }
 
 export interface MaintenancePatchBody extends Partial<MaintenanceFormBody> {
@@ -235,6 +251,7 @@ export interface ClassificationInput {
   source?: string;
   confidence?: number | null;
   is_primary?: boolean;
+  metadata?: JsonObject | null;
 }
 
 export interface TargetBody {
@@ -256,6 +273,51 @@ export interface ImpactedCustomerBody {
   derivation_source: string;
   confidence?: number | null;
   reason?: string | null;
+}
+
+export interface MaintenanceAssistanceDraftBody {
+  regenerate?: boolean;
+  note?: string | null;
+}
+
+export interface AssistanceTextProposal {
+  title_it?: string | null;
+  title_en?: string | null;
+  description_it?: string | null;
+  description_en?: string | null;
+  reason_en?: string | null;
+  residual_service_en?: string | null;
+}
+
+export interface AssistanceClassificationProposal {
+  reference_id: number;
+  label: string;
+  source: string;
+  confidence?: number | null;
+  is_primary: boolean;
+  rationale?: string | null;
+}
+
+export interface AssistanceAudit {
+  generated_at: string;
+  model: string;
+  summary: string;
+}
+
+export interface AssistanceUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+export interface MaintenanceAssistanceDraft {
+  texts: AssistanceTextProposal;
+  service_taxonomy: AssistanceClassificationProposal[];
+  reason_classes: AssistanceClassificationProposal[];
+  impact_effects: AssistanceClassificationProposal[];
+  quality_flags: AssistanceClassificationProposal[];
+  audit: AssistanceAudit;
+  usage: AssistanceUsage;
 }
 
 export interface NoticeBody {

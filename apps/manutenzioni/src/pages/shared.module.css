@@ -121,6 +121,19 @@
   text-transform: uppercase;
 }
 
+.fieldGroup {
+  display: grid;
+  gap: 0.3rem;
+  align-self: start;
+}
+
+.fieldLabel {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .labelText {
   display: inline-flex;
   align-items: baseline;
@@ -171,6 +184,83 @@
   display: flex;
   justify-content: flex-end;
   gap: 0.65rem;
+}
+
+.wizardLayout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.32fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.wizardAside {
+  position: sticky;
+  top: 5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.wizardMain {
+  display: grid;
+  gap: 1rem;
+}
+
+.stepList {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.stepItem,
+.stepItemActive {
+  display: flex;
+  align-items: center;
+  min-height: 2.2rem;
+  border-left: 2px solid var(--color-border);
+  padding-left: 0.75rem;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.stepItemActive {
+  border-left-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.summaryList {
+  display: grid;
+  gap: 0.7rem;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 0.9rem;
+}
+
+.summaryList div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.summaryList span {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.summaryList strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.stickyActionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--color-bg-elevated) 94%, transparent);
+  box-shadow: var(--shadow-sm);
 }
 
 .tableScroll {
@@ -290,6 +380,60 @@
   text-transform: uppercase;
 }
 
+.assistancePanel {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 1rem;
+}
+
+.proposalGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.proposalBlock {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.proposalBlock h4 {
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.proposalList {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.proposalItem {
+  display: grid;
+  gap: 0.15rem;
+  border-left: 2px solid var(--color-border);
+  padding-left: 0.65rem;
+}
+
+.proposalItem span {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.proposalItem strong {
+  overflow-wrap: anywhere;
+}
+
+.proposalMeta {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+
 .tabsSpacer {
   display: grid;
   gap: 1rem;
@@ -334,6 +478,14 @@
   .formGridThree {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .wizardLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .wizardAside {
+    position: static;
+  }
 }
 
 @media (max-width: 760px) {
@@ -348,14 +500,21 @@
   }
 
   .headerActions,
-  .formActions {
+  .formActions,
+  .stickyActionBar {
     justify-content: stretch;
   }
 
   .filterBar,
   .formGrid,
   .formGridThree,
-  .detailsGrid {
+  .detailsGrid,
+  .proposalGrid {
     grid-template-columns: 1fr;
+  }
+
+  .stickyActionBar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

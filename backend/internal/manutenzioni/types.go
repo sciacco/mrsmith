@@ -109,6 +109,7 @@ type MaintenanceDetail struct {
 	Events            []MaintenanceEvent   `json:"events"`
 	CreatedAt         time.Time            `json:"created_at"`
 	UpdatedAt         time.Time            `json:"updated_at"`
+	Metadata          json.RawMessage      `json:"metadata,omitempty"`
 }
 
 type MaintenanceWindow struct {
@@ -317,6 +318,51 @@ type impactedCustomerRequest struct {
 	Confidence       *float64        `json:"confidence"`
 	Reason           *string         `json:"reason"`
 	Metadata         json.RawMessage `json:"metadata"`
+}
+
+type assistanceDraftRequest struct {
+	Regenerate bool    `json:"regenerate"`
+	Note       *string `json:"note"`
+}
+
+type assistanceTextProposal struct {
+	TitleIT           *string `json:"title_it,omitempty"`
+	TitleEN           *string `json:"title_en,omitempty"`
+	DescriptionIT     *string `json:"description_it,omitempty"`
+	DescriptionEN     *string `json:"description_en,omitempty"`
+	ReasonEN          *string `json:"reason_en,omitempty"`
+	ResidualServiceEN *string `json:"residual_service_en,omitempty"`
+}
+
+type assistanceClassificationProposal struct {
+	ReferenceID int64    `json:"reference_id"`
+	Label       string   `json:"label"`
+	Source      string   `json:"source"`
+	Confidence  *float64 `json:"confidence,omitempty"`
+	IsPrimary   bool     `json:"is_primary"`
+	Rationale   *string  `json:"rationale,omitempty"`
+}
+
+type assistanceAudit struct {
+	GeneratedAt time.Time `json:"generated_at"`
+	Model       string    `json:"model"`
+	Summary     string    `json:"summary"`
+}
+
+type assistanceUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
+type assistanceDraftResponse struct {
+	Texts           assistanceTextProposal             `json:"texts"`
+	ServiceTaxonomy []assistanceClassificationProposal `json:"service_taxonomy"`
+	ReasonClasses   []assistanceClassificationProposal `json:"reason_classes"`
+	ImpactEffects   []assistanceClassificationProposal `json:"impact_effects"`
+	QualityFlags    []assistanceClassificationProposal `json:"quality_flags"`
+	Audit           assistanceAudit                    `json:"audit"`
+	Usage           assistanceUsage                    `json:"usage"`
 }
 
 type noticeRequest struct {

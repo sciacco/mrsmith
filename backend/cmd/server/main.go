@@ -388,6 +388,7 @@ func main() {
 	manutenzioni.RegisterRoutes(api, manutenzioni.Deps{
 		Maintenance: manutenzioniDB,
 		Mistra:      mistraDB,
+		AI:          openrouterCli,
 		Logger:      logger,
 	})
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
