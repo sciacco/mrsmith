@@ -15,9 +15,51 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 )
 
-const maintenanceAssistanceModel = "google/gemini-2.5-flash-lite-preview-06-17"
-
 var errAssistanceDecode = errors.New("decode assistance response")
+
+type assistanceFailure struct {
+	err            error
+	scope          string
+	requestedModel string
+}
+
+func (e *assistanceFailure) Error() string {
+	return e.err.Error()
+}
+
+func (e *assistanceFailure) Unwrap() error {
+	return e.err
+}
+
+func wrapAssistanceFailure(err error, scope, requestedModel string) error {
+	if err == nil {
+		return nil
+	}
+	return &assistanceFailure{
+		err:            err,
+		scope:          scope,
+		requestedModel: requestedModel,
+	}
+}
+
+func logAssistanceFailure(ctx context.Context, message string, err error, attrs ...any) {
+	args := []any{
+		"component", "manutenzioni",
+		"request_id", logging.RequestID(ctx),
+	}
+	args = append(args, attrs...)
+	var failure *assistanceFailure
+	if errors.As(err, &failure) {
+		if failure.scope != "" {
+			args = append(args, "model_scope", failure.scope)
+		}
+		if failure.requestedModel != "" {
+			args = append(args, "requested_model", failure.requestedModel)
+		}
+	}
+	args = append(args, "error", err)
+	logging.FromContext(ctx).Error(message, args...)
+}
 
 type assistanceAIOutput struct {
 	Texts           assistanceTextProposal       `json:"texts"`
@@ -76,12 +118,11 @@ func (h *Handler) handleDraftAssistance(w http.ResponseWriter, r *http.Request) 
 	}
 	response, err := h.generateAssistanceDraft(r, detail, references, body)
 	if err != nil {
-		logging.FromContext(r.Context()).Error(
+		logAssistanceFailure(
+			r.Context(),
 			"maintenance assistance failed",
-			"component", "manutenzioni",
-			"request_id", logging.RequestID(r.Context()),
+			err,
 			"maintenance_id", id,
-			"error", err,
 		)
 		appError(w, http.StatusBadGateway, "assistance_generation_failed")
 		return
@@ -120,11 +161,10 @@ func (h *Handler) handlePreviewAssistance(w http.ResponseWriter, r *http.Request
 	draft := assistanceDraftRequest{Note: &brief, Regenerate: false}
 	response, err := h.generateAssistanceDraft(r, detail, references, draft)
 	if err != nil {
-		logging.FromContext(r.Context()).Error(
+		logAssistanceFailure(
+			r.Context(),
 			"maintenance assistance preview failed",
-			"component", "manutenzioni",
-			"request_id", logging.RequestID(r.Context()),
-			"error", err,
+			err,
 		)
 		appError(w, http.StatusBadGateway, "assistance_generation_failed")
 		return
@@ -213,12 +253,17 @@ func (h *Handler) loadAssistanceReferences(r *http.Request, maintenanceID int64)
 }
 
 func (h *Handler) generateAssistanceDraft(r *http.Request, detail MaintenanceDetail, refs assistanceReferenceBundle, body assistanceDraftRequest) (assistanceDraftResponse, error) {
+	modelScope := llmModelScopeAssistanceDraft
+	requestedModel, err := h.resolveLLMModel(r.Context(), modelScope)
+	if err != nil {
+		return assistanceDraftResponse{}, wrapAssistanceFailure(fmt.Errorf("resolve assistance model: %w", err), modelScope, "")
+	}
 	payload, err := json.MarshalIndent(buildAssistancePromptPayload(detail, refs, body), "", "  ")
 	if err != nil {
-		return assistanceDraftResponse{}, fmt.Errorf("marshal assistance payload: %w", err)
+		return assistanceDraftResponse{}, wrapAssistanceFailure(fmt.Errorf("marshal assistance payload: %w", err), modelScope, requestedModel)
 	}
 	request := openrouter.ChatRequest{
-		Model:       maintenanceAssistanceModel,
+		Model:       requestedModel,
 		Temperature: 0.2,
 		MaxTokens:   4096,
 		ResponseFormat: &openrouter.ResponseFormat{
@@ -234,13 +279,15 @@ func (h *Handler) generateAssistanceDraft(r *http.Request, detail MaintenanceDet
 	aiResponse, err := h.ai.Chat(r.Context(), request)
 	latencyMs := time.Since(start).Milliseconds()
 	if err != nil {
-		return assistanceDraftResponse{}, err
+		return assistanceDraftResponse{}, wrapAssistanceFailure(err, modelScope, requestedModel)
 	}
 	logging.FromContext(r.Context()).Info(
 		"maintenance assistance completion succeeded",
 		"component", "manutenzioni",
 		"request_id", logging.RequestID(r.Context()),
 		"maintenance_id", detail.MaintenanceID,
+		"model_scope", modelScope,
+		"requested_model", requestedModel,
 		"model", aiResponse.Model,
 		"latency_ms", latencyMs,
 		"prompt_tokens", aiResponse.Usage.PromptTokens,
@@ -250,7 +297,7 @@ func (h *Handler) generateAssistanceDraft(r *http.Request, detail MaintenanceDet
 
 	parsed, err := decodeAssistanceAIOutput(aiResponse.Content)
 	if err != nil {
-		return assistanceDraftResponse{}, err
+		return assistanceDraftResponse{}, wrapAssistanceFailure(err, modelScope, requestedModel)
 	}
 	parsed.Texts.TitleIT = cleanTextOrFallback(parsed.Texts.TitleIT, detail.TitleIT)
 	parsed.Texts.TitleEN = cleanText(parsed.Texts.TitleEN)

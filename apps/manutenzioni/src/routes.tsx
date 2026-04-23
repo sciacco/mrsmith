@@ -8,6 +8,7 @@ import { MaintenanceCreatePage } from './pages/MaintenanceCreatePage';
 import { MaintenanceDetailPage } from './pages/MaintenanceDetailPage';
 import { MaintenanceListPage } from './pages/MaintenanceListPage';
 import { ConfigurationIndexPage } from './pages/ConfigurationIndexPage';
+import { ConfigurationLLMModelsPage } from './pages/ConfigurationLLMModelsPage';
 import { ConfigurationResourcePage } from './pages/ConfigurationResourcePage';
 
 function RequireManager({ children }: { children: ReactElement }) {
@@ -35,6 +36,14 @@ export const routes: RouteObject[] = [
     element: (
       <RequireManager>
         <ConfigurationIndexPage />
+      </RequireManager>
+    ),
+  },
+  {
+    path: 'manutenzioni/configurazione/modelli-llm',
+    element: (
+      <RequireManager>
+        <ConfigurationLLMModelsPage />
       </RequireManager>
     ),
   },

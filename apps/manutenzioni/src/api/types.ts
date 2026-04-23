@@ -332,6 +332,11 @@ export interface MaintenanceAssistanceDraft {
   usage: AssistanceUsage;
 }
 
+export interface LLMModel {
+  scope: string;
+  model: string;
+}
+
 export interface AssistancePreviewRequest {
   brief: string;
   maintenance_kind_id?: number | null;

@@ -516,6 +516,12 @@
   font-size: 0.82rem;
 }
 
+.modelValue {
+  max-width: 42rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .actionsCell {
   text-align: right !important;
   white-space: nowrap;

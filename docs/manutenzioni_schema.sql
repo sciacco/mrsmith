@@ -315,6 +315,19 @@ on conflict (code) do update set
     name_en = excluded.name_en,
     sort_order = excluded.sort_order;
 
+create table maintenance.llm_model (
+    scope                         text primary key
+                                  check (scope ~ '^[a-z][a-z0-9_]*$'),
+    model                         text not null
+                                  check (btrim(model) <> '')
+);
+
+insert into maintenance.llm_model (scope, model)
+values
+    ('default', 'google/gemini-2.5-flash-lite-preview-06-17'),
+    ('assistance_draft', 'google/gemini-2.5-flash-lite-preview-06-17')
+on conflict (scope) do nothing;
+
 -- =========================
 -- 2) OGGETTO MANUTENZIONE
 -- =========================

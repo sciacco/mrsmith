@@ -397,6 +397,16 @@ type assistancePreviewResponse struct {
 	Usage              assistanceUsage                    `json:"usage"`
 }
 
+type LLMModel struct {
+	Scope string `json:"scope"`
+	Model string `json:"model"`
+}
+
+type llmModelRequest struct {
+	Scope string `json:"scope"`
+	Model string `json:"model"`
+}
+
 type noticeRequest struct {
 	MaintenanceWindowID *int64          `json:"maintenance_window_id"`
 	NoticeType          string          `json:"notice_type"`

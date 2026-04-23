@@ -140,6 +140,11 @@ export function errorMessage(error: unknown, fallback: string): string {
         sent_at_required: 'Indica la data di invio.',
         assistance_not_configured: 'Assistenza non disponibile. Puoi completare la bozza manualmente.',
         assistance_generation_failed: 'Assistenza non riuscita. Riprova o completa la bozza manualmente.',
+        invalid_llm_model_scope: 'Ambito non valido.',
+        llm_model_model_required: 'Indica il modello.',
+        llm_model_already_exists: 'Esiste già un modello con questo ambito.',
+        llm_model_scope_immutable: "L'ambito non può essere modificato.",
+        llm_model_not_found: 'Modello non trovato.',
       };
       return known[code] ?? fallback;
     }

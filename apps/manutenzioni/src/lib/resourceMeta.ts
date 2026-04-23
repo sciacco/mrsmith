@@ -10,7 +10,7 @@ export type ResourceKey =
   | 'target-types'
   | 'notice-channels';
 
-export type ResourceGroup = 'classification' | 'impact' | 'communications';
+export type ResourceGroup = 'classification' | 'impact' | 'communications' | 'automation';
 
 export type FieldRequirement = 'required' | 'optional' | 'hidden';
 
@@ -161,6 +161,7 @@ export const RESOURCE_GROUPS: Array<{ id: ResourceGroup; label: string }> = [
   { id: 'classification', label: 'Classificazione' },
   { id: 'impact', label: 'Impatto e servizi' },
   { id: 'communications', label: 'Comunicazioni' },
+  { id: 'automation', label: 'Automazioni' },
 ];
 
 export const RESOURCE_KEYS: ResourceKey[] = [
