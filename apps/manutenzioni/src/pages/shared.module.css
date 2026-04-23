@@ -114,10 +114,17 @@
 .label {
   display: grid;
   gap: 0.3rem;
+  align-self: start;
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.labelText {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
 }
 
 .formGrid {
@@ -154,7 +161,6 @@
 
 .required {
   color: var(--color-danger);
-  margin-left: 0.15rem;
 }
 
 .fieldInvalid {

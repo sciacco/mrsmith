@@ -533,7 +533,9 @@ function ConfigModal({
     >
       <div className={shared.formGrid}>
         <label className={shared.label}>
-          Codice<span className={shared.required}>*</span>
+          <span className={shared.labelText}>
+            Codice<span className={shared.required}>*</span>
+          </span>
           <input
             className={`${shared.field} ${errors.code ? shared.fieldInvalid : ''}`}
             value={form.code}
@@ -552,7 +554,9 @@ function ConfigModal({
           )}
         </label>
         <label className={shared.label}>
-          Nome (italiano)<span className={shared.required}>*</span>
+          <span className={shared.labelText}>
+            Nome (italiano)<span className={shared.required}>*</span>
+          </span>
           <input
             className={`${shared.field} ${errors.name_it ? shared.fieldInvalid : ''}`}
             value={form.name_it}
@@ -563,7 +567,7 @@ function ConfigModal({
         </label>
         {showNameEn ? (
           <label className={shared.label}>
-            Nome (inglese)
+            <span className={shared.labelText}>Nome (inglese)</span>
             <input
               className={shared.field}
               value={form.name_en}
@@ -573,7 +577,9 @@ function ConfigModal({
         ) : null}
         {showTechnicalDomain ? (
           <label className={shared.label}>
-            Dominio<span className={shared.required}>*</span>
+            <span className={shared.labelText}>
+              Dominio<span className={shared.required}>*</span>
+            </span>
             <select
               className={`${shared.select} ${errors.technical_domain_id ? shared.fieldInvalid : ''}`}
               value={form.technical_domain_id}
@@ -593,7 +599,9 @@ function ConfigModal({
         ) : null}
         {showCity ? (
           <label className={shared.label}>
-            Città<span className={shared.required}>*</span>
+            <span className={shared.labelText}>
+              Città<span className={shared.required}>*</span>
+            </span>
             <input
               className={`${shared.field} ${errors.city ? shared.fieldInvalid : ''}`}
               value={form.city}
@@ -604,7 +612,9 @@ function ConfigModal({
         ) : null}
         {showCountry ? (
           <label className={shared.label}>
-            Paese (ISO-2)<span className={shared.required}>*</span>
+            <span className={shared.labelText}>
+              Paese (ISO-2)<span className={shared.required}>*</span>
+            </span>
             <input
               className={`${shared.field} ${errors.country_code ? shared.fieldInvalid : ''}`}
               value={form.country_code}
@@ -617,8 +627,10 @@ function ConfigModal({
         ) : null}
         {showSortOrder ? (
           <label className={shared.label}>
-            Ordine di visualizzazione
-            {meta.fields.sort_order === 'required' ? <span className={shared.required}>*</span> : null}
+            <span className={shared.labelText}>
+              Ordine di visualizzazione
+              {meta.fields.sort_order === 'required' ? <span className={shared.required}>*</span> : null}
+            </span>
             <input
               className={`${shared.field} ${errors.sort_order ? shared.fieldInvalid : ''}`}
               type="number"
@@ -635,7 +647,7 @@ function ConfigModal({
           </label>
         ) : null}
         <label className={`${shared.label} ${shared.formGridSpan}`}>
-          Descrizione
+          <span className={shared.labelText}>Descrizione</span>
           <textarea
             className={shared.textarea}
             value={form.description}
@@ -644,7 +656,7 @@ function ConfigModal({
         </label>
         {item ? (
           <div className={`${shared.label} ${shared.formGridSpan}`}>
-            Stato
+            <span className={shared.labelText}>Stato</span>
             <div style={{ marginTop: '0.25rem' }}>
               <ToggleSwitch
                 id={`config-active-${item.id}`}
