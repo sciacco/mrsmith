@@ -35,6 +35,18 @@ All components in `packages/ui/` consume theme variables, making them theme-agno
 
 ### 3.1 Clean Theme (Mini-Apps)
 
+**Global Mini-App Background:**
+
+Every clean mini-app `global.css` body should use the approved Quotes-style page background:
+
+```css
+background:
+  radial-gradient(circle at top left, rgba(99, 91, 255, 0.06), transparent 28%),
+  linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+```
+
+This background gradient is the default mini-app page background. Override it only when an explicit product-specific design review approves a different background treatment.
+
 **Backgrounds & Surfaces:**
 | Token | Value | Usage |
 |-------|-------|-------|
@@ -398,6 +410,7 @@ All buttons: `border-radius: 999px` (pill), `min-height: 2.75rem`, `font-weight:
 - **Border:** 1.5px, transitions on focus
 - **Focus:** 3px accent glow ring + background shift
 - **Labels:** 0.75rem uppercase, weight 600, letter-spacing 0.06em
+- **Required fields:** Do not render a literal `*`. Use a small red dot marker next to the label, styled with `--color-danger` and optionally `--color-danger-subtle`. The visual dot must be `aria-hidden="true"` and paired with hidden text such as `obbligatorio`, or an equivalent `aria-label`/description. Keep native `required` and validation behavior on the control; the dot is only the visual affordance.
 
 ### Toggle Switch
 - **Size:** 44x24px
@@ -486,6 +499,11 @@ All buttons: `border-radius: 999px` (pill), `min-height: 2.75rem`, `font-weight:
 - **CSS Custom Properties** — theming via `:root[data-theme]`
 - **No Tailwind** — all styles are hand-authored CSS
 - **No CSS-in-JS** — pure CSS with module scoping
+
+### Token Discipline
+- App-local CSS must use theme tokens for colors, radii, shadows, spacing, typography, and focus rings.
+- Avoid hardcoded literals such as `8px`, `999px`, `#fff`, raw accent colors, and one-off shadow values when an existing token exists.
+- If no token exists for a needed value, add or extend a token first. The only allowed literal color/radius exceptions are documented global recipes, such as the approved mini-app background gradient.
 
 ### Naming Conventions
 - Component root class matches component name (e.g., `.card`, `.header`)
