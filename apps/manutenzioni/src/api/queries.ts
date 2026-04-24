@@ -18,6 +18,8 @@ import type {
   PagedResponse,
   ReferenceData,
   ReferenceItem,
+  ServiceDependency,
+  ServiceDependencyBody,
   TargetBody,
   WindowBody,
 } from './types';
@@ -33,6 +35,8 @@ const queryKeys = {
   configUsage: (resource: string, id: number) =>
     ['manutenzioni', 'config-usage', resource, id] as const,
   llmModels: () => ['manutenzioni', 'llm-models'] as const,
+  serviceDependencies: (active: string, q: string) =>
+    ['manutenzioni', 'service-dependencies', active, q] as const,
 };
 
 export type ConfigResourceCounts = { active: number; inactive: number };
@@ -455,6 +459,47 @@ export function useLLMModelMutations() {
           `/manutenzioni/v1/llm-models/${encodeURIComponent(scope)}`,
           { scope, model },
         ),
+      onSuccess: invalidate,
+    }),
+  };
+}
+
+export function useServiceDependencies(active = 'active', q = '') {
+  const api = useManutenzioniApiClient();
+  return useQuery({
+    queryKey: queryKeys.serviceDependencies(active, q),
+    queryFn: () =>
+      api.get<ServiceDependency[]>(
+        `/manutenzioni/v1/service-dependencies?active=${encodeURIComponent(active)}&q=${encodeURIComponent(q)}`,
+      ),
+  });
+}
+
+export function useServiceDependencyMutations() {
+  const api = useManutenzioniApiClient();
+  const queryClient = useQueryClient();
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'service-dependencies'] });
+  };
+  return {
+    create: useMutation({
+      mutationFn: (body: ServiceDependencyBody) =>
+        api.post<ServiceDependency>('/manutenzioni/v1/service-dependencies', body),
+      onSuccess: invalidate,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, body }: { id: number; body: ServiceDependencyBody }) =>
+        api.patch<ServiceDependency>(`/manutenzioni/v1/service-dependencies/${id}`, body),
+      onSuccess: invalidate,
+    }),
+    deactivate: useMutation({
+      mutationFn: (id: number) =>
+        api.post<ServiceDependency>(`/manutenzioni/v1/service-dependencies/${id}/deactivate`),
+      onSuccess: invalidate,
+    }),
+    reactivate: useMutation({
+      mutationFn: (id: number) =>
+        api.post<ServiceDependency>(`/manutenzioni/v1/service-dependencies/${id}/reactivate`),
       onSuccess: invalidate,
     }),
   };

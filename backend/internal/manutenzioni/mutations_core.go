@@ -392,6 +392,18 @@ func (h *Handler) handleMaintenanceStatus(w http.ResponseWriter, r *http.Request
 		appError(w, http.StatusBadRequest, "maintenance_window_required")
 		return
 	}
+	if body.Action == "approve" || body.Action == "schedule" || body.Action == "announce" || body.Action == "start" {
+		if err := h.validateImpactReadyTx(r, tx, id); errors.Is(err, errBadRequest) {
+			appError(w, http.StatusBadRequest, "impact_selection_required")
+			return
+		} else if errors.Is(err, errAudienceRequired) {
+			appError(w, http.StatusBadRequest, "service_audience_required")
+			return
+		} else if err != nil {
+			h.dbFailure(w, r, "status_impact_validation", err, "maintenance_id", id)
+			return
+		}
+	}
 	if body.Action == "cancel" && (current == StatusScheduled || current == StatusAnnounced) && strings.TrimSpace(stringValue(body.ReasonIT)) == "" {
 		appError(w, http.StatusBadRequest, "cancellation_reason_required")
 		return
@@ -420,6 +432,45 @@ func (h *Handler) handleMaintenanceStatus(w http.ResponseWriter, r *http.Request
 		return
 	}
 	respondMutationDetail(h, w, r, id, http.StatusOK)
+}
+
+var errAudienceRequired = errors.New("audience required")
+
+func (h *Handler) validateImpactReadyTx(r *http.Request, tx *sql.Tx, maintenanceID int64) error {
+	var selected bool
+	if err := tx.QueryRowContext(
+		r.Context(),
+		`SELECT EXISTS (
+			SELECT 1 FROM maintenance.maintenance_service_taxonomy WHERE maintenance_id = $1
+			UNION ALL
+			SELECT 1 FROM maintenance.maintenance_target WHERE maintenance_id = $1
+		)`,
+		maintenanceID,
+	).Scan(&selected); err != nil {
+		return err
+	}
+	if !selected {
+		return errBadRequest
+	}
+	var unresolved bool
+	if err := tx.QueryRowContext(
+		r.Context(),
+		`SELECT EXISTS (
+			SELECT 1
+			FROM maintenance.maintenance_service_taxonomy mst
+			JOIN maintenance.service_taxonomy st ON st.service_taxonomy_id = mst.service_taxonomy_id
+			WHERE mst.maintenance_id = $1
+				AND st.audience = 'maintenance'
+				AND mst.expected_audience IS NULL
+		)`,
+		maintenanceID,
+	).Scan(&unresolved); err != nil {
+		return err
+	}
+	if unresolved {
+		return errAudienceRequired
+	}
+	return nil
 }
 
 func nextStatus(current string, action string) (string, string, string, bool) {

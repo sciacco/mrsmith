@@ -136,19 +136,24 @@ type MaintenanceWindow struct {
 }
 
 type ClassificationItem struct {
-	ID            int64           `json:"id"`
-	MaintenanceID int64           `json:"maintenance_id"`
-	Reference     ReferenceItem   `json:"reference"`
-	Source        string          `json:"source"`
-	Confidence    *float64        `json:"confidence,omitempty"`
-	IsPrimary     bool            `json:"is_primary"`
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
+	ID               int64           `json:"id"`
+	MaintenanceID    int64           `json:"maintenance_id"`
+	Reference        ReferenceItem   `json:"reference"`
+	Source           string          `json:"source"`
+	Confidence       *float64        `json:"confidence,omitempty"`
+	IsPrimary        bool            `json:"is_primary"`
+	Role             *string         `json:"role,omitempty"`
+	ExpectedSeverity *string         `json:"expected_severity,omitempty"`
+	ExpectedAudience *string         `json:"expected_audience,omitempty"`
+	Metadata         json.RawMessage `json:"metadata,omitempty"`
 }
 
 type MaintenanceTarget struct {
 	MaintenanceTargetID int64           `json:"maintenance_target_id"`
 	MaintenanceID       int64           `json:"maintenance_id"`
 	TargetType          ReferenceItem   `json:"target_type"`
+	ServiceTaxonomyID   *int64          `json:"service_taxonomy_id,omitempty"`
+	ServiceTaxonomy     *ReferenceItem  `json:"service_taxonomy,omitempty"`
 	ReferenceTable      *string         `json:"reference_table,omitempty"`
 	ReferenceID         *int64          `json:"reference_id,omitempty"`
 	ExternalKey         *string         `json:"external_key,omitempty"`
@@ -300,11 +305,15 @@ type cancelWindowRequest struct {
 }
 
 type classificationInput struct {
-	ReferenceID int64           `json:"reference_id"`
-	Source      string          `json:"source"`
-	Confidence  *float64        `json:"confidence"`
-	IsPrimary   bool            `json:"is_primary"`
-	Metadata    json.RawMessage `json:"metadata"`
+	ReferenceID       int64           `json:"reference_id"`
+	ServiceTaxonomyID int64           `json:"service_taxonomy_id"`
+	Source            string          `json:"source"`
+	Confidence        *float64        `json:"confidence"`
+	IsPrimary         bool            `json:"is_primary"`
+	Role              string          `json:"role"`
+	ExpectedSeverity  string          `json:"expected_severity"`
+	ExpectedAudience  *string         `json:"expected_audience"`
+	Metadata          json.RawMessage `json:"metadata"`
 }
 
 type classificationRequest struct {
@@ -312,15 +321,41 @@ type classificationRequest struct {
 }
 
 type targetRequest struct {
-	TargetTypeID   int64           `json:"target_type_id"`
-	ReferenceTable *string         `json:"reference_table"`
-	ReferenceID    *int64          `json:"reference_id"`
-	ExternalKey    *string         `json:"external_key"`
-	DisplayName    string          `json:"display_name"`
-	Source         string          `json:"source"`
-	Confidence     *float64        `json:"confidence"`
-	IsPrimary      bool            `json:"is_primary"`
-	Metadata       json.RawMessage `json:"metadata"`
+	TargetTypeID      int64           `json:"target_type_id"`
+	ServiceTaxonomyID *int64          `json:"service_taxonomy_id"`
+	ReferenceTable    *string         `json:"reference_table"`
+	ReferenceID       *int64          `json:"reference_id"`
+	ExternalKey       *string         `json:"external_key"`
+	DisplayName       string          `json:"display_name"`
+	Source            string          `json:"source"`
+	Confidence        *float64        `json:"confidence"`
+	IsPrimary         bool            `json:"is_primary"`
+	Metadata          json.RawMessage `json:"metadata"`
+}
+
+type ServiceDependency struct {
+	ServiceDependencyID int64           `json:"service_dependency_id"`
+	UpstreamServiceID   int64           `json:"upstream_service_id"`
+	UpstreamService     ReferenceItem   `json:"upstream_service"`
+	DownstreamServiceID int64           `json:"downstream_service_id"`
+	DownstreamService   ReferenceItem   `json:"downstream_service"`
+	DependencyType      string          `json:"dependency_type"`
+	IsRedundant         bool            `json:"is_redundant"`
+	DefaultSeverity     string          `json:"default_severity"`
+	Source              string          `json:"source"`
+	IsActive            bool            `json:"is_active"`
+	Metadata            json.RawMessage `json:"metadata,omitempty"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+type serviceDependencyRequest struct {
+	UpstreamServiceID   int64           `json:"upstream_service_id"`
+	DownstreamServiceID int64           `json:"downstream_service_id"`
+	DependencyType      string          `json:"dependency_type"`
+	IsRedundant         bool            `json:"is_redundant"`
+	DefaultSeverity     string          `json:"default_severity"`
+	Metadata            json.RawMessage `json:"metadata"`
 }
 
 type impactedCustomerRequest struct {

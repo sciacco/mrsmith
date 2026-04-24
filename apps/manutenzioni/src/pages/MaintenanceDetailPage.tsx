@@ -42,6 +42,8 @@ import {
   noticeTypeLabel,
   parsePositiveId,
   sendStatusLabel,
+  serviceRoleLabel,
+  severityLabel,
   sourceLabel,
   statusLabel,
   windowStatusLabel,
@@ -902,6 +904,10 @@ function ClassificationSection({
   const toast = useToast();
   const [selected, setSelected] = useState('');
   const [isPrimary, setIsPrimary] = useState(false);
+  const [role, setRole] = useState<'operated' | 'dependent'>('operated');
+  const [severity, setSeverity] = useState<'none' | 'degraded' | 'unavailable'>('unavailable');
+  const [audience, setAudience] = useState('');
+  const isServiceSection = resource === 'service-taxonomy';
 
   async function add() {
     if (!selected) return;
@@ -910,12 +916,26 @@ function ClassificationSection({
       source: item.source,
       confidence: item.confidence ?? null,
       is_primary: primary ? item.is_primary && !isPrimary : false,
+      role: item.role ?? undefined,
+      expected_severity: item.expected_severity ?? undefined,
+      expected_audience: item.expected_audience ?? null,
     }));
-    next.push({ reference_id: Number(selected), source: 'manual', is_primary: primary ? isPrimary : false });
+    next.push({
+      reference_id: Number(selected),
+      service_taxonomy_id: Number(selected),
+      source: 'manual',
+      is_primary: primary ? isPrimary : false,
+      role: isServiceSection ? role : undefined,
+      expected_severity: isServiceSection ? severity : undefined,
+      expected_audience: isServiceSection ? (audience || null) as 'internal' | 'external' | 'both' | null : null,
+    });
     try {
       await mutation.mutateAsync(next);
       setSelected('');
       setIsPrimary(false);
+      setRole('operated');
+      setSeverity('unavailable');
+      setAudience('');
       toast.toast('Classificazione aggiornata.');
     } catch (error) {
       toast.toast(errorMessage(error, 'Aggiornamento non riuscito.'), 'error');
@@ -943,18 +963,52 @@ function ClassificationSection({
               <input type="checkbox" checked={isPrimary} onChange={(event) => setIsPrimary(event.target.checked)} />
             </label>
           )}
+          {isServiceSection && (
+            <>
+              <select className={shared.select} value={role} onChange={(event) => setRole(event.target.value as typeof role)}>
+                <option value="operated">Operato</option>
+                <option value="dependent">Impattato</option>
+              </select>
+              <select className={shared.select} value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}>
+                <option value="none">Nessun impatto</option>
+                <option value="degraded">Degradato</option>
+                <option value="unavailable">Non disponibile</option>
+              </select>
+              <select className={shared.select} value={audience} onChange={(event) => setAudience(event.target.value)}>
+                <option value="">Audience catalogo</option>
+                <option value="internal">Interna</option>
+                <option value="external">Esterna</option>
+                <option value="both">Interna ed esterna</option>
+              </select>
+            </>
+          )}
           <Button onClick={add} loading={mutation.isPending}>
             Aggiungi
           </Button>
         </div>
       )}
       <SimpleTable
-        headers={['Valore', 'Origine', 'Confidenza', 'Principale']}
+        headers={
+          isServiceSection
+            ? ['Valore', 'Ruolo', 'Severità', 'Audience', 'Origine', 'Principale']
+            : ['Valore', 'Origine', 'Confidenza', 'Principale']
+        }
         rows={items.map((item) => [
-          item.reference.name_it,
-          sourceLabel(item.source),
-          confidenceLabel(item.confidence),
-          item.is_primary ? 'Sì' : '-',
+          ...(isServiceSection
+            ? [
+                item.reference.name_it,
+                serviceRoleLabel(item.role),
+                severityLabel(item.expected_severity),
+                item.expected_audience ? audienceLabel(item.expected_audience) : audienceLabel(item.reference.audience ?? ''),
+                sourceLabel(item.source),
+                item.is_primary ? 'Sì' : '-',
+              ]
+            : [
+                item.reference.name_it,
+                sourceLabel(item.source),
+                confidenceLabel(item.confidence),
+                item.is_primary ? 'Sì' : '-',
+              ]),
         ])}
         empty="Nessun valore registrato."
       />
@@ -976,6 +1030,7 @@ function TargetsTab({
   const [removeId, setRemoveId] = useState<number | null>(null);
   const [form, setForm] = useState<TargetBody>({
     target_type_id: 0,
+    service_taxonomy_id: null,
     display_name: '',
     source: 'manual',
     is_primary: false,
@@ -988,7 +1043,7 @@ function TargetsTab({
     }
     try {
       await mutations.create.mutateAsync(form);
-      setForm({ target_type_id: 0, display_name: '', source: 'manual', is_primary: false });
+      setForm({ target_type_id: 0, service_taxonomy_id: null, display_name: '', source: 'manual', is_primary: false });
       toast.toast('Target aggiunto.');
     } catch (error) {
       toast.toast(errorMessage(error, 'Salvataggio target non riuscito.'), 'error');
@@ -1020,6 +1075,20 @@ function TargetsTab({
             onChange={(event) => setForm({ ...form, display_name: event.target.value })}
             placeholder="Nome target"
           />
+          <select
+            className={shared.select}
+            value={form.service_taxonomy_id ?? ''}
+            onChange={(event) =>
+              setForm({ ...form, service_taxonomy_id: event.target.value ? Number(event.target.value) : null })
+            }
+          >
+            <option value="">Servizio collegato</option>
+            {reference.service_taxonomy.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name_it}
+              </option>
+            ))}
+          </select>
           <Button onClick={save} loading={mutations.create.isPending}>
             Aggiungi
           </Button>
@@ -1032,6 +1101,7 @@ function TargetsTab({
               <tr>
                 <th>Nome</th>
                 <th>Tipo</th>
+                <th>Servizio</th>
                 <th>Origine</th>
                 <th>Principale</th>
                 <th className={shared.actionsCell}>Azioni</th>
@@ -1040,13 +1110,14 @@ function TargetsTab({
             <tbody>
               {detail.targets.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>Nessun target registrato.</td>
+                  <td colSpan={6}>Nessun target registrato.</td>
                 </tr>
               ) : (
                 detail.targets.map((item) => (
                   <tr key={item.maintenance_target_id}>
                     <td>{item.display_name}</td>
                     <td>{item.target_type.name_it}</td>
+                    <td>{item.service_taxonomy?.name_it ?? '-'}</td>
                     <td>{sourceLabel(item.source)}</td>
                     <td>{item.is_primary ? 'Sì' : '-'}</td>
                     <td className={shared.actionsCell}>

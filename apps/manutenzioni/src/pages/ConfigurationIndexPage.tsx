@@ -1,6 +1,6 @@
 import { Icon } from '@mrsmith/ui';
 import { Link } from 'react-router-dom';
-import { useConfigSummary, useLLMModels, type ConfigSummary } from '../api/queries';
+import { useConfigSummary, useLLMModels, useServiceDependencies, type ConfigSummary } from '../api/queries';
 import { errorMessage } from '../lib/format';
 import {
   RESOURCE_GROUPS,
@@ -59,6 +59,7 @@ function ResourceGroupSection({
     (meta) => meta.group === group.id && !meta.hiddenFromIndex,
   );
   const isAutomationGroup = group.id === 'automation';
+  const isImpactGroup = group.id === 'impact';
   const hasDomainsCard = items.some((meta) => meta.key === 'technical-domains');
   return (
     <div className={styles.group}>
@@ -73,6 +74,7 @@ function ResourceGroupSection({
             loading={summaryLoading}
           />
         ))}
+        {isImpactGroup ? <DependencyGraphCard /> : null}
         {isAutomationGroup ? <LLMModelsCard /> : null}
       </div>
       {hasDomainsCard ? (
@@ -84,6 +86,41 @@ function ResourceGroupSection({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function DependencyGraphCard() {
+  const dependencies = useServiceDependencies('all');
+  const active = dependencies.data?.filter((item) => item.is_active).length ?? 0;
+  const inactive = dependencies.data?.filter((item) => !item.is_active).length ?? 0;
+  const isEmpty = !dependencies.isLoading && !dependencies.error && active + inactive === 0;
+  return (
+    <Link to="/manutenzioni/configurazione/dipendenze" className={styles.card}>
+      <div className={styles.cardHeader}>
+        <h3 className={styles.cardTitle}>Grafo dipendenze</h3>
+        {isEmpty ? (
+          <span className={styles.emptyBadge}>
+            <Icon name="triangle-alert" size={12} />
+            Da configurare
+          </span>
+        ) : null}
+      </div>
+      <p className={styles.cardDescription}>Relazioni tra servizi usate per suggerire gli impatti.</p>
+      <div className={styles.cardFooter}>
+        {dependencies.isLoading ? (
+          <span className={styles.counterSkeleton} aria-hidden="true" />
+        ) : dependencies.error ? (
+          <span className={styles.counters}>—</span>
+        ) : (
+          <span className={styles.counters}>
+            {active} attive
+            <span className={styles.dot}>·</span>
+            {inactive} non attive
+          </span>
+        )}
+        <Icon name="chevron-right" size={18} className={styles.chevron} />
+      </div>
+    </Link>
   );
 }
 

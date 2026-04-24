@@ -106,12 +106,17 @@ export interface ClassificationItem {
   source: string;
   confidence?: number | null;
   is_primary: boolean;
+  role?: 'operated' | 'dependent' | null;
+  expected_severity?: SeverityValue | null;
+  expected_audience?: AudienceOverride | null;
 }
 
 export interface MaintenanceTarget {
   maintenance_target_id: number;
   maintenance_id: number;
   target_type: ReferenceItem;
+  service_taxonomy_id?: number | null;
+  service_taxonomy?: ReferenceItem | null;
   reference_table?: string | null;
   reference_id?: number | null;
   external_key?: string | null;
@@ -250,6 +255,7 @@ export interface MaintenanceFormBody {
   residual_service_it?: string | null;
   residual_service_en?: string | null;
   first_window?: WindowBody | null;
+  initial_targets?: TargetBody[];
   initial_service_taxonomy?: ClassificationInput[];
   initial_reason_classes?: ClassificationInput[];
   initial_impact_effects?: ClassificationInput[];
@@ -263,14 +269,19 @@ export interface MaintenancePatchBody extends Partial<MaintenanceFormBody> {
 
 export interface ClassificationInput {
   reference_id: number;
+  service_taxonomy_id?: number;
   source?: string;
   confidence?: number | null;
   is_primary?: boolean;
+  role?: 'operated' | 'dependent';
+  expected_severity?: SeverityValue;
+  expected_audience?: AudienceOverride | null;
   metadata?: JsonObject | null;
 }
 
 export interface TargetBody {
   target_type_id: number;
+  service_taxonomy_id?: number | null;
   reference_table?: string | null;
   reference_id?: number | null;
   external_key?: string | null;
@@ -380,4 +391,32 @@ export interface NoticeBody {
 export interface CustomerSearchItem {
   id: number;
   name: string;
+}
+
+export type SeverityValue = 'none' | 'degraded' | 'unavailable';
+export type AudienceOverride = 'internal' | 'external' | 'both';
+
+export interface ServiceDependency {
+  service_dependency_id: number;
+  upstream_service_id: number;
+  upstream_service: ReferenceItem;
+  downstream_service_id: number;
+  downstream_service: ReferenceItem;
+  dependency_type: 'runs_on' | 'connects_through' | 'consumes' | 'depends_on';
+  is_redundant: boolean;
+  default_severity: SeverityValue;
+  source: string;
+  is_active: boolean;
+  metadata?: JsonObject;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServiceDependencyBody {
+  upstream_service_id: number;
+  downstream_service_id: number;
+  dependency_type: ServiceDependency['dependency_type'];
+  is_redundant: boolean;
+  default_severity: SeverityValue;
+  metadata?: JsonObject | null;
 }

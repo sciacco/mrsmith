@@ -1,0 +1,143 @@
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.35fr);
+  gap: 1rem;
+}
+
+.filterBar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.master,
+.detail {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-elevated);
+  min-width: 0;
+}
+
+.master {
+  overflow: hidden;
+}
+
+.masterHeader,
+.detailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.masterList {
+  display: grid;
+  max-height: 58vh;
+  overflow: auto;
+}
+
+.masterRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 0.85rem 1rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.masterRow:hover,
+.masterRowActive {
+  background: var(--color-surface);
+}
+
+.rowTitle {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.rowTitle strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.detail {
+  padding-bottom: 1rem;
+}
+
+.detailBody {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.dependencyList {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.dependencyRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  align-items: center;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  padding: 0.8rem;
+  background: var(--color-surface);
+}
+
+.metaLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+
+.formPanel {
+  display: grid;
+  gap: 0.8rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  padding: 0.9rem;
+  background: var(--color-bg-elevated);
+}
+
+.inlineCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 920px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .filterBar {
+    grid-template-columns: 1fr;
+  }
+
+  .masterList {
+    max-height: none;
+  }
+}

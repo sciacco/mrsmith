@@ -465,7 +465,7 @@ func (h *Handler) handleReplaceNoticeQualityFlags(w http.ResponseWriter, r *http
 		}
 		seen[item.ReferenceID] = struct{}{}
 		source := normalizeSource(item.Source)
-		if !validClassificationSource(source) || (item.Confidence != nil && (*item.Confidence < 0 || *item.Confidence > 1)) {
+		if !validClassificationSource(qualityFlagClass, source) || (item.Confidence != nil && (*item.Confidence < 0 || *item.Confidence > 1)) {
 			appError(w, http.StatusBadRequest, "invalid_notice_quality_flag")
 			return
 		}

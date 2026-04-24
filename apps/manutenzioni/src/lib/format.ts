@@ -50,9 +50,37 @@ export function sourceLabel(source: string): string {
     ai_extracted: 'AI',
     ai: 'AI',
     catalog_mapping: 'Catalogo',
+    dependency_graph: 'Grafo servizi',
     hybrid: 'Ibrido',
   };
   return labels[source] ?? source;
+}
+
+export function serviceRoleLabel(role?: string | null): string {
+  const labels: Record<string, string> = {
+    operated: 'Operato',
+    dependent: 'Impattato',
+  };
+  return role ? labels[role] ?? role : '-';
+}
+
+export function severityLabel(value?: string | null): string {
+  const labels: Record<string, string> = {
+    none: 'Nessun impatto',
+    degraded: 'Degradato',
+    unavailable: 'Non disponibile',
+  };
+  return value ? labels[value] ?? value : '-';
+}
+
+export function dependencyTypeLabel(value?: string | null): string {
+  const labels: Record<string, string> = {
+    runs_on: 'Ospita',
+    connects_through: 'Transita da',
+    consumes: 'Consuma',
+    depends_on: 'Dipende da',
+  };
+  return value ? labels[value] ?? value : '-';
 }
 
 export function impactScopeLabel(scope: string): string {

@@ -70,6 +70,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	access("GET /manutenzioni/v1/maintenances/{id}", h.handleGetMaintenance)
 	access("GET /manutenzioni/v1/maintenances/{id}/events", h.handleGetEvents)
 	access("GET /manutenzioni/v1/reference-data", h.handleReferenceData)
+	access("GET /manutenzioni/v1/service-dependencies", h.handleListServiceDependencies)
 
 	manager("GET /manutenzioni/v1/customers", h.handleSearchCustomers)
 	manager("POST /manutenzioni/v1/maintenances", h.handleCreateMaintenance)
@@ -102,18 +103,24 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	manager("POST /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/status", h.handleNoticeStatus)
 	manager("PUT /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/quality-flags", h.handleReplaceNoticeQualityFlags)
 
-	manager("GET /manutenzioni/v1/llm-models", h.handleListLLMModels)
-	manager("POST /manutenzioni/v1/llm-models", h.handleCreateLLMModel)
-	manager("PATCH /manutenzioni/v1/llm-models/{scope}", h.handleUpdateLLMModel)
+	action("GET /manutenzioni/v1/llm-models", h.handleListLLMModels)
+	action("POST /manutenzioni/v1/llm-models", h.handleCreateLLMModel)
+	action("PATCH /manutenzioni/v1/llm-models/{scope}", h.handleUpdateLLMModel)
 
-	manager("GET /manutenzioni/v1/config/summary", h.handleConfigSummary)
-	manager("GET /manutenzioni/v1/config/{resource}", h.handleListConfig)
-	manager("POST /manutenzioni/v1/config/{resource}", h.handleCreateConfig)
-	manager("POST /manutenzioni/v1/config/{resource}/reorder", h.handleReorderConfig)
-	manager("PATCH /manutenzioni/v1/config/{resource}/{id}", h.handleUpdateConfig)
-	manager("POST /manutenzioni/v1/config/{resource}/{id}/deactivate", h.handleDeactivateConfig)
-	manager("POST /manutenzioni/v1/config/{resource}/{id}/reactivate", h.handleReactivateConfig)
-	manager("GET /manutenzioni/v1/config/{resource}/{id}/usage", h.handleConfigUsage)
+	action("GET /manutenzioni/v1/service-dependencies/{id}", h.handleGetServiceDependency)
+	action("POST /manutenzioni/v1/service-dependencies", h.handleCreateServiceDependency)
+	action("PATCH /manutenzioni/v1/service-dependencies/{id}", h.handleUpdateServiceDependency)
+	action("POST /manutenzioni/v1/service-dependencies/{id}/deactivate", h.handleDeactivateServiceDependency)
+	action("POST /manutenzioni/v1/service-dependencies/{id}/reactivate", h.handleReactivateServiceDependency)
+
+	action("GET /manutenzioni/v1/config/summary", h.handleConfigSummary)
+	action("GET /manutenzioni/v1/config/{resource}", h.handleListConfig)
+	action("POST /manutenzioni/v1/config/{resource}", h.handleCreateConfig)
+	action("POST /manutenzioni/v1/config/{resource}/reorder", h.handleReorderConfig)
+	action("PATCH /manutenzioni/v1/config/{resource}/{id}", h.handleUpdateConfig)
+	action("POST /manutenzioni/v1/config/{resource}/{id}/deactivate", h.handleDeactivateConfig)
+	action("POST /manutenzioni/v1/config/{resource}/{id}/reactivate", h.handleReactivateConfig)
+	action("GET /manutenzioni/v1/config/{resource}/{id}/usage", h.handleConfigUsage)
 }
 
 func combineRoles(groups ...[]string) []string {

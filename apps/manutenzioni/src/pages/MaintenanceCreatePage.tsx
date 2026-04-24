@@ -5,13 +5,18 @@ import {
   useCreateMaintenance,
   useMaintenanceAssistancePreview,
   useReferenceData,
+  useServiceDependencies,
 } from '../api/queries';
 import type {
   AdhocSiteInput,
   AssistancePreviewResponse,
+  AudienceOverride,
   ClassificationInput,
   MaintenanceFormBody,
   ReferenceItem,
+  ServiceDependency,
+  SeverityValue,
+  TargetBody,
   WindowBody,
 } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -32,7 +37,8 @@ interface FormState {
   customer_scope_id: string;
   site_id: string;
   adhoc_site: AdhocSiteInput | null;
-  service_taxonomy_ids: number[];
+  service_selections: ServiceSelection[];
+  manual_targets: ManualTarget[];
   reason_class_ids: number[];
   impact_effect_ids: number[];
   quality_flag_ids: number[];
@@ -40,6 +46,21 @@ interface FormState {
   scheduled_start_at: string;
   scheduled_end_at: string;
   expected_downtime_minutes: string;
+}
+
+interface ServiceSelection {
+  service_taxonomy_id: number;
+  role: 'operated' | 'dependent';
+  expected_severity: SeverityValue;
+  expected_audience: AudienceOverride | null;
+  source: 'manual' | 'dependency_graph' | 'ai_extracted';
+}
+
+interface ManualTarget {
+  id: string;
+  target_type_id: number;
+  display_name: string;
+  service_taxonomy_id: number | null;
 }
 
 const initialForm: FormState = {
@@ -50,7 +71,8 @@ const initialForm: FormState = {
   customer_scope_id: '',
   site_id: '',
   adhoc_site: null,
-  service_taxonomy_ids: [],
+  service_selections: [],
+  manual_targets: [],
   reason_class_ids: [],
   impact_effect_ids: [],
   quality_flag_ids: [],
@@ -71,6 +93,7 @@ export function MaintenanceCreatePage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const reference = useReferenceData();
+  const dependencies = useServiceDependencies('active');
   const create = useCreateMaintenance();
   const assistancePreview = useMaintenanceAssistancePreview();
   const [form, setForm] = useState<FormState>(initialForm);
@@ -80,6 +103,13 @@ export function MaintenanceCreatePage() {
   const [aiError, setAiError] = useState<string | null>(null);
   const [preAiSnapshot, setPreAiSnapshot] = useState<FormState | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [checkedSuggestions, setCheckedSuggestions] = useState<Record<number, boolean>>({});
+  const [targetDraft, setTargetDraft] = useState<ManualTarget>({
+    id: '',
+    target_type_id: 0,
+    display_name: '',
+    service_taxonomy_id: null,
+  });
   const formRef = useRef<HTMLDivElement>(null);
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initialForm), [form]);
 
@@ -99,6 +129,25 @@ export function MaintenanceCreatePage() {
     if (!selectedDomainId) return items;
     return items.filter((item) => item.technical_domain_id === selectedDomainId);
   }, [reference.data?.service_taxonomy, selectedDomainId]);
+  const operatedIds = useMemo(
+    () => form.service_selections.filter((item) => item.role === 'operated').map((item) => item.service_taxonomy_id),
+    [form.service_selections],
+  );
+  const impactedIds = useMemo(
+    () => form.service_selections.filter((item) => item.role === 'dependent').map((item) => item.service_taxonomy_id),
+    [form.service_selections],
+  );
+  const directSuggestions = useMemo(() => {
+    const selected = new Set(form.service_selections.map((item) => item.service_taxonomy_id));
+    const operated = new Set(operatedIds);
+    return (dependencies.data ?? [])
+      .filter((item) => operated.has(item.upstream_service_id) && !selected.has(item.downstream_service_id))
+      .sort((a, b) => a.downstream_service.name_it.localeCompare(b.downstream_service.name_it));
+  }, [dependencies.data, form.service_selections, operatedIds]);
+  const transitivePreview = useMemo(
+    () => dependencyPreview(operatedIds, dependencies.data ?? [], form.service_selections),
+    [dependencies.data, form.service_selections, operatedIds],
+  );
 
   const missing = useMemo(() => {
     const reasons: string[] = [];
@@ -119,19 +168,21 @@ export function MaintenanceCreatePage() {
     setForm((current) => {
       const domainId = value ? Number(value) : null;
       const nextServices = domainId
-        ? current.service_taxonomy_ids.filter((id) => {
+        ? current.service_selections.filter((selection) => {
+            if (selection.role !== 'operated') return true;
+            const id = selection.service_taxonomy_id;
             const item = reference.data?.service_taxonomy.find((service) => service.id === id);
             return item?.technical_domain_id === domainId;
           })
-        : current.service_taxonomy_ids;
-      const removed = current.service_taxonomy_ids.length - nextServices.length;
+        : current.service_selections;
+      const removed = current.service_selections.length - nextServices.length;
       if (removed > 0) {
         toast(
-          `Rimosso ${removed} servizio${removed > 1 ? ' non compatibile' : ' non compatibile'} con il nuovo dominio.`,
+          `Rimosso ${removed} servizio operato non compatibile con il nuovo dominio.`,
           'warning',
         );
       }
-      return { ...current, technical_domain_id: value, service_taxonomy_ids: nextServices };
+      return { ...current, technical_domain_id: value, service_selections: nextServices };
     });
   }
 
@@ -155,7 +206,7 @@ export function MaintenanceCreatePage() {
 
   function hasClassificationsOrTitle(): boolean {
     if (form.summary_it.trim()) return true;
-    if (form.service_taxonomy_ids.length > 0) return true;
+    if (form.service_selections.length > 0) return true;
     if (form.reason_class_ids.length > 0) return true;
     if (form.impact_effect_ids.length > 0) return true;
     if (form.quality_flag_ids.length > 0) return true;
@@ -195,10 +246,19 @@ export function MaintenanceCreatePage() {
     setForm((current) => ({
       ...current,
       summary_it: response.texts.title_it?.trim() || current.summary_it,
-      service_taxonomy_ids:
+      service_selections:
         response.service_taxonomy_ids.length > 0
-          ? response.service_taxonomy_ids
-          : current.service_taxonomy_ids,
+          ? mergeServiceSelections(
+              current.service_selections,
+              response.service_taxonomy_ids.map((id) => ({
+                service_taxonomy_id: id,
+                role: 'operated' as const,
+                expected_severity: 'unavailable' as const,
+                expected_audience: null,
+                source: 'ai_extracted' as const,
+              })),
+            )
+          : current.service_selections,
       reason_class_ids:
         response.reason_class_ids.length > 0 ? response.reason_class_ids : current.reason_class_ids,
       impact_effect_ids:
@@ -266,7 +326,8 @@ export function MaintenanceCreatePage() {
         : null,
       residual_service_it: form.residual_service_it.trim() || null,
       first_window: firstWindow,
-      initial_service_taxonomy: classificationInputs(form.service_taxonomy_ids, true),
+      initial_targets: form.manual_targets.map(targetInput),
+      initial_service_taxonomy: serviceClassificationInputs(form.service_selections),
       initial_reason_classes: classificationInputs(form.reason_class_ids, true),
       initial_impact_effects: classificationInputs(form.impact_effect_ids, true),
       initial_quality_flags: classificationInputs(form.quality_flag_ids, false),
@@ -274,7 +335,14 @@ export function MaintenanceCreatePage() {
         ai_intake: {
           summary_it: form.summary_it.trim(),
           context_it: form.assistance_context.trim() || null,
-          service_taxonomy_ids: form.service_taxonomy_ids,
+          service_taxonomy_ids: form.service_selections.map((item) => item.service_taxonomy_id),
+          service_selections: form.service_selections.map((item) => ({
+            service_taxonomy_id: item.service_taxonomy_id,
+            role: item.role,
+            expected_severity: item.expected_severity,
+            expected_audience: item.expected_audience,
+            source: item.source,
+          })),
           reason_class_ids: form.reason_class_ids,
           impact_effect_ids: form.impact_effect_ids,
           quality_flag_ids: form.quality_flag_ids,
@@ -288,6 +356,77 @@ export function MaintenanceCreatePage() {
     } catch (error) {
       toast(errorMessage(error, 'Creazione non riuscita.'), 'error');
     }
+  }
+
+  function updateServiceRole(role: ServiceSelection['role'], ids: number[]) {
+    setForm((current) => {
+      const keep = current.service_selections.filter((item) => item.role !== role);
+      const nextSelections = ids.map((id) => {
+        const existing = current.service_selections.find((item) => item.service_taxonomy_id === id);
+        return {
+          service_taxonomy_id: id,
+          role,
+          expected_severity: existing?.expected_severity ?? 'unavailable',
+          expected_audience: existing?.expected_audience ?? null,
+          source: existing?.source ?? 'manual',
+        } satisfies ServiceSelection;
+      });
+      return {
+        ...current,
+        service_selections: mergeServiceSelections(keep, nextSelections),
+      };
+    });
+  }
+
+  function updateServiceSelection(id: number, patch: Partial<ServiceSelection>) {
+    setForm((current) => ({
+      ...current,
+      service_selections: current.service_selections.map((item) =>
+        item.service_taxonomy_id === id ? { ...item, ...patch } : item,
+      ),
+    }));
+  }
+
+  function addCheckedSuggestions() {
+    const selected = directSuggestions.filter(
+      (item) => checkedSuggestions[item.service_dependency_id] !== false,
+    );
+    if (selected.length === 0) {
+      toast('Seleziona almeno un suggerimento.', 'error');
+      return;
+    }
+    setForm((current) => ({
+      ...current,
+      service_selections: mergeServiceSelections(
+        current.service_selections,
+        selected.map((item) => ({
+          service_taxonomy_id: item.downstream_service_id,
+          role: 'dependent',
+          expected_severity: item.default_severity,
+          expected_audience: null,
+          source: 'dependency_graph',
+        })),
+      ),
+    }));
+  }
+
+  function addManualTarget() {
+    if (!targetDraft.target_type_id || !targetDraft.display_name.trim()) {
+      toast('Completa tipo e nome target.', 'error');
+      return;
+    }
+    setForm((current) => ({
+      ...current,
+      manual_targets: [
+        ...current.manual_targets,
+        {
+          ...targetDraft,
+          id: targetDraft.id || crypto.randomUUID(),
+          display_name: targetDraft.display_name.trim(),
+        },
+      ],
+    }));
+    setTargetDraft({ id: '', target_type_id: 0, display_name: '', service_taxonomy_id: null });
   }
 
   function requestLeave(target: string) {
@@ -414,12 +553,36 @@ export function MaintenanceCreatePage() {
               </summary>
               <div className={shared.collapsibleContent}>
                 <div className={shared.formGrid}>
-                  <MultiSelectField
-                    label="Servizi coinvolti"
-                    options={toOptions(serviceItems)}
-                    selected={form.service_taxonomy_ids}
-                    onChange={(value) => update('service_taxonomy_ids', value)}
-                  />
+                  <div className={shared.formGridSpan}>
+                    <ServiceImpactSection
+                      operatedOptions={serviceItems}
+                      allServices={reference.data.service_taxonomy}
+                      targetTypes={reference.data.target_types}
+                      selections={form.service_selections}
+                      operatedIds={operatedIds}
+                      impactedIds={impactedIds}
+                      suggestions={directSuggestions}
+                      checkedSuggestions={checkedSuggestions}
+                      transitivePreview={transitivePreview}
+                      targets={form.manual_targets}
+                      targetDraft={targetDraft}
+                      onOperatedChange={(ids) => updateServiceRole('operated', ids)}
+                      onImpactedChange={(ids) => updateServiceRole('dependent', ids)}
+                      onSelectionChange={updateServiceSelection}
+                      onSuggestionCheck={(id, checked) =>
+                        setCheckedSuggestions((current) => ({ ...current, [id]: checked }))
+                      }
+                      onAddSuggestions={addCheckedSuggestions}
+                      onTargetDraftChange={setTargetDraft}
+                      onAddTarget={addManualTarget}
+                      onRemoveTarget={(id) =>
+                        setForm((current) => ({
+                          ...current,
+                          manual_targets: current.manual_targets.filter((target) => target.id !== id),
+                        }))
+                      }
+                    />
+                  </div>
                   <MultiSelectField
                     label="Motivi"
                     options={toOptions(reference.data.reason_classes)}
@@ -639,6 +802,235 @@ function SelectField({
   );
 }
 
+function ServiceImpactSection({
+  operatedOptions,
+  allServices,
+  targetTypes,
+  selections,
+  operatedIds,
+  impactedIds,
+  suggestions,
+  checkedSuggestions,
+  transitivePreview,
+  targets,
+  targetDraft,
+  onOperatedChange,
+  onImpactedChange,
+  onSelectionChange,
+  onSuggestionCheck,
+  onAddSuggestions,
+  onTargetDraftChange,
+  onAddTarget,
+  onRemoveTarget,
+}: {
+  operatedOptions: ReferenceItem[];
+  allServices: ReferenceItem[];
+  targetTypes: ReferenceItem[];
+  selections: ServiceSelection[];
+  operatedIds: number[];
+  impactedIds: number[];
+  suggestions: ServiceDependency[];
+  checkedSuggestions: Record<number, boolean>;
+  transitivePreview: ReferenceItem[];
+  targets: ManualTarget[];
+  targetDraft: ManualTarget;
+  onOperatedChange: (ids: number[]) => void;
+  onImpactedChange: (ids: number[]) => void;
+  onSelectionChange: (id: number, patch: Partial<ServiceSelection>) => void;
+  onSuggestionCheck: (id: number, checked: boolean) => void;
+  onAddSuggestions: () => void;
+  onTargetDraftChange: (target: ManualTarget) => void;
+  onAddTarget: () => void;
+  onRemoveTarget: (id: string) => void;
+}) {
+  const serviceById = useMemo(() => new Map(allServices.map((service) => [service.id, service])), [allServices]);
+  return (
+    <div className={shared.serviceImpactBox}>
+      <div className={shared.serviceColumns}>
+        <MultiSelectField
+          label="Servizi operati"
+          options={toOptions(operatedOptions)}
+          selected={operatedIds}
+          onChange={onOperatedChange}
+        />
+        <MultiSelectField
+          label="Servizi impattati"
+          options={toOptions(allServices)}
+          selected={impactedIds}
+          onChange={onImpactedChange}
+        />
+      </div>
+
+      {selections.length > 0 ? (
+        <div className={shared.serviceSelectionList}>
+          {selections.map((selection) => {
+            const service = serviceById.get(selection.service_taxonomy_id);
+            if (!service) return null;
+            const needsAudience = service.audience === 'maintenance' && !selection.expected_audience;
+            return (
+              <div key={selection.service_taxonomy_id} className={shared.serviceSelectionRow}>
+                <div className={shared.rowTitle}>
+                  <strong>{service.name_it}</strong>
+                  <span className={shared.small}>
+                    {selection.role === 'operated' ? 'Operato' : 'Impattato'}
+                    {needsAudience ? ' · Audience da definire' : ''}
+                  </span>
+                </div>
+                <select
+                  className={shared.select}
+                  value={selection.role}
+                  onChange={(event) =>
+                    onSelectionChange(selection.service_taxonomy_id, {
+                      role: event.target.value as ServiceSelection['role'],
+                      source: 'manual',
+                    })
+                  }
+                >
+                  <option value="operated">Operato</option>
+                  <option value="dependent">Impattato</option>
+                </select>
+                <select
+                  className={shared.select}
+                  value={selection.expected_severity}
+                  onChange={(event) =>
+                    onSelectionChange(selection.service_taxonomy_id, {
+                      expected_severity: event.target.value as SeverityValue,
+                    })
+                  }
+                >
+                  <option value="none">Nessun impatto</option>
+                  <option value="degraded">Degradato</option>
+                  <option value="unavailable">Non disponibile</option>
+                </select>
+                <select
+                  className={shared.select}
+                  value={selection.expected_audience ?? ''}
+                  onChange={(event) =>
+                    onSelectionChange(selection.service_taxonomy_id, {
+                      expected_audience: (event.target.value || null) as AudienceOverride | null,
+                    })
+                  }
+                >
+                  <option value="">
+                    {service.audience === 'maintenance' ? 'Da definire' : 'Predefinita catalogo'}
+                  </option>
+                  <option value="internal">Interna</option>
+                  <option value="external">Esterna</option>
+                  <option value="both">Interna ed esterna</option>
+                </select>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className={shared.small}>Nessun servizio selezionato.</p>
+      )}
+
+      {suggestions.length > 0 ? (
+        <div className={shared.suggestionPanel}>
+          <div className={shared.sectionHeader}>
+            <h3 className={shared.sectionTitle}>Suggerimenti</h3>
+            <Button size="sm" variant="secondary" onClick={onAddSuggestions}>
+              Aggiungi suggeriti
+            </Button>
+          </div>
+          <div className={shared.suggestionList}>
+            {suggestions.map((item) => (
+              <label key={item.service_dependency_id} className={shared.suggestionRow}>
+                <input
+                  type="checkbox"
+                  checked={checkedSuggestions[item.service_dependency_id] !== false}
+                  onChange={(event) => onSuggestionCheck(item.service_dependency_id, event.target.checked)}
+                />
+                <span>
+                  <strong>{item.downstream_service.name_it}</strong>
+                  <span className={shared.small}> · {item.default_severity === 'degraded' ? 'Degradato' : item.default_severity === 'none' ? 'Nessun impatto' : 'Non disponibile'}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {transitivePreview.length > 0 ? (
+        <div className={shared.suggestionPanel}>
+          <h3 className={shared.sectionTitle}>Possibili impatti indiretti</h3>
+          <div className={shared.chipList}>
+            {transitivePreview.map((service) => (
+              <span key={service.id} className={shared.filterChip}>
+                {service.name_it}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className={shared.suggestionPanel}>
+        <h3 className={shared.sectionTitle}>Target manuali</h3>
+        <div className={shared.formGridThree}>
+          <select
+            className={shared.select}
+            value={targetDraft.target_type_id || ''}
+            onChange={(event) =>
+              onTargetDraftChange({ ...targetDraft, target_type_id: Number(event.target.value) })
+            }
+          >
+            <option value="">Tipo target</option>
+            {targetTypes.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name_it}
+              </option>
+            ))}
+          </select>
+          <input
+            className={shared.field}
+            value={targetDraft.display_name}
+            onChange={(event) => onTargetDraftChange({ ...targetDraft, display_name: event.target.value })}
+            placeholder="Nome target"
+          />
+          <select
+            className={shared.select}
+            value={targetDraft.service_taxonomy_id ?? ''}
+            onChange={(event) =>
+              onTargetDraftChange({
+                ...targetDraft,
+                service_taxonomy_id: event.target.value ? Number(event.target.value) : null,
+              })
+            }
+          >
+            <option value="">Servizio collegato</option>
+            {allServices.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name_it}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={shared.formActions}>
+          <Button size="sm" variant="secondary" onClick={onAddTarget}>
+            Aggiungi target
+          </Button>
+        </div>
+        {targets.length > 0 ? (
+          <div className={shared.chipList}>
+            {targets.map((target) => (
+              <button
+                key={target.id}
+                type="button"
+                className={shared.filterChip}
+                onClick={() => onRemoveTarget(target.id)}
+              >
+                {target.display_name}
+                <Icon name="x" size={14} />
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function MultiSelectField({
   label,
   options,
@@ -674,4 +1066,77 @@ function classificationInputs(ids: number[], hasPrimary: boolean): Classificatio
     confidence: null,
     is_primary: hasPrimary && index === 0,
   }));
+}
+
+function serviceClassificationInputs(items: ServiceSelection[]): ClassificationInput[] {
+  return items.map((item, index) => ({
+    reference_id: item.service_taxonomy_id,
+    service_taxonomy_id: item.service_taxonomy_id,
+    source: item.source,
+    confidence: null,
+    is_primary: item.role === 'operated' && index === items.findIndex((candidate) => candidate.role === 'operated'),
+    role: item.role,
+    expected_severity: item.expected_severity,
+    expected_audience: item.expected_audience,
+  }));
+}
+
+function targetInput(item: ManualTarget): TargetBody {
+  return {
+    target_type_id: item.target_type_id,
+    display_name: item.display_name,
+    service_taxonomy_id: item.service_taxonomy_id,
+    source: 'manual',
+    is_primary: false,
+  };
+}
+
+function mergeServiceSelections(current: ServiceSelection[], incoming: ServiceSelection[]): ServiceSelection[] {
+  const byID = new Map<number, ServiceSelection>();
+  for (const item of current) byID.set(item.service_taxonomy_id, item);
+  for (const item of incoming) {
+    const existing = byID.get(item.service_taxonomy_id);
+    if (existing?.role === 'operated' && item.role === 'dependent') {
+      byID.set(item.service_taxonomy_id, { ...existing, expected_severity: item.expected_severity });
+    } else {
+      byID.set(item.service_taxonomy_id, { ...existing, ...item });
+    }
+  }
+  return [...byID.values()].sort((a, b) => {
+    if (a.role !== b.role) return a.role === 'operated' ? -1 : 1;
+    return a.service_taxonomy_id - b.service_taxonomy_id;
+  });
+}
+
+function dependencyPreview(
+  operatedIds: number[],
+  dependencies: ServiceDependency[],
+  selected: ServiceSelection[],
+): ReferenceItem[] {
+  const selectedIds = new Set(selected.map((item) => item.service_taxonomy_id));
+  const byUpstream = new Map<number, ServiceDependency[]>();
+  for (const dependency of dependencies) {
+    const rows = byUpstream.get(dependency.upstream_service_id) ?? [];
+    rows.push(dependency);
+    byUpstream.set(dependency.upstream_service_id, rows);
+  }
+  const result = new Map<number, ReferenceItem>();
+  const visited = new Set<number>(operatedIds);
+  const walk = (ids: number[], depth: number) => {
+    if (depth > 2) return;
+    const next: number[] = [];
+    for (const id of ids) {
+      for (const dependency of byUpstream.get(id) ?? []) {
+        if (visited.has(dependency.downstream_service_id)) continue;
+        visited.add(dependency.downstream_service_id);
+        next.push(dependency.downstream_service_id);
+        if (!selectedIds.has(dependency.downstream_service_id)) {
+          result.set(dependency.downstream_service_id, dependency.downstream_service);
+        }
+      }
+    }
+    if (next.length > 0) walk(next, depth + 1);
+  };
+  walk(operatedIds, 1);
+  return [...result.values()];
 }

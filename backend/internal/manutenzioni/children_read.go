@@ -55,17 +55,20 @@ var (
 func (h *Handler) loadClassifications(ctx context.Context, meta classificationMeta, maintenanceID int64) ([]ClassificationItem, error) {
 	var refSelect string
 	var refJoin string
+	var serviceSelect string
 	switch meta.Resource.Kind {
 	case resourceService:
 		refSelect = `r.code, r.name_it, r.name_en, r.description, r.sort_order, r.is_active,
 			NULL::text AS city, NULL::text AS country_code, r.technical_domain_id, td.name_it AS technical_domain_name,
 			r.target_type_id, tt.name_it AS target_type_name, r.audience`
 		refJoin = fmt.Sprintf(`JOIN %s r ON r.%s = c.%s JOIN maintenance.technical_domain td ON td.technical_domain_id = r.technical_domain_id JOIN maintenance.target_type tt ON tt.target_type_id = r.target_type_id`, meta.Resource.Table, meta.Resource.IDColumn, meta.ReferenceIDColumn)
+		serviceSelect = `c.role, c.expected_severity, c.expected_audience`
 	default:
 		refSelect = `r.code, r.name_it, r.name_en, r.description, r.sort_order, r.is_active,
 			NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
 			NULL::bigint AS target_type_id, NULL::text AS target_type_name, NULL::text AS audience`
 		refJoin = fmt.Sprintf(`JOIN %s r ON r.%s = c.%s`, meta.Resource.Table, meta.Resource.IDColumn, meta.ReferenceIDColumn)
+		serviceSelect = `NULL::text AS role, NULL::text AS expected_severity, NULL::text AS expected_audience`
 	}
 
 	query := fmt.Sprintf(`SELECT
@@ -76,6 +79,7 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 			c.source,
 			c.confidence::float8,
 			%s,
+			%s,
 			c.metadata
 		FROM %s c
 		%s
@@ -85,6 +89,7 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 		meta.Resource.IDColumn,
 		refSelect,
 		classPrimarySelect(meta),
+		serviceSelect,
 		meta.RelationTable,
 		refJoin,
 		classPrimaryOrder(meta),
@@ -102,6 +107,7 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 		var item ClassificationItem
 		var ref ReferenceItem
 		var nameEN, description, city, country, domainName, targetTypeName, audience sql.NullString
+		var role, expectedSeverity, expectedAudience sql.NullString
 		var domainID, targetTypeID sql.NullInt64
 		var confidence sql.NullFloat64
 		var metadata []byte
@@ -125,6 +131,9 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 			&item.Source,
 			&confidence,
 			&item.IsPrimary,
+			&role,
+			&expectedSeverity,
+			&expectedAudience,
 			&metadata,
 		); err != nil {
 			return nil, err
@@ -140,6 +149,9 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 		ref.Audience = nullStringValue(audience)
 		item.Reference = ref
 		item.Confidence = nullFloatValue(confidence)
+		item.Role = nullStringValue(role)
+		item.ExpectedSeverity = nullStringValue(expectedSeverity)
+		item.ExpectedAudience = nullStringValue(expectedAudience)
 		item.Metadata = rawJSONFromBytes(metadata)
 		items = append(items, item)
 	}
@@ -167,6 +179,9 @@ func (h *Handler) loadTargets(ctx context.Context, maintenanceID int64) ([]Maint
 			mt.maintenance_target_id,
 			mt.maintenance_id,
 			tt.target_type_id, tt.code, tt.name_it, tt.name_en, tt.description, tt.sort_order, tt.is_active,
+			mt.service_taxonomy_id,
+			st.code, st.name_it, st.name_en, st.description, st.sort_order, st.is_active,
+			st.technical_domain_id, td.name_it, st.target_type_id, stt.name_it, st.audience,
 			mt.ref_table,
 			mt.ref_id,
 			mt.external_key,
@@ -177,6 +192,9 @@ func (h *Handler) loadTargets(ctx context.Context, maintenanceID int64) ([]Maint
 			mt.metadata
 		FROM maintenance.maintenance_target mt
 		JOIN maintenance.target_type tt ON tt.target_type_id = mt.target_type_id
+		LEFT JOIN maintenance.service_taxonomy st ON st.service_taxonomy_id = mt.service_taxonomy_id
+		LEFT JOIN maintenance.technical_domain td ON td.technical_domain_id = st.technical_domain_id
+		LEFT JOIN maintenance.target_type stt ON stt.target_type_id = st.target_type_id
 		WHERE mt.maintenance_id = $1
 		ORDER BY mt.is_primary DESC, mt.display_name, mt.maintenance_target_id`,
 		maintenanceID,
@@ -190,8 +208,12 @@ func (h *Handler) loadTargets(ctx context.Context, maintenanceID int64) ([]Maint
 	for rows.Next() {
 		var item MaintenanceTarget
 		var ref ReferenceItem
+		var serviceRef ReferenceItem
 		var nameEN, description, refTable, externalKey sql.NullString
-		var refID sql.NullInt64
+		var serviceCode, serviceName, serviceNameEN, serviceDescription, serviceDomainName, serviceTargetTypeName, serviceAudience sql.NullString
+		var refID, serviceID, serviceDomainID, serviceTargetTypeID sql.NullInt64
+		var serviceSort sql.NullInt64
+		var serviceActive sql.NullBool
 		var confidence sql.NullFloat64
 		var metadata []byte
 		if err := rows.Scan(
@@ -204,6 +226,18 @@ func (h *Handler) loadTargets(ctx context.Context, maintenanceID int64) ([]Maint
 			&description,
 			&ref.SortOrder,
 			&ref.IsActive,
+			&serviceID,
+			&serviceCode,
+			&serviceName,
+			&serviceNameEN,
+			&serviceDescription,
+			&serviceSort,
+			&serviceActive,
+			&serviceDomainID,
+			&serviceDomainName,
+			&serviceTargetTypeID,
+			&serviceTargetTypeName,
+			&serviceAudience,
 			&refTable,
 			&refID,
 			&externalKey,
@@ -218,6 +252,24 @@ func (h *Handler) loadTargets(ctx context.Context, maintenanceID int64) ([]Maint
 		ref.NameEN = nullStringValue(nameEN)
 		ref.Description = nullStringValue(description)
 		item.TargetType = ref
+		item.ServiceTaxonomyID = nullInt64Value(serviceID)
+		if serviceID.Valid {
+			serviceRef.ID = serviceID.Int64
+			serviceRef.Code = serviceCode.String
+			serviceRef.NameIT = serviceName.String
+			serviceRef.NameEN = nullStringValue(serviceNameEN)
+			serviceRef.Description = nullStringValue(serviceDescription)
+			if serviceSort.Valid {
+				serviceRef.SortOrder = int(serviceSort.Int64)
+			}
+			serviceRef.IsActive = serviceActive.Bool
+			serviceRef.TechnicalDomainID = nullInt64Value(serviceDomainID)
+			serviceRef.TechnicalDomainName = nullStringValue(serviceDomainName)
+			serviceRef.TargetTypeID = nullInt64Value(serviceTargetTypeID)
+			serviceRef.TargetTypeName = nullStringValue(serviceTargetTypeName)
+			serviceRef.Audience = nullStringValue(serviceAudience)
+			item.ServiceTaxonomy = &serviceRef
+		}
 		item.ReferenceTable = nullStringValue(refTable)
 		item.ReferenceID = nullInt64Value(refID)
 		item.ExternalKey = nullStringValue(externalKey)

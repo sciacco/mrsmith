@@ -64,18 +64,30 @@ func (h *Handler) replaceClassificationsTx(r *http.Request, tx *sql.Tx, maintena
 	}
 	primaryCount := 0
 	seen := map[int64]struct{}{}
-	for _, item := range items {
-		if item.ReferenceID <= 0 {
+	for i := range items {
+		items[i].ReferenceID = resolveClassificationReferenceID(meta, items[i])
+		if items[i].ReferenceID <= 0 {
 			return errBadRequest
 		}
-		if _, ok := seen[item.ReferenceID]; ok {
+		if _, ok := seen[items[i].ReferenceID]; ok {
 			return errBadRequest
 		}
-		seen[item.ReferenceID] = struct{}{}
-		if item.Confidence != nil && (*item.Confidence < 0 || *item.Confidence > 1) {
+		seen[items[i].ReferenceID] = struct{}{}
+		if items[i].Confidence != nil && (*items[i].Confidence < 0 || *items[i].Confidence > 1) {
 			return errBadRequest
 		}
-		if item.IsPrimary {
+		if meta.Resource.Kind == resourceService {
+			if !validServiceRole(defaultIfEmpty(items[i].Role, "operated")) {
+				return errBadRequest
+			}
+			if !validSeverity(defaultIfEmpty(items[i].ExpectedSeverity, "unavailable")) {
+				return errBadRequest
+			}
+			if items[i].ExpectedAudience != nil && !validExpectedAudience(*items[i].ExpectedAudience) {
+				return errBadRequest
+			}
+		}
+		if items[i].IsPrimary {
 			primaryCount++
 		}
 	}
@@ -87,10 +99,30 @@ func (h *Handler) replaceClassificationsTx(r *http.Request, tx *sql.Tx, maintena
 	}
 	for _, item := range items {
 		source := normalizeSource(item.Source)
-		if !validClassificationSource(source) {
+		if !validClassificationSource(meta, source) {
 			return errBadRequest
 		}
-		if meta.HasPrimary {
+		if meta.Resource.Kind == resourceService {
+			_, err := tx.ExecContext(
+				r.Context(),
+				`INSERT INTO `+meta.RelationTable+` (
+					maintenance_id, `+meta.ReferenceIDColumn+`, source, confidence, is_primary,
+					role, expected_severity, expected_audience, metadata
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)`,
+				maintenanceID,
+				item.ReferenceID,
+				source,
+				item.Confidence,
+				item.IsPrimary,
+				defaultIfEmpty(item.Role, "operated"),
+				defaultIfEmpty(item.ExpectedSeverity, "unavailable"),
+				cleanExpectedAudiencePtr(item.ExpectedAudience),
+				rawJSONOrDefault(item.Metadata),
+			)
+			if err != nil {
+				return err
+			}
+		} else if meta.HasPrimary {
 			_, err := tx.ExecContext(
 				r.Context(),
 				`INSERT INTO `+meta.RelationTable+` (
@@ -126,13 +158,60 @@ func (h *Handler) replaceClassificationsTx(r *http.Request, tx *sql.Tx, maintena
 	return nil
 }
 
-func validClassificationSource(source string) bool {
+func resolveClassificationReferenceID(meta classificationMeta, item classificationInput) int64 {
+	if meta.Resource.Kind == resourceService && item.ServiceTaxonomyID > 0 {
+		return item.ServiceTaxonomyID
+	}
+	return item.ReferenceID
+}
+
+func validClassificationSource(meta classificationMeta, source string) bool {
 	switch source {
 	case "manual", "import", "rule", "ai_extracted", "catalog_mapping":
+		return true
+	case "dependency_graph":
+		return meta.Resource.Kind == resourceService
+	default:
+		return false
+	}
+}
+
+func validServiceRole(value string) bool {
+	switch value {
+	case "operated", "dependent":
 		return true
 	default:
 		return false
 	}
+}
+
+func validSeverity(value string) bool {
+	switch value {
+	case "none", "degraded", "unavailable":
+		return true
+	default:
+		return false
+	}
+}
+
+func validExpectedAudience(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "internal", "external", "both":
+		return true
+	default:
+		return false
+	}
+}
+
+func cleanExpectedAudiencePtr(value *string) any {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return trimmed
 }
 
 func (h *Handler) classificationMutationError(w http.ResponseWriter, r *http.Request, operation string, err error, maintenanceID int64) {
@@ -210,7 +289,10 @@ func (h *Handler) upsertTargetTx(r *http.Request, tx *sql.Tx, maintenanceID int6
 		return errBadRequest
 	}
 	source := normalizeSource(body.Source)
-	if !validClassificationSource(source) {
+	if !validTargetSource(source) {
+		return errBadRequest
+	}
+	if body.ServiceTaxonomyID != nil && *body.ServiceTaxonomyID <= 0 {
 		return errBadRequest
 	}
 	if body.Confidence != nil && (*body.Confidence < 0 || *body.Confidence > 1) {
@@ -234,11 +316,12 @@ func (h *Handler) upsertTargetTx(r *http.Request, tx *sql.Tx, maintenanceID int6
 		_, err := tx.ExecContext(
 			r.Context(),
 			`INSERT INTO maintenance.maintenance_target (
-				maintenance_id, target_type_id, ref_table, ref_id, external_key,
+				maintenance_id, target_type_id, service_taxonomy_id, ref_table, ref_id, external_key,
 				display_name, source, confidence, is_primary, metadata
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`,
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)`,
 			maintenanceID,
 			body.TargetTypeID,
+			body.ServiceTaxonomyID,
 			nullStringPtr(body.ReferenceTable),
 			body.ReferenceID,
 			nullStringPtr(body.ExternalKey),
@@ -254,16 +337,18 @@ func (h *Handler) upsertTargetTx(r *http.Request, tx *sql.Tx, maintenanceID int6
 		r.Context(),
 		`UPDATE maintenance.maintenance_target SET
 			target_type_id = $1,
-			ref_table = $2,
-			ref_id = $3,
-			external_key = $4,
-			display_name = $5,
-			source = $6,
-			confidence = $7,
-			is_primary = $8,
-			metadata = $9::jsonb
-		WHERE maintenance_id = $10 AND maintenance_target_id = $11`,
+			service_taxonomy_id = $2,
+			ref_table = $3,
+			ref_id = $4,
+			external_key = $5,
+			display_name = $6,
+			source = $7,
+			confidence = $8,
+			is_primary = $9,
+			metadata = $10::jsonb
+		WHERE maintenance_id = $11 AND maintenance_target_id = $12`,
 		body.TargetTypeID,
+		body.ServiceTaxonomyID,
 		nullStringPtr(body.ReferenceTable),
 		body.ReferenceID,
 		nullStringPtr(body.ExternalKey),
@@ -282,6 +367,15 @@ func (h *Handler) upsertTargetTx(r *http.Request, tx *sql.Tx, maintenanceID int6
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+func validTargetSource(source string) bool {
+	switch source {
+	case "manual", "import", "rule", "ai_extracted", "catalog_mapping":
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *Handler) handleDeleteTarget(w http.ResponseWriter, r *http.Request) {
