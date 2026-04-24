@@ -71,6 +71,7 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 		serviceSelect = `NULL::text AS role, NULL::text AS expected_severity, NULL::text AS expected_audience`
 	}
 
+	orderBy := classOrderBy(meta)
 	query := fmt.Sprintf(`SELECT
 			c.%s,
 			c.maintenance_id,
@@ -84,7 +85,7 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 		FROM %s c
 		%s
 		WHERE c.maintenance_id = $1
-		ORDER BY %s DESC, r.sort_order, r.name_it, r.%s`,
+		ORDER BY %s`,
 		meta.RelationIDColumn,
 		meta.Resource.IDColumn,
 		refSelect,
@@ -92,8 +93,7 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 		serviceSelect,
 		meta.RelationTable,
 		refJoin,
-		classPrimaryOrder(meta),
-		meta.Resource.IDColumn,
+		orderBy,
 	)
 
 	rows, err := h.maintenance.QueryContext(ctx, query, maintenanceID)
@@ -165,11 +165,12 @@ func classPrimarySelect(meta classificationMeta) string {
 	return "false AS is_primary"
 }
 
-func classPrimaryOrder(meta classificationMeta) string {
+func classOrderBy(meta classificationMeta) string {
+	fields := []string{"r.sort_order", "r.name_it", "r." + meta.Resource.IDColumn}
 	if meta.HasPrimary {
-		return "c.is_primary"
+		fields = append([]string{"c.is_primary DESC"}, fields...)
 	}
-	return "false"
+	return strings.Join(fields, ", ")
 }
 
 func (h *Handler) loadTargets(ctx context.Context, maintenanceID int64) ([]MaintenanceTarget, error) {
