@@ -94,6 +94,19 @@ func (h *Handler) replaceClassificationsTx(r *http.Request, tx *sql.Tx, maintena
 	if meta.HasPrimary && primaryCount > 1 {
 		return errBadRequest
 	}
+	if meta.Resource.Kind == resourceService {
+		maintenanceDomainID, err := h.loadMaintenanceTechnicalDomainTx(r, tx, maintenanceID)
+		if err != nil {
+			return err
+		}
+		serviceDomains, err := h.loadServiceTechnicalDomainsTx(r, tx, items)
+		if err != nil {
+			return err
+		}
+		if err := validateOperatedServiceDomains(maintenanceDomainID, serviceDomains, items); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.ExecContext(r.Context(), `DELETE FROM `+meta.RelationTable+` WHERE maintenance_id = $1`, maintenanceID); err != nil {
 		return err
 	}
@@ -153,6 +166,73 @@ func (h *Handler) replaceClassificationsTx(r *http.Request, tx *sql.Tx, maintena
 			if err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func (h *Handler) loadMaintenanceTechnicalDomainTx(r *http.Request, tx *sql.Tx, maintenanceID int64) (int64, error) {
+	var domainID int64
+	if err := tx.QueryRowContext(
+		r.Context(),
+		`SELECT technical_domain_id FROM maintenance.maintenance WHERE maintenance_id = $1`,
+		maintenanceID,
+	).Scan(&domainID); err != nil {
+		return 0, err
+	}
+	return domainID, nil
+}
+
+func (h *Handler) loadServiceTechnicalDomainsTx(r *http.Request, tx *sql.Tx, items []classificationInput) (map[int64]int64, error) {
+	ids := make([]int64, 0, len(items))
+	seen := map[int64]struct{}{}
+	for _, item := range items {
+		if _, ok := seen[item.ReferenceID]; ok {
+			continue
+		}
+		seen[item.ReferenceID] = struct{}{}
+		ids = append(ids, item.ReferenceID)
+	}
+	if len(ids) == 0 {
+		return map[int64]int64{}, nil
+	}
+	args := []any{}
+	holders := make([]string, 0, len(ids))
+	for _, id := range ids {
+		holders = append(holders, placeholder(&args, id))
+	}
+	rows, err := tx.QueryContext(
+		r.Context(),
+		`SELECT service_taxonomy_id, technical_domain_id
+		FROM maintenance.service_taxonomy
+		WHERE service_taxonomy_id IN (`+strings.Join(holders, ", ")+`)`,
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	domains := map[int64]int64{}
+	for rows.Next() {
+		var serviceID int64
+		var domainID int64
+		if err := rows.Scan(&serviceID, &domainID); err != nil {
+			return nil, err
+		}
+		domains[serviceID] = domainID
+	}
+	return domains, rows.Err()
+}
+
+func validateOperatedServiceDomains(maintenanceDomainID int64, serviceDomains map[int64]int64, items []classificationInput) error {
+	for _, item := range items {
+		role := defaultIfEmpty(item.Role, "operated")
+		serviceDomainID, ok := serviceDomains[item.ReferenceID]
+		if !ok {
+			return errBadRequest
+		}
+		if role == "operated" && serviceDomainID != maintenanceDomainID {
+			return errBadRequest
 		}
 	}
 	return nil

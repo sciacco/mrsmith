@@ -71,6 +71,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	access("GET /manutenzioni/v1/maintenances/{id}/events", h.handleGetEvents)
 	access("GET /manutenzioni/v1/reference-data", h.handleReferenceData)
 	access("GET /manutenzioni/v1/service-dependencies", h.handleListServiceDependencies)
+	access("GET /manutenzioni/v1/service-dependencies/{id}", h.handleGetServiceDependency)
 
 	manager("GET /manutenzioni/v1/customers", h.handleSearchCustomers)
 	manager("POST /manutenzioni/v1/maintenances", h.handleCreateMaintenance)
@@ -107,7 +108,6 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	action("POST /manutenzioni/v1/llm-models", h.handleCreateLLMModel)
 	action("PATCH /manutenzioni/v1/llm-models/{scope}", h.handleUpdateLLMModel)
 
-	action("GET /manutenzioni/v1/service-dependencies/{id}", h.handleGetServiceDependency)
 	action("POST /manutenzioni/v1/service-dependencies", h.handleCreateServiceDependency)
 	action("PATCH /manutenzioni/v1/service-dependencies/{id}", h.handleUpdateServiceDependency)
 	action("POST /manutenzioni/v1/service-dependencies/{id}/deactivate", h.handleDeactivateServiceDependency)

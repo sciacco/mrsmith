@@ -24,6 +24,7 @@ import type {
   JsonObject,
   MaintenanceDetail,
   NoticeBody,
+  ReferenceItem,
   ReferenceData,
   TargetBody,
   WindowBody,
@@ -849,6 +850,7 @@ function ImpactTab({
         resource="service-taxonomy"
         items={detail.service_taxonomy}
         options={reference.service_taxonomy}
+        technicalDomainId={detail.technical_domain.id}
         maintenanceId={detail.maintenance_id}
         canManage={canManage}
         primary
@@ -888,6 +890,7 @@ function ClassificationSection({
   resource,
   items,
   options,
+  technicalDomainId,
   maintenanceId,
   canManage,
   primary = false,
@@ -895,7 +898,8 @@ function ClassificationSection({
   title: string;
   resource: string;
   items: MaintenanceDetail['service_taxonomy'];
-  options: Array<{ id: number; name_it: string }>;
+  options: ReferenceItem[];
+  technicalDomainId?: number;
   maintenanceId: number;
   canManage: boolean;
   primary?: boolean;
@@ -908,9 +912,31 @@ function ClassificationSection({
   const [severity, setSeverity] = useState<'none' | 'degraded' | 'unavailable'>('unavailable');
   const [audience, setAudience] = useState('');
   const isServiceSection = resource === 'service-taxonomy';
+  const selectableOptions =
+    isServiceSection && role === 'operated' && technicalDomainId
+      ? options.filter((item) => item.technical_domain_id === technicalDomainId)
+      : options;
+
+  function canOperateSelection(id: number): boolean {
+    if (!technicalDomainId) return true;
+    const option = options.find((item) => item.id === id);
+    return option?.technical_domain_id === technicalDomainId;
+  }
+
+  function changeRole(nextRole: 'operated' | 'dependent') {
+    setRole(nextRole);
+    if (nextRole === 'operated' && selected && !canOperateSelection(Number(selected))) {
+      setSelected('');
+      toast.toast('Solo i servizi del dominio tecnico possono essere operati.', 'warning');
+    }
+  }
 
   async function add() {
     if (!selected) return;
+    if (isServiceSection && role === 'operated' && !canOperateSelection(Number(selected))) {
+      toast.toast('Solo i servizi del dominio tecnico possono essere operati.', 'error');
+      return;
+    }
     const next: ClassificationInput[] = items.map((item) => ({
       reference_id: item.reference.id,
       source: item.source,
@@ -951,7 +977,7 @@ function ClassificationSection({
         <div className={shared.formGridThree} style={{ marginBottom: '1rem' }}>
           <select className={shared.select} value={selected} onChange={(event) => setSelected(event.target.value)}>
             <option value="">Seleziona</option>
-            {options.map((item) => (
+            {selectableOptions.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name_it}
               </option>
@@ -965,7 +991,7 @@ function ClassificationSection({
           )}
           {isServiceSection && (
             <>
-              <select className={shared.select} value={role} onChange={(event) => setRole(event.target.value as typeof role)}>
+              <select className={shared.select} value={role} onChange={(event) => changeRole(event.target.value as typeof role)}>
                 <option value="operated">Operato</option>
                 <option value="dependent">Impattato</option>
               </select>

@@ -22,6 +22,43 @@ func TestResolveServiceTaxonomyIDPreservesLegacyReferenceID(t *testing.T) {
 	}
 }
 
+func TestValidateOperatedServiceDomains(t *testing.T) {
+	serviceDomains := map[int64]int64{
+		10: 1,
+		20: 2,
+	}
+	validSameDomain := []classificationInput{
+		{ReferenceID: 10, Role: "operated"},
+	}
+	if err := validateOperatedServiceDomains(1, serviceDomains, validSameDomain); err != nil {
+		t.Fatalf("operated same-domain returned error: %v", err)
+	}
+	validDependentCrossDomain := []classificationInput{
+		{ReferenceID: 20, Role: "dependent"},
+	}
+	if err := validateOperatedServiceDomains(1, serviceDomains, validDependentCrossDomain); err != nil {
+		t.Fatalf("dependent cross-domain returned error: %v", err)
+	}
+	emptyRoleDefaultsToOperated := []classificationInput{
+		{ReferenceID: 20},
+	}
+	if err := validateOperatedServiceDomains(1, serviceDomains, emptyRoleDefaultsToOperated); err == nil {
+		t.Fatalf("empty role cross-domain should be rejected as operated")
+	}
+	invalidCrossDomain := []classificationInput{
+		{ReferenceID: 20, Role: "operated"},
+	}
+	if err := validateOperatedServiceDomains(1, serviceDomains, invalidCrossDomain); err == nil {
+		t.Fatalf("operated cross-domain should be rejected")
+	}
+	missingService := []classificationInput{
+		{ReferenceID: 30, Role: "dependent"},
+	}
+	if err := validateOperatedServiceDomains(1, serviceDomains, missingService); err == nil {
+		t.Fatalf("unknown service should be rejected")
+	}
+}
+
 func TestValidateServiceDependencyRequest(t *testing.T) {
 	valid := serviceDependencyRequest{
 		UpstreamServiceID:   1,

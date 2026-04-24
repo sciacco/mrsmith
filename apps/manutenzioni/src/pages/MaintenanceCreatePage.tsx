@@ -21,7 +21,7 @@ import type {
 } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { SiteSelectField } from '../components/SiteSelectField';
-import { errorMessage } from '../lib/format';
+import { audienceLabel, dependencyTypeLabel, errorMessage, severityLabel } from '../lib/format';
 import shared from './shared.module.css';
 
 const BRIEF_MIN_LENGTH = 30;
@@ -379,12 +379,22 @@ export function MaintenanceCreatePage() {
   }
 
   function updateServiceSelection(id: number, patch: Partial<ServiceSelection>) {
+    if (patch.role === 'operated' && !canOperateService(id)) {
+      toast('Solo i servizi del dominio tecnico possono essere operati.', 'error');
+      return;
+    }
     setForm((current) => ({
       ...current,
       service_selections: current.service_selections.map((item) =>
         item.service_taxonomy_id === id ? { ...item, ...patch } : item,
       ),
     }));
+  }
+
+  function canOperateService(id: number): boolean {
+    if (!selectedDomainId) return true;
+    const service = reference.data?.service_taxonomy.find((item) => item.id === id);
+    return service?.technical_domain_id === selectedDomainId;
   }
 
   function addCheckedSuggestions() {
@@ -558,6 +568,7 @@ export function MaintenanceCreatePage() {
                       operatedOptions={serviceItems}
                       allServices={reference.data.service_taxonomy}
                       targetTypes={reference.data.target_types}
+                      selectedDomainId={selectedDomainId}
                       selections={form.service_selections}
                       operatedIds={operatedIds}
                       impactedIds={impactedIds}
@@ -806,6 +817,7 @@ function ServiceImpactSection({
   operatedOptions,
   allServices,
   targetTypes,
+  selectedDomainId,
   selections,
   operatedIds,
   impactedIds,
@@ -826,6 +838,7 @@ function ServiceImpactSection({
   operatedOptions: ReferenceItem[];
   allServices: ReferenceItem[];
   targetTypes: ReferenceItem[];
+  selectedDomainId: number | null;
   selections: ServiceSelection[];
   operatedIds: number[];
   impactedIds: number[];
@@ -866,6 +879,7 @@ function ServiceImpactSection({
           {selections.map((selection) => {
             const service = serviceById.get(selection.service_taxonomy_id);
             if (!service) return null;
+            const canOperate = !selectedDomainId || service.technical_domain_id === selectedDomainId;
             const needsAudience = service.audience === 'maintenance' && !selection.expected_audience;
             return (
               <div key={selection.service_taxonomy_id} className={shared.serviceSelectionRow}>
@@ -879,14 +893,15 @@ function ServiceImpactSection({
                 <select
                   className={shared.select}
                   value={selection.role}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    if (event.target.value === 'operated' && !canOperate) return;
                     onSelectionChange(selection.service_taxonomy_id, {
                       role: event.target.value as ServiceSelection['role'],
                       source: 'manual',
-                    })
-                  }
+                    });
+                  }}
                 >
-                  <option value="operated">Operato</option>
+                  <option value="operated" disabled={!canOperate}>Operato</option>
                   <option value="dependent">Impattato</option>
                 </select>
                 <select
@@ -944,7 +959,16 @@ function ServiceImpactSection({
                 />
                 <span>
                   <strong>{item.downstream_service.name_it}</strong>
-                  <span className={shared.small}> · {item.default_severity === 'degraded' ? 'Degradato' : item.default_severity === 'none' ? 'Nessun impatto' : 'Non disponibile'}</span>
+                  <span className={shared.small}>
+                    {' '}
+                    · {item.upstream_service.name_it} → {item.downstream_service.name_it}
+                    {' · '}
+                    {dependencyTypeLabel(item.dependency_type)}
+                    {' · '}
+                    {severityLabel(item.default_severity)}
+                    {' · '}
+                    {audienceLabel(item.downstream_service.audience ?? '')}
+                  </span>
                 </span>
               </label>
             ))}
@@ -1130,7 +1154,7 @@ function dependencyPreview(
         if (visited.has(dependency.downstream_service_id)) continue;
         visited.add(dependency.downstream_service_id);
         next.push(dependency.downstream_service_id);
-        if (!selectedIds.has(dependency.downstream_service_id)) {
+        if (depth >= 2 && !selectedIds.has(dependency.downstream_service_id)) {
           result.set(dependency.downstream_service_id, dependency.downstream_service);
         }
       }
