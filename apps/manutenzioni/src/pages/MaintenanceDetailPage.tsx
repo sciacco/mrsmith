@@ -492,7 +492,10 @@ function SummaryTab({
           <DetailItem label="Aggiornata" value={formatDateTime(detail.updated_at)} />
           <DetailItem label="Descrizione" value={detail.description_it ?? '-'} />
           <DetailItem label="Motivo" value={detail.reason_it ?? '-'} />
-          <DetailItem label="Servizio residuo" value={detail.residual_service_it ?? '-'} />
+          <DetailItem
+            label="Servizio garantito durante l'intervento"
+            value={detail.residual_service_it ?? '-'}
+          />
         </div>
       )}
       {canManage && !editing && (
@@ -681,7 +684,7 @@ function textProposalRows(draft: MaintenanceAssistanceDraft): Array<{ label: str
   addTextRow(rows, 'Descrizione', draft.texts.description_it);
   addTextRow(rows, 'Descrizione EN', draft.texts.description_en);
   addTextRow(rows, 'Motivo EN', draft.texts.reason_en);
-  addTextRow(rows, 'Servizio residuo EN', draft.texts.residual_service_en);
+  addTextRow(rows, "Servizio garantito durante l'intervento EN", draft.texts.residual_service_en);
   return rows;
 }
 

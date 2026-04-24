@@ -26,6 +26,13 @@ import shared from './shared.module.css';
 
 const BRIEF_MIN_LENGTH = 30;
 const BRIEF_MAX_LENGTH = 2000;
+const RESIDUAL_SERVICE_PLACEHOLDER = [
+  'Solo se necessario indicare una descrizione che chiarisca lo stato dei servizi residui. Es:',
+  '- "Durante l\'intervento resta attivo il ramo B."',
+  '- "Il servizio sarà erogato dal sito secondario con capacità ridotta."',
+  '- "Il portale resta consultabile, ma non saranno disponibili modifiche di configurazione."',
+  '- "Nessun servizio residuo garantito nella finestra 02:00-03:00."',
+].join('\n');
 
 type AiState = 'idle' | 'loading' | 'applied' | 'error';
 
@@ -100,6 +107,7 @@ export function MaintenanceCreatePage() {
   const [leaveTarget, setLeaveTarget] = useState<string | null>(null);
   const [aiState, setAiState] = useState<AiState>('idle');
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
   const [preAiSnapshot, setPreAiSnapshot] = useState<FormState | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [checkedSuggestions, setCheckedSuggestions] = useState<Record<number, boolean>>({});
@@ -456,8 +464,20 @@ export function MaintenanceCreatePage() {
         <div className={shared.titleBlock}>
           <h1 className={shared.pageTitle}>Nuova manutenzione</h1>
           <p className={shared.pageSubtitle}>
-            Incolla un brief oppure compila i campi essenziali. I testi sono provvisori: si affineranno nei prossimi step.
+            Compila i campi essenziali. I testi sono provvisori: si affineranno nei prossimi step.
           </p>
+        </div>
+        <div className={shared.headerActions}>
+          <button
+            type="button"
+            className={`${shared.aiToggle} ${aiOpen ? shared.aiToggleActive : ''}`}
+            onClick={() => setAiOpen((open) => !open)}
+            aria-pressed={aiOpen}
+            aria-expanded={aiOpen}
+            title="Compila da brief (sperimentale)"
+          >
+            <Icon name="sparkles" size={16} />
+          </button>
         </div>
       </div>
 
@@ -476,14 +496,16 @@ export function MaintenanceCreatePage() {
       ) : (
         <>
           <div ref={formRef} className={shared.tabsSpacer}>
-            <BriefBlock
-              value={form.assistance_context}
-              onChange={(value) => update('assistance_context', value)}
-              aiState={aiState}
-              aiError={aiError}
-              onApply={handleAiApplyClick}
-              onUndo={handleAiUndo}
-            />
+            {aiOpen && (
+              <BriefBlock
+                value={form.assistance_context}
+                onChange={(value) => update('assistance_context', value)}
+                aiState={aiState}
+                aiError={aiError}
+                onApply={handleAiApplyClick}
+                onUndo={handleAiUndo}
+              />
+            )}
 
             <div className={shared.panel}>
               <div className={shared.sectionHeader}>
@@ -493,7 +515,7 @@ export function MaintenanceCreatePage() {
               <div className={shared.formGrid}>
                 <label className={`${shared.label} ${shared.formGridSpan}`}>
                   <span className={shared.labelText}>
-                    Titolo <span className={shared.required}>*</span>
+                    Titolo provvisorio <span className={shared.required}>*</span>
                   </span>
                   <input
                     id={REQUIRED_FIELD_IDS.summary_it}
@@ -605,9 +627,10 @@ export function MaintenanceCreatePage() {
                     onChange={(value) => update('quality_flag_ids', value)}
                   />
                   <label className={`${shared.label} ${shared.formGridSpan}`}>
-                    Servizio residuo
+                    Servizio garantito durante l'intervento
                     <textarea
                       className={shared.textarea}
+                      placeholder={RESIDUAL_SERVICE_PLACEHOLDER}
                       value={form.residual_service_it}
                       onChange={(event) => update('residual_service_it', event.target.value)}
                     />
