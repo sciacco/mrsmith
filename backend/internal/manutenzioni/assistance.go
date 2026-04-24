@@ -399,6 +399,9 @@ func assistanceReferenceOptions(items []ReferenceItem) []map[string]any {
 			"description":           item.Description,
 			"technical_domain_id":   item.TechnicalDomainID,
 			"technical_domain_name": item.TechnicalDomainName,
+			"target_type_id":        item.TargetTypeID,
+			"target_type_name":      item.TargetTypeName,
+			"audience":              item.Audience,
 		})
 	}
 	return result

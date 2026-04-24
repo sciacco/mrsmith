@@ -144,6 +144,9 @@ create table maintenance.service_taxonomy (
     service_taxonomy_id  bigint generated always as identity primary key,
     code                 text not null unique,            -- es: veeam_cloud_connect
     technical_domain_id  bigint not null references maintenance.technical_domain(technical_domain_id),
+    target_type_id       bigint not null references maintenance.target_type(target_type_id),
+    audience             text not null default 'maintenance'
+                              check (audience in ('internal','external','both','maintenance')),
     name_it              text not null,
     name_en              text,
     description          text,
@@ -156,20 +159,15 @@ create table maintenance.service_taxonomy (
 );
 
 create index idx_service_taxonomy_domain on maintenance.service_taxonomy(technical_domain_id);
+create index idx_service_taxonomy_target_type on maintenance.service_taxonomy(target_type_id);
 
 insert into maintenance.technical_domain (code, name_it, name_en, sort_order)
 values
-    ('network', 'Network', 'Network', 10),
+    ('applications', 'Applications', 'Applications', 10),
     ('cloud', 'Cloud', 'Cloud', 20),
-    ('facility', 'Facility', 'Facility', 30),
-    ('storage', 'Storage', 'Storage', 40),
-    ('power', 'Power', 'Power', 50),
-    ('portal', 'Portale', 'Portal', 60),
-    ('backup', 'Backup', 'Backup', 70),
-    ('voice', 'Voce', 'Voice', 80),
-    ('firewall', 'Firewall', 'Firewall', 90),
-    ('security', 'Sicurezza', 'Security', 100),
-    ('other', 'Altro', 'Other', 1000)
+    ('tlc', 'TLC', 'TLC', 30),
+    ('datacenter', 'Datacenter', 'Datacenter', 40),
+    ('ms', 'MS', 'MS', 50)
 on conflict (code) do update set
     name_it = excluded.name_it,
     name_en = excluded.name_en,
@@ -273,6 +271,7 @@ values
     ('asset', 'Asset', 'Asset', 70),
     ('circuit', 'Circuito', 'Circuit', 80),
     ('location', 'Luogo', 'Location', 90),
+    ('tenant', 'Tenant', 'Tenant', 100),
     ('other', 'Altro', 'Other', 1000)
 on conflict (code) do update set
     name_it = excluded.name_it,
@@ -291,28 +290,104 @@ on conflict (code) do update set
     name_en = excluded.name_en,
     sort_order = excluded.sort_order;
 
-insert into maintenance.service_taxonomy (code, technical_domain_id, name_it, name_en, sort_order)
-select seed.code, d.technical_domain_id, seed.name_it, seed.name_en, seed.sort_order
+insert into maintenance.service_taxonomy (
+    code,
+    technical_domain_id,
+    target_type_id,
+    audience,
+    name_it,
+    name_en,
+    description,
+    sort_order
+)
+select
+    seed.code,
+    d.technical_domain_id,
+    tt.target_type_id,
+    seed.audience,
+    seed.name_it,
+    seed.name_en,
+    seed.description,
+    seed.sort_order
 from (
     values
-        ('point_to_point_transport', 'network', 'Trasporto punto-punto', 'Point-to-point transport', 10),
-        ('virtual_machine', 'cloud', 'Macchina virtuale', 'Virtual machine', 20),
-        ('veeam_cloud_connect', 'backup', 'Veeam Cloud Connect', 'Veeam Cloud Connect', 30),
-        ('customer_portal', 'portal', 'Portale cliente', 'Customer portal', 40),
-        ('hosting', 'cloud', 'Hosting', 'Hosting', 50),
-        ('iaas', 'cloud', 'IaaS', 'IaaS', 60),
-        ('voip_pbx', 'voice', 'PBX VoIP', 'VoIP PBX', 70),
-        ('cloud_director', 'cloud', 'Cloud Director', 'Cloud Director', 80),
-        ('electrical_infrastructure', 'power', 'Infrastruttura elettrica', 'Electrical infrastructure', 90),
-        ('cloudstack', 'cloud', 'CloudStack', 'CloudStack', 100),
-        ('firewall_infrastructure', 'firewall', 'Infrastruttura firewall', 'Firewall infrastructure', 110)
-) as seed(code, domain_code, name_it, name_en, sort_order)
+        ('customer_portal', 'applications', 'service', 'external', 'Customer Portal', 'Customer Portal', NULL::text, 10),
+        ('mistra_gateway', 'applications', 'service', 'both', 'Mistra Gateway', 'Mistra Gateway', 'API gateway per applicazioni interne ed esterne, incluso Customer Portal con SLA stringenti', 20),
+        ('mistra_psql_db', 'applications', 'platform', 'both', 'Mistra PSQL DB', 'Mistra PSQL DB', 'Database/logical data store applicativo Mistra; distinto dal cluster HA Patroni gestito da Cloud', 30),
+        ('mistra_mysql_db', 'applications', 'platform', 'both', 'Mistra MySQL DB', 'Mistra MySQL DB', 'Database/logical data store applicativo Mistra; distinto dal cluster HA Galera gestito da Cloud', 40),
+        ('grappa', 'applications', 'service', 'internal', 'Grappa', 'Grappa', NULL::text, 50),
+        ('keycloak_k8s', 'applications', 'service', 'both', 'Keycloak (k8s)', 'Keycloak (k8s)', 'Auth per app sia interne che esterne', 60),
+        ('gitlab', 'applications', 'service', 'internal', 'GitLab', 'GitLab', NULL::text, 70),
+        ('harbor', 'applications', 'service', 'internal', 'Harbor', 'Harbor', 'Container registry', 80),
+        ('appsmith', 'applications', 'platform', 'internal', 'Appsmith', 'Appsmith', 'Piattaforma low-code legacy su cui girano molte mini app', 90),
+        ('alyante', 'applications', 'service', 'internal', 'Alyante', 'Alyante', NULL::text, 100),
+        ('arxivar', 'applications', 'service', 'internal', 'ARXIVAR', 'ARXIVAR', NULL::text, 110),
+        ('assenzio', 'applications', 'service', 'internal', 'Assenzio', 'Assenzio', NULL::text, 120),
+        ('apicore', 'applications', 'service', 'internal', 'apicore', 'apicore', NULL::text, 130),
+        ('chrono', 'applications', 'service', 'internal', 'chrono', 'chrono', NULL::text, 140),
+        ('hive', 'applications', 'service', 'internal', 'hive', 'hive', NULL::text, 150),
+        ('gestione_portale', 'applications', 'service', 'internal', 'Gestione Portale', 'Portal Management', NULL::text, 160),
+        ('ingressi', 'applications', 'service', 'both', 'INGRESSI', 'INGRESSI', NULL::text, 170),
+        ('cloudstack', 'cloud', 'platform', 'both', 'Cloudstack', 'Cloudstack', 'Piattaforma IaaS + uso interno', 180),
+        ('firewall_appliance_clienti', 'cloud', 'platform', 'external', 'Firewall appliance clienti', 'Customer firewall appliances', 'Appliance virtuali pfSense e simili su infrastruttura Cloud', 190),
+        ('cpanel', 'cloud', 'platform', 'external', 'cpanel', 'cpanel', 'Hosting clienti', 200),
+        ('dns_autoritativi', 'cloud', 'service', 'external', 'DNS Autoritativi', 'Authoritative DNS', 'ns1-ns6', 210),
+        ('resolver_dns', 'cloud', 'service', 'external', 'Resolver DNS', 'DNS Resolver', 'Resolver DNS pubblico', 220),
+        ('active_directory', 'cloud', 'service', 'internal', 'Active Directory', 'Active Directory', NULL::text, 230),
+        ('timoo_pbx', 'cloud', 'service', 'both', 'TIMOO (PBX)', 'TIMOO (PBX)', 'Uso interno + erogato ai clienti', 240),
+        ('bitwarden', 'cloud', 'service', 'internal', 'Bitwarden', 'Bitwarden', NULL::text, 250),
+        ('storage_san_nas', 'cloud', 'asset', 'maintenance', 'Storage SAN/NAS', 'SAN/NAS Storage', 'Dipende da quale volume/storage si tocca', 260),
+        ('vmware_iaas', 'cloud', 'platform', 'both', 'VMware IaaS', 'VMware IaaS', NULL::text, 270),
+        ('kvm_iaas', 'cloud', 'platform', 'both', 'KVM IaaS', 'KVM IaaS', NULL::text, 280),
+        ('proxmox_privato', 'cloud', 'platform', 'internal', 'Proxmox Privato', 'Private Proxmox', 'Due cluster interni gestiti da Cloud, dislocati nei datacenter C21 Milano ed E100 Roma', 290),
+        ('veeam_backup_infrastrutturale', 'cloud', 'service', 'both', 'Veeam / Backup infrastrutturale', 'Veeam / Infrastructure Backup', NULL::text, 300),
+        ('private_cloud_cloud', 'cloud', 'product', 'external', 'Private Cloud (Cloud)', 'Private Cloud (Cloud)', 'Infrastruttura fisica dedicata a cliente con hypervisor/orchestrator specifico, distinta da MS', 310),
+        ('cluster_k8s', 'cloud', 'platform', 'both', 'Cluster k8s', 'k8s Cluster', 'Ospita app sia internal sia external', 320),
+        ('patroni', 'cloud', 'platform', 'both', 'Patroni', 'Patroni', 'Cluster HA PostgreSQL gestito da Cloud; puo servire piu app', 330),
+        ('galera', 'cloud', 'platform', 'both', 'Galera', 'Galera', 'Cluster HA MySQL gestito da Cloud; puo servire piu app', 340),
+        ('db01virt_mysql', 'cloud', 'platform', 'internal', 'db01virt (MySQL)', 'db01virt (MySQL)', 'Database MySQL di Grappa, ospitato come VM su cluster VMware e manutenuto prevalentemente da Cloud', 350),
+        ('keycloak_esterno', 'cloud', 'service', 'both', 'Keycloak Esterno', 'External Keycloak', 'Istanza separata da quella su k8s', 360),
+        ('switching_core_datacenter', 'tlc', 'asset', 'maintenance', 'Switching core datacenter', 'Datacenter core switching', 'Coppie core / fabric core DC; dipende da quale coppia si tocca', 370),
+        ('switching_datacenter_accesso_leaf_tor', 'tlc', 'asset', 'maintenance', 'Switching datacenter accesso/leaf/ToR', 'Datacenter access/leaf/ToR switching', 'Leaf, ToR, switch server-facing, accesso rack', 380),
+        ('switching_accesso_distribuzione', 'tlc', 'asset', 'maintenance', 'Switching accesso/distribuzione', 'Access/distribution switching', 'Distribuzione non strettamente DC fabric', 390),
+        ('routing_edge_border', 'tlc', 'asset', 'both', 'Routing edge/border', 'Edge/border routing', 'Border router, peering, upstream, internet edge', 400),
+        ('routing_backbone_datacenter', 'tlc', 'asset', 'maintenance', 'Routing backbone e datacenter', 'Backbone and datacenter routing', 'Router backbone, inter-DC, routing interno DC', 410),
+        ('bras_bng', 'tlc', 'platform', 'external', 'BRAS / BNG', 'BRAS / BNG', 'Piattaforma accesso clienti; impatto su autenticazione/sessioni', 420),
+        ('firewall_perimetrale', 'tlc', 'asset', 'both', 'Firewall perimetrale', 'Perimeter firewall', 'Protegge CdLAN ma il down impatta anche clienti', 430),
+        ('firewall_multitenant', 'tlc', 'platform', 'external', 'Firewall Multitenant', 'Multitenant firewall', 'Cluster/firewall HA multitenant; manutenzione su tenant, nodo o intero cluster', 440),
+        ('radius_applicativo', 'tlc', 'service', 'external', 'RADIUS (applicativo)', 'RADIUS (application)', 'Down: clienti non autenticano', 450),
+        ('radius_ui', 'tlc', 'service', 'internal', 'RADIUS UI', 'RADIUS UI', NULL::text, 460),
+        ('ruckus', 'tlc', 'platform', 'internal', 'Ruckus', 'Ruckus', 'Controller wifi corporate', 470),
+        ('checkmk', 'tlc', 'service', 'internal', 'CHECKmk', 'CHECKmk', 'Monitoring interno', 480),
+        ('desigo', 'datacenter', 'platform', 'internal', 'Desigo', 'Desigo', 'BMS', 490),
+        ('lenel', 'datacenter', 'platform', 'internal', 'Lenel', 'Lenel', 'Controllo accessi', 500),
+        ('traka', 'datacenter', 'platform', 'internal', 'Traka', 'Traka', 'Gestione chiavi', 510),
+        ('power_ups', 'datacenter', 'asset', 'maintenance', 'Power / UPS', 'Power / UPS', 'Dipende dal quadro/impianto toccato', 520),
+        ('generatori', 'datacenter', 'asset', 'both', 'Generatori', 'Generators', NULL::text, 530),
+        ('condizionamento', 'datacenter', 'asset', 'maintenance', 'Condizionamento', 'Cooling', NULL::text, 540),
+        ('cablaggio_strutturato_passivo', 'datacenter', 'asset', 'maintenance', 'Cablaggio strutturato passivo', 'Passive structured cabling', 'Permutazioni massive, patch panel, cablaggio fisico non apparati', 550),
+        ('illuminazione_sala_locale_tecnico', 'datacenter', 'asset', 'maintenance', 'Illuminazione sala/locale tecnico', 'Room/technical area lighting', 'Illuminazione tecnica di sale DC/locali tecnici', 560),
+        ('antincendio_rilevazione_estinzione', 'datacenter', 'asset', 'maintenance', 'Antincendio / rilevazione / estinzione', 'Fire detection / suppression', 'Impianti rilevazione e spegnimento; distinguere dal solo monitoraggio BMS', 570),
+        ('sensori_telemetria_ambientale', 'datacenter', 'asset', 'maintenance', 'Sensori e telemetria ambientale', 'Environmental sensors and telemetry', 'Sonde, sensori e punti campo che alimentano BMS/allarmi', 580),
+        ('plc_controllori_impianti', 'datacenter', 'asset', 'both', 'PLC / controllori impianti', 'PLC / plant controllers', 'Controllori di campo e automazioni che alimentano o sono supervisionati dal BMS', 590),
+        ('facility', 'datacenter', 'location', 'maintenance', 'Facility', 'Facility', 'Infrastruttura strutturale/ambientale non coperta da voci specifiche', 600),
+        ('firewall_cliente', 'ms', 'product', 'external', 'Firewall cliente', 'Customer firewall', NULL::text, 610),
+        ('backup_gestito', 'ms', 'product', 'external', 'Backup gestito', 'Managed backup', NULL::text, 620),
+        ('monitoring_gestito', 'ms', 'product', 'external', 'Monitoring gestito', 'Managed monitoring', NULL::text, 630),
+        ('vpn_cliente', 'ms', 'product', 'external', 'VPN cliente', 'Customer VPN', NULL::text, 640),
+        ('infrastrutture_cloud_gestite', 'ms', 'product', 'external', 'Infrastrutture cloud gestite', 'Managed cloud infrastructures', NULL::text, 650),
+        ('private_cloud_ms', 'ms', 'product', 'external', 'Private Cloud (MS)', 'Private Cloud (MS)', NULL::text, 660)
+) as seed(code, domain_code, target_type_code, audience, name_it, name_en, description, sort_order)
 join maintenance.technical_domain d on d.code = seed.domain_code
+join maintenance.target_type tt on tt.code = seed.target_type_code
 where true
 on conflict (code) do update set
     technical_domain_id = excluded.technical_domain_id,
+    target_type_id = excluded.target_type_id,
+    audience = excluded.audience,
     name_it = excluded.name_it,
     name_en = excluded.name_en,
+    description = excluded.description,
     sort_order = excluded.sort_order;
 
 create table maintenance.llm_model (

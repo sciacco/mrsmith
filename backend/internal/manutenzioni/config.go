@@ -35,7 +35,9 @@ func (h *Handler) handleListConfig(w http.ResponseWriter, r *http.Request) {
 			OR COALESCE(x.name_it, '') ILIKE `+placeholder(&args, pattern)+`
 			OR COALESCE(x.name_en, '') ILIKE `+placeholder(&args, pattern)+`
 			OR COALESCE(x.description, '') ILIKE `+placeholder(&args, pattern)+`
-			OR COALESCE(x.technical_domain_name, '') ILIKE `+placeholder(&args, pattern)+`)`)
+			OR COALESCE(x.technical_domain_name, '') ILIKE `+placeholder(&args, pattern)+`
+			OR COALESCE(x.target_type_name, '') ILIKE `+placeholder(&args, pattern)+`
+			OR COALESCE(x.audience, '') ILIKE `+placeholder(&args, pattern)+`)`)
 	}
 	whereSQL := ""
 	if len(where) > 0 {
@@ -71,6 +73,7 @@ func configListQuery(meta resourceMeta, whereSQL string) string {
 			SELECT site_id AS id, code, name AS name_it, NULL::text AS name_en, NULL::text AS description,
 				100 AS sort_order, is_active, city, country_code,
 				NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::bigint AS target_type_id, NULL::text AS target_type_name, NULL::text AS audience,
 				scope, owner_maintenance_id
 			FROM maintenance.site
 			WHERE scope = 'global'
@@ -80,14 +83,17 @@ func configListQuery(meta resourceMeta, whereSQL string) string {
 			SELECT st.service_taxonomy_id AS id, st.code, st.name_it, st.name_en, st.description,
 				st.sort_order, st.is_active, NULL::text AS city, NULL::text AS country_code,
 				st.technical_domain_id, td.name_it AS technical_domain_name,
+				st.target_type_id, tt.name_it AS target_type_name, st.audience,
 				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM maintenance.service_taxonomy st
 			JOIN maintenance.technical_domain td ON td.technical_domain_id = st.technical_domain_id
+			JOIN maintenance.target_type tt ON tt.target_type_id = st.target_type_id
 		) x` + whereSQL + ` ORDER BY x.sort_order, x.name_it, x.id`
 	default:
 		return fmt.Sprintf(`SELECT * FROM (
 			SELECT %s AS id, code, name_it, name_en, description, sort_order, is_active,
 				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::bigint AS target_type_id, NULL::text AS target_type_name, NULL::text AS audience,
 				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM %s
 		) x`, meta.IDColumn, meta.Table) + whereSQL + ` ORDER BY x.sort_order, x.name_it, x.id`
@@ -187,6 +193,7 @@ func (h *Handler) insertConfigItem(r *http.Request, meta resourceMeta, body conf
 			RETURNING site_id AS id, code, name AS name_it, NULL::text AS name_en, NULL::text AS description,
 				100 AS sort_order, is_active, city, country_code,
 				NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::bigint AS target_type_id, NULL::text AS target_type_name, NULL::text AS audience,
 				scope, owner_maintenance_id`,
 			body.Code,
 			body.NameIT,
@@ -195,23 +202,30 @@ func (h *Handler) insertConfigItem(r *http.Request, meta resourceMeta, body conf
 			isActive,
 		)
 	case resourceService:
-		if body.TechnicalDomainID == nil || *body.TechnicalDomainID <= 0 {
+		audience, ok := cleanServiceAudience(body.Audience)
+		if body.TechnicalDomainID == nil || *body.TechnicalDomainID <= 0 || body.TargetTypeID == nil || *body.TargetTypeID <= 0 || !ok {
 			return ReferenceItem{}, errBadRequest
 		}
 		return h.queryConfigItem(
 			r,
 			`WITH inserted AS (
-				INSERT INTO maintenance.service_taxonomy (code, technical_domain_id, name_it, name_en, description, sort_order, is_active)
-				VALUES ($1, $2, $3, $4, $5, $6, $7)
+				INSERT INTO maintenance.service_taxonomy (
+					code, technical_domain_id, target_type_id, audience, name_it, name_en, description, sort_order, is_active
+				)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 				RETURNING *
 			)
 			SELECT i.service_taxonomy_id AS id, i.code, i.name_it, i.name_en, i.description, i.sort_order, i.is_active,
 				NULL::text AS city, NULL::text AS country_code, i.technical_domain_id, td.name_it AS technical_domain_name,
+				i.target_type_id, tt.name_it AS target_type_name, i.audience,
 				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM inserted i
-			JOIN maintenance.technical_domain td ON td.technical_domain_id = i.technical_domain_id`,
+			JOIN maintenance.technical_domain td ON td.technical_domain_id = i.technical_domain_id
+			JOIN maintenance.target_type tt ON tt.target_type_id = i.target_type_id`,
 			body.Code,
 			*body.TechnicalDomainID,
+			*body.TargetTypeID,
+			audience,
 			body.NameIT,
 			nullStringPtr(body.NameEN),
 			nullStringPtr(body.Description),
@@ -225,6 +239,7 @@ func (h *Handler) insertConfigItem(r *http.Request, meta resourceMeta, body conf
 			VALUES ($1, $2, $3, $4, $5, $6)
 			RETURNING %s AS id, code, name_it, name_en, description, sort_order, is_active,
 				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::bigint AS target_type_id, NULL::text AS target_type_name, NULL::text AS audience,
 				NULL::text AS scope, NULL::bigint AS owner_maintenance_id`, meta.Table, meta.IDColumn),
 			body.Code,
 			body.NameIT,
@@ -246,6 +261,7 @@ func (h *Handler) updateConfigItem(r *http.Request, meta resourceMeta, id int64,
 			RETURNING site_id AS id, code, name AS name_it, NULL::text AS name_en, NULL::text AS description,
 				100 AS sort_order, is_active, city, country_code,
 				NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::bigint AS target_type_id, NULL::text AS target_type_name, NULL::text AS audience,
 				scope, owner_maintenance_id`,
 			body.NameIT,
 			nullStringPtr(body.City),
@@ -254,23 +270,29 @@ func (h *Handler) updateConfigItem(r *http.Request, meta resourceMeta, id int64,
 			id,
 		)
 	case resourceService:
-		if body.TechnicalDomainID == nil || *body.TechnicalDomainID <= 0 {
+		audience, ok := cleanServiceAudience(body.Audience)
+		if body.TechnicalDomainID == nil || *body.TechnicalDomainID <= 0 || body.TargetTypeID == nil || *body.TargetTypeID <= 0 || !ok {
 			return ReferenceItem{}, errBadRequest
 		}
 		return h.queryConfigItem(
 			r,
 			`WITH updated AS (
 				UPDATE maintenance.service_taxonomy
-				SET technical_domain_id = $1, name_it = $2, name_en = $3, description = $4, sort_order = $5, is_active = $6
-				WHERE service_taxonomy_id = $7
+				SET technical_domain_id = $1, target_type_id = $2, audience = $3, name_it = $4, name_en = $5,
+					description = $6, sort_order = $7, is_active = $8
+				WHERE service_taxonomy_id = $9
 				RETURNING *
 			)
 			SELECT u.service_taxonomy_id AS id, u.code, u.name_it, u.name_en, u.description, u.sort_order, u.is_active,
 				NULL::text AS city, NULL::text AS country_code, u.technical_domain_id, td.name_it AS technical_domain_name,
+				u.target_type_id, tt.name_it AS target_type_name, u.audience,
 				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM updated u
-			JOIN maintenance.technical_domain td ON td.technical_domain_id = u.technical_domain_id`,
+			JOIN maintenance.technical_domain td ON td.technical_domain_id = u.technical_domain_id
+			JOIN maintenance.target_type tt ON tt.target_type_id = u.target_type_id`,
 			*body.TechnicalDomainID,
+			*body.TargetTypeID,
+			audience,
 			body.NameIT,
 			nullStringPtr(body.NameEN),
 			nullStringPtr(body.Description),
@@ -286,6 +308,7 @@ func (h *Handler) updateConfigItem(r *http.Request, meta resourceMeta, id int64,
 			WHERE %s = $6
 			RETURNING %s AS id, code, name_it, name_en, description, sort_order, is_active,
 				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::bigint AS target_type_id, NULL::text AS target_type_name, NULL::text AS audience,
 				NULL::text AS scope, NULL::bigint AS owner_maintenance_id`, meta.Table, meta.IDColumn, meta.IDColumn),
 			body.NameIT,
 			nullStringPtr(body.NameEN),
@@ -299,6 +322,19 @@ func (h *Handler) updateConfigItem(r *http.Request, meta resourceMeta, id int64,
 
 func (h *Handler) queryConfigItem(r *http.Request, query string, args ...any) (ReferenceItem, error) {
 	return scanReferenceItem(h.maintenance.QueryRowContext(r.Context(), query, args...))
+}
+
+func cleanServiceAudience(value *string) (string, bool) {
+	if value == nil {
+		return "", false
+	}
+	cleaned := strings.TrimSpace(*value)
+	switch cleaned {
+	case "internal", "external", "both", "maintenance":
+		return cleaned, true
+	default:
+		return "", false
+	}
 }
 
 func (h *Handler) handleDeactivateConfig(w http.ResponseWriter, r *http.Request) {
@@ -330,6 +366,7 @@ func (h *Handler) handleConfigActive(w http.ResponseWriter, r *http.Request, act
 			RETURNING site_id AS id, code, name AS name_it, NULL::text AS name_en, NULL::text AS description,
 				100 AS sort_order, is_active, city, country_code,
 				NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::bigint AS target_type_id, NULL::text AS target_type_name, NULL::text AS audience,
 				scope, owner_maintenance_id`
 	case resourceService:
 		query = `WITH updated AS (
@@ -337,13 +374,16 @@ func (h *Handler) handleConfigActive(w http.ResponseWriter, r *http.Request, act
 			)
 			SELECT u.service_taxonomy_id AS id, u.code, u.name_it, u.name_en, u.description, u.sort_order, u.is_active,
 				NULL::text AS city, NULL::text AS country_code, u.technical_domain_id, td.name_it AS technical_domain_name,
+				u.target_type_id, tt.name_it AS target_type_name, u.audience,
 				NULL::text AS scope, NULL::bigint AS owner_maintenance_id
 			FROM updated u
-			JOIN maintenance.technical_domain td ON td.technical_domain_id = u.technical_domain_id`
+			JOIN maintenance.technical_domain td ON td.technical_domain_id = u.technical_domain_id
+			JOIN maintenance.target_type tt ON tt.target_type_id = u.target_type_id`
 	default:
 		query = fmt.Sprintf(`UPDATE %s SET is_active = $1 WHERE %s = $2
 			RETURNING %s AS id, code, name_it, name_en, description, sort_order, is_active,
 				NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+				NULL::bigint AS target_type_id, NULL::text AS target_type_name, NULL::text AS audience,
 				NULL::text AS scope, NULL::bigint AS owner_maintenance_id`, meta.Table, meta.IDColumn, meta.IDColumn)
 	}
 	item, err := h.queryConfigItem(r, query, active, id)

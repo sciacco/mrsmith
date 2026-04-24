@@ -78,7 +78,13 @@ export function noticeTypeLabel(value: string): string {
 }
 
 export function audienceLabel(value: string): string {
-  return value === 'external' ? 'Esterna' : 'Interna';
+  const labels: Record<string, string> = {
+    internal: 'Interna',
+    external: 'Esterna',
+    both: 'Interna ed esterna',
+    maintenance: 'Da valutare',
+  };
+  return labels[value] ?? value;
 }
 
 export function sendStatusLabel(value: string): string {

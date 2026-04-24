@@ -58,11 +58,13 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 	switch meta.Resource.Kind {
 	case resourceService:
 		refSelect = `r.code, r.name_it, r.name_en, r.description, r.sort_order, r.is_active,
-			NULL::text AS city, NULL::text AS country_code, r.technical_domain_id, td.name_it AS technical_domain_name`
-		refJoin = fmt.Sprintf(`JOIN %s r ON r.%s = c.%s JOIN maintenance.technical_domain td ON td.technical_domain_id = r.technical_domain_id`, meta.Resource.Table, meta.Resource.IDColumn, meta.ReferenceIDColumn)
+			NULL::text AS city, NULL::text AS country_code, r.technical_domain_id, td.name_it AS technical_domain_name,
+			r.target_type_id, tt.name_it AS target_type_name, r.audience`
+		refJoin = fmt.Sprintf(`JOIN %s r ON r.%s = c.%s JOIN maintenance.technical_domain td ON td.technical_domain_id = r.technical_domain_id JOIN maintenance.target_type tt ON tt.target_type_id = r.target_type_id`, meta.Resource.Table, meta.Resource.IDColumn, meta.ReferenceIDColumn)
 	default:
 		refSelect = `r.code, r.name_it, r.name_en, r.description, r.sort_order, r.is_active,
-			NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name`
+			NULL::text AS city, NULL::text AS country_code, NULL::bigint AS technical_domain_id, NULL::text AS technical_domain_name,
+			NULL::bigint AS target_type_id, NULL::text AS target_type_name, NULL::text AS audience`
 		refJoin = fmt.Sprintf(`JOIN %s r ON r.%s = c.%s`, meta.Resource.Table, meta.Resource.IDColumn, meta.ReferenceIDColumn)
 	}
 
@@ -99,8 +101,8 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 	for rows.Next() {
 		var item ClassificationItem
 		var ref ReferenceItem
-		var nameEN, description, city, country, domainName sql.NullString
-		var domainID sql.NullInt64
+		var nameEN, description, city, country, domainName, targetTypeName, audience sql.NullString
+		var domainID, targetTypeID sql.NullInt64
 		var confidence sql.NullFloat64
 		var metadata []byte
 		if err := rows.Scan(
@@ -117,6 +119,9 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 			&country,
 			&domainID,
 			&domainName,
+			&targetTypeID,
+			&targetTypeName,
+			&audience,
 			&item.Source,
 			&confidence,
 			&item.IsPrimary,
@@ -130,6 +135,9 @@ func (h *Handler) loadClassifications(ctx context.Context, meta classificationMe
 		ref.CountryCode = nullStringValue(country)
 		ref.TechnicalDomainID = nullInt64Value(domainID)
 		ref.TechnicalDomainName = nullStringValue(domainName)
+		ref.TargetTypeID = nullInt64Value(targetTypeID)
+		ref.TargetTypeName = nullStringValue(targetTypeName)
+		ref.Audience = nullStringValue(audience)
 		item.Reference = ref
 		item.Confidence = nullFloatValue(confidence)
 		item.Metadata = rawJSONFromBytes(metadata)

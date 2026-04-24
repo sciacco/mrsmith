@@ -28,7 +28,7 @@ import {
 import type { ReferenceItem } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StatusPill } from '../components/StatusPill';
-import { errorMessage } from '../lib/format';
+import { audienceLabel, errorMessage } from '../lib/format';
 import { capitalize, getResourceMeta, type ResourceMeta } from '../lib/resourceMeta';
 import shared from './shared.module.css';
 
@@ -325,6 +325,8 @@ export function ConfigurationResourcePage() {
                       <th>Nome</th>
                       {resource === 'technical-domains' && <th>Servizi</th>}
                       {resource === 'service-taxonomy' && !filterActive && <th>Dominio</th>}
+                      {resource === 'service-taxonomy' && <th>Tipo target</th>}
+                      {resource === 'service-taxonomy' && <th>Audience</th>}
                       {resource === 'sites' && <th>Città</th>}
                       <th>Stato</th>
                       <th className={shared.actionsCell}>Azioni</th>
@@ -374,6 +376,7 @@ export function ConfigurationResourcePage() {
         meta={meta}
         item={editing}
         technicalDomains={reference.data?.technical_domains ?? []}
+        targetTypes={reference.data?.target_types ?? []}
         defaultTechnicalDomainId={filterActive ? domainFilter : null}
         onClose={() => setModalOpen(false)}
         onSaved={() => {
@@ -475,6 +478,8 @@ function SortableConfigRow({
         </td>
       ) : null}
       {resource === 'service-taxonomy' && !hideDomainColumn && <td>{item.technical_domain_name ?? '-'}</td>}
+      {resource === 'service-taxonomy' && <td>{item.target_type_name ?? '-'}</td>}
+      {resource === 'service-taxonomy' && <td>{item.audience ? audienceLabel(item.audience) : '-'}</td>}
       {resource === 'sites' && <td>{item.city ?? '-'}</td>}
       <td>
         <StatusPill tone={item.is_active ? 'success' : 'neutral'}>
@@ -641,6 +646,8 @@ type FormState = {
   city: string;
   country_code: string;
   technical_domain_id: string;
+  target_type_id: string;
+  audience: string;
   is_active: boolean;
 };
 
@@ -651,6 +658,7 @@ function ConfigModal({
   meta,
   item,
   technicalDomains,
+  targetTypes,
   defaultTechnicalDomainId,
   onClose,
   onSaved,
@@ -659,6 +667,7 @@ function ConfigModal({
   meta: ResourceMeta;
   item: ReferenceItem | null;
   technicalDomains: ReferenceItem[];
+  targetTypes: ReferenceItem[];
   defaultTechnicalDomainId: number | null;
   onClose: () => void;
   onSaved: () => void;
@@ -696,6 +705,12 @@ function ConfigModal({
     if (meta.fields.technical_domain_id === 'required' && !form.technical_domain_id) {
       next.technical_domain_id = 'Seleziona un dominio tecnico.';
     }
+    if (meta.fields.target_type_id === 'required' && !form.target_type_id) {
+      next.target_type_id = 'Seleziona un tipo target.';
+    }
+    if (meta.fields.audience === 'required' && !form.audience) {
+      next.audience = 'Seleziona una audience.';
+    }
     if (meta.fields.city === 'required' && !form.city.trim()) {
       next.city = 'La città è obbligatoria.';
     }
@@ -721,6 +736,8 @@ function ConfigModal({
       city: form.city.trim() || null,
       country_code: form.country_code.trim() || null,
       technical_domain_id: form.technical_domain_id ? Number(form.technical_domain_id) : undefined,
+      target_type_id: form.target_type_id ? Number(form.target_type_id) : undefined,
+      audience: form.audience || undefined,
       is_active: form.is_active,
     };
     try {
@@ -735,6 +752,8 @@ function ConfigModal({
 
   const showNameEn = meta.fields.name_en !== 'hidden';
   const showTechnicalDomain = meta.fields.technical_domain_id !== undefined;
+  const showTargetType = meta.fields.target_type_id !== undefined;
+  const showAudience = meta.fields.audience !== undefined;
   const showCity = meta.fields.city !== undefined;
   const showCountry = meta.fields.country_code !== undefined;
 
@@ -809,6 +828,47 @@ function ConfigModal({
             {errors.technical_domain_id ? (
               <span className={shared.fieldError}>{errors.technical_domain_id}</span>
             ) : null}
+          </label>
+        ) : null}
+        {showTargetType ? (
+          <label className={shared.label}>
+            <span className={shared.labelText}>
+              Tipo target<span className={shared.required}>*</span>
+            </span>
+            <select
+              className={`${shared.select} ${errors.target_type_id ? shared.fieldInvalid : ''}`}
+              value={form.target_type_id}
+              onChange={(event) => update('target_type_id', event.target.value)}
+            >
+              <option value="">Seleziona tipo</option>
+              {targetTypes.map((targetType) => (
+                <option key={targetType.id} value={targetType.id}>
+                  {targetType.name_it}
+                </option>
+              ))}
+            </select>
+            {errors.target_type_id ? (
+              <span className={shared.fieldError}>{errors.target_type_id}</span>
+            ) : null}
+          </label>
+        ) : null}
+        {showAudience ? (
+          <label className={shared.label}>
+            <span className={shared.labelText}>
+              Audience<span className={shared.required}>*</span>
+            </span>
+            <select
+              className={`${shared.select} ${errors.audience ? shared.fieldInvalid : ''}`}
+              value={form.audience}
+              onChange={(event) => update('audience', event.target.value)}
+            >
+              {SERVICE_AUDIENCE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {errors.audience ? <span className={shared.fieldError}>{errors.audience}</span> : null}
           </label>
         ) : null}
         {showCity ? (
@@ -892,6 +952,15 @@ function formFromItem(
     technical_domain_id: item?.technical_domain_id
       ? String(item.technical_domain_id)
       : defaultDomain,
+    target_type_id: item?.target_type_id ? String(item.target_type_id) : '',
+    audience: item?.audience ?? 'maintenance',
     is_active: item ? item.is_active : true,
   };
 }
+
+const SERVICE_AUDIENCE_OPTIONS = [
+  { value: 'internal', label: 'Interna' },
+  { value: 'external', label: 'Esterna' },
+  { value: 'both', label: 'Interna ed esterna' },
+  { value: 'maintenance', label: 'Da valutare in manutenzione' },
+] as const;

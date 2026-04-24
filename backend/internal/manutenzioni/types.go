@@ -35,6 +35,9 @@ type ReferenceItem struct {
 	CountryCode         *string `json:"country_code,omitempty"`
 	TechnicalDomainID   *int64  `json:"technical_domain_id,omitempty"`
 	TechnicalDomainName *string `json:"technical_domain_name,omitempty"`
+	TargetTypeID        *int64  `json:"target_type_id,omitempty"`
+	TargetTypeName      *string `json:"target_type_name,omitempty"`
+	Audience            *string `json:"audience,omitempty"`
 	Scope               *string `json:"scope,omitempty"`
 	OwnerMaintenanceID  *int64  `json:"owner_maintenance_id,omitempty"`
 }
@@ -448,6 +451,8 @@ type configItemRequest struct {
 	City              *string `json:"city"`
 	CountryCode       *string `json:"country_code"`
 	TechnicalDomainID *int64  `json:"technical_domain_id"`
+	TargetTypeID      *int64  `json:"target_type_id"`
+	Audience          *string `json:"audience"`
 }
 
 type configReorderRequest struct {

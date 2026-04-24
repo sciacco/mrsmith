@@ -31,6 +31,8 @@ export interface ResourceMeta {
     description: FieldRequirement;
     sort_order: FieldRequirement;
     technical_domain_id?: FieldRequirement;
+    target_type_id?: FieldRequirement;
+    audience?: FieldRequirement;
     city?: FieldRequirement;
     country_code?: FieldRequirement;
   };
@@ -91,12 +93,12 @@ export const RESOURCE_META: Record<ResourceKey, ResourceMeta> = {
   },
   'service-taxonomy': {
     key: 'service-taxonomy',
-    title: 'Servizi',
+    title: 'Servizi / oggetti manutenibili',
     singular: 'servizio',
     singularArticle: 'il',
     plural: 'servizi',
-    subtitle: 'Tassonomia servizi collegata ai domini tecnici.',
-    shortDescription: 'Tassonomia servizi collegata ai domini.',
+    subtitle: 'Catalogo operativo dei servizi e oggetti manutenibili.',
+    shortDescription: 'Catalogo servizi e oggetti manutenibili.',
     group: 'impact',
     hiddenFromIndex: true,
     fields: {
@@ -104,6 +106,8 @@ export const RESOURCE_META: Record<ResourceKey, ResourceMeta> = {
       description: 'optional',
       sort_order: 'required',
       technical_domain_id: 'required',
+      target_type_id: 'required',
+      audience: 'required',
     },
   },
   'reason-classes': {

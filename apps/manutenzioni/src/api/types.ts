@@ -27,6 +27,9 @@ export interface ReferenceItem {
   country_code?: string | null;
   technical_domain_id?: number | null;
   technical_domain_name?: string | null;
+  target_type_id?: number | null;
+  target_type_name?: string | null;
+  audience?: string | null;
   /** Solo per sites: 'global' (anagrafica condivisa) o 'scoped' (ad-hoc per una manutenzione). */
   scope?: string | null;
   /** Solo per sites scoped: id della manutenzione proprietaria. */
