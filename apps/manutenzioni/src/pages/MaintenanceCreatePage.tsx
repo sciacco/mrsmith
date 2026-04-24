@@ -48,7 +48,6 @@ interface FormState {
   manual_targets: ManualTarget[];
   reason_class_ids: number[];
   impact_effect_ids: number[];
-  quality_flag_ids: number[];
   residual_service_it: string;
   scheduled_start_at: string;
   scheduled_end_at: string;
@@ -82,7 +81,6 @@ const initialForm: FormState = {
   manual_targets: [],
   reason_class_ids: [],
   impact_effect_ids: [],
-  quality_flag_ids: [],
   residual_service_it: '',
   scheduled_start_at: '',
   scheduled_end_at: '',
@@ -211,7 +209,6 @@ export function MaintenanceCreatePage() {
     if (form.service_selections.length > 0) return true;
     if (form.reason_class_ids.length > 0) return true;
     if (form.impact_effect_ids.length > 0) return true;
-    if (form.quality_flag_ids.length > 0) return true;
     return false;
   }
 
@@ -267,8 +264,6 @@ export function MaintenanceCreatePage() {
         response.impact_effect_ids.length > 0
           ? response.impact_effect_ids
           : current.impact_effect_ids,
-      quality_flag_ids:
-        response.quality_flag_ids.length > 0 ? response.quality_flag_ids : current.quality_flag_ids,
     }));
   }
 
@@ -332,7 +327,6 @@ export function MaintenanceCreatePage() {
       initial_service_taxonomy: serviceClassificationInputs(form.service_selections),
       initial_reason_classes: classificationInputs(form.reason_class_ids, true),
       initial_impact_effects: classificationInputs(form.impact_effect_ids, true),
-      initial_quality_flags: classificationInputs(form.quality_flag_ids, false),
       metadata: {
         ai_intake: {
           summary_it: form.summary_it.trim(),
@@ -347,7 +341,6 @@ export function MaintenanceCreatePage() {
           })),
           reason_class_ids: form.reason_class_ids,
           impact_effect_ids: form.impact_effect_ids,
-          quality_flag_ids: form.quality_flag_ids,
         },
       },
     };
@@ -619,12 +612,6 @@ export function MaintenanceCreatePage() {
                     options={toOptions(reference.data.impact_effects)}
                     selected={form.impact_effect_ids}
                     onChange={(value) => update('impact_effect_ids', value)}
-                  />
-                  <MultiSelectField
-                    label="Segnali qualità"
-                    options={toOptions(reference.data.quality_flags)}
-                    selected={form.quality_flag_ids}
-                    onChange={(value) => update('quality_flag_ids', value)}
                   />
                   <label className={`${shared.label} ${shared.formGridSpan}`}>
                     Servizio garantito durante l'intervento
