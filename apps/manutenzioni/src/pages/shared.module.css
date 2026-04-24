@@ -152,6 +152,12 @@
   gap: 0.9rem;
 }
 
+.serviceImpactSummary {
+  margin: 0 0 0.75rem;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
 .serviceImpactBox {
   display: grid;
   gap: 0.9rem;
@@ -161,26 +167,125 @@
   background: var(--color-surface);
 }
 
-.serviceColumns {
+.serviceBlock {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.9rem;
+  gap: 0.7rem;
 }
 
-.serviceSelectionList {
+.serviceBlockHeader {
   display: grid;
+  gap: 0.15rem;
+}
+
+.serviceBlockTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.serviceBlockDivider {
+  border: 0;
+  border-top: 1px dashed var(--color-border-subtle);
+  margin: 0.4rem 0;
+}
+
+.compactRowList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.compactRow {
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  background: var(--color-bg-elevated);
+}
+
+.compactRowHead {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.compactRowName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compactRowSelect {
+  flex: 0 0 auto;
+  width: 12rem;
+}
+
+.compactRowToggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.compactRowToggle:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.compactRowExpanded {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  padding-left: 1.6rem;
+}
+
+.compactRowField {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.compactRowFieldLabel {
+  color: var(--color-text-muted);
+}
+
+.iconOperated {
+  color: var(--color-accent);
+  fill: currentColor;
+}
+
+.iconImpacted {
+  color: var(--color-text-muted);
+  fill: none;
+}
+
+.targetForm {
+  display: grid;
+  grid-template-columns: 1fr 2fr 2fr;
   gap: 0.55rem;
 }
 
-.serviceSelectionRow {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(120px, 0.55fr) minmax(150px, 0.7fr) minmax(160px, 0.75fr);
-  gap: 0.6rem;
-  align-items: center;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 8px;
-  padding: 0.65rem;
-  background: var(--color-bg-elevated);
+.targetFormActions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .suggestionPanel {
@@ -201,6 +306,66 @@
   gap: 0.55rem;
   color: var(--color-text);
   font-size: 0.84rem;
+}
+
+.suggestionRowGrid {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 0.6rem;
+  align-items: center;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.suggestionUpstream {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suggestionSeverity {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.suggestionDisclaimer {
+  margin: -0.2rem 0 0.3rem 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.indirectDetails {
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 0.7rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.indirectDetails > summary {
+  list-style: none;
+}
+
+.indirectDetails > summary::-webkit-details-marker {
+  display: none;
+}
+
+.indirectSummary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.indirectSummary:hover {
+  color: var(--color-text);
 }
 
 .chipList {
@@ -497,8 +662,20 @@
 }
 
 @media (max-width: 760px) {
-  .serviceColumns,
-  .serviceSelectionRow {
+  .compactRowHead {
+    flex-wrap: wrap;
+  }
+
+  .compactRowSelect {
+    width: 100%;
+  }
+
+  .compactRowExpanded {
+    grid-template-columns: 1fr;
+    padding-left: 0;
+  }
+
+  .targetForm {
     grid-template-columns: 1fr;
   }
 
