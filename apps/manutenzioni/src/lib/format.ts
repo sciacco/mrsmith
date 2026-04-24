@@ -169,6 +169,8 @@ export function errorMessage(error: unknown, fallback: string): string {
         customer_lookup_not_configured: 'Ricerca clienti non disponibile.',
         maintenance_not_found: 'Manutenzione non trovata.',
         status_transition_not_allowed: 'Cambio stato non consentito.',
+        customer_scope_required: "Definisci l'ambito clienti prima di continuare.",
+        invalid_customer_scope: 'Ambito clienti non valido.',
         maintenance_window_required: 'Aggiungi una finestra prima di continuare.',
         notice_content_required: 'Completa i testi richiesti prima di cambiare stato.',
         sent_at_required: 'Indica la data di invio.',

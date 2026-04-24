@@ -131,7 +131,7 @@ Primary row content:
 - status
 - technical domain
 - maintenance kind
-- customer scope
+- customer scope, or `Da definire` for drafts that still need a customer perimeter
 - site
 - current window start/end
 - expected downtime
@@ -147,10 +147,10 @@ Required fields:
 - Italian title
 - maintenance kind
 - technical domain
-- customer scope
 
 Optional fields at creation:
 
+- customer scope
 - English title
 - Italian and English description
 - site
@@ -620,6 +620,7 @@ Implementation verification, once approved:
 8. Target display names are enough in V1; no detail-page links are required.
 9. Imported or AI-sourced classifications are editable by managers.
 10. V1 includes configuration pages for all maintenance lookup and taxonomy tables.
+11. Customer scope can be left undefined only for drafts and cancelled maintenance; approval and operational states require it.
 
 ## Future Phases
 

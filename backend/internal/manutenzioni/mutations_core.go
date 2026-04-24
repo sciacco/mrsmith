@@ -19,8 +19,12 @@ func (h *Handler) handleCreateMaintenance(w http.ResponseWriter, r *http.Request
 		return
 	}
 	body.TitleIT = strings.TrimSpace(body.TitleIT)
-	if body.TitleIT == "" || body.MaintenanceKindID <= 0 || body.TechnicalDomainID <= 0 || body.CustomerScopeID <= 0 {
+	if body.TitleIT == "" || body.MaintenanceKindID <= 0 || body.TechnicalDomainID <= 0 {
 		appError(w, http.StatusBadRequest, "required_fields_missing")
+		return
+	}
+	if body.CustomerScopeID != nil && *body.CustomerScopeID <= 0 {
+		appError(w, http.StatusBadRequest, "invalid_customer_scope")
 		return
 	}
 	if body.SiteID != nil && body.AdhocSite != nil {
@@ -52,6 +56,10 @@ func (h *Handler) handleCreateMaintenance(w http.ResponseWriter, r *http.Request
 
 	var id int64
 	var createdAt sql.NullTime
+	var customerScopeID any
+	if body.CustomerScopeID != nil {
+		customerScopeID = *body.CustomerScopeID
+	}
 	if err := tx.QueryRowContext(
 		r.Context(),
 		`INSERT INTO maintenance.maintenance (
@@ -76,7 +84,7 @@ func (h *Handler) handleCreateMaintenance(w http.ResponseWriter, r *http.Request
 		nullStringPtr(body.DescriptionEN),
 		body.MaintenanceKindID,
 		body.TechnicalDomainID,
-		body.CustomerScopeID,
+		customerScopeID,
 		body.SiteID,
 		nullStringPtr(body.ReasonIT),
 		nullStringPtr(body.ReasonEN),
@@ -200,6 +208,10 @@ func (h *Handler) handleUpdateMaintenance(w http.ResponseWriter, r *http.Request
 		appError(w, http.StatusBadRequest, "invalid_adhoc_site")
 		return
 	}
+	if body.ClearCustomerScope && body.CustomerScopeID != nil {
+		appError(w, http.StatusBadRequest, "invalid_customer_scope")
+		return
+	}
 
 	args := []any{}
 	sets := []string{}
@@ -254,20 +266,28 @@ func (h *Handler) handleUpdateMaintenance(w http.ResponseWriter, r *http.Request
 	defer tx.Rollback()
 
 	// Sito corrente: serve per decidere se lasciare orfano un sito scoped di questa manutenzione.
+	var currentStatus string
 	var currentSiteID sql.NullInt64
 	var currentSiteScope sql.NullString
 	var currentOwner sql.NullInt64
 	if err := tx.QueryRowContext(r.Context(),
-		`SELECT m.site_id, s.scope, s.owner_maintenance_id
+		`SELECT m.status, m.site_id, s.scope, s.owner_maintenance_id
 		 FROM maintenance.maintenance m
 		 LEFT JOIN maintenance.site s ON s.site_id = m.site_id
 		 WHERE m.maintenance_id = $1 FOR UPDATE OF m`, id).
-		Scan(&currentSiteID, &currentSiteScope, &currentOwner); errors.Is(err, sql.ErrNoRows) {
+		Scan(&currentStatus, &currentSiteID, &currentSiteScope, &currentOwner); errors.Is(err, sql.ErrNoRows) {
 		appError(w, http.StatusNotFound, "maintenance_not_found")
 		return
 	} else if err != nil {
 		h.dbFailure(w, r, "update_maintenance_site_load", err, "maintenance_id", id)
 		return
+	}
+	if body.ClearCustomerScope {
+		if currentStatus != StatusDraft && currentStatus != StatusCancelled {
+			appError(w, http.StatusBadRequest, "customer_scope_required")
+			return
+		}
+		sets = append(sets, "customer_scope_id = NULL")
 	}
 	currentScopedOwned := currentSiteID.Valid &&
 		currentSiteScope.Valid && currentSiteScope.String == "scoped" &&
@@ -388,11 +408,15 @@ func (h *Handler) handleMaintenanceStatus(w http.ResponseWriter, r *http.Request
 		appError(w, http.StatusBadRequest, "status_transition_not_allowed")
 		return
 	}
-	if (body.Action == "schedule" || body.Action == "announce" || body.Action == "start") && !h.hasUsableWindowTx(r, tx, id) {
-		appError(w, http.StatusBadRequest, "maintenance_window_required")
-		return
-	}
 	if body.Action == "approve" || body.Action == "schedule" || body.Action == "announce" || body.Action == "start" {
+		if !h.hasCustomerScopeTx(r, tx, id) {
+			appError(w, http.StatusBadRequest, "customer_scope_required")
+			return
+		}
+		if (body.Action == "schedule" || body.Action == "announce" || body.Action == "start") && !h.hasUsableWindowTx(r, tx, id) {
+			appError(w, http.StatusBadRequest, "maintenance_window_required")
+			return
+		}
 		if err := h.validateImpactReadyTx(r, tx, id); errors.Is(err, errBadRequest) {
 			appError(w, http.StatusBadRequest, "impact_selection_required")
 			return
@@ -471,6 +495,18 @@ func (h *Handler) validateImpactReadyTx(r *http.Request, tx *sql.Tx, maintenance
 		return errAudienceRequired
 	}
 	return nil
+}
+
+func (h *Handler) hasCustomerScopeTx(r *http.Request, tx *sql.Tx, maintenanceID int64) bool {
+	var exists bool
+	err := tx.QueryRowContext(
+		r.Context(),
+		`SELECT customer_scope_id IS NOT NULL
+		FROM maintenance.maintenance
+		WHERE maintenance_id = $1`,
+		maintenanceID,
+	).Scan(&exists)
+	return err == nil && exists
 }
 
 func nextStatus(current string, action string) (string, string, string, bool) {

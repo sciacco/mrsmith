@@ -144,7 +144,7 @@ export function MaintenanceDetailPage() {
                 {data.code || `MNT #${data.maintenance_id}`} · {data.title_it}
               </h1>
               <p className={shared.pageSubtitle}>
-                {data.technical_domain.name_it} · {data.maintenance_kind.name_it} · {data.customer_scope.name_it}
+                {data.technical_domain.name_it} · {data.maintenance_kind.name_it} · {customerScopeLabel(data.customer_scope)}
               </p>
             </div>
             <div className={shared.headerActions}>
@@ -229,7 +229,7 @@ function SummaryTab({
     description_en: detail.description_en ?? '',
     maintenance_kind_id: String(detail.maintenance_kind.id),
     technical_domain_id: String(detail.technical_domain.id),
-    customer_scope_id: String(detail.customer_scope.id),
+    customer_scope_id: detail.customer_scope ? String(detail.customer_scope.id) : '',
     site_id: detail.site ? String(detail.site.id) : '',
     adhoc_site: null as AdhocSiteInput | null,
     reason_it: detail.reason_it ?? '',
@@ -246,6 +246,15 @@ function SummaryTab({
       siteIdRaw: form.site_id,
       adhocSite: form.adhoc_site,
     });
+    const customerScopePatch = buildCustomerScopePatch({
+      status: detail.status,
+      previousCustomerScopeId: detail.customer_scope?.id ?? null,
+      customerScopeIdRaw: form.customer_scope_id,
+    });
+    if (customerScopePatch === null) {
+      toast.toast("Definisci l'ambito clienti prima di continuare.", 'error');
+      return;
+    }
     try {
       await update.mutateAsync({
         id: detail.maintenance_id,
@@ -256,7 +265,7 @@ function SummaryTab({
           description_en: form.description_en || null,
           maintenance_kind_id: Number(form.maintenance_kind_id),
           technical_domain_id: Number(form.technical_domain_id),
-          customer_scope_id: Number(form.customer_scope_id),
+          ...customerScopePatch,
           ...sitePatch,
           reason_it: form.reason_it || null,
           residual_service_it: form.residual_service_it || null,
@@ -406,6 +415,8 @@ function SummaryTab({
               label="Ambito clienti"
               value={form.customer_scope_id}
               items={reference.customer_scopes}
+              emptyLabel="Da definire"
+              includeEmpty={canClearCustomerScope(detail.status)}
               onChange={(value) => setForm({ ...form, customer_scope_id: value })}
             />
             <SiteSelectField
@@ -453,7 +464,7 @@ function SummaryTab({
         <div className={shared.detailsGrid}>
           <DetailItem label="Tipo" value={detail.maintenance_kind.name_it} />
           <DetailItem label="Dominio" value={detail.technical_domain.name_it} />
-          <DetailItem label="Ambito clienti" value={detail.customer_scope.name_it} />
+          <DetailItem label="Ambito clienti" value={customerScopeLabel(detail.customer_scope)} />
           <div className={shared.detailItem}>
             <span>Sito</span>
             <strong>
@@ -506,18 +517,20 @@ function SelectField({
   items,
   onChange,
   emptyLabel = 'Seleziona',
+  includeEmpty = true,
 }: {
   label: string;
   value: string;
   items: Array<{ id: number; name_it: string }>;
   onChange: (value: string) => void;
   emptyLabel?: string;
+  includeEmpty?: boolean;
 }) {
   return (
     <label className={shared.label}>
       {label}
       <select className={shared.select} value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{emptyLabel}</option>
+        {includeEmpty && <option value="">{emptyLabel}</option>}
         {items.map((item) => (
           <option key={item.id} value={item.id}>
             {item.name_it}
@@ -535,6 +548,10 @@ function DetailItem({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function customerScopeLabel(scope: ReferenceItem | null): string {
+  return scope?.name_it ?? 'Da definire';
 }
 
 function AssistancePanel({
@@ -718,6 +735,30 @@ function buildSitePatch(input: {
   // Niente sito scelto: clear solo se prima ce n'era uno.
   if (input.previousSiteId != null) {
     return { clear_site: true };
+  }
+  return {};
+}
+
+function canClearCustomerScope(status: string): boolean {
+  return status === 'draft' || status === 'cancelled';
+}
+
+function buildCustomerScopePatch(input: {
+  status: string;
+  previousCustomerScopeId: number | null;
+  customerScopeIdRaw: string;
+}): {
+  customer_scope_id?: number;
+  clear_customer_scope?: boolean;
+} | null {
+  if (input.customerScopeIdRaw) {
+    return { customer_scope_id: Number(input.customerScopeIdRaw) };
+  }
+  if (!canClearCustomerScope(input.status)) {
+    return null;
+  }
+  if (input.previousCustomerScopeId != null) {
+    return { clear_customer_scope: true };
   }
   return {};
 }

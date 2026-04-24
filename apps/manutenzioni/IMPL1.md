@@ -767,7 +767,7 @@ Create page:
   - Italian title
   - maintenance kind
   - technical domain
-  - customer scope
+- Customer scope is optional while the maintenance is a draft; approval and operational states require it.
 - Optional sections can be collapsed:
   - English title
   - descriptions
@@ -959,8 +959,10 @@ Manual verification:
 - [ ] User with `app_manutenzioni_access` can open the app and view the register.
 - [ ] User without the role cannot access backend data.
 - [ ] Manager can create a draft maintenance.
+- [ ] Manager can create a draft maintenance without customer scope.
 - [ ] Code is generated server-side.
 - [ ] Approver approval is required before schedule or announcement.
+- [ ] Approval, scheduling, announcement, and start are blocked until customer scope is defined.
 - [ ] Manager can add, reschedule, cancel, and complete windows with validation.
 - [ ] Manager can manage classifications, targets, impacted customers, and notices.
 - [ ] Read-only users see data without edit controls.

@@ -29,7 +29,7 @@ func (h *Handler) handleListMaintenances(w http.ResponseWriter, r *http.Request)
 	from := ` FROM maintenance.maintenance m
 		JOIN maintenance.maintenance_kind mk ON mk.maintenance_kind_id = m.maintenance_kind_id
 		JOIN maintenance.technical_domain td ON td.technical_domain_id = m.technical_domain_id
-		JOIN maintenance.customer_scope cs ON cs.customer_scope_id = m.customer_scope_id
+		LEFT JOIN maintenance.customer_scope cs ON cs.customer_scope_id = m.customer_scope_id
 		LEFT JOIN maintenance.site s ON s.site_id = m.site_id
 		LEFT JOIN maintenance.v_current_window vcw ON vcw.maintenance_id = m.maintenance_id`
 
@@ -187,11 +187,15 @@ func splitQueryList(raw string) []string {
 func scanMaintenanceListItem(rows *sql.Rows) (MaintenanceListItem, error) {
 	var item MaintenanceListItem
 	var titleEN sql.NullString
-	var kindID, domainID, scopeID int64
-	var kindCode, kindName, domainCode, domainName, scopeCode, scopeName string
+	var kindID, domainID int64
+	var scopeID sql.NullInt64
+	var kindCode, kindName, domainCode, domainName string
+	var scopeCode, scopeName sql.NullString
 	var kindNameEN, kindDescription, domainNameEN, domainDescription, scopeNameEN, scopeDescription sql.NullString
-	var kindSort, domainSort, scopeSort int
-	var kindActive, domainActive, scopeActive bool
+	var kindSort, domainSort int
+	var scopeSort sql.NullInt64
+	var kindActive, domainActive bool
+	var scopeActive sql.NullBool
 	var siteID sql.NullInt64
 	var siteCode, siteName, siteCity, siteCountry, siteScope sql.NullString
 	var siteActive sql.NullBool
@@ -225,7 +229,7 @@ func scanMaintenanceListItem(rows *sql.Rows) (MaintenanceListItem, error) {
 	item.TitleEN = nullStringValue(titleEN)
 	item.MaintenanceKind = ReferenceItem{ID: kindID, Code: kindCode, NameIT: kindName, NameEN: nullStringValue(kindNameEN), Description: nullStringValue(kindDescription), SortOrder: kindSort, IsActive: kindActive}
 	item.TechnicalDomain = ReferenceItem{ID: domainID, Code: domainCode, NameIT: domainName, NameEN: nullStringValue(domainNameEN), Description: nullStringValue(domainDescription), SortOrder: domainSort, IsActive: domainActive}
-	item.CustomerScope = ReferenceItem{ID: scopeID, Code: scopeCode, NameIT: scopeName, NameEN: nullStringValue(scopeNameEN), Description: nullStringValue(scopeDescription), SortOrder: scopeSort, IsActive: scopeActive}
+	item.CustomerScope = nullableReferenceItem(scopeID, scopeCode, scopeName, scopeNameEN, scopeDescription, scopeSort, scopeActive)
 	if siteID.Valid {
 		item.Site = &ReferenceItem{
 			ID:          siteID.Int64,
@@ -258,6 +262,32 @@ func scanMaintenanceListItem(rows *sql.Rows) (MaintenanceListItem, error) {
 	return item, nil
 }
 
+func nullableReferenceItem(
+	id sql.NullInt64,
+	code sql.NullString,
+	name sql.NullString,
+	nameEN sql.NullString,
+	description sql.NullString,
+	sortOrder sql.NullInt64,
+	isActive sql.NullBool,
+) *ReferenceItem {
+	if !id.Valid {
+		return nil
+	}
+	item := ReferenceItem{
+		ID:          id.Int64,
+		Code:        code.String,
+		NameIT:      name.String,
+		NameEN:      nullStringValue(nameEN),
+		Description: nullStringValue(description),
+		IsActive:    isActive.Valid && isActive.Bool,
+	}
+	if sortOrder.Valid {
+		item.SortOrder = int(sortOrder.Int64)
+	}
+	return &item
+}
+
 func (h *Handler) handleGetMaintenance(w http.ResponseWriter, r *http.Request) {
 	if !h.requireMaintenanceDB(w) {
 		return
@@ -283,11 +313,15 @@ func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (Maintena
 	var detail MaintenanceDetail
 	var titleEN, descriptionIT, descriptionEN, reasonIT, reasonEN, residualIT, residualEN sql.NullString
 	var metadata []byte
-	var kindID, domainID, scopeID int64
-	var kindCode, kindName, domainCode, domainName, scopeCode, scopeName string
+	var kindID, domainID int64
+	var scopeID sql.NullInt64
+	var kindCode, kindName, domainCode, domainName string
+	var scopeCode, scopeName sql.NullString
 	var kindNameEN, kindDescription, domainNameEN, domainDescription, scopeNameEN, scopeDescription sql.NullString
-	var kindSort, domainSort, scopeSort int
-	var kindActive, domainActive, scopeActive bool
+	var kindSort, domainSort int
+	var scopeSort sql.NullInt64
+	var kindActive, domainActive bool
+	var scopeActive sql.NullBool
 	var siteID sql.NullInt64
 	var siteCode, siteName, siteCity, siteCountry, siteScope sql.NullString
 	var siteActive sql.NullBool
@@ -322,7 +356,7 @@ func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (Maintena
 		FROM maintenance.maintenance m
 		JOIN maintenance.maintenance_kind mk ON mk.maintenance_kind_id = m.maintenance_kind_id
 		JOIN maintenance.technical_domain td ON td.technical_domain_id = m.technical_domain_id
-		JOIN maintenance.customer_scope cs ON cs.customer_scope_id = m.customer_scope_id
+		LEFT JOIN maintenance.customer_scope cs ON cs.customer_scope_id = m.customer_scope_id
 		LEFT JOIN maintenance.site s ON s.site_id = m.site_id
 		LEFT JOIN maintenance.v_current_window vcw ON vcw.maintenance_id = m.maintenance_id
 		WHERE m.maintenance_id = $1`,
@@ -362,7 +396,7 @@ func (h *Handler) loadMaintenanceDetail(ctx context.Context, id int64) (Maintena
 	detail.Metadata = rawJSONFromBytes(metadata)
 	detail.MaintenanceKind = ReferenceItem{ID: kindID, Code: kindCode, NameIT: kindName, NameEN: nullStringValue(kindNameEN), Description: nullStringValue(kindDescription), SortOrder: kindSort, IsActive: kindActive}
 	detail.TechnicalDomain = ReferenceItem{ID: domainID, Code: domainCode, NameIT: domainName, NameEN: nullStringValue(domainNameEN), Description: nullStringValue(domainDescription), SortOrder: domainSort, IsActive: domainActive}
-	detail.CustomerScope = ReferenceItem{ID: scopeID, Code: scopeCode, NameIT: scopeName, NameEN: nullStringValue(scopeNameEN), Description: nullStringValue(scopeDescription), SortOrder: scopeSort, IsActive: scopeActive}
+	detail.CustomerScope = nullableReferenceItem(scopeID, scopeCode, scopeName, scopeNameEN, scopeDescription, scopeSort, scopeActive)
 	if siteID.Valid {
 		detail.Site = &ReferenceItem{
 			ID:          siteID.Int64,

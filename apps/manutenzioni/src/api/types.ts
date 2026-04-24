@@ -78,7 +78,7 @@ export interface MaintenanceListItem {
   status: string;
   maintenance_kind: ReferenceItem;
   technical_domain: ReferenceItem;
-  customer_scope: ReferenceItem;
+  customer_scope: ReferenceItem | null;
   site?: ReferenceItem | null;
   current_window?: WindowSummary | null;
   primary_impact_label?: string | null;
@@ -195,7 +195,7 @@ export interface MaintenanceDetail {
   status: string;
   maintenance_kind: ReferenceItem;
   technical_domain: ReferenceItem;
-  customer_scope: ReferenceItem;
+  customer_scope: ReferenceItem | null;
   site?: ReferenceItem | null;
   reason_it?: string | null;
   reason_en?: string | null;
@@ -247,7 +247,7 @@ export interface MaintenanceFormBody {
   description_en?: string | null;
   maintenance_kind_id: number;
   technical_domain_id: number;
-  customer_scope_id: number;
+  customer_scope_id: number | null;
   site_id?: number | null;
   adhoc_site?: AdhocSiteInput | null;
   reason_it?: string | null;
@@ -265,6 +265,7 @@ export interface MaintenanceFormBody {
 
 export interface MaintenancePatchBody extends Partial<MaintenanceFormBody> {
   clear_site?: boolean;
+  clear_customer_scope?: boolean;
 }
 
 export interface ClassificationInput {

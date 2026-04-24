@@ -86,7 +86,6 @@ const REQUIRED_FIELD_IDS = {
   summary_it: 'mcp-field-summary',
   maintenance_kind_id: 'mcp-field-kind',
   technical_domain_id: 'mcp-field-domain',
-  customer_scope_id: 'mcp-field-scope',
 } as const;
 
 export function MaintenanceCreatePage() {
@@ -154,9 +153,8 @@ export function MaintenanceCreatePage() {
     if (!form.summary_it.trim()) reasons.push('titolo');
     if (!form.maintenance_kind_id) reasons.push('tipo');
     if (!form.technical_domain_id) reasons.push('dominio tecnico');
-    if (!form.customer_scope_id) reasons.push('ambito clienti');
     return reasons;
-  }, [form.customer_scope_id, form.maintenance_kind_id, form.summary_it, form.technical_domain_id]);
+  }, [form.maintenance_kind_id, form.summary_it, form.technical_domain_id]);
 
   const canSubmit = missing.length === 0;
 
@@ -197,10 +195,6 @@ export function MaintenanceCreatePage() {
     }
     if (!form.technical_domain_id) {
       document.getElementById(REQUIRED_FIELD_IDS.technical_domain_id)?.focus();
-      return;
-    }
-    if (!form.customer_scope_id) {
-      document.getElementById(REQUIRED_FIELD_IDS.customer_scope_id)?.focus();
     }
   }
 
@@ -314,7 +308,7 @@ export function MaintenanceCreatePage() {
       description_it: form.assistance_context.trim() || null,
       maintenance_kind_id: Number(form.maintenance_kind_id),
       technical_domain_id: Number(form.technical_domain_id),
-      customer_scope_id: Number(form.customer_scope_id),
+      customer_scope_id: form.customer_scope_id ? Number(form.customer_scope_id) : null,
       site_id: form.adhoc_site ? null : form.site_id ? Number(form.site_id) : null,
       adhoc_site: form.adhoc_site
         ? {
@@ -529,11 +523,9 @@ export function MaintenanceCreatePage() {
                 />
                 <SelectField
                   label="Ambito clienti"
-                  required
-                  id={REQUIRED_FIELD_IDS.customer_scope_id}
                   value={form.customer_scope_id}
                   items={reference.data.customer_scopes}
-                  invalid={attemptedSubmit && !form.customer_scope_id}
+                  emptyLabel="Da definire"
                   onChange={(value) => update('customer_scope_id', value)}
                 />
                 <SiteSelectField

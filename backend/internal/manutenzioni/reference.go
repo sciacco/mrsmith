@@ -107,7 +107,8 @@ func (h *Handler) handleReferenceData(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) selectedReferenceIDs(ctx context.Context, maintenanceID int64) (map[string][]int64, error) {
 	result := map[string][]int64{}
-	var kindID, domainID, scopeID int64
+	var kindID, domainID int64
+	var scopeID sql.NullInt64
 	var siteID sql.NullInt64
 	if err := h.maintenance.QueryRowContext(
 		ctx,
@@ -120,7 +121,9 @@ func (h *Handler) selectedReferenceIDs(ctx context.Context, maintenanceID int64)
 	}
 	result["maintenance-kinds"] = []int64{kindID}
 	result["technical-domains"] = []int64{domainID}
-	result["customer-scopes"] = []int64{scopeID}
+	if scopeID.Valid {
+		result["customer-scopes"] = []int64{scopeID.Int64}
+	}
 	if siteID.Valid {
 		result["sites"] = []int64{siteID.Int64}
 	}

@@ -199,7 +199,7 @@ func buildPreviewDetail(body assistancePreviewRequest) MaintenanceDetail {
 		detail.TechnicalDomain = ReferenceItem{ID: *body.TechnicalDomainID}
 	}
 	if body.CustomerScopeID != nil {
-		detail.CustomerScope = ReferenceItem{ID: *body.CustomerScopeID}
+		detail.CustomerScope = &ReferenceItem{ID: *body.CustomerScopeID}
 	}
 	return detail
 }

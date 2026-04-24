@@ -505,7 +505,7 @@ create table maintenance.maintenance (
 
     maintenance_kind_id  bigint not null references maintenance.maintenance_kind(maintenance_kind_id),
     technical_domain_id  bigint not null references maintenance.technical_domain(technical_domain_id),
-    customer_scope_id    bigint not null references maintenance.customer_scope(customer_scope_id),
+    customer_scope_id    bigint references maintenance.customer_scope(customer_scope_id),
 
     status               text not null check (
                             status in ('draft','announced','approved','scheduled','in_progress','completed','cancelled','superseded')
@@ -526,7 +526,11 @@ create table maintenance.maintenance (
     created_at           timestamptz not null default now(),
     updated_at           timestamptz not null default now(),
 
-    metadata             jsonb not null default '{}'::jsonb
+    metadata             jsonb not null default '{}'::jsonb,
+    constraint maintenance_customer_scope_required_for_active_status check (
+        customer_scope_id is not null
+        or status in ('draft','cancelled')
+    )
 );
 
 create index idx_maintenance_status on maintenance.maintenance(status);

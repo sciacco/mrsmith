@@ -223,7 +223,7 @@ export function MaintenanceListPage() {
                       </td>
                       <td>{item.technical_domain.name_it}</td>
                       <td>{item.maintenance_kind.name_it}</td>
-                      <td>{item.customer_scope.name_it}</td>
+                      <td>{item.customer_scope?.name_it ?? 'Da definire'}</td>
                       <td>{item.site?.name_it ?? '-'}</td>
                       <td>{item.current_window ? formatDateTime(item.current_window.scheduled_start_at) : '-'}</td>
                       <td>{minutesLabel(item.current_window?.expected_downtime_minutes)}</td>

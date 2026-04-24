@@ -68,7 +68,7 @@ type MaintenanceListItem struct {
 	Status             string         `json:"status"`
 	MaintenanceKind    ReferenceItem  `json:"maintenance_kind"`
 	TechnicalDomain    ReferenceItem  `json:"technical_domain"`
-	CustomerScope      ReferenceItem  `json:"customer_scope"`
+	CustomerScope      *ReferenceItem `json:"customer_scope"`
 	Site               *ReferenceItem `json:"site,omitempty"`
 	CurrentWindow      *WindowSummary `json:"current_window,omitempty"`
 	PrimaryImpactLabel *string        `json:"primary_impact_label,omitempty"`
@@ -96,7 +96,7 @@ type MaintenanceDetail struct {
 	Status            string               `json:"status"`
 	MaintenanceKind   ReferenceItem        `json:"maintenance_kind"`
 	TechnicalDomain   ReferenceItem        `json:"technical_domain"`
-	CustomerScope     ReferenceItem        `json:"customer_scope"`
+	CustomerScope     *ReferenceItem       `json:"customer_scope"`
 	Site              *ReferenceItem       `json:"site,omitempty"`
 	ReasonIT          *string              `json:"reason_it,omitempty"`
 	ReasonEN          *string              `json:"reason_en,omitempty"`
@@ -239,7 +239,7 @@ type createMaintenanceRequest struct {
 	DescriptionEN          *string               `json:"description_en"`
 	MaintenanceKindID      int64                 `json:"maintenance_kind_id"`
 	TechnicalDomainID      int64                 `json:"technical_domain_id"`
-	CustomerScopeID        int64                 `json:"customer_scope_id"`
+	CustomerScopeID        *int64                `json:"customer_scope_id"`
 	SiteID                 *int64                `json:"site_id"`
 	AdhocSite              *adhocSiteInput       `json:"adhoc_site"`
 	ReasonIT               *string               `json:"reason_it"`
@@ -263,21 +263,22 @@ type adhocSiteInput struct {
 }
 
 type updateMaintenanceRequest struct {
-	TitleIT           *string         `json:"title_it"`
-	TitleEN           *string         `json:"title_en"`
-	DescriptionIT     *string         `json:"description_it"`
-	DescriptionEN     *string         `json:"description_en"`
-	MaintenanceKindID *int64          `json:"maintenance_kind_id"`
-	TechnicalDomainID *int64          `json:"technical_domain_id"`
-	CustomerScopeID   *int64          `json:"customer_scope_id"`
-	SiteID            *int64          `json:"site_id"`
-	AdhocSite         *adhocSiteInput `json:"adhoc_site"`
-	ClearSite         bool            `json:"clear_site"`
-	ReasonIT          *string         `json:"reason_it"`
-	ReasonEN          *string         `json:"reason_en"`
-	ResidualServiceIT *string         `json:"residual_service_it"`
-	ResidualServiceEN *string         `json:"residual_service_en"`
-	Metadata          json.RawMessage `json:"metadata"`
+	TitleIT            *string         `json:"title_it"`
+	TitleEN            *string         `json:"title_en"`
+	DescriptionIT      *string         `json:"description_it"`
+	DescriptionEN      *string         `json:"description_en"`
+	MaintenanceKindID  *int64          `json:"maintenance_kind_id"`
+	TechnicalDomainID  *int64          `json:"technical_domain_id"`
+	CustomerScopeID    *int64          `json:"customer_scope_id"`
+	ClearCustomerScope bool            `json:"clear_customer_scope"`
+	SiteID             *int64          `json:"site_id"`
+	AdhocSite          *adhocSiteInput `json:"adhoc_site"`
+	ClearSite          bool            `json:"clear_site"`
+	ReasonIT           *string         `json:"reason_it"`
+	ReasonEN           *string         `json:"reason_en"`
+	ResidualServiceIT  *string         `json:"residual_service_it"`
+	ResidualServiceEN  *string         `json:"residual_service_en"`
+	Metadata           json.RawMessage `json:"metadata"`
 }
 
 type statusActionRequest struct {
