@@ -17,7 +17,9 @@ body {
   min-height: 100vh;
   font-family: var(--font-sans);
   color: var(--color-text);
-  background: var(--color-bg);
+  background:
+    radial-gradient(circle at top left, rgba(99, 91, 255, 0.06), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.5;
@@ -78,9 +80,10 @@ textarea {
   max-width: 40rem;
   padding: 1.4rem;
   border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 8px;
-  background: #fff;
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
   color: #7b1f2d;
+  box-shadow: var(--shadow-sm);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -3,6 +3,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLLMModelMutations, useLLMModels } from '../api/queries';
 import type { LLMModel } from '../api/types';
+import { RequiredMark } from '../components/RequiredMark';
 import { errorMessage } from '../lib/format';
 import shared from './shared.module.css';
 
@@ -287,7 +288,7 @@ function LLMModelModal({
       <div className={shared.formGrid}>
         <label className={shared.label}>
           <span className={shared.labelText}>
-            Ambito<span className={shared.required}>*</span>
+            Ambito<RequiredMark />
           </span>
           <input
             className={`${shared.field} ${errors.scope ? shared.fieldInvalid : ''}`}
@@ -308,7 +309,7 @@ function LLMModelModal({
         </label>
         <label className={shared.label}>
           <span className={shared.labelText}>
-            Modello<span className={shared.required}>*</span>
+            Modello<RequiredMark />
           </span>
           <input
             className={`${shared.field} ${errors.model ? shared.fieldInvalid : ''}`}

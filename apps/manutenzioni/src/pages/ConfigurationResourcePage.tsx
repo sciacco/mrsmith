@@ -27,6 +27,7 @@ import {
 } from '../api/queries';
 import type { ReferenceItem } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { RequiredMark } from '../components/RequiredMark';
 import { StatusPill } from '../components/StatusPill';
 import { audienceLabel, errorMessage } from '../lib/format';
 import { capitalize, getResourceMeta, type ResourceMeta } from '../lib/resourceMeta';
@@ -767,7 +768,7 @@ function ConfigModal({
       <div className={shared.formGrid}>
         <label className={shared.label}>
           <span className={shared.labelText}>
-            Codice<span className={shared.required}>*</span>
+            Codice<RequiredMark />
           </span>
           <input
             className={`${shared.field} ${errors.code ? shared.fieldInvalid : ''}`}
@@ -788,7 +789,7 @@ function ConfigModal({
         </label>
         <label className={shared.label}>
           <span className={shared.labelText}>
-            Nome (italiano)<span className={shared.required}>*</span>
+            Nome (italiano)<RequiredMark />
           </span>
           <input
             className={`${shared.field} ${errors.name_it ? shared.fieldInvalid : ''}`}
@@ -811,7 +812,7 @@ function ConfigModal({
         {showTechnicalDomain ? (
           <label className={shared.label}>
             <span className={shared.labelText}>
-              Dominio<span className={shared.required}>*</span>
+              Dominio<RequiredMark />
             </span>
             <select
               className={`${shared.select} ${errors.technical_domain_id ? shared.fieldInvalid : ''}`}
@@ -833,7 +834,7 @@ function ConfigModal({
         {showTargetType ? (
           <label className={shared.label}>
             <span className={shared.labelText}>
-              Tipo target<span className={shared.required}>*</span>
+              Tipo target<RequiredMark />
             </span>
             <select
               className={`${shared.select} ${errors.target_type_id ? shared.fieldInvalid : ''}`}
@@ -855,7 +856,7 @@ function ConfigModal({
         {showAudience ? (
           <label className={shared.label}>
             <span className={shared.labelText}>
-              Audience<span className={shared.required}>*</span>
+              Audience<RequiredMark />
             </span>
             <select
               className={`${shared.select} ${errors.audience ? shared.fieldInvalid : ''}`}
@@ -874,7 +875,7 @@ function ConfigModal({
         {showCity ? (
           <label className={shared.label}>
             <span className={shared.labelText}>
-              Città<span className={shared.required}>*</span>
+              Città<RequiredMark />
             </span>
             <input
               className={`${shared.field} ${errors.city ? shared.fieldInvalid : ''}`}
@@ -887,7 +888,7 @@ function ConfigModal({
         {showCountry ? (
           <label className={shared.label}>
             <span className={shared.labelText}>
-              Paese (ISO-2)<span className={shared.required}>*</span>
+              Paese (ISO-2)<RequiredMark />
             </span>
             <input
               className={`${shared.field} ${errors.country_code ? shared.fieldInvalid : ''}`}

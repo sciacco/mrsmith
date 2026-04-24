@@ -20,6 +20,7 @@ import type {
   WindowBody,
 } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { RequiredMark } from '../components/RequiredMark';
 import { SiteSelectField } from '../components/SiteSelectField';
 import { audienceLabel, dependencyTypeLabel, errorMessage, severityLabel } from '../lib/format';
 import shared from './shared.module.css';
@@ -533,7 +534,7 @@ export function MaintenanceCreatePage() {
               <div className={shared.formGrid}>
                 <label className={`${shared.label} ${shared.formGridSpan}`}>
                   <span className={shared.labelText}>
-                    Titolo provvisorio <span className={shared.required}>*</span>
+                    Titolo provvisorio <RequiredMark />
                   </span>
                   <input
                     id={REQUIRED_FIELD_IDS.summary_it}
@@ -836,7 +837,7 @@ function SelectField({
   return (
     <label className={shared.label}>
       <span className={shared.labelText}>
-        {label} {required && <span className={shared.required}>*</span>}
+        {label} {required && <RequiredMark />}
       </span>
       <select
         id={id}
