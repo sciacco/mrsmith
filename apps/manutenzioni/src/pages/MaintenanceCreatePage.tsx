@@ -1,4 +1,4 @@
-import { Button, Icon, MultiSelect, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, MultiSelect, Skeleton, Tooltip, useToast } from '@mrsmith/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -19,10 +19,15 @@ import type {
   TargetBody,
   WindowBody,
 } from '../api/types';
+import { CatalogCombobox } from '../components/CatalogCombobox';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { CreateServiceTaxonomyModal } from '../components/CreateServiceTaxonomyModal';
+import { GraphSuggestionsBanner } from '../components/GraphSuggestionsBanner';
 import { RequiredMark } from '../components/RequiredMark';
+import { SeverityDropdown } from '../components/SeverityDropdown';
 import { SiteSelectField } from '../components/SiteSelectField';
-import { audienceLabel, dependencyTypeLabel, errorMessage, severityLabel } from '../lib/format';
+import { errorMessage } from '../lib/format';
+import { suggestedSeverityForKindId } from '../lib/smartDefaults';
 import shared from './shared.module.css';
 
 const BRIEF_MIN_LENGTH = 30;
@@ -58,7 +63,8 @@ interface FormState {
 interface ServiceSelection {
   service_taxonomy_id: number;
   role: 'operated' | 'dependent';
-  expected_severity: SeverityValue;
+  expected_severity: SeverityValue | null;
+  severity_confirmed: boolean;
   expected_audience: AudienceOverride | null;
   source: 'manual' | 'dependency_graph' | 'ai_extracted';
 }
@@ -67,7 +73,7 @@ interface ManualTarget {
   id: string;
   target_type_id: number;
   display_name: string;
-  service_taxonomy_id: number | null;
+  service_taxonomy_id: number;
 }
 
 const initialForm: FormState = {
@@ -109,13 +115,11 @@ export function MaintenanceCreatePage() {
   const [aiOpen, setAiOpen] = useState(false);
   const [preAiSnapshot, setPreAiSnapshot] = useState<FormState | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
-  const [checkedSuggestions, setCheckedSuggestions] = useState<Record<number, boolean>>({});
-  const [targetDraft, setTargetDraft] = useState<ManualTarget>({
-    id: '',
-    target_type_id: 0,
-    display_name: '',
-    service_taxonomy_id: null,
-  });
+  const [ignoredSuggestions, setIgnoredSuggestions] = useState<Set<number>>(new Set());
+  const [createTaxonomyContext, setCreateTaxonomyContext] = useState<{
+    role: 'operated' | 'dependent';
+    initialName: string;
+  } | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initialForm), [form]);
 
@@ -130,17 +134,8 @@ export function MaintenanceCreatePage() {
   }, [create.isPending, dirty]);
 
   const selectedDomainId = form.technical_domain_id ? Number(form.technical_domain_id) : null;
-  const serviceItems = useMemo(() => {
-    const items = reference.data?.service_taxonomy ?? [];
-    if (!selectedDomainId) return items;
-    return items.filter((item) => item.technical_domain_id === selectedDomainId);
-  }, [reference.data?.service_taxonomy, selectedDomainId]);
   const operatedIds = useMemo(
     () => form.service_selections.filter((item) => item.role === 'operated').map((item) => item.service_taxonomy_id),
-    [form.service_selections],
-  );
-  const impactedIds = useMemo(
-    () => form.service_selections.filter((item) => item.role === 'dependent').map((item) => item.service_taxonomy_id),
     [form.service_selections],
   );
   const directSuggestions = useMemo(() => {
@@ -150,24 +145,23 @@ export function MaintenanceCreatePage() {
       .filter((item) => operated.has(item.upstream_service_id) && !selected.has(item.downstream_service_id))
       .sort((a, b) => a.downstream_service.name_it.localeCompare(b.downstream_service.name_it));
   }, [dependencies.data, form.service_selections, operatedIds]);
-  const transitivePreview = useMemo(
-    () => dependencyPreview(operatedIds, dependencies.data ?? [], form.service_selections),
-    [dependencies.data, form.service_selections, operatedIds],
+
+  const kindList = reference.data?.maintenance_kinds ?? [];
+  const suggestedSeverity = useMemo(
+    () =>
+      suggestedSeverityForKindId(
+        form.maintenance_kind_id ? Number(form.maintenance_kind_id) : null,
+        kindList,
+      ),
+    [form.maintenance_kind_id, kindList],
   );
 
-  useEffect(() => {
-    setCheckedSuggestions((current) => {
-      let dirtyMap = false;
-      const next = { ...current };
-      for (const item of directSuggestions) {
-        if (!(item.service_dependency_id in next)) {
-          next[item.service_dependency_id] = getSuggestionDefaultChecked(item);
-          dirtyMap = true;
-        }
-      }
-      return dirtyMap ? next : current;
-    });
-  }, [directSuggestions]);
+  const undefinedSeverityCount = useMemo(
+    () =>
+      form.service_selections.filter((item) => !item.severity_confirmed || item.expected_severity === null)
+        .length,
+    [form.service_selections],
+  );
 
   const missing = useMemo(() => {
     const reasons: string[] = [];
@@ -257,29 +251,35 @@ export function MaintenanceCreatePage() {
   }
 
   function applyAssistance(response: AssistancePreviewResponse) {
-    setForm((current) => ({
-      ...current,
-      summary_it: response.texts.title_it?.trim() || current.summary_it,
-      service_selections:
-        response.service_taxonomy_ids.length > 0
-          ? mergeServiceSelections(
-              current.service_selections,
-              response.service_taxonomy_ids.map((id) => ({
-                service_taxonomy_id: id,
-                role: 'operated' as const,
-                expected_severity: 'unavailable' as const,
-                expected_audience: null,
-                source: 'ai_extracted' as const,
-              })),
-            )
-          : current.service_selections,
-      reason_class_ids:
-        response.reason_class_ids.length > 0 ? response.reason_class_ids : current.reason_class_ids,
-      impact_effect_ids:
-        response.impact_effect_ids.length > 0
-          ? response.impact_effect_ids
-          : current.impact_effect_ids,
-    }));
+    setForm((current) => {
+      const existing = new Set(current.service_selections.map((item) => item.service_taxonomy_id));
+      const incoming: ServiceSelection[] = response.service_taxonomy_ids
+        .filter((id) => !existing.has(id))
+        .map((id) => ({
+          service_taxonomy_id: id,
+          role: 'operated' as const,
+          expected_severity: 'unavailable' as const,
+          severity_confirmed: true,
+          expected_audience: null,
+          source: 'ai_extracted' as const,
+        }));
+      return {
+        ...current,
+        summary_it: response.texts.title_it?.trim() || current.summary_it,
+        service_selections:
+          incoming.length > 0
+            ? [...current.service_selections, ...incoming]
+            : current.service_selections,
+        reason_class_ids:
+          response.reason_class_ids.length > 0
+            ? response.reason_class_ids
+            : current.reason_class_ids,
+        impact_effect_ids:
+          response.impact_effect_ids.length > 0
+            ? response.impact_effect_ids
+            : current.impact_effect_ids,
+      };
+    });
   }
 
   function handleAiUndo() {
@@ -368,47 +368,97 @@ export function MaintenanceCreatePage() {
     }
   }
 
-  function updateServiceRole(role: ServiceSelection['role'], ids: number[]) {
+  function addServiceSelection(item: ReferenceItem, role: ServiceSelection['role']) {
+    if (role === 'operated' && !canOperateService(item.id)) {
+      toast('Solo le voci del dominio tecnico possono essere operate.', 'error');
+      return;
+    }
     setForm((current) => {
-      let acceptedIds = ids;
-      if (role === 'dependent') {
-        const operatedSet = new Set(
-          current.service_selections.filter((item) => item.role === 'operated').map((item) => item.service_taxonomy_id),
-        );
-        const rejected = ids.filter((id) => operatedSet.has(id));
-        if (rejected.length > 0) {
-          toast('Già operato — gli operati sono impattati per definizione.', 'warning');
-          acceptedIds = ids.filter((id) => !operatedSet.has(id));
-        }
+      if (current.service_selections.some((sel) => sel.service_taxonomy_id === item.id)) {
+        toast(`"${item.name_it}" è già stato aggiunto.`, 'warning');
+        return current;
       }
-      const keep = current.service_selections.filter((item) => item.role !== role);
-      const nextSelections = acceptedIds.map((id) => {
-        const existing = current.service_selections.find((item) => item.service_taxonomy_id === id);
-        return {
-          service_taxonomy_id: id,
-          role,
-          expected_severity: existing?.expected_severity ?? defaultSeverityFor(role),
-          expected_audience: existing?.expected_audience ?? null,
-          source: existing?.source ?? 'manual',
-        } satisfies ServiceSelection;
-      });
+      const next: ServiceSelection = {
+        service_taxonomy_id: item.id,
+        role,
+        expected_severity: suggestedSeverity,
+        severity_confirmed: false,
+        expected_audience: null,
+        source: 'manual',
+      };
       return {
         ...current,
-        service_selections: mergeServiceSelections(keep, nextSelections),
+        service_selections: [...current.service_selections, next],
       };
     });
   }
 
-  function updateServiceSelection(id: number, patch: Partial<ServiceSelection>) {
-    if (patch.role === 'operated' && !canOperateService(id)) {
-      toast('Solo i servizi del dominio tecnico possono essere operati.', 'error');
+  function removeServiceSelection(id: number) {
+    setForm((current) => ({
+      ...current,
+      service_selections: current.service_selections.filter((item) => item.service_taxonomy_id !== id),
+      manual_targets: current.manual_targets.filter((target) => target.service_taxonomy_id !== id),
+    }));
+  }
+
+  function setSeverity(id: number, value: SeverityValue | null) {
+    setForm((current) => ({
+      ...current,
+      service_selections: current.service_selections.map((item) =>
+        item.service_taxonomy_id === id
+          ? { ...item, expected_severity: value, severity_confirmed: value !== null }
+          : item,
+      ),
+    }));
+  }
+
+  function confirmSuggestedSeverity(id: number) {
+    setForm((current) => ({
+      ...current,
+      service_selections: current.service_selections.map((item) =>
+        item.service_taxonomy_id === id ? { ...item, severity_confirmed: true } : item,
+      ),
+    }));
+  }
+
+  function setAudience(id: number, value: AudienceOverride | null) {
+    setForm((current) => ({
+      ...current,
+      service_selections: current.service_selections.map((item) =>
+        item.service_taxonomy_id === id ? { ...item, expected_audience: value } : item,
+      ),
+    }));
+  }
+
+  function addInstance(serviceTaxonomyId: number, displayName: string) {
+    const trimmed = displayName.trim();
+    if (!trimmed) {
+      toast('Inserisci il nome dell\'istanza.', 'error');
+      return;
+    }
+    const service = reference.data?.service_taxonomy.find((item) => item.id === serviceTaxonomyId);
+    if (!service?.target_type_id) {
+      toast('Voce di catalogo senza natura definita: impossibile creare l\'istanza.', 'error');
       return;
     }
     setForm((current) => ({
       ...current,
-      service_selections: current.service_selections.map((item) =>
-        item.service_taxonomy_id === id ? { ...item, ...patch } : item,
-      ),
+      manual_targets: [
+        ...current.manual_targets,
+        {
+          id: crypto.randomUUID(),
+          service_taxonomy_id: serviceTaxonomyId,
+          target_type_id: service.target_type_id ?? 0,
+          display_name: trimmed,
+        },
+      ],
+    }));
+  }
+
+  function removeInstance(targetId: string) {
+    setForm((current) => ({
+      ...current,
+      manual_targets: current.manual_targets.filter((target) => target.id !== targetId),
     }));
   }
 
@@ -418,46 +468,39 @@ export function MaintenanceCreatePage() {
     return service?.technical_domain_id === selectedDomainId;
   }
 
-  function addCheckedSuggestions() {
-    const selected = directSuggestions.filter(
-      (item) => checkedSuggestions[item.service_dependency_id] === true,
-    );
-    if (selected.length === 0) {
-      toast('Seleziona almeno un suggerimento.', 'error');
-      return;
-    }
-    setForm((current) => ({
-      ...current,
-      service_selections: mergeServiceSelections(
-        current.service_selections,
-        selected.map((item) => ({
-          service_taxonomy_id: item.downstream_service_id,
-          role: 'dependent',
-          expected_severity: item.default_severity,
-          expected_audience: null,
-          source: 'dependency_graph',
-        })),
-      ),
-    }));
+  function ignoreSuggestion(dependencyId: number) {
+    setIgnoredSuggestions((current) => {
+      const next = new Set(current);
+      next.add(dependencyId);
+      return next;
+    });
   }
 
-  function addManualTarget() {
-    if (!targetDraft.target_type_id || !targetDraft.display_name.trim()) {
-      toast('Completa tipo e nome target.', 'error');
-      return;
+  function acceptSuggestions(items: ServiceDependency[]) {
+    setForm((current) => {
+      const existing = new Set(current.service_selections.map((item) => item.service_taxonomy_id));
+      const incoming: ServiceSelection[] = items
+        .filter((item) => !existing.has(item.downstream_service_id))
+        .map((item) => ({
+          service_taxonomy_id: item.downstream_service_id,
+          role: 'dependent' as const,
+          expected_severity: item.default_severity,
+          severity_confirmed: false,
+          expected_audience: null,
+          source: 'dependency_graph' as const,
+        }));
+      return {
+        ...current,
+        service_selections: [...current.service_selections, ...incoming],
+      };
+    });
+  }
+
+  function handleTaxonomyCreated(item: ReferenceItem) {
+    if (createTaxonomyContext) {
+      addServiceSelection(item, createTaxonomyContext.role);
     }
-    setForm((current) => ({
-      ...current,
-      manual_targets: [
-        ...current.manual_targets,
-        {
-          ...targetDraft,
-          id: targetDraft.id || crypto.randomUUID(),
-          display_name: targetDraft.display_name.trim(),
-        },
-      ],
-    }));
-    setTargetDraft({ id: '', target_type_id: 0, display_name: '', service_taxonomy_id: null });
+    setCreateTaxonomyContext(null);
   }
 
   function requestLeave(target: string) {
@@ -611,6 +654,10 @@ export function MaintenanceCreatePage() {
                 <span className={shared.collapsibleSummaryLeft}>
                   <Icon name="chevron-right" size={16} className={shared.collapsibleChevron} />
                   <h2 className={shared.sectionTitle}>Dettagli tecnici della manutenzione</h2>
+                  <SectionStatusIcon
+                    gapCount={undefinedSeverityCount}
+                    gaps={selectionGapList(form, reference.data.service_taxonomy)}
+                  />
                 </span>
               </summary>
               <div className={shared.collapsibleContent}>
@@ -621,33 +668,24 @@ export function MaintenanceCreatePage() {
                   ) : null;
                 })()}
                 <ServiceImpactSection
-                  operatedOptions={serviceItems}
-                  allServices={reference.data.service_taxonomy}
-                  targetTypes={reference.data.target_types}
+                  serviceCatalog={reference.data.service_taxonomy}
                   selectedDomainId={selectedDomainId}
                   selections={form.service_selections}
-                  operatedIds={operatedIds}
-                  impactedIds={impactedIds}
+                  manualTargets={form.manual_targets}
                   suggestions={directSuggestions}
-                  checkedSuggestions={checkedSuggestions}
-                  transitivePreview={transitivePreview}
-                  targets={form.manual_targets}
-                  targetDraft={targetDraft}
-                  onOperatedChange={(ids) => updateServiceRole('operated', ids)}
-                  onImpactedChange={(ids) => updateServiceRole('dependent', ids)}
-                  onSelectionChange={updateServiceSelection}
-                  onSuggestionCheck={(id, checked) =>
-                    setCheckedSuggestions((current) => ({ ...current, [id]: checked }))
+                  ignoredSuggestionIds={ignoredSuggestions}
+                  onAddCatalog={addServiceSelection}
+                  onCreateRequest={(initialName, role) =>
+                    setCreateTaxonomyContext({ initialName, role })
                   }
-                  onAddSuggestions={addCheckedSuggestions}
-                  onTargetDraftChange={setTargetDraft}
-                  onAddTarget={addManualTarget}
-                  onRemoveTarget={(id) =>
-                    setForm((current) => ({
-                      ...current,
-                      manual_targets: current.manual_targets.filter((target) => target.id !== id),
-                    }))
-                  }
+                  onRemoveSelection={removeServiceSelection}
+                  onSetSeverity={setSeverity}
+                  onConfirmSeverity={confirmSuggestedSeverity}
+                  onSetAudience={setAudience}
+                  onAddInstance={addInstance}
+                  onRemoveInstance={removeInstance}
+                  onIgnoreSuggestion={ignoreSuggestion}
+                  onAcceptSuggestions={acceptSuggestions}
                 />
               </div>
             </details>
@@ -733,9 +771,46 @@ export function MaintenanceCreatePage() {
             onConfirm={confirmRegenerateNow}
             onClose={() => setConfirmRegenerate(false)}
           />
+
+          <CreateServiceTaxonomyModal
+            open={createTaxonomyContext !== null}
+            initialName={createTaxonomyContext?.initialName ?? ''}
+            initialDomainId={selectedDomainId}
+            domains={reference.data.technical_domains}
+            targetTypes={reference.data.target_types}
+            onClose={() => setCreateTaxonomyContext(null)}
+            onCreated={handleTaxonomyCreated}
+          />
         </>
       )}
     </section>
+  );
+}
+
+function SectionStatusIcon({ gapCount, gaps }: { gapCount: number; gaps: string[] }) {
+  if (gapCount === 0) {
+    return (
+      <Tooltip content="Pronto per la pubblicazione" placement="top">
+        <span className={shared.sectionStatusOk} aria-label="Sezione completa">
+          <Icon name="check-circle" size={14} />
+        </span>
+      </Tooltip>
+    );
+  }
+  const tooltip =
+    gaps.length > 0
+      ? `${gapCount} controlli mancanti:\n• ${gaps.slice(0, 5).join('\n• ')}${gaps.length > 5 ? `\n• …e altri ${gaps.length - 5}` : ''}`
+      : `${gapCount} controlli mancanti`;
+  return (
+    <Tooltip content={tooltip} placement="top">
+      <span
+        className={shared.sectionStatusWarn}
+        aria-label={`${gapCount} controlli mancanti per la pubblicazione`}
+      >
+        <Icon name="triangle-alert" size={14} />
+        <span>{gapCount}</span>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -840,52 +915,47 @@ function SelectField({
   );
 }
 
-function ServiceImpactSection({
-  operatedOptions,
-  allServices,
-  targetTypes,
-  selectedDomainId,
-  selections,
-  operatedIds,
-  impactedIds,
-  suggestions,
-  checkedSuggestions,
-  transitivePreview,
-  targets,
-  targetDraft,
-  onOperatedChange,
-  onImpactedChange,
-  onSelectionChange,
-  onSuggestionCheck,
-  onAddSuggestions,
-  onTargetDraftChange,
-  onAddTarget,
-  onRemoveTarget,
-}: {
-  operatedOptions: ReferenceItem[];
-  allServices: ReferenceItem[];
-  targetTypes: ReferenceItem[];
+interface ServiceImpactProps {
+  serviceCatalog: ReferenceItem[];
   selectedDomainId: number | null;
   selections: ServiceSelection[];
-  operatedIds: number[];
-  impactedIds: number[];
+  manualTargets: ManualTarget[];
   suggestions: ServiceDependency[];
-  checkedSuggestions: Record<number, boolean>;
-  transitivePreview: ReferenceItem[];
-  targets: ManualTarget[];
-  targetDraft: ManualTarget;
-  onOperatedChange: (ids: number[]) => void;
-  onImpactedChange: (ids: number[]) => void;
-  onSelectionChange: (id: number, patch: Partial<ServiceSelection>) => void;
-  onSuggestionCheck: (id: number, checked: boolean) => void;
-  onAddSuggestions: () => void;
-  onTargetDraftChange: (target: ManualTarget) => void;
-  onAddTarget: () => void;
-  onRemoveTarget: (id: string) => void;
-}) {
-  const serviceById = useMemo(() => new Map(allServices.map((service) => [service.id, service])), [allServices]);
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  const [targetFormOpen, setTargetFormOpen] = useState(false);
+  ignoredSuggestionIds: Set<number>;
+  onAddCatalog: (item: ReferenceItem, role: ServiceSelection['role']) => void;
+  onCreateRequest: (initialName: string, role: ServiceSelection['role']) => void;
+  onRemoveSelection: (id: number) => void;
+  onSetSeverity: (id: number, value: SeverityValue | null) => void;
+  onConfirmSeverity: (id: number) => void;
+  onSetAudience: (id: number, value: AudienceOverride | null) => void;
+  onAddInstance: (serviceTaxonomyId: number, displayName: string) => void;
+  onRemoveInstance: (targetId: string) => void;
+  onIgnoreSuggestion: (dependencyId: number) => void;
+  onAcceptSuggestions: (items: ServiceDependency[]) => void;
+}
+
+function ServiceImpactSection({
+  serviceCatalog,
+  selectedDomainId,
+  selections,
+  manualTargets,
+  suggestions,
+  ignoredSuggestionIds,
+  onAddCatalog,
+  onCreateRequest,
+  onRemoveSelection,
+  onSetSeverity,
+  onConfirmSeverity,
+  onSetAudience,
+  onAddInstance,
+  onRemoveInstance,
+  onIgnoreSuggestion,
+  onAcceptSuggestions,
+}: ServiceImpactProps) {
+  const serviceById = useMemo(
+    () => new Map(serviceCatalog.map((service) => [service.id, service])),
+    [serviceCatalog],
+  );
 
   const operatedSelections = useMemo(
     () => selections.filter((selection) => selection.role === 'operated'),
@@ -896,37 +966,45 @@ function ServiceImpactSection({
     [selections],
   );
 
-  function toggleRow(id: number) {
-    setExpandedRows((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const operatedCatalog = useMemo(
+    () =>
+      selectedDomainId
+        ? serviceCatalog.filter((item) => item.technical_domain_id === selectedDomainId)
+        : serviceCatalog,
+    [selectedDomainId, serviceCatalog],
+  );
 
-  function handleAddTarget() {
-    const valid = targetDraft.target_type_id && targetDraft.display_name.trim();
-    onAddTarget();
-    if (valid) setTargetFormOpen(false);
-  }
+  const excludedIds = useMemo(
+    () => new Set(selections.map((item) => item.service_taxonomy_id)),
+    [selections],
+  );
 
-  function cancelTargetForm() {
-    setTargetFormOpen(false);
-    onTargetDraftChange({ id: '', target_type_id: 0, display_name: '', service_taxonomy_id: null });
-  }
+  const instancesBySelection = useMemo(() => {
+    const map = new Map<number, ManualTarget[]>();
+    for (const target of manualTargets) {
+      const list = map.get(target.service_taxonomy_id) ?? [];
+      list.push(target);
+      map.set(target.service_taxonomy_id, list);
+    }
+    return map;
+  }, [manualTargets]);
 
   return (
     <div className={shared.serviceImpactBox}>
       <section className={shared.serviceBlock}>
         <header className={shared.serviceBlockHeader}>
-          <h3 className={shared.serviceBlockTitle}>Ambito dell'intervento</h3>
+          <h3 className={shared.serviceBlockTitle}>In manutenzione</h3>
+          <p className={shared.serviceBlockSublabel}>
+            Gli oggetti su cui interviene questa finestra
+          </p>
         </header>
-        <MultiSelectField
-          label="Seleziona l'oggetto della manutenzione"
-          options={toOptions(operatedOptions)}
-          selected={operatedIds}
-          onChange={onOperatedChange}
+        <CatalogCombobox
+          options={operatedCatalog}
+          excludedIds={excludedIds}
+          domainHintId={selectedDomainId}
+          placeholder="Cerca o crea voce di catalogo…"
+          onSelect={(item) => onAddCatalog(item, 'operated')}
+          onCreateRequest={(name) => onCreateRequest(name, 'operated')}
         />
         {operatedSelections.length > 0 ? (
           <ul className={shared.compactRowList}>
@@ -935,15 +1013,18 @@ function ServiceImpactSection({
                 key={selection.service_taxonomy_id}
                 selection={selection}
                 service={serviceById.get(selection.service_taxonomy_id)}
-                selectedDomainId={selectedDomainId}
-                expanded={expandedRows.has(selection.service_taxonomy_id)}
-                onToggle={() => toggleRow(selection.service_taxonomy_id)}
-                onSelectionChange={onSelectionChange}
+                instances={instancesBySelection.get(selection.service_taxonomy_id) ?? []}
+                onSetSeverity={onSetSeverity}
+                onConfirmSeverity={onConfirmSeverity}
+                onSetAudience={onSetAudience}
+                onAddInstance={onAddInstance}
+                onRemoveInstance={onRemoveInstance}
+                onRemove={onRemoveSelection}
               />
             ))}
           </ul>
         ) : (
-          <p className={shared.small}>Nessun servizio operato.</p>
+          <p className={shared.small}>Nessuna voce di catalogo aggiunta.</p>
         )}
       </section>
 
@@ -951,13 +1032,24 @@ function ServiceImpactSection({
 
       <section className={shared.serviceBlock}>
         <header className={shared.serviceBlockHeader}>
-          <h3 className={shared.serviceBlockTitle}>Valutazione di impatto esteso</h3>
+          <h3 className={shared.serviceBlockTitle}>Effetti su altri sistemi</h3>
+          <p className={shared.serviceBlockSublabel}>
+            Altri oggetti che subiscono impatto anche se non vengono operati direttamente
+          </p>
         </header>
-        <MultiSelectField
-          label="Seleziona altri sistemi o asset impattati"
-          options={toOptions(allServices)}
-          selected={impactedIds}
-          onChange={onImpactedChange}
+        <GraphSuggestionsBanner
+          suggestions={suggestions}
+          ignoredIds={ignoredSuggestionIds}
+          onIgnore={onIgnoreSuggestion}
+          onAccept={onAcceptSuggestions}
+        />
+        <CatalogCombobox
+          options={serviceCatalog}
+          excludedIds={excludedIds}
+          domainHintId={selectedDomainId}
+          placeholder="Cerca o crea voce di catalogo…"
+          onSelect={(item) => onAddCatalog(item, 'dependent')}
+          onCreateRequest={(name) => onCreateRequest(name, 'dependent')}
         />
         {impactedSelections.length > 0 ? (
           <ul className={shared.compactRowList}>
@@ -966,249 +1058,221 @@ function ServiceImpactSection({
                 key={selection.service_taxonomy_id}
                 selection={selection}
                 service={serviceById.get(selection.service_taxonomy_id)}
-                selectedDomainId={selectedDomainId}
-                expanded={expandedRows.has(selection.service_taxonomy_id)}
-                onToggle={() => toggleRow(selection.service_taxonomy_id)}
-                onSelectionChange={onSelectionChange}
+                instances={instancesBySelection.get(selection.service_taxonomy_id) ?? []}
+                onSetSeverity={onSetSeverity}
+                onConfirmSeverity={onConfirmSeverity}
+                onSetAudience={onSetAudience}
+                onAddInstance={onAddInstance}
+                onRemoveInstance={onRemoveInstance}
+                onRemove={onRemoveSelection}
               />
             ))}
           </ul>
         ) : (
-          <p className={shared.small}>Nessun altro servizio impattato.</p>
+          <p className={shared.small}>Nessun effetto su altri sistemi.</p>
         )}
       </section>
-
-      <hr className={shared.serviceBlockDivider} />
-
-      <section className={shared.serviceBlock}>
-        <header className={shared.serviceBlockHeader}>
-          <h3 className={shared.serviceBlockTitle}>Apparati e oggetti</h3>
-        </header>
-        {targets.length > 0 ? (
-          <div className={shared.chipList}>
-            {targets.map((target) => (
-              <button
-                key={target.id}
-                type="button"
-                className={shared.filterChip}
-                onClick={() => onRemoveTarget(target.id)}
-              >
-                {target.display_name}
-                <Icon name="x" size={14} />
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {targetFormOpen ? (
-          <div className={shared.targetForm}>
-            <select
-              className={shared.select}
-              value={targetDraft.target_type_id || ''}
-              onChange={(event) =>
-                onTargetDraftChange({ ...targetDraft, target_type_id: Number(event.target.value) })
-              }
-            >
-              <option value="">Tipo target</option>
-              {targetTypes.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name_it}
-                </option>
-              ))}
-            </select>
-            <input
-              className={shared.field}
-              value={targetDraft.display_name}
-              onChange={(event) => onTargetDraftChange({ ...targetDraft, display_name: event.target.value })}
-              placeholder="Nome target"
-            />
-            <select
-              className={shared.select}
-              value={targetDraft.service_taxonomy_id ?? ''}
-              onChange={(event) =>
-                onTargetDraftChange({
-                  ...targetDraft,
-                  service_taxonomy_id: event.target.value ? Number(event.target.value) : null,
-                })
-              }
-            >
-              <option value="">Servizio collegato (opzionale)</option>
-              {allServices.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name_it}
-                </option>
-              ))}
-            </select>
-            <div className={shared.targetFormActions}>
-              <Button size="sm" variant="secondary" onClick={cancelTargetForm}>
-                Annulla
-              </Button>
-              <Button size="sm" onClick={handleAddTarget}>
-                Aggiungi
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <Button size="sm" variant="secondary" onClick={() => setTargetFormOpen(true)}>
-            <Icon name="plus" size={14} /> Aggiungi target
-          </Button>
-        )}
-      </section>
-
-      {suggestions.length > 0 ? (
-        <div className={shared.suggestionPanel}>
-          <div className={shared.sectionHeader}>
-            <h4 className={shared.sectionTitle}>Suggerimenti</h4>
-            <Button size="sm" variant="secondary" onClick={onAddSuggestions}>
-              Aggiungi suggeriti
-            </Button>
-          </div>
-          <p className={shared.suggestionDisclaimer}>
-            Proposti dal grafo dipendenze — può essere incompleto, verifica.
-          </p>
-          <div className={shared.suggestionList}>
-            {suggestions.map((item) => {
-              const tooltip = `${dependencyTypeLabel(item.dependency_type)} · ${audienceLabel(
-                item.downstream_service.audience ?? '',
-              )}`;
-              return (
-                <label
-                  key={item.service_dependency_id}
-                  className={shared.suggestionRowGrid}
-                  title={tooltip}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checkedSuggestions[item.service_dependency_id] === true}
-                    onChange={(event) =>
-                      onSuggestionCheck(item.service_dependency_id, event.target.checked)
-                    }
-                  />
-                  <strong>{item.downstream_service.name_it}</strong>
-                  <span className={shared.suggestionUpstream}>
-                    ← {item.upstream_service.name_it}
-                  </span>
-                  <span className={shared.suggestionSeverity}>
-                    {severityLabel(item.default_severity)}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {transitivePreview.length > 0 ? (
-        <details className={shared.indirectDetails}>
-          <summary className={shared.indirectSummary}>
-            Possibili effetti a catena ({transitivePreview.length})
-          </summary>
-          <div className={shared.chipList}>
-            {transitivePreview.map((service) => (
-              <span key={service.id} className={shared.filterChip}>
-                {service.name_it}
-              </span>
-            ))}
-          </div>
-        </details>
-      ) : null}
     </div>
   );
+}
+
+interface CompactSelectionRowProps {
+  selection: ServiceSelection;
+  service: ReferenceItem | undefined;
+  instances: ManualTarget[];
+  onSetSeverity: (id: number, value: SeverityValue | null) => void;
+  onConfirmSeverity: (id: number) => void;
+  onSetAudience: (id: number, value: AudienceOverride | null) => void;
+  onAddInstance: (serviceTaxonomyId: number, displayName: string) => void;
+  onRemoveInstance: (targetId: string) => void;
+  onRemove: (id: number) => void;
 }
 
 function CompactSelectionRow({
   selection,
   service,
-  selectedDomainId,
-  expanded,
-  onToggle,
-  onSelectionChange,
-}: {
-  selection: ServiceSelection;
-  service: ReferenceItem | undefined;
-  selectedDomainId: number | null;
-  expanded: boolean;
-  onToggle: () => void;
-  onSelectionChange: (id: number, patch: Partial<ServiceSelection>) => void;
-}) {
+  instances,
+  onSetSeverity,
+  onConfirmSeverity,
+  onSetAudience,
+  onAddInstance,
+  onRemoveInstance,
+  onRemove,
+}: CompactSelectionRowProps) {
+  const [instanceDraft, setInstanceDraft] = useState('');
   if (!service) return null;
-  const canOperate = !selectedDomainId || service.technical_domain_id === selectedDomainId;
   const showAudience = service.audience === 'maintenance';
-  const iconClass =
-    selection.role === 'operated' ? shared.iconOperated : shared.iconImpacted;
-  const expandedId = `compact-row-expanded-${selection.service_taxonomy_id}`;
+  const isSuggested = !selection.severity_confirmed && selection.expected_severity !== null;
+  const fromGraph = selection.source === 'dependency_graph';
+
+  function commitInstance() {
+    const value = instanceDraft.trim();
+    if (!value) return;
+    onAddInstance(selection.service_taxonomy_id, value);
+    setInstanceDraft('');
+  }
+
   return (
     <li className={shared.compactRow}>
       <div className={shared.compactRowHead}>
-        <Icon name="circle" size={10} className={iconClass} aria-hidden="true" />
         <span className={shared.compactRowName}>
           <strong>{service.name_it}</strong>
+          {service.target_type_name ? (
+            <span className={shared.compactRowChip}>{service.target_type_name}</span>
+          ) : null}
+          {fromGraph ? <span className={shared.compactRowFromGraph}>dal grafo</span> : null}
         </span>
-        <select
-          className={`${shared.select} ${shared.compactRowSelect}`}
-          value={selection.expected_severity}
-          onChange={(event) =>
-            onSelectionChange(selection.service_taxonomy_id, {
-              expected_severity: event.target.value as SeverityValue,
-            })
-          }
-        >
-          <option value="none">Nessun impatto</option>
-          <option value="degraded">Degradato</option>
-          <option value="unavailable">Non disponibile</option>
-        </select>
+        <span className={shared.compactRowSeverity}>
+          <span className={shared.compactRowSeverityLabel}>Impatto atteso</span>
+          <SeverityDropdown
+            value={selection.expected_severity}
+            onChange={(value) => onSetSeverity(selection.service_taxonomy_id, value)}
+            isSuggested={isSuggested}
+            onConfirmSuggested={() => onConfirmSeverity(selection.service_taxonomy_id)}
+          />
+        </span>
         <button
           type="button"
-          className={shared.compactRowToggle}
-          aria-expanded={expanded}
-          aria-controls={expandedId}
-          onClick={onToggle}
-          title={expanded ? 'Comprimi' : 'Espandi'}
+          className={shared.compactRowRemove}
+          onClick={() => onRemove(selection.service_taxonomy_id)}
+          title="Rimuovi"
+          aria-label="Rimuovi questa voce"
         >
-          <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} />
+          <Icon name="x" size={14} />
         </button>
       </div>
-      {expanded ? (
-        <div id={expandedId} className={shared.compactRowExpanded}>
+      <div className={shared.compactRowInstances}>
+        <span className={shared.compactRowInstancesLabel}>Istanze:</span>
+        {instances.length > 0 ? (
+          <ul className={shared.compactRowInstanceList}>
+            {instances.map((instance) => (
+              <li key={instance.id} className={shared.compactRowInstanceItem}>
+                <span className={shared.compactRowInstanceTree}>└</span>
+                <span>{instance.display_name}</span>
+                <button
+                  type="button"
+                  className={shared.compactRowInstanceRemove}
+                  onClick={() => onRemoveInstance(instance.id)}
+                  title="Rimuovi istanza"
+                  aria-label="Rimuovi istanza"
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <div className={shared.compactRowInstanceAdd}>
+          <input
+            className={shared.compactRowInstanceInput}
+            value={instanceDraft}
+            onChange={(event) => setInstanceDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                commitInstance();
+              }
+            }}
+            placeholder="+ aggiungi istanza"
+          />
+          {instanceDraft.trim() ? (
+            <button
+              type="button"
+              className={shared.compactRowInstanceConfirm}
+              onClick={commitInstance}
+              title="Aggiungi istanza"
+            >
+              <Icon name="check" size={12} />
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {showAudience ? (
+        <div className={shared.compactRowAudience}>
           <label className={shared.compactRowField}>
-            <span className={shared.compactRowFieldLabel}>Ruolo</span>
+            <span className={shared.compactRowFieldLabel}>Audience</span>
             <select
               className={shared.select}
-              value={selection.role}
-              onChange={(event) => {
-                if (event.target.value === 'operated' && !canOperate) return;
-                onSelectionChange(selection.service_taxonomy_id, {
-                  role: event.target.value as ServiceSelection['role'],
-                  source: 'manual',
-                });
-              }}
+              value={selection.expected_audience ?? ''}
+              onChange={(event) =>
+                onSetAudience(
+                  selection.service_taxonomy_id,
+                  (event.target.value || null) as AudienceOverride | null,
+                )
+              }
             >
-              <option value="operated" disabled={!canOperate}>Operato</option>
-              <option value="dependent">Impattato</option>
+              <option value="">Da definire</option>
+              <option value="internal">Interna</option>
+              <option value="external">Esterna</option>
+              <option value="both">Interna ed esterna</option>
             </select>
           </label>
-          {showAudience ? (
-            <label className={shared.compactRowField}>
-              <span className={shared.compactRowFieldLabel}>Audience</span>
-              <select
-                className={shared.select}
-                value={selection.expected_audience ?? ''}
-                onChange={(event) =>
-                  onSelectionChange(selection.service_taxonomy_id, {
-                    expected_audience: (event.target.value || null) as AudienceOverride | null,
-                  })
-                }
-              >
-                <option value="">Da definire</option>
-                <option value="internal">Interna</option>
-                <option value="external">Esterna</option>
-                <option value="both">Interna ed esterna</option>
-              </select>
-            </label>
-          ) : null}
         </div>
       ) : null}
     </li>
   );
+}
+
+function classificationInputs(ids: number[], hasPrimary: boolean): ClassificationInput[] {
+  return ids.map((id, index) => ({
+    reference_id: id,
+    source: 'manual',
+    confidence: null,
+    is_primary: hasPrimary && index === 0,
+  }));
+}
+
+function serviceClassificationInputs(items: ServiceSelection[]): ClassificationInput[] {
+  return items.map((item, index) => {
+    const input: ClassificationInput = {
+      reference_id: item.service_taxonomy_id,
+      service_taxonomy_id: item.service_taxonomy_id,
+      source: item.source,
+      confidence: null,
+      is_primary:
+        item.role === 'operated' &&
+        index === items.findIndex((candidate) => candidate.role === 'operated'),
+      role: item.role,
+      expected_audience: item.expected_audience,
+    };
+    if (item.severity_confirmed && item.expected_severity !== null) {
+      input.expected_severity = item.expected_severity;
+    }
+    return input;
+  });
+}
+
+function targetInput(item: ManualTarget): TargetBody {
+  return {
+    target_type_id: item.target_type_id,
+    display_name: item.display_name,
+    service_taxonomy_id: item.service_taxonomy_id,
+    source: 'manual',
+    is_primary: false,
+  };
+}
+
+function selectionSummary(form: FormState): string | null {
+  const operatedCount = form.service_selections.filter((item) => item.role === 'operated').length;
+  const impactedCount = form.service_selections.filter((item) => item.role === 'dependent').length;
+  const instancesCount = form.manual_targets.length;
+  if (operatedCount === 0 && impactedCount === 0) return null;
+  const operatedLabel =
+    instancesCount > 0
+      ? `${operatedCount} in manutenzione (${instancesCount} ${instancesCount === 1 ? 'istanza' : 'istanze'})`
+      : `${operatedCount} ${operatedCount === 1 ? 'in manutenzione' : 'in manutenzione'}`;
+  return `${operatedLabel} · ${impactedCount} ${impactedCount === 1 ? 'effetto su altri sistemi' : 'effetti su altri sistemi'}`;
+}
+
+function selectionGapList(form: FormState, services: ReferenceItem[]): string[] {
+  const byId = new Map(services.map((service) => [service.id, service]));
+  return form.service_selections
+    .filter((item) => !item.severity_confirmed || item.expected_severity === null)
+    .map((item) => {
+      const service = byId.get(item.service_taxonomy_id);
+      const name = service?.name_it ?? `Voce #${item.service_taxonomy_id}`;
+      return `Severità non dichiarata: ${name}`;
+    });
 }
 
 function MultiSelectField({
@@ -1237,102 +1301,4 @@ function MultiSelectField({
 
 function toOptions(items: ReferenceItem[]): Array<{ value: number; label: string }> {
   return items.map((item) => ({ value: item.id, label: item.name_it }));
-}
-
-function classificationInputs(ids: number[], hasPrimary: boolean): ClassificationInput[] {
-  return ids.map((id, index) => ({
-    reference_id: id,
-    source: 'manual',
-    confidence: null,
-    is_primary: hasPrimary && index === 0,
-  }));
-}
-
-function serviceClassificationInputs(items: ServiceSelection[]): ClassificationInput[] {
-  return items.map((item, index) => ({
-    reference_id: item.service_taxonomy_id,
-    service_taxonomy_id: item.service_taxonomy_id,
-    source: item.source,
-    confidence: null,
-    is_primary: item.role === 'operated' && index === items.findIndex((candidate) => candidate.role === 'operated'),
-    role: item.role,
-    expected_severity: item.expected_severity,
-    expected_audience: item.expected_audience,
-  }));
-}
-
-function targetInput(item: ManualTarget): TargetBody {
-  return {
-    target_type_id: item.target_type_id,
-    display_name: item.display_name,
-    service_taxonomy_id: item.service_taxonomy_id,
-    source: 'manual',
-    is_primary: false,
-  };
-}
-
-function mergeServiceSelections(current: ServiceSelection[], incoming: ServiceSelection[]): ServiceSelection[] {
-  const byID = new Map<number, ServiceSelection>();
-  for (const item of current) byID.set(item.service_taxonomy_id, item);
-  for (const item of incoming) {
-    const existing = byID.get(item.service_taxonomy_id);
-    if (existing?.role === 'operated' && item.role === 'dependent') {
-      byID.set(item.service_taxonomy_id, { ...existing, expected_severity: item.expected_severity });
-    } else {
-      byID.set(item.service_taxonomy_id, { ...existing, ...item });
-    }
-  }
-  return [...byID.values()].sort((a, b) => {
-    if (a.role !== b.role) return a.role === 'operated' ? -1 : 1;
-    return a.service_taxonomy_id - b.service_taxonomy_id;
-  });
-}
-
-function dependencyPreview(
-  operatedIds: number[],
-  dependencies: ServiceDependency[],
-  selected: ServiceSelection[],
-): ReferenceItem[] {
-  const selectedIds = new Set(selected.map((item) => item.service_taxonomy_id));
-  const byUpstream = new Map<number, ServiceDependency[]>();
-  for (const dependency of dependencies) {
-    const rows = byUpstream.get(dependency.upstream_service_id) ?? [];
-    rows.push(dependency);
-    byUpstream.set(dependency.upstream_service_id, rows);
-  }
-  const result = new Map<number, ReferenceItem>();
-  const visited = new Set<number>(operatedIds);
-  const walk = (ids: number[], depth: number) => {
-    if (depth > 2) return;
-    const next: number[] = [];
-    for (const id of ids) {
-      for (const dependency of byUpstream.get(id) ?? []) {
-        if (visited.has(dependency.downstream_service_id)) continue;
-        visited.add(dependency.downstream_service_id);
-        next.push(dependency.downstream_service_id);
-        if (depth >= 2 && !selectedIds.has(dependency.downstream_service_id)) {
-          result.set(dependency.downstream_service_id, dependency.downstream_service);
-        }
-      }
-    }
-    if (next.length > 0) walk(next, depth + 1);
-  };
-  walk(operatedIds, 1);
-  return [...result.values()];
-}
-
-function defaultSeverityFor(role: ServiceSelection['role']): SeverityValue {
-  return role === 'operated' ? 'unavailable' : 'degraded';
-}
-
-function getSuggestionDefaultChecked(item: ServiceDependency): boolean {
-  return item.dependency_type === 'runs_on' && !item.is_redundant;
-}
-
-function selectionSummary(form: FormState): string | null {
-  const operatedCount = form.service_selections.filter((item) => item.role === 'operated').length;
-  const impactedCount = form.service_selections.filter((item) => item.role === 'dependent').length;
-  const targetCount = form.manual_targets.length;
-  if (operatedCount === 0 && impactedCount === 0 && targetCount === 0) return null;
-  return `${operatedCount} operati · ${impactedCount} impattati · ${targetCount} apparati`;
 }

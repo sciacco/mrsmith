@@ -1,0 +1,110 @@
+.banner {
+  background: var(--color-info-soft, #eff6ff);
+  border: 1px solid var(--color-info, #bfdbfe);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerIcon {
+  color: var(--color-info-strong, #2563eb);
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--color-surface, #fff);
+  border: 1px solid transparent;
+}
+
+.row:hover {
+  border-color: var(--color-border, #e2e8f0);
+}
+
+.rowMain {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--color-text, #0f172a);
+}
+
+.checkbox {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.rowName {
+  font-weight: 500;
+}
+
+.rowReason {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+
+.rowSeverity {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #475569);
+  white-space: nowrap;
+}
+
+.ignore {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--color-text-muted, #94a3b8);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ignore:hover {
+  background: var(--color-surface-subtle, #f1f5f9);
+  color: var(--color-text, #0f172a);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
