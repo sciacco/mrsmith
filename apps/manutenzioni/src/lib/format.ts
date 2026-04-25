@@ -1,5 +1,6 @@
 import { ApiError } from '@mrsmith/api-client';
 import type { StatusCount } from '../api/types';
+export { severityLabel } from './severity';
 
 export const STATUS_OPTIONS = [
   'draft',
@@ -62,15 +63,6 @@ export function serviceRoleLabel(role?: string | null): string {
     dependent: 'Impattato',
   };
   return role ? labels[role] ?? role : '-';
-}
-
-export function severityLabel(value?: string | null): string {
-  const labels: Record<string, string> = {
-    none: 'Nessun impatto',
-    degraded: 'Degradato',
-    unavailable: 'Non disponibile',
-  };
-  return value ? labels[value] ?? value : '-';
 }
 
 export function dependencyTypeLabel(value?: string | null): string {

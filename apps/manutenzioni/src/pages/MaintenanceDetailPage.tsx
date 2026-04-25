@@ -50,6 +50,7 @@ import {
   windowStatusLabel,
 } from '../lib/format';
 import { MANUTENZIONI_APPROVER_ROLES, MANUTENZIONI_MANAGER_ROLES } from '../lib/roles';
+import { SEVERITY_OPTIONS } from '../lib/severity';
 import shared from './shared.module.css';
 
 type TabKey = 'riepilogo' | 'finestre' | 'impatto' | 'target' | 'clienti' | 'comunicazioni' | 'storico';
@@ -1040,9 +1041,11 @@ function ClassificationSection({
                 <option value="dependent">Impattato</option>
               </select>
               <select className={shared.select} value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}>
-                <option value="none">Nessun impatto</option>
-                <option value="degraded">Degradato</option>
-                <option value="unavailable">Non disponibile</option>
+                {SEVERITY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
               <select className={shared.select} value={audience} onChange={(event) => setAudience(event.target.value)}>
                 <option value="">Audience catalogo</option>

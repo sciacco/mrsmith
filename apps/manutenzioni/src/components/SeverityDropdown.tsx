@@ -1,22 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@mrsmith/ui';
-import type { SeverityValue } from '../api/types';
+import {
+  NULLABLE_SEVERITY_OPTIONS,
+  severityOption,
+  type SeveritySelectionValue,
+} from '../lib/severity';
 import styles from './SeverityDropdown.module.css';
 
-type SeverityDropdownValue = SeverityValue | null;
-
-const FALLBACK = { value: null as SeverityDropdownValue, label: 'Da definire', tone: 'undefined' };
-
-const VALUES: Array<{ value: SeverityDropdownValue; label: string; tone: string }> = [
-  { value: 'none', label: 'Nessun impatto', tone: 'none' },
-  { value: 'degraded', label: 'Degradato', tone: 'degraded' },
-  { value: 'unavailable', label: 'Non disponibile', tone: 'unavailable' },
-  FALLBACK,
-];
-
 interface Props {
-  value: SeverityDropdownValue;
-  onChange: (value: SeverityDropdownValue) => void;
+  value: SeveritySelectionValue;
+  onChange: (value: SeveritySelectionValue) => void;
   isSuggested?: boolean;
   onConfirmSuggested?: () => void;
   disabled?: boolean;
@@ -49,7 +42,7 @@ export function SeverityDropdown({
     };
   }, [open]);
 
-  const current = VALUES.find((entry) => entry.value === value) ?? FALLBACK;
+  const current = severityOption(value);
 
   return (
     <div className={styles.wrapper} ref={ref}>
@@ -81,8 +74,8 @@ export function SeverityDropdown({
       ) : null}
       {open ? (
         <ul className={styles.menu} role="listbox">
-          {VALUES.map((entry) => (
-            <li key={entry.label}>
+          {NULLABLE_SEVERITY_OPTIONS.map((entry) => (
+            <li key={entry.value ?? 'undefined'}>
               <button
                 type="button"
                 className={`${styles.option} ${entry.value === value ? styles.optionSelected : ''}`}

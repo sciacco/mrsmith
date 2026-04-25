@@ -657,6 +657,7 @@ export function MaintenanceCreatePage() {
                   <SectionStatusIcon
                     gapCount={undefinedSeverityCount}
                     gaps={selectionGapList(form, reference.data.service_taxonomy)}
+                    hasContent={form.service_selections.length > 0}
                   />
                 </span>
               </summary>
@@ -787,10 +788,19 @@ export function MaintenanceCreatePage() {
   );
 }
 
-function SectionStatusIcon({ gapCount, gaps }: { gapCount: number; gaps: string[] }) {
+function SectionStatusIcon({
+  gapCount,
+  gaps,
+  hasContent,
+}: {
+  gapCount: number;
+  gaps: string[];
+  hasContent: boolean;
+}) {
+  if (!hasContent) return null;
   if (gapCount === 0) {
     return (
-      <Tooltip content="Pronto per la pubblicazione" placement="top">
+      <Tooltip content="Sezione completa" placement="top">
         <span className={shared.sectionStatusOk} aria-label="Sezione completa">
           <Icon name="check-circle" size={14} />
         </span>
@@ -799,13 +809,13 @@ function SectionStatusIcon({ gapCount, gaps }: { gapCount: number; gaps: string[
   }
   const tooltip =
     gaps.length > 0
-      ? `${gapCount} controlli mancanti:\n• ${gaps.slice(0, 5).join('\n• ')}${gaps.length > 5 ? `\n• …e altri ${gaps.length - 5}` : ''}`
-      : `${gapCount} controlli mancanti`;
+      ? `${gapCount} dichiarazioni mancanti:\n• ${gaps.slice(0, 5).join('\n• ')}${gaps.length > 5 ? `\n• …e altri ${gaps.length - 5}` : ''}`
+      : `${gapCount} dichiarazioni mancanti`;
   return (
     <Tooltip content={tooltip} placement="top">
       <span
         className={shared.sectionStatusWarn}
-        aria-label={`${gapCount} controlli mancanti per la pubblicazione`}
+        aria-label={`${gapCount} dichiarazioni mancanti`}
       >
         <Icon name="triangle-alert" size={14} />
         <span>{gapCount}</span>

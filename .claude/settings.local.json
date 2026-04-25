@@ -12,7 +12,9 @@
       "Bash(GOINSECURE=github.com/go-sql-driver/mysql go mod:*)",
       "mcp__plugin_playwright_playwright__browser_console_messages",
       "mcp__plugin_playwright_playwright__browser_close",
-      "Skill(playwright-cli)"
+      "Skill(playwright-cli)",
+      "Bash(playwright-cli -s=manutsmoke press PageDown)",
+      "Bash(playwright-cli -s=manutsmoke screenshot --filename=/tmp/claude/manut-section.png)"
     ]
   },
   "spinnerTipsEnabled": false

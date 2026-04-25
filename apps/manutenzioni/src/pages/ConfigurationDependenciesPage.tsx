@@ -9,6 +9,7 @@ import {
 import type { ReferenceItem, ServiceDependency, ServiceDependencyBody } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { dependencyTypeLabel, errorMessage, severityLabel } from '../lib/format';
+import { SEVERITY_OPTIONS } from '../lib/severity';
 import styles from './ConfigurationDependenciesPage.module.css';
 import shared from './shared.module.css';
 
@@ -330,9 +331,11 @@ function DependencyForm({
               onChange({ ...form, default_severity: event.target.value as ServiceDependencyBody['default_severity'] })
             }
           >
-            <option value="none">Nessun impatto</option>
-            <option value="degraded">Degradato</option>
-            <option value="unavailable">Non disponibile</option>
+            {SEVERITY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
         <label className={styles.inlineCheck}>
