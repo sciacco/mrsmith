@@ -24,8 +24,8 @@
 - Auth: OAuth2/OIDC with remote Keycloak (no local instance)
 
 ## UI/UX
-- [`docs/UI-UX.md`](docs/UI-UX.md) — Reference document for all UI/UX decisions implemented in the codebase. Use this as the foundation when building new mini-apps.
-- For any new portal mini-app or mini-app UI review, use `.claude/skills/portal-miniapp-generator/` as the canonical workflow. For Appsmith migrations, run it after `.claude/skills/appsmith-migration-spec/` and before implementation.
+- [`docs/UI-UX.md`](docs/UI-UX.md) — Mandatory reference for all UI, frontend, and mini-app work. Agents must read it before planning or implementing UI changes and treat it as the canonical design-system source unless the user explicitly overrides it.
+- For any new portal mini-app or mini-app UI review, use `.agents/skills/portal-miniapp-generator/` as the canonical workflow.
 
 ## TODOs
 - [`docs/TODO.md`](docs/TODO.md) — project-wide open items, deferred decisions, and out-of-scope work tracked for future implementation

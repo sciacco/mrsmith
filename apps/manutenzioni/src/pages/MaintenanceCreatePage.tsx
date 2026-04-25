@@ -529,7 +529,6 @@ export function MaintenanceCreatePage() {
             <div className={shared.panel}>
               <div className={shared.sectionHeader}>
                 <h2 className={shared.sectionTitle}>Contesto</h2>
-                <span className={shared.sectionBadge}>Obbligatorio</span>
               </div>
               <div className={shared.formGrid}>
                 <label className={`${shared.label} ${shared.formGridSpan}`}>
@@ -583,6 +582,27 @@ export function MaintenanceCreatePage() {
                     }))
                   }
                 />
+                <MultiSelectField
+                  label="Motivazione intervento"
+                  options={toOptions(reference.data.reason_classes)}
+                  selected={form.reason_class_ids}
+                  onChange={(value) => update('reason_class_ids', value)}
+                />
+                <MultiSelectField
+                  label="Impatto previsto"
+                  options={toOptions(reference.data.impact_effects)}
+                  selected={form.impact_effect_ids}
+                  onChange={(value) => update('impact_effect_ids', value)}
+                />
+                <label className={`${shared.label} ${shared.formGridSpan}`}>
+                  Servizio garantito durante l'intervento
+                  <textarea
+                    className={shared.textarea}
+                    placeholder={RESIDUAL_SERVICE_PLACEHOLDER}
+                    value={form.residual_service_it}
+                    onChange={(event) => update('residual_service_it', event.target.value)}
+                  />
+                </label>
               </div>
             </div>
 
@@ -590,44 +610,8 @@ export function MaintenanceCreatePage() {
               <summary className={shared.collapsibleSummary}>
                 <span className={shared.collapsibleSummaryLeft}>
                   <Icon name="chevron-right" size={16} className={shared.collapsibleChevron} />
-                  <h2 className={shared.sectionTitle}>Sommario</h2>
-                </span>
-                <span className={shared.sectionBadge}>Opzionale</span>
-              </summary>
-              <div className={shared.collapsibleContent}>
-                <div className={shared.formGrid}>
-                  <MultiSelectField
-                    label="Motivazione intervento"
-                    options={toOptions(reference.data.reason_classes)}
-                    selected={form.reason_class_ids}
-                    onChange={(value) => update('reason_class_ids', value)}
-                  />
-                  <MultiSelectField
-                    label="Impatto previsto"
-                    options={toOptions(reference.data.impact_effects)}
-                    selected={form.impact_effect_ids}
-                    onChange={(value) => update('impact_effect_ids', value)}
-                  />
-                  <label className={`${shared.label} ${shared.formGridSpan}`}>
-                    Servizio garantito durante l'intervento
-                    <textarea
-                      className={shared.textarea}
-                      placeholder={RESIDUAL_SERVICE_PLACEHOLDER}
-                      value={form.residual_service_it}
-                      onChange={(event) => update('residual_service_it', event.target.value)}
-                    />
-                  </label>
-                </div>
-              </div>
-            </details>
-
-            <details className={shared.collapsiblePanel} open>
-              <summary className={shared.collapsibleSummary}>
-                <span className={shared.collapsibleSummaryLeft}>
-                  <Icon name="chevron-right" size={16} className={shared.collapsibleChevron} />
                   <h2 className={shared.sectionTitle}>Servizi e impatti</h2>
                 </span>
-                <span className={shared.sectionBadge}>Opzionale</span>
               </summary>
               <div className={shared.collapsibleContent}>
                 {(() => {
@@ -674,7 +658,6 @@ export function MaintenanceCreatePage() {
                   <Icon name="chevron-right" size={16} className={shared.collapsibleChevron} />
                   <h2 className={shared.sectionTitle}>Prima finestra</h2>
                 </span>
-                <span className={shared.sectionBadge}>Opzionale</span>
               </summary>
               <div className={shared.collapsibleContent}>
                 <div className={shared.formGridThree}>
@@ -940,7 +923,7 @@ function ServiceImpactSection({
           <h3 className={shared.serviceBlockTitle}>Servizi su cui intervieni</h3>
         </header>
         <MultiSelectField
-          label="Aggiungi servizio operato"
+          label="Aggiungi i servizi oggetto della manutenzione"
           options={toOptions(operatedOptions)}
           selected={operatedIds}
           onChange={onOperatedChange}
