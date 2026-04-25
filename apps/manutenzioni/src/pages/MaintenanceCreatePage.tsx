@@ -156,13 +156,6 @@ export function MaintenanceCreatePage() {
     [form.maintenance_kind_id, kindList],
   );
 
-  const undefinedSeverityCount = useMemo(
-    () =>
-      form.service_selections.filter((item) => !item.severity_confirmed || item.expected_severity === null)
-        .length,
-    [form.service_selections],
-  );
-
   const missing = useMemo(() => {
     const reasons: string[] = [];
     if (!form.summary_it.trim()) reasons.push('titolo');
@@ -654,11 +647,6 @@ export function MaintenanceCreatePage() {
                 <span className={shared.collapsibleSummaryLeft}>
                   <Icon name="chevron-right" size={16} className={shared.collapsibleChevron} />
                   <h2 className={shared.sectionTitle}>Dettagli tecnici della manutenzione</h2>
-                  <SectionStatusIcon
-                    gapCount={undefinedSeverityCount}
-                    gaps={selectionGapList(form, reference.data.service_taxonomy)}
-                    hasContent={form.service_selections.length > 0}
-                  />
                 </span>
               </summary>
               <div className={shared.collapsibleContent}>
@@ -788,37 +776,36 @@ export function MaintenanceCreatePage() {
   );
 }
 
-function SectionStatusIcon({
-  gapCount,
-  gaps,
-  hasContent,
-}: {
-  gapCount: number;
+interface SectionWarningSummary {
+  count: number;
   gaps: string[];
-  hasContent: boolean;
-}) {
-  if (!hasContent) return null;
-  if (gapCount === 0) {
-    return (
-      <Tooltip content="Sezione completa" placement="top">
-        <span className={shared.sectionStatusOk} aria-label="Sezione completa">
-          <Icon name="check-circle" size={14} />
-        </span>
-      </Tooltip>
-    );
-  }
+}
+
+function SectionWarningIcon({ summary }: { summary: SectionWarningSummary }) {
+  if (summary.count === 0) return null;
   const tooltip =
-    gaps.length > 0
-      ? `${gapCount} dichiarazioni mancanti:\n• ${gaps.slice(0, 5).join('\n• ')}${gaps.length > 5 ? `\n• …e altri ${gaps.length - 5}` : ''}`
-      : `${gapCount} dichiarazioni mancanti`;
+    summary.gaps.length > 0
+      ? (
+          <span className={shared.sectionWarningTooltip}>
+            <span>{summary.count} dichiarazioni mancanti:</span>
+            {summary.gaps.slice(0, 5).map((gap, index) => (
+              <span key={`${gap}-${index}`}>• {gap}</span>
+            ))}
+            {summary.gaps.length > 5 ? (
+              <span>• …e altri {summary.gaps.length - 5}</span>
+            ) : null}
+          </span>
+        )
+      : `${summary.count} dichiarazioni mancanti`;
   return (
     <Tooltip content={tooltip} placement="top">
       <span
-        className={shared.sectionStatusWarn}
-        aria-label={`${gapCount} dichiarazioni mancanti`}
+        className={shared.sectionWarningBadge}
+        aria-label={`${summary.count} dichiarazioni mancanti`}
+        tabIndex={0}
       >
         <Icon name="triangle-alert" size={14} />
-        <span>{gapCount}</span>
+        <span>{summary.count}</span>
       </span>
     </Tooltip>
   );
@@ -975,6 +962,14 @@ function ServiceImpactSection({
     () => selections.filter((selection) => selection.role === 'dependent'),
     [selections],
   );
+  const operatedWarnings = useMemo(
+    () => selectionWarningSummary(operatedSelections, serviceById),
+    [operatedSelections, serviceById],
+  );
+  const impactedWarnings = useMemo(
+    () => selectionWarningSummary(impactedSelections, serviceById),
+    [impactedSelections, serviceById],
+  );
 
   const operatedCatalog = useMemo(
     () =>
@@ -1003,7 +998,10 @@ function ServiceImpactSection({
     <div className={shared.serviceImpactBox}>
       <section className={shared.serviceBlock}>
         <header className={shared.serviceBlockHeader}>
-          <h3 className={shared.serviceBlockTitle}>In manutenzione</h3>
+          <div className={shared.serviceBlockTitleRow}>
+            <h3 className={shared.serviceBlockTitle}>In manutenzione</h3>
+            <SectionWarningIcon summary={operatedWarnings} />
+          </div>
           <p className={shared.serviceBlockSublabel}>
             Gli oggetti su cui interviene questa finestra
           </p>
@@ -1042,7 +1040,10 @@ function ServiceImpactSection({
 
       <section className={shared.serviceBlock}>
         <header className={shared.serviceBlockHeader}>
-          <h3 className={shared.serviceBlockTitle}>Effetti su altri sistemi</h3>
+          <div className={shared.serviceBlockTitleRow}>
+            <h3 className={shared.serviceBlockTitle}>Effetti su altri sistemi</h3>
+            <SectionWarningIcon summary={impactedWarnings} />
+          </div>
           <p className={shared.serviceBlockSublabel}>
             Altri oggetti che subiscono impatto anche se non vengono operati direttamente
           </p>
@@ -1152,7 +1153,33 @@ function CompactSelectionRow({
         </button>
       </div>
       <div className={shared.compactRowInstances}>
-        <span className={shared.compactRowInstancesLabel}>Istanze:</span>
+        <div className={shared.compactRowInstancesHeader}>
+          <span className={shared.compactRowInstancesLabel}>Istanze:</span>
+          <div className={shared.compactRowInstanceAdd}>
+            <input
+              className={shared.compactRowInstanceInput}
+              value={instanceDraft}
+              onChange={(event) => setInstanceDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  commitInstance();
+                }
+              }}
+              placeholder="+ aggiungi istanza"
+            />
+            {instanceDraft.trim() ? (
+              <button
+                type="button"
+                className={shared.compactRowInstanceConfirm}
+                onClick={commitInstance}
+                title="Aggiungi istanza"
+              >
+                <Icon name="check" size={12} />
+              </button>
+            ) : null}
+          </div>
+        </div>
         {instances.length > 0 ? (
           <ul className={shared.compactRowInstanceList}>
             {instances.map((instance) => (
@@ -1172,30 +1199,6 @@ function CompactSelectionRow({
             ))}
           </ul>
         ) : null}
-        <div className={shared.compactRowInstanceAdd}>
-          <input
-            className={shared.compactRowInstanceInput}
-            value={instanceDraft}
-            onChange={(event) => setInstanceDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                commitInstance();
-              }
-            }}
-            placeholder="+ aggiungi istanza"
-          />
-          {instanceDraft.trim() ? (
-            <button
-              type="button"
-              className={shared.compactRowInstanceConfirm}
-              onClick={commitInstance}
-              title="Aggiungi istanza"
-            >
-              <Icon name="check" size={12} />
-            </button>
-          ) : null}
-        </div>
       </div>
       {showAudience ? (
         <div className={shared.compactRowAudience}>
@@ -1274,15 +1277,18 @@ function selectionSummary(form: FormState): string | null {
   return `${operatedLabel} · ${impactedCount} ${impactedCount === 1 ? 'effetto su altri sistemi' : 'effetti su altri sistemi'}`;
 }
 
-function selectionGapList(form: FormState, services: ReferenceItem[]): string[] {
-  const byId = new Map(services.map((service) => [service.id, service]));
-  return form.service_selections
+function selectionWarningSummary(
+  selections: ServiceSelection[],
+  serviceById: Map<number, ReferenceItem>,
+): SectionWarningSummary {
+  const gaps = selections
     .filter((item) => !item.severity_confirmed || item.expected_severity === null)
     .map((item) => {
-      const service = byId.get(item.service_taxonomy_id);
+      const service = serviceById.get(item.service_taxonomy_id);
       const name = service?.name_it ?? `Voce #${item.service_taxonomy_id}`;
       return `Severità non dichiarata: ${name}`;
     });
+  return { count: gaps.length, gaps };
 }
 
 function MultiSelectField({
