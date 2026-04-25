@@ -379,28 +379,27 @@ Cross-database note: the `articles.article_category` table sits in a separate sc
 - `Dashboard.GetDocumentByIDfile` references a widget (`TBL_Document.triggeredRow.ID`) that exists only on Dashboard Copy.
 - `DT_expireDate.defaultDate` is a frozen timestamp from October 2025 — likely unintentional.
 
-### Migration blockers / open questions
+### Backend coverage of today's data layer
 
-1. Does the Arak API expose all SQL data needed by the Dashboard (drafts, expiring docs, categories needing requalification)? If not, who owns adding those endpoints?
-2. Are `articles.article_category` and `provider_qualifications.payment_method.rda_available` accessible through any backend? If no, the migration must add new endpoints (and potentially new Arak endpoints).
-3. What is the policy for the `skip_qualification_validation` switch? Which roles should see it?
-4. Is the `Acquisti RDA AFC` group the only role check, or are there others not visible in the export (e.g. for the Fornitori page)?
-5. Should "Storico modifiche" tab be implemented (currently a placeholder), or is it out of scope?
-6. Notification API filter periods: should the production Dashboard standardize on 30 days like today, or expose a selector like Dashboard Copy?
-7. Is the `Country` lookup table authoritative, or should we use ISO 3166?
-8. Is the qualification reference a *single* ref per provider (as Tab Dati implies) or one entry inside `refs[]` (as the API returns)? Today it's both — a duplicated source of truth.
-9. The export hard-codes `DDL_payment_method.defaultOptionValue=320`; what is `payment_method.code=320`? Confirm with Mistra DB.
+Cross-check of the audit's SQL/REST inventory against `docs/mistra-dist.yaml`:
+
+- **Dashboard SQL is fully replaceable by the existing Arak API.** `/arak/provider-qualification/v1/notification` already supports `notification_type ∈ {PROVIDER_DRAFT, DOCUMENT_EXPIRATION, PROVIDER_CATEGORY_STATE_CHANGE}` with a `last_days ∈ {7,30,60,90}` filter (default 30). This is exactly what `Dashboard Copy` consumes today. **The hidden Dashboard Copy is the intended target design**; the active raw-SQL Dashboard is legacy and should not be ported as-is.
+- **`payment_method.rda_available` has no Arak endpoint.** `/arak/rda/v1/po/{id}/payment-method` is per-PO and unrelated. Migrating "Modalità Pagamenti RDA" requires either a new endpoint in Mistra/Arak or a new endpoint in this monolith (`backend/internal/...`) that owns the master toggle directly against the Postgres `provider_qualifications.payment_method` table.
+- **`articles.article_category` has no Arak endpoint.** `/arak/rda/v1/article` lists articles but exposes no mapping CRUD. Migrating "Articoli - Categorie" requires the same call: new mrsmith endpoint backed by the `articles.article_category` table.
+- **`country` lookup has no Arak endpoint.** Either keep reading the `provider_qualifications.country` table from a backend-side lookup, or replace it with a static ISO 3166 source — design choice for the spec phase.
+- **`payment_method` listing has no Arak endpoint either.** Today consumed by `DDL_payment_method` (Fornitori) and by Modalità Pagamenti. Both need a backend-side list endpoint.
+
+Implication: the new mini-app cannot be a thin proxy over the Arak client. It must own at least four areas of data access — payment methods (list + rda_available toggle), article-category mappings (list + update), country lookup, and any Dashboard aggregations beyond what `notification` returns.
 
 ---
 
 ## 5. Recommended next steps
 
-1. **Validate the open questions above** with the product owner before moving to the migration spec.
-2. **Run `appsmith-migration-spec`** with this audit + answers as input. The output should be the per-mini-app PRD aligned with `docs/IMPLEMENTATION-PLANNING.md`.
-3. **Inventory the Arak API surface** in `docs/mistra-dist.yaml` against the table in §3.1 to confirm coverage; identify which SQL queries need new backend endpoints.
-4. **Move RBAC server-side** (Keycloak roles `app_fornitori_access` and a finer-grained admin role for `Impostazioni Qualifica` / `Articoli - Categorie` / `Modalità Pagamenti RDA`).
-5. **Plan the new app per the New App Checklist** (`CLAUDE.md`): root `package.json`, Makefile, `applaunch/catalog.go`, `cmd/server/main.go`, `config.go`.
-6. **Pick the production Dashboard** (raw-SQL vs notification API) before writing UI specs — the two sources disagree on which providers/categories appear.
+1. Hand this audit to `appsmith-migration-spec` for the product specification (state-machine semantics, RBAC scope, "Storico modifiche" inclusion, notification time-window UX, qualification-reference modeling, payment-method default).
+2. Plan the new app per the New App Checklist (`CLAUDE.md`): root `package.json`, Makefile, `applaunch/catalog.go`, `cmd/server/main.go`, `config.go`. Keycloak access role `app_fornitori_access`.
+3. Move authorization server-side: replace the client-side `appsmith.user.groups.includes('Acquisti RDA AFC')` gate with a Keycloak role enforced by the backend on the admin endpoints (`Impostazioni Qualifica`, `Articoli - Categorie`, `Modalità Pagamenti RDA`, and the `skip_qualification_validation` switch).
+4. Build the new endpoints not covered by Arak: payment methods list + `rda_available` PUT, article-category list + PUT, country list. All directly against Postgres `provider_qualifications` / `articles` schemas.
+5. Treat Dashboard Copy as the target Dashboard design (Arak `notification` API + period selector); do not port the raw-SQL Dashboard.
 
 ---
 
