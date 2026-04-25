@@ -483,7 +483,7 @@ export function MaintenanceCreatePage() {
         <div className={shared.titleBlock}>
           <h1 className={shared.pageTitle}>Nuova manutenzione</h1>
           <p className={shared.pageSubtitle}>
-            Compila i campi essenziali. I testi sono provvisori: si affineranno nei prossimi step.
+            Compila i campi essenziali. I testi potranno essere affinati prima dell'approvazione.
           </p>
         </div>
         <div className={shared.headerActions}>
@@ -610,7 +610,7 @@ export function MaintenanceCreatePage() {
               <summary className={shared.collapsibleSummary}>
                 <span className={shared.collapsibleSummaryLeft}>
                   <Icon name="chevron-right" size={16} className={shared.collapsibleChevron} />
-                  <h2 className={shared.sectionTitle}>Servizi e impatti</h2>
+                  <h2 className={shared.sectionTitle}>Dettagli tecnici della manutenzione</h2>
                 </span>
               </summary>
               <div className={shared.collapsibleContent}>
@@ -920,10 +920,10 @@ function ServiceImpactSection({
     <div className={shared.serviceImpactBox}>
       <section className={shared.serviceBlock}>
         <header className={shared.serviceBlockHeader}>
-          <h3 className={shared.serviceBlockTitle}>Servizi su cui intervieni</h3>
+          <h3 className={shared.serviceBlockTitle}>Ambito dell'intervento</h3>
         </header>
         <MultiSelectField
-          label="Aggiungi i servizi oggetto della manutenzione"
+          label="Seleziona l'oggetto della manutenzione"
           options={toOptions(operatedOptions)}
           selected={operatedIds}
           onChange={onOperatedChange}
@@ -951,10 +951,10 @@ function ServiceImpactSection({
 
       <section className={shared.serviceBlock}>
         <header className={shared.serviceBlockHeader}>
-          <h3 className={shared.serviceBlockTitle}>Altri servizi impattati</h3>
+          <h3 className={shared.serviceBlockTitle}>Valutazione di impatto esteso</h3>
         </header>
         <MultiSelectField
-          label="Aggiungi servizio impattato"
+          label="Seleziona altri sistemi o asset impattati"
           options={toOptions(allServices)}
           selected={impactedIds}
           onChange={onImpactedChange}
@@ -974,7 +974,7 @@ function ServiceImpactSection({
             ))}
           </ul>
         ) : (
-          <p className={shared.small}>Nessun servizio impattato.</p>
+          <p className={shared.small}>Nessun altro servizio impattato.</p>
         )}
       </section>
 
