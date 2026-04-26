@@ -22,6 +22,7 @@
 - `make dev-docker` — same via docker-compose
 - Backend proxy: Vite proxies `/api` → `localhost:8080`
 - Auth: OAuth2/OIDC with remote Keycloak (no local instance)
+- Before running Playwright, browser checks, or similar UI tests, first check whether `make dev` or the relevant Vite dev server is already running and reuse that URL. Do not start a second dev/preview server unless no suitable server is active.
 
 ## UI/UX
 - [`docs/UI-UX.md`](docs/UI-UX.md) — Mandatory reference for all UI, frontend, and mini-app work. Agents must read it before planning or implementing UI changes and treat it as the canonical design-system source unless the user explicitly overrides it.

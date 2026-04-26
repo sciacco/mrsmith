@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useManutenzioniApiClient } from './client';
 import type {
   AssistancePreviewRequest,
@@ -14,6 +14,7 @@ import type {
   MaintenanceFormBody,
   MaintenanceListItem,
   MaintenancePatchBody,
+  MaintenanceRadarResponse,
   NoticeBody,
   PagedResponse,
   ReferenceData,
@@ -26,6 +27,7 @@ import type {
 
 const queryKeys = {
   list: (params: MaintenanceFilters) => ['manutenzioni', 'list', params] as const,
+  radar: (params: MaintenanceFilters) => ['manutenzioni', 'radar', params] as const,
   detail: (id: number) => ['manutenzioni', 'detail', id] as const,
   reference: (id?: number) => ['manutenzioni', 'reference', id ?? 'new'] as const,
   customers: (q: string) => ['manutenzioni', 'customers', q] as const,
@@ -58,6 +60,11 @@ function searchParams(params: MaintenanceFilters): string {
   return search.toString();
 }
 
+async function invalidateMaintenanceCollections(queryClient: QueryClient) {
+  await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'list'] });
+  await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'radar'] });
+}
+
 export function useMaintenances(params: MaintenanceFilters) {
   const api = useManutenzioniApiClient();
   return useQuery({
@@ -65,6 +72,17 @@ export function useMaintenances(params: MaintenanceFilters) {
     queryFn: () =>
       api.get<PagedResponse<MaintenanceListItem>>(
         `/manutenzioni/v1/maintenances?${searchParams(params)}`,
+      ),
+  });
+}
+
+export function useMaintenanceRadar(params: MaintenanceFilters) {
+  const api = useManutenzioniApiClient();
+  return useQuery({
+    queryKey: queryKeys.radar(params),
+    queryFn: () =>
+      api.get<MaintenanceRadarResponse>(
+        `/manutenzioni/v1/maintenances/radar?${searchParams(params)}`,
       ),
   });
 }
@@ -106,7 +124,7 @@ export function useCreateMaintenance() {
     mutationFn: (body: MaintenanceFormBody) =>
       api.post<MaintenanceDetail>('/manutenzioni/v1/maintenances', body),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'list'] });
+      await invalidateMaintenanceCollections(queryClient);
     },
   });
 }
@@ -141,7 +159,7 @@ export function useUpdateMaintenance() {
       api.patch<MaintenanceDetail>(`/manutenzioni/v1/maintenances/${id}`, body),
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.detail(variables.id) });
-      await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'list'] });
+      await invalidateMaintenanceCollections(queryClient);
     },
   });
 }
@@ -165,7 +183,7 @@ export function useStatusAction() {
       }),
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.detail(variables.id) });
-      await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'list'] });
+      await invalidateMaintenanceCollections(queryClient);
     },
   });
 }
@@ -175,7 +193,7 @@ export function useWindowMutations(id: number) {
   const queryClient = useQueryClient();
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.detail(id) });
-    await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'list'] });
+    await invalidateMaintenanceCollections(queryClient);
   };
   return {
     create: useMutation({
@@ -218,7 +236,7 @@ export function useReplaceClassifications(id: number, resource: string) {
       api.put<MaintenanceDetail>(`/manutenzioni/v1/maintenances/${id}/${resource}`, { items }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.detail(id) });
-      await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'list'] });
+      await invalidateMaintenanceCollections(queryClient);
     },
   });
 }
@@ -228,7 +246,7 @@ export function useTargetMutations(id: number) {
   const queryClient = useQueryClient();
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.detail(id) });
-    await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'list'] });
+    await invalidateMaintenanceCollections(queryClient);
   };
   return {
     create: useMutation({
@@ -257,7 +275,7 @@ export function useCustomerImpactMutations(id: number) {
   const queryClient = useQueryClient();
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.detail(id) });
-    await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'list'] });
+    await invalidateMaintenanceCollections(queryClient);
   };
   return {
     create: useMutation({
@@ -297,7 +315,7 @@ export function useNoticeMutations(id: number) {
   const queryClient = useQueryClient();
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.detail(id) });
-    await queryClient.invalidateQueries({ queryKey: ['manutenzioni', 'list'] });
+    await invalidateMaintenanceCollections(queryClient);
   };
   return {
     create: useMutation({

@@ -8,41 +8,23 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
-func (h *Handler) handleListMaintenances(w http.ResponseWriter, r *http.Request) {
-	if !h.requireMaintenanceDB(w) {
-		return
-	}
+type maintenanceListFilterOptions struct {
+	includeScheduledRange bool
+}
 
-	page := queryPositiveInt(r, "page", 1)
-	pageSize := queryPositiveInt(r, "page_size", 20)
-	if pageSize > 100 {
-		pageSize = 100
-	}
-	offset := (page - 1) * pageSize
-
-	args := []any{}
-	where := maintenanceListWhere(r, &args)
-	from := ` FROM maintenance.maintenance m
+const maintenanceListFrom = ` FROM maintenance.maintenance m
 		JOIN maintenance.maintenance_kind mk ON mk.maintenance_kind_id = m.maintenance_kind_id
 		JOIN maintenance.technical_domain td ON td.technical_domain_id = m.technical_domain_id
 		LEFT JOIN maintenance.customer_scope cs ON cs.customer_scope_id = m.customer_scope_id
 		LEFT JOIN maintenance.site s ON s.site_id = m.site_id
 		LEFT JOIN maintenance.v_current_window vcw ON vcw.maintenance_id = m.maintenance_id`
 
-	var total int
-	if err := h.maintenance.QueryRowContext(r.Context(), `SELECT COUNT(*)`+from+where, args...).Scan(&total); err != nil {
-		h.dbFailure(w, r, "list_maintenances_count", err)
-		return
-	}
-
-	listArgs := append([]any{}, args...)
-	limit := placeholder(&listArgs, pageSize)
-	off := placeholder(&listArgs, offset)
-	query := `SELECT
+const maintenanceListSelect = `SELECT
 			m.maintenance_id,
 			COALESCE(m.code, ''),
 			m.title_it,
@@ -56,7 +38,9 @@ func (h *Handler) handleListMaintenances(w http.ResponseWriter, r *http.Request)
 			COALESCE(primary_service.name_it, primary_impact.name_it, ''),
 			COALESCE(notice_counts.statuses, '[]'::jsonb),
 			m.created_at,
-			m.updated_at` + from + `
+			m.updated_at`
+
+const maintenanceListLateralJoins = `
 		LEFT JOIN LATERAL (
 			SELECT st.name_it
 			FROM maintenance.maintenance_service_taxonomy mst
@@ -81,12 +65,40 @@ func (h *Handler) handleListMaintenances(w http.ResponseWriter, r *http.Request)
 				WHERE n.maintenance_id = m.maintenance_id
 				GROUP BY send_status
 			) x
-		) notice_counts ON true` + where + `
+		) notice_counts ON true`
+
+const maintenanceListOrder = `
 		ORDER BY
 			CASE WHEN vcw.scheduled_start_at IS NOT NULL AND vcw.scheduled_start_at >= now() THEN 0 ELSE 1 END,
 			vcw.scheduled_start_at ASC NULLS LAST,
 			m.updated_at DESC,
-			m.maintenance_id DESC
+			m.maintenance_id DESC`
+
+func (h *Handler) handleListMaintenances(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMaintenanceDB(w) {
+		return
+	}
+
+	page := queryPositiveInt(r, "page", 1)
+	pageSize := queryPositiveInt(r, "page_size", 20)
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+
+	args := []any{}
+	where := maintenanceListWhere(r, &args)
+
+	var total int
+	if err := h.maintenance.QueryRowContext(r.Context(), `SELECT COUNT(*)`+maintenanceListFrom+where, args...).Scan(&total); err != nil {
+		h.dbFailure(w, r, "list_maintenances_count", err)
+		return
+	}
+
+	listArgs := append([]any{}, args...)
+	limit := placeholder(&listArgs, pageSize)
+	off := placeholder(&listArgs, offset)
+	query := maintenanceListSelect + maintenanceListFrom + maintenanceListLateralJoins + where + maintenanceListOrder + `
 		LIMIT ` + limit + ` OFFSET ` + off
 
 	rows, err := h.maintenance.QueryContext(r.Context(), query, listArgs...)
@@ -119,6 +131,10 @@ func (h *Handler) handleListMaintenances(w http.ResponseWriter, r *http.Request)
 }
 
 func maintenanceListWhere(r *http.Request, args *[]any) string {
+	return maintenanceListWhereWithOptions(r, args, maintenanceListFilterOptions{includeScheduledRange: true})
+}
+
+func maintenanceListWhereWithOptions(r *http.Request, args *[]any, options maintenanceListFilterOptions) string {
 	parts := []string{"1=1"}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q != "" {
@@ -145,11 +161,13 @@ func maintenanceListWhere(r *http.Request, args *[]any) string {
 		}
 		parts = append(parts, "m.status IN ("+strings.Join(holders, ", ")+")")
 	}
-	if raw := strings.TrimSpace(r.URL.Query().Get("scheduled_from")); raw != "" {
-		parts = append(parts, "vcw.scheduled_start_at::date >= "+placeholder(args, raw))
-	}
-	if raw := strings.TrimSpace(r.URL.Query().Get("scheduled_to")); raw != "" {
-		parts = append(parts, "vcw.scheduled_start_at::date <= "+placeholder(args, raw))
+	if options.includeScheduledRange {
+		if raw := strings.TrimSpace(r.URL.Query().Get("scheduled_from")); raw != "" {
+			parts = append(parts, "vcw.scheduled_start_at::date >= "+placeholder(args, raw))
+		}
+		if raw := strings.TrimSpace(r.URL.Query().Get("scheduled_to")); raw != "" {
+			parts = append(parts, "vcw.scheduled_start_at::date <= "+placeholder(args, raw))
+		}
 	}
 	addIDFilter := func(param string, column string) {
 		raw := strings.TrimSpace(r.URL.Query().Get(param))
@@ -167,6 +185,56 @@ func maintenanceListWhere(r *http.Request, args *[]any) string {
 	addIDFilter("site_id", "m.site_id")
 
 	return " WHERE " + strings.Join(parts, " AND ")
+}
+
+func (h *Handler) handleMaintenanceRadar(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMaintenanceDB(w) {
+		return
+	}
+
+	now := time.Now().Local()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	next7DaysTo := today.AddDate(0, 0, 7)
+	next45DaysFrom := today.AddDate(0, 0, 8)
+	next45DaysTo := today.AddDate(0, 0, 52)
+	sixMonthsTo := today.AddDate(0, 6, 0)
+
+	args := []any{}
+	where := maintenanceListWhereWithOptions(r, &args, maintenanceListFilterOptions{includeScheduledRange: false})
+	todayParam := placeholder(&args, today.Format("2006-01-02"))
+	sixMonthsParam := placeholder(&args, sixMonthsTo.Format("2006-01-02"))
+	where += ` AND (vcw.maintenance_window_id IS NULL OR vcw.scheduled_start_at::date BETWEEN ` + todayParam + ` AND ` + sixMonthsParam + `)`
+
+	query := maintenanceListSelect + maintenanceListFrom + maintenanceListLateralJoins + where + maintenanceListOrder
+	rows, err := h.maintenance.QueryContext(r.Context(), query, args...)
+	if err != nil {
+		h.dbFailure(w, r, "maintenance_radar", err)
+		return
+	}
+	defer rows.Close()
+
+	items := make([]MaintenanceListItem, 0)
+	for rows.Next() {
+		item, err := scanMaintenanceListItem(rows)
+		if err != nil {
+			h.dbFailure(w, r, "maintenance_radar_scan", err)
+			return
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		h.dbFailure(w, r, "maintenance_radar_rows", err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, maintenanceRadarResponse{
+		Items:          items,
+		Today:          today.Format("2006-01-02"),
+		Next7DaysTo:    next7DaysTo.Format("2006-01-02"),
+		Next45DaysFrom: next45DaysFrom.Format("2006-01-02"),
+		Next45DaysTo:   next45DaysTo.Format("2006-01-02"),
+		SixMonthsTo:    sixMonthsTo.Format("2006-01-02"),
+	})
 }
 
 func splitQueryList(raw string) []string {

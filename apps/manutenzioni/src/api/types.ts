@@ -87,6 +87,15 @@ export interface MaintenanceListItem {
   updated_at: string;
 }
 
+export interface MaintenanceRadarResponse {
+  items: MaintenanceListItem[];
+  today: string;
+  next_7_days_to: string;
+  next_45_days_from: string;
+  next_45_days_to: string;
+  six_months_to: string;
+}
+
 export interface MaintenanceWindow extends WindowSummary {
   maintenance_id: number;
   actual_start_at?: string | null;

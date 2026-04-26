@@ -23,6 +23,15 @@ type pagedResponse[T any] struct {
 	Total    int `json:"total"`
 }
 
+type maintenanceRadarResponse struct {
+	Items          []MaintenanceListItem `json:"items"`
+	Today          string                `json:"today"`
+	Next7DaysTo    string                `json:"next_7_days_to"`
+	Next45DaysFrom string                `json:"next_45_days_from"`
+	Next45DaysTo   string                `json:"next_45_days_to"`
+	SixMonthsTo    string                `json:"six_months_to"`
+}
+
 type ReferenceItem struct {
 	ID                  int64   `json:"id"`
 	Code                string  `json:"code"`

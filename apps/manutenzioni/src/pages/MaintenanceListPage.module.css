@@ -1,0 +1,448 @@
+.filterShell {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.searchControl {
+  flex: 1 1 22rem;
+  min-width: 16rem;
+}
+
+.statusControl {
+  flex: 0 1 18rem;
+  min-width: 14rem;
+}
+
+.secondaryFilters {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.secondaryFilters[hidden] {
+  display: none;
+}
+
+.filterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 1.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 0.25rem 0.6rem 0.25rem 0.7rem;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.filterChip:hover {
+  border-color: var(--color-accent-muted);
+  background: var(--color-accent-muted);
+}
+
+.filterChip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.radar {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 0.95rem 1rem 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78)),
+    radial-gradient(circle at 8% 0%, rgba(99, 91, 255, 0.08), transparent 28%);
+  box-shadow: var(--shadow-sm);
+}
+
+.radarHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.radarHeader h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.radarHeader p {
+  margin: 0.15rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.radarGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.radarLane {
+  --lane-accent: #64748b;
+  --lane-accent-soft: rgba(100, 116, 139, 0.1);
+  --lane-accent-line: rgba(100, 116, 139, 0.24);
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  border: 1px solid var(--lane-accent-line);
+  border-radius: var(--radius-md);
+  padding: 0.55rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.5)),
+    var(--lane-accent-soft);
+}
+
+.radarLane[data-bucket='next7'] {
+  --lane-accent: #b45309;
+  --lane-accent-soft: rgba(245, 158, 11, 0.1);
+  --lane-accent-line: rgba(245, 158, 11, 0.24);
+}
+
+.radarLane[data-bucket='next45'] {
+  --lane-accent: var(--color-accent);
+  --lane-accent-soft: rgba(99, 91, 255, 0.08);
+  --lane-accent-line: rgba(99, 91, 255, 0.2);
+}
+
+.radarLane[data-bucket='sixMonths'] {
+  --lane-accent: #047857;
+  --lane-accent-soft: rgba(16, 185, 129, 0.09);
+  --lane-accent-line: rgba(16, 185, 129, 0.2);
+}
+
+.radarLane[data-bucket='unscheduled'] {
+  --lane-accent: #475569;
+  --lane-accent-soft: rgba(100, 116, 139, 0.08);
+  --lane-accent-line: rgba(100, 116, 139, 0.2);
+}
+
+.radarLaneLabel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--lane-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.radarLaneLabel span {
+  min-width: 0;
+}
+
+.radarLaneLabel strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.45rem;
+  height: 1.45rem;
+  border: 1px solid var(--lane-accent-line);
+  border-radius: var(--radius-full);
+  color: var(--lane-accent);
+  background: rgba(255, 255, 255, 0.64);
+  font-variant-numeric: tabular-nums;
+}
+
+.radarTrack {
+  position: relative;
+  min-height: 2rem;
+  border: 1px solid var(--lane-accent-line);
+  border-radius: var(--radius-md);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--lane-accent-line) 0,
+      var(--lane-accent-line) 1px,
+      transparent 1px,
+      transparent 22%
+    ),
+    rgba(255, 255, 255, 0.62);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--lane-accent-line) transparent;
+}
+
+.radarTrack::before {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 1px;
+  background: var(--lane-accent-line);
+  transform: translateY(-50%);
+}
+
+.radarRail {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: max-content;
+  min-width: 100%;
+  min-height: 2rem;
+  padding: 0 0.55rem;
+}
+
+.radarEmpty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.radarMarker {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid #fff;
+  border-radius: var(--radius-full);
+  padding: 0;
+  background: var(--color-text-muted);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08), 0 4px 10px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  transition:
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.radarMarker:hover,
+.radarMarker:focus-visible,
+.radarMarker[data-active='true'] {
+  box-shadow: 0 0 0 4px var(--color-accent-subtle), 0 6px 14px rgba(15, 23, 42, 0.18);
+  transform: scale(1.32);
+}
+
+.radarMarker:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.radarMarker[data-tone='info'],
+.accentBar[data-tone='info'] {
+  background: var(--color-accent);
+}
+
+.radarMarker[data-tone='success'],
+.accentBar[data-tone='success'] {
+  background: var(--color-success);
+}
+
+.radarMarker[data-tone='warning'],
+.accentBar[data-tone='warning'] {
+  background: var(--color-warning);
+}
+
+.radarMarker[data-tone='danger'],
+.accentBar[data-tone='danger'] {
+  background: var(--color-danger);
+}
+
+.tableCard {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 1120px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table th {
+  padding: 0.72rem 0.8rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 0.82rem 0.8rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text);
+  font-size: 0.84rem;
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.row {
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.row:hover,
+.row:focus-visible,
+.row[data-active='true'] {
+  background: color-mix(in srgb, var(--color-accent-subtle) 72%, #fff 28%);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.accentHeader,
+.accentCell {
+  width: 0.45rem;
+  min-width: 0.45rem;
+  padding-right: 0 !important;
+}
+
+.accentCell {
+  position: relative;
+}
+
+.accentBar {
+  position: absolute;
+  inset: 0.75rem auto 0.75rem 0;
+  width: 3px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-muted);
+  opacity: 0.34;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    width var(--duration-fast) var(--ease-out);
+}
+
+.row:hover .accentBar,
+.row:focus-visible .accentBar,
+.row[data-active='true'] .accentBar {
+  width: 4px;
+  opacity: 1;
+}
+
+.maintenanceCell,
+.stackCell {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.maintenanceCell {
+  min-width: 18rem;
+}
+
+.maintenanceCell strong,
+.stackCell strong {
+  color: var(--color-text);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.code {
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.subtleLine,
+.stackCell span {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.inlineHint {
+  color: var(--color-text-muted) !important;
+  font-weight: 500 !important;
+}
+
+.numericCell {
+  font-variant-numeric: tabular-nums;
+}
+
+.actionsCell {
+  width: 5.4rem;
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .secondaryFilters,
+  .radarGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .filterBar {
+    align-items: stretch;
+  }
+
+  .searchControl,
+  .statusControl {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .secondaryFilters,
+  .radarGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .radarHeader {
+    display: grid;
+  }
+}
