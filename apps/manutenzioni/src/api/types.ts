@@ -361,27 +361,6 @@ export interface LLMModel {
   model: string;
 }
 
-export interface AssistancePreviewRequest {
-  brief: string;
-  maintenance_kind_id?: number | null;
-  technical_domain_id?: number | null;
-  customer_scope_id?: number | null;
-}
-
-export interface AssistancePreviewResponse {
-  texts: AssistanceTextProposal;
-  service_taxonomy_ids: number[];
-  reason_class_ids: number[];
-  impact_effect_ids: number[];
-  quality_flag_ids: number[];
-  service_taxonomy: AssistanceClassificationProposal[];
-  reason_classes: AssistanceClassificationProposal[];
-  impact_effects: AssistanceClassificationProposal[];
-  quality_flags: AssistanceClassificationProposal[];
-  audit: AssistanceAudit;
-  usage: AssistanceUsage;
-}
-
 export interface NoticeBody {
   maintenance_window_id?: number | null;
   notice_type: string;

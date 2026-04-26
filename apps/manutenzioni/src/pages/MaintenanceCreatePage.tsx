@@ -3,13 +3,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useCreateMaintenance,
-  useMaintenanceAssistancePreview,
   useReferenceData,
   useServiceDependencies,
 } from '../api/queries';
 import type {
   AdhocSiteInput,
-  AssistancePreviewResponse,
   AudienceOverride,
   ClassificationInput,
   MaintenanceFormBody,
@@ -30,8 +28,6 @@ import { errorMessage } from '../lib/format';
 import { suggestedSeverityForKindId } from '../lib/smartDefaults';
 import shared from './shared.module.css';
 
-const BRIEF_MIN_LENGTH = 30;
-const BRIEF_MAX_LENGTH = 2000;
 const RESIDUAL_SERVICE_PLACEHOLDER = [
   'Solo se necessario indicare una descrizione che chiarisca lo stato dei servizi residui. Es:',
   '- "Durante l\'intervento resta attivo il ramo B."',
@@ -40,11 +36,8 @@ const RESIDUAL_SERVICE_PLACEHOLDER = [
   '- "Nessun servizio residuo garantito nella finestra 02:00-03:00."',
 ].join('\n');
 
-type AiState = 'idle' | 'loading' | 'applied' | 'error';
-
 interface FormState {
   summary_it: string;
-  assistance_context: string;
   maintenance_kind_id: string;
   technical_domain_id: string;
   customer_scope_id: string;
@@ -66,7 +59,7 @@ interface ServiceSelection {
   expected_severity: SeverityValue | null;
   severity_confirmed: boolean;
   expected_audience: AudienceOverride | null;
-  source: 'manual' | 'dependency_graph' | 'ai_extracted';
+  source: 'manual' | 'dependency_graph';
 }
 
 interface ManualTarget {
@@ -78,7 +71,6 @@ interface ManualTarget {
 
 const initialForm: FormState = {
   summary_it: '',
-  assistance_context: '',
   maintenance_kind_id: '',
   technical_domain_id: '',
   customer_scope_id: '',
@@ -106,15 +98,9 @@ export function MaintenanceCreatePage() {
   const reference = useReferenceData();
   const dependencies = useServiceDependencies('active');
   const create = useCreateMaintenance();
-  const assistancePreview = useMaintenanceAssistancePreview();
   const [form, setForm] = useState<FormState>(initialForm);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [leaveTarget, setLeaveTarget] = useState<string | null>(null);
-  const [aiState, setAiState] = useState<AiState>('idle');
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [preAiSnapshot, setPreAiSnapshot] = useState<FormState | null>(null);
-  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [ignoredSuggestions, setIgnoredSuggestions] = useState<Set<number>>(new Set());
   const [createTaxonomyContext, setCreateTaxonomyContext] = useState<{
     role: 'operated' | 'dependent';
@@ -206,90 +192,6 @@ export function MaintenanceCreatePage() {
     }
   }
 
-  function hasClassificationsOrTitle(): boolean {
-    if (form.summary_it.trim()) return true;
-    if (form.service_selections.length > 0) return true;
-    if (form.reason_class_ids.length > 0) return true;
-    if (form.impact_effect_ids.length > 0) return true;
-    return false;
-  }
-
-  async function runAiApply() {
-    const brief = form.assistance_context.trim();
-    if (brief.length < BRIEF_MIN_LENGTH) return;
-    setAiState('loading');
-    setAiError(null);
-    try {
-      const response = await assistancePreview.mutateAsync({
-        brief,
-        maintenance_kind_id: form.maintenance_kind_id ? Number(form.maintenance_kind_id) : null,
-        technical_domain_id: form.technical_domain_id ? Number(form.technical_domain_id) : null,
-        customer_scope_id: form.customer_scope_id ? Number(form.customer_scope_id) : null,
-      });
-      applyAssistance(response);
-      setAiState('applied');
-    } catch (error) {
-      setAiError(errorMessage(error, 'Compilazione non disponibile. Inserisci i campi manualmente.'));
-      setAiState('error');
-    }
-  }
-
-  function handleAiApplyClick() {
-    if (aiState === 'applied' && hasClassificationsOrTitle()) {
-      setConfirmRegenerate(true);
-      return;
-    }
-    setPreAiSnapshot(form);
-    runAiApply();
-  }
-
-  function applyAssistance(response: AssistancePreviewResponse) {
-    setForm((current) => {
-      const existing = new Set(current.service_selections.map((item) => item.service_taxonomy_id));
-      const incoming: ServiceSelection[] = response.service_taxonomy_ids
-        .filter((id) => !existing.has(id))
-        .map((id) => ({
-          service_taxonomy_id: id,
-          role: 'operated' as const,
-          expected_severity: 'unavailable' as const,
-          severity_confirmed: true,
-          expected_audience: null,
-          source: 'ai_extracted' as const,
-        }));
-      return {
-        ...current,
-        summary_it: response.texts.title_it?.trim() || current.summary_it,
-        service_selections:
-          incoming.length > 0
-            ? [...current.service_selections, ...incoming]
-            : current.service_selections,
-        reason_class_ids:
-          response.reason_class_ids.length > 0
-            ? response.reason_class_ids
-            : current.reason_class_ids,
-        impact_effect_ids:
-          response.impact_effect_ids.length > 0
-            ? response.impact_effect_ids
-            : current.impact_effect_ids,
-      };
-    });
-  }
-
-  function handleAiUndo() {
-    if (preAiSnapshot) {
-      setForm(preAiSnapshot);
-    }
-    setAiState('idle');
-    setAiError(null);
-    setPreAiSnapshot(null);
-  }
-
-  function confirmRegenerateNow() {
-    setConfirmRegenerate(false);
-    setPreAiSnapshot(form);
-    runAiApply();
-  }
-
   async function submit() {
     setAttemptedSubmit(true);
     if (!canSubmit) {
@@ -316,7 +218,6 @@ export function MaintenanceCreatePage() {
     }
     const body: MaintenanceFormBody = {
       title_it: form.summary_it.trim(),
-      description_it: form.assistance_context.trim() || null,
       maintenance_kind_id: Number(form.maintenance_kind_id),
       technical_domain_id: Number(form.technical_domain_id),
       customer_scope_id: form.customer_scope_id ? Number(form.customer_scope_id) : null,
@@ -335,22 +236,6 @@ export function MaintenanceCreatePage() {
       initial_service_taxonomy: serviceClassificationInputs(form.service_selections),
       initial_reason_classes: classificationInputs(form.reason_class_ids, true),
       initial_impact_effects: classificationInputs(form.impact_effect_ids, true),
-      metadata: {
-        ai_intake: {
-          summary_it: form.summary_it.trim(),
-          context_it: form.assistance_context.trim() || null,
-          service_taxonomy_ids: form.service_selections.map((item) => item.service_taxonomy_id),
-          service_selections: form.service_selections.map((item) => ({
-            service_taxonomy_id: item.service_taxonomy_id,
-            role: item.role,
-            expected_severity: item.expected_severity,
-            expected_audience: item.expected_audience,
-            source: item.source,
-          })),
-          reason_class_ids: form.reason_class_ids,
-          impact_effect_ids: form.impact_effect_ids,
-        },
-      },
     };
     try {
       const result = await create.mutateAsync(body);
@@ -522,18 +407,6 @@ export function MaintenanceCreatePage() {
             Compila i campi essenziali. I testi potranno essere affinati prima dell'approvazione.
           </p>
         </div>
-        <div className={shared.headerActions}>
-          <button
-            type="button"
-            className={`${shared.aiToggle} ${aiOpen ? shared.aiToggleActive : ''}`}
-            onClick={() => setAiOpen((open) => !open)}
-            aria-pressed={aiOpen}
-            aria-expanded={aiOpen}
-            title="Compila da brief (sperimentale)"
-          >
-            <Icon name="sparkles" size={16} />
-          </button>
-        </div>
       </div>
 
       {reference.isLoading ? (
@@ -551,17 +424,6 @@ export function MaintenanceCreatePage() {
       ) : (
         <>
           <div ref={formRef} className={shared.tabsSpacer}>
-            {aiOpen && (
-              <BriefBlock
-                value={form.assistance_context}
-                onChange={(value) => update('assistance_context', value)}
-                aiState={aiState}
-                aiError={aiError}
-                onApply={handleAiApplyClick}
-                onUndo={handleAiUndo}
-              />
-            )}
-
             <div className={shared.panel}>
               <div className={shared.sectionHeader}>
                 <h2 className={shared.sectionTitle}>Contesto</h2>
@@ -751,16 +613,6 @@ export function MaintenanceCreatePage() {
             onClose={() => setLeaveTarget(null)}
           />
 
-          <ConfirmDialog
-            open={confirmRegenerate}
-            title="Sovrascrivere i campi compilati?"
-            message="Il brief è cambiato. La compilazione sostituirà titolo e classificazioni attuali."
-            confirmLabel="Sovrascrivi"
-            variant="primary"
-            onConfirm={confirmRegenerateNow}
-            onClose={() => setConfirmRegenerate(false)}
-          />
-
           <CreateServiceTaxonomyModal
             open={createTaxonomyContext !== null}
             initialName={createTaxonomyContext?.initialName ?? ''}
@@ -808,65 +660,6 @@ function SectionWarningIcon({ summary }: { summary: SectionWarningSummary }) {
         <span>{summary.count}</span>
       </span>
     </Tooltip>
-  );
-}
-
-function BriefBlock({
-  value,
-  onChange,
-  aiState,
-  aiError,
-  onApply,
-  onUndo,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  aiState: AiState;
-  aiError: string | null;
-  onApply: () => void;
-  onUndo: () => void;
-}) {
-  const length = value.length;
-  const canApply = value.trim().length >= BRIEF_MIN_LENGTH && length <= BRIEF_MAX_LENGTH;
-  const overLimit = length > BRIEF_MAX_LENGTH;
-
-  return (
-    <div className={shared.briefPanel}>
-      <div className={shared.briefHeader}>
-        <h2 className={shared.briefTitle}>Brief</h2>
-        <span className={`${shared.briefCounter} ${overLimit ? shared.briefCounterWarn : ''}`}>
-          {length}/{BRIEF_MAX_LENGTH}
-        </span>
-      </div>
-      <textarea
-        className={shared.briefTextarea}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="Descrizione libera dell'intervento: apparati, finestra prevista, impatto atteso, motivo."
-      />
-      <div className={shared.briefActions}>
-        <Button
-          onClick={onApply}
-          loading={aiState === 'loading'}
-          disabled={!canApply || aiState === 'loading'}
-        >
-          {aiState === 'loading' ? 'Analisi in corso…' : 'Compila dal brief'}
-        </Button>
-      </div>
-      {aiState === 'applied' && (
-        <div className={`${shared.briefBanner} ${shared.briefBannerSuccess}`}>
-          <span>Campi compilati dal brief. Verifica e crea la bozza.</span>
-          <button type="button" className={shared.briefBannerAction} onClick={onUndo}>
-            Annulla compilazione
-          </button>
-        </div>
-      )}
-      {aiState === 'error' && aiError && (
-        <div className={`${shared.briefBanner} ${shared.briefBannerError}`}>
-          <span>{aiError}</span>
-        </div>
-      )}
-    </div>
   );
 }
 

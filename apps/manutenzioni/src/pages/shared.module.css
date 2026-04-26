@@ -117,8 +117,7 @@
 
 .field:focus,
 .select:focus,
-.textarea:focus,
-.briefTextarea:focus {
+.textarea:focus {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
@@ -528,128 +527,6 @@
   padding: 0.15rem 0.55rem;
 }
 
-.aiToggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-subtle);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-
-.aiToggle:hover {
-  color: var(--color-text);
-  background: var(--color-surface);
-}
-
-.aiToggleActive {
-  color: var(--color-accent);
-  background: var(--color-accent-subtle);
-  border-color: var(--color-accent-subtle);
-}
-
-.briefPanel {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated);
-  box-shadow: var(--shadow-xs);
-  padding: 1rem;
-  display: grid;
-  gap: 0.7rem;
-}
-
-.briefHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-}
-
-.briefTitle {
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.briefCounter {
-  color: var(--color-text-muted);
-  font-size: 0.72rem;
-  font-weight: 400;
-}
-
-.briefCounterWarn {
-  color: var(--color-danger);
-}
-
-.briefTextarea {
-  width: 100%;
-  min-height: 7rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0.7rem 0.8rem;
-  color: var(--color-text);
-  background: var(--color-bg-elevated);
-  font-size: 0.88rem;
-  outline: none;
-  resize: vertical;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-}
-
-.briefActions {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-}
-
-.briefSecondary {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  color: var(--color-text-secondary);
-  font-size: 0.82rem;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.briefSecondary:hover {
-  color: var(--color-text);
-}
-
-.briefBanner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-  border-radius: var(--radius-md);
-  padding: 0.55rem 0.75rem;
-  font-size: 0.82rem;
-}
-
-.briefBannerSuccess {
-  background: var(--color-accent-subtle);
-  color: var(--color-accent);
-}
-
-.briefBannerError {
-  background: var(--color-danger-subtle);
-  color: var(--color-danger);
-}
-
-.briefBannerAction {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  color: inherit;
-  cursor: pointer;
-  text-decoration: underline;
-  font-size: 0.82rem;
-}
-
 .collapsiblePanel {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -809,9 +686,6 @@
   box-shadow: 0 0 0 3px var(--color-danger-subtle);
 }
 
-.aiToggle:focus-visible,
-.briefSecondary:focus-visible,
-.briefBannerAction:focus-visible,
 .compactRowToggle:focus-visible,
 .indirectSummary:focus-visible,
 .siteAdhocLink button:focus-visible,
