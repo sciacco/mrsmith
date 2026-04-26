@@ -19,6 +19,7 @@ type Config struct {
 	// Optional launcher override for split-server local development.
 	BudgetAppURL               string
 	FornitoriAppURL            string
+	RDAAppURL                  string
 	ComplianceAppURL           string
 	CopertureAppURL            string
 	CPBackofficeAppURL         string
@@ -98,10 +99,11 @@ func Load() Config {
 		Port:                         envOr("PORT", "8080"),
 		LogLevel:                     envOr("LOG_LEVEL", "info"),
 		KeycloakIssuerURL:            envOr("KEYCLOAK_ISSUER_URL", ""),
-		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185,http://localhost:5186,http://localhost:5187,http://localhost:5188,http://localhost:5189"),
+		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185,http://localhost:5186,http://localhost:5187,http://localhost:5188,http://localhost:5189,http://localhost:5190"),
 		StaticDir:                    envOr("STATIC_DIR", ""),
 		BudgetAppURL:                 envOr("BUDGET_APP_URL", ""),
 		FornitoriAppURL:              envOr("FORNITORI_APP_URL", ""),
+		RDAAppURL:                    envOr("RDA_APP_URL", ""),
 		ComplianceAppURL:             envOr("COMPLIANCE_APP_URL", ""),
 		CopertureAppURL:              envOr("COPERTURE_APP_URL", ""),
 		CPBackofficeAppURL:           envOr("CP_BACKOFFICE_APP_URL", ""),

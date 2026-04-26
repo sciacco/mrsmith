@@ -14,6 +14,9 @@ const (
 	FornitoriAppID   = "fornitori"
 	FornitoriAppHref = "/apps/fornitori/"
 
+	RDAAppID   = "rda"
+	RDAAppHref = "/apps/rda/"
+
 	ComplianceAppID   = "compliance"
 	ComplianceAppHref = "/apps/compliance/"
 
@@ -62,6 +65,11 @@ var (
 	fornitoriAccessRoles             = []string{"app_fornitori_access"}
 	fornitoriReadonlyRoles           = []string{"app_fornitori_readonly"}
 	fornitoriSkipQualificationRoles  = []string{"app_fornitori_skip_qualification"}
+	rdaAccessRoles                   = []string{"app_rda_access"}
+	rdaApproverL1L2Roles             = []string{"app_rda_approver_l1l2"}
+	rdaApproverAFCRoles              = []string{"app_rda_approver_afc"}
+	rdaApproverNoLeasingRoles        = []string{"app_rda_approver_no_leasing"}
+	rdaApproverExtraBudgetRoles      = []string{"app_rda_approver_extra_budget"}
 	complianceAccessRoles            = []string{"app_compliance_access"}
 	copertureAccessRoles             = []string{"app_coperture_access"}
 	cpBackofficeAccessRoles          = []string{"app_cpbackoffice_access"}
@@ -137,6 +145,17 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryID:    "acquisti",
 			CategoryTitle: "Acquisti",
 			AccessRoles:   FornitoriAccessRoles(),
+		},
+		{
+			ID:            RDAAppID,
+			Name:          "RDA",
+			Description:   "Richieste di acquisto e approvazioni.",
+			Icon:          "cart",
+			Href:          RDAAppHref,
+			Status:        "ready",
+			CategoryID:    "acquisti",
+			CategoryTitle: "Acquisti",
+			AccessRoles:   RDAAccessRoles(),
 		},
 		// {
 		// 	ID:            "gestione-utenti",
@@ -404,6 +423,26 @@ func FornitoriSkipQualificationRoles() []string {
 	return slices.Clone(fornitoriSkipQualificationRoles)
 }
 
+func RDAAccessRoles() []string {
+	return slices.Clone(rdaAccessRoles)
+}
+
+func RDAApproverL1L2Roles() []string {
+	return slices.Clone(rdaApproverL1L2Roles)
+}
+
+func RDAApproverAFCRoles() []string {
+	return slices.Clone(rdaApproverAFCRoles)
+}
+
+func RDAApproverNoLeasingRoles() []string {
+	return slices.Clone(rdaApproverNoLeasingRoles)
+}
+
+func RDAApproverExtraBudgetRoles() []string {
+	return slices.Clone(rdaApproverExtraBudgetRoles)
+}
+
 func ComplianceAccessRoles() []string {
 	return slices.Clone(complianceAccessRoles)
 }
@@ -494,6 +533,11 @@ func AllRoles() []string {
 		fornitoriAccessRoles,
 		fornitoriReadonlyRoles,
 		fornitoriSkipQualificationRoles,
+		rdaAccessRoles,
+		rdaApproverL1L2Roles,
+		rdaApproverAFCRoles,
+		rdaApproverNoLeasingRoles,
+		rdaApproverExtraBudgetRoles,
 		complianceAccessRoles,
 		copertureAccessRoles,
 		cpBackofficeAccessRoles,

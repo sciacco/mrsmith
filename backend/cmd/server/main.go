@@ -38,6 +38,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/staticspa"
 	"github.com/sciacco/mrsmith/internal/portal"
 	"github.com/sciacco/mrsmith/internal/quotes"
+	"github.com/sciacco/mrsmith/internal/rda"
 	"github.com/sciacco/mrsmith/internal/rdf"
 	"github.com/sciacco/mrsmith/internal/rdfbackend"
 	"github.com/sciacco/mrsmith/internal/reports"
@@ -269,6 +270,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.FornitoriAppID] = "http://localhost:5189"
 	}
+	if cfg.RDAAppURL != "" {
+		hrefOverrides[applaunch.RDAAppID] = cfg.RDAAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.RDAAppID] = "http://localhost:5190"
+	}
 	if cfg.ComplianceAppURL != "" {
 		hrefOverrides[applaunch.ComplianceAppID] = cfg.ComplianceAppURL
 	} else if cfg.StaticDir == "" {
@@ -352,6 +358,9 @@ func main() {
 			if definition.ID == applaunch.FornitoriAppID && (arakCli == nil || cfg.ArakDSN == "") {
 				continue
 			}
+			if definition.ID == applaunch.RDAAppID && (arakCli == nil || arakDB == nil) {
+				continue
+			}
 			if definition.ID == applaunch.EnergiaDCAppID && cfg.GrappaDSN == "" {
 				continue
 			}
@@ -391,6 +400,7 @@ func main() {
 	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB)
+	rda.RegisterRoutes(api, rda.Deps{Arak: arakCli, ArakDB: arakDB, Logger: logger})
 	compliance.RegisterRoutes(api, anisettaDB)
 	coperture.RegisterRoutes(api, dbCoperture)
 	cpbackoffice.RegisterRoutes(api, cpbackoffice.Deps{
