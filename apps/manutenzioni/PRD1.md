@@ -73,10 +73,11 @@ Reviews business-critical maintenance before communication. In V1 every maintena
 Default V1 roles:
 
 - `app_manutenzioni_access`: read access to the app and all maintenance details.
-- `app_manutenzioni_manager`: create/update access, lifecycle actions, window management, target/customer management, notice authoring, manual notice status updates, and lookup/taxonomy configuration.
-- `app_manutenzioni_approver`: approve maintenance before scheduling or announcement.
+- `app_manutenzioni_operator`: create/update access on maintenance records, lifecycle actions (except `approve`), window management, target/customer management, notice authoring, manual notice status updates. Inline catalog enrichment limited to `service-taxonomy` (`POST /config/service-taxonomy`) so operators can add new entries while editing a maintenance. **No** access to the configuration pages (`/manutenzioni/configurazione/*`) or to other configuration endpoints.
+- `app_manutenzioni_manager`: superset of `operator`; additionally has access to all configuration pages/endpoints (`/llm-models`, `/service-dependencies`, `/config/*`) and can perform the `approve` lifecycle action.
+- `app_manutenzioni_approver`: can perform the `approve` lifecycle action and access the configuration pages/endpoints. Does **not** include the operational write access on maintenances (those remain with `operator`/`manager`).
 
-V1 approval rule: all maintenance must be approved by `app_manutenzioni_approver`. V2 can refine which maintenance kinds require explicit approval.
+V1 approval rule: the `approve` lifecycle action is gated by `app_manutenzioni_manager` or `app_manutenzioni_approver`. V2 can refine which maintenance kinds require explicit approval.
 
 ## Data Model Scope
 
@@ -334,7 +335,7 @@ Proposed V1 lifecycle actions:
 
 | Current status | Allowed actions |
 | --- | --- |
-| `draft` | approve with `app_manutenzioni_approver`, cancel |
+| `draft` | approve with `app_manutenzioni_manager` or `app_manutenzioni_approver`, cancel |
 | `approved` | schedule, announce, cancel |
 | `scheduled` | announce, start, reschedule, cancel |
 | `announced` | schedule if no window exists, start if a current window exists, reschedule, cancel |
@@ -576,7 +577,7 @@ Module routes are registered without `/api`; the server mounts them under `/api`
 - The register supports search, status, date, domain, kind, customer-scope, and site filters.
 - Deep links to `/apps/manutenzioni/manutenzioni/:id` work after browser refresh in production.
 - A manager can create a draft maintenance and receive a generated code.
-- A maintenance cannot be scheduled or announced until a user with `app_manutenzioni_approver` approves it.
+- A maintenance cannot be scheduled or announced until a user with `app_manutenzioni_manager` or `app_manutenzioni_approver` approves it.
 - A manager can add a valid planned window.
 - A manager cannot save an invalid window where end is before start.
 - A manager can reschedule by creating a new window while preserving the old one as superseded.
@@ -611,7 +612,7 @@ Implementation verification, once approved:
 ## Product Decisions Captured
 
 1. V1 is internal planning and notice drafting only. No channel delivery is included.
-2. Approval uses a separate `app_manutenzioni_approver` role. All V1 maintenance requires explicit approval.
+2. The `approve` action is gated by `app_manutenzioni_manager` or `app_manutenzioni_approver`. All V1 maintenance requires explicit approval, but the manager role can perform the approval step itself; a dedicated approver remains available for installations that want a separate sign-off.
 3. The maintenance schema uses a dedicated `MANUTENZIONI_DSN`.
 4. Impacted customers come from Mistra `customers.customer`; `maintenance_impacted_customer.customer_id` stores `customers.customer.id`.
 5. Customer names are enriched in V1 from Mistra `customers.customer`.

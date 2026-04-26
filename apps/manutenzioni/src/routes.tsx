@@ -3,7 +3,7 @@ import { useToast } from '@mrsmith/ui';
 import { useEffect, type ReactElement } from 'react';
 import { Navigate, type RouteObject } from 'react-router-dom';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
-import { MANUTENZIONI_APPROVER_ROLES, MANUTENZIONI_MANAGER_ROLES } from './lib/roles';
+import { MANUTENZIONI_APPROVAL_ROLES } from './lib/roles';
 import { MaintenanceCreatePage } from './pages/MaintenanceCreatePage';
 import { MaintenanceDetailPage } from './pages/MaintenanceDetailPage';
 import { MaintenanceListPage } from './pages/MaintenanceListPage';
@@ -15,10 +15,7 @@ import { ConfigurationResourcePage } from './pages/ConfigurationResourcePage';
 function RequireConfiguration({ children }: { children: ReactElement }) {
   const { user, loading } = useOptionalAuth();
   const toast = useToast();
-  const canOpen = hasAnyRole(user?.roles, [
-    ...MANUTENZIONI_MANAGER_ROLES,
-    ...MANUTENZIONI_APPROVER_ROLES,
-  ]);
+  const canOpen = hasAnyRole(user?.roles, MANUTENZIONI_APPROVAL_ROLES);
 
   useEffect(() => {
     if (!loading && !canOpen) {

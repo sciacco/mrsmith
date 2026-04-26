@@ -51,8 +51,16 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	}
 
 	accessProtect := acl.RequireRole(applaunch.ManutenzioniAccessRoles()...)
-	managerProtect := acl.RequireRole(applaunch.ManutenzioniManagerRoles()...)
-	actionProtect := acl.RequireRole(combineRoles(
+	operatorProtect := acl.RequireRole(combineRoles(
+		applaunch.ManutenzioniManagerRoles(),
+		applaunch.ManutenzioniOperatorRoles(),
+	)...)
+	lifecycleStatusProtect := acl.RequireRole(combineRoles(
+		applaunch.ManutenzioniManagerRoles(),
+		applaunch.ManutenzioniOperatorRoles(),
+		applaunch.ManutenzioniApproverRoles(),
+	)...)
+	configProtect := acl.RequireRole(combineRoles(
 		applaunch.ManutenzioniManagerRoles(),
 		applaunch.ManutenzioniApproverRoles(),
 	)...)
@@ -60,11 +68,14 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	access := func(pattern string, handler http.HandlerFunc) {
 		mux.Handle(pattern, accessProtect(http.HandlerFunc(handler)))
 	}
-	manager := func(pattern string, handler http.HandlerFunc) {
-		mux.Handle(pattern, managerProtect(http.HandlerFunc(handler)))
+	operator := func(pattern string, handler http.HandlerFunc) {
+		mux.Handle(pattern, operatorProtect(http.HandlerFunc(handler)))
 	}
-	action := func(pattern string, handler http.HandlerFunc) {
-		mux.Handle(pattern, actionProtect(http.HandlerFunc(handler)))
+	status := func(pattern string, handler http.HandlerFunc) {
+		mux.Handle(pattern, lifecycleStatusProtect(http.HandlerFunc(handler)))
+	}
+	config := func(pattern string, handler http.HandlerFunc) {
+		mux.Handle(pattern, configProtect(http.HandlerFunc(handler)))
 	}
 
 	access("GET /manutenzioni/v1/maintenances", h.handleListMaintenances)
@@ -76,54 +87,57 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	access("GET /manutenzioni/v1/service-dependencies", h.handleListServiceDependencies)
 	access("GET /manutenzioni/v1/service-dependencies/{id}", h.handleGetServiceDependency)
 
-	manager("GET /manutenzioni/v1/customers", h.handleSearchCustomers)
-	manager("POST /manutenzioni/v1/maintenances", h.handleCreateMaintenance)
-	manager("PATCH /manutenzioni/v1/maintenances/{id}", h.handleUpdateMaintenance)
-	manager("POST /manutenzioni/v1/maintenances/{id}/assistance/draft", h.handleDraftAssistance)
-	action("POST /manutenzioni/v1/maintenances/{id}/status", h.handleMaintenanceStatus)
+	operator("GET /manutenzioni/v1/customers", h.handleSearchCustomers)
+	operator("POST /manutenzioni/v1/maintenances", h.handleCreateMaintenance)
+	operator("PATCH /manutenzioni/v1/maintenances/{id}", h.handleUpdateMaintenance)
+	operator("POST /manutenzioni/v1/maintenances/{id}/assistance/draft", h.handleDraftAssistance)
+	status("POST /manutenzioni/v1/maintenances/{id}/status", h.handleMaintenanceStatus)
 
-	manager("POST /manutenzioni/v1/maintenances/{id}/windows", h.handleCreateWindow)
-	manager("PATCH /manutenzioni/v1/maintenances/{id}/windows/{windowId}", h.handleUpdateWindow)
-	manager("POST /manutenzioni/v1/maintenances/{id}/windows/{windowId}/cancel", h.handleCancelWindow)
-	manager("POST /manutenzioni/v1/maintenances/{id}/windows/{windowId}/reschedule", h.handleRescheduleWindow)
-	manager("POST /manutenzioni/v1/maintenances/{id}/windows/reschedule", h.handleRescheduleWindow)
+	operator("POST /manutenzioni/v1/maintenances/{id}/windows", h.handleCreateWindow)
+	operator("PATCH /manutenzioni/v1/maintenances/{id}/windows/{windowId}", h.handleUpdateWindow)
+	operator("POST /manutenzioni/v1/maintenances/{id}/windows/{windowId}/cancel", h.handleCancelWindow)
+	operator("POST /manutenzioni/v1/maintenances/{id}/windows/{windowId}/reschedule", h.handleRescheduleWindow)
+	operator("POST /manutenzioni/v1/maintenances/{id}/windows/reschedule", h.handleRescheduleWindow)
 
-	manager("PUT /manutenzioni/v1/maintenances/{id}/service-taxonomy", h.handleReplaceServiceTaxonomy)
-	manager("PUT /manutenzioni/v1/maintenances/{id}/reason-classes", h.handleReplaceReasonClasses)
-	manager("PUT /manutenzioni/v1/maintenances/{id}/impact-effects", h.handleReplaceImpactEffects)
-	manager("PUT /manutenzioni/v1/maintenances/{id}/quality-flags", h.handleReplaceQualityFlags)
+	operator("PUT /manutenzioni/v1/maintenances/{id}/service-taxonomy", h.handleReplaceServiceTaxonomy)
+	operator("PUT /manutenzioni/v1/maintenances/{id}/reason-classes", h.handleReplaceReasonClasses)
+	operator("PUT /manutenzioni/v1/maintenances/{id}/impact-effects", h.handleReplaceImpactEffects)
+	operator("PUT /manutenzioni/v1/maintenances/{id}/quality-flags", h.handleReplaceQualityFlags)
 
-	manager("POST /manutenzioni/v1/maintenances/{id}/targets", h.handleCreateTarget)
-	manager("PATCH /manutenzioni/v1/maintenances/{id}/targets/{targetId}", h.handleUpdateTarget)
-	manager("DELETE /manutenzioni/v1/maintenances/{id}/targets/{targetId}", h.handleDeleteTarget)
+	operator("POST /manutenzioni/v1/maintenances/{id}/targets", h.handleCreateTarget)
+	operator("PATCH /manutenzioni/v1/maintenances/{id}/targets/{targetId}", h.handleUpdateTarget)
+	operator("DELETE /manutenzioni/v1/maintenances/{id}/targets/{targetId}", h.handleDeleteTarget)
 
-	manager("POST /manutenzioni/v1/maintenances/{id}/impacted-customers", h.handleCreateImpactedCustomer)
-	manager("PATCH /manutenzioni/v1/maintenances/{id}/impacted-customers/{customerImpactId}", h.handleUpdateImpactedCustomer)
-	manager("DELETE /manutenzioni/v1/maintenances/{id}/impacted-customers/{customerImpactId}", h.handleDeleteImpactedCustomer)
+	operator("POST /manutenzioni/v1/maintenances/{id}/impacted-customers", h.handleCreateImpactedCustomer)
+	operator("PATCH /manutenzioni/v1/maintenances/{id}/impacted-customers/{customerImpactId}", h.handleUpdateImpactedCustomer)
+	operator("DELETE /manutenzioni/v1/maintenances/{id}/impacted-customers/{customerImpactId}", h.handleDeleteImpactedCustomer)
 
-	manager("POST /manutenzioni/v1/maintenances/{id}/notices", h.handleCreateNotice)
-	manager("PATCH /manutenzioni/v1/maintenances/{id}/notices/{noticeId}", h.handleUpdateNotice)
-	manager("PUT /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/locales/{locale}", h.handleUpsertNoticeLocale)
-	manager("POST /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/status", h.handleNoticeStatus)
-	manager("PUT /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/quality-flags", h.handleReplaceNoticeQualityFlags)
+	operator("POST /manutenzioni/v1/maintenances/{id}/notices", h.handleCreateNotice)
+	operator("PATCH /manutenzioni/v1/maintenances/{id}/notices/{noticeId}", h.handleUpdateNotice)
+	operator("PUT /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/locales/{locale}", h.handleUpsertNoticeLocale)
+	operator("POST /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/status", h.handleNoticeStatus)
+	operator("PUT /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/quality-flags", h.handleReplaceNoticeQualityFlags)
 
-	action("GET /manutenzioni/v1/llm-models", h.handleListLLMModels)
-	action("POST /manutenzioni/v1/llm-models", h.handleCreateLLMModel)
-	action("PATCH /manutenzioni/v1/llm-models/{scope}", h.handleUpdateLLMModel)
+	config("GET /manutenzioni/v1/llm-models", h.handleListLLMModels)
+	config("POST /manutenzioni/v1/llm-models", h.handleCreateLLMModel)
+	config("PATCH /manutenzioni/v1/llm-models/{scope}", h.handleUpdateLLMModel)
 
-	action("POST /manutenzioni/v1/service-dependencies", h.handleCreateServiceDependency)
-	action("PATCH /manutenzioni/v1/service-dependencies/{id}", h.handleUpdateServiceDependency)
-	action("POST /manutenzioni/v1/service-dependencies/{id}/deactivate", h.handleDeactivateServiceDependency)
-	action("POST /manutenzioni/v1/service-dependencies/{id}/reactivate", h.handleReactivateServiceDependency)
+	config("POST /manutenzioni/v1/service-dependencies", h.handleCreateServiceDependency)
+	config("PATCH /manutenzioni/v1/service-dependencies/{id}", h.handleUpdateServiceDependency)
+	config("POST /manutenzioni/v1/service-dependencies/{id}/deactivate", h.handleDeactivateServiceDependency)
+	config("POST /manutenzioni/v1/service-dependencies/{id}/reactivate", h.handleReactivateServiceDependency)
 
-	action("GET /manutenzioni/v1/config/summary", h.handleConfigSummary)
-	action("GET /manutenzioni/v1/config/{resource}", h.handleListConfig)
-	action("POST /manutenzioni/v1/config/{resource}", h.handleCreateConfig)
-	action("POST /manutenzioni/v1/config/{resource}/reorder", h.handleReorderConfig)
-	action("PATCH /manutenzioni/v1/config/{resource}/{id}", h.handleUpdateConfig)
-	action("POST /manutenzioni/v1/config/{resource}/{id}/deactivate", h.handleDeactivateConfig)
-	action("POST /manutenzioni/v1/config/{resource}/{id}/reactivate", h.handleReactivateConfig)
-	action("GET /manutenzioni/v1/config/{resource}/{id}/usage", h.handleConfigUsage)
+	config("GET /manutenzioni/v1/config/summary", h.handleConfigSummary)
+	config("GET /manutenzioni/v1/config/{resource}", h.handleListConfig)
+	// Override specifico: l'operator può creare nuove voci di service-taxonomy
+	// inline durante create/edit di una manutenzione (catalog enrichment).
+	status("POST /manutenzioni/v1/config/service-taxonomy", h.handleCreateConfig)
+	config("POST /manutenzioni/v1/config/{resource}", h.handleCreateConfig)
+	config("POST /manutenzioni/v1/config/{resource}/reorder", h.handleReorderConfig)
+	config("PATCH /manutenzioni/v1/config/{resource}/{id}", h.handleUpdateConfig)
+	config("POST /manutenzioni/v1/config/{resource}/{id}/deactivate", h.handleDeactivateConfig)
+	config("POST /manutenzioni/v1/config/{resource}/{id}/reactivate", h.handleReactivateConfig)
+	config("GET /manutenzioni/v1/config/{resource}/{id}/usage", h.handleConfigUsage)
 }
 
 func combineRoles(groups ...[]string) []string {
@@ -383,12 +397,15 @@ func claimsActor(r *http.Request) map[string]any {
 	}
 }
 
-func canManage(r *http.Request) bool {
+func canOperate(r *http.Request) bool {
 	claims, ok := auth.GetClaims(r.Context())
 	if !ok {
 		return false
 	}
-	return authz.HasAnyRole(claims.Roles, applaunch.ManutenzioniManagerRoles()...)
+	return authz.HasAnyRole(claims.Roles, combineRoles(
+		applaunch.ManutenzioniManagerRoles(),
+		applaunch.ManutenzioniOperatorRoles(),
+	)...)
 }
 
 func canApprove(r *http.Request) bool {
@@ -396,7 +413,10 @@ func canApprove(r *http.Request) bool {
 	if !ok {
 		return false
 	}
-	return authz.HasAnyRole(claims.Roles, applaunch.ManutenzioniApproverRoles()...)
+	return authz.HasAnyRole(claims.Roles, combineRoles(
+		applaunch.ManutenzioniManagerRoles(),
+		applaunch.ManutenzioniApproverRoles(),
+	)...)
 }
 
 type eventWriter interface {

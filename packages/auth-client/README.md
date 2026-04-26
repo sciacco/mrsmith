@@ -42,7 +42,10 @@ To verify that a page is correctly hidden / disabled for a user without a specif
 # simulate a user that only has read access to manutenzioni
 VITE_DEV_FAKE_ROLES=app_manutenzioni_access
 
-# simulate a manager (without approver)
+# simulate an operator (write on maintenances, no configuration)
+VITE_DEV_FAKE_ROLES=app_manutenzioni_access,app_manutenzioni_operator
+
+# simulate a manager (operator + configuration + approve)
 VITE_DEV_FAKE_ROLES=app_manutenzioni_access,app_manutenzioni_manager
 ```
 

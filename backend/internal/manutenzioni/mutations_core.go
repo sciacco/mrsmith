@@ -382,8 +382,8 @@ func (h *Handler) handleMaintenanceStatus(w http.ResponseWriter, r *http.Request
 		appError(w, http.StatusForbidden, "approval_role_required")
 		return
 	}
-	if body.Action != "approve" && !canManage(r) {
-		appError(w, http.StatusForbidden, "manager_role_required")
+	if body.Action != "approve" && !canOperate(r) {
+		appError(w, http.StatusForbidden, "operator_role_required")
 		return
 	}
 

@@ -30,8 +30,9 @@ This document is the pre-code handoff for the Manutenzioni mini-app. It does not
 - Portal icon: `wrench` (verified in `apps/portal/src/components/Icon/icons.tsx`)
 - Access roles:
   - `app_manutenzioni_access`
-  - `app_manutenzioni_manager`
-  - `app_manutenzioni_approver`
+  - `app_manutenzioni_operator` (operational write on maintenances + inline `service-taxonomy` enrichment; no configuration access)
+  - `app_manutenzioni_manager` (operator superset + configuration access + `approve` action)
+  - `app_manutenzioni_approver` (`approve` action + configuration access)
   - `app_devadmin` remains the shared superuser override through existing authz helpers.
 
 V1 is an internal maintenance register and lifecycle workspace. It covers register, create/edit, detail management, maintenance windows, classification, targets, impacted customers, notice drafting/status tracking, timeline, and lookup/taxonomy configuration. It deliberately excludes customer-facing notices, automatic send jobs, AI generation, bulk import, CMDB links, dashboards, and schema changes.
@@ -279,10 +280,12 @@ Add to `backend/internal/platform/applaunch/catalog.go`:
 - `ManutenzioniAppHref = "/apps/manutenzioni/"`
 - `manutenzioniAccessRoles = []string{"app_manutenzioni_access"}`
 - `manutenzioniManagerRoles = []string{"app_manutenzioni_manager"}`
+- `manutenzioniOperatorRoles = []string{"app_manutenzioni_operator"}`
 - `manutenzioniApproverRoles = []string{"app_manutenzioni_approver"}`
 - Helper methods:
   - `ManutenzioniAccessRoles()`
   - `ManutenzioniManagerRoles()`
+  - `ManutenzioniOperatorRoles()`
   - `ManutenzioniApproverRoles()`
 - Catalog definition:
   - ID `manutenzioni`
@@ -478,9 +481,11 @@ Allowed V1 actions:
 
 Role rules:
 - read: `app_manutenzioni_access`
-- create/update and most lifecycle actions: `app_manutenzioni_manager`
-- approve: `app_manutenzioni_approver`
-- schedule and announce must require the maintenance to already be approved; the actor performing schedule/announce can be a manager, but the status must have passed through an approver action.
+- create/update and most lifecycle actions: `app_manutenzioni_operator` or `app_manutenzioni_manager`
+- inline `service-taxonomy` create (catalog enrichment from maintenance editing): `app_manutenzioni_operator`, `app_manutenzioni_manager`, or `app_manutenzioni_approver`
+- other configuration endpoints (`/llm-models`, `/service-dependencies`, `/config/*`): `app_manutenzioni_manager` or `app_manutenzioni_approver`
+- approve: `app_manutenzioni_manager` or `app_manutenzioni_approver`
+- schedule and announce must require the maintenance to already be approved; the actor performing schedule/announce can be an operator or manager, but the status must have passed through an approve action by a manager or approver.
 
 Schema caveat:
 - `maintenance_event.event_type` does not include `approved` or `scheduled`.
@@ -918,8 +923,9 @@ Automated tests are not to be added unless approved by the user. If approval is 
 - Portal tile is visible only to users with `app_manutenzioni_access` or `app_devadmin`.
 - Backend routes return 401 without bearer auth.
 - Backend routes return 403 without the required role.
-- Manager endpoints reject access-only users.
-- Approve action rejects managers without `app_manutenzioni_approver`.
+- Operator endpoints reject access-only users.
+- Configuration endpoints (`/config/*`, `/llm-models`, `/service-dependencies`) reject operator-only users (except the inline `POST /config/service-taxonomy` override).
+- Approve action rejects operator-only users; both manager and approver can perform it.
 - `/config` bootstrap works on port `5188`.
 - `/api` calls use same-origin paths from the browser.
 - Deep-link refresh works for `/apps/manutenzioni/manutenzioni/:id`.

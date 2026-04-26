@@ -54,7 +54,7 @@ import {
   windowStatusLabel,
 } from '../lib/format';
 import { NOTICE_TYPE_LABELS, WINDOW_ACTION_LABELS } from '../lib/labels';
-import { MANUTENZIONI_APPROVER_ROLES, MANUTENZIONI_MANAGER_ROLES } from '../lib/roles';
+import { MANUTENZIONI_APPROVAL_ROLES, MANUTENZIONI_OPERATIONAL_ROLES } from '../lib/roles';
 import { SEVERITY_OPTIONS } from '../lib/severity';
 import { validateWindowTiming, windowDurationMinutes } from '../lib/windowValidation';
 import shared from './shared.module.css';
@@ -77,8 +77,8 @@ export function MaintenanceDetailPage() {
   const params = useParams();
   const id = parsePositiveId(params.id);
   const { user } = useOptionalAuth();
-  const canManage = hasAnyRole(user?.roles, MANUTENZIONI_MANAGER_ROLES);
-  const canApprove = hasAnyRole(user?.roles, MANUTENZIONI_APPROVER_ROLES);
+  const canOperate = hasAnyRole(user?.roles, MANUTENZIONI_OPERATIONAL_ROLES);
+  const canApprove = hasAnyRole(user?.roles, MANUTENZIONI_APPROVAL_ROLES);
   const [activeTab, setActiveTab] = useState<TabKey>('cockpit');
   const detail = useMaintenance(id);
   const cockpit = useMaintenanceCockpit(id);
@@ -113,7 +113,7 @@ export function MaintenanceDetailPage() {
 
   const data = detail.data;
   const statusButtons = data
-    ? lifecycleButtons(data.status, canManage, canApprove).map((item) => (
+    ? lifecycleButtons(data.status, canOperate, canApprove).map((item) => (
         <Button
           key={item.action}
           size="sm"
@@ -194,21 +194,21 @@ export function MaintenanceDetailPage() {
               <SummaryTab
                 detail={data}
                 reference={reference.data}
-                canManage={canManage}
+                canOperate={canOperate}
               />
             )}
             {activeTab === 'finestre' && (
-              <WindowsTab detail={data} canManage={canManage} />
+              <WindowsTab detail={data} canOperate={canOperate} />
             )}
             {activeTab === 'impatto' && (
-              <ImpactTab detail={data} reference={reference.data} canManage={canManage} />
+              <ImpactTab detail={data} reference={reference.data} canOperate={canOperate} />
             )}
             {activeTab === 'target' && (
-              <TargetsTab detail={data} reference={reference.data} canManage={canManage} />
+              <TargetsTab detail={data} reference={reference.data} canOperate={canOperate} />
             )}
-            {activeTab === 'clienti' && <CustomersTab detail={data} canManage={canManage} />}
+            {activeTab === 'clienti' && <CustomersTab detail={data} canOperate={canOperate} />}
             {activeTab === 'comunicazioni' && (
-              <NoticesTab detail={data} reference={reference.data} canManage={canManage} />
+              <NoticesTab detail={data} reference={reference.data} canOperate={canOperate} />
             )}
             {activeTab === 'storico' && <EventsTab detail={data} />}
           </div>
@@ -218,20 +218,20 @@ export function MaintenanceDetailPage() {
   );
 }
 
-function lifecycleButtons(status: string, canManage: boolean, canApprove: boolean) {
+function lifecycleButtons(status: string, canOperate: boolean, canApprove: boolean) {
   const items: Array<{ action: string; label: string }> = [];
   if (status === 'draft' && canApprove) items.push({ action: 'approve', label: 'Approva' });
-  if ((status === 'approved' || status === 'announced') && canManage) {
+  if ((status === 'approved' || status === 'announced') && canOperate) {
     items.push({ action: 'schedule', label: 'Pianifica' });
   }
-  if ((status === 'approved' || status === 'scheduled') && canManage) {
+  if ((status === 'approved' || status === 'scheduled') && canOperate) {
     items.push({ action: 'announce', label: 'Annuncia' });
   }
-  if ((status === 'scheduled' || status === 'announced') && canManage) {
+  if ((status === 'scheduled' || status === 'announced') && canOperate) {
     items.push({ action: 'start', label: 'Avvia' });
   }
-  if (status === 'in_progress' && canManage) items.push({ action: 'complete', label: 'Completa' });
-  if (['draft', 'approved', 'scheduled', 'announced'].includes(status) && canManage) {
+  if (status === 'in_progress' && canOperate) items.push({ action: 'complete', label: 'Completa' });
+  if (['draft', 'approved', 'scheduled', 'announced'].includes(status) && canOperate) {
     items.push({ action: 'cancel', label: 'Annulla' });
   }
   return items;
@@ -240,11 +240,11 @@ function lifecycleButtons(status: string, canManage: boolean, canApprove: boolea
 function SummaryTab({
   detail,
   reference,
-  canManage,
+  canOperate,
 }: {
   detail: MaintenanceDetail;
   reference?: ReferenceData;
-  canManage: boolean;
+  canOperate: boolean;
 }) {
   const update = useUpdateMaintenance();
   const assistance = useMaintenanceAssistanceDraft(detail.maintenance_id);
@@ -396,7 +396,7 @@ function SummaryTab({
     <div className={shared.panel}>
       <div className={shared.sectionHeader}>
         <h2 className={shared.sectionTitle}>Riepilogo</h2>
-        {canManage && (
+        {canOperate && (
           <div className={shared.inlineActions}>
             {!editing && (
               <Button
@@ -532,7 +532,7 @@ function SummaryTab({
           />
         </div>
       )}
-      {canManage && !editing && (
+      {canOperate && !editing && (
         <AssistancePanel
           draft={assistanceDraft}
           note={assistanceNote}
@@ -881,7 +881,7 @@ function windowStatusTone(status: string): 'neutral' | 'success' | 'warning' | '
   return 'neutral';
 }
 
-function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManage: boolean }) {
+function WindowsTab({ detail, canOperate }: { detail: MaintenanceDetail; canOperate: boolean }) {
   const mutations = useWindowMutations(detail.maintenance_id);
   const toast = useToast();
   const [form, setForm] = useState<WindowFormState>(emptyWindowForm);
@@ -980,7 +980,7 @@ function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManag
       <div className={shared.sectionHeader}>
         <h2 className={shared.sectionTitle}>Finestre di attività</h2>
       </div>
-      {canManage && (
+      {canOperate && (
         <div className={shared.windowFormPanel}>
           <WindowFields form={form} onChange={setForm} />
           <div className={shared.windowFormFooter}>
@@ -1026,7 +1026,7 @@ function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManag
                     <td>{formatDateTime(window.scheduled_end_at)}</td>
                     <td>{minutesLabel(window.expected_downtime_minutes)}</td>
                     <td className={shared.actionsCell}>
-                      {canManage && window.window_status === 'planned' ? (
+                      {canOperate && window.window_status === 'planned' ? (
                         <div className={shared.actionRow}>
                           <Button
                             size="sm"
@@ -1190,11 +1190,11 @@ function WindowFields({
 function ImpactTab({
   detail,
   reference,
-  canManage,
+  canOperate,
 }: {
   detail: MaintenanceDetail;
   reference?: ReferenceData;
-  canManage: boolean;
+  canOperate: boolean;
 }) {
   if (!reference) return <Skeleton rows={5} />;
   return (
@@ -1206,7 +1206,7 @@ function ImpactTab({
         options={reference.service_taxonomy}
         technicalDomainId={detail.technical_domain.id}
         maintenanceId={detail.maintenance_id}
-        canManage={canManage}
+        canOperate={canOperate}
         primary
       />
       <ClassificationSection
@@ -1215,7 +1215,7 @@ function ImpactTab({
         items={detail.reason_classes}
         options={reference.reason_classes}
         maintenanceId={detail.maintenance_id}
-        canManage={canManage}
+        canOperate={canOperate}
         primary
       />
       <ClassificationSection
@@ -1224,7 +1224,7 @@ function ImpactTab({
         items={detail.impact_effects}
         options={reference.impact_effects}
         maintenanceId={detail.maintenance_id}
-        canManage={canManage}
+        canOperate={canOperate}
         primary
       />
       <ClassificationSection
@@ -1233,7 +1233,7 @@ function ImpactTab({
         items={detail.quality_flags}
         options={reference.quality_flags}
         maintenanceId={detail.maintenance_id}
-        canManage={canManage}
+        canOperate={canOperate}
       />
     </>
   );
@@ -1246,7 +1246,7 @@ function ClassificationSection({
   options,
   technicalDomainId,
   maintenanceId,
-  canManage,
+  canOperate,
   primary = false,
 }: {
   title: string;
@@ -1255,7 +1255,7 @@ function ClassificationSection({
   options: ReferenceItem[];
   technicalDomainId?: number;
   maintenanceId: number;
-  canManage: boolean;
+  canOperate: boolean;
   primary?: boolean;
 }) {
   const mutation = useReplaceClassifications(maintenanceId, resource);
@@ -1327,7 +1327,7 @@ function ClassificationSection({
       <div className={shared.sectionHeader}>
         <h2 className={shared.sectionTitle}>{title}</h2>
       </div>
-      {canManage && (
+      {canOperate && (
         <div className={shared.formGridThree} style={{ marginBottom: '1rem' }}>
           <select className={shared.select} value={selected} onChange={(event) => setSelected(event.target.value)}>
             <option value="">Seleziona</option>
@@ -1401,11 +1401,11 @@ function ClassificationSection({
 function TargetsTab({
   detail,
   reference,
-  canManage,
+  canOperate,
 }: {
   detail: MaintenanceDetail;
   reference?: ReferenceData;
-  canManage: boolean;
+  canOperate: boolean;
 }) {
   const mutations = useTargetMutations(detail.maintenance_id);
   const toast = useToast();
@@ -1437,7 +1437,7 @@ function TargetsTab({
       <div className={shared.sectionHeader}>
         <h2 className={shared.sectionTitle}>Target</h2>
       </div>
-      {canManage && reference && (
+      {canOperate && reference && (
         <div className={shared.formGridThree} style={{ marginBottom: '1rem' }}>
           <select
             className={shared.select}
@@ -1503,7 +1503,7 @@ function TargetsTab({
                     <td>{sourceLabel(item.source)}</td>
                     <td>{item.is_primary ? 'Sì' : '-'}</td>
                     <td className={shared.actionsCell}>
-                      {canManage && (
+                      {canOperate && (
                         <Button
                           size="sm"
                           variant="danger"
@@ -1542,12 +1542,12 @@ function TargetsTab({
   );
 }
 
-function CustomersTab({ detail, canManage }: { detail: MaintenanceDetail; canManage: boolean }) {
+function CustomersTab({ detail, canOperate }: { detail: MaintenanceDetail; canOperate: boolean }) {
   const mutations = useCustomerImpactMutations(detail.maintenance_id);
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [removeId, setRemoveId] = useState<number | null>(null);
-  const customers = useCustomerSearch(search, canManage);
+  const customers = useCustomerSearch(search, canOperate);
   const [form, setForm] = useState<ImpactedCustomerBody>({
     customer_id: 0,
     impact_scope: 'possible',
@@ -1574,7 +1574,7 @@ function CustomersTab({ detail, canManage }: { detail: MaintenanceDetail; canMan
       <div className={shared.sectionHeader}>
         <h2 className={shared.sectionTitle}>Clienti impattati</h2>
       </div>
-      {canManage && (
+      {canOperate && (
         <div className={shared.formGridThree} style={{ marginBottom: '1rem' }}>
           <input
             className={shared.field}
@@ -1633,7 +1633,7 @@ function CustomersTab({ detail, canManage }: { detail: MaintenanceDetail; canMan
                     <td>{sourceLabel(item.derivation_source)}</td>
                     <td>{confidenceLabel(item.confidence)}</td>
                     <td className={shared.actionsCell}>
-                      {canManage && (
+                      {canOperate && (
                         <Button
                           size="sm"
                           variant="danger"
@@ -1675,11 +1675,11 @@ function CustomersTab({ detail, canManage }: { detail: MaintenanceDetail; canMan
 function NoticesTab({
   detail,
   reference,
-  canManage,
+  canOperate,
 }: {
   detail: MaintenanceDetail;
   reference?: ReferenceData;
-  canManage: boolean;
+  canOperate: boolean;
 }) {
   const mutations = useNoticeMutations(detail.maintenance_id);
   const toast = useToast();
@@ -1718,7 +1718,7 @@ function NoticesTab({
       <div className={shared.sectionHeader}>
         <h2 className={shared.sectionTitle}>Comunicazioni</h2>
       </div>
-      {canManage && reference && (
+      {canOperate && reference && (
         <div className={shared.formGridThree} style={{ marginBottom: '1rem' }}>
           <select
             className={shared.select}

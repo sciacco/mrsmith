@@ -64,6 +64,7 @@ var (
 	listiniAccessRoles               = []string{"app_listini_access"}
 	manutenzioniAccessRoles          = []string{"app_manutenzioni_access"}
 	manutenzioniManagerRoles         = []string{"app_manutenzioni_manager"}
+	manutenzioniOperatorRoles        = []string{"app_manutenzioni_operator"}
 	manutenzioniApproverRoles        = []string{"app_manutenzioni_approver"}
 	panoramicaAccessRoles            = []string{"app_panoramica_access"}
 	quotesAccessRoles                = []string{"app_quotes_access"}
@@ -407,6 +408,10 @@ func ManutenzioniManagerRoles() []string {
 	return slices.Clone(manutenzioniManagerRoles)
 }
 
+func ManutenzioniOperatorRoles() []string {
+	return slices.Clone(manutenzioniOperatorRoles)
+}
+
 func ManutenzioniApproverRoles() []string {
 	return slices.Clone(manutenzioniApproverRoles)
 }
@@ -466,6 +471,7 @@ func AllRoles() []string {
 		listiniAccessRoles,
 		manutenzioniAccessRoles,
 		manutenzioniManagerRoles,
+		manutenzioniOperatorRoles,
 		manutenzioniApproverRoles,
 		panoramicaAccessRoles,
 		quotesAccessRoles,

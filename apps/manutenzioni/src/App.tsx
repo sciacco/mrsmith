@@ -3,15 +3,12 @@ import { hasAnyRole } from '@mrsmith/auth-client';
 import { useRoutes } from 'react-router-dom';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
-import { MANUTENZIONI_APPROVER_ROLES, MANUTENZIONI_MANAGER_ROLES } from './lib/roles';
+import { MANUTENZIONI_APPROVAL_ROLES } from './lib/roles';
 import styles from './App.module.css';
 
 export function App() {
   const { user, authenticated, loading, logout, status } = useOptionalAuth();
-  const canConfigure = hasAnyRole(user?.roles, [
-    ...MANUTENZIONI_MANAGER_ROLES,
-    ...MANUTENZIONI_APPROVER_ROLES,
-  ]);
+  const canConfigure = hasAnyRole(user?.roles, MANUTENZIONI_APPROVAL_ROLES);
   const navGroups: TabGroup[] = [
     {
       label: 'Registro',
