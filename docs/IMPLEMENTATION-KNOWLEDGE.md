@@ -104,6 +104,15 @@ Alyante ERP ID
 
 ## API and Backend Contract Quirks
 
+### Manutenzioni Radar Excludes Terminal Maintenance States
+
+- Context: `GET /api/manutenzioni/v1/maintenances/radar`, used by `apps/manutenzioni` on the Registro Manutenzioni page.
+- Discovery: maintenance records with status `cancelled` or `superseded` are lifecycle history, not actionable operational windows. Counting them in the radar makes the upcoming-window buckets noisy and misleading.
+- Practical rule: Manutenzioni radar-style operational summaries must always exclude `cancelled` and `superseded`, even when the caller passes explicit status filters. Keep the full register/list endpoints available for searching those terminal records.
+- Evidence: `backend/internal/manutenzioni/read.go` `handleMaintenanceRadar`; regression coverage in `backend/internal/manutenzioni/radar_test.go`.
+- Used by: `apps/manutenzioni` Registro Manutenzioni radar.
+- Open questions: none.
+
 ### Cross-Database Mini-App Summaries Must Merge In Code, Not In One SQL Join
 
 - Context: mini-apps that read business records from one DB and enrich them with replica/loader data from another DB in the same request path.

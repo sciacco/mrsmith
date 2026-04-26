@@ -42,6 +42,9 @@ func TestHandleMaintenanceRadarReturnsOperationalSixMonthScope(t *testing.T) {
 	if !state.sawRadarPredicate {
 		t.Fatalf("radar query did not include six-month/unscheduled predicate")
 	}
+	if !state.sawTerminalStatusExclusion {
+		t.Fatalf("radar query did not exclude terminal statuses")
+	}
 }
 
 func TestHandleMaintenanceRadarAppliesNonDateFiltersAndIgnoresDateAndPagination(t *testing.T) {
@@ -63,6 +66,7 @@ func TestHandleMaintenanceRadarAppliesNonDateFiltersAndIgnoresDateAndPagination(
 	for _, fragment := range []string{
 		"ILIKE",
 		"m.status IN",
+		"m.status NOT IN",
 		"m.technical_domain_id =",
 		"m.maintenance_kind_id =",
 		"m.customer_scope_id =",
@@ -86,6 +90,40 @@ func TestHandleMaintenanceRadarAppliesNonDateFiltersAndIgnoresDateAndPagination(
 			t.Fatalf("radar query args missing applied filter %#v in %#v", expected, args)
 		}
 	}
+	for _, excluded := range []driver.Value{StatusCancelled, StatusSuperseded} {
+		if !radarArgsContain(args, excluded) {
+			t.Fatalf("radar query args missing terminal status exclusion %#v in %#v", excluded, args)
+		}
+	}
+}
+
+func TestHandleMaintenanceRadarAlwaysExcludesTerminalStatuses(t *testing.T) {
+	db, state := openMaintenanceRadarTestDB(t, "terminal-statuses")
+	h := &Handler{maintenance: db}
+	req := httptest.NewRequest(http.MethodGet, "/manutenzioni/v1/maintenances/radar?status=cancelled,superseded", nil)
+	rec := httptest.NewRecorder()
+
+	h.handleMaintenanceRadar(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	state.mu.Lock()
+	query := state.lastQuery
+	args := append([]driver.NamedValue{}, state.lastArgs...)
+	state.mu.Unlock()
+
+	if !strings.Contains(query, "m.status IN") {
+		t.Fatalf("radar query should preserve caller status filter: %s", query)
+	}
+	if !strings.Contains(query, "m.status NOT IN") {
+		t.Fatalf("radar query should exclude terminal statuses: %s", query)
+	}
+	for _, expected := range []driver.Value{StatusCancelled, StatusSuperseded} {
+		if !radarArgsContain(args, expected) {
+			t.Fatalf("radar query args missing expected status %#v in %#v", expected, args)
+		}
+	}
 }
 
 const maintenanceRadarTestDriverName = "manutenzioni_radar_test_driver"
@@ -96,10 +134,11 @@ var (
 )
 
 type maintenanceRadarTestState struct {
-	mu                sync.Mutex
-	lastQuery         string
-	lastArgs          []driver.NamedValue
-	sawRadarPredicate bool
+	mu                         sync.Mutex
+	lastQuery                  string
+	lastArgs                   []driver.NamedValue
+	sawRadarPredicate          bool
+	sawTerminalStatusExclusion bool
 }
 
 func openMaintenanceRadarTestDB(t *testing.T, mode string) (*sql.DB, *maintenanceRadarTestState) {
@@ -151,6 +190,7 @@ func (c *maintenanceRadarTestConn) QueryContext(_ context.Context, query string,
 	state.lastArgs = append([]driver.NamedValue{}, args...)
 	state.sawRadarPredicate = strings.Contains(query, "vcw.maintenance_window_id IS NULL") &&
 		strings.Contains(query, "vcw.scheduled_start_at::date BETWEEN")
+	state.sawTerminalStatusExclusion = strings.Contains(query, "m.status NOT IN")
 	state.mu.Unlock()
 
 	today, sixMonthsTo, err := maintenanceRadarBoundsFromArgs(args)

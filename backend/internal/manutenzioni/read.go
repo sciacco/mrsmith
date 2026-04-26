@@ -201,6 +201,7 @@ func (h *Handler) handleMaintenanceRadar(w http.ResponseWriter, r *http.Request)
 
 	args := []any{}
 	where := maintenanceListWhereWithOptions(r, &args, maintenanceListFilterOptions{includeScheduledRange: false})
+	where += ` AND m.status NOT IN (` + placeholder(&args, StatusCancelled) + `, ` + placeholder(&args, StatusSuperseded) + `)`
 	todayParam := placeholder(&args, today.Format("2006-01-02"))
 	sixMonthsParam := placeholder(&args, sixMonthsTo.Format("2006-01-02"))
 	where += ` AND (vcw.maintenance_window_id IS NULL OR vcw.scheduled_start_at::date BETWEEN ` + todayParam + ` AND ` + sixMonthsParam + `)`
