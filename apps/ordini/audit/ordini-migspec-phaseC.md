@@ -113,7 +113,7 @@ The UTF8 conversion on read (`convert(note_tecnici using UTF8)`) stays in the re
 **Classification.** Domain.
 
 **Placement.** **Backend.**
-- `PATCH /api/ordini/:id` body `{customer_po, confirmation_date, customer_id}` (three fields only — the other readonly Info-tab fields are immutable here). Auth: `app_customer_relations` + `stato == 'BOZZA'`. `customer_id` here is `erp_an_cli.selectedOptionValue` — under 1:1 this is the `NUMERO_AZIENDA`, which vodka persists into `orders.cdlan_cliente` as the **string** RAGIONE_SOCIALE today. The backend continues to persist the string (no schema change) but also logs the `NUMERO_AZIENDA` where the mapping is available; the canonical identifier linkage (Alyante ID ↔ Mistra customer.id ↔ Grappa codice_aggancio_gest, per `docs/IMPLEMENTATION-KNOWLEDGE.md`) is noted for a later pass but not rewired in v1.
+- `PATCH /api/ordini/:id` body `{customer_po, confirmation_date, customer_id}` (three fields only — the other readonly Info-tab fields are immutable here). Auth: `app_customer_relations` + `stato == 'BOZZA'`. `customer_id` is the dropdown value from `erp_an_cli.selectedOptionValue` — i.e. `NUMERO_AZIENDA` from Alyante. **Per C2 (resolved):** the UPDATE writes **both** `orders.cdlan_cliente = <RAGIONE_SOCIALE>` (string, as today) and `orders.cdlan_cliente_id = <NUMERO_AZIENDA>`. No schema change — `cdlan_cliente_id` already exists in vodka and is already in the read SELECT (datasource-catalog.md:188). This strengthens the cross-DB linkage (Alyante ID ↔ Mistra `customers.customer.id` ↔ Grappa `cli_fatturazione.codice_aggancio_gest`, per `docs/IMPLEMENTATION-KNOWLEDGE.md`) at zero cost.
 - `PATCH /api/ordini/:id/referents` body `{technical:{name,phone,email}, technical_alt:{…}, administrative:{…}}`. Auth: `app_customer_relations` + `stato ∈ {BOZZA, INVIATO}`.
 
 All writes are parameterized.
@@ -195,11 +195,14 @@ Collected from Phases A/B so Phase D has a single reference:
 
 No transactional rollback against the ERP. The endpoint calls `GW_SendToErp` one row at a time (as the source does today) and returns a structured per-row outcome report. vodka state flips only on full success (source parity). The UI renders every row's status so the operator sees exactly which lines made it to the ERP. Post-v1 follow-up for partial-failure retry tracked in `docs/TODO.md`.
 
-### C2. `customer_id` persistence in v1
-Under 1:1 the backend continues to persist `orders.cdlan_cliente` as the RAGIONE_SOCIALE **string**. The `NUMERO_AZIENDA` is available at write time (it's `erp_an_cli.selectedOptionValue`) but the current schema has no column to receive it that is wired up end-to-end. Options for v1: (a) strict 1:1 — write only the string, accept the fragility; (b) populate the existing-but-unused `cdlan_cliente_id` column with `NUMERO_AZIENDA` on every BOZZA header save, strengthening the linkage for free. Proposal: **(b)** — zero schema change, backend-only, matches the cross-DB identifier guidance in `docs/IMPLEMENTATION-KNOWLEDGE.md`. **Confirm.**
+### C2. `customer_id` persistence in v1 — **RESOLVED: write both `cdlan_cliente` (string) and `cdlan_cliente_id` (NUMERO_AZIENDA) on BOZZA header save**
+
+The BOZZA header save UPDATE sets both columns from the same dropdown value. Zero schema change (column already exists). This is a deliberate, minimal deviation from strict 1:1: Appsmith reads `cdlan_cliente_id` but never writes it; the rewrite both reads and writes it.
+
+The write happens only at edit point #1 (Info tab SALVA) — once the order leaves BOZZA, the Ragione sociale dropdown is not editable, so there is no second backfill opportunity through the UI.
 
 ---
 
 ## Phase C exit criteria
 
-Phase C is complete once C1 and C2 are answered. Everything else flows from Phases A+B.
+**Phase C complete.** C1 → per-row push, per-row UI feedback, no transaction. C2 → write both `cdlan_cliente` and `cdlan_cliente_id` on BOZZA header save. Ready for Phase D (Integration & Data Flow).
