@@ -64,6 +64,19 @@ function selectOptions(items: Category[] | DocumentType[] | undefined) {
   return items?.map((item) => ({ value: item.id, label: item.name })) ?? [];
 }
 
+const providerStateOptions = [
+  { value: 'DRAFT', label: stateLabel('DRAFT') },
+  { value: 'ACTIVE', label: stateLabel('ACTIVE') },
+  { value: 'INACTIVE', label: stateLabel('INACTIVE') },
+];
+
+const languageOptions = [
+  { value: 'it', label: 'Italiano' },
+  { value: 'en', label: 'Inglese' },
+];
+
+const countryOptions = countries.map((item) => ({ value: item.code, label: item.name }));
+
 function providerPayload(form: HTMLFormElement): ProviderPayload {
   const data = new FormData(form);
   const erp = String(data.get('erp_id') ?? '').trim();
@@ -132,36 +145,45 @@ export function DashboardPage() {
             <Metric label="Categorie da gestire" value={categories.data?.length ?? 0} />
           </section>
           <section className="threeTables">
-            <Panel title="Fornitori da qualificare">
+            <Panel title="Fornitori da qualificare" className="dashboardPanel">
+              <div className="tableScroll dashboardScroll">
               <table className="table">
                 <thead><tr><th>Fornitore</th><th>Stato</th><th>Codice Alyante</th></tr></thead>
                 <tbody>{(drafts.data ?? []).map((row) => (
                   <tr key={row.id} onClick={() => navigate(`/fornitori?id_provider=${row.id}&tab=Dati`)}>
-                    <td>{value(row.company_name)}</td><td>{value(row.state)}</td><td>{value(row.erp_id)}</td>
+                    <td>{value(row.company_name)}</td><td>{stateLabel(row.state)}</td><td>{value(row.erp_id)}</td>
                   </tr>
-                ))}</tbody>
+                ))}
+                {(drafts.data ?? []).length === 0 ? <tr><td colSpan={3}>{stateBlock('Nessuna bozza', 'Non ci sono fornitori da qualificare.')}</td></tr> : null}</tbody>
               </table>
+              </div>
             </Panel>
-            <Panel title="Documenti in scadenza">
+            <Panel title="Documenti in scadenza" className="dashboardPanel">
+              <div className="tableScroll dashboardScroll">
               <table className="table">
                 <thead><tr><th>Fornitore</th><th>Documento</th><th>Scadenza</th><th /></tr></thead>
                 <tbody>{(documents.data ?? []).map((row) => (
                   <tr key={row.id}>
                     <td>{value(row.company_name)}</td><td>{value(row.document_type)}</td><td>{dateLabel(row.expire_date)}</td>
-                    <td><Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} onClick={() => void download(row.id)}>Scarica file</Button></td>
+                    <td className="iconCell"><Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} aria-label="Scarica documento" title="Scarica documento" onClick={() => void download(row.id)} /></td>
                   </tr>
-                ))}</tbody>
+                ))}
+                {(documents.data ?? []).length === 0 ? <tr><td colSpan={4}>{stateBlock('Nessun documento', 'Non ci sono scadenze da gestire.')}</td></tr> : null}</tbody>
               </table>
+              </div>
             </Panel>
-            <Panel title="Categorie da gestire">
+            <Panel title="Categorie da gestire" className="dashboardPanel">
+              <div className="tableScroll dashboardScroll">
               <table className="table">
                 <thead><tr><th>Fornitore</th><th>Categoria</th><th>Stato</th></tr></thead>
                 <tbody>{(categories.data ?? []).map((row) => (
                   <tr key={`${row.provider_id}-${row.category_id}`} onClick={() => navigate(`/fornitori?id_provider=${row.provider_id}&tab=Qualifica`)}>
-                    <td>{value(row.company_name)}</td><td>{value(row.category_name)}</td><td>{value(row.state)}</td>
+                    <td>{value(row.company_name)}</td><td>{value(row.category_name)}</td><td>{stateLabel(row.state)}</td>
                   </tr>
-                ))}</tbody>
+                ))}
+                {(categories.data ?? []).length === 0 ? <tr><td colSpan={3}>{stateBlock('Nessuna categoria', 'Non ci sono categorie da rivedere.')}</td></tr> : null}</tbody>
               </table>
+              </div>
             </Panel>
           </section>
         </>
@@ -174,8 +196,8 @@ function Metric({ label, value: count }: { label: string; value: number }) {
   return <div className="metric"><span>{label}</span><strong>{count}</strong></div>;
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="panel"><header className="panelHeader"><h2>{title}</h2></header>{children}</section>;
+function Panel({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
+  return <section className={`panel ${className ?? ''}`}><header className="panelHeader"><h2>{title}</h2></header>{children}</section>;
 }
 
 export function FornitoriPage() {
@@ -208,10 +230,10 @@ export function FornitoriPage() {
         <section className="master panel">
           <div className="toolbar"><SearchInput value={query} onChange={setQuery} placeholder="Cerca fornitore" /></div>
           {providers.isLoading ? <Skeleton rows={8} /> : providers.error ? stateBlock(errorTitle(providers.error), 'Elenco fornitori non disponibile.') : (
-            <div className="listRows">
-              {filtered.map((item) => (
-                <button key={item.id} className={`listRow ${item.id === selectedId ? 'selected' : ''}`} onClick={() => selectProvider(item.id)}>
-                  <span><strong>{item.company_name}</strong><small>{stateLabel(item.state)} · {value(item.erp_id)}</small></span>
+              <div className="listRows">
+                {filtered.map((item) => (
+                  <button key={item.id} className={`listRow ${item.id === selectedId ? 'selected' : ''}`} onClick={() => selectProvider(item.id)}>
+                    <span><strong>{item.company_name}</strong><small>{stateLabel(item.state)} · {value(item.erp_id)}</small></span>
                   <Icon name="chevron-right" size={16} />
                 </button>
               ))}
@@ -268,12 +290,12 @@ function ProviderData({ provider }: { provider?: Provider }) {
     <>
       <form className="formGrid" onSubmit={(event) => void submit(event)}>
         <Input name="company_name" label="Ragione sociale" defaultValue={provider?.company_name} />
-        <Select name="state" label="Stato" defaultValue={provider?.state ?? 'DRAFT'} options={['DRAFT', 'ACTIVE', 'INACTIVE']} />
+        <Select name="state" label="Stato" defaultValue={provider?.state ?? 'DRAFT'} options={providerStateOptions} />
         <Input name="vat_number" label="P.IVA" defaultValue={provider?.vat_number} />
         <Input name="cf" label="CF" defaultValue={provider?.cf} />
         <Input name="erp_id" label="Codice Alyante" type="number" defaultValue={provider?.erp_id ?? ''} />
-        <Select name="language" label="Lingua" defaultValue={provider?.language ?? 'it'} options={['it', 'en']} />
-        <Select name="country" label="Paese" defaultValue={provider?.country ?? 'IT'} options={countries.map((item) => item.code)} />
+        <Select name="language" label="Lingua" defaultValue={provider?.language ?? 'it'} options={languageOptions} />
+        <Select name="country" label="Paese" defaultValue={provider?.country ?? 'IT'} options={countryOptions} />
         <Select name="province" label="Provincia" defaultValue={provider?.province ?? ''} options={['', ...provinces]} />
         <Input name="city" label="Citta" defaultValue={provider?.city} />
         <Input name="postal_code" label="CAP" defaultValue={provider?.postal_code} />
@@ -392,7 +414,7 @@ function ProviderQualification({ providerId }: { providerId: number }) {
           <thead><tr><th>Categoria</th><th>Stato</th><th>Critica</th></tr></thead>
           <tbody>{(providerCategories.data ?? []).map((row) => (
             <tr key={row.category?.id} className={selectedCategory === row.category?.id ? 'selectedRow' : ''} onClick={() => setSelectedCategory(row.category?.id ?? null)}>
-              <td>{row.category?.name}</td><td>{value(row.status ?? row.state)}</td><td>{row.critical ? 'Si' : 'No'}</td>
+              <td>{row.category?.name}</td><td>{stateLabel(row.status ?? row.state)}</td><td>{row.critical ? 'Si' : 'No'}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -401,7 +423,7 @@ function ProviderQualification({ providerId }: { providerId: number }) {
         {selectedCategory == null ? stateBlock('Seleziona una categoria', 'I documenti verranno mostrati dopo la selezione.') : documents.isLoading ? <Skeleton rows={4} /> : (
           <table className="table">
             <thead><tr><th>Tipo</th><th>Stato</th><th>Scadenza</th></tr></thead>
-            <tbody>{(documents.data ?? []).map((doc) => <tr key={doc.id}><td>{doc.document_type?.name}</td><td>{doc.state}</td><td>{dateLabel(doc.expire_date)}</td></tr>)}</tbody>
+            <tbody>{(documents.data ?? []).map((doc) => <tr key={doc.id}><td>{doc.document_type?.name}</td><td>{stateLabel(doc.state)}</td><td>{dateLabel(doc.expire_date)}</td></tr>)}</tbody>
           </table>
         )}
       </Panel>
@@ -424,15 +446,15 @@ function ProviderDocuments({ providerId }: { providerId: number }) {
 
   return (
     <>
-      <div className="toolbar"><Button leftIcon={<Icon name="plus" />} onClick={() => setUploadOpen(true)}>Salva</Button></div>
+      <div className="toolbar"><Button leftIcon={<Icon name="plus" />} onClick={() => setUploadOpen(true)}>Nuovo documento</Button></div>
       <table className="table">
         <thead><tr><th>Tipo</th><th>Stato</th><th>Scadenza</th><th /></tr></thead>
         <tbody>{documents.isLoading ? <tr><td colSpan={4}><Skeleton rows={4} /></td></tr> : (documents.data ?? []).map((doc) => (
           <tr key={doc.id}>
-            <td>{doc.document_type?.name}</td><td>{doc.state}</td><td>{dateLabel(doc.expire_date)}</td>
+            <td>{doc.document_type?.name}</td><td>{stateLabel(doc.state)}</td><td>{dateLabel(doc.expire_date)}</td>
             <td className="rowActions">
-              <Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} onClick={() => void download(doc.id)}>Scarica file</Button>
-              <Button size="sm" variant="secondary" leftIcon={<Icon name="pencil" />} onClick={() => setEditId(doc.id)}>Salva</Button>
+              <Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} onClick={() => void download(doc.id)}>Scarica</Button>
+              <Button size="sm" variant="secondary" leftIcon={<Icon name="pencil" />} onClick={() => setEditId(doc.id)}>Modifica</Button>
             </td>
           </tr>
         ))}</tbody>
@@ -463,9 +485,9 @@ function DocumentModal({ open, onClose, providerId, documentId, documentTypes, o
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={documentId ? 'Salva documento' : 'Salva documento'} size="md">
+    <Modal open={open} onClose={onClose} title={documentId ? 'Modifica documento' : 'Nuovo documento'} size="md">
       <form className="modalForm" onSubmit={(event) => void submit(event)}>
-        {!documentId ? <Select name="document_type_id" label="Tipo documento" options={documentTypes.map((item) => String(item.id))} /> : null}
+        {!documentId ? <Select name="document_type_id" label="Tipo documento" options={documentTypes.map((item) => ({ value: String(item.id), label: item.name }))} /> : null}
         <Input name="expire_date" label="Scadenza" type="date" />
         <label className="field"><span>File</span><input name="file" type="file" /></label>
         <div className="modalActions"><Button variant="secondary" onClick={onClose}>Annulla</Button><Button type="submit">Salva</Button></div>
@@ -502,12 +524,12 @@ function ProviderCreateModal({ open, onClose }: { open: boolean; onClose: () => 
     <Modal open={open} onClose={onClose} title="Nuovo fornitore" size="wide">
       <form className="formGrid" onSubmit={(event) => void submit(event)}>
         <Input name="company_name" label="Ragione sociale" />
-        <Select name="state" label="Stato" defaultValue="DRAFT" options={['DRAFT', 'ACTIVE', 'INACTIVE']} />
+        <Select name="state" label="Stato" defaultValue="DRAFT" options={providerStateOptions} />
         <Input name="vat_number" label="P.IVA" />
         <Input name="cf" label="CF" />
         <Input name="erp_id" label="Codice Alyante" type="number" />
-        <Select name="language" label="Lingua" defaultValue="it" options={['it', 'en']} />
-        <Select name="country" label="Paese" defaultValue="IT" options={countries.map((item) => item.code)} />
+        <Select name="language" label="Lingua" defaultValue="it" options={languageOptions} />
+        <Select name="country" label="Paese" defaultValue="IT" options={countryOptions} />
         <Select name="province" label="Provincia" options={['', ...provinces]} />
         <Input name="city" label="Citta" />
         <Input name="postal_code" label="CAP" />
@@ -570,11 +592,11 @@ export function QualificationSettingsPage() {
       <header className="pageHeader"><div><h1>Impostazioni qualifica</h1><p>Categorie e tipi documento.</p></div></header>
       <div className="twoCols">
         <Panel title="Categorie">
-          <table className="table"><tbody>{(categories.data ?? []).map((item) => <tr key={item.id} onClick={() => setSelectedCategory(item)}><td>{item.name}</td><td className="rightText"><Icon name="chevron-right" size={16} /></td></tr>)}</tbody></table>
+          <div className="tableScroll adminScroll"><table className="table"><tbody>{(categories.data ?? []).map((item) => <tr key={item.id} onClick={() => setSelectedCategory(item)}><td>{item.name}</td><td className="rightText"><Icon name="chevron-right" size={16} /></td></tr>)}</tbody></table></div>
           <form className="modalForm" onSubmit={(event) => void saveCategory(event)}>
             <Input name="name" label="Categoria" defaultValue={selectedCategory?.name ?? ''} />
-            <span className="fieldLabel">Doc obbligatori</span><MultiSelect options={selectOptions(documentTypes.data)} selected={required} onChange={setRequired} />
-            <span className="fieldLabel">Doc facoltativi</span><MultiSelect options={selectOptions(documentTypes.data)} selected={optional} onChange={setOptional} />
+            <span className="fieldLabel">Documenti obbligatori</span><MultiSelect options={selectOptions(documentTypes.data)} selected={required} onChange={setRequired} />
+            <span className="fieldLabel">Documenti facoltativi</span><MultiSelect options={selectOptions(documentTypes.data)} selected={optional} onChange={setOptional} />
             <div className="formActions">
               <Button type="submit" disabled={readonly}>Salva</Button>
               {selectedCategory ? <Button variant="danger" disabled={readonly} onClick={() => void mutations.deleteCategory.mutateAsync(selectedCategory.id)}>Elimina</Button> : null}
@@ -582,7 +604,7 @@ export function QualificationSettingsPage() {
           </form>
         </Panel>
         <Panel title="Tipi documento">
-          <table className="table"><tbody>{(documentTypes.data ?? []).map((item) => <tr key={item.id} onClick={() => setSelectedDocType(item)}><td>{item.name}</td><td className="rightText"><Icon name="chevron-right" size={16} /></td></tr>)}</tbody></table>
+          <div className="tableScroll adminScroll"><table className="table"><tbody>{(documentTypes.data ?? []).map((item) => <tr key={item.id} onClick={() => setSelectedDocType(item)}><td>{item.name}</td><td className="rightText"><Icon name="chevron-right" size={16} /></td></tr>)}</tbody></table></div>
           <form className="modalForm" onSubmit={(event) => void saveDocType(event)}>
             <Input name="name" label="Tipo documento" defaultValue={selectedDocType?.name ?? ''} />
             <div className="formActions">
@@ -612,12 +634,12 @@ export function PaymentMethodsPage() {
       <header className="pageHeader"><div><h1>Pagamenti RDA</h1><p>Disponibilita dei metodi di pagamento per RDA.</p></div></header>
       <section className="panel">
         {methods.isLoading ? <Skeleton rows={8} /> : methods.error ? stateBlock(errorTitle(methods.error), 'I metodi di pagamento non possono essere caricati.') : (
-          <table className="table">
+          <div className="tableScroll"><table className="table">
             <thead><tr><th>Codice</th><th>Descrizione</th><th>Disponibile RDA</th></tr></thead>
             <tbody>{(methods.data ?? []).map((item) => (
               <tr key={item.code}><td>{item.code}</td><td>{item.description}</td><td><ToggleSwitch id={`rda-${item.code}`} checked={Boolean(item.rda_available)} disabled={readonly} onChange={(checked) => void toggle(item.code, checked)} /></td></tr>
             ))}</tbody>
-          </table>
+          </table></div>
         )}
       </section>
     </main>
@@ -647,10 +669,10 @@ export function ArticleCategoriesPage() {
       <div className="workspace">
         <section className="master panel">
           {articles.isLoading ? <Skeleton rows={8} /> : articles.error ? stateBlock(errorTitle(articles.error), 'Gli articoli non possono essere caricati.') : (
-            <table className="table">
+            <div className="tableScroll"><table className="table">
               <thead><tr><th>Articolo</th><th>Categoria</th></tr></thead>
               <tbody>{(articles.data ?? []).map((item) => <tr key={item.article_code} className={selected === item.article_code ? 'selectedRow' : ''} onClick={() => setSelected(item.article_code)}><td>{item.article_code}<small>{item.description}</small></td><td>{item.category_name}</td></tr>)}</tbody>
-            </table>
+            </table></div>
           )}
         </section>
         <section className="detail panel">
@@ -672,6 +694,19 @@ function Input({ label, wide, ...props }: React.InputHTMLAttributes<HTMLInputEle
   return <label className={`field ${wide ? 'wideField' : ''}`}><span>{label}</span><input {...props} /></label>;
 }
 
-function Select({ label, options, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string; options: string[] }) {
-  return <label className="field"><span>{label}</span><select {...props}>{options.map((item) => <option key={item} value={item}>{item || '-'}</option>)}</select></label>;
+type SelectOption = string | { value: string; label: string };
+
+function Select({ label, options, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string; options: SelectOption[] }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select {...props}>
+        {options.map((item) => {
+          const value = typeof item === 'string' ? item : item.value;
+          const optionLabel = typeof item === 'string' ? item || '-' : item.label;
+          return <option key={value} value={value}>{optionLabel}</option>;
+        })}
+      </select>
+    </label>
+  );
 }

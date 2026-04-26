@@ -8,6 +8,8 @@ import { ToastProvider } from '@mrsmith/ui';
 import { App } from './App';
 import './styles/global.css';
 
+document.documentElement.dataset.theme = 'clean';
+
 const routerBasename = import.meta.env.BASE_URL === '/' ? '/' : import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const queryClient = new QueryClient({

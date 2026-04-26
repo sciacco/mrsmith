@@ -9,7 +9,29 @@ export const referenceTypes = [
 
 export function stateLabel(value?: string | null) {
   if (!value) return '-';
-  return value;
+  const labels: Record<string, string> = {
+    ACTIVE: 'Attivo',
+    APPROVED: 'Approvato',
+    DRAFT: 'Bozza',
+    EXPIRED: 'Scaduto',
+    INACTIVE: 'Non attivo',
+    MISSING: 'Mancante',
+    NOT_QUALIFIED: 'Non qualificato',
+    PENDING: 'In attesa',
+    QUALIFIED: 'Qualificato',
+    REJECTED: 'Respinto',
+    REQUIRED: 'Obbligatorio',
+    TO_REVIEW: 'Da verificare',
+    VALID: 'Valido',
+  };
+  const key = value.toUpperCase().replace(/[-\s]+/g, '_');
+  if (labels[key]) return labels[key];
+  return value
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 export function referenceTypeLabel(value?: string | null) {

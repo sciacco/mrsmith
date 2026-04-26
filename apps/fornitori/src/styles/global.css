@@ -4,23 +4,59 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  color-scheme: light;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   min-height: 100vh;
-  margin: 0;
-  font-family: var(--font-sans);
   color: var(--color-text);
   background:
     radial-gradient(circle at top left, rgba(99, 91, 255, 0.06), transparent 28%),
     linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
 input,
 select {
   font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+::selection {
+  color: var(--color-text);
+  background: var(--color-accent-muted);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--color-border);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
 }
 
 .navRow {
@@ -35,76 +71,93 @@ select {
 }
 
 .page {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  width: min(1480px, 100%);
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1560px;
   margin: 0 auto;
-  padding: 24px;
-  animation: pageEnter 0.25s ease-out;
+  min-width: 0;
+  animation: pageEnter 0.45s var(--ease-out) both;
 }
 
 .pageHeader {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 1rem;
+  min-width: 0;
 }
 
 .pageHeader h1 {
-  margin: 0;
+  color: var(--color-text);
   font-size: 1.75rem;
-  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
 }
 
 .pageHeader p,
 .muted,
 .modalText {
-  margin: 6px 0 0;
-  color: var(--color-text-secondary);
+  max-width: 50rem;
+  margin-top: 0.3rem;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
 }
 
 .metricGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 0.65rem;
 }
 
 .metric,
 .panel,
 .stateCard {
+  min-width: 0;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
 }
 
 .metric {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  gap: 0.75rem;
+  min-height: 4rem;
+  padding: 0.72rem 0.85rem;
 }
 
 .metric span {
   color: var(--color-text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .metric strong {
+  color: var(--color-text);
   font-size: 1.55rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .threeTables {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 0.8rem;
   align-items: start;
 }
 
 .panel {
-  min-width: 0;
   overflow: hidden;
+}
+
+.dashboardPanel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 23rem;
 }
 
 .panelHeader,
@@ -113,90 +166,151 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 0.75rem;
+  padding: 0.72rem 0.85rem;
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .panelHeader h2,
 .detailHeader h2 {
-  margin: 0;
+  min-width: 0;
+  color: var(--color-text);
   font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.tableScroll {
+  min-width: 0;
+  overflow: auto;
+}
+
+.dashboardScroll {
+  max-height: 19.5rem;
+}
+
+.adminScroll {
+  max-height: 17rem;
 }
 
 .table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.84rem;
 }
 
 .table th {
-  padding: 10px 12px;
-  color: var(--color-text-secondary);
-  font-size: 0.68rem;
+  padding: 0.66rem 0.72rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  font-size: 0.6875rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
   text-align: left;
   text-transform: uppercase;
-  background: var(--color-surface);
+  white-space: nowrap;
 }
 
 .table td {
-  padding: 11px 12px;
-  border-top: 1px solid var(--color-border-subtle);
+  padding: 0.68rem 0.72rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text);
+  line-height: 1.35;
   vertical-align: middle;
 }
 
-.table tr {
-  transition: background 150ms ease;
+.table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
-.table tbody tr:hover {
-  background: var(--color-accent-subtle);
+.table tbody tr {
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.table tbody tr:hover,
+.table tbody tr:focus-visible,
+.selectedRow {
+  background: color-mix(in srgb, var(--color-accent-subtle) 72%, #fff 28%);
 }
 
 .table small {
   display: block;
-  margin-top: 2px;
+  margin-top: 0.12rem;
   color: var(--color-text-secondary);
+  font-size: 0.76rem;
+}
+
+.table .emptyState {
+  min-height: 8rem;
+}
+
+.iconCell {
+  width: 3.5rem;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(18rem, 0.88fr) minmax(0, 1.62fr);
+  gap: 1rem;
   align-items: start;
 }
 
 .master,
 .detail {
-  min-height: 520px;
+  min-height: min(42rem, calc(100vh - 12rem));
+}
+
+.master {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.detail {
+  position: sticky;
+  top: 5.8rem;
 }
 
 .listRows {
-  display: flex;
-  flex-direction: column;
-  padding: 8px;
+  display: grid;
+  gap: 0.2rem;
+  max-height: calc(100vh - 16rem);
+  overflow: auto;
+  padding: 0.35rem;
 }
 
 .listRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.65rem;
   width: 100%;
-  min-height: 58px;
-  padding: 10px 12px;
+  min-height: 3.25rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.65rem;
   color: var(--color-text);
   text-align: left;
   background: transparent;
   cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .listRow:hover,
-.listRow.selected,
-.selectedRow {
+.listRow.selected {
   background: var(--color-accent-subtle);
+}
+
+.listRow:active {
+  transform: scale(0.995);
 }
 
 .listRow span {
@@ -206,41 +320,62 @@ select {
 .listRow strong {
   display: block;
   overflow: hidden;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .listRow small {
   display: block;
+  margin-top: 0.15rem;
+  overflow: hidden;
   color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detailHeader span {
-  padding: 4px 8px;
-  border-radius: 999px;
-  color: var(--color-text-secondary);
-  background: var(--color-surface);
-  font-size: 0.78rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  padding: 0.25rem 0.55rem;
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .segments {
   display: flex;
-  gap: 6px;
-  padding: 12px 16px 0;
+  gap: 0.35rem;
+  padding: 0.65rem 0.8rem 0;
   overflow-x: auto;
 }
 
 .segments button {
+  flex: 0 0 auto;
+  min-height: 2rem;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 7px 12px;
+  border-radius: var(--radius-full);
+  padding: 0.35rem 0.7rem;
   color: var(--color-text-secondary);
-  background: #fff;
+  background: var(--color-bg-elevated);
+  font-size: 0.82rem;
+  font-weight: 700;
   cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
+.segments button:hover,
 .segments button.active {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-muted);
   color: var(--color-accent);
   background: var(--color-accent-subtle);
 }
@@ -248,22 +383,23 @@ select {
 .formGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 16px;
+  gap: 0.75rem;
+  padding: 0.9rem;
 }
 
 .field,
 .modalForm {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
 }
 
 .field span,
 .fieldLabel {
-  color: var(--color-text-secondary);
-  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -273,12 +409,28 @@ select {
 .inlineForm select,
 .modalForm input,
 .modalForm select {
-  min-height: 38px;
+  width: 100%;
+  min-height: 2.35rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: #fff;
+  border-radius: var(--radius-sm);
+  padding: 0.52rem 0.65rem;
   color: var(--color-text);
+  background: var(--color-bg-elevated);
+  outline: none;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.field input:focus,
+.field select:focus,
+.inlineForm input:focus,
+.inlineForm select:focus,
+.modalForm input:focus,
+.modalForm select:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
 .wideField {
@@ -288,53 +440,57 @@ select {
 .checkLine {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.45rem;
   color: var(--color-text-secondary);
+  font-size: 0.84rem;
 }
 
 .formActions,
 .modalActions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 0.6rem;
   grid-column: 1 / -1;
 }
 
 .modalActions {
-  margin-top: 14px;
+  margin-top: 0.8rem;
 }
 
 .modalForm {
-  gap: 12px;
-  padding-top: 6px;
+  gap: 0.75rem;
+  padding-top: 0.35rem;
 }
 
 .stack {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 16px;
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.9rem;
 }
 
 .inlineForm {
   display: grid;
-  grid-template-columns: repeat(4, minmax(110px, 1fr)) auto;
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(7.5rem, 1fr)) auto;
+  gap: 0.5rem;
   align-items: center;
 }
 
 .addLine {
-  padding: 12px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 8px;
-  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: 0.7rem;
+  background: color-mix(in srgb, var(--color-surface) 76%, #fff 24%);
 }
 
 .twoCols {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 1rem;
   align-items: start;
+}
+
+.twoCols > section {
+  min-width: 0;
 }
 
 .compact {
@@ -344,7 +500,8 @@ select {
 .rowActions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 0.45rem;
+  white-space: nowrap;
 }
 
 .rightText {
@@ -354,20 +511,21 @@ select {
 .emptyState {
   display: grid;
   place-items: center;
-  min-height: 180px;
-  padding: 24px;
+  min-height: 11rem;
+  padding: 1.2rem;
   text-align: center;
 }
 
 .emptyTitle {
-  margin: 0;
+  color: var(--color-text);
   font-weight: 700;
 }
 
 .emptyText {
   max-width: 34rem;
-  margin: 6px 0 0;
+  margin-top: 0.28rem;
   color: var(--color-text-secondary);
+  font-size: 0.875rem;
 }
 
 .stateCard,
@@ -375,7 +533,7 @@ select {
   display: grid;
   place-items: center;
   min-height: 50vh;
-  padding: 28px;
+  padding: 1.75rem;
 }
 
 .stateCard {
@@ -383,20 +541,22 @@ select {
 }
 
 .eyebrow {
-  margin: 0 0 6px;
-  color: var(--color-text-secondary);
+  margin-bottom: 0.35rem;
+  color: var(--color-text-muted);
   font-size: 0.75rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .fatal section {
   max-width: 38rem;
   border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 8px;
-  padding: 20px;
-  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 1.2rem;
   color: #7b1f2d;
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
 }
 
 @keyframes pageEnter {
@@ -410,18 +570,7 @@ select {
   }
 }
 
-@media (max-width: 980px) {
-  .page {
-    padding: 16px;
-  }
-
-  .pageHeader,
-  .toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .metricGrid,
+@media (max-width: 1180px) {
   .threeTables,
   .workspace,
   .twoCols {
@@ -433,6 +582,31 @@ select {
     min-height: 0;
   }
 
+  .detail {
+    position: static;
+  }
+
+  .listRows {
+    max-height: 28rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    width: 100%;
+  }
+
+  .pageHeader,
+  .toolbar,
+  .detailHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .metricGrid {
+    grid-template-columns: 1fr;
+  }
+
   .formGrid,
   .inlineForm {
     grid-template-columns: 1fr;
@@ -441,5 +615,16 @@ select {
   .rowActions {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
