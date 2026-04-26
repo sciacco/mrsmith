@@ -11,6 +11,9 @@ const (
 	BudgetAppID   = "budget"
 	BudgetAppHref = "/apps/budget/"
 
+	FornitoriAppID   = "fornitori"
+	FornitoriAppHref = "/apps/fornitori/"
+
 	ComplianceAppID   = "compliance"
 	ComplianceAppHref = "/apps/compliance/"
 
@@ -56,6 +59,9 @@ const (
 
 var (
 	budgetAccessRoles                = []string{"app_budget_access"}
+	fornitoriAccessRoles             = []string{"app_fornitori_access"}
+	fornitoriReadonlyRoles           = []string{"app_fornitori_readonly"}
+	fornitoriSkipQualificationRoles  = []string{"app_fornitori_skip_qualification"}
 	complianceAccessRoles            = []string{"app_compliance_access"}
 	copertureAccessRoles             = []string{"app_coperture_access"}
 	cpBackofficeAccessRoles          = []string{"app_cpbackoffice_access"}
@@ -121,6 +127,16 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryID:    "acquisti",
 			CategoryTitle: "Acquisti",
 			AccessRoles:   BudgetAccessRoles(),
+		},
+		{
+			ID:            FornitoriAppID,
+			Name:          "Fornitori",
+			Icon:          "handshake",
+			Href:          FornitoriAppHref,
+			Status:        "ready",
+			CategoryID:    "acquisti",
+			CategoryTitle: "Acquisti",
+			AccessRoles:   FornitoriAccessRoles(),
 		},
 		// {
 		// 	ID:            "gestione-utenti",
@@ -311,11 +327,11 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		// 	AccessRoles:   defaultRoles,
 		// },
 		{
-			ID:            AFCToolsAppID,
-			Name:          "AFC Tools",
-			Icon:          "settings",
-			Href:          AFCToolsAppHref,
-			Status:        "ready",
+			ID:     AFCToolsAppID,
+			Name:   "AFC Tools",
+			Icon:   "settings",
+			Href:   AFCToolsAppHref,
+			Status: "ready",
 			// CategoryID:    "afc",
 			// CategoryTitle: "AFC",
 			CategoryID:    "smart-apps",
@@ -374,6 +390,18 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 
 func BudgetAccessRoles() []string {
 	return slices.Clone(budgetAccessRoles)
+}
+
+func FornitoriAccessRoles() []string {
+	return slices.Clone(fornitoriAccessRoles)
+}
+
+func FornitoriReadonlyRoles() []string {
+	return slices.Clone(fornitoriReadonlyRoles)
+}
+
+func FornitoriSkipQualificationRoles() []string {
+	return slices.Clone(fornitoriSkipQualificationRoles)
 }
 
 func ComplianceAccessRoles() []string {
@@ -463,6 +491,9 @@ func DefaultAccessRoles() []string {
 func AllRoles() []string {
 	groups := [][]string{
 		budgetAccessRoles,
+		fornitoriAccessRoles,
+		fornitoriReadonlyRoles,
+		fornitoriSkipQualificationRoles,
 		complianceAccessRoles,
 		copertureAccessRoles,
 		cpBackofficeAccessRoles,

@@ -21,6 +21,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/coperture"
 	"github.com/sciacco/mrsmith/internal/cpbackoffice"
 	"github.com/sciacco/mrsmith/internal/energiadc"
+	"github.com/sciacco/mrsmith/internal/fornitori"
 	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/listini"
 	"github.com/sciacco/mrsmith/internal/manutenzioni"
@@ -112,6 +113,18 @@ func main() {
 			os.Exit(1)
 		}
 		logger.Info("mistra database connected", "component", "kitproducts")
+	}
+
+	// Arak DB (fornitori module)
+	var arakDB *sql.DB
+	if cfg.ArakDSN != "" {
+		var err error
+		arakDB, err = database.New(database.Config{Driver: "postgres", DSN: cfg.ArakDSN})
+		if err != nil {
+			logger.Error("failed to connect to arak", "component", "fornitori", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("arak database connected", "component", "fornitori")
 	}
 
 	// Coperture DB
@@ -251,6 +264,11 @@ func main() {
 		// Local split-server development still launches Budget on its own Vite server.
 		hrefOverrides[applaunch.BudgetAppID] = "http://localhost:5174"
 	}
+	if cfg.FornitoriAppURL != "" {
+		hrefOverrides[applaunch.FornitoriAppID] = cfg.FornitoriAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.FornitoriAppID] = "http://localhost:5189"
+	}
 	if cfg.ComplianceAppURL != "" {
 		hrefOverrides[applaunch.ComplianceAppID] = cfg.ComplianceAppURL
 	} else if cfg.StaticDir == "" {
@@ -331,6 +349,9 @@ func main() {
 			if definition.ID == applaunch.CPBackofficeAppID && (arakCli == nil || cfg.MistraDSN == "") {
 				continue
 			}
+			if definition.ID == applaunch.FornitoriAppID && (arakCli == nil || cfg.ArakDSN == "") {
+				continue
+			}
 			if definition.ID == applaunch.EnergiaDCAppID && cfg.GrappaDSN == "" {
 				continue
 			}
@@ -369,6 +390,7 @@ func main() {
 	}
 	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
+	fornitori.RegisterRoutes(api, arakCli, arakDB)
 	compliance.RegisterRoutes(api, anisettaDB)
 	coperture.RegisterRoutes(api, dbCoperture)
 	cpbackoffice.RegisterRoutes(api, cpbackoffice.Deps{

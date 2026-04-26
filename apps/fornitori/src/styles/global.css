@@ -1,0 +1,445 @@
+@import '@mrsmith/ui/src/themes/clean.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background:
+    radial-gradient(circle at top left, rgba(99, 91, 255, 0.06), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.navRow {
+  display: flex;
+  min-width: 0;
+}
+
+.navScroller {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(1480px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+  animation: pageEnter 0.25s ease-out;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pageHeader h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.1;
+}
+
+.pageHeader p,
+.muted,
+.modalText {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric,
+.panel,
+.stateCard {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-sm);
+}
+
+.metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.metric span {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.metric strong {
+  font-size: 1.55rem;
+}
+
+.threeTables {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.panelHeader,
+.toolbar,
+.detailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.panelHeader h2,
+.detailHeader h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table th {
+  padding: 10px 12px;
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+  background: var(--color-surface);
+}
+
+.table td {
+  padding: 11px 12px;
+  border-top: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.table tr {
+  transition: background 150ms ease;
+}
+
+.table tbody tr:hover {
+  background: var(--color-accent-subtle);
+}
+
+.table small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.master,
+.detail {
+  min-height: 520px;
+}
+
+.listRows {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--color-text);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.listRow:hover,
+.listRow.selected,
+.selectedRow {
+  background: var(--color-accent-subtle);
+}
+
+.listRow span {
+  min-width: 0;
+}
+
+.listRow strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listRow small {
+  display: block;
+  color: var(--color-text-secondary);
+}
+
+.detailHeader span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 0.78rem;
+}
+
+.segments {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px 0;
+  overflow-x: auto;
+}
+
+.segments button {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 7px 12px;
+  color: var(--color-text-secondary);
+  background: #fff;
+  cursor: pointer;
+}
+
+.segments button.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.field,
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field span,
+.fieldLabel {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.field input,
+.field select,
+.inlineForm input,
+.inlineForm select,
+.modalForm input,
+.modalForm select {
+  min-height: 38px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--color-text);
+}
+
+.wideField {
+  grid-column: 1 / -1;
+}
+
+.checkLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+}
+
+.formActions,
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  grid-column: 1 / -1;
+}
+
+.modalActions {
+  margin-top: 14px;
+}
+
+.modalForm {
+  gap: 12px;
+  padding-top: 6px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.inlineForm {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(110px, 1fr)) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.addLine {
+  padding: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.twoCols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.compact {
+  align-items: stretch;
+}
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rightText {
+  text-align: right;
+}
+
+.emptyState {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  padding: 24px;
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-weight: 700;
+}
+
+.emptyText {
+  max-width: 34rem;
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+}
+
+.stateCard,
+.fatal {
+  display: grid;
+  place-items: center;
+  min-height: 50vh;
+  padding: 28px;
+}
+
+.stateCard {
+  display: block;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fatal section {
+  max-width: 38rem;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 20px;
+  background: #fff;
+  color: #7b1f2d;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 980px) {
+  .page {
+    padding: 16px;
+  }
+
+  .pageHeader,
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .metricGrid,
+  .threeTables,
+  .workspace,
+  .twoCols {
+    grid-template-columns: 1fr;
+  }
+
+  .master,
+  .detail {
+    min-height: 0;
+  }
+
+  .formGrid,
+  .inlineForm {
+    grid-template-columns: 1fr;
+  }
+
+  .rowActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

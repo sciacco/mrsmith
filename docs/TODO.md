@@ -64,6 +64,9 @@ The `lint:css` script enforces the `declaration-property-value-disallowed-list` 
 
 ## Cross-App Infrastructure
 
+### Fornitori — Arak schema drift guard
+The Fornitori mini-app reads and writes Arak-owned PostgreSQL tables directly through `ARAK_DSN` for dashboard rows, RDA payment toggles, and article-category mapping. Add a schema-drift guard after the 1:1 cutover: either a small integration contract test pinned to `provider_qualifications.payment_method`, `provider_qualifications.document`, `provider_qualifications.provider_category`, `articles.article`, and `articles.article_category`, or an operational alert tied to Arak migration changes. Until then, table/column changes in Arak can break the MrSmith BFF without compile-time warning.
+
 ### Shared Carbone Service
 `CarboneService` is duplicated in two packages (`internal/listini/carbone.go` and `internal/reports/carbone.go`) with nearly identical code — the only difference is `convertTo: "pdf"` vs `"xlsx"` and template ID handling (per-struct vs per-call). Extract to a shared `internal/platform/carbone` package with a single service that accepts both format and template ID per call. Both listini and reports would receive the same instance from `main.go`.
 

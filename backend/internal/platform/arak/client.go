@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -96,6 +97,13 @@ func (c *Client) invalidateToken() {
 // queryString is appended as-is (already URL-encoded).
 // body may be nil for requests without a body.
 func (c *Client) Do(method, path, queryString string, body io.Reader) (*http.Response, error) {
+	return c.DoWithHeaders(method, path, queryString, body, nil)
+}
+
+// DoWithHeaders performs an authenticated request to the Arak API and lets the
+// caller provide request headers. It is used for multipart upload and streaming
+// download paths where the default JSON Content-Type would be incorrect.
+func (c *Client) DoWithHeaders(method, path, queryString string, body io.Reader, headers http.Header) (*http.Response, error) {
 	fullURL := strings.TrimRight(c.cfg.BaseURL, "/") + path
 	if queryString != "" {
 		fullURL += "?" + queryString
@@ -127,8 +135,11 @@ func (c *Client) Do(method, path, queryString string, body io.Reader) (*http.Res
 		}
 		req.Header.Set("Authorization", "Bearer "+tok)
 		req.Header.Set("Accept", "application/json")
+		maps.Copy(req.Header, headers)
 		if bodyBytes != nil {
-			req.Header.Set("Content-Type", "application/json")
+			if req.Header.Get("Content-Type") == "" {
+				req.Header.Set("Content-Type", "application/json")
+			}
 		}
 
 		resp, err := c.httpClient.Do(req)

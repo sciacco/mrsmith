@@ -37,9 +37,11 @@ export interface ApiClient {
   delete: <T>(path: string) => Promise<T>;
   getBlob: (path: string) => Promise<Blob>;
   postBlob: (path: string, body?: unknown) => Promise<Blob>;
+  postFormData: <T>(path: string, body: FormData) => Promise<T>;
+  patchFormData: <T>(path: string, body: FormData) => Promise<T>;
 }
 
-type BodyMode = 'json' | 'blob';
+type BodyMode = 'json' | 'blob' | 'form';
 
 function isLocalAuthPreflightBody(value: unknown): value is LocalAuthPreflightUnauthorizedBody {
   return (
@@ -159,6 +161,23 @@ export function createApiClient({
     }
   }
 
+  async function requestFormData<T>(method: string, path: string, body: FormData): Promise<T> {
+    try {
+      const res = await sendWithRetry(path, method, body, 'form');
+      if (!res.ok) {
+        const payload = await readErrorBody(res);
+        throw new ApiError(res.status, res.statusText, path, payload);
+      }
+      if (res.status === 204) return undefined as T;
+      return res.json() as Promise<T>;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await onUnauthorized?.(error);
+      }
+      throw error;
+    }
+  }
+
   async function requestBlob(method: string, path: string, body?: unknown): Promise<Blob> {
     try {
       const res = await sendWithRetry(path, method, body, body === undefined ? 'blob' : 'json');
@@ -187,5 +206,7 @@ export function createApiClient({
     delete: <T>(path: string) => requestJSON<T>('DELETE', path),
     getBlob: (path: string) => requestBlob('GET', path),
     postBlob: (path: string, body?: unknown) => requestBlob('POST', path, emptyIfMissing(body)),
+    postFormData: <T>(path: string, body: FormData) => requestFormData<T>('POST', path, body),
+    patchFormData: <T>(path: string, body: FormData) => requestFormData<T>('PATCH', path, body),
   };
 }

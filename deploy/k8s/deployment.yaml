@@ -53,6 +53,12 @@ spec:
                   name: mrsmith-secrets
                   key: MANUTENZIONI_DSN
                   optional: true
+            - name: ARAK_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: ARAK_DSN
+                  optional: true
             - name: HUBSPOT_API_KEY
               valueFrom:
                 secretKeyRef:

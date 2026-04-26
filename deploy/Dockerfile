@@ -19,6 +19,7 @@ FROM gcr.io/distroless/static-debian12
 COPY --from=backend /app/server /server
 COPY --from=frontend /app/apps/portal/dist /static
 COPY --from=frontend /app/apps/budget/dist /static/apps/budget
+COPY --from=frontend /app/apps/fornitori/dist /static/apps/fornitori
 COPY --from=frontend /app/apps/compliance/dist /static/apps/compliance
 COPY --from=frontend /app/apps/coperture/dist /static/apps/coperture
 COPY --from=frontend /app/apps/cp-backoffice/dist /static/apps/cp-backoffice

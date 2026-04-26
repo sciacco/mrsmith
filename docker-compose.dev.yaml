@@ -33,6 +33,20 @@ services:
     depends_on:
       - backend
 
+  fornitori:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter mrsmith-fornitori dev --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - fornitori_node_modules:/app/node_modules
+    environment:
+      - VITE_DEV_BACKEND_URL=http://backend:8080
+    ports:
+      - "5189:5189"
+    depends_on:
+      - backend
+
   compliance:
     image: node:20-slim
     working_dir: /app
@@ -174,6 +188,7 @@ services:
 volumes:
   portal_node_modules:
   budget_node_modules:
+  fornitori_node_modules:
   compliance_node_modules:
   kit_products_node_modules:
   listini_node_modules:
