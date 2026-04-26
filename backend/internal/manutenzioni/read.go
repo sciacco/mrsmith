@@ -541,7 +541,7 @@ func (h *Handler) loadWindows(ctx context.Context, maintenanceID int64) ([]Maint
 			created_at
 		FROM maintenance.maintenance_window
 		WHERE maintenance_id = $1
-		ORDER BY seq_no DESC`,
+		ORDER BY scheduled_start_at ASC, seq_no ASC`,
 		maintenanceID,
 	)
 	if err != nil {

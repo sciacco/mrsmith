@@ -1,6 +1,6 @@
-import { Button, Icon, Skeleton, TabNav, type TabNavItem, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, Skeleton, TabNav, type TabNavItem, useToast } from '@mrsmith/ui';
 import { hasAnyRole } from '@mrsmith/auth-client';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useCustomerImpactMutations,
@@ -24,6 +24,7 @@ import type {
   ImpactedCustomerBody,
   JsonObject,
   MaintenanceDetail,
+  MaintenanceWindow,
   NoticeBody,
   ReferenceItem,
   ReferenceData,
@@ -39,6 +40,7 @@ import {
   audienceLabel,
   confidenceLabel,
   errorMessage,
+  formatDateInput,
   formatDateTime,
   impactScopeLabel,
   minutesLabel,
@@ -53,6 +55,7 @@ import {
 } from '../lib/format';
 import { MANUTENZIONI_APPROVER_ROLES, MANUTENZIONI_MANAGER_ROLES } from '../lib/roles';
 import { SEVERITY_OPTIONS } from '../lib/severity';
+import { validateWindowTiming, windowDurationMinutes } from '../lib/windowValidation';
 import shared from './shared.module.css';
 
 type TabKey = 'cockpit' | 'riepilogo' | 'finestre' | 'impatto' | 'target' | 'clienti' | 'comunicazioni' | 'storico';
@@ -814,95 +817,308 @@ function mergeMetadata(current: JsonObject | undefined, patch: JsonObject): Json
   };
 }
 
+interface WindowFormState {
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  expectedDowntimeMinutes: string;
+}
+
+const emptyWindowForm: WindowFormState = {
+  startDate: '',
+  startTime: '',
+  endDate: '',
+  endTime: '',
+  expectedDowntimeMinutes: '',
+};
+
+function splitDateTimeInput(value: string): { date: string; time: string } {
+  if (!value) return { date: '', time: '' };
+  const [date = '', rawTime = ''] = value.split('T');
+  return { date, time: rawTime.slice(0, 5) };
+}
+
+function windowFormFromWindow(window: MaintenanceWindow): WindowFormState {
+  const start = splitDateTimeInput(formatDateInput(window.scheduled_start_at));
+  const end = splitDateTimeInput(formatDateInput(window.scheduled_end_at));
+  return {
+    startDate: start.date,
+    startTime: start.time,
+    endDate: end.date,
+    endTime: end.time,
+    expectedDowntimeMinutes:
+      window.expected_downtime_minutes === null || window.expected_downtime_minutes === undefined
+        ? ''
+        : String(window.expected_downtime_minutes),
+  };
+}
+
+function buildWindowBody(form: WindowFormState): WindowBody | null {
+  if (!form.startDate || !form.startTime || !form.endDate || !form.endTime) return null;
+  return {
+    scheduled_start_at: `${form.startDate}T${form.startTime}`,
+    scheduled_end_at: `${form.endDate}T${form.endTime}`,
+    expected_downtime_minutes: form.expectedDowntimeMinutes
+      ? Number(form.expectedDowntimeMinutes)
+      : null,
+  };
+}
+
+function windowFormValidationMessage(form: WindowFormState, missingMessage: string): string | null {
+  const body = buildWindowBody(form);
+  if (!body) return missingMessage;
+  return validateWindowTiming(body);
+}
+
+function durationHelper(form: WindowFormState): string {
+  const body = buildWindowBody(form);
+  if (!body) return 'Durata finestra: -';
+  const minutes = windowDurationMinutes(body);
+  return minutes === null
+    ? 'Durata finestra: verifica inizio e fine'
+    : `Durata finestra: ${minutes} min`;
+}
+
+function compareWindowsBySchedule(a: MaintenanceWindow, b: MaintenanceWindow): number {
+  const aStart = new Date(a.scheduled_start_at).getTime();
+  const bStart = new Date(b.scheduled_start_at).getTime();
+  if (aStart !== bStart) return aStart - bStart;
+  return a.seq_no - b.seq_no;
+}
+
 function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManage: boolean }) {
   const mutations = useWindowMutations(detail.maintenance_id);
   const toast = useToast();
-  const [form, setForm] = useState<WindowBody>({
-    scheduled_start_at: '',
-    scheduled_end_at: '',
-    expected_downtime_minutes: null,
-  });
+  const [form, setForm] = useState<WindowFormState>(emptyWindowForm);
+  const [rescheduleWindow, setRescheduleWindow] = useState<MaintenanceWindow | null>(null);
+  const [rescheduleForm, setRescheduleForm] = useState<WindowFormState>(emptyWindowForm);
+  const sortedWindows = [...detail.windows].sort(compareWindowsBySchedule);
 
-  async function addWindow(reschedule: boolean) {
-    if (!form.scheduled_start_at || !form.scheduled_end_at) {
+  async function addWindow() {
+    const validationMessage = windowFormValidationMessage(form, 'Indica inizio e fine previsti.');
+    if (validationMessage) {
+      toast.toast(validationMessage, 'error');
+      return;
+    }
+    const body = buildWindowBody(form);
+    if (!body) {
       toast.toast('Indica inizio e fine previsti.', 'error');
       return;
     }
     try {
-      if (reschedule) await mutations.reschedule.mutateAsync(form);
-      else await mutations.create.mutateAsync(form);
-      setForm({ scheduled_start_at: '', scheduled_end_at: '', expected_downtime_minutes: null });
-      toast.toast(reschedule ? 'Finestra ripianificata.' : 'Finestra aggiunta.');
+      await mutations.create.mutateAsync(body);
+      setForm(emptyWindowForm);
+      toast.toast('Finestra aggiunta.');
     } catch (error) {
       toast.toast(errorMessage(error, 'Salvataggio finestra non riuscito.'), 'error');
+    }
+  }
+
+  function openReschedule(window: MaintenanceWindow) {
+    setRescheduleWindow(window);
+    setRescheduleForm(windowFormFromWindow(window));
+  }
+
+  function closeReschedule() {
+    setRescheduleWindow(null);
+    setRescheduleForm(emptyWindowForm);
+  }
+
+  async function submitReschedule() {
+    const validationMessage = windowFormValidationMessage(rescheduleForm, 'Indica inizio e fine previsti.');
+    if (validationMessage) {
+      toast.toast(validationMessage, 'error');
+      return;
+    }
+    const body = buildWindowBody(rescheduleForm);
+    if (!body) {
+      toast.toast('Indica inizio e fine previsti.', 'error');
+      return;
+    }
+    if (!rescheduleWindow) return;
+    try {
+      await mutations.reschedule.mutateAsync({
+        windowId: rescheduleWindow.maintenance_window_id,
+        body,
+      });
+      closeReschedule();
+      toast.toast('Finestra ripianificata.');
+    } catch (error) {
+      toast.toast(errorMessage(error, 'Ripianificazione non riuscita.'), 'error');
     }
   }
 
   return (
     <div className={shared.panel}>
       <div className={shared.sectionHeader}>
-        <h2 className={shared.sectionTitle}>Finestre</h2>
+        <h2 className={shared.sectionTitle}>Finestre di attività</h2>
       </div>
       {canManage && (
-        <div className={shared.formGridThree} style={{ marginBottom: '1rem' }}>
-          <label className={shared.label}>
-            Inizio previsto
-            <input
-              className={shared.field}
-              type="datetime-local"
-              value={form.scheduled_start_at}
-              onChange={(event) => setForm({ ...form, scheduled_start_at: event.target.value })}
-            />
-          </label>
-          <label className={shared.label}>
-            Fine prevista
-            <input
-              className={shared.field}
-              type="datetime-local"
-              value={form.scheduled_end_at}
-              onChange={(event) => setForm({ ...form, scheduled_end_at: event.target.value })}
-            />
-          </label>
-          <label className={shared.label}>
-            Downtime
-            <input
-              className={shared.field}
-              type="number"
-              min="0"
-              value={form.expected_downtime_minutes ?? ''}
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  expected_downtime_minutes: event.target.value ? Number(event.target.value) : null,
-                })
-              }
-            />
-          </label>
-          <div className={shared.formActions}>
-            <Button
-              variant="secondary"
-              onClick={() => addWindow(false)}
-              loading={mutations.create.isPending}
-            >
-              Aggiungi
-            </Button>
-            <Button onClick={() => addWindow(true)} loading={mutations.reschedule.isPending}>
-              Ripianifica
-            </Button>
+        <div className={shared.windowFormPanel}>
+          <WindowFields form={form} onChange={setForm} />
+          <div className={shared.windowFormFooter}>
+            <span className={shared.durationHint}>{durationHelper(form)}</span>
+            <div className={shared.formActions}>
+              <Button
+                onClick={addWindow}
+                loading={mutations.create.isPending}
+                leftIcon={<Icon name="plus" size={16} />}
+              >
+                Aggiungi finestra
+              </Button>
+            </div>
           </div>
         </div>
       )}
-      <SimpleTable
-        headers={['Sequenza', 'Stato', 'Inizio', 'Fine', 'Downtime']}
-        rows={detail.windows.map((window) => [
-          String(window.seq_no),
-          windowStatusLabel(window.window_status),
-          formatDateTime(window.scheduled_start_at),
-          formatDateTime(window.scheduled_end_at),
-          minutesLabel(window.expected_downtime_minutes),
-        ])}
-        empty="Nessuna finestra registrata."
-      />
+      <div className={shared.tableCard}>
+        <div className={shared.tableScroll}>
+          <table className={shared.table}>
+            <thead>
+              <tr>
+                <th>Stato</th>
+                <th>Inizio</th>
+                <th>Fine</th>
+                <th>Downtime previsto</th>
+                <th className={shared.actionsCell}>Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedWindows.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>Nessuna finestra registrata.</td>
+                </tr>
+              ) : (
+                sortedWindows.map((window) => (
+                  <tr key={window.maintenance_window_id}>
+                    <td>{windowStatusLabel(window.window_status)}</td>
+                    <td>{formatDateTime(window.scheduled_start_at)}</td>
+                    <td>{formatDateTime(window.scheduled_end_at)}</td>
+                    <td>{minutesLabel(window.expected_downtime_minutes)}</td>
+                    <td className={shared.actionsCell}>
+                      {canManage && window.window_status === 'planned' ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => openReschedule(window)}
+                          leftIcon={<Icon name="calendar" size={16} />}
+                        >
+                          Ripianifica
+                        </Button>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <Modal
+        open={rescheduleWindow !== null}
+        onClose={closeReschedule}
+        title="Ripianifica finestra"
+        size="md"
+      >
+        <div className={shared.modalBody}>
+          <p className={shared.modalIntro}>
+            Crea una nuova finestra sostitutiva. La finestra attuale verrà marcata come Sostituita.
+          </p>
+          {rescheduleWindow ? (
+            <div className={shared.inlineSummary}>
+              <span>Finestra attuale</span>
+              <strong>
+                {formatDateTime(rescheduleWindow.scheduled_start_at)} -{' '}
+                {formatDateTime(rescheduleWindow.scheduled_end_at)}
+              </strong>
+            </div>
+          ) : null}
+          <WindowFields form={rescheduleForm} onChange={setRescheduleForm} />
+          <div className={shared.windowFormFooter}>
+            <span className={shared.durationHint}>{durationHelper(rescheduleForm)}</span>
+            <div className={shared.formActions}>
+              <Button
+                variant="secondary"
+                onClick={closeReschedule}
+                disabled={mutations.reschedule.isPending}
+              >
+                Annulla
+              </Button>
+              <Button
+                onClick={submitReschedule}
+                loading={mutations.reschedule.isPending}
+                leftIcon={<Icon name="calendar" size={16} />}
+              >
+                Ripianifica
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function WindowFields({
+  form,
+  onChange,
+}: {
+  form: WindowFormState;
+  onChange: (form: WindowFormState) => void;
+}) {
+  return (
+    <div className={shared.windowFormGrid}>
+      <label className={shared.label}>
+        Data inizio
+        <input
+          className={shared.field}
+          type="date"
+          value={form.startDate}
+          onChange={(event) => onChange({ ...form, startDate: event.target.value })}
+        />
+      </label>
+      <label className={shared.label}>
+        Ora inizio
+        <input
+          className={shared.field}
+          type="time"
+          value={form.startTime}
+          onChange={(event) => onChange({ ...form, startTime: event.target.value })}
+        />
+      </label>
+      <label className={shared.label}>
+        Data fine
+        <input
+          className={shared.field}
+          type="date"
+          min={form.startDate || undefined}
+          value={form.endDate}
+          onChange={(event) => onChange({ ...form, endDate: event.target.value })}
+        />
+      </label>
+      <label className={shared.label}>
+        Ora fine
+        <input
+          className={shared.field}
+          type="time"
+          min={form.endDate && form.endDate === form.startDate ? form.startTime || undefined : undefined}
+          value={form.endTime}
+          onChange={(event) => onChange({ ...form, endTime: event.target.value })}
+        />
+      </label>
+      <label className={shared.label}>
+        Downtime previsto (minuti)
+        <input
+          className={shared.field}
+          type="number"
+          min="0"
+          value={form.expectedDowntimeMinutes}
+          onChange={(event) => onChange({ ...form, expectedDowntimeMinutes: event.target.value })}
+        />
+        <span className={shared.fieldHelper}>Tempo stimato di indisponibilità, espresso in minuti.</span>
+      </label>
     </div>
   );
 }
@@ -1532,7 +1748,7 @@ function SimpleTable({
   empty,
 }: {
   headers: string[];
-  rows: string[][];
+  rows: ReactNode[][];
   empty: string;
 }) {
   return (

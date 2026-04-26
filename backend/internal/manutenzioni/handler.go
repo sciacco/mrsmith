@@ -37,8 +37,9 @@ type Handler struct {
 }
 
 var (
-	errBadRequest = errors.New("bad request")
-	codePattern   = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+	errBadRequest         = errors.New("bad request")
+	errInvalidWindowRange = fmt.Errorf("%w: invalid window range", errBadRequest)
+	codePattern           = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 )
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
@@ -84,6 +85,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	manager("POST /manutenzioni/v1/maintenances/{id}/windows", h.handleCreateWindow)
 	manager("PATCH /manutenzioni/v1/maintenances/{id}/windows/{windowId}", h.handleUpdateWindow)
 	manager("POST /manutenzioni/v1/maintenances/{id}/windows/{windowId}/cancel", h.handleCancelWindow)
+	manager("POST /manutenzioni/v1/maintenances/{id}/windows/{windowId}/reschedule", h.handleRescheduleWindow)
 	manager("POST /manutenzioni/v1/maintenances/{id}/windows/reschedule", h.handleRescheduleWindow)
 
 	manager("PUT /manutenzioni/v1/maintenances/{id}/service-taxonomy", h.handleReplaceServiceTaxonomy)
@@ -335,7 +337,7 @@ func validateWindowRequest(body windowRequest) (time.Time, time.Time, *time.Time
 		return time.Time{}, time.Time{}, nil, nil, nil, nil, err
 	}
 	if !end.After(start) {
-		return time.Time{}, time.Time{}, nil, nil, nil, nil, errBadRequest
+		return time.Time{}, time.Time{}, nil, nil, nil, nil, errInvalidWindowRange
 	}
 	actualStart, err := parseOptionalTime(body.ActualStartAt)
 	if err != nil {
@@ -346,7 +348,7 @@ func validateWindowRequest(body windowRequest) (time.Time, time.Time, *time.Time
 		return time.Time{}, time.Time{}, nil, nil, nil, nil, err
 	}
 	if actualStart != nil && actualEnd != nil && !actualEnd.After(*actualStart) {
-		return time.Time{}, time.Time{}, nil, nil, nil, nil, errBadRequest
+		return time.Time{}, time.Time{}, nil, nil, nil, nil, errInvalidWindowRange
 	}
 	announcedAt, err := parseOptionalTime(body.AnnouncedAt)
 	if err != nil {
@@ -363,6 +365,13 @@ func validateWindowRequest(body windowRequest) (time.Time, time.Time, *time.Time
 		return time.Time{}, time.Time{}, nil, nil, nil, nil, errBadRequest
 	}
 	return start, end, actualStart, actualEnd, announcedAt, lastNoticeAt, nil
+}
+
+func windowRequestErrorCode(err error) string {
+	if errors.Is(err, errInvalidWindowRange) {
+		return "invalid_window_range"
+	}
+	return "invalid_window"
 }
 
 func claimsActor(r *http.Request) map[string]any {

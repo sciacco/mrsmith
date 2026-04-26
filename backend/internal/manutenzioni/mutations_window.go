@@ -37,7 +37,7 @@ func (h *Handler) handleCreateWindow(w http.ResponseWriter, r *http.Request) {
 	}
 	windowID, err := h.insertWindow(r, tx, maintenanceID, body)
 	if errors.Is(err, errBadRequest) {
-		appError(w, http.StatusBadRequest, "invalid_window")
+		appError(w, http.StatusBadRequest, windowRequestErrorCode(err))
 		return
 	}
 	if err != nil {
@@ -126,7 +126,7 @@ func (h *Handler) handleUpdateWindow(w http.ResponseWriter, r *http.Request) {
 	}
 	start, end, actualStart, actualEnd, announcedAt, lastNoticeAt, err := validateWindowRequest(body)
 	if errors.Is(err, errBadRequest) {
-		appError(w, http.StatusBadRequest, "invalid_window")
+		appError(w, http.StatusBadRequest, windowRequestErrorCode(err))
 		return
 	}
 	if err != nil {
@@ -252,6 +252,14 @@ func (h *Handler) handleRescheduleWindow(w http.ResponseWriter, r *http.Request)
 		appError(w, http.StatusBadRequest, "invalid_maintenance_id")
 		return
 	}
+	var targetWindowID int64
+	if rawWindowID := strings.TrimSpace(r.PathValue("windowId")); rawWindowID != "" {
+		targetWindowID, err = strconv.ParseInt(rawWindowID, 10, 64)
+		if err != nil || targetWindowID <= 0 {
+			appError(w, http.StatusBadRequest, "invalid_window_id")
+			return
+		}
+	}
 	var body windowRequest
 	if err := decodeBody(r, &body); err != nil {
 		appError(w, http.StatusBadRequest, "invalid_json")
@@ -265,18 +273,36 @@ func (h *Handler) handleRescheduleWindow(w http.ResponseWriter, r *http.Request)
 	defer tx.Rollback()
 
 	var previousID sql.NullInt64
-	if err := tx.QueryRowContext(
-		r.Context(),
-		`SELECT maintenance_window_id
-		FROM maintenance.maintenance_window
-		WHERE maintenance_id = $1 AND window_status = 'planned'
-		ORDER BY seq_no DESC
-		LIMIT 1
-		FOR UPDATE`,
-		maintenanceID,
-	).Scan(&previousID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		h.dbFailure(w, r, "reschedule_previous", err, "maintenance_id", maintenanceID)
-		return
+	if targetWindowID > 0 {
+		if err := tx.QueryRowContext(
+			r.Context(),
+			`SELECT maintenance_window_id
+			FROM maintenance.maintenance_window
+			WHERE maintenance_id = $1 AND maintenance_window_id = $2 AND window_status = 'planned'
+			FOR UPDATE`,
+			maintenanceID,
+			targetWindowID,
+		).Scan(&previousID); errors.Is(err, sql.ErrNoRows) {
+			appError(w, http.StatusNotFound, "window_not_found")
+			return
+		} else if err != nil {
+			h.dbFailure(w, r, "reschedule_previous", err, "maintenance_id", maintenanceID, "window_id", targetWindowID)
+			return
+		}
+	} else {
+		if err := tx.QueryRowContext(
+			r.Context(),
+			`SELECT maintenance_window_id
+			FROM maintenance.maintenance_window
+			WHERE maintenance_id = $1 AND window_status = 'planned'
+			ORDER BY seq_no DESC
+			LIMIT 1
+			FOR UPDATE`,
+			maintenanceID,
+		).Scan(&previousID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			h.dbFailure(w, r, "reschedule_previous", err, "maintenance_id", maintenanceID)
+			return
+		}
 	}
 	if previousID.Valid {
 		if _, err := tx.ExecContext(r.Context(), `UPDATE maintenance.maintenance_window SET window_status = 'superseded' WHERE maintenance_window_id = $1`, previousID.Int64); err != nil {
@@ -286,7 +312,7 @@ func (h *Handler) handleRescheduleWindow(w http.ResponseWriter, r *http.Request)
 	}
 	newID, err := h.insertWindow(r, tx, maintenanceID, body)
 	if errors.Is(err, errBadRequest) {
-		appError(w, http.StatusBadRequest, "invalid_window")
+		appError(w, http.StatusBadRequest, windowRequestErrorCode(err))
 		return
 	}
 	if err != nil {

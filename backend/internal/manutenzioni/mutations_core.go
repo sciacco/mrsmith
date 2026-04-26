@@ -123,7 +123,7 @@ func (h *Handler) handleCreateMaintenance(w http.ResponseWriter, r *http.Request
 	if body.FirstWindow != nil {
 		if _, err := h.insertWindow(r, tx, id, *body.FirstWindow); err != nil {
 			if errors.Is(err, errBadRequest) {
-				appError(w, http.StatusBadRequest, "invalid_window")
+				appError(w, http.StatusBadRequest, windowRequestErrorCode(err))
 				return
 			}
 			h.dbFailure(w, r, "create_maintenance_window", err, "maintenance_id", id)

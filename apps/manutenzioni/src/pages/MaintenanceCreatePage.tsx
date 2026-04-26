@@ -26,6 +26,7 @@ import { SeverityDropdown } from '../components/SeverityDropdown';
 import { SiteSelectField } from '../components/SiteSelectField';
 import { errorMessage } from '../lib/format';
 import { suggestedSeverityForKindId } from '../lib/smartDefaults';
+import { validateWindowTiming } from '../lib/windowValidation';
 import shared from './shared.module.css';
 
 const RESIDUAL_SERVICE_PLACEHOLDER = [
@@ -201,6 +202,16 @@ export function MaintenanceCreatePage() {
     if ((form.scheduled_start_at && !form.scheduled_end_at) || (!form.scheduled_start_at && form.scheduled_end_at)) {
       toast('Indica inizio e fine della prima finestra.', 'error');
       return;
+    }
+    if (form.scheduled_start_at && form.scheduled_end_at) {
+      const validationMessage = validateWindowTiming({
+        scheduled_start_at: form.scheduled_start_at,
+        scheduled_end_at: form.scheduled_end_at,
+      });
+      if (validationMessage) {
+        toast(validationMessage, 'error');
+        return;
+      }
     }
     const firstWindow: WindowBody | null =
       form.scheduled_start_at && form.scheduled_end_at
@@ -565,6 +576,7 @@ export function MaintenanceCreatePage() {
                     <input
                       className={shared.field}
                       type="datetime-local"
+                      min={form.scheduled_start_at || undefined}
                       value={form.scheduled_end_at}
                       onChange={(event) => update('scheduled_end_at', event.target.value)}
                     />

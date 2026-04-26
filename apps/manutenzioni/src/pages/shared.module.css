@@ -120,6 +120,7 @@
 .panel,
 .tableCard,
 .emptyCard {
+  min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-bg-elevated);
@@ -784,6 +785,74 @@
   gap: 0.65rem;
 }
 
+.windowFormPanel {
+  min-width: 0;
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+  background: color-mix(in srgb, var(--color-surface) 42%, transparent);
+}
+
+.windowFormGrid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns:
+    minmax(130px, 0.75fr)
+    minmax(110px, 0.55fr)
+    minmax(130px, 0.75fr)
+    minmax(110px, 0.55fr)
+    minmax(210px, 1fr);
+  gap: 0.8rem;
+  align-items: start;
+}
+
+.windowFormFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.durationHint {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.modalBody {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.modalIntro {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.inlineSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.75rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 0.82rem;
+}
+
+.inlineSummary strong {
+  color: var(--color-text);
+  font-weight: 700;
+  text-align: right;
+}
+
 .stickyActionBar {
   display: flex;
   align-items: center;
@@ -797,6 +866,7 @@
 }
 
 .tableScroll {
+  min-width: 0;
   overflow-x: auto;
 }
 
@@ -1157,7 +1227,8 @@
 
 @media (max-width: 1120px) {
   .filterBar,
-  .formGridThree {
+  .formGridThree,
+  .windowFormGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1196,9 +1267,20 @@
   .filterBar,
   .formGrid,
   .formGridThree,
+  .windowFormGrid,
   .detailsGrid,
   .proposalGrid {
     grid-template-columns: 1fr;
+  }
+
+  .windowFormFooter,
+  .inlineSummary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inlineSummary strong {
+    text-align: left;
   }
 
   .stickyActionBar {

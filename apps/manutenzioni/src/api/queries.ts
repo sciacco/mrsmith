@@ -213,9 +213,9 @@ export function useWindowMutations(id: number) {
       onSuccess: invalidate,
     }),
     reschedule: useMutation({
-      mutationFn: (body: WindowBody) =>
+      mutationFn: ({ windowId, body }: { windowId: number; body: WindowBody }) =>
         api.post<MaintenanceDetail>(
-          `/manutenzioni/v1/maintenances/${id}/windows/reschedule`,
+          `/manutenzioni/v1/maintenances/${id}/windows/${windowId}/reschedule`,
           body,
         ),
       onSuccess: invalidate,

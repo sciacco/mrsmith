@@ -164,6 +164,8 @@ export function errorMessage(error: unknown, fallback: string): string {
         customer_scope_required: "Definisci l'ambito clienti prima di continuare.",
         invalid_customer_scope: 'Ambito clienti non valido.',
         maintenance_window_required: 'Aggiungi una finestra prima di continuare.',
+        invalid_window_range: 'La fine della finestra deve essere successiva all’inizio.',
+        invalid_window: 'Verifica i dati della finestra.',
         notice_content_required: 'Completa i testi richiesti prima di cambiare stato.',
         sent_at_required: 'Indica la data di invio.',
         assistance_not_configured: 'Assistenza non disponibile. Puoi completare la bozza manualmente.',
