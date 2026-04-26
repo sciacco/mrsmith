@@ -19,18 +19,18 @@ func TestCockpitReadinessBlocksDraftWithoutCustomerScope(t *testing.T) {
 	}
 }
 
-func TestCockpitReadinessBlocksApprovedWithoutPlannedWindow(t *testing.T) {
-	detail := cockpitReadyDetail(StatusApproved)
+func TestCockpitReadinessBlocksDraftWithoutPlannedWindow(t *testing.T) {
+	detail := cockpitReadyDetail(StatusDraft)
 	detail.Windows = nil
 	detail.CurrentWindow = nil
 
 	cockpit := buildMaintenanceCockpit(detail, nil)
 
-	if cockpit.NextAction == nil || cockpit.NextAction.Action != "schedule" {
-		t.Fatalf("next action = %#v, want schedule", cockpit.NextAction)
+	if cockpit.NextAction == nil || cockpit.NextAction.Action != "approve" {
+		t.Fatalf("next action = %#v, want approve", cockpit.NextAction)
 	}
 	if cockpit.NextAction.Enabled {
-		t.Fatalf("schedule should be blocked without planned window")
+		t.Fatalf("approve should be blocked without planned window")
 	}
 	if !containsString(cockpit.NextAction.BlockedBy, "window") {
 		t.Fatalf("blocked_by = %v, want window", cockpit.NextAction.BlockedBy)

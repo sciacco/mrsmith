@@ -10,7 +10,6 @@ export { severityLabel } from './severity';
 
 export const STATUS_OPTIONS = [
   'draft',
-  'approved',
   'scheduled',
   'announced',
   'in_progress',

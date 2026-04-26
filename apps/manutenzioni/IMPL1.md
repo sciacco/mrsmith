@@ -459,25 +459,33 @@ Configuration pages:
 
 ### Lifecycle Rules
 
-Statuses:
+Active statuses (linear flow):
 - `draft`
-- `approved`
 - `scheduled`
 - `announced`
 - `in_progress`
 - `completed`
-- `cancelled`
-- `superseded`
+
+Terminal/lateral:
+- `cancelled` (reachable from `draft`, `scheduled`, `announced`)
+- `superseded` (window-level concept)
+
+> `approved` is deprecated. The schema CHECK still allows it but the
+> application never writes nor transitions through it. See `OPEN1.md`
+> for the schema tightening and migration plan.
 
 Allowed V1 actions:
-- `draft` -> approve, cancel
-- `approved` -> schedule, announce, cancel
-- `scheduled` -> announce, start, reschedule, cancel
-- `announced` -> schedule if no current window exists, start if a current window exists, reschedule, cancel
-- `in_progress` -> complete
+- `draft` -> `approve` (transitions to `scheduled`), `cancel`
+- `scheduled` -> `announce`, `cancel`, reschedule the window
+- `announced` -> `start`, `cancel`, reschedule the window
+- `in_progress` -> `complete`
 - `completed` -> correction only by manager
 - `cancelled` -> correction only by manager
 - `superseded` -> read-only
+
+The action `schedule` no longer exists. `start` requires `announced`
+(no longer accepts `scheduled` directly): the announce step is a
+mandatory checkpoint that the right audience has been informed.
 
 Role rules:
 - read: `app_manutenzioni_access`
@@ -485,7 +493,9 @@ Role rules:
 - inline `service-taxonomy` create (catalog enrichment from maintenance editing): `app_manutenzioni_operator`, `app_manutenzioni_manager`, or `app_manutenzioni_approver`
 - other configuration endpoints (`/llm-models`, `/service-dependencies`, `/config/*`): `app_manutenzioni_manager` or `app_manutenzioni_approver`
 - approve: `app_manutenzioni_manager` or `app_manutenzioni_approver`
-- schedule and announce must require the maintenance to already be approved; the actor performing schedule/announce can be an operator or manager, but the status must have passed through an approve action by a manager or approver.
+- the `approve` action requires the data quality gate to be green
+  (window planned, customer scope, classification, audience, impact).
+  The exact gate definition is tracked in `OPEN1.md`.
 
 Schema caveat:
 - `maintenance_event.event_type` does not include `approved` or `scheduled`.

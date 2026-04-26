@@ -320,31 +320,41 @@ Configuration requirements:
 
 ## Lifecycle Requirements
 
-Schema statuses:
+Active statuses (linear flow):
 
 - `draft`
-- `announced`
-- `approved`
 - `scheduled`
+- `announced`
 - `in_progress`
 - `completed`
-- `cancelled`
-- `superseded`
 
-Proposed V1 lifecycle actions:
+Terminal/lateral:
+
+- `cancelled` (reachable from `draft`/`scheduled`/`announced`)
+- `superseded` (window-level concept)
+
+> The legacy `approved` status is deprecated. The schema CHECK constraint still
+> accepts it for backward compatibility but the application no longer writes
+> nor transitions through it. See `OPEN1.md` for the schema tightening plan.
+
+V1 lifecycle actions:
 
 | Current status | Allowed actions |
 | --- | --- |
-| `draft` | approve with `app_manutenzioni_manager` or `app_manutenzioni_approver`, cancel |
-| `approved` | schedule, announce, cancel |
-| `scheduled` | announce, start, reschedule, cancel |
-| `announced` | schedule if no window exists, start if a current window exists, reschedule, cancel |
-| `in_progress` | complete |
+| `draft` | `approve` with `app_manutenzioni_manager` or `app_manutenzioni_approver` (transitions to `scheduled`), `cancel` |
+| `scheduled` | `announce`, `cancel`, reschedule the window |
+| `announced` | `start`, `cancel`, reschedule the window |
+| `in_progress` | `complete` |
 | `completed` | no standard mutation except correction by manager |
 | `cancelled` | no standard mutation except correction by manager |
 | `superseded` | read-only |
 
-Approval must always come before scheduling or announcement. `announced` without a scheduled window is allowed only as a corner case for approved maintenance whose communication exists before the schedule is finalized.
+`approve` certifies that the plan is complete and ready: the data quality
+checks (window planned, customer scope, classification, audience, impact)
+must be green for the action to be enabled. After approve, `announce` is a
+mandatory checkpoint — even when the audience is internal-only or a subset
+of technicians, it records that the right people have been informed.
+`start` requires `announced` (no longer accepts `scheduled`).
 
 ## Functional Requirements
 

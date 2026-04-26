@@ -7,7 +7,6 @@ import (
 
 const (
 	StatusDraft      = "draft"
-	StatusApproved   = "approved"
 	StatusScheduled  = "scheduled"
 	StatusAnnounced  = "announced"
 	StatusInProgress = "in_progress"

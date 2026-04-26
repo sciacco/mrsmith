@@ -513,18 +513,14 @@ func nextStatus(current string, action string) (string, string, string, bool) {
 	switch action {
 	case "approve":
 		if current == StatusDraft {
-			return StatusApproved, "updated", "Manutenzione approvata", true
-		}
-	case "schedule":
-		if current == StatusApproved || current == StatusAnnounced {
-			return StatusScheduled, "updated", "Manutenzione pianificata", true
+			return StatusScheduled, "updated", "Pianificazione approvata", true
 		}
 	case "announce":
-		if current == StatusApproved || current == StatusScheduled {
+		if current == StatusScheduled {
 			return StatusAnnounced, "announced", "Manutenzione annunciata", true
 		}
 	case "start":
-		if current == StatusScheduled || current == StatusAnnounced {
+		if current == StatusAnnounced {
 			return StatusInProgress, "started", "Manutenzione avviata", true
 		}
 	case "complete":
@@ -532,7 +528,7 @@ func nextStatus(current string, action string) (string, string, string, bool) {
 			return StatusCompleted, "completed", "Manutenzione completata", true
 		}
 	case "cancel":
-		if current == StatusDraft || current == StatusApproved || current == StatusScheduled || current == StatusAnnounced {
+		if current == StatusDraft || current == StatusScheduled || current == StatusAnnounced {
 			return StatusCancelled, "cancelled", "Manutenzione annullata", true
 		}
 	}

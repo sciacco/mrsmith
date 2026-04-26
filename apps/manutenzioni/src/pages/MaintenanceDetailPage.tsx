@@ -188,6 +188,7 @@ export function MaintenanceDetailPage() {
                 isLoading={cockpit.isLoading}
                 error={cockpit.error}
                 onTabChange={changeTab}
+                canApprove={canApprove}
               />
             )}
             {activeTab === 'riepilogo' && (
@@ -220,18 +221,19 @@ export function MaintenanceDetailPage() {
 
 function lifecycleButtons(status: string, canOperate: boolean, canApprove: boolean) {
   const items: Array<{ action: string; label: string }> = [];
-  if (status === 'draft' && canApprove) items.push({ action: 'approve', label: 'Approva' });
-  if ((status === 'approved' || status === 'announced') && canOperate) {
-    items.push({ action: 'schedule', label: 'Pianifica' });
+  if (status === 'draft' && canApprove) {
+    items.push({ action: 'approve', label: 'Approva la pianificazione' });
   }
-  if ((status === 'approved' || status === 'scheduled') && canOperate) {
+  if (status === 'scheduled' && canOperate) {
     items.push({ action: 'announce', label: 'Annuncia' });
   }
-  if ((status === 'scheduled' || status === 'announced') && canOperate) {
+  if (status === 'announced' && canOperate) {
     items.push({ action: 'start', label: 'Avvia' });
   }
-  if (status === 'in_progress' && canOperate) items.push({ action: 'complete', label: 'Completa' });
-  if (['draft', 'approved', 'scheduled', 'announced'].includes(status) && canOperate) {
+  if (status === 'in_progress' && canOperate) {
+    items.push({ action: 'complete', label: 'Completa' });
+  }
+  if (['draft', 'scheduled', 'announced'].includes(status) && canOperate) {
     items.push({ action: 'cancel', label: 'Annulla' });
   }
   return items;

@@ -1,6 +1,5 @@
 export const STATUS_LABELS: Record<string, string> = {
   draft: 'Bozza',
-  approved: 'Approvata',
   scheduled: 'Pianificata',
   announced: 'Annunciata',
   in_progress: 'In corso',

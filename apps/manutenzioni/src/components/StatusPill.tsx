@@ -2,7 +2,6 @@ import styles from './StatusPill.module.css';
 
 export function statusTone(status: string): 'neutral' | 'info' | 'success' | 'warning' | 'danger' {
   switch (status) {
-    case 'approved':
     case 'scheduled':
       return 'info';
     case 'announced':

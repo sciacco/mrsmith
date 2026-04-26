@@ -19,6 +19,7 @@ interface Props {
   isLoading: boolean;
   error: unknown;
   onTabChange: (tab: string) => void;
+  canApprove: boolean;
 }
 
 export function MaintenanceCockpit({
@@ -27,6 +28,7 @@ export function MaintenanceCockpit({
   isLoading,
   error,
   onTabChange,
+  canApprove,
 }: Props) {
   if (isLoading) {
     return (
@@ -59,7 +61,7 @@ export function MaintenanceCockpit({
           <div className={styles.panelHeader}>
             <div>
               <h3>Runway operativa</h3>
-              <p>{nextActionSummary(nextAction, blockingCount)}</p>
+              <p>{nextActionSummary(nextAction, blockingCount, canApprove)}</p>
             </div>
           </div>
           <div className={styles.runway}>
@@ -227,9 +229,14 @@ function readinessIcon(status: string): 'check-circle' | 'triangle-alert' | 'inf
   return 'info';
 }
 
-function nextActionSummary(nextAction: MaintenanceCockpitData['next_action'], blockingCount: number) {
+function nextActionSummary(
+  nextAction: MaintenanceCockpitData['next_action'],
+  blockingCount: number,
+  canApprove: boolean,
+) {
   if (!nextAction) return 'Ciclo operativo chiuso.';
   if (blockingCount > 0) return 'Completa i blocchi prima di avanzare.';
+  if (nextAction.action === 'approve' && !canApprove) return 'Da approvare.';
   return `${nextAction.label} disponibile.`;
 }
 

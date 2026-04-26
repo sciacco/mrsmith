@@ -120,7 +120,6 @@ func cockpitLifecycle(status string) []cockpitLifecycleStep {
 		label string
 	}{
 		{StatusDraft, "Bozza"},
-		{StatusApproved, "Approvata"},
 		{StatusScheduled, "Pianificata"},
 		{StatusAnnounced, "Annunciata"},
 		{StatusInProgress, "In corso"},
@@ -163,11 +162,7 @@ func cockpitNextActionFor(status string, readiness []cockpitReadinessItem) *cock
 	switch status {
 	case StatusDraft:
 		next.Action = "approve"
-		next.Label = "Approva"
-	case StatusApproved:
-		next.Action = "schedule"
-		next.Label = "Pianifica"
-		next.TargetTab = "finestre"
+		next.Label = "Approva la pianificazione"
 	case StatusScheduled:
 		next.Action = "announce"
 		next.Label = "Annuncia"
@@ -192,9 +187,10 @@ func cockpitBlockersForAction(action string, readiness []cockpitReadinessItem) [
 	switch action {
 	case "approve":
 		required["customer_scope"] = true
+		required["window"] = true
 		required["impact"] = true
 		required["audience"] = true
-	case "schedule", "announce", "start":
+	case "announce", "start":
 		required["customer_scope"] = true
 		required["window"] = true
 		required["impact"] = true
