@@ -225,6 +225,66 @@ export interface MaintenanceDetail {
   metadata?: JsonObject;
 }
 
+export interface CockpitLifecycleStep {
+  key: string;
+  label: string;
+  state: 'complete' | 'current' | 'pending' | 'locked';
+  current: boolean;
+}
+
+export interface CockpitNextAction {
+  action: string;
+  label: string;
+  enabled: boolean;
+  target_tab: string;
+  blocked_by: string[];
+}
+
+export interface CockpitReadinessItem {
+  key: string;
+  label: string;
+  status: 'ready' | 'blocking' | 'warning';
+  summary: string;
+  target_tab: string;
+  blocking: boolean;
+}
+
+export interface CockpitImpact {
+  operated_services: ClassificationItem[];
+  dependent_services: ClassificationItem[];
+  targets: MaintenanceTarget[];
+  customers: ImpactedCustomer[];
+  dependencies: ServiceDependency[];
+  summary: {
+    services: number;
+    targets: number;
+    customers: number;
+    dependencies: number;
+  };
+}
+
+export interface CockpitTimelineItem {
+  id: string;
+  kind: 'window' | 'notice' | 'event' | string;
+  label: string;
+  status: string;
+  start_at?: string | null;
+  end_at?: string | null;
+  event_at?: string | null;
+  summary?: string;
+  target_tab: string;
+}
+
+export interface MaintenanceCockpit {
+  maintenance_id: number;
+  status: string;
+  lifecycle: CockpitLifecycleStep[];
+  next_action?: CockpitNextAction;
+  readiness: CockpitReadinessItem[];
+  impact: CockpitImpact;
+  timeline: CockpitTimelineItem[];
+}
+
 export interface MaintenanceFilters {
   q?: string;
   status?: string[];

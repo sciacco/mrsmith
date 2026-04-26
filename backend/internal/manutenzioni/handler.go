@@ -68,6 +68,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 
 	access("GET /manutenzioni/v1/maintenances", h.handleListMaintenances)
 	access("GET /manutenzioni/v1/maintenances/radar", h.handleMaintenanceRadar)
+	access("GET /manutenzioni/v1/maintenances/{id}/cockpit", h.handleMaintenanceCockpit)
 	access("GET /manutenzioni/v1/maintenances/{id}", h.handleGetMaintenance)
 	access("GET /manutenzioni/v1/maintenances/{id}/events", h.handleGetEvents)
 	access("GET /manutenzioni/v1/reference-data", h.handleReferenceData)

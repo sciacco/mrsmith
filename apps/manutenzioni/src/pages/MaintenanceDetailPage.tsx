@@ -6,6 +6,7 @@ import {
   useCustomerImpactMutations,
   useCustomerSearch,
   useMaintenance,
+  useMaintenanceCockpit,
   useMaintenanceAssistanceDraft,
   useNoticeMutations,
   useReferenceData,
@@ -30,6 +31,7 @@ import type {
   WindowBody,
 } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { MaintenanceCockpit } from '../components/MaintenanceCockpit';
 import { SiteSelectField } from '../components/SiteSelectField';
 import { StatusPill, statusTone } from '../components/StatusPill';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
@@ -53,9 +55,10 @@ import { MANUTENZIONI_APPROVER_ROLES, MANUTENZIONI_MANAGER_ROLES } from '../lib/
 import { SEVERITY_OPTIONS } from '../lib/severity';
 import shared from './shared.module.css';
 
-type TabKey = 'riepilogo' | 'finestre' | 'impatto' | 'target' | 'clienti' | 'comunicazioni' | 'storico';
+type TabKey = 'cockpit' | 'riepilogo' | 'finestre' | 'impatto' | 'target' | 'clienti' | 'comunicazioni' | 'storico';
 
 const tabs: TabNavItem[] = [
+  { key: 'cockpit', label: 'Cruscotto' },
   { key: 'riepilogo', label: 'Riepilogo' },
   { key: 'finestre', label: 'Finestre' },
   { key: 'impatto', label: 'Impatto' },
@@ -72,8 +75,9 @@ export function MaintenanceDetailPage() {
   const { user } = useOptionalAuth();
   const canManage = hasAnyRole(user?.roles, MANUTENZIONI_MANAGER_ROLES);
   const canApprove = hasAnyRole(user?.roles, MANUTENZIONI_APPROVER_ROLES);
-  const [activeTab, setActiveTab] = useState<TabKey>('riepilogo');
+  const [activeTab, setActiveTab] = useState<TabKey>('cockpit');
   const detail = useMaintenance(id);
+  const cockpit = useMaintenanceCockpit(id);
   const reference = useReferenceData(id ?? undefined);
   const statusAction = useStatusAction();
   const toast = useToast();
@@ -118,6 +122,12 @@ export function MaintenanceDetailPage() {
       ))
     : null;
 
+  function changeTab(key: string) {
+    if (tabs.some((item) => item.key === key)) {
+      setActiveTab(key as TabKey);
+    }
+  }
+
   return (
     <section className={shared.page}>
       <button type="button" className={shared.backLink} onClick={() => navigate('/manutenzioni')}>
@@ -139,24 +149,43 @@ export function MaintenanceDetailPage() {
         </div>
       ) : (
         <>
-          <div className={shared.header}>
-            <div className={shared.titleBlock}>
-              <h1 className={shared.pageTitle}>
-                {data.code || `MNT #${data.maintenance_id}`} · {data.title_it}
-              </h1>
-              <p className={shared.pageSubtitle}>
-                {data.technical_domain.name_it} · {data.maintenance_kind.name_it} · {customerScopeLabel(data.customer_scope)}
-              </p>
+          <div className={shared.detailShell}>
+            <div className={shared.detailShellTop}>
+              <div className={shared.titleBlock}>
+                <div className={shared.detailIdentity}>
+                  <span className={shared.detailCode}>{data.code || `MNT #${data.maintenance_id}`}</span>
+                  <h1 className={shared.pageTitle}>{data.title_it}</h1>
+                </div>
+                <div className={shared.detailMeta} aria-label="Metadati manutenzione">
+                  <span>{data.technical_domain.name_it}</span>
+                  <span>{data.maintenance_kind.name_it}</span>
+                  <span>{customerScopeLabel(data.customer_scope)}</span>
+                  {data.site ? <span>{data.site.name_it}</span> : null}
+                </div>
+              </div>
+              <div className={shared.headerActions}>
+                <StatusPill tone={statusTone(data.status)}>{statusLabel(data.status)}</StatusPill>
+                {statusButtons}
+              </div>
             </div>
-            <div className={shared.headerActions}>
-              <StatusPill tone={statusTone(data.status)}>{statusLabel(data.status)}</StatusPill>
-              {statusButtons}
+
+            <div className={shared.detailShellTabs}>
+              <div className={shared.tabScroller}>
+                <TabNav items={tabs} activeKey={activeTab} onTabChange={(key) => setActiveTab(key as TabKey)} />
+              </div>
             </div>
           </div>
 
-          <TabNav items={tabs} activeKey={activeTab} onTabChange={(key) => setActiveTab(key as TabKey)} />
-
           <div className={shared.tabsSpacer}>
+            {activeTab === 'cockpit' && (
+              <MaintenanceCockpit
+                detail={data}
+                cockpit={cockpit.data}
+                isLoading={cockpit.isLoading}
+                error={cockpit.error}
+                onTabChange={changeTab}
+              />
+            )}
             {activeTab === 'riepilogo' && (
               <SummaryTab
                 detail={data}
