@@ -53,6 +53,7 @@ import {
   statusLabel,
   windowStatusLabel,
 } from '../lib/format';
+import { NOTICE_TYPE_LABELS, WINDOW_ACTION_LABELS } from '../lib/labels';
 import { MANUTENZIONI_APPROVER_ROLES, MANUTENZIONI_MANAGER_ROLES } from '../lib/roles';
 import { SEVERITY_OPTIONS } from '../lib/severity';
 import { validateWindowTiming, windowDurationMinutes } from '../lib/windowValidation';
@@ -818,35 +819,21 @@ function mergeMetadata(current: JsonObject | undefined, patch: JsonObject): Json
 }
 
 interface WindowFormState {
-  startDate: string;
-  startTime: string;
-  endDate: string;
-  endTime: string;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
   expectedDowntimeMinutes: string;
 }
 
 const emptyWindowForm: WindowFormState = {
-  startDate: '',
-  startTime: '',
-  endDate: '',
-  endTime: '',
+  scheduledStartAt: '',
+  scheduledEndAt: '',
   expectedDowntimeMinutes: '',
 };
 
-function splitDateTimeInput(value: string): { date: string; time: string } {
-  if (!value) return { date: '', time: '' };
-  const [date = '', rawTime = ''] = value.split('T');
-  return { date, time: rawTime.slice(0, 5) };
-}
-
 function windowFormFromWindow(window: MaintenanceWindow): WindowFormState {
-  const start = splitDateTimeInput(formatDateInput(window.scheduled_start_at));
-  const end = splitDateTimeInput(formatDateInput(window.scheduled_end_at));
   return {
-    startDate: start.date,
-    startTime: start.time,
-    endDate: end.date,
-    endTime: end.time,
+    scheduledStartAt: formatDateInput(window.scheduled_start_at),
+    scheduledEndAt: formatDateInput(window.scheduled_end_at),
     expectedDowntimeMinutes:
       window.expected_downtime_minutes === null || window.expected_downtime_minutes === undefined
         ? ''
@@ -855,10 +842,10 @@ function windowFormFromWindow(window: MaintenanceWindow): WindowFormState {
 }
 
 function buildWindowBody(form: WindowFormState): WindowBody | null {
-  if (!form.startDate || !form.startTime || !form.endDate || !form.endTime) return null;
+  if (!form.scheduledStartAt || !form.scheduledEndAt) return null;
   return {
-    scheduled_start_at: `${form.startDate}T${form.startTime}`,
-    scheduled_end_at: `${form.endDate}T${form.endTime}`,
+    scheduled_start_at: form.scheduledStartAt,
+    scheduled_end_at: form.scheduledEndAt,
     expected_downtime_minutes: form.expectedDowntimeMinutes
       ? Number(form.expectedDowntimeMinutes)
       : null,
@@ -887,13 +874,23 @@ function compareWindowsBySchedule(a: MaintenanceWindow, b: MaintenanceWindow): n
   return a.seq_no - b.seq_no;
 }
 
+function windowStatusTone(status: string): 'neutral' | 'success' | 'warning' | 'danger' {
+  if (status === 'planned' || status === 'executed') return 'success';
+  if (status === 'superseded') return 'warning';
+  if (status === 'cancelled') return 'danger';
+  return 'neutral';
+}
+
 function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManage: boolean }) {
   const mutations = useWindowMutations(detail.maintenance_id);
   const toast = useToast();
   const [form, setForm] = useState<WindowFormState>(emptyWindowForm);
   const [rescheduleWindow, setRescheduleWindow] = useState<MaintenanceWindow | null>(null);
   const [rescheduleForm, setRescheduleForm] = useState<WindowFormState>(emptyWindowForm);
+  const [cancelWindow, setCancelWindow] = useState<MaintenanceWindow | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
   const sortedWindows = [...detail.windows].sort(compareWindowsBySchedule);
+  const cancelReasonRequired = detail.status === 'scheduled' || detail.status === 'announced';
 
   async function addWindow() {
     const validationMessage = windowFormValidationMessage(form, 'Indica inizio e fine previsti.');
@@ -925,6 +922,16 @@ function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManag
     setRescheduleForm(emptyWindowForm);
   }
 
+  function openCancel(window: MaintenanceWindow) {
+    setCancelWindow(window);
+    setCancelReason('');
+  }
+
+  function closeCancel() {
+    setCancelWindow(null);
+    setCancelReason('');
+  }
+
   async function submitReschedule() {
     const validationMessage = windowFormValidationMessage(rescheduleForm, 'Indica inizio e fine previsti.');
     if (validationMessage) {
@@ -943,9 +950,28 @@ function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManag
         body,
       });
       closeReschedule();
-      toast.toast('Finestra ripianificata.');
+      toast.toast(WINDOW_ACTION_LABELS.rescheduleSuccess);
     } catch (error) {
-      toast.toast(errorMessage(error, 'Ripianificazione non riuscita.'), 'error');
+      toast.toast(errorMessage(error, WINDOW_ACTION_LABELS.rescheduleFailure), 'error');
+    }
+  }
+
+  async function submitCancel() {
+    if (!cancelWindow) return;
+    const reason_it = cancelReason.trim();
+    if (cancelReasonRequired && !reason_it) {
+      toast.toast('Indica il motivo dell’annullamento.', 'error');
+      return;
+    }
+    try {
+      await mutations.cancel.mutateAsync({
+        windowId: cancelWindow.maintenance_window_id,
+        reason_it,
+      });
+      closeCancel();
+      toast.toast(WINDOW_ACTION_LABELS.cancelSuccess);
+    } catch (error) {
+      toast.toast(errorMessage(error, WINDOW_ACTION_LABELS.cancelFailure), 'error');
     }
   }
 
@@ -991,20 +1017,34 @@ function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManag
               ) : (
                 sortedWindows.map((window) => (
                   <tr key={window.maintenance_window_id}>
-                    <td>{windowStatusLabel(window.window_status)}</td>
+                    <td>
+                      <StatusPill tone={windowStatusTone(window.window_status)}>
+                        {windowStatusLabel(window.window_status)}
+                      </StatusPill>
+                    </td>
                     <td>{formatDateTime(window.scheduled_start_at)}</td>
                     <td>{formatDateTime(window.scheduled_end_at)}</td>
                     <td>{minutesLabel(window.expected_downtime_minutes)}</td>
                     <td className={shared.actionsCell}>
                       {canManage && window.window_status === 'planned' ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => openReschedule(window)}
-                          leftIcon={<Icon name="calendar" size={16} />}
-                        >
-                          Ripianifica
-                        </Button>
+                        <div className={shared.actionRow}>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openReschedule(window)}
+                            leftIcon={<Icon name="calendar" size={16} />}
+                          >
+                            {WINDOW_ACTION_LABELS.reschedule}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => openCancel(window)}
+                            leftIcon={<Icon name="x-circle" size={16} />}
+                          >
+                            {WINDOW_ACTION_LABELS.cancel}
+                          </Button>
+                        </div>
                       ) : (
                         '-'
                       )}
@@ -1019,8 +1059,8 @@ function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManag
       <Modal
         open={rescheduleWindow !== null}
         onClose={closeReschedule}
-        title="Ripianifica finestra"
-        size="md"
+        title={WINDOW_ACTION_LABELS.rescheduleTitle}
+        size="lg"
       >
         <div className={shared.modalBody}>
           <p className={shared.modalIntro}>
@@ -1051,9 +1091,52 @@ function WindowsTab({ detail, canManage }: { detail: MaintenanceDetail; canManag
                 loading={mutations.reschedule.isPending}
                 leftIcon={<Icon name="calendar" size={16} />}
               >
-                Ripianifica
+                {WINDOW_ACTION_LABELS.reschedule}
               </Button>
             </div>
+          </div>
+        </div>
+      </Modal>
+      <Modal
+        open={cancelWindow !== null}
+        onClose={closeCancel}
+        title={WINDOW_ACTION_LABELS.cancelTitle}
+        size="sm"
+      >
+        <div className={shared.modalBody}>
+          <p className={shared.modalIntro}>
+            La finestra verrà marcata come Annullata e resterà nello storico della manutenzione.
+          </p>
+          {cancelWindow ? (
+            <div className={shared.inlineSummary}>
+              <span>Finestra</span>
+              <strong>
+                {formatDateTime(cancelWindow.scheduled_start_at)} -{' '}
+                {formatDateTime(cancelWindow.scheduled_end_at)}
+              </strong>
+            </div>
+          ) : null}
+          <label className={shared.label}>
+            Motivo annullamento{cancelReasonRequired ? '' : ' (opzionale)'}
+            <textarea
+              className={shared.textarea}
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              rows={4}
+            />
+          </label>
+          <div className={shared.formActions}>
+            <Button variant="secondary" onClick={closeCancel} disabled={mutations.cancel.isPending}>
+              Mantieni finestra
+            </Button>
+            <Button
+              variant="danger"
+              onClick={submitCancel}
+              loading={mutations.cancel.isPending}
+              leftIcon={<Icon name="x-circle" size={16} />}
+            >
+              {WINDOW_ACTION_LABELS.cancelTitle}
+            </Button>
           </div>
         </div>
       </Modal>
@@ -1071,41 +1154,22 @@ function WindowFields({
   return (
     <div className={shared.windowFormGrid}>
       <label className={shared.label}>
-        Data inizio
+        Inizio
         <input
           className={shared.field}
-          type="date"
-          value={form.startDate}
-          onChange={(event) => onChange({ ...form, startDate: event.target.value })}
+          type="datetime-local"
+          value={form.scheduledStartAt}
+          onChange={(event) => onChange({ ...form, scheduledStartAt: event.target.value })}
         />
       </label>
       <label className={shared.label}>
-        Ora inizio
+        Fine
         <input
           className={shared.field}
-          type="time"
-          value={form.startTime}
-          onChange={(event) => onChange({ ...form, startTime: event.target.value })}
-        />
-      </label>
-      <label className={shared.label}>
-        Data fine
-        <input
-          className={shared.field}
-          type="date"
-          min={form.startDate || undefined}
-          value={form.endDate}
-          onChange={(event) => onChange({ ...form, endDate: event.target.value })}
-        />
-      </label>
-      <label className={shared.label}>
-        Ora fine
-        <input
-          className={shared.field}
-          type="time"
-          min={form.endDate && form.endDate === form.startDate ? form.startTime || undefined : undefined}
-          value={form.endTime}
-          onChange={(event) => onChange({ ...form, endTime: event.target.value })}
+          type="datetime-local"
+          min={form.scheduledStartAt || undefined}
+          value={form.scheduledEndAt}
+          onChange={(event) => onChange({ ...form, scheduledEndAt: event.target.value })}
         />
       </label>
       <label className={shared.label}>
@@ -1661,11 +1725,11 @@ function NoticesTab({
             value={form.notice_type}
             onChange={(event) => setForm({ ...form, notice_type: event.target.value })}
           >
-            <option value="announcement">Annuncio</option>
-            <option value="reminder">Promemoria</option>
-            <option value="reschedule">Riprogrammazione</option>
-            <option value="cancellation">Annullamento</option>
-            <option value="internal_update">Aggiornamento interno</option>
+            <option value="announcement">{NOTICE_TYPE_LABELS.announcement}</option>
+            <option value="reminder">{NOTICE_TYPE_LABELS.reminder}</option>
+            <option value="reschedule">{NOTICE_TYPE_LABELS.reschedule}</option>
+            <option value="cancellation">{NOTICE_TYPE_LABELS.cancellation}</option>
+            <option value="internal_update">{NOTICE_TYPE_LABELS.internal_update}</option>
           </select>
           <select
             className={shared.select}

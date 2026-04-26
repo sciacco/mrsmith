@@ -323,7 +323,7 @@ func (h *Handler) handleRescheduleWindow(w http.ResponseWriter, r *http.Request)
 	if previousID.Valid {
 		payload["previous_window_id"] = previousID.Int64
 	}
-	if err := writeEvent(r.Context(), tx, maintenanceID, &newID, "rescheduled", "Finestra ripianificata", claimsActor(r), payload); err != nil {
+	if err := writeEvent(r.Context(), tx, maintenanceID, &newID, "rescheduled", windowRescheduledLabel, claimsActor(r), payload); err != nil {
 		h.dbFailure(w, r, "reschedule_event", err, "maintenance_id", maintenanceID)
 		return
 	}

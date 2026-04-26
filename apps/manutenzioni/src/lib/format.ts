@@ -1,5 +1,11 @@
 import { ApiError } from '@mrsmith/api-client';
 import type { StatusCount } from '../api/types';
+import {
+  API_ERROR_MESSAGES,
+  NOTICE_TYPE_LABELS,
+  STATUS_LABELS,
+  WINDOW_STATUS_LABELS,
+} from './labels';
 export { severityLabel } from './severity';
 
 export const STATUS_OPTIONS = [
@@ -20,27 +26,11 @@ export function parsePositiveId(raw: string | undefined): number | null {
 }
 
 export function statusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    draft: 'Bozza',
-    approved: 'Approvata',
-    scheduled: 'Pianificata',
-    announced: 'Annunciata',
-    in_progress: 'In corso',
-    completed: 'Completata',
-    cancelled: 'Annullata',
-    superseded: 'Superata',
-  };
-  return labels[status] ?? status;
+  return STATUS_LABELS[status] ?? status;
 }
 
 export function windowStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    planned: 'Pianificata',
-    cancelled: 'Annullata',
-    superseded: 'Sostituita',
-    executed: 'Eseguita',
-  };
-  return labels[status] ?? status;
+  return WINDOW_STATUS_LABELS[status] ?? status;
 }
 
 export function sourceLabel(source: string): string {
@@ -85,16 +75,7 @@ export function impactScopeLabel(scope: string): string {
 }
 
 export function noticeTypeLabel(value: string): string {
-  const labels: Record<string, string> = {
-    announcement: 'Annuncio',
-    reminder: 'Promemoria',
-    reschedule: 'Riprogrammazione',
-    cancellation: 'Annullamento',
-    start: 'Avvio',
-    completion: 'Completamento',
-    internal_update: 'Aggiornamento interno',
-  };
-  return labels[value] ?? value;
+  return NOTICE_TYPE_LABELS[value] ?? value;
 }
 
 export function audienceLabel(value: string): string {
@@ -156,27 +137,7 @@ export function errorMessage(error: unknown, fallback: string): string {
     const body = error.body;
     if (typeof body === 'object' && body !== null && 'error' in body) {
       const code = String((body as { error: unknown }).error);
-      const known: Record<string, string> = {
-        manutenzioni_database_not_configured: 'Registro non configurato.',
-        customer_lookup_not_configured: 'Ricerca clienti non disponibile.',
-        maintenance_not_found: 'Manutenzione non trovata.',
-        status_transition_not_allowed: 'Cambio stato non consentito.',
-        customer_scope_required: "Definisci l'ambito clienti prima di continuare.",
-        invalid_customer_scope: 'Ambito clienti non valido.',
-        maintenance_window_required: 'Aggiungi una finestra prima di continuare.',
-        invalid_window_range: 'La fine della finestra deve essere successiva all’inizio.',
-        invalid_window: 'Verifica i dati della finestra.',
-        notice_content_required: 'Completa i testi richiesti prima di cambiare stato.',
-        sent_at_required: 'Indica la data di invio.',
-        assistance_not_configured: 'Assistenza non disponibile. Puoi completare la bozza manualmente.',
-        assistance_generation_failed: 'Assistenza non riuscita. Riprova o completa la bozza manualmente.',
-        invalid_llm_model_scope: 'Ambito non valido.',
-        llm_model_model_required: 'Indica il modello.',
-        llm_model_already_exists: 'Esiste già un modello con questo ambito.',
-        llm_model_scope_immutable: "L'ambito non può essere modificato.",
-        llm_model_not_found: 'Modello non trovato.',
-      };
-      return known[code] ?? fallback;
+      return API_ERROR_MESSAGES[code] ?? fallback;
     }
     if (error.status === 403) return 'Non hai i permessi per questa azione.';
     if (error.status === 503) return 'Servizio non disponibile.';

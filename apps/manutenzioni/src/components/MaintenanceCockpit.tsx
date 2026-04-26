@@ -9,6 +9,7 @@ import {
   severityLabel,
   windowStatusLabel,
 } from '../lib/format';
+import { MAINTENANCE_EVENT_LABELS } from '../lib/labels';
 import shared from '../pages/shared.module.css';
 import styles from './MaintenanceCockpit.module.css';
 
@@ -145,7 +146,6 @@ export function MaintenanceCockpit({
           <div className={styles.panelHeader}>
             <div>
               <h3>Timeline</h3>
-              <p>{timelineCountLabel(cockpit.timeline.length)}</p>
             </div>
           </div>
           <div className={styles.timeline}>
@@ -153,9 +153,16 @@ export function MaintenanceCockpit({
               <div className={styles.emptyInline}>Aggiungi una finestra o una comunicazione per costruire la timeline.</div>
             ) : (
               cockpit.timeline.slice(0, 7).map((item) => (
-                <button key={item.id} type="button" className={styles.timelineItem} onClick={() => onTabChange(item.target_tab)}>
-                  <span className={styles.timelineDot} data-kind={item.kind} />
-                  <span>
+                <button
+                  key={item.id}
+                  type="button"
+                  className={styles.timelineItem}
+                  data-kind={item.kind}
+                  data-status={item.status}
+                  onClick={() => onTabChange(item.target_tab)}
+                >
+                  <span className={styles.timelineDot} data-kind={item.kind} data-status={item.status} />
+                  <span className={styles.timelineText}>
                     <strong>{timelineLabel(item.kind, item.label)}</strong>
                     <small>{timelineMeta(item, timelineLabel(item.kind, item.label))}</small>
                   </span>
@@ -243,25 +250,10 @@ function finalStateLabel(status: string) {
   return 'Nessuna azione';
 }
 
-function timelineCountLabel(count: number) {
-  if (count === 0) return 'Nessun evento operativo';
-  if (count === 1) return '1 evento operativo';
-  return `${count} eventi operativi`;
-}
-
 function timelineLabel(kind: string, label: string) {
   if (kind === 'window') return label;
   if (kind === 'notice') return `Comunicazione ${label}`;
-  const eventLabels: Record<string, string> = {
-    created: 'Manutenzione creata',
-    updated: 'Manutenzione aggiornata',
-    announced: 'Manutenzione annunciata',
-    started: 'Manutenzione avviata',
-    completed: 'Manutenzione completata',
-    cancelled: 'Manutenzione annullata',
-    rescheduled: 'Finestra ripianificata',
-  };
-  if (kind === 'event') return eventLabels[label] ?? label;
+  if (kind === 'event') return MAINTENANCE_EVENT_LABELS[label] ?? label;
   return label;
 }
 

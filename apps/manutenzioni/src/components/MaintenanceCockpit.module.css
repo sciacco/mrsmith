@@ -320,12 +320,60 @@
   align-items: center;
 }
 
+.timelineText {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.timelineText strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.timelineText small {
+  display: block;
+}
+
+.timelineItem[data-kind='window'][data-status='cancelled'],
+.timelineItem[data-kind='window'][data-status='superseded'] {
+  color: var(--color-text-muted);
+}
+
+.timelineItem[data-kind='window'][data-status='cancelled'] .timelineText strong,
+.timelineItem[data-kind='window'][data-status='cancelled'] .timelineText small,
+.timelineItem[data-kind='window'][data-status='superseded'] .timelineText strong,
+.timelineItem[data-kind='window'][data-status='superseded'] .timelineText small {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
 .timelineDot {
   width: 0.72rem;
   height: 0.72rem;
   border-radius: var(--radius-full);
   background: var(--color-accent);
   box-shadow: 0 0 0 4px var(--color-accent-subtle);
+}
+
+.timelineDot[data-kind='window'][data-status='planned'] {
+  background: var(--color-success);
+  box-shadow: 0 0 0 4px var(--color-success-bg);
+}
+
+.timelineDot[data-kind='window'][data-status='executed'] {
+  background: var(--color-success);
+  box-shadow: 0 0 0 4px var(--color-success-bg);
+}
+
+.timelineDot[data-kind='window'][data-status='superseded'] {
+  background: var(--color-warning);
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+}
+
+.timelineDot[data-kind='window'][data-status='cancelled'] {
+  background: var(--color-danger);
+  box-shadow: 0 0 0 4px var(--color-danger-subtle);
 }
 
 .timelineDot[data-kind='notice'] {

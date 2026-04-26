@@ -219,14 +219,16 @@ func cockpitReadiness(detail MaintenanceDetail) []cockpitReadinessItem {
 		items = append(items, cockpitReadyItem("customer_scope", "Ambito clienti", detail.CustomerScope.NameIT, "riepilogo"))
 	}
 
-	if hasPlannedWindow(detail) {
-		summary := "Finestra pianificata"
-		if detail.CurrentWindow != nil {
-			summary = detail.CurrentWindow.ScheduledStartAt.Format("02/01/2006 15:04")
+	validWindows := chronologicalOperationalWindows(detail.Windows)
+	if len(validWindows) > 0 {
+		index := nextOperationalWindowIndex(validWindows, time.Now())
+		label := "Finestra"
+		if len(validWindows) > 1 {
+			label = label + " (" + strconv.Itoa(index+1) + "/" + strconv.Itoa(len(validWindows)) + ")"
 		}
-		items = append(items, cockpitReadyItem("window", "Finestra", summary, "finestre"))
+		items = append(items, cockpitReadyItem("window", label, validWindows[index].ScheduledStartAt.Format("02/01/2006 15:04"), "finestre"))
 	} else {
-		items = append(items, cockpitBlockingItem("window", "Finestra", "Aggiungi una finestra pianificata per programmare, annunciare o avviare.", "finestre"))
+		items = append(items, cockpitBlockingItem("window", "Finestra", windowScheduledPromptLabel, "finestre"))
 	}
 
 	if len(detail.ServiceTaxonomy) == 0 && len(detail.Targets) == 0 {
@@ -268,13 +270,33 @@ func cockpitWarningItem(key, label, summary, targetTab string) cockpitReadinessI
 	return cockpitReadinessItem{Key: key, Label: label, Status: "warning", Summary: summary, TargetTab: targetTab}
 }
 
-func hasPlannedWindow(detail MaintenanceDetail) bool {
-	for _, window := range detail.Windows {
-		if window.WindowStatus == "planned" {
-			return true
+func chronologicalOperationalWindows(windows []MaintenanceWindow) []MaintenanceWindow {
+	items := make([]MaintenanceWindow, 0, len(windows))
+	for _, window := range windows {
+		if isOperationalWindowStatus(window.WindowStatus) {
+			items = append(items, window)
 		}
 	}
-	return false
+	sort.SliceStable(items, func(i, j int) bool {
+		if !items[i].ScheduledStartAt.Equal(items[j].ScheduledStartAt) {
+			return items[i].ScheduledStartAt.Before(items[j].ScheduledStartAt)
+		}
+		return items[i].SeqNo < items[j].SeqNo
+	})
+	return items
+}
+
+func isOperationalWindowStatus(status string) bool {
+	return status != "cancelled" && status != "superseded"
+}
+
+func nextOperationalWindowIndex(windows []MaintenanceWindow, now time.Time) int {
+	for index, window := range windows {
+		if !window.ScheduledEndAt.Before(now) {
+			return index
+		}
+	}
+	return 0
 }
 
 func unresolvedAudienceCount(detail MaintenanceDetail) int {
@@ -378,9 +400,32 @@ func cockpitTimeline(detail MaintenanceDetail) []cockpitTimelineItem {
 		})
 	}
 	sort.SliceStable(items, func(i, j int) bool {
-		return cockpitTimelineTime(items[i]).After(cockpitTimelineTime(items[j]))
+		leftBucket := cockpitTimelineBucket(items[i])
+		rightBucket := cockpitTimelineBucket(items[j])
+		if leftBucket != rightBucket {
+			return leftBucket < rightBucket
+		}
+		leftTime := cockpitTimelineTime(items[i])
+		rightTime := cockpitTimelineTime(items[j])
+		if leftBucket == 2 {
+			return leftTime.After(rightTime)
+		}
+		if !leftTime.Equal(rightTime) {
+			return leftTime.Before(rightTime)
+		}
+		return items[i].ID < items[j].ID
 	})
 	return items
+}
+
+func cockpitTimelineBucket(item cockpitTimelineItem) int {
+	if item.Kind != "window" {
+		return 2
+	}
+	if isOperationalWindowStatus(item.Status) {
+		return 0
+	}
+	return 1
 }
 
 func cockpitTimelineTime(item cockpitTimelineItem) time.Time {

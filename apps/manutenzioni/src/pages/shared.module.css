@@ -799,12 +799,7 @@
 .windowFormGrid {
   min-width: 0;
   display: grid;
-  grid-template-columns:
-    minmax(130px, 0.75fr)
-    minmax(110px, 0.55fr)
-    minmax(130px, 0.75fr)
-    minmax(110px, 0.55fr)
-    minmax(210px, 1fr);
+  grid-template-columns: repeat(3, minmax(190px, 1fr));
   gap: 0.8rem;
   align-items: start;
 }
@@ -950,6 +945,14 @@
 .actionsCell {
   text-align: right !important;
   white-space: nowrap;
+}
+
+.actionRow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .dragHandleCell {
