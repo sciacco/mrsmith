@@ -21,6 +21,23 @@
   border-color: var(--color-text-muted);
 }
 
+.triggerDisabled,
+.triggerDisabled:hover {
+  cursor: not-allowed;
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.triggerDisabled .selectedLabel {
+  color: var(--color-text-muted);
+}
+
+.triggerDisabled .placeholder,
+.triggerDisabled .arrow {
+  color: var(--color-text-faint);
+}
+
 .triggerOpen {
   border-color: var(--color-accent);
   background: var(--color-bg-elevated);
@@ -31,11 +48,19 @@
   font-size: 0.875rem;
   color: var(--color-text);
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .placeholder {
   color: var(--color-text-faint);
   font-size: 0.875rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .arrow {

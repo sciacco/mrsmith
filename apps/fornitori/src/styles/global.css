@@ -678,6 +678,18 @@ button {
   align-items: start;
 }
 
+.fornitoriListPage {
+  max-width: 1120px;
+}
+
+.fornitoriListPanel {
+  min-height: min(42rem, calc(100vh - 12rem));
+}
+
+.fornitoriSearchRows {
+  max-height: calc(100vh - 15rem);
+}
+
 .master,
 .detail {
   min-height: min(42rem, calc(100vh - 12rem));
@@ -1106,15 +1118,29 @@ button {
   box-shadow: var(--shadow-sm);
 }
 
+.providerDetailPage,
 .providerPage {
   display: grid;
   gap: 1rem;
-  padding: 1rem;
+}
+
+.detailTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
 .providerHeader {
   display: grid;
   gap: 0.55rem;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-xs);
 }
 
 .providerHeaderTop {
@@ -1176,6 +1202,133 @@ button {
   font-size: 0.85rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.providerDetailNav {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.providerDetailWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+  gap: 1rem;
+  align-items: start;
+}
+
+.providerDetailMain {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.providerAttentionRail {
+  position: sticky;
+  top: 5.8rem;
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-xs);
+}
+
+.providerAttentionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.providerAttentionHeader h2 {
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.providerAttentionHeader span {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.providerAttentionActions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.providerAttentionAction {
+  position: relative;
+  display: grid;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: 5.4rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.7rem 2.1rem 0.7rem 0.7rem;
+  color: var(--color-text);
+  background: var(--color-bg-elevated);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.providerAttentionAction:hover {
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.providerAttentionAction:focus-visible {
+  outline: 0;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow), var(--shadow-sm);
+}
+
+.providerAttentionActionTopline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.providerAttentionActionTopline > span:last-child {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.providerAttentionAction strong {
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.providerAttentionActionIcon {
+  position: absolute;
+  right: 0.65rem;
+  bottom: 0.65rem;
+  display: inline-flex;
+  color: var(--color-text-secondary);
+}
+
+.providerAttentionEmpty {
+  align-items: flex-start;
+  min-height: 0;
 }
 
 .banner {
@@ -1254,6 +1407,12 @@ button {
 
 .qualificationCard[data-state='NOT_QUALIFIED'] {
   border-color: rgba(245, 158, 11, 0.32);
+}
+
+.qualificationCard[data-focus-highlight='true'],
+.documentsTable tr[data-focus-highlight='true'] {
+  animation: focusPulse 1.6s var(--ease-out) both;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 
 .qualificationCardHeader {
@@ -1382,13 +1541,31 @@ button {
 
 .docTypeBadges {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 0.3rem;
   align-items: center;
+  min-width: 0;
 }
 
 .docTypeActions {
   display: inline-flex;
   gap: 0.3rem;
+}
+
+.documentsTable td:last-child {
+  width: 8rem;
+  white-space: nowrap;
+}
+
+.formActionsWithState {
+  align-items: center;
+}
+
+.dirtyState {
+  margin-right: auto;
+  color: var(--color-warning);
+  font-size: 0.8rem;
+  font-weight: 750;
 }
 
 .contactsList {
@@ -1509,10 +1686,25 @@ button {
   }
 }
 
+@keyframes focusPulse {
+  0% {
+    border-color: var(--color-accent);
+    background: var(--color-accent-subtle);
+  }
+  70% {
+    border-color: var(--color-accent);
+    background: var(--color-accent-subtle);
+  }
+  100% {
+    background: var(--color-bg-elevated);
+  }
+}
+
 @media (max-width: 1180px) {
   .threeTables,
   .workspace,
-  .twoCols {
+  .twoCols,
+  .providerDetailWorkspace {
     grid-template-columns: 1fr;
   }
 
@@ -1522,6 +1714,10 @@ button {
   }
 
   .detail {
+    position: static;
+  }
+
+  .providerAttentionRail {
     position: static;
   }
 
@@ -1643,6 +1839,62 @@ button {
   .formGrid,
   .inlineForm {
     grid-template-columns: 1fr;
+  }
+
+  .providerHeaderProgress {
+    grid-template-columns: 1fr auto;
+  }
+
+  .progressLabel {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+
+  .documentsTable thead {
+    display: none;
+  }
+
+  .documentsTable,
+  .documentsTable tbody,
+  .documentsTable tr,
+  .documentsTable td {
+    display: block;
+    width: 100%;
+  }
+
+  .documentsTable tr {
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding: 0.7rem 0.8rem;
+  }
+
+  .documentsTable tr:last-child {
+    border-bottom: 0;
+  }
+
+  .documentsTable td {
+    display: grid;
+    grid-template-columns: minmax(5.8rem, 0.42fr) minmax(0, 1fr);
+    gap: 0.65rem;
+    border: 0;
+    padding: 0.28rem 0;
+  }
+
+  .documentsTable td::before {
+    content: attr(data-label);
+    color: var(--color-text-muted);
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .documentsTable td:last-child {
+    width: 100%;
+    white-space: normal;
+  }
+
+  .documentsTable .docTypeActions {
+    justify-content: flex-start;
   }
 
   .rowActions {

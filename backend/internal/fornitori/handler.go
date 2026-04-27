@@ -103,6 +103,7 @@ func RegisterRoutes(mux *http.ServeMux, arakClient *arak.Client, arakDB *sql.DB)
 
 	handle("GET /fornitori/v1/payment-method", h.handlePaymentMethods)
 	handle("PUT /fornitori/v1/payment-method/{code}/rda-available", h.requireWritable(h.handlePaymentMethodAvailability))
+	handle("GET /fornitori/v1/country", h.handleCountries)
 
 	handle("GET /fornitori/v1/article-category", h.handleArticleCategories)
 	handle("PUT /fornitori/v1/article-category/{article_code}", h.requireWritable(h.handleArticleCategoryUpdate))
@@ -592,6 +593,32 @@ func (h *Handler) handlePaymentMethodAvailability(w http.ResponseWriter, r *http
 	httputil.JSON(w, http.StatusOK, map[string]string{"message": "Aggiornamento completato"})
 }
 
+func (h *Handler) handleCountries(w http.ResponseWriter, r *http.Request) {
+	if !h.requireDB(w) {
+		return
+	}
+	rows, err := h.db.QueryContext(r.Context(), `
+		SELECT code, name
+		FROM provider_qualifications.country
+		ORDER BY name ASC`)
+	if err != nil {
+		httputil.InternalError(w, r, err, "countries query failed")
+		return
+	}
+	defer rows.Close()
+
+	items := make([]country, 0)
+	for rows.Next() {
+		var item country
+		if err := rows.Scan(&item.Code, &item.Name); err != nil {
+			httputil.InternalError(w, r, err, "countries scan failed")
+			return
+		}
+		items = append(items, item)
+	}
+	writeRows(w, r, items, rows.Err())
+}
+
 func (h *Handler) handleArticleCategories(w http.ResponseWriter, r *http.Request) {
 	if !h.requireDB(w) {
 		return
@@ -764,6 +791,11 @@ type paymentMethod struct {
 	Code         string `json:"code"`
 	Description  string `json:"description"`
 	RDAAvailable bool   `json:"rda_available"`
+}
+
+type country struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
 }
 
 type articleCategory struct {

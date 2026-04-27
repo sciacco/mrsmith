@@ -3,10 +3,15 @@ package fornitori
 import (
 	"bytes"
 	"context"
+	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/sciacco/mrsmith/internal/auth"
@@ -133,6 +138,28 @@ func TestDevAdminCanSetSkipQualification(t *testing.T) {
 	}
 }
 
+func TestHandleCountriesReturnsArakCountries(t *testing.T) {
+	h := &Handler{db: openFornitoriTestDB(t, "countries")}
+
+	req := httptest.NewRequest(http.MethodGet, "/fornitori/v1/country", nil)
+	rec := httptest.NewRecorder()
+	h.handleCountries(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var rows []country
+	if err := json.Unmarshal(rec.Body.Bytes(), &rows); err != nil {
+		t.Fatalf("failed to decode countries response: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 countries, got %d: %#v", len(rows), rows)
+	}
+	if rows[0].Code != "FR" || rows[0].Name != "Francia" || rows[1].Code != "IT" || rows[1].Name != "Italia" {
+		t.Fatalf("unexpected countries payload: %#v", rows)
+	}
+}
+
 func authedRequest(method, target string, body io.Reader, roles ...string) *http.Request {
 	req := httptest.NewRequest(method, target, body)
 	req.Header.Set("Content-Type", "application/json")
@@ -155,4 +182,88 @@ func fakeArakServer(t *testing.T, inspect ...func(*http.Request, []byte)) *httpt
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.Copy(w, bytes.NewReader([]byte(`{"ok":true}`)))
 	}))
+}
+
+func openFornitoriTestDB(t *testing.T, mode string) *sql.DB {
+	t.Helper()
+
+	registerFornitoriTestDriver()
+
+	db, err := sql.Open(fornitoriTestDriverName, mode)
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+	return db
+}
+
+const fornitoriTestDriverName = "fornitori_test_driver"
+
+var registerFornitoriDriverOnce sync.Once
+
+func registerFornitoriTestDriver() {
+	registerFornitoriDriverOnce.Do(func() {
+		sql.Register(fornitoriTestDriverName, fornitoriTestDriver{})
+	})
+}
+
+type fornitoriTestDriver struct{}
+
+func (fornitoriTestDriver) Open(name string) (driver.Conn, error) {
+	return fornitoriTestConn{mode: name}, nil
+}
+
+type fornitoriTestConn struct {
+	mode string
+}
+
+func (c fornitoriTestConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c fornitoriTestConn) Close() error { return nil }
+
+func (c fornitoriTestConn) Begin() (driver.Tx, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c fornitoriTestConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+	if c.mode == "countries" && strings.Contains(query, "provider_qualifications.country") {
+		return &fornitoriTestRows{
+			columns: []string{"code", "name"},
+			values: [][]driver.Value{
+				{"FR", "Francia"},
+				{"IT", "Italia"},
+			},
+		}, nil
+	}
+	return nil, errors.New("unexpected query")
+}
+
+func (c fornitoriTestConn) Ping(context.Context) error { return nil }
+
+var _ driver.QueryerContext = fornitoriTestConn{}
+var _ driver.Pinger = fornitoriTestConn{}
+
+type fornitoriTestRows struct {
+	columns []string
+	values  [][]driver.Value
+	index   int
+}
+
+func (r *fornitoriTestRows) Columns() []string {
+	return r.columns
+}
+
+func (r *fornitoriTestRows) Close() error { return nil }
+
+func (r *fornitoriTestRows) Next(dest []driver.Value) error {
+	if r.index >= len(r.values) {
+		return io.EOF
+	}
+	copy(dest, r.values[r.index])
+	r.index++
+	return nil
 }

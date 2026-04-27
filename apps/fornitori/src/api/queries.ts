@@ -3,6 +3,7 @@ import type {
   ArticleCategory,
   Category,
   CategoryPayload,
+  Country,
   DashboardCategory,
   DashboardDocument,
   DashboardDraft,
@@ -101,6 +102,14 @@ export function usePaymentMethods() {
   return useQuery({
     queryKey: ['fornitori', 'payment-methods'],
     queryFn: () => api.get<PaymentMethod[]>(`${root}/payment-method`),
+  });
+}
+
+export function useCountries() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['fornitori', 'countries'],
+    queryFn: () => api.get<Country[]>(`${root}/country`),
   });
 }
 

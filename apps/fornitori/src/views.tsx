@@ -1,10 +1,11 @@
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, type IconName, Modal, MultiSelect, SearchInput, Skeleton, StatusBadge, ToggleSwitch, useToast, type StatusBadgeVariant } from '@mrsmith/ui';
-import { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Button, Icon, type IconName, Modal, MultiSelect, SearchInput, SingleSelect, Skeleton, StatusBadge, TabNav, ToggleSwitch, useToast, type StatusBadgeVariant } from '@mrsmith/ui';
+import { useEffect, useMemo, useState } from 'react';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   useArticleCategories,
   useCategories,
+  useCountries,
   useDashboard,
   useDocumentTypes,
   useFornitoriMutations,
@@ -14,14 +15,32 @@ import {
   useProviderDocuments,
   useProviderSummary,
 } from './api/queries';
-import type { Category, CategoryDocumentType, DashboardCategory, DashboardDocument, DashboardDraft, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
-import { countries } from './lib/countries';
+import type { Category, CategoryDocumentType, Country, DashboardCategory, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
 import { provinces } from './lib/provinces';
-import { referenceTypeLabel, referenceTypes } from './lib/reference';
+import { referenceTypeLabel, referenceTypes, stateLabel } from './lib/reference';
+import { hasProviderErp, providerStateSelectOptions } from './lib/providerState';
 import { saveBlob } from './lib/download';
 import { useHasRole } from './hooks/useHasRole';
 import {
+  PROVIDER_ATTENTION_LABELS,
+  buildDashboardProviderAttention,
+  buildDetailProviderAttention,
+  buildPrioritySummary,
+  missingProviderActivationFields,
+  type ProviderAttention,
+  type ProviderAttentionAction,
+  type ProviderAttentionSeverity,
+  type PrioritySummary,
+} from './lib/providerAttention';
+import {
+  legacyProviderDetailPath,
+  normalizeProviderSection,
+  providerDetailPath,
+  type ProviderDetailSection,
+} from './lib/providerRoutes';
+import {
   CategoryStateBadge,
+  daysUntilExpiry,
   DocumentStateBadge,
   DocumentUrgencyBadge,
   ProviderStateBadge,
@@ -80,7 +99,18 @@ const languageOptions = [
   { value: 'en', label: 'Inglese' },
 ];
 
-const countryOptions = countries.map((item) => ({ value: item.code, label: item.name }));
+function countrySelectOptions(countries: Country[] | undefined, current?: string | null) {
+  const options = countries?.map((item) => ({ value: item.code, label: item.name })) ?? [];
+  if (current && !options.some((item) => item.value === current)) {
+    return [{ value: current, label: current }, ...options];
+  }
+  return options;
+}
+
+function ensureSelectedOption(options: { value: string; label: string }[], selected?: string | null) {
+  if (!selected || options.some((item) => item.value === selected)) return options;
+  return [{ value: selected, label: stateLabel(selected) }, ...options];
+}
 
 function providerPayload(form: HTMLFormElement): ProviderPayload {
   const data = new FormData(form);
@@ -98,7 +128,7 @@ function providerPayload(form: HTMLFormElement): ProviderPayload {
     erp_id: erp ? Number(erp) : null,
     language: String(data.get('language') || 'it'),
     country,
-    default_payment_method: String(data.get('default_payment_method') ?? '').trim() || null,
+    default_payment_method: String(data.get('default_payment_method') ?? '') || null,
     ref: {
       first_name: String(data.get('ref_first_name') ?? '').trim(),
       last_name: String(data.get('ref_last_name') ?? '').trim(),
@@ -128,51 +158,11 @@ interface CategoryGroup {
   categories: { id: number; name: string; state: string; critical: boolean }[];
 }
 
-interface PrioritySummary {
-  overdue: number;
-  expiring: number;
-  drafts: number;
-  openCategories: number;
-}
-
-type ProviderPriorityClass = 'blocking' | 'expired' | 'expiring' | 'completion';
-
-interface ProviderMissingReason {
-  id: string;
-  label: string;
-  score: number;
-}
-
-interface ProviderPriorityCard {
-  providerId: number;
-  companyName: string;
-  classification: ProviderPriorityClass;
-  missingCount: number;
-  details: string[];
-  href: string;
-  actionLabel: string;
-  sortScore: number;
-}
-
-interface ProviderPriorityAccumulator {
-  providerId: number;
-  companyName: string;
-  hasDraft: boolean;
-  hasCriticalCategory: boolean;
-  expiredDocuments: number;
-  expiringDocuments: number;
-  criticalCategories: number;
-  openCategories: number;
-  criticalCategoryNames: string[];
-  standardCategoryNames: string[];
-  reasons: ProviderMissingReason[];
-}
-
-const PROVIDER_PRIORITY_META: Record<ProviderPriorityClass, { label: string; variant: StatusBadgeVariant; rank: number }> = {
-  blocking: { label: 'Bloccante', variant: 'accent', rank: 0 },
-  expired: { label: 'Scaduto', variant: 'danger', rank: 1 },
-  expiring: { label: 'In scadenza', variant: 'warning', rank: 2 },
-  completion: { label: 'Da completare', variant: 'neutral', rank: 3 },
+const PROVIDER_ATTENTION_BADGE: Record<Exclude<ProviderAttentionSeverity, 'none'>, StatusBadgeVariant> = {
+  blocking: 'accent',
+  expired: 'danger',
+  expiring: 'warning',
+  completion: 'neutral',
 };
 
 function groupCategoriesByProvider(rows: DashboardCategory[]): CategoryGroup[] {
@@ -191,182 +181,27 @@ function groupCategoriesByProvider(rows: DashboardCategory[]): CategoryGroup[] {
   return Array.from(groups.values());
 }
 
-function expiryCopy(documentType?: string | null, days?: number | null) {
-  const label = documentType || 'Documento';
-  if (days == null) return `${label} in scadenza`;
-  if (days < 0) return `${label} scaduto da ${Math.abs(days)}gg`;
-  if (days === 0) return `${label} scade oggi`;
-  return `${label} scade tra ${days}gg`;
-}
-
-function buildPrioritySummary(
-  documents: DashboardDocument[],
-  categories: DashboardCategory[],
-  drafts: DashboardDraft[],
-): PrioritySummary {
-  return {
-    overdue: documents.filter((row) => row.days_remaining < 0).length,
-    expiring: documents.filter((row) => row.days_remaining >= 0).length,
-    drafts: drafts.length,
-    openCategories: categories.length,
-  };
-}
-
 function anomalyCountLabel(count: number) {
   return count === 1 ? '1 anomalia' : `${count} anomalie`;
 }
 
-function namedCategoryIssue(name: string, critical: boolean) {
-  if (!name) return critical ? 'Categoria critica da qualificare' : 'Categoria da qualificare';
-  return critical ? `Categoria ${name} critica da qualificare` : `Categoria ${name} da qualificare`;
-}
-
-function matchesProviderAnomalyQuery(card: ProviderPriorityCard, query: string) {
+function matchesProviderAnomalyQuery(card: ProviderAttention, query: string) {
   const terms = query.toLocaleLowerCase('it').trim().split(/\s+/).filter(Boolean);
   if (terms.length === 0) return true;
   const haystack = [
     card.companyName,
-    PROVIDER_PRIORITY_META[card.classification].label,
-    anomalyCountLabel(card.missingCount),
-    ...card.details,
+    PROVIDER_ATTENTION_LABELS[card.severity],
+    anomalyCountLabel(card.openCount),
+    ...card.actions.map((action) => action.detail),
   ].join(' ').toLocaleLowerCase('it');
   return terms.every((term) => haystack.includes(term));
-}
-
-function providerClassification(item: ProviderPriorityAccumulator): ProviderPriorityClass {
-  if (item.hasDraft || item.hasCriticalCategory) return 'blocking';
-  if (item.expiredDocuments > 0) return 'expired';
-  if (item.expiringDocuments > 0) return 'expiring';
-  return 'completion';
-}
-
-function providerRiskScore(item: ProviderPriorityAccumulator) {
-  return (
-    (item.hasDraft ? 80 : 0) +
-    (item.hasCriticalCategory ? 70 : 0) +
-    (item.expiredDocuments * 18) +
-    (item.expiringDocuments * 8) +
-    (item.criticalCategories * 16) +
-    (item.openCategories * 6) +
-    item.reasons.reduce((total, reason) => total + reason.score, 0)
-  );
-}
-
-function ensureProviderAccumulator(
-  groups: Map<number, ProviderPriorityAccumulator>,
-  providerId: number,
-  companyName?: string | null,
-) {
-  const existing = groups.get(providerId);
-  if (existing) {
-    if (existing.companyName === '-' && companyName) existing.companyName = value(companyName);
-    return existing;
-  }
-  const next: ProviderPriorityAccumulator = {
-    providerId,
-    companyName: value(companyName),
-    hasDraft: false,
-    hasCriticalCategory: false,
-    expiredDocuments: 0,
-    expiringDocuments: 0,
-    criticalCategories: 0,
-    openCategories: 0,
-    criticalCategoryNames: [],
-    standardCategoryNames: [],
-    reasons: [],
-  };
-  groups.set(providerId, next);
-  return next;
-}
-
-function buildProviderPriorityCards(
-  documents: DashboardDocument[],
-  categories: DashboardCategory[],
-  drafts: DashboardDraft[],
-) {
-  const groups = new Map<number, ProviderPriorityAccumulator>();
-
-  for (const row of drafts) {
-    const item = ensureProviderAccumulator(groups, row.id, row.company_name);
-    item.hasDraft = true;
-    item.reasons.push({ id: `draft-${row.id}`, label: 'Qualifica da completare', score: 55 });
-  }
-
-  for (const row of documents) {
-    const item = ensureProviderAccumulator(groups, row.provider_id, row.company_name);
-    const expired = row.days_remaining < 0;
-    if (expired) item.expiredDocuments += 1;
-    else item.expiringDocuments += 1;
-    item.reasons.push({
-      id: `document-${row.id}`,
-      label: expiryCopy(row.document_type, row.days_remaining),
-      score: expired ? Math.min(45, 25 + Math.abs(row.days_remaining)) : Math.max(4, 18 - row.days_remaining),
-    });
-  }
-
-  for (const row of categories) {
-    const item = ensureProviderAccumulator(groups, row.provider_id, row.company_name);
-    item.openCategories += 1;
-    if (row.critical) {
-      item.hasCriticalCategory = true;
-      item.criticalCategories += 1;
-      item.criticalCategoryNames.push(row.category_name?.trim() ?? '');
-    } else {
-      item.standardCategoryNames.push(row.category_name?.trim() ?? '');
-    }
-  }
-
-  return Array.from(groups.values())
-    .map((item): ProviderPriorityCard => {
-      const classification = providerClassification(item);
-      const categoryReasons: ProviderMissingReason[] = [];
-      const standardCategories = item.openCategories - item.criticalCategories;
-      if (item.criticalCategories > 0) {
-        categoryReasons.push({
-          id: `critical-categories-${item.providerId}`,
-          label: item.criticalCategoryNames.length === 1
-            ? namedCategoryIssue(item.criticalCategoryNames[0] ?? '', true)
-            : `${item.criticalCategoryNames.length} categorie critiche da qualificare`,
-          score: 52 + item.criticalCategories * 4,
-        });
-      }
-      if (standardCategories > 0) {
-        categoryReasons.push({
-          id: `categories-${item.providerId}`,
-          label: item.standardCategoryNames.length === 1
-            ? namedCategoryIssue(item.standardCategoryNames[0] ?? '', false)
-            : `${item.standardCategoryNames.length} categorie da qualificare`,
-          score: 14 + standardCategories * 2,
-        });
-      }
-      const details = [...item.reasons, ...categoryReasons]
-        .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label, 'it'))
-        .slice(0, 3)
-        .map((reason) => reason.label);
-
-      return {
-        providerId: item.providerId,
-        companyName: item.companyName,
-        classification,
-        missingCount: item.reasons.length + item.openCategories,
-        details,
-        href: item.hasDraft ? `/fornitori?id_provider=${item.providerId}` : `/fornitori?id_provider=${item.providerId}&tab=Qualifica`,
-        actionLabel: item.hasDraft ? 'Completa fornitore' : 'Apri Qualifica',
-        sortScore: providerRiskScore(item),
-      };
-    })
-    .sort((a, b) => (
-      PROVIDER_PRIORITY_META[a.classification].rank - PROVIDER_PRIORITY_META[b.classification].rank ||
-      b.sortScore - a.sortScore ||
-      a.companyName.localeCompare(b.companyName, 'it')
-    ));
 }
 
 function ProviderMissingConsole({
   cards,
   onOpen,
 }: {
-  cards: ProviderPriorityCard[];
+  cards: ProviderAttention[];
   onOpen: (href: string) => void;
 }) {
   const visibleCards = cards.slice(0, 8);
@@ -403,24 +238,26 @@ function ProviderMissingCard({
   card,
   onOpen,
 }: {
-  card: ProviderPriorityCard;
+  card: ProviderAttention;
   onOpen: (href: string) => void;
 }) {
-  const meta = PROVIDER_PRIORITY_META[card.classification];
+  const label = PROVIDER_ATTENTION_LABELS[card.severity];
+  const variant = card.severity === 'none' ? 'success' : PROVIDER_ATTENTION_BADGE[card.severity];
+  const details = card.actions.slice(0, 3).map((action) => action.detail);
   return (
     <button
       type="button"
       className="providerMissingCard"
-      data-classification={card.classification}
+      data-classification={card.severity}
       onClick={() => onOpen(card.href)}
     >
       <span className="providerMissingTopline">
-        <StatusBadge value={meta.label} label={meta.label} variant={meta.variant} />
-        <span>{anomalyCountLabel(card.missingCount)}</span>
+        <StatusBadge value={label} label={label} variant={variant} />
+        <span>{anomalyCountLabel(card.openCount)}</span>
       </span>
       <span className="providerMissingName">{card.companyName}</span>
       <span className="providerMissingDetails">
-        {card.details.map((detail, index) => (
+        {details.map((detail, index) => (
           <span key={`${detail}-${index}`}>{detail}</span>
         ))}
       </span>
@@ -436,7 +273,7 @@ function ProviderAnomalyList({
   cards,
   onOpen,
 }: {
-  cards: ProviderPriorityCard[];
+  cards: ProviderAttention[];
   onOpen: (href: string) => void;
 }) {
   const [query, setQuery] = useState('');
@@ -496,10 +333,12 @@ function ProviderAnomalyRow({
   card,
   onOpen,
 }: {
-  card: ProviderPriorityCard;
+  card: ProviderAttention;
   onOpen: (href: string) => void;
 }) {
-  const meta = PROVIDER_PRIORITY_META[card.classification];
+  const label = PROVIDER_ATTENTION_LABELS[card.severity];
+  const variant = card.severity === 'none' ? 'success' : PROVIDER_ATTENTION_BADGE[card.severity];
+  const details = card.actions.slice(0, 3).map((action) => action.detail);
   return (
     <button
       type="button"
@@ -507,11 +346,11 @@ function ProviderAnomalyRow({
       onClick={() => onOpen(card.href)}
     >
       <span className="providerAnomalySeverity">
-        <StatusBadge value={meta.label} label={meta.label} variant={meta.variant} />
+        <StatusBadge value={label} label={label} variant={variant} />
       </span>
       <span className="providerAnomalyName">{card.companyName}</span>
-      <span className="providerAnomalyCount">{anomalyCountLabel(card.missingCount)}</span>
-      <span className="providerAnomalyDetails">{card.details.length > 0 ? card.details.join(' · ') : '-'}</span>
+      <span className="providerAnomalyCount">{anomalyCountLabel(card.openCount)}</span>
+      <span className="providerAnomalyDetails">{details.length > 0 ? details.join(' · ') : '-'}</span>
       <span className="providerAnomalyAction">
         {card.actionLabel}
         <Icon name="chevron-right" size={16} />
@@ -596,7 +435,11 @@ export function DashboardPage() {
     [categories.data, documents.data, drafts.data],
   );
   const providerPriorityCards = useMemo(
-    () => buildProviderPriorityCards(documents.data ?? [], categories.data ?? [], drafts.data ?? []),
+    () => buildDashboardProviderAttention({
+      documents: documents.data ?? [],
+      categories: categories.data ?? [],
+      drafts: drafts.data ?? [],
+    }),
     [categories.data, documents.data, drafts.data],
   );
   const loading = drafts.isLoading || documents.isLoading || categories.isLoading;
@@ -631,7 +474,7 @@ export function DashboardPage() {
                 <table className="table">
                   <thead><tr><th>Ragione sociale</th><th>P.IVA</th><th>CF</th><th /></tr></thead>
                   <tbody>{(drafts.data ?? []).map((row) => (
-                    <tr key={row.id} onClick={() => navigate(`/fornitori?id_provider=${row.id}`)}>
+                    <tr key={row.id} onClick={() => navigate(providerDetailPath(row.id, 'dati'))}>
                       <td>{value(row.company_name)}</td>
                       <td>{value(row.vat_number)}</td>
                       <td>{value(row.cf)}</td>
@@ -655,7 +498,7 @@ export function DashboardPage() {
                 <table className="table">
                   <thead><tr><th>Fornitore</th><th>Documento</th><th>Scadenza</th><th>Urgenza</th><th /></tr></thead>
                   <tbody>{(documents.data ?? []).map((row) => (
-                    <tr key={row.id} onClick={() => navigate(`/fornitori?id_provider=${row.provider_id}&tab=Qualifica`)}>
+                    <tr key={row.id} onClick={() => navigate(providerDetailPath(row.provider_id, 'documenti', `document-${row.id}`))}>
                       <td>{value(row.company_name)}</td>
                       <td>{value(row.document_type)}</td>
                       <td>{dateLabel(row.expire_date)}</td>
@@ -680,27 +523,37 @@ export function DashboardPage() {
               <div className="tableScroll dashboardScroll">
                 <table className="table">
                   <thead><tr><th>Fornitore</th><th>Categorie aperte</th><th /></tr></thead>
-                  <tbody>{groupedCategories.map((group) => (
-                    <tr key={group.provider_id} onClick={() => navigate(`/fornitori?id_provider=${group.provider_id}&tab=Qualifica`)}>
-                      <td>{group.company_name}</td>
-                      <td>
-                        <div className="categoryChips">
-                          {group.categories.map((category) => (
-                            <span
-                              key={category.id}
-                              className="categoryChip"
-                              data-state={category.state}
-                              data-critical={category.critical ? 'true' : 'false'}
-                              title={category.critical ? 'Categoria critica' : undefined}
-                            >
-                              {category.name}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="iconCell"><Icon name="chevron-right" size={16} /></td>
-                    </tr>
-                  ))}</tbody>
+                  <tbody>{groupedCategories.map((group) => {
+                    const firstCategory = group.categories[0];
+                    return (
+                      <tr
+                        key={group.provider_id}
+                        onClick={() => navigate(providerDetailPath(
+                          group.provider_id,
+                          'qualifica',
+                          firstCategory ? `category-${firstCategory.id}` : null,
+                        ))}
+                      >
+                        <td>{group.company_name}</td>
+                        <td>
+                          <div className="categoryChips">
+                            {group.categories.map((category) => (
+                              <span
+                                key={category.id}
+                                className="categoryChip"
+                                data-state={category.state}
+                                data-critical={category.critical ? 'true' : 'false'}
+                                title={category.critical ? 'Categoria critica' : undefined}
+                              >
+                                {category.name}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="iconCell"><Icon name="chevron-right" size={16} /></td>
+                      </tr>
+                    );
+                  })}</tbody>
                 </table>
               </div>
             )}
@@ -792,18 +645,19 @@ function qualificationVariant(item: ProviderSummary): 'success' | 'warning' | 'd
   return 'warning';
 }
 
+export function FornitoriRoute() {
+  const [params] = useSearchParams();
+  const redirect = legacyProviderDetailPath(params.get('id_provider'), params.get('tab'));
+  if (redirect) return <Navigate to={redirect} replace />;
+  return <FornitoriPage />;
+}
+
 export function FornitoriPage() {
-  const [params, setParams] = useSearchParams();
-  const selectedId = Number(params.get('id_provider') ?? '') || null;
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [showArchive, setShowArchive] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const summary = useProviderSummary();
-  const summaryById = useMemo(() => {
-    const map = new Map<number, ProviderSummary>();
-    for (const item of summary.data ?? []) map.set(item.id, item);
-    return map;
-  }, [summary.data]);
 
   const { active, archive } = useMemo(() => {
     const all = summary.data ?? [];
@@ -815,58 +669,51 @@ export function FornitoriPage() {
   }, [summary.data, query]);
 
   function selectProvider(id: number) {
-    setParams({ id_provider: String(id) });
+    navigate(providerDetailPath(id, 'dati'));
   }
 
   return (
-    <main className="page">
+    <main className="page fornitoriListPage">
       <header className="pageHeader">
         <div><h1>Fornitori</h1><p>Anagrafica, contatti, qualifica e documenti.</p></div>
         <Button leftIcon={<Icon name="plus" />} onClick={() => setCreateOpen(true)}>Nuovo fornitore</Button>
       </header>
-      <div className="workspace">
-        <section className="master panel">
-          <div className="toolbar"><SearchInput value={query} onChange={setQuery} placeholder="Cerca per nome, P.IVA, CF, codice ERP" /></div>
-          {summary.isLoading ? <Skeleton rows={8} /> : summary.error ? stateBlock(errorTitle(summary.error), 'Elenco fornitori non disponibile.', 'triangle-alert') : (
-              <div className="listRows">
-                {active.map((item) => (
-                  <ProviderRow key={item.id} item={item} selected={item.id === selectedId} onSelect={selectProvider} />
-                ))}
-                {active.length === 0 && !showArchive ? stateBlock('Nessun fornitore trovato', 'Modifica i criteri di ricerca.', 'search') : null}
-                {archive.length > 0 ? (
-                  <button type="button" className="archiveToggle" onClick={() => setShowArchive((value) => !value)}>
-                    <Icon name={showArchive ? 'chevron-down' : 'chevron-right'} size={14} />
-                    <span>{showArchive ? 'Nascondi' : 'Mostra'} fornitori cessati e sospesi ({archive.length})</span>
-                  </button>
-                ) : null}
-                {showArchive ? archive.map((item) => (
-                  <ProviderRow key={item.id} item={item} selected={item.id === selectedId} onSelect={selectProvider} />
-                )) : null}
-            </div>
-          )}
-        </section>
-        <section className="detail panel">
-          {!selectedId
-            ? stateBlock('Seleziona un fornitore', 'Scegli un fornitore dalla lista per vedere i dettagli.', 'user')
-            : <ProviderPage providerId={selectedId} summary={summaryById.get(selectedId)} />}
-        </section>
-      </div>
+      <section className="panel fornitoriListPanel">
+        <div className="toolbar"><SearchInput value={query} onChange={setQuery} placeholder="Cerca per nome, P.IVA, CF, codice ERP" /></div>
+        {summary.isLoading ? <Skeleton rows={8} /> : summary.error ? stateBlock(errorTitle(summary.error), 'Elenco fornitori non disponibile.', 'triangle-alert') : (
+          <div className="listRows fornitoriSearchRows">
+            {active.map((item) => (
+              <ProviderRow key={item.id} item={item} onSelect={selectProvider} />
+            ))}
+            {active.length === 0 && !showArchive ? stateBlock('Nessun fornitore trovato', 'Modifica i criteri di ricerca.', 'search') : null}
+            {archive.length > 0 ? (
+              <button type="button" className="archiveToggle" onClick={() => setShowArchive((value) => !value)}>
+                <Icon name={showArchive ? 'chevron-down' : 'chevron-right'} size={14} />
+                <span>{showArchive ? 'Nascondi' : 'Mostra'} fornitori cessati e sospesi ({archive.length})</span>
+              </button>
+            ) : null}
+            {showArchive ? archive.map((item) => (
+              <ProviderRow key={item.id} item={item} onSelect={selectProvider} />
+            )) : null}
+          </div>
+        )}
+      </section>
       <ProviderCreateModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={(id) => {
           setCreateOpen(false);
-          setParams({ id_provider: String(id) });
+          navigate(providerDetailPath(id, 'dati'));
         }}
       />
     </main>
   );
 }
 
-function ProviderRow({ item, selected, onSelect }: { item: ProviderSummary; selected: boolean; onSelect: (id: number) => void }) {
+function ProviderRow({ item, onSelect }: { item: ProviderSummary; onSelect: (id: number) => void }) {
   const qualVariant = qualificationVariant(item);
   return (
-    <button className={`listRow ${selected ? 'selected' : ''}`} onClick={() => onSelect(item.id)}>
+    <button className="listRow" onClick={() => onSelect(item.id)}>
       <span>
         <strong>{item.company_name ?? '—'}</strong>
         <small className="providerRowMeta">
@@ -901,20 +748,100 @@ function refPayload(form: HTMLFormElement, type?: string): ProviderReference {
 function paymentCodeOf(value: Provider['default_payment_method']): string {
   if (value && typeof value === 'object') return value.code ?? '';
   if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
   return '';
 }
 
-function missingForActivation(provider: Provider): string[] {
-  const missing: string[] = [];
-  if (!provider.company_name?.trim()) missing.push('ragione sociale');
-  if (!provider.address?.trim()) missing.push('indirizzo');
-  if (!provider.city?.trim()) missing.push('città');
-  if (!provider.postal_code?.trim()) missing.push('CAP');
-  if (!provider.country?.trim()) missing.push('paese');
-  if (!provider.erp_id || provider.erp_id <= 0) missing.push('codice ERP');
-  if (!paymentCodeOf(provider.default_payment_method).trim()) missing.push('metodo di pagamento');
-  if (getProviderRefs(provider).length === 0) missing.push('almeno un contatto');
-  return missing;
+interface ProviderFormState {
+  company_name: string;
+  state: string;
+  vat_number: string;
+  cf: string;
+  erp_id: string;
+  language: string;
+  country: string;
+  province: string;
+  city: string;
+  postal_code: string;
+  address: string;
+  default_payment_method: string;
+  ref_first_name: string;
+  ref_last_name: string;
+  ref_email: string;
+  ref_phone: string;
+  skip_qualification_validation: boolean;
+}
+
+function providerFormState(provider: Provider): ProviderFormState {
+  const ref = qualificationRef(provider);
+  return {
+    company_name: provider.company_name ?? '',
+    state: (provider.state ?? 'DRAFT').toUpperCase(),
+    vat_number: provider.vat_number ?? '',
+    cf: provider.cf ?? '',
+    erp_id: provider.erp_id == null ? '' : String(provider.erp_id),
+    language: provider.language ?? 'it',
+    country: provider.country ?? 'IT',
+    province: provider.province ?? '',
+    city: provider.city ?? '',
+    postal_code: provider.postal_code ?? '',
+    address: provider.address ?? '',
+    default_payment_method: paymentCodeOf(provider.default_payment_method),
+    ref_first_name: ref?.first_name ?? '',
+    ref_last_name: ref?.last_name ?? '',
+    ref_email: ref?.email ?? '',
+    ref_phone: ref?.phone ?? '',
+    skip_qualification_validation: Boolean(provider.skip_qualification_validation),
+  };
+}
+
+function providerFormStatesEqual(a: ProviderFormState, b: ProviderFormState) {
+  return (
+    a.company_name === b.company_name &&
+    a.state === b.state &&
+    a.vat_number === b.vat_number &&
+    a.cf === b.cf &&
+    a.erp_id === b.erp_id &&
+    a.language === b.language &&
+    a.country === b.country &&
+    a.province === b.province &&
+    a.city === b.city &&
+    a.postal_code === b.postal_code &&
+    a.address === b.address &&
+    a.default_payment_method === b.default_payment_method &&
+    a.ref_first_name === b.ref_first_name &&
+    a.ref_last_name === b.ref_last_name &&
+    a.ref_email === b.ref_email &&
+    a.ref_phone === b.ref_phone &&
+    a.skip_qualification_validation === b.skip_qualification_validation
+  );
+}
+
+function providerPayloadFromState(state: ProviderFormState): ProviderPayload {
+  const erp = state.erp_id.trim();
+  const payload: ProviderPayload = {
+    company_name: state.company_name.trim(),
+    state: state.state || 'DRAFT',
+    vat_number: state.vat_number.trim() || undefined,
+    cf: state.cf.trim() || undefined,
+    address: state.address.trim() || undefined,
+    city: state.city.trim() || undefined,
+    postal_code: state.postal_code.trim() || undefined,
+    province: state.province.trim() || undefined,
+    erp_id: erp ? Number(erp) : null,
+    language: state.language || 'it',
+    country: state.country || 'IT',
+    default_payment_method: state.default_payment_method || null,
+    ref: {
+      first_name: state.ref_first_name.trim(),
+      last_name: state.ref_last_name.trim(),
+      email: state.ref_email.trim(),
+      phone: state.ref_phone.trim(),
+      reference_type: 'QUALIFICATION_REF',
+    },
+  };
+  if (state.skip_qualification_validation) payload.skip_qualification_validation = true;
+  return payload;
 }
 
 function ProviderCreateModal({
@@ -929,11 +856,14 @@ function ProviderCreateModal({
   const { toast } = useToast();
   const mutations = useFornitoriMutations();
   const paymentMethods = usePaymentMethods();
+  const countriesQuery = useCountries();
   const [country, setCountry] = useState('IT');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   function close() {
     setCountry('IT');
+    setPaymentMethod('');
     setShowAdvanced(false);
     onClose();
   }
@@ -967,7 +897,15 @@ function ProviderCreateModal({
             <Input name="company_name" label="Ragione sociale" required wide />
             <Input name="vat_number" label="P.IVA" />
             <Input name="cf" label="Codice fiscale" />
-            <Select name="country" label="Paese" defaultValue="IT" options={countryOptions} onChange={(event) => setCountry(event.target.value)} />
+            <SearchableSelectField
+              name="country"
+              label="Paese"
+              value={country}
+              options={countrySelectOptions(countriesQuery.data, country)}
+              disabled={countriesQuery.isLoading || countriesQuery.isError}
+              onChange={(next) => setCountry(next || 'IT')}
+              placeholder="Seleziona paese"
+            />
             {country === 'IT' ? (
               <Select name="province" label="Provincia" options={['', ...provinces]} />
             ) : (
@@ -1002,7 +940,7 @@ function ProviderCreateModal({
           <div className="formSectionGrid">
             <Select name="language" label="Lingua" defaultValue="it" options={languageOptions} />
             <Input name="erp_id" label="Codice Alyante" type="number" />
-            <PaymentMethodField defaultValue="" options={paymentMethods.data ?? []} disabled={false} />
+            <PaymentMethodField value={paymentMethod} options={paymentMethods.data ?? []} disabled={paymentMethods.isLoading || paymentMethods.isError} onChange={setPaymentMethod} />
           </div>
         ) : null}
 
@@ -1026,12 +964,72 @@ function validateCreatePayload(payload: ProviderPayload): string | null {
   return null;
 }
 
-function ProviderPage({ providerId, summary }: { providerId: number; summary?: ProviderSummary }) {
-  const provider = useProvider(providerId);
+const PROVIDER_DETAIL_TABS = [
+  { key: 'dati', label: 'Dati' },
+  { key: 'qualifica', label: 'Qualifica' },
+  { key: 'documenti', label: 'Documenti' },
+  { key: 'contatti', label: 'Contatti' },
+];
 
-  if (provider.isLoading) return <Skeleton rows={10} />;
-  if (provider.error) return stateBlock(errorTitle(provider.error), 'Il dettaglio fornitore non può essere caricato.', 'triangle-alert');
-  if (!provider.data) return null;
+function parseProviderId(raw?: string) {
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+export function ProviderDetailPage() {
+  const navigate = useNavigate();
+  const { providerId: rawProviderId } = useParams();
+  const providerId = parseProviderId(rawProviderId);
+  const [params, setParams] = useSearchParams();
+  const section = normalizeProviderSection(params.get('section'));
+  const focus = params.get('focus');
+
+  const provider = useProvider(providerId);
+  const loadedProviderId = provider.data ? providerId : null;
+  const providerCategories = useProviderCategories(loadedProviderId);
+  const documents = useProviderDocuments(loadedProviderId);
+
+  useEffect(() => {
+    if (!focus) return;
+    const handle = window.setTimeout(() => {
+      const target = document.querySelector<HTMLElement>(`[data-focus-id="${focus}"]`);
+      target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 120);
+    return () => window.clearTimeout(handle);
+  }, [focus, section, providerCategories.data, documents.data]);
+
+  function updateSection(nextSection: ProviderDetailSection, nextFocus?: string | null) {
+    const next = new URLSearchParams(params);
+    next.set('section', nextSection);
+    if (nextFocus) next.set('focus', nextFocus);
+    else next.delete('focus');
+    setParams(next);
+  }
+
+  function openAttentionAction(action: ProviderAttentionAction) {
+    updateSection(action.section, action.focus ?? null);
+  }
+
+  if (providerId === null) return <Navigate to="/fornitori" replace />;
+
+  if (provider.isLoading) {
+    return (
+      <main className="page providerDetailPage">
+        <section className="stateCard"><Skeleton rows={10} /></section>
+      </main>
+    );
+  }
+
+  if (provider.error || !provider.data) {
+    return (
+      <main className="page providerDetailPage">
+        <div className="detailTopBar">
+          <Button variant="secondary" leftIcon={<Icon name="arrow-left" />} onClick={() => navigate('/fornitori')}>Elenco fornitori</Button>
+        </div>
+        <section className="panel">{stateBlock(errorTitle(provider.error), 'Il dettaglio fornitore non può essere caricato.', 'triangle-alert')}</section>
+      </main>
+    );
+  }
 
   const data = provider.data;
   const stateUpper = (data.state ?? '').toUpperCase();
@@ -1039,22 +1037,86 @@ function ProviderPage({ providerId, summary }: { providerId: number; summary?: P
   const isActive = stateUpper === 'ACTIVE';
   const isDraft = stateUpper === 'DRAFT';
   const fullReadonly = !isUsable;
+  const attention = buildDetailProviderAttention({
+    provider: data,
+    providerCategories: providerCategories.data ?? [],
+    providerDocuments: documents.data ?? [],
+  });
+
+  const dotIndicator = {
+    dati: attention.counts.drafts > 0 ? 'warning' : null,
+    qualifica: attention.counts.criticalCategories > 0 ? 'danger' : attention.counts.openCategories > 0 ? 'warning' : null,
+    documenti: attention.counts.expiredDocuments > 0 ? 'danger' : attention.counts.expiringDocuments > 0 ? 'warning' : null,
+    contatti: null,
+  } as const;
+
+  let content: React.ReactNode;
+  if (section === 'qualifica') {
+    content = (
+      <QualificationSection
+        providerId={providerId}
+        readonly={fullReadonly}
+        providerCategories={providerCategories.data ?? []}
+        providerCategoriesLoading={providerCategories.isLoading}
+        providerCategoriesError={providerCategories.error}
+        documents={documents.data ?? []}
+        documentsLoading={documents.isLoading}
+        focus={focus}
+      />
+    );
+  } else if (section === 'documenti') {
+    content = (
+      <DocumentsSection
+        providerId={providerId}
+        readonly={fullReadonly}
+        documents={documents.data ?? []}
+        loading={documents.isLoading}
+        error={documents.error}
+        focus={focus}
+      />
+    );
+  } else if (section === 'contatti') {
+    content = <ContactsSection provider={data} readonly={fullReadonly} />;
+  } else {
+    content = (
+      <AnagraficaSection
+        provider={data}
+        fullReadonly={fullReadonly}
+        anagraficaLocked={isActive}
+        onDeleted={() => navigate('/fornitori')}
+      />
+    );
+  }
 
   return (
-    <div className="providerPage">
-      <ProviderHeader provider={data} summary={summary} />
+    <main className="page providerDetailPage">
+      <div className="detailTopBar">
+        <Button variant="secondary" leftIcon={<Icon name="arrow-left" />} onClick={() => navigate('/fornitori')}>Elenco fornitori</Button>
+      </div>
+      <ProviderHeader provider={data} providerCategories={providerCategories.data ?? []} />
       {fullReadonly ? <StateBanner state={data.state} /> : null}
       {isDraft ? <CompletenessBanner provider={data} /> : null}
-      <QualificationSection providerId={providerId} readonly={fullReadonly} />
-      <ContactsSection provider={data} readonly={fullReadonly} />
-      <AnagraficaSection provider={data} fullReadonly={fullReadonly} anagraficaLocked={isActive} />
-    </div>
+      <section className="providerDetailNav" aria-label="Sezioni fornitore">
+        <TabNav
+          items={PROVIDER_DETAIL_TABS}
+          activeKey={section}
+          onTabChange={(key) => updateSection(normalizeProviderSection(key))}
+          dotIndicator={dotIndicator}
+        />
+      </section>
+      <div className="providerDetailWorkspace">
+        <div className="providerDetailMain">
+          {content}
+        </div>
+        <ProviderAttentionRail attention={attention} onOpen={openAttentionAction} />
+      </div>
+    </main>
   );
 }
 
-function ProviderHeader({ provider, summary }: { provider: Provider; summary?: ProviderSummary }) {
-  const total = summary?.total_count ?? 0;
-  const qualified = summary?.qualified_count ?? 0;
+function ProviderHeader({ provider, providerCategories }: { provider: Provider; providerCategories: ProviderCategory[] }) {
+  const total = providerCategories.length;
+  const qualified = providerCategories.filter((row) => (row.status ?? row.state)?.toUpperCase() === 'QUALIFIED').length;
   const percent = total > 0 ? Math.round((qualified / total) * 100) : 0;
 
   return (
@@ -1105,7 +1167,7 @@ function StateBanner({ state }: { state?: string | null }) {
 }
 
 function CompletenessBanner({ provider }: { provider: Provider }) {
-  const missing = missingForActivation(provider);
+  const missing = missingProviderActivationFields(provider);
   if (missing.length === 0) {
     return (
       <div className="banner banner--success">
@@ -1122,12 +1184,78 @@ function CompletenessBanner({ provider }: { provider: Provider }) {
   );
 }
 
-function QualificationSection({ providerId, readonly }: { providerId: number; readonly: boolean }) {
+function ProviderAttentionRail({
+  attention,
+  onOpen,
+}: {
+  attention: ProviderAttention;
+  onOpen: (action: ProviderAttentionAction) => void;
+}) {
+  return (
+    <aside className="providerAttentionRail" aria-labelledby="provider-attention-title">
+      <header className="providerAttentionHeader">
+        <div>
+          <h2 id="provider-attention-title">Da completare</h2>
+          <span>{attention.openCount === 1 ? '1 attività aperta' : `${attention.openCount} attività aperte`}</span>
+        </div>
+      </header>
+      {attention.actions.length === 0 ? (
+        <div className="priorityEmpty providerAttentionEmpty">
+          <span className="priorityEmptyIcon" aria-hidden="true"><Icon name="check-circle" size={20} /></span>
+          <div>
+            <strong>Nessuna attività aperta</strong>
+            <span>Il fornitore non richiede interventi.</span>
+          </div>
+        </div>
+      ) : (
+        <div className="providerAttentionActions">
+          {attention.actions.map((action) => (
+            <button
+              key={action.id}
+              type="button"
+              className="providerAttentionAction"
+              onClick={() => onOpen(action)}
+            >
+              <span className="providerAttentionActionTopline">
+                <StatusBadge
+                  value={PROVIDER_ATTENTION_LABELS[action.severity]}
+                  label={PROVIDER_ATTENTION_LABELS[action.severity]}
+                  variant={PROVIDER_ATTENTION_BADGE[action.severity]}
+                />
+                <span>{action.label}</span>
+              </span>
+              <strong>{action.detail}</strong>
+              <span className="providerAttentionActionIcon"><Icon name="chevron-right" size={16} /></span>
+            </button>
+          ))}
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function QualificationSection({
+  providerId,
+  readonly,
+  providerCategories,
+  providerCategoriesLoading,
+  providerCategoriesError,
+  documents,
+  documentsLoading,
+  focus,
+}: {
+  providerId: number;
+  readonly: boolean;
+  providerCategories: ProviderCategory[];
+  providerCategoriesLoading: boolean;
+  providerCategoriesError: unknown;
+  documents: ProviderDocument[];
+  documentsLoading: boolean;
+  focus: string | null;
+}) {
   const { toast } = useToast();
   const mutations = useFornitoriMutations();
-  const providerCategories = useProviderCategories(providerId);
   const allCategories = useCategories();
-  const documents = useProviderDocuments(providerId);
   const [addOpen, setAddOpen] = useState(false);
 
   const categoryById = useMemo(() => {
@@ -1138,7 +1266,7 @@ function QualificationSection({ providerId, readonly }: { providerId: number; re
 
   const documentsByType = useMemo(() => {
     const map = new Map<number, ProviderDocument[]>();
-    for (const doc of documents.data ?? []) {
+    for (const doc of documents) {
       const typeId = doc.document_type?.id;
       if (typeId == null) continue;
       const list = map.get(typeId) ?? [];
@@ -1146,9 +1274,9 @@ function QualificationSection({ providerId, readonly }: { providerId: number; re
       map.set(typeId, list);
     }
     return map;
-  }, [documents.data]);
+  }, [documents]);
 
-  const rows = providerCategories.data ?? [];
+  const rows = providerCategories;
   const totalCount = rows.length;
   const qualifiedCount = rows.filter((row) => (row.status ?? row.state)?.toUpperCase() === 'QUALIFIED').length;
   const availableCategories = (allCategories.data ?? []).filter(
@@ -1165,7 +1293,7 @@ function QualificationSection({ providerId, readonly }: { providerId: number; re
         </Button>
       ) : undefined}
     >
-      {providerCategories.isLoading ? <Skeleton rows={4} /> : rows.length === 0 ? stateBlock('Nessuna categoria assegnata', 'Aggiungi una categoria di qualifica per iniziare.', 'box') : (
+      {providerCategoriesError ? stateBlock(errorTitle(providerCategoriesError), 'Le categorie del fornitore non possono essere caricate.', 'triangle-alert') : providerCategoriesLoading || documentsLoading || allCategories.isLoading ? <Skeleton rows={4} /> : rows.length === 0 ? stateBlock('Nessuna categoria assegnata', 'Aggiungi una categoria di qualifica per iniziare.', 'box') : (
         <div className="qualificationList">
           {rows.map((row) => {
             const categoryId = row.category?.id;
@@ -1178,6 +1306,7 @@ function QualificationSection({ providerId, readonly }: { providerId: number; re
                 documentsByType={documentsByType}
                 providerId={providerId}
                 readonly={readonly}
+                focused={focus === `category-${categoryId}`}
               />
             );
           })}
@@ -1204,12 +1333,14 @@ function CategoryCard({
   documentsByType,
   providerId,
   readonly,
+  focused,
 }: {
   providerCategory: ProviderCategory;
   category?: Category;
   documentsByType: Map<number, ProviderDocument[]>;
   providerId: number;
   readonly: boolean;
+  focused: boolean;
 }) {
   const state = (providerCategory.status ?? providerCategory.state ?? 'NEW').toUpperCase();
   const [open, setOpen] = useState(state !== 'QUALIFIED');
@@ -1220,6 +1351,11 @@ function CategoryCard({
   const docTypes = category?.document_types ?? [];
   const required = docTypes.filter((dt) => dt.required);
   const optional = docTypes.filter((dt) => !dt.required);
+  const categoryId = providerCategory.category?.id ?? category?.id;
+
+  useEffect(() => {
+    if (focused) setOpen(true);
+  }, [focused]);
 
   const requiredMissingNames = required
     .filter((dt) => !(documentsByType.get(dt.document_type.id) ?? []).some((d) => (d.state ?? '').toUpperCase() === 'OK'))
@@ -1237,7 +1373,12 @@ function CategoryCard({
   }
 
   return (
-    <article className="qualificationCard" data-state={state}>
+    <article
+      className="qualificationCard"
+      data-state={state}
+      data-focus-id={categoryId != null ? `category-${categoryId}` : undefined}
+      data-focus-highlight={focused ? 'true' : undefined}
+    >
       <button type="button" className="qualificationCardHeader" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         <div className="qualificationCardTitle">
           <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} />
@@ -1320,6 +1461,10 @@ function DocumentGroup({
           const docs = documentsByType.get(entry.document_type.id) ?? [];
           const hasUsable = docs.some((d) => (d.state ?? '').toUpperCase() === 'OK');
           const display = docs[0];
+          const stateUpper = (display?.state ?? '').toUpperCase();
+          const expiryDays = daysUntilExpiry(display?.expire_date);
+          const hasStateBadge = Boolean(stateUpper && stateUpper !== 'OK');
+          const hasUrgencyBadge = expiryDays !== null && expiryDays <= 30;
           return (
             <li key={entry.document_type.id} className="docTypeRow" data-required={required ? 'true' : 'false'} data-uploaded={display ? 'true' : 'false'}>
               <span className="docTypeIndicator" aria-hidden="true">{display ? <Icon name={hasUsable ? 'check-circle' : 'circle'} size={14} /> : <Icon name="circle" size={14} />}</span>
@@ -1330,6 +1475,7 @@ function DocumentGroup({
               <span className="docTypeBadges">
                 <DocumentStateBadge state={display?.state} />
                 <DocumentUrgencyBadge expireDate={display?.expire_date} />
+                {display && !hasStateBadge && !hasUrgencyBadge ? <span className="muted">Valido</span> : null}
               </span>
               <span className="docTypeActions">
                 {display ? (
@@ -1346,6 +1492,108 @@ function DocumentGroup({
         })}
       </ul>
     </div>
+  );
+}
+
+function DocumentsSection({
+  providerId,
+  readonly,
+  documents,
+  loading,
+  error,
+  focus,
+}: {
+  providerId: number;
+  readonly: boolean;
+  documents: ProviderDocument[];
+  loading: boolean;
+  error: unknown;
+  focus: string | null;
+}) {
+  const { toast } = useToast();
+  const mutations = useFornitoriMutations();
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [editDocId, setEditDocId] = useState<number | null>(null);
+
+  async function download(id: number) {
+    try {
+      const blob = await mutations.downloadDocument(id);
+      saveBlob(blob, `documento-${id}`);
+    } catch {
+      toast('Download non riuscito', 'error');
+    }
+  }
+
+  return (
+    <Panel
+      title="Documenti"
+      subtitle={documents.length === 0 ? 'Nessun documento caricato' : `${documents.length} documenti`}
+      actions={!readonly ? (
+        <Button size="sm" leftIcon={<Icon name="plus" />} onClick={() => setUploadOpen(true)}>
+          Carica documento
+        </Button>
+      ) : undefined}
+    >
+      {loading ? <Skeleton rows={5} /> : error ? stateBlock(errorTitle(error), 'I documenti del fornitore non possono essere caricati.', 'triangle-alert') : documents.length === 0 ? stateBlock('Nessun documento caricato', 'Carica un documento per collegarlo al fornitore.', 'file-text') : (
+        <div className="tableScroll">
+          <table className="table documentsTable">
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Scadenza</th>
+                <th>Stato</th>
+                <th>Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {documents.map((document) => {
+                const focused = focus === `document-${document.id}`;
+                const stateUpper = (document.state ?? '').toUpperCase();
+                const expiryDays = daysUntilExpiry(document.expire_date);
+                const hasStateBadge = Boolean(stateUpper && stateUpper !== 'OK');
+                const hasUrgencyBadge = expiryDays !== null && expiryDays <= 30;
+                return (
+                  <tr
+                    key={document.id}
+                    data-focus-id={`document-${document.id}`}
+                    data-focus-highlight={focused ? 'true' : undefined}
+                  >
+                    <td data-label="Documento">{document.document_type?.name ?? 'Documento'}</td>
+                    <td data-label="Scadenza">{dateLabel(document.expire_date)}</td>
+                    <td data-label="Stato">
+                      <span className="docTypeBadges">
+                        <DocumentStateBadge state={document.state} />
+                        <DocumentUrgencyBadge expireDate={document.expire_date} />
+                        {!hasStateBadge && !hasUrgencyBadge ? <span className="muted">Valido</span> : null}
+                      </span>
+                    </td>
+                    <td data-label="Azioni">
+                      <span className="docTypeActions">
+                        <Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} aria-label="Scarica documento" onClick={() => void download(document.id)} />
+                        {!readonly ? <Button size="sm" variant="secondary" leftIcon={<Icon name="pencil" />} aria-label="Aggiorna documento" onClick={() => setEditDocId(document.id)} /> : null}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <DocumentModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        providerId={providerId}
+        onSaved={() => toast('Documento caricato')}
+      />
+      <DocumentModal
+        open={editDocId !== null}
+        onClose={() => setEditDocId(null)}
+        providerId={providerId}
+        documentId={editDocId ?? undefined}
+        onSaved={() => toast('Documento aggiornato')}
+      />
+    </Panel>
   );
 }
 
@@ -1527,19 +1775,37 @@ function AnagraficaSection({
   provider,
   fullReadonly,
   anagraficaLocked,
+  onDeleted,
 }: {
   provider: Provider;
   fullReadonly: boolean;
   anagraficaLocked: boolean;
+  onDeleted: () => void;
 }) {
   const { toast } = useToast();
   const skipRole = useHasRole('app_fornitori_skip_qualification');
   const mutations = useFornitoriMutations();
   const paymentMethods = usePaymentMethods();
-  const [open, setOpen] = useState(false);
+  const countriesQuery = useCountries();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const ref = qualificationRef(provider);
-  const currentPaymentCode = paymentCodeOf(provider.default_payment_method);
+  const baseline = useMemo(() => providerFormState(provider), [provider]);
+  const [formState, setFormState] = useState<ProviderFormState>(baseline);
+
+  useEffect(() => {
+    setFormState(baseline);
+  }, [baseline]);
+
+  const dirty = !providerFormStatesEqual(formState, baseline);
+
+  useEffect(() => {
+    if (!dirty) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
 
   // Anagrafica master fields are locked when state=ACTIVE (cfr. trg_provider_state_guard).
   // Always editable on ACTIVE: payment method, qualification ref, skip flag.
@@ -1547,10 +1813,27 @@ function AnagraficaSection({
   // Never editable on INACTIVE/CEASED (fullReadonly).
   const masterFieldsDisabled = fullReadonly || anagraficaLocked;
   const editableSidefieldsDisabled = fullReadonly;
+  const stateOptions = ensureSelectedOption(
+    providerStateSelectOptions(provider.state, formState.erp_id),
+    formState.state,
+  );
+  const countryOptions = countrySelectOptions(countriesQuery.data, formState.country);
+
+  function updateField<K extends keyof ProviderFormState>(key: K, currentValue: ProviderFormState[K]) {
+    setFormState((current) => ({ ...current, [key]: currentValue }));
+  }
+
+  function updateErpId(nextValue: string) {
+    setFormState((current) => ({
+      ...current,
+      erp_id: nextValue,
+      state: (provider.state ?? '').toUpperCase() === 'DRAFT' && !hasProviderErp(nextValue) ? 'DRAFT' : current.state,
+    }));
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const body = providerPayload(event.currentTarget);
+    const body = providerPayloadFromState(formState);
     const validation = validateProvider(body);
     if (validation) {
       toast(validation, 'warning');
@@ -1564,78 +1847,172 @@ function AnagraficaSection({
     await mutations.deleteProvider.mutateAsync(provider.id);
     setConfirmDelete(false);
     toast('Fornitore eliminato');
+    onDeleted();
   }
 
   return (
     <Panel
       title="Anagrafica"
-      subtitle={anagraficaLocked && !fullReadonly ? 'Anagrafica bloccata: provider attivo' : undefined}
-      collapsible
-      open={open}
-      onToggle={() => setOpen((v) => !v)}
+      subtitle={anagraficaLocked && !fullReadonly ? 'Anagrafica bloccata: fornitore attivo' : undefined}
     >
-      {open ? (
-        <>
-          <form className="formGrid" onSubmit={(event) => void submit(event)}>
-            <input type="hidden" name="state" value={provider.state ?? 'DRAFT'} />
-            <Input name="company_name" label="Ragione sociale" defaultValue={provider.company_name} disabled={masterFieldsDisabled} />
-            <Input name="vat_number" label="P.IVA" defaultValue={provider.vat_number} disabled={masterFieldsDisabled} />
-            <Input name="cf" label="CF" defaultValue={provider.cf} disabled={masterFieldsDisabled} />
-            <Input name="erp_id" label="Codice Alyante" type="number" defaultValue={provider.erp_id ?? ''} disabled={masterFieldsDisabled} />
-            <Select name="language" label="Lingua" defaultValue={provider.language ?? 'it'} options={languageOptions} disabled={masterFieldsDisabled} />
-            <Select name="country" label="Paese" defaultValue={provider.country ?? 'IT'} options={countryOptions} disabled={masterFieldsDisabled} />
-            <Select name="province" label="Provincia" defaultValue={provider.province ?? ''} options={['', ...provinces]} disabled={masterFieldsDisabled} />
-            <Input name="city" label="Città" defaultValue={provider.city} disabled={masterFieldsDisabled} />
-            <Input name="postal_code" label="CAP" defaultValue={provider.postal_code} disabled={masterFieldsDisabled} />
-            <Input name="address" label="Indirizzo" defaultValue={provider.address} disabled={masterFieldsDisabled} wide />
-            <PaymentMethodField defaultValue={currentPaymentCode} options={paymentMethods.data ?? []} disabled={editableSidefieldsDisabled} />
-            <Input name="ref_first_name" label="Nome contatto qualifica" defaultValue={ref?.first_name} disabled={editableSidefieldsDisabled} />
-            <Input name="ref_last_name" label="Cognome contatto qualifica" defaultValue={ref?.last_name} disabled={editableSidefieldsDisabled} />
-            <Input name="ref_email" label="Email contatto qualifica" type="email" defaultValue={ref?.email} disabled={editableSidefieldsDisabled} />
-            <Input name="ref_phone" label="Telefono contatto qualifica" defaultValue={ref?.phone} disabled={editableSidefieldsDisabled} />
-            {skipRole ? (
-              <label className="checkLine">
-                <input name="skip_qualification_validation" type="checkbox" disabled={editableSidefieldsDisabled} defaultChecked={false} />
-                Salta controllo qualifica
-              </label>
+      <form className="formGrid" onSubmit={(event) => void submit(event)}>
+        <Input name="company_name" label="Ragione sociale" value={formState.company_name} disabled={masterFieldsDisabled} onChange={(event) => updateField('company_name', event.target.value)} />
+        <Input name="vat_number" label="P.IVA" value={formState.vat_number} disabled={masterFieldsDisabled} onChange={(event) => updateField('vat_number', event.target.value)} />
+        <Input name="cf" label="CF" value={formState.cf} disabled={masterFieldsDisabled} onChange={(event) => updateField('cf', event.target.value)} />
+        <Input name="erp_id" label="Codice Alyante" type="number" value={formState.erp_id} disabled={masterFieldsDisabled} onChange={(event) => updateErpId(event.target.value)} />
+        <SearchableSelectField
+          label="Stato"
+          value={formState.state}
+          options={stateOptions}
+          disabled={fullReadonly}
+          onChange={(next) => updateField('state', next || formState.state)}
+          placeholder="Seleziona stato"
+        />
+        <Select name="language" label="Lingua" value={formState.language} options={languageOptions} disabled={masterFieldsDisabled} onChange={(event) => updateField('language', event.target.value)} />
+        <SearchableSelectField
+          label="Paese"
+          value={formState.country}
+          options={countryOptions}
+          disabled={masterFieldsDisabled || countriesQuery.isLoading || countriesQuery.isError}
+          onChange={(next) => updateField('country', next || 'IT')}
+          placeholder="Seleziona paese"
+        />
+        <Select name="province" label="Provincia" value={formState.province} options={['', ...provinces]} disabled={masterFieldsDisabled} onChange={(event) => updateField('province', event.target.value)} />
+        <Input name="city" label="Città" value={formState.city} disabled={masterFieldsDisabled} onChange={(event) => updateField('city', event.target.value)} />
+        <Input name="postal_code" label="CAP" value={formState.postal_code} disabled={masterFieldsDisabled} onChange={(event) => updateField('postal_code', event.target.value)} />
+        <Input name="address" label="Indirizzo" value={formState.address} disabled={masterFieldsDisabled} onChange={(event) => updateField('address', event.target.value)} wide />
+        <PaymentMethodField
+          value={formState.default_payment_method}
+          defaultValue={formState.default_payment_method}
+          options={paymentMethods.data ?? []}
+          disabled={editableSidefieldsDisabled || paymentMethods.isLoading || paymentMethods.isError}
+          onChange={(next) => updateField('default_payment_method', next)}
+        />
+        <Input name="ref_first_name" label="Nome contatto qualifica" value={formState.ref_first_name} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_first_name', event.target.value)} />
+        <Input name="ref_last_name" label="Cognome contatto qualifica" value={formState.ref_last_name} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_last_name', event.target.value)} />
+        <Input name="ref_email" label="Email contatto qualifica" type="email" value={formState.ref_email} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_email', event.target.value)} />
+        <Input name="ref_phone" label="Telefono contatto qualifica" value={formState.ref_phone} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_phone', event.target.value)} />
+        {skipRole ? (
+          <div className="wideField">
+            <ToggleSwitch
+              id={`skip-qualification-${provider.id}`}
+              checked={formState.skip_qualification_validation}
+              disabled={editableSidefieldsDisabled}
+              onChange={(checked) => updateField('skip_qualification_validation', checked)}
+              label="Salta controllo qualifica"
+            />
+          </div>
+        ) : null}
+        {!fullReadonly ? (
+          <div className="formActions formActionsWithState">
+            {dirty ? <span className="dirtyState">Modifiche non salvate</span> : null}
+            <Button type="submit" leftIcon={<Icon name="check" />} loading={mutations.updateProvider.isPending} disabled={!dirty}>Salva anagrafica</Button>
+            {!anagraficaLocked ? (
+              <Button variant="danger" type="button" leftIcon={<Icon name="trash" />} onClick={() => setConfirmDelete(true)}>Elimina</Button>
             ) : null}
-            {!fullReadonly ? (
-              <div className="formActions">
-                <Button type="submit" leftIcon={<Icon name="check" />} loading={mutations.updateProvider.isPending}>Salva anagrafica</Button>
-                {!anagraficaLocked ? (
-                  <Button variant="danger" type="button" leftIcon={<Icon name="trash" />} onClick={() => setConfirmDelete(true)}>Elimina</Button>
-                ) : null}
-              </div>
-            ) : null}
-          </form>
-          <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Elimina fornitore" size="sm">
-            <p className="modalText">Confermi l'eliminazione del fornitore? L'operazione non è reversibile.</p>
-            <div className="modalActions">
-              <Button variant="secondary" onClick={() => setConfirmDelete(false)}>Annulla</Button>
-              <Button variant="danger" onClick={() => void remove()} loading={mutations.deleteProvider.isPending}>Elimina</Button>
-            </div>
-          </Modal>
-        </>
-      ) : null}
+          </div>
+        ) : null}
+      </form>
+      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Elimina fornitore" size="sm">
+        <p className="modalText">Confermi l'eliminazione del fornitore? L'operazione non è reversibile.</p>
+        <div className="modalActions">
+          <Button variant="secondary" onClick={() => setConfirmDelete(false)}>Annulla</Button>
+          <Button variant="danger" onClick={() => void remove()} loading={mutations.deleteProvider.isPending}>Elimina</Button>
+        </div>
+      </Modal>
     </Panel>
   );
 }
 
 function PaymentMethodField({
-  defaultValue,
+  value: selectedValue,
+  defaultValue = '',
   options,
   disabled,
+  onChange,
 }: {
-  defaultValue: string;
+  value?: string;
+  defaultValue?: string;
   options: PaymentMethod[];
   disabled: boolean;
+  onChange?: (value: string) => void;
 }) {
-  const selectOptionsList: SelectOption[] = [
-    { value: '', label: '—' },
+  const [internalValue, setInternalValue] = useState(defaultValue);
+  const controlled = selectedValue !== undefined;
+  const current = controlled ? selectedValue ?? '' : internalValue;
+
+  useEffect(() => {
+    if (!controlled) setInternalValue(defaultValue);
+  }, [controlled, defaultValue]);
+
+  const hasCurrent = current === '' || options.some((item) => item.code === current);
+  const selectOptionsList = [
+    ...(hasCurrent ? [] : [{ value: current, label: current }]),
     ...options.map((item) => ({ value: item.code, label: `${item.description} (${item.code.trim()})` })),
   ];
+
+  function handleChange(next: string | null) {
+    const value = next ?? '';
+    if (!controlled) setInternalValue(value);
+    onChange?.(value);
+  }
+
   return (
-    <Select name="default_payment_method" label="Metodo di pagamento" defaultValue={defaultValue} options={selectOptionsList} disabled={disabled} />
+    <SearchableSelectField
+      name="default_payment_method"
+      label="Metodo di pagamento"
+      value={selectedValue}
+      fallbackValue={current}
+      options={selectOptionsList}
+      disabled={disabled}
+      onChange={handleChange}
+      allowClear
+      clearLabel="—"
+      placeholder="—"
+    />
+  );
+}
+
+function SearchableSelectField({
+  label,
+  name,
+  value,
+  fallbackValue,
+  options,
+  disabled,
+  onChange,
+  placeholder,
+  allowClear,
+  clearLabel,
+  wide,
+}: {
+  label: string;
+  name?: string;
+  value?: string;
+  fallbackValue?: string;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
+  onChange: (value: string | null) => void;
+  placeholder?: string;
+  allowClear?: boolean;
+  clearLabel?: string;
+  wide?: boolean;
+}) {
+  const selectedValue = value ?? fallbackValue ?? '';
+  return (
+    <label className={`field ${wide ? 'wideField' : ''}`}>
+      <span>{label}</span>
+      <SingleSelect<string>
+        options={options}
+        selected={selectedValue ? selectedValue : null}
+        onChange={onChange}
+        placeholder={placeholder}
+        allowClear={allowClear}
+        clearLabel={clearLabel}
+        disabled={disabled}
+      />
+      {name ? <input type="hidden" name={name} value={selectedValue} /> : null}
+    </label>
   );
 }
 

@@ -11,6 +11,11 @@ export interface PaymentMethod {
   rda_available?: boolean;
 }
 
+export interface Country {
+  code: string;
+  name: string;
+}
+
 export interface ProviderReference {
   id?: number;
   first_name?: string;
@@ -36,6 +41,7 @@ export interface Provider {
   country?: string;
   ref?: ProviderReference;
   refs?: ProviderReference[];
+  skip_qualification_validation?: boolean;
 }
 
 export interface DocumentType {

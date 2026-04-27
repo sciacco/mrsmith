@@ -13,6 +13,8 @@ interface SingleSelectProps<V extends string | number = string | number> {
   onChange: (value: V | null) => void;
   placeholder?: string;
   allowClear?: boolean;
+  clearLabel?: string;
+  disabled?: boolean;
 }
 
 const DROPDOWN_GAP = 6;
@@ -25,12 +27,18 @@ export function SingleSelect<V extends string | number = string | number>({
   onChange,
   placeholder = 'Seleziona...',
   allowClear,
+  clearLabel = 'Tutti',
+  disabled = false,
 }: SingleSelectProps<V>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0, placeTop: false });
   const triggerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   useEffect(() => {
     if (!open) return;
@@ -89,12 +97,14 @@ export function SingleSelect<V extends string | number = string | number>({
   const renderInline = Boolean(triggerRef.current?.closest('dialog[open]'));
 
   function handleSelect(value: V) {
+    if (disabled) return;
     onChange(value);
     setOpen(false);
     setSearch('');
   }
 
   function handleClear() {
+    if (disabled) return;
     onChange(null);
     setOpen(false);
     setSearch('');
@@ -134,7 +144,7 @@ export function SingleSelect<V extends string | number = string | number>({
             <span className={styles.radio}>
               {selected === null && <span className={styles.radioDot} />}
             </span>
-            <span className={styles.clearLabel}>Tutti</span>
+            <span className={styles.clearLabel}>{clearLabel}</span>
           </div>
         )}
         {filtered.length === 0 ? (
@@ -161,8 +171,11 @@ export function SingleSelect<V extends string | number = string | number>({
     <div className={styles.container}>
       <div
         ref={triggerRef}
-        className={`${styles.trigger} ${open ? styles.triggerOpen : ''}`}
-        onClick={() => setOpen(!open)}
+        className={`${styles.trigger} ${open && !disabled ? styles.triggerOpen : ''} ${disabled ? styles.triggerDisabled : ''}`}
+        aria-disabled={disabled}
+        onClick={() => {
+          if (!disabled) setOpen(!open);
+        }}
       >
         {selectedOption ? (
           <span className={styles.selectedLabel}>{selectedOption.label}</span>
@@ -173,7 +186,7 @@ export function SingleSelect<V extends string | number = string | number>({
           &#9660;
         </span>
       </div>
-      {open && (renderInline ? dropdown : createPortal(dropdown, document.body))}
+      {open && !disabled && (renderInline ? dropdown : createPortal(dropdown, document.body))}
     </div>
   );
 }
