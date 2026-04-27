@@ -11,6 +11,11 @@ export interface PaymentMethod {
   rda_available?: boolean;
 }
 
+export interface AlyanteSupplier {
+  code: string;
+  company_name: string;
+}
+
 export interface Country {
   code: string;
   name: string;

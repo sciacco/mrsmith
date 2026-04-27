@@ -900,6 +900,12 @@ button {
   padding: 0.9rem;
 }
 
+.providerDataForm {
+  display: grid;
+  gap: 1rem;
+  padding: 0.9rem;
+}
+
 .field,
 .modalForm {
   display: grid;
@@ -948,6 +954,79 @@ button {
 
 .wideField {
   grid-column: 1 / -1;
+}
+
+.alyanteLookup {
+  position: relative;
+  min-width: 0;
+}
+
+.alyanteLookupMenu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  max-height: 16rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+
+.modalForm .alyanteLookupMenu {
+  top: auto;
+  bottom: calc(100% + 0.35rem);
+  max-height: min(16rem, 45vh);
+}
+
+.alyanteLookupOption {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 0.62rem 0.7rem;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.alyanteLookupOption:last-child {
+  border-bottom: 0;
+}
+
+.alyanteLookupOption:hover,
+.alyanteLookupOption:focus-visible {
+  background: var(--color-accent-subtle);
+  outline: none;
+}
+
+.alyanteLookupCode {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.alyanteLookupName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alyanteLookupState {
+  padding: 0.75rem;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 650;
 }
 
 .checkLine {
@@ -1837,6 +1916,7 @@ button {
   }
 
   .formGrid,
+  .formSectionGrid,
   .inlineForm {
     grid-template-columns: 1fr;
   }

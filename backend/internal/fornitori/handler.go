@@ -36,6 +36,21 @@ const (
 	maxUploadBytes = 25 << 20
 )
 
+const alyanteSuppliersQuery = `SELECT TOP 100
+       LTRIM(RTRIM(CG16_RAGSOANAG)) AS company_name,
+       LTRIM(RTRIM(CONVERT(varchar(30), CG44_CLIFOR))) AS code
+FROM CG44_CLIFOR
+JOIN CG16_ANAGGEN
+  ON CG16_ANAGGEN.CG16_CODICE = CG44_CLIFOR.CG44_CODICE_CG16
+WHERE CG44_DITTA_CG18 = 1
+  AND CG44_TIPOCF = 1
+  AND (CG16_DATAVALID IS NULL OR CG16_DATAVALID >= GETDATE())
+  AND (
+    CG16_RAGSOANAG LIKE @p1
+    OR CONVERT(varchar(30), CG44_CLIFOR) LIKE @p1
+  )
+ORDER BY CG16_RAGSOANAG`
+
 var allowedUploadTypes = map[string]struct{}{
 	"application/pdf":    {},
 	"image/jpeg":         {},
@@ -50,16 +65,18 @@ var allowedUploadTypes = map[string]struct{}{
 }
 
 type Handler struct {
-	arak   *arak.Client
-	db     *sql.DB
-	logger *slog.Logger
+	arak      *arak.Client
+	db        *sql.DB
+	alyanteDB *sql.DB
+	logger    *slog.Logger
 }
 
-func RegisterRoutes(mux *http.ServeMux, arakClient *arak.Client, arakDB *sql.DB) {
+func RegisterRoutes(mux *http.ServeMux, arakClient *arak.Client, arakDB *sql.DB, alyanteDB *sql.DB) {
 	h := &Handler{
-		arak:   arakClient,
-		db:     arakDB,
-		logger: slog.Default().With("component", component),
+		arak:      arakClient,
+		db:        arakDB,
+		alyanteDB: alyanteDB,
+		logger:    slog.Default().With("component", component),
 	}
 
 	protect := acl.RequireRole(applaunch.FornitoriAccessRoles()...)
@@ -96,6 +113,7 @@ func RegisterRoutes(mux *http.ServeMux, arakClient *arak.Client, arakDB *sql.DB)
 	handle("GET /fornitori/v1/document/{id}/download", h.handleDownloadDocument)
 
 	handle("GET /fornitori/v1/provider-summary", h.handleProviderSummary)
+	handle("GET /fornitori/v1/alyante-suppliers", h.handleAlyanteSuppliers)
 
 	handle("GET /fornitori/v1/dashboard/drafts", h.handleDashboardDrafts)
 	handle("GET /fornitori/v1/dashboard/expiring-documents", h.handleDashboardExpiringDocuments)
@@ -429,6 +447,11 @@ type providerSummary struct {
 	HasExpiringDocs bool    `json:"has_expiring_docs"`
 }
 
+type alyanteSupplier struct {
+	Code        string `json:"code"`
+	CompanyName string `json:"company_name"`
+}
+
 // handleProviderSummary returns the providers list (anagrafica from Mistra) enriched with
 // qualification counts and expiring-document flag computed from the local DB.
 // One Mistra call + one SQL query, merged in-process.
@@ -539,6 +562,40 @@ func (h *Handler) handleProviderSummary(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 	httputil.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) handleAlyanteSuppliers(w http.ResponseWriter, r *http.Request) {
+	search := strings.TrimSpace(r.URL.Query().Get("search"))
+	if len([]rune(search)) < 3 || h.alyanteDB == nil {
+		httputil.JSON(w, http.StatusOK, []alyanteSupplier{})
+		return
+	}
+
+	rows, err := h.alyanteDB.QueryContext(r.Context(), alyanteSuppliersQuery, "%"+search+"%")
+	if err != nil {
+		httputil.InternalError(w, r, err, "alyante suppliers query failed", "component", component, "operation", "alyante_suppliers")
+		return
+	}
+	defer rows.Close()
+
+	items := make([]alyanteSupplier, 0)
+	for rows.Next() {
+		var companyName sql.NullString
+		var code sql.NullString
+		if err := rows.Scan(&companyName, &code); err != nil {
+			httputil.InternalError(w, r, err, "alyante suppliers scan failed", "component", component, "operation", "alyante_suppliers_scan")
+			return
+		}
+		item := alyanteSupplier{
+			Code:        strings.TrimSpace(code.String),
+			CompanyName: strings.TrimSpace(companyName.String),
+		}
+		if item.Code == "" {
+			continue
+		}
+		items = append(items, item)
+	}
+	writeRows(w, r, items, rows.Err())
 }
 
 func (h *Handler) handlePaymentMethods(w http.ResponseWriter, r *http.Request) {

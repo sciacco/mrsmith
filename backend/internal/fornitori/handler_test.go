@@ -20,7 +20,7 @@ import (
 
 func TestAccessRoleRequired(t *testing.T) {
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, nil, nil)
+	RegisterRoutes(mux, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/fornitori/v1/provider", nil)
 	rec := httptest.NewRecorder()
@@ -33,7 +33,7 @@ func TestAccessRoleRequired(t *testing.T) {
 
 func TestMissingArakReturnsServiceUnavailable(t *testing.T) {
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, nil, nil)
+	RegisterRoutes(mux, nil, nil, nil)
 
 	req := authedRequest(http.MethodGet, "/fornitori/v1/provider", nil, "app_fornitori_access")
 	rec := httptest.NewRecorder()
@@ -49,7 +49,7 @@ func TestMissingArakReturnsServiceUnavailable(t *testing.T) {
 
 func TestReadonlyRoleBlocksAdminWrites(t *testing.T) {
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, nil, nil)
+	RegisterRoutes(mux, nil, nil, nil)
 
 	req := authedRequest(
 		http.MethodPost,
@@ -80,7 +80,7 @@ func TestSkipQualificationRequiresRole(t *testing.T) {
 		ClientSecret: "secret",
 	})
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, client, nil)
+	RegisterRoutes(mux, client, nil, nil)
 
 	req := authedRequest(
 		http.MethodPut,
@@ -115,7 +115,7 @@ func TestDevAdminCanSetSkipQualification(t *testing.T) {
 		ClientSecret: "secret",
 	})
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, client, nil)
+	RegisterRoutes(mux, client, nil, nil)
 
 	req := authedRequest(
 		http.MethodPut,

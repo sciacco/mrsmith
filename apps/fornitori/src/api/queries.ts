@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  AlyanteSupplier,
   ArticleCategory,
   Category,
   CategoryPayload,
@@ -118,6 +119,17 @@ export function useArticleCategories() {
   return useQuery({
     queryKey: ['fornitori', 'article-categories'],
     queryFn: () => api.get<ArticleCategory[]>(`${root}/article-category`),
+  });
+}
+
+export function useAlyanteSuppliers(search: string) {
+  const api = useApiClient();
+  const term = search.trim();
+  return useQuery({
+    queryKey: ['fornitori', 'alyante-suppliers', term],
+    enabled: term.length >= 3,
+    staleTime: 60_000,
+    queryFn: () => api.get<AlyanteSupplier[]>(`${root}/alyante-suppliers?search=${encodeURIComponent(term)}`),
   });
 }
 

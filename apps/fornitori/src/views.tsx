@@ -1,9 +1,10 @@
 import { ApiError } from '@mrsmith/api-client';
 import { Button, Icon, type IconName, Modal, MultiSelect, SearchInput, SingleSelect, Skeleton, StatusBadge, TabNav, ToggleSwitch, useToast, type StatusBadgeVariant } from '@mrsmith/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   useArticleCategories,
+  useAlyanteSuppliers,
   useCategories,
   useCountries,
   useDashboard,
@@ -15,8 +16,8 @@ import {
   useProviderDocuments,
   useProviderSummary,
 } from './api/queries';
-import type { Category, CategoryDocumentType, Country, DashboardCategory, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
-import { provinces } from './lib/provinces';
+import type { AlyanteSupplier, Category, CategoryDocumentType, Country, DashboardCategory, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
+import { provinceSelectOptions } from './lib/provinces';
 import { referenceTypeLabel, referenceTypes, stateLabel } from './lib/reference';
 import { hasProviderErp, providerStateSelectOptions } from './lib/providerState';
 import { saveBlob } from './lib/download';
@@ -112,6 +113,18 @@ function ensureSelectedOption(options: { value: string; label: string }[], selec
   return [{ value: selected, label: stateLabel(selected) }, ...options];
 }
 
+function parseErpId(raw?: string | null) {
+  const trimmed = raw?.trim() ?? '';
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function hasInvalidErpId(raw?: string | null) {
+  const trimmed = raw?.trim() ?? '';
+  return trimmed !== '' && parseErpId(trimmed) === null;
+}
+
 function providerPayload(form: HTMLFormElement): ProviderPayload {
   const data = new FormData(form);
   const erp = String(data.get('erp_id') ?? '').trim();
@@ -125,7 +138,7 @@ function providerPayload(form: HTMLFormElement): ProviderPayload {
     city: String(data.get('city') ?? '').trim() || undefined,
     postal_code: String(data.get('postal_code') ?? '').trim() || undefined,
     province: String(data.get('province') ?? '').trim() || undefined,
-    erp_id: erp ? Number(erp) : null,
+    erp_id: parseErpId(erp),
     language: String(data.get('language') || 'it'),
     country,
     default_payment_method: String(data.get('default_payment_method') ?? '') || null,
@@ -828,7 +841,7 @@ function providerPayloadFromState(state: ProviderFormState): ProviderPayload {
     city: state.city.trim() || undefined,
     postal_code: state.postal_code.trim() || undefined,
     province: state.province.trim() || undefined,
-    erp_id: erp ? Number(erp) : null,
+    erp_id: parseErpId(erp),
     language: state.language || 'it',
     country: state.country || 'IT',
     default_payment_method: state.default_payment_method || null,
@@ -859,17 +872,24 @@ function ProviderCreateModal({
   const countriesQuery = useCountries();
   const [country, setCountry] = useState('IT');
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [erpId, setErpId] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   function close() {
     setCountry('IT');
     setPaymentMethod('');
+    setErpId('');
     setShowAdvanced(false);
     onClose();
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const rawErpId = String(new FormData(event.currentTarget).get('erp_id') ?? '');
+    if (hasInvalidErpId(rawErpId)) {
+      toast('Inserisci un codice Alyante numerico', 'warning');
+      return;
+    }
     const body = providerPayload(event.currentTarget);
     const validation = validateCreatePayload(body);
     if (validation) {
@@ -907,7 +927,7 @@ function ProviderCreateModal({
               placeholder="Seleziona paese"
             />
             {country === 'IT' ? (
-              <Select name="province" label="Provincia" options={['', ...provinces]} />
+              <Select name="province" label="Provincia" options={provinceSelectOptions()} />
             ) : (
               <Input name="province" label="Provincia / Stato" />
             )}
@@ -939,7 +959,7 @@ function ProviderCreateModal({
         {showAdvanced ? (
           <div className="formSectionGrid">
             <Select name="language" label="Lingua" defaultValue="it" options={languageOptions} />
-            <Input name="erp_id" label="Codice Alyante" type="number" />
+            <AlyanteSupplierLookupField value={erpId} onChange={setErpId} />
             <PaymentMethodField value={paymentMethod} options={paymentMethods.data ?? []} disabled={paymentMethods.isLoading || paymentMethods.isError} onChange={setPaymentMethod} />
           </div>
         ) : null}
@@ -1833,6 +1853,10 @@ function AnagraficaSection({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (hasInvalidErpId(formState.erp_id)) {
+      toast('Inserisci un codice Alyante numerico', 'warning');
+      return;
+    }
     const body = providerPayloadFromState(formState);
     const validation = validateProvider(body);
     if (validation) {
@@ -1855,54 +1879,76 @@ function AnagraficaSection({
       title="Anagrafica"
       subtitle={anagraficaLocked && !fullReadonly ? 'Anagrafica bloccata: fornitore attivo' : undefined}
     >
-      <form className="formGrid" onSubmit={(event) => void submit(event)}>
-        <Input name="company_name" label="Ragione sociale" value={formState.company_name} disabled={masterFieldsDisabled} onChange={(event) => updateField('company_name', event.target.value)} />
-        <Input name="vat_number" label="P.IVA" value={formState.vat_number} disabled={masterFieldsDisabled} onChange={(event) => updateField('vat_number', event.target.value)} />
-        <Input name="cf" label="CF" value={formState.cf} disabled={masterFieldsDisabled} onChange={(event) => updateField('cf', event.target.value)} />
-        <Input name="erp_id" label="Codice Alyante" type="number" value={formState.erp_id} disabled={masterFieldsDisabled} onChange={(event) => updateErpId(event.target.value)} />
-        <SearchableSelectField
-          label="Stato"
-          value={formState.state}
-          options={stateOptions}
-          disabled={fullReadonly}
-          onChange={(next) => updateField('state', next || formState.state)}
-          placeholder="Seleziona stato"
-        />
-        <Select name="language" label="Lingua" value={formState.language} options={languageOptions} disabled={masterFieldsDisabled} onChange={(event) => updateField('language', event.target.value)} />
-        <SearchableSelectField
-          label="Paese"
-          value={formState.country}
-          options={countryOptions}
-          disabled={masterFieldsDisabled || countriesQuery.isLoading || countriesQuery.isError}
-          onChange={(next) => updateField('country', next || 'IT')}
-          placeholder="Seleziona paese"
-        />
-        <Select name="province" label="Provincia" value={formState.province} options={['', ...provinces]} disabled={masterFieldsDisabled} onChange={(event) => updateField('province', event.target.value)} />
-        <Input name="city" label="Città" value={formState.city} disabled={masterFieldsDisabled} onChange={(event) => updateField('city', event.target.value)} />
-        <Input name="postal_code" label="CAP" value={formState.postal_code} disabled={masterFieldsDisabled} onChange={(event) => updateField('postal_code', event.target.value)} />
-        <Input name="address" label="Indirizzo" value={formState.address} disabled={masterFieldsDisabled} onChange={(event) => updateField('address', event.target.value)} wide />
-        <PaymentMethodField
-          value={formState.default_payment_method}
-          defaultValue={formState.default_payment_method}
-          options={paymentMethods.data ?? []}
-          disabled={editableSidefieldsDisabled || paymentMethods.isLoading || paymentMethods.isError}
-          onChange={(next) => updateField('default_payment_method', next)}
-        />
-        <Input name="ref_first_name" label="Nome contatto qualifica" value={formState.ref_first_name} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_first_name', event.target.value)} />
-        <Input name="ref_last_name" label="Cognome contatto qualifica" value={formState.ref_last_name} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_last_name', event.target.value)} />
-        <Input name="ref_email" label="Email contatto qualifica" type="email" value={formState.ref_email} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_email', event.target.value)} />
-        <Input name="ref_phone" label="Telefono contatto qualifica" value={formState.ref_phone} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_phone', event.target.value)} />
-        {skipRole ? (
-          <div className="wideField">
-            <ToggleSwitch
-              id={`skip-qualification-${provider.id}`}
-              checked={formState.skip_qualification_validation}
-              disabled={editableSidefieldsDisabled}
-              onChange={(checked) => updateField('skip_qualification_validation', checked)}
-              label="Salta controllo qualifica"
+      <form className="providerDataForm" onSubmit={(event) => void submit(event)}>
+        <fieldset className="formSection">
+          <legend>Dati fornitore</legend>
+          <div className="formSectionGrid">
+            <Input name="company_name" label="Ragione sociale" value={formState.company_name} disabled={masterFieldsDisabled} onChange={(event) => updateField('company_name', event.target.value)} wide />
+            <Input name="vat_number" label="P.IVA" value={formState.vat_number} disabled={masterFieldsDisabled} onChange={(event) => updateField('vat_number', event.target.value)} />
+            <Input name="cf" label="CF" value={formState.cf} disabled={masterFieldsDisabled} onChange={(event) => updateField('cf', event.target.value)} />
+            <AlyanteSupplierLookupField value={formState.erp_id} disabled={masterFieldsDisabled} onChange={updateErpId} />
+            <SearchableSelectField
+              label="Stato"
+              value={formState.state}
+              options={stateOptions}
+              disabled={fullReadonly}
+              onChange={(next) => updateField('state', next || formState.state)}
+              placeholder="Seleziona stato"
+            />
+            <Select name="language" label="Lingua" value={formState.language} options={languageOptions} disabled={masterFieldsDisabled} onChange={(event) => updateField('language', event.target.value)} />
+            <PaymentMethodField
+              value={formState.default_payment_method}
+              defaultValue={formState.default_payment_method}
+              options={paymentMethods.data ?? []}
+              disabled={editableSidefieldsDisabled || paymentMethods.isLoading || paymentMethods.isError}
+              onChange={(next) => updateField('default_payment_method', next)}
             />
           </div>
-        ) : null}
+        </fieldset>
+
+        <fieldset className="formSection">
+          <legend>Sede</legend>
+          <div className="formSectionGrid">
+            <SearchableSelectField
+              label="Paese"
+              value={formState.country}
+              options={countryOptions}
+              disabled={masterFieldsDisabled || countriesQuery.isLoading || countriesQuery.isError}
+              onChange={(next) => updateField('country', next || 'IT')}
+              placeholder="Seleziona paese"
+            />
+            {formState.country === 'IT' ? (
+              <Select name="province" label="Provincia" value={formState.province} options={provinceSelectOptions(formState.province)} disabled={masterFieldsDisabled} onChange={(event) => updateField('province', event.target.value)} />
+            ) : (
+              <Input name="province" label="Provincia / Stato" value={formState.province} disabled={masterFieldsDisabled} onChange={(event) => updateField('province', event.target.value)} />
+            )}
+            <Input name="city" label="Città" value={formState.city} disabled={masterFieldsDisabled} onChange={(event) => updateField('city', event.target.value)} />
+            <Input name="postal_code" label="CAP" value={formState.postal_code} disabled={masterFieldsDisabled} onChange={(event) => updateField('postal_code', event.target.value)} />
+            <Input name="address" label="Indirizzo" value={formState.address} disabled={masterFieldsDisabled} onChange={(event) => updateField('address', event.target.value)} wide />
+          </div>
+        </fieldset>
+
+        <fieldset className="formSection">
+          <legend>Contatto qualifica</legend>
+          <div className="formSectionGrid">
+            <Input name="ref_first_name" label="Nome" value={formState.ref_first_name} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_first_name', event.target.value)} />
+            <Input name="ref_last_name" label="Cognome" value={formState.ref_last_name} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_last_name', event.target.value)} />
+            <Input name="ref_email" label="Email" type="email" value={formState.ref_email} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_email', event.target.value)} />
+            <Input name="ref_phone" label="Telefono" value={formState.ref_phone} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_phone', event.target.value)} />
+            {skipRole ? (
+              <div className="wideField">
+                <ToggleSwitch
+                  id={`skip-qualification-${provider.id}`}
+                  checked={formState.skip_qualification_validation}
+                  disabled={editableSidefieldsDisabled}
+                  onChange={(checked) => updateField('skip_qualification_validation', checked)}
+                  label="Salta controllo qualifica"
+                />
+              </div>
+            ) : null}
+          </div>
+        </fieldset>
+
         {!fullReadonly ? (
           <div className="formActions formActionsWithState">
             {dirty ? <span className="dirtyState">Modifiche non salvate</span> : null}
@@ -1921,6 +1967,100 @@ function AnagraficaSection({
         </div>
       </Modal>
     </Panel>
+  );
+}
+
+function useDebouncedString(value: string, delayMs: number) {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(handle);
+  }, [delayMs, value]);
+
+  return debounced;
+}
+
+function AlyanteSupplierLookupField({
+  value,
+  disabled = false,
+  onChange,
+  name = 'erp_id',
+  label = 'Codice Alyante',
+}: {
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+  name?: string;
+  label?: string;
+}) {
+  const inputId = useId();
+  const listId = `${inputId}-results`;
+  const [open, setOpen] = useState(false);
+  const debouncedSearch = useDebouncedString(value, 250);
+  const currentSearch = value.trim();
+  const settledSearch = debouncedSearch.trim();
+  const results = useAlyanteSuppliers(open && !disabled ? settledSearch : '');
+  const suppliers = results.data ?? [];
+  const canSearch = currentSearch.length >= 3;
+  const isSettled = currentSearch === settledSearch;
+  const showMenu = open && !disabled && canSearch;
+
+  function selectSupplier(supplier: AlyanteSupplier) {
+    onChange(supplier.code);
+    setOpen(false);
+  }
+
+  return (
+    <div className="field alyanteLookupField">
+      <label className="fieldLabel" htmlFor={inputId}>{label}</label>
+      <div className="alyanteLookup">
+        <input
+          id={inputId}
+          name={name}
+          type="text"
+          value={value}
+          disabled={disabled}
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={showMenu}
+          aria-controls={showMenu ? listId : undefined}
+          aria-autocomplete="list"
+          placeholder="Codice o ragione sociale"
+          onFocus={() => setOpen(true)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          onChange={(event) => {
+            onChange(event.target.value);
+            setOpen(true);
+          }}
+        />
+        {showMenu ? (
+          <div id={listId} className="alyanteLookupMenu" role="listbox">
+            {!isSettled || results.isFetching ? (
+              <div className="alyanteLookupState">Ricerca in corso</div>
+            ) : results.isError ? (
+              <div className="alyanteLookupState">Lookup Alyante non disponibile</div>
+            ) : suppliers.length === 0 ? (
+              <div className="alyanteLookupState">Nessun risultato</div>
+            ) : (
+              suppliers.map((supplier) => (
+                <button
+                  key={`${supplier.code}-${supplier.company_name}`}
+                  type="button"
+                  className="alyanteLookupOption"
+                  role="option"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => selectSupplier(supplier)}
+                >
+                  <span className="alyanteLookupCode">{supplier.code}</span>
+                  <span className="alyanteLookupName">{supplier.company_name || '-'}</span>
+                </button>
+              ))
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

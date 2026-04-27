@@ -399,7 +399,7 @@ func main() {
 	}
 	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
-	fornitori.RegisterRoutes(api, arakCli, arakDB)
+	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	rda.RegisterRoutes(api, rda.Deps{Arak: arakCli, ArakDB: arakDB, Logger: logger})
 	compliance.RegisterRoutes(api, anisettaDB)
 	coperture.RegisterRoutes(api, dbCoperture)
