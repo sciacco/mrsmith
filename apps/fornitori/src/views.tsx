@@ -1,5 +1,5 @@
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, type IconName, Modal, MultiSelect, SearchInput, Skeleton, ToggleSwitch, useToast } from '@mrsmith/ui';
+import { Button, Icon, type IconName, Modal, MultiSelect, SearchInput, Skeleton, StatusBadge, ToggleSwitch, useToast, type StatusBadgeVariant } from '@mrsmith/ui';
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -17,7 +17,7 @@ import {
 import type { Category, CategoryDocumentType, DashboardCategory, DashboardDocument, DashboardDraft, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
 import { countries } from './lib/countries';
 import { provinces } from './lib/provinces';
-import { referenceTypeLabel, referenceTypes, stateLabel } from './lib/reference';
+import { referenceTypeLabel, referenceTypes } from './lib/reference';
 import { saveBlob } from './lib/download';
 import { useHasRole } from './hooks/useHasRole';
 import {
@@ -128,27 +128,52 @@ interface CategoryGroup {
   categories: { id: number; name: string; state: string; critical: boolean }[];
 }
 
-type PrioritySeverity = 'overdue' | 'expiring' | 'critical' | 'draft';
-
-interface PriorityItem {
-  id: string;
-  providerId: number;
-  badgeLabel: string;
-  title: string;
-  detail: string;
-  context: string;
-  actionLabel: string;
-  href: string;
-  severity: PrioritySeverity;
-  score: number;
-}
-
 interface PrioritySummary {
   overdue: number;
   expiring: number;
   drafts: number;
   openCategories: number;
 }
+
+type ProviderPriorityClass = 'blocking' | 'expired' | 'expiring' | 'completion';
+
+interface ProviderMissingReason {
+  id: string;
+  label: string;
+  score: number;
+}
+
+interface ProviderPriorityCard {
+  providerId: number;
+  companyName: string;
+  classification: ProviderPriorityClass;
+  missingCount: number;
+  details: string[];
+  href: string;
+  actionLabel: string;
+  sortScore: number;
+}
+
+interface ProviderPriorityAccumulator {
+  providerId: number;
+  companyName: string;
+  hasDraft: boolean;
+  hasCriticalCategory: boolean;
+  expiredDocuments: number;
+  expiringDocuments: number;
+  criticalCategories: number;
+  openCategories: number;
+  criticalCategoryNames: string[];
+  standardCategoryNames: string[];
+  reasons: ProviderMissingReason[];
+}
+
+const PROVIDER_PRIORITY_META: Record<ProviderPriorityClass, { label: string; variant: StatusBadgeVariant; rank: number }> = {
+  blocking: { label: 'Bloccante', variant: 'accent', rank: 0 },
+  expired: { label: 'Scaduto', variant: 'danger', rank: 1 },
+  expiring: { label: 'In scadenza', variant: 'warning', rank: 2 },
+  completion: { label: 'Da completare', variant: 'neutral', rank: 3 },
+};
 
 function groupCategoriesByProvider(rows: DashboardCategory[]): CategoryGroup[] {
   const groups = new Map<number, CategoryGroup>();
@@ -174,18 +199,6 @@ function expiryCopy(documentType?: string | null, days?: number | null) {
   return `${label} scade tra ${days}gg`;
 }
 
-function documentPriorityScore(days: number | null | undefined) {
-  if (days == null) return 55;
-  if (days < 0) return days;
-  if (days <= 7) return 10 + days;
-  return 40 + days;
-}
-
-function categoryPriorityScore(row: DashboardCategory) {
-  if (row.critical) return 60;
-  return row.state === 'NOT_QUALIFIED' ? 72 : 88;
-}
-
 function buildPrioritySummary(
   documents: DashboardDocument[],
   categories: DashboardCategory[],
@@ -199,93 +212,186 @@ function buildPrioritySummary(
   };
 }
 
-function prioritySummaryLabel(summary: PrioritySummary) {
-  return `${summary.overdue} scaduti · ${summary.expiring} in scadenza · ${summary.drafts} bozze · ${summary.openCategories} categorie aperte`;
+function anomalyCountLabel(count: number) {
+  return count === 1 ? '1 anomalia' : `${count} anomalie`;
 }
 
-function buildDashboardPriorities(
+function namedCategoryIssue(name: string, critical: boolean) {
+  if (!name) return critical ? 'Categoria critica da qualificare' : 'Categoria da qualificare';
+  return critical ? `Categoria ${name} critica da qualificare` : `Categoria ${name} da qualificare`;
+}
+
+function matchesProviderAnomalyQuery(card: ProviderPriorityCard, query: string) {
+  const terms = query.toLocaleLowerCase('it').trim().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return true;
+  const haystack = [
+    card.companyName,
+    PROVIDER_PRIORITY_META[card.classification].label,
+    anomalyCountLabel(card.missingCount),
+    ...card.details,
+  ].join(' ').toLocaleLowerCase('it');
+  return terms.every((term) => haystack.includes(term));
+}
+
+function providerClassification(item: ProviderPriorityAccumulator): ProviderPriorityClass {
+  if (item.hasDraft || item.hasCriticalCategory) return 'blocking';
+  if (item.expiredDocuments > 0) return 'expired';
+  if (item.expiringDocuments > 0) return 'expiring';
+  return 'completion';
+}
+
+function providerRiskScore(item: ProviderPriorityAccumulator) {
+  return (
+    (item.hasDraft ? 80 : 0) +
+    (item.hasCriticalCategory ? 70 : 0) +
+    (item.expiredDocuments * 18) +
+    (item.expiringDocuments * 8) +
+    (item.criticalCategories * 16) +
+    (item.openCategories * 6) +
+    item.reasons.reduce((total, reason) => total + reason.score, 0)
+  );
+}
+
+function ensureProviderAccumulator(
+  groups: Map<number, ProviderPriorityAccumulator>,
+  providerId: number,
+  companyName?: string | null,
+) {
+  const existing = groups.get(providerId);
+  if (existing) {
+    if (existing.companyName === '-' && companyName) existing.companyName = value(companyName);
+    return existing;
+  }
+  const next: ProviderPriorityAccumulator = {
+    providerId,
+    companyName: value(companyName),
+    hasDraft: false,
+    hasCriticalCategory: false,
+    expiredDocuments: 0,
+    expiringDocuments: 0,
+    criticalCategories: 0,
+    openCategories: 0,
+    criticalCategoryNames: [],
+    standardCategoryNames: [],
+    reasons: [],
+  };
+  groups.set(providerId, next);
+  return next;
+}
+
+function buildProviderPriorityCards(
   documents: DashboardDocument[],
   categories: DashboardCategory[],
   drafts: DashboardDraft[],
 ) {
-  const documentItems: PriorityItem[] = documents.map((row) => {
+  const groups = new Map<number, ProviderPriorityAccumulator>();
+
+  for (const row of drafts) {
+    const item = ensureProviderAccumulator(groups, row.id, row.company_name);
+    item.hasDraft = true;
+    item.reasons.push({ id: `draft-${row.id}`, label: 'Qualifica da completare', score: 55 });
+  }
+
+  for (const row of documents) {
+    const item = ensureProviderAccumulator(groups, row.provider_id, row.company_name);
     const expired = row.days_remaining < 0;
-    return {
+    if (expired) item.expiredDocuments += 1;
+    else item.expiringDocuments += 1;
+    item.reasons.push({
       id: `document-${row.id}`,
-      providerId: row.provider_id,
-      badgeLabel: expired ? 'Scaduto' : 'In scadenza',
-      title: value(row.company_name),
-      detail: expiryCopy(row.document_type, row.days_remaining),
-      context: dateLabel(row.expire_date),
-      actionLabel: 'Apri Qualifica',
-      href: `/fornitori?id_provider=${row.provider_id}&tab=Qualifica`,
-      severity: expired ? 'overdue' : 'expiring',
-      score: documentPriorityScore(row.days_remaining),
-    };
-  });
+      label: expiryCopy(row.document_type, row.days_remaining),
+      score: expired ? Math.min(45, 25 + Math.abs(row.days_remaining)) : Math.max(4, 18 - row.days_remaining),
+    });
+  }
 
-  const categoryItems: PriorityItem[] = categories.map((row) => {
-    const critical = row.critical;
-    return {
-      id: `category-${row.provider_id}-${row.category_id}`,
-      providerId: row.provider_id,
-      badgeLabel: critical ? 'Critica' : 'In scadenza',
-      title: value(row.company_name),
-      detail: critical ? 'Categoria critica da qualificare' : 'Categoria da qualificare',
-      context: `${row.category_name || 'Categoria'} · ${stateLabel(row.state)}`,
-      actionLabel: 'Apri Qualifica',
-      href: `/fornitori?id_provider=${row.provider_id}&tab=Qualifica`,
-      severity: critical ? 'critical' : 'expiring',
-      score: categoryPriorityScore(row),
-    };
-  });
+  for (const row of categories) {
+    const item = ensureProviderAccumulator(groups, row.provider_id, row.company_name);
+    item.openCategories += 1;
+    if (row.critical) {
+      item.hasCriticalCategory = true;
+      item.criticalCategories += 1;
+      item.criticalCategoryNames.push(row.category_name?.trim() ?? '');
+    } else {
+      item.standardCategoryNames.push(row.category_name?.trim() ?? '');
+    }
+  }
 
-  const draftItems: PriorityItem[] = drafts.map((row, index) => ({
-    id: `draft-${row.id}`,
-    providerId: row.id,
-    badgeLabel: 'Bozza',
-    title: value(row.company_name),
-    detail: 'Fornitore in bozza',
-    context: 'Completa i dati per la qualifica',
-    actionLabel: 'Apri Fornitore',
-    href: `/fornitori?id_provider=${row.id}`,
-    severity: 'draft',
-    score: 120 + index,
-  }));
+  return Array.from(groups.values())
+    .map((item): ProviderPriorityCard => {
+      const classification = providerClassification(item);
+      const categoryReasons: ProviderMissingReason[] = [];
+      const standardCategories = item.openCategories - item.criticalCategories;
+      if (item.criticalCategories > 0) {
+        categoryReasons.push({
+          id: `critical-categories-${item.providerId}`,
+          label: item.criticalCategoryNames.length === 1
+            ? namedCategoryIssue(item.criticalCategoryNames[0] ?? '', true)
+            : `${item.criticalCategoryNames.length} categorie critiche da qualificare`,
+          score: 52 + item.criticalCategories * 4,
+        });
+      }
+      if (standardCategories > 0) {
+        categoryReasons.push({
+          id: `categories-${item.providerId}`,
+          label: item.standardCategoryNames.length === 1
+            ? namedCategoryIssue(item.standardCategoryNames[0] ?? '', false)
+            : `${item.standardCategoryNames.length} categorie da qualificare`,
+          score: 14 + standardCategories * 2,
+        });
+      }
+      const details = [...item.reasons, ...categoryReasons]
+        .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label, 'it'))
+        .slice(0, 3)
+        .map((reason) => reason.label);
 
-  return [...documentItems, ...categoryItems, ...draftItems]
-    .sort((a, b) => a.score - b.score || a.title.localeCompare(b.title, 'it'))
-    .slice(0, 8);
+      return {
+        providerId: item.providerId,
+        companyName: item.companyName,
+        classification,
+        missingCount: item.reasons.length + item.openCategories,
+        details,
+        href: item.hasDraft ? `/fornitori?id_provider=${item.providerId}` : `/fornitori?id_provider=${item.providerId}&tab=Qualifica`,
+        actionLabel: item.hasDraft ? 'Completa fornitore' : 'Apri Qualifica',
+        sortScore: providerRiskScore(item),
+      };
+    })
+    .sort((a, b) => (
+      PROVIDER_PRIORITY_META[a.classification].rank - PROVIDER_PRIORITY_META[b.classification].rank ||
+      b.sortScore - a.sortScore ||
+      a.companyName.localeCompare(b.companyName, 'it')
+    ));
 }
 
-function PriorityConsole({
-  priorities,
-  summary,
+function ProviderMissingConsole({
+  cards,
   onOpen,
 }: {
-  priorities: PriorityItem[];
-  summary: PrioritySummary;
+  cards: ProviderPriorityCard[];
   onOpen: (href: string) => void;
 }) {
+  const visibleCards = cards.slice(0, 8);
+
   return (
-    <section className="priorityConsole" aria-labelledby="priority-console-title">
-      <header className="priorityHeader">
-        <h2 id="priority-console-title">Priorità di oggi</h2>
-        <p className="prioritySummary">{prioritySummaryLabel(summary)}</p>
+    <section className="providerMissingConsole" aria-labelledby="provider-missing-title">
+      <header className="providerMissingHeader">
+        <div>
+          <h2 id="provider-missing-title">Fornitori che richiedono attenzione</h2>
+        </div>
+        <span className="providerMissingCount">{cards.length > 0 ? `${visibleCards.length} in evidenza su ${cards.length}` : 'Tutto in ordine'}</span>
       </header>
 
-      {priorities.length === 0 ? (
+      {cards.length === 0 ? (
         <div className="priorityEmpty">
           <span className="priorityEmptyIcon" aria-hidden="true"><Icon name="check-circle" size={20} /></span>
           <div>
-            <strong>Nessuna priorità urgente</strong>
-            <span>Le code fornitori non hanno interventi critici in evidenza.</span>
+            <strong>Nessun fornitore con mancanze</strong>
+            <span>Le code fornitori non evidenziano blocchi o completamenti aperti.</span>
           </div>
         </div>
       ) : (
-        <div className="priorityList">
-          {priorities.map((item) => (
-            <PriorityRow key={item.id} item={item} onOpen={onOpen} />
+        <div className="providerMissingGrid">
+          {visibleCards.map((card) => (
+            <ProviderMissingCard key={card.providerId} card={card} onOpen={onOpen} />
           ))}
         </div>
       )}
@@ -293,45 +399,204 @@ function PriorityConsole({
   );
 }
 
-function PriorityRow({
-  item,
+function ProviderMissingCard({
+  card,
   onOpen,
 }: {
-  item: PriorityItem;
+  card: ProviderPriorityCard;
   onOpen: (href: string) => void;
 }) {
+  const meta = PROVIDER_PRIORITY_META[card.classification];
   return (
     <button
       type="button"
-      className="priorityItem"
-      data-severity={item.severity}
-      onClick={() => onOpen(item.href)}
+      className="providerMissingCard"
+      data-classification={card.classification}
+      onClick={() => onOpen(card.href)}
     >
-      <span className="priorityBadge">
-        <span className="priorityBadgeDot" aria-hidden="true" />
-        {item.badgeLabel}
+      <span className="providerMissingTopline">
+        <StatusBadge value={meta.label} label={meta.label} variant={meta.variant} />
+        <span>{anomalyCountLabel(card.missingCount)}</span>
       </span>
-      <span className="priorityTitle">{item.title}</span>
-      <span className="priorityDetail">{item.detail}</span>
-      <span className="priorityContext">{item.context}</span>
-      <span className="priorityAction">
-        {item.actionLabel}
+      <span className="providerMissingName">{card.companyName}</span>
+      <span className="providerMissingDetails">
+        {card.details.map((detail, index) => (
+          <span key={`${detail}-${index}`}>{detail}</span>
+        ))}
+      </span>
+      <span className="providerMissingAction">
+        {card.actionLabel}
         <Icon name="chevron-right" size={16} />
       </span>
     </button>
   );
 }
 
+function ProviderAnomalyList({
+  cards,
+  onOpen,
+}: {
+  cards: ProviderPriorityCard[];
+  onOpen: (href: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const filteredCards = useMemo(
+    () => cards.filter((card) => matchesProviderAnomalyQuery(card, query)),
+    [cards, query],
+  );
+  const counter = query.trim()
+    ? `${filteredCards.length} di ${cards.length} fornitori`
+    : cards.length === 1 ? '1 fornitore' : `${cards.length} fornitori`;
+
+  return (
+    <section className="providerAnomalyPanel" aria-labelledby="provider-anomaly-title">
+      <header className="providerAnomalyHeader">
+        <div>
+          <h2 id="provider-anomaly-title">Tutti i fornitori con anomalie</h2>
+        </div>
+        {cards.length > 0 ? (
+          <SearchInput
+            className="providerAnomalySearch"
+            value={query}
+            onChange={setQuery}
+            placeholder="Cerca fornitore"
+          />
+        ) : null}
+        <span className="providerAnomalyTotal">{counter}</span>
+      </header>
+
+      {cards.length === 0 ? (
+        <div className="priorityEmpty providerAnomalyEmpty">
+          <span className="priorityEmptyIcon" aria-hidden="true"><Icon name="check-circle" size={20} /></span>
+          <div>
+            <strong>Nessun fornitore con anomalie</strong>
+            <span>Le code fornitori non evidenziano blocchi o completamenti aperti.</span>
+          </div>
+        </div>
+      ) : filteredCards.length === 0 ? (
+        <div className="priorityEmpty providerAnomalyEmpty">
+          <span className="priorityEmptyIcon" aria-hidden="true"><Icon name="search" size={20} /></span>
+          <div>
+            <strong>Nessun fornitore trovato</strong>
+            <span>Modifica la ricerca per tornare alla lista completa.</span>
+          </div>
+        </div>
+      ) : (
+        <div className="providerAnomalyRows">
+          {filteredCards.map((card) => (
+            <ProviderAnomalyRow key={card.providerId} card={card} onOpen={onOpen} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProviderAnomalyRow({
+  card,
+  onOpen,
+}: {
+  card: ProviderPriorityCard;
+  onOpen: (href: string) => void;
+}) {
+  const meta = PROVIDER_PRIORITY_META[card.classification];
+  return (
+    <button
+      type="button"
+      className="providerAnomalyRow"
+      onClick={() => onOpen(card.href)}
+    >
+      <span className="providerAnomalySeverity">
+        <StatusBadge value={meta.label} label={meta.label} variant={meta.variant} />
+      </span>
+      <span className="providerAnomalyName">{card.companyName}</span>
+      <span className="providerAnomalyCount">{anomalyCountLabel(card.missingCount)}</span>
+      <span className="providerAnomalyDetails">{card.details.length > 0 ? card.details.join(' · ') : '-'}</span>
+      <span className="providerAnomalyAction">
+        {card.actionLabel}
+        <Icon name="chevron-right" size={16} />
+      </span>
+    </button>
+  );
+}
+
+function DashboardSummaryStrip({
+  summary,
+  providerCount,
+}: {
+  summary: PrioritySummary;
+  providerCount: number;
+}) {
+  const providerLabel = providerCount === 1 ? '1 fornitore con anomalie' : `${providerCount} fornitori con anomalie`;
+  const draftLabel = `${summary.drafts} in bozza`;
+  const overdueLabel = summary.overdue === 1 ? '1 documento scaduto' : `${summary.overdue} documenti scaduti`;
+  const expiringDocumentsLabel = summary.expiring === 1
+    ? '1 documento in scadenza'
+    : `${summary.expiring} documenti in scadenza`;
+  const documentLabel = summary.overdue > 0
+    ? `${overdueLabel}, ${summary.expiring} in scadenza`
+    : expiringDocumentsLabel;
+  const categoriesLabel = summary.openCategories === 1
+    ? '1 categoria da completare'
+    : `${summary.openCategories} categorie da completare`;
+
+  return (
+    <div
+      className="dashboardSummary"
+      aria-label={`Riepilogo anomalie dashboard: ${providerLabel}, ${draftLabel}, ${documentLabel}, ${categoriesLabel}`}
+    >
+      <span className="dashboardSummaryGroup">
+        <span className="dashboardSummaryMetric">
+          <strong>{providerCount}</strong>
+          {providerCount === 1 ? ' fornitore con anomalie' : ' fornitori con anomalie'}
+        </span>
+        <span className="dashboardSummarySub">
+          <strong>{summary.drafts}</strong>
+          {' in bozza'}
+        </span>
+      </span>
+      <span className="dashboardSummaryGroup">
+        {summary.overdue > 0 ? (
+          <>
+            <span className="dashboardSummaryMetric dashboardSummaryMetric--danger">
+              <strong>{summary.overdue}</strong>
+              {summary.overdue === 1 ? ' documento scaduto' : ' documenti scaduti'}
+            </span>
+            <span className="dashboardSummarySub dashboardSummarySub--warning">
+              <strong>{summary.expiring}</strong>
+              {' in scadenza'}
+            </span>
+          </>
+        ) : (
+          <span className="dashboardSummaryMetric dashboardSummaryMetric--warning">
+            <strong>{summary.expiring}</strong>
+            {summary.expiring === 1 ? ' documento in scadenza' : ' documenti in scadenza'}
+          </span>
+        )}
+      </span>
+      <span className="dashboardSummaryGroup">
+        <span className="dashboardSummaryMetric">
+          <strong>{summary.openCategories}</strong>
+          {summary.openCategories === 1 ? ' categoria da completare' : ' categorie da completare'}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 export function DashboardPage() {
   const navigate = useNavigate();
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const { drafts, documents, categories } = useDashboard();
   const groupedCategories = useMemo(() => groupCategoriesByProvider(categories.data ?? []), [categories.data]);
-  const priorities = useMemo(
-    () => buildDashboardPriorities(documents.data ?? [], categories.data ?? [], drafts.data ?? []),
-    [categories.data, documents.data, drafts.data],
-  );
   const prioritySummary = useMemo(
     () => buildPrioritySummary(documents.data ?? [], categories.data ?? [], drafts.data ?? []),
+    [categories.data, documents.data, drafts.data],
+  );
+  const providerPriorityCards = useMemo(
+    () => buildProviderPriorityCards(documents.data ?? [], categories.data ?? [], drafts.data ?? []),
     [categories.data, documents.data, drafts.data],
   );
   const loading = drafts.isLoading || documents.isLoading || categories.isLoading;
@@ -339,16 +604,28 @@ export function DashboardPage() {
 
   return (
     <main className="page">
-      <header className="pageHeader">
+      <header className="pageHeader dashboardHeader">
         <div>
           <h1>Dashboard</h1>
-          <p>Fornitori da qualificare, documenti in scadenza e categorie da gestire.</p>
+          {!loading && !error ? (
+            <DashboardSummaryStrip summary={prioritySummary} providerCount={providerPriorityCards.length} />
+          ) : (
+            <p>Fornitori da qualificare, documenti in scadenza e categorie da gestire.</p>
+          )}
         </div>
       </header>
       {loading ? <Skeleton rows={8} /> : error ? stateBlock(errorTitle(error), 'Le attività fornitori non possono essere caricate.', 'triangle-alert') : (
         <>
-          <PriorityConsole priorities={priorities} summary={prioritySummary} onOpen={(href) => navigate(href)} />
-          <Panel title="Da qualificare" subtitle="Fornitori in stato bozza" count={drafts.data?.length ?? 0}>
+          <ProviderMissingConsole cards={providerPriorityCards} onOpen={(href) => navigate(href)} />
+          <ProviderAnomalyList cards={providerPriorityCards} onOpen={(href) => navigate(href)} />
+          <Panel
+            title="Da qualificare"
+            subtitle="Fornitori in stato bozza"
+            count={drafts.data?.length ?? 0}
+            collapsible
+            open={draftsOpen}
+            onToggle={() => setDraftsOpen((open) => !open)}
+          >
             {(drafts.data ?? []).length === 0 ? stateBlock('Nessun fornitore in attesa', 'Tutti i fornitori arrivati da Mistra sono stati lavorati.', 'check-circle') : (
               <div className="tableScroll dashboardScroll">
                 <table className="table">
@@ -365,7 +642,14 @@ export function DashboardPage() {
               </div>
             )}
           </Panel>
-          <Panel title="Documenti in scadenza" subtitle="Scadenza ≤30 giorni, fornitori in bozza o attivi" count={documents.data?.length ?? 0}>
+          <Panel
+            title="Documenti in scadenza"
+            subtitle="Scadenza ≤30 giorni, fornitori in bozza o attivi"
+            count={documents.data?.length ?? 0}
+            collapsible
+            open={documentsOpen}
+            onToggle={() => setDocumentsOpen((open) => !open)}
+          >
             {(documents.data ?? []).length === 0 ? stateBlock('Nessun documento in scadenza', 'Tutti i documenti dei fornitori attivi sono in regola.', 'check-circle') : (
               <div className="tableScroll dashboardScroll">
                 <table className="table">
@@ -383,7 +667,15 @@ export function DashboardPage() {
               </div>
             )}
           </Panel>
-          <Panel title="Categorie aperte" subtitle="Categorie da qualificare per fornitori in bozza o attivi" count={groupedCategories.length} countSuffix="fornitori">
+          <Panel
+            title="Categorie aperte"
+            subtitle="Categorie da qualificare per fornitori in bozza o attivi"
+            count={groupedCategories.length}
+            countSuffix="fornitori"
+            collapsible
+            open={categoriesOpen}
+            onToggle={() => setCategoriesOpen((open) => !open)}
+          >
             {groupedCategories.length === 0 ? stateBlock('Nessuna categoria aperta', 'Tutte le categorie assegnate sono qualificate.', 'check-circle') : (
               <div className="tableScroll dashboardScroll">
                 <table className="table">
