@@ -1,12 +1,12 @@
 openapi: 3.0.9
 info:
-  version: 2.7.14
+  version: 2.8.8
   title: Mistra NG Internal API
   license:
     name: CDLAN
     url: https://www.cdlan.it
   description: |
-    # Mistra NG Internal API Reference Build: 2.7.14
+    # Mistra NG Internal API Reference Build: 2.8.8
 servers:
   - url: /
 security:
@@ -3296,6 +3296,130 @@ paths:
           $ref: '#/components/responses/404'
         '500':
           $ref: '#/components/responses/500'
+  /arak/provider-qualification/v1/provider/{provider_id}/reference:
+    post:
+      summary: create new provider ref
+      operationId: NewProviderRef
+      tags:
+        - arak-provider-qualification
+      parameters:
+        - name: provider_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/provider-ref-new'
+      responses:
+        '200':
+          description: Successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/id-object'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '500':
+          $ref: '#/components/responses/500'
+  /arak/provider-qualification/v1/provider/{provider_id}/reference/{reference_id}:
+    get:
+      summary: get provider ref
+      operationId: GetProviderRef
+      tags:
+        - arak-provider-qualification
+      parameters:
+        - name: provider_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: reference_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Provider ref details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/provider-ref'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+    put:
+      summary: edit provider ref
+      operationId: EditProviderRef
+      tags:
+        - arak-provider-qualification
+      parameters:
+        - name: provider_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: reference_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        description: Provider ref fields to update
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/provider-ref-edit'
+      responses:
+        '200':
+          $ref: '#/components/responses/200'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+    delete:
+      summary: delete provider ref
+      operationId: DeleteProviderRef
+      tags:
+        - arak-provider-qualification
+      parameters:
+        - name: provider_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: reference_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          $ref: '#/components/responses/200'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
   /arak/provider-qualification/v1/provider/{provider_id}/category:
     get:
       summary: list categories for a provider
@@ -4111,7 +4235,7 @@ paths:
         '500':
           $ref: '#/components/responses/500'
     get:
-      summary: get all RDA
+      summary: get all PO
       operationId: GetAllRDA
       tags:
         - arak-rda
@@ -4186,6 +4310,81 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/rda-document-preview'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+  /arak/rda/v1/sudo/po-details:
+    get:
+      summary: '[SUDO] get all purchase order with details'
+      operationId: GetAllPOWithDetailsSudo
+      tags:
+        - arak-rda
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+            description: the type of state
+        - name: page_number
+          in: query
+          required: true
+          schema:
+            default: 1
+            minimum: 1
+            type: integer
+            format: int
+            description: page number
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            default: 20
+            minimum: 1
+            type: integer
+            format: int
+            description: number of results to show in each page
+        - name: search_string
+          in: query
+          required: false
+          description: filters through RDA code
+          schema:
+            type: string
+        - name: disable_pagination
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            description: set true if want disable the pagination option
+      responses:
+        '200':
+          description: Successfully retrieved list
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - total_number
+                  - current_page
+                  - total_pages
+                  - items
+                properties:
+                  total_number:
+                    type: integer
+                  current_page:
+                    type: integer
+                  total_pages:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/po-details'
         '400':
           $ref: '#/components/responses/400'
         '403':
@@ -7251,6 +7450,9 @@ components:
     provider-ref:
       type: object
       properties:
+        id:
+          type: integer
+          format: int64
         first_name:
           type: string
           minLength: 1
@@ -7265,13 +7467,26 @@ components:
           pattern: ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$
           minLength: 5
           maxLength: 100
+        phone:
+          type: string
+          maxLength: 20
+        reference_type:
+          type: string
+          enum:
+            - QUALIFICATION_REF
+            - OTHER_REF
+            - ADMINISTRATIVE_REF
+            - TECHNICAL_REF
       required:
+        - id
         - email
+        - reference_type
     provider:
       type: object
       properties:
         id:
           type: integer
+          format: int64
           description: ID of the provider
         company_name:
           type: string
@@ -7595,9 +7810,12 @@ components:
             - YE
             - ZM
             - ZW
-        ref:
-          $ref: '#/components/schemas/provider-ref'
-          description: Contact reference (always required)
+        refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/provider-ref'
+        skip_qualification_validation:
+          type: boolean
       required:
         - id
         - company_name
@@ -7609,7 +7827,8 @@ components:
         - province
         - country
         - language
-        - ref
+        - refs
+        - skip_qualification_validation
     country:
       type: string
       description: ISO 3166-1 alpha-2 country code
@@ -7863,6 +8082,37 @@ components:
         - YE
         - ZM
         - ZW
+    provider-ref-new:
+      type: object
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        email:
+          type: string
+          format: email
+          pattern: ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$
+          minLength: 5
+          maxLength: 100
+        phone:
+          type: string
+          maxLength: 20
+          pattern: ^$|^\+[1-9][0-9]{4,19}$
+        reference_type:
+          type: string
+          enum:
+            - QUALIFICATION_REF
+            - OTHER_REF
+            - ADMINISTRATIVE_REF
+            - TECHNICAL_REF
+          default: QUALIFICATION_REF
+      required:
+        - email
     provider-new:
       type: object
       properties:
@@ -7908,7 +8158,7 @@ components:
         country:
           $ref: '#/components/schemas/country'
         ref:
-          $ref: '#/components/schemas/provider-ref'
+          $ref: '#/components/schemas/provider-ref-new'
         language:
           type: string
           description: Language used for communications to the provider
@@ -7920,6 +8170,9 @@ components:
           type: string
           minLength: 1
           maxLength: 6
+        skip_qualification_validation:
+          type: boolean
+          default: false
       required:
         - default_payment_method
         - language
@@ -7974,7 +8227,7 @@ components:
         country:
           $ref: '#/components/schemas/country'
         ref:
-          $ref: '#/components/schemas/provider-ref'
+          $ref: '#/components/schemas/provider-ref-new'
           description: Contact reference (always required)
         language:
           type: string
@@ -7990,6 +8243,27 @@ components:
         - country
         - language
         - ref
+    provider-ref-edit:
+      type: object
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        email:
+          type: string
+          format: email
+          pattern: ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$
+          minLength: 5
+          maxLength: 100
+        phone:
+          type: string
+          maxLength: 20
+          pattern: ^$|^\+[1-9][0-9]{4,19}$
     provider-edit:
       type: object
       properties:
@@ -8035,7 +8309,7 @@ components:
           format: int64
           description: Optional ERP identifier
         ref:
-          $ref: '#/components/schemas/provider-ref'
+          $ref: '#/components/schemas/provider-ref-edit'
         state:
           type: string
           description: Provider state
@@ -8053,6 +8327,8 @@ components:
           type: string
           minLength: 1
           maxLength: 6
+        skip_qualification_validation:
+          type: boolean
     provider-category-item-get:
       type: object
       required:
@@ -8395,6 +8671,17 @@ components:
           type: string
           description: Description of the article
           example: High quality industrial widget
+    approver-brief:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        level:
+          type: integer
+      required:
+        - level
+        - email
     rda-document-preview:
       type: object
       properties:
@@ -8492,8 +8779,13 @@ components:
               format: int64
             state:
               type: string
+        approvers:
+          type: array
+          items:
+            $ref: '#/components/schemas/approver-brief'
       required:
         - id
+        - code
         - reference_warehouse
         - state
         - creation_date
@@ -8508,6 +8800,7 @@ components:
         - currency
         - language
         - payment_method
+        - approvers
     rda-create:
       type: object
       properties:
@@ -8555,7 +8848,12 @@ components:
           maxLength: 6
           minLength: 1
           pattern: .*\S.*
-          description: paymenth method code
+          description: payment method code
+        recipient_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
       required:
         - reference_warehouse
         - payment_method
@@ -8567,6 +8865,59 @@ components:
             - cost_center
         - required:
             - budget_user_id
+    reference_warehouse:
+      type: object
+      properties:
+        name:
+          type: string
+        ref_text_code:
+          type: string
+        ref_code:
+          type: integer
+      required:
+        - name
+        - ref_text_code
+        - ref_code
+    payment-method:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+      required:
+        - code
+        - description
+    pseudo-budget:
+      type: object
+      properties:
+        budget_id:
+          type: integer
+          format: int64
+        budget_name:
+          type: string
+        budget_year:
+          type: integer
+        cost_center:
+          type: string
+        user_id:
+          type: integer
+          format: int64
+        limit:
+          type: string
+        current:
+          type: string
+      required:
+        - budget_id
+        - budget_name
+        - budget_year
+        - limit
+        - current
+      oneOf:
+        - required:
+            - cost_center
+        - required:
+            - user_id
     rda-row:
       type: object
       properties:
@@ -8637,6 +8988,111 @@ components:
               description: Notifica giorni prima per dare la possibilità di disdire
             created:
               type: string
+    po-attachment-get:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The unique identifier of the attachment
+        attachment_type:
+          type: string
+          description: The type of attachment
+          enum:
+            - quote
+            - transport_document
+            - other
+        file_id:
+          type: integer
+          description: The ID of the stored file
+        file_name:
+          type: string
+          description: Original file name
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the attachment was created
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp when the attachment was last updated
+      required:
+        - id
+        - attachment_type
+        - file_id
+        - file_name
+        - created_at
+        - updated_at
+    po-details:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        state:
+          type: string
+        type:
+          type: string
+        total_price:
+          type: string
+        description:
+          type: string
+        project:
+          type: string
+        language:
+          type: string
+        currency:
+          type: string
+        created:
+          type: string
+          format: datetime
+        updated:
+          type: string
+          format: datetime
+        pdf_generation_date:
+          type: string
+          format: datetime
+        leasing:
+          type: boolean
+        object:
+          type: string
+        note:
+          type: string
+        reference_warehouse:
+          $ref: '#/components/schemas/reference_warehouse'
+        payment_method:
+          $ref: '#/components/schemas/payment-method'
+        requester:
+          $ref: '#/components/schemas/arak-int-user'
+        budget:
+          $ref: '#/components/schemas/pseudo-budget'
+        provider:
+          $ref: '#/components/schemas/provider'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/rda-row'
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/po-attachment-get'
+      required:
+        - id
+        - state
+        - type
+        - total_price
+        - reference_warehouse
+        - language
+        - currency
+        - created
+        - updated
+        - pdf_generation_date
+        - leasing
+        - payment_method
+        - requester
+        - budget
+        - provider
+        - rows
+        - attachments
     RdaRequester:
       type: object
       required:
@@ -8681,13 +9137,26 @@ components:
       type: object
       required:
         - email
+        - reference_type
       properties:
+        id:
+          type: integer
+          format: int64
         email:
           type: string
         first_name:
           type: string
         last_name:
           type: string
+        phone:
+          type: string
+        reference_type:
+          type: string
+          enum:
+            - QUALIFICATION_REF
+            - OTHER_REF
+            - ADMINISTRATIVE_REF
+            - TECHNICAL_REF
     RdaProvider:
       type: object
       required:
@@ -8705,44 +9174,22 @@ components:
           format: int64
         state:
           type: string
-        ref:
-          $ref: '#/components/schemas/RdaProviderRef'
+        refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/RdaProviderRef'
         default_payment_method:
           $ref: '#/components/schemas/RdaPaymentMethod'
-    po-attachment-get:
+    approver:
       type: object
       properties:
-        id:
+        level:
           type: integer
-          description: The unique identifier of the attachment
-        attachment_type:
-          type: string
-          description: The type of attachment
-          enum:
-            - quote
-            - transport_document
-            - other
-        file_id:
-          type: integer
-          description: The ID of the stored file
-        file_name:
-          type: string
-          description: Original file name
-        created_at:
-          type: string
-          format: date-time
-          description: Timestamp when the attachment was created
-        updated_at:
-          type: string
-          format: date-time
-          description: Timestamp when the attachment was last updated
+        user:
+          $ref: '#/components/schemas/arak-int-user'
       required:
-        - id
-        - attachment_type
-        - file_id
-        - file_name
-        - created_at
-        - updated_at
+        - level
+        - user
     rda-document-detail:
       type: object
       properties:
@@ -8803,8 +9250,17 @@ components:
             $ref: '#/components/schemas/po-attachment-get'
         language:
           type: string
+        recipients:
+          type: array
+          items:
+            $ref: '#/components/schemas/provider-ref'
+        approvers:
+          type: array
+          items:
+            $ref: '#/components/schemas/approver'
       required:
         - id
+        - code
         - reference_warehouse
         - state
         - creation_date
@@ -8820,6 +9276,8 @@ components:
         - language
         - payment_method
         - rows
+        - recipients
+        - approvers
       components:
         schemas:
           RdaRequester:
@@ -8866,13 +9324,26 @@ components:
             type: object
             required:
               - email
+              - reference_type
             properties:
+              id:
+                type: integer
+                format: int64
               email:
                 type: string
               first_name:
                 type: string
               last_name:
                 type: string
+              phone:
+                type: string
+              reference_type:
+                type: string
+                enum:
+                  - QUALIFICATION_REF
+                  - OTHER_REF
+                  - ADMINISTRATIVE_REF
+                  - TECHNICAL_REF
           RdaProvider:
             type: object
             required:
@@ -8890,8 +9361,10 @@ components:
                 format: int64
               state:
                 type: string
-              ref:
-                $ref: '#/components/schemas/RdaProviderRef'
+              refs:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RdaProviderRef'
               default_payment_method:
                 $ref: '#/components/schemas/RdaPaymentMethod'
     rda-patch:
@@ -8932,6 +9405,11 @@ components:
           maxLength: 50
         currency:
           type: string
+        recipient_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
     po-attachment-upload:
       type: object
       properties:
@@ -9058,6 +9536,7 @@ components:
       type: object
       required:
         - id
+        - code
         - state
         - created
         - updated
