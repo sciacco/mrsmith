@@ -1,6 +1,3 @@
-export const providerTabs = ['Dati', 'Contatti', 'Qualifica', 'Documenti'] as const;
-export type ProviderTab = (typeof providerTabs)[number];
-
 export const referenceTypes = [
   { value: 'ADMINISTRATIVE_REF', label: 'Amministrativo' },
   { value: 'TECHNICAL_REF', label: 'Tecnico' },

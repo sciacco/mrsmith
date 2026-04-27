@@ -14,10 +14,10 @@ import {
   useProviderDocuments,
   useProviderSummary,
 } from './api/queries';
-import type { Category, DashboardCategory, DocumentType, Provider, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
+import type { Category, CategoryDocumentType, DashboardCategory, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
 import { countries } from './lib/countries';
 import { provinces } from './lib/provinces';
-import { providerTabs, referenceTypeLabel, referenceTypes, stateLabel, type ProviderTab } from './lib/reference';
+import { referenceTypeLabel, referenceTypes } from './lib/reference';
 import { saveBlob } from './lib/download';
 import { useHasRole } from './hooks/useHasRole';
 import {
@@ -74,12 +74,6 @@ function qualificationRef(provider?: Provider) {
 function selectOptions(items: Category[] | DocumentType[] | undefined) {
   return items?.map((item) => ({ value: item.id, label: item.name })) ?? [];
 }
-
-const providerStateOptions = [
-  { value: 'DRAFT', label: stateLabel('DRAFT') },
-  { value: 'ACTIVE', label: stateLabel('ACTIVE') },
-  { value: 'INACTIVE', label: stateLabel('INACTIVE') },
-];
 
 const languageOptions = [
   { value: 'it', label: 'Italiano' },
@@ -245,6 +239,10 @@ function Panel({
   countSuffix,
   children,
   className,
+  collapsible,
+  open = true,
+  onToggle,
+  actions,
 }: {
   title: string;
   subtitle?: string;
@@ -252,19 +250,40 @@ function Panel({
   countSuffix?: string;
   children: React.ReactNode;
   className?: string;
+  collapsible?: boolean;
+  open?: boolean;
+  onToggle?: () => void;
+  actions?: React.ReactNode;
 }) {
+  const headerInner = (
+    <>
+      <div>
+        <h2>
+          {collapsible ? <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} /> : null}
+          {title}
+          {count !== undefined ? <span className="panelCount">{count}{countSuffix ? ` ${countSuffix}` : ''}</span> : null}
+        </h2>
+        {subtitle ? <span className="panelSubtitle">{subtitle}</span> : null}
+      </div>
+      {actions ? <div className="panelActions">{actions}</div> : null}
+    </>
+  );
+
   return (
     <section className={`panel ${className ?? ''}`}>
-      <header className="panelHeader">
-        <div>
-          <h2>
-            {title}
-            {count !== undefined ? <span className="panelCount">{count}{countSuffix ? ` ${countSuffix}` : ''}</span> : null}
-          </h2>
-          {subtitle ? <span className="panelSubtitle">{subtitle}</span> : null}
-        </div>
-      </header>
-      {children}
+      {collapsible ? (
+        <button
+          type="button"
+          className="panelHeader panelHeader--button"
+          aria-expanded={open}
+          onClick={onToggle}
+        >
+          {headerInner}
+        </button>
+      ) : (
+        <header className="panelHeader">{headerInner}</header>
+      )}
+      {(!collapsible || open) ? children : null}
     </section>
   );
 }
@@ -297,11 +316,14 @@ function qualificationVariant(item: ProviderSummary): 'success' | 'warning' | 'd
 export function FornitoriPage() {
   const [params, setParams] = useSearchParams();
   const selectedId = Number(params.get('id_provider') ?? '') || null;
-  const tab = providerTabs.includes(params.get('tab') as ProviderTab) ? (params.get('tab') as ProviderTab) : 'Dati';
   const [query, setQuery] = useState('');
   const [showArchive, setShowArchive] = useState(false);
   const summary = useProviderSummary();
-  const provider = useProvider(selectedId);
+  const summaryById = useMemo(() => {
+    const map = new Map<number, ProviderSummary>();
+    for (const item of summary.data ?? []) map.set(item.id, item);
+    return map;
+  }, [summary.data]);
 
   const { active, archive } = useMemo(() => {
     const all = summary.data ?? [];
@@ -313,13 +335,7 @@ export function FornitoriPage() {
   }, [summary.data, query]);
 
   function selectProvider(id: number) {
-    setParams({ id_provider: String(id), tab });
-  }
-
-  function setTab(next: ProviderTab) {
-    const nextParams: Record<string, string> = { tab: next };
-    if (selectedId) nextParams.id_provider = String(selectedId);
-    setParams(nextParams);
+    setParams({ id_provider: String(id) });
   }
 
   return (
@@ -349,16 +365,9 @@ export function FornitoriPage() {
           )}
         </section>
         <section className="detail panel">
-          {!selectedId ? stateBlock('Seleziona un fornitore', 'Scegli un fornitore dalla lista per vedere i dettagli.') : provider.isLoading ? <Skeleton rows={8} /> : provider.error ? stateBlock(errorTitle(provider.error), 'Il dettaglio fornitore non puo essere caricato.') : (
-            <>
-              <header className="detailHeader"><h2>{provider.data?.company_name}</h2><ProviderStateBadge state={provider.data?.state} /></header>
-              <div className="segments">{providerTabs.map((item) => <button key={item} className={item === tab ? 'active' : ''} onClick={() => setTab(item)}>{item}</button>)}</div>
-              {tab === 'Dati' ? <ProviderData provider={provider.data} /> : null}
-              {tab === 'Contatti' ? <ProviderContacts provider={provider.data} /> : null}
-              {tab === 'Qualifica' ? <ProviderQualification providerId={selectedId} /> : null}
-              {tab === 'Documenti' ? <ProviderDocuments providerId={selectedId} /> : null}
-            </>
-          )}
+          {!selectedId
+            ? stateBlock('Seleziona un fornitore', 'Scegli un fornitore dalla lista per vedere i dettagli.', 'user')
+            : <ProviderPage providerId={selectedId} summary={summaryById.get(selectedId)} />}
         </section>
       </div>
     </main>
@@ -389,121 +398,6 @@ function ProviderRow({ item, selected, onSelect }: { item: ProviderSummary; sele
   );
 }
 
-function ProviderData({ provider }: { provider?: Provider }) {
-  const { toast } = useToast();
-  const skipRole = useHasRole('app_fornitori_skip_qualification');
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const mutations = useFornitoriMutations();
-  const ref = qualificationRef(provider);
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!provider) return;
-    const body = providerPayload(event.currentTarget);
-    const validation = validateProvider(body);
-    if (validation) {
-      toast(validation, 'warning');
-      return;
-    }
-    await mutations.updateProvider.mutateAsync({ id: provider.id, body });
-    toast('Aggiornamento completato');
-  }
-
-  async function remove() {
-    if (!provider) return;
-    await mutations.deleteProvider.mutateAsync(provider.id);
-    setConfirmDelete(false);
-    toast('Aggiornamento completato');
-  }
-
-  return (
-    <>
-      <form className="formGrid" onSubmit={(event) => void submit(event)}>
-        <Input name="company_name" label="Ragione sociale" defaultValue={provider?.company_name} />
-        <Select name="state" label="Stato" defaultValue={provider?.state ?? 'DRAFT'} options={providerStateOptions} />
-        <Input name="vat_number" label="P.IVA" defaultValue={provider?.vat_number} />
-        <Input name="cf" label="CF" defaultValue={provider?.cf} />
-        <Input name="erp_id" label="Codice Alyante" type="number" defaultValue={provider?.erp_id ?? ''} />
-        <Select name="language" label="Lingua" defaultValue={provider?.language ?? 'it'} options={languageOptions} />
-        <Select name="country" label="Paese" defaultValue={provider?.country ?? 'IT'} options={countryOptions} />
-        <Select name="province" label="Provincia" defaultValue={provider?.province ?? ''} options={['', ...provinces]} />
-        <Input name="city" label="Citta" defaultValue={provider?.city} />
-        <Input name="postal_code" label="CAP" defaultValue={provider?.postal_code} />
-        <Input name="address" label="Indirizzo" defaultValue={provider?.address} wide />
-        <Input name="default_payment_method" label="Pagamento predefinito" defaultValue={typeof provider?.default_payment_method === 'object' ? provider.default_payment_method?.code : provider?.default_payment_method ?? ''} />
-        <Input name="ref_first_name" label="Nome qualifica" defaultValue={ref?.first_name} />
-        <Input name="ref_last_name" label="Cognome qualifica" defaultValue={ref?.last_name} />
-        <Input name="ref_email" label="Email qualifica" defaultValue={ref?.email} />
-        <Input name="ref_phone" label="Telefono qualifica" defaultValue={ref?.phone} />
-        {skipRole ? <label className="checkLine"><input name="skip_qualification_validation" type="checkbox" /> Salta controllo qualifica</label> : null}
-        <div className="formActions">
-          <Button type="submit" leftIcon={<Icon name="check" />} loading={mutations.updateProvider.isPending}>Salva</Button>
-          <Button variant="danger" leftIcon={<Icon name="trash" />} onClick={() => setConfirmDelete(true)}>Elimina</Button>
-        </div>
-      </form>
-      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Elimina fornitore" size="sm">
-        <p className="modalText">Confermi eliminazione del fornitore selezionato?</p>
-        <div className="modalActions">
-          <Button variant="secondary" onClick={() => setConfirmDelete(false)}>Annulla</Button>
-          <Button variant="danger" onClick={() => void remove()} loading={mutations.deleteProvider.isPending}>Elimina</Button>
-        </div>
-      </Modal>
-    </>
-  );
-}
-
-function ProviderContacts({ provider }: { provider?: Provider }) {
-  const { toast } = useToast();
-  const mutations = useFornitoriMutations();
-  const refs = getProviderRefs(provider).filter((ref) => ref.reference_type !== 'QUALIFICATION_REF');
-  const [newType, setNewType] = useState('ADMINISTRATIVE_REF');
-
-  async function save(ref: ProviderReference, form: HTMLFormElement) {
-    if (!provider || !ref.id) return;
-    const body = refPayload(form, ref.reference_type);
-    await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: ref.id, body });
-    toast('Aggiornamento completato');
-  }
-
-  async function add(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!provider) return;
-    await mutations.createReference.mutateAsync({ providerId: provider.id, body: refPayload(event.currentTarget, newType) });
-    event.currentTarget.reset();
-    toast('Aggiornamento completato');
-  }
-
-  return (
-    <div className="stack">
-      <table className="table">
-        <thead><tr><th>Tipo</th><th>Nome</th><th>Email</th><th>Telefono</th><th /></tr></thead>
-        <tbody>{refs.map((ref) => (
-          <tr key={ref.id}>
-            <td>{referenceTypeLabel(ref.reference_type)}</td>
-            <td colSpan={4}>
-              <form className="inlineForm" onSubmit={(event) => { event.preventDefault(); void save(ref, event.currentTarget); }}>
-                <input name="first_name" defaultValue={ref.first_name} placeholder="Nome" />
-                <input name="last_name" defaultValue={ref.last_name} placeholder="Cognome" />
-                <input name="email" defaultValue={ref.email} placeholder="Email" />
-                <input name="phone" defaultValue={ref.phone} placeholder="Telefono" />
-                <Button size="sm" type="submit">Salva</Button>
-              </form>
-            </td>
-          </tr>
-        ))}</tbody>
-      </table>
-      <form className="inlineForm addLine" onSubmit={(event) => void add(event)}>
-        <select value={newType} onChange={(event) => setNewType(event.target.value)}>{referenceTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
-        <input name="first_name" placeholder="Nome" />
-        <input name="last_name" placeholder="Cognome" />
-        <input name="email" placeholder="Email" />
-        <input name="phone" placeholder="Telefono" />
-        <Button type="submit" leftIcon={<Icon name="plus" />}>Salva</Button>
-      </form>
-    </div>
-  );
-}
-
 function refPayload(form: HTMLFormElement, type?: string): ProviderReference {
   const data = new FormData(form);
   return {
@@ -515,67 +409,229 @@ function refPayload(form: HTMLFormElement, type?: string): ProviderReference {
   };
 }
 
-function ProviderQualification({ providerId }: { providerId: number }) {
-  const { toast } = useToast();
-  const categories = useCategories();
-  const providerCategories = useProviderCategories(providerId);
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [newCategories, setNewCategories] = useState<number[]>([]);
-  const [critical, setCritical] = useState(false);
-  const mutations = useFornitoriMutations();
-  const documents = useProviderDocuments(providerId, selectedCategory);
+function paymentCodeOf(value: Provider['default_payment_method']): string {
+  if (value && typeof value === 'object') return value.code ?? '';
+  if (typeof value === 'string') return value;
+  return '';
+}
 
-  async function add() {
-    if (newCategories.length === 0) return;
-    await mutations.addProviderCategories.mutateAsync({ providerId, categoryIds: newCategories, critical });
-    setNewCategories([]);
-    toast('Aggiornamento completato');
-  }
+function missingForActivation(provider: Provider): string[] {
+  const missing: string[] = [];
+  if (!provider.company_name?.trim()) missing.push('ragione sociale');
+  if (!provider.address?.trim()) missing.push('indirizzo');
+  if (!provider.city?.trim()) missing.push('città');
+  if (!provider.postal_code?.trim()) missing.push('CAP');
+  if (!provider.country?.trim()) missing.push('paese');
+  if (!provider.erp_id || provider.erp_id <= 0) missing.push('codice ERP');
+  if (!paymentCodeOf(provider.default_payment_method).trim()) missing.push('metodo di pagamento');
+  if (getProviderRefs(provider).length === 0) missing.push('almeno un contatto');
+  return missing;
+}
+
+function ProviderPage({ providerId, summary }: { providerId: number; summary?: ProviderSummary }) {
+  const provider = useProvider(providerId);
+
+  if (provider.isLoading) return <Skeleton rows={10} />;
+  if (provider.error) return stateBlock(errorTitle(provider.error), 'Il dettaglio fornitore non può essere caricato.', 'triangle-alert');
+  if (!provider.data) return null;
+
+  const data = provider.data;
+  const stateUpper = (data.state ?? '').toUpperCase();
+  const isUsable = USABLE_PROVIDER_STATES.has(stateUpper);
+  const isActive = stateUpper === 'ACTIVE';
+  const isDraft = stateUpper === 'DRAFT';
+  const fullReadonly = !isUsable;
 
   return (
-    <div className="twoCols">
-      <section>
-        <div className="toolbar compact">
-          <MultiSelect options={selectOptions(categories.data)} selected={newCategories} onChange={setNewCategories} placeholder="Aggiungi categorie" />
-          <ToggleSwitch id="critical-category" checked={critical} onChange={setCritical} label="Critica" />
-          <Button onClick={() => void add()} leftIcon={<Icon name="plus" />}>Salva</Button>
-        </div>
-        <table className="table">
-          <thead><tr><th>Categoria</th><th>Stato</th><th>Critica</th></tr></thead>
-          <tbody>{(providerCategories.data ?? []).map((row) => (
-            <tr key={row.category?.id} className={selectedCategory === row.category?.id ? 'selectedRow' : ''} onClick={() => setSelectedCategory(row.category?.id ?? null)}>
-              <td>{row.category?.name}</td>
-              <td><CategoryStateBadge state={row.status ?? row.state} /></td>
-              <td>{row.critical ? 'Sì' : 'No'}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </section>
-      <Panel title="Documenti categoria">
-        {selectedCategory == null ? stateBlock('Seleziona una categoria', 'I documenti verranno mostrati dopo la selezione.') : documents.isLoading ? <Skeleton rows={4} /> : (
-          <table className="table">
-            <thead><tr><th>Tipo</th><th>Stato</th><th>Scadenza</th></tr></thead>
-            <tbody>{(documents.data ?? []).map((doc) => (
-              <tr key={doc.id}>
-                <td>{doc.document_type?.name}</td>
-                <td><DocumentStateBadge state={doc.state} /><DocumentUrgencyBadge expireDate={doc.expire_date} /></td>
-                <td>{dateLabel(doc.expire_date)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        )}
-      </Panel>
+    <div className="providerPage">
+      <ProviderHeader provider={data} summary={summary} />
+      {fullReadonly ? <StateBanner state={data.state} /> : null}
+      {isDraft ? <CompletenessBanner provider={data} /> : null}
+      <QualificationSection providerId={providerId} readonly={fullReadonly} />
+      <ContactsSection provider={data} readonly={fullReadonly} />
+      <AnagraficaSection provider={data} fullReadonly={fullReadonly} anagraficaLocked={isActive} />
     </div>
   );
 }
 
-function ProviderDocuments({ providerId }: { providerId: number }) {
+function ProviderHeader({ provider, summary }: { provider: Provider; summary?: ProviderSummary }) {
+  const total = summary?.total_count ?? 0;
+  const qualified = summary?.qualified_count ?? 0;
+  const percent = total > 0 ? Math.round((qualified / total) * 100) : 0;
+
+  return (
+    <header className="providerHeader">
+      <div className="providerHeaderTop">
+        <h2>{provider.company_name ?? '—'}</h2>
+        <ProviderStateBadge state={provider.state} />
+      </div>
+      <p className="providerHeaderMeta">
+        {[
+          provider.vat_number ? `P.IVA ${provider.vat_number}` : null,
+          provider.cf ? `CF ${provider.cf}` : null,
+          provider.erp_id ? `ERP ${provider.erp_id}` : null,
+        ].filter(Boolean).join(' · ') || 'Identificativi non disponibili'}
+      </p>
+      {total > 0 ? (
+        <div className="providerHeaderProgress" aria-label={`Completezza qualifica ${percent}%`}>
+          <div className="progressLabel">Qualifica · {qualified}/{total} categorie</div>
+          <div className="progressTrack">
+            <div className="progressFill" style={{ width: `${percent}%` }} data-state={qualified === total ? 'complete' : 'partial'} />
+          </div>
+          <div className="progressPercent">{percent}%</div>
+        </div>
+      ) : null}
+    </header>
+  );
+}
+
+function StateBanner({ state }: { state?: string | null }) {
+  const upper = (state ?? '').toUpperCase();
+  if (upper === 'CEASED') {
+    return (
+      <div className="banner banner--neutral">
+        <Icon name="lock" size={16} aria-hidden="true" />
+        <span>Fornitore cessato. Pagina in sola consultazione.</span>
+      </div>
+    );
+  }
+  if (upper === 'INACTIVE') {
+    return (
+      <div className="banner banner--neutral">
+        <Icon name="lock" size={16} aria-hidden="true" />
+        <span>Fornitore sospeso. Modifiche disabilitate fino a riattivazione.</span>
+      </div>
+    );
+  }
+  return null;
+}
+
+function CompletenessBanner({ provider }: { provider: Provider }) {
+  const missing = missingForActivation(provider);
+  if (missing.length === 0) {
+    return (
+      <div className="banner banner--success">
+        <Icon name="check-circle" size={16} aria-hidden="true" />
+        <span>Tutti i campi obbligatori sono compilati. Il fornitore è pronto per essere attivato.</span>
+      </div>
+    );
+  }
+  return (
+    <div className="banner banner--info">
+      <Icon name="info" size={16} aria-hidden="true" />
+      <span>Per attivare il fornitore: {missing.join(', ')}.</span>
+    </div>
+  );
+}
+
+function QualificationSection({ providerId, readonly }: { providerId: number; readonly: boolean }) {
   const { toast } = useToast();
-  const documents = useProviderDocuments(providerId);
-  const types = useDocumentTypes();
   const mutations = useFornitoriMutations();
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
+  const providerCategories = useProviderCategories(providerId);
+  const allCategories = useCategories();
+  const documents = useProviderDocuments(providerId);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const categoryById = useMemo(() => {
+    const map = new Map<number, Category>();
+    for (const item of allCategories.data ?? []) map.set(item.id, item);
+    return map;
+  }, [allCategories.data]);
+
+  const documentsByType = useMemo(() => {
+    const map = new Map<number, ProviderDocument[]>();
+    for (const doc of documents.data ?? []) {
+      const typeId = doc.document_type?.id;
+      if (typeId == null) continue;
+      const list = map.get(typeId) ?? [];
+      list.push(doc);
+      map.set(typeId, list);
+    }
+    return map;
+  }, [documents.data]);
+
+  const rows = providerCategories.data ?? [];
+  const totalCount = rows.length;
+  const qualifiedCount = rows.filter((row) => (row.status ?? row.state)?.toUpperCase() === 'QUALIFIED').length;
+  const availableCategories = (allCategories.data ?? []).filter(
+    (cat) => !rows.some((row) => row.category?.id === cat.id),
+  );
+
+  return (
+    <Panel
+      title="Qualifica"
+      subtitle={totalCount === 0 ? 'Nessuna categoria assegnata' : `${qualifiedCount} di ${totalCount} categorie qualificate`}
+      actions={!readonly ? (
+        <Button size="sm" leftIcon={<Icon name="plus" />} onClick={() => setAddOpen(true)} disabled={availableCategories.length === 0}>
+          Aggiungi categoria
+        </Button>
+      ) : undefined}
+    >
+      {providerCategories.isLoading ? <Skeleton rows={4} /> : rows.length === 0 ? stateBlock('Nessuna categoria assegnata', 'Aggiungi una categoria di qualifica per iniziare.', 'box') : (
+        <div className="qualificationList">
+          {rows.map((row) => {
+            const categoryId = row.category?.id;
+            const fullCategory = categoryId != null ? categoryById.get(categoryId) : undefined;
+            return (
+              <CategoryCard
+                key={categoryId ?? row.category?.name}
+                providerCategory={row}
+                category={fullCategory}
+                documentsByType={documentsByType}
+                providerId={providerId}
+                readonly={readonly}
+              />
+            );
+          })}
+        </div>
+      )}
+      <AddCategoryModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        availableCategories={availableCategories}
+        onSubmit={async (categoryIds, critical) => {
+          await mutations.addProviderCategories.mutateAsync({ providerId, categoryIds, critical });
+          toast('Categoria aggiunta');
+          setAddOpen(false);
+        }}
+        pending={mutations.addProviderCategories.isPending}
+      />
+    </Panel>
+  );
+}
+
+function CategoryCard({
+  providerCategory,
+  category,
+  documentsByType,
+  providerId,
+  readonly,
+}: {
+  providerCategory: ProviderCategory;
+  category?: Category;
+  documentsByType: Map<number, ProviderDocument[]>;
+  providerId: number;
+  readonly: boolean;
+}) {
+  const state = (providerCategory.status ?? providerCategory.state ?? 'NEW').toUpperCase();
+  const [open, setOpen] = useState(state !== 'QUALIFIED');
+  const [uploadType, setUploadType] = useState<DocumentType | null>(null);
+  const [editDocId, setEditDocId] = useState<number | null>(null);
+  const { toast } = useToast();
+  const mutations = useFornitoriMutations();
+  const docTypes = category?.document_types ?? [];
+  const required = docTypes.filter((dt) => dt.required);
+  const optional = docTypes.filter((dt) => !dt.required);
+
+  const requiredMissingNames = required
+    .filter((dt) => !(documentsByType.get(dt.document_type.id) ?? []).some((d) => (d.state ?? '').toUpperCase() === 'OK'))
+    .map((dt) => dt.document_type.name);
+
+  const subtitle = required.length === 0
+    ? 'Nessun documento richiesto'
+    : requiredMissingNames.length === 0
+      ? `${required.length} di ${required.length} documenti richiesti`
+      : `${required.length - requiredMissingNames.length} di ${required.length} richiesti — manca: ${requiredMissingNames.join(', ')}`;
 
   async function download(id: number) {
     const blob = await mutations.downloadDocument(id);
@@ -583,31 +639,428 @@ function ProviderDocuments({ providerId }: { providerId: number }) {
   }
 
   return (
-    <>
-      <div className="toolbar"><Button leftIcon={<Icon name="plus" />} onClick={() => setUploadOpen(true)}>Nuovo documento</Button></div>
-      <table className="table">
-        <thead><tr><th>Tipo</th><th>Stato</th><th>Scadenza</th><th /></tr></thead>
-        <tbody>{documents.isLoading ? <tr><td colSpan={4}><Skeleton rows={4} /></td></tr> : (documents.data ?? []).map((doc) => (
-          <tr key={doc.id}>
-            <td>{doc.document_type?.name}</td>
-            <td><DocumentStateBadge state={doc.state} /><DocumentUrgencyBadge expireDate={doc.expire_date} /></td>
-            <td>{dateLabel(doc.expire_date)}</td>
-            <td className="rowActions">
-              <Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} onClick={() => void download(doc.id)}>Scarica</Button>
-              <Button size="sm" variant="secondary" leftIcon={<Icon name="pencil" />} onClick={() => setEditId(doc.id)}>Modifica</Button>
-            </td>
-          </tr>
-        ))}</tbody>
-      </table>
-      <DocumentModal open={uploadOpen} onClose={() => setUploadOpen(false)} providerId={providerId} documentTypes={types.data ?? []} onSaved={() => toast('Aggiornamento completato')} />
-      <DocumentModal open={editId != null} onClose={() => setEditId(null)} providerId={providerId} documentId={editId ?? undefined} documentTypes={types.data ?? []} onSaved={() => toast('Aggiornamento completato')} />
-    </>
+    <article className="qualificationCard" data-state={state}>
+      <button type="button" className="qualificationCardHeader" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <div className="qualificationCardTitle">
+          <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} />
+          <strong>{providerCategory.category?.name ?? category?.name ?? '—'}</strong>
+          <CategoryStateBadge state={state} />
+          {providerCategory.critical ? <span className="criticalTag" title="Categoria critica">Critica</span> : null}
+        </div>
+        <span className="qualificationCardSubtitle">{subtitle}</span>
+      </button>
+      {open ? (
+        <div className="qualificationCardBody">
+          {required.length > 0 ? (
+            <DocumentGroup
+              title="Documenti richiesti"
+              required
+              types={required}
+              documentsByType={documentsByType}
+              readonly={readonly}
+              onUpload={(t) => setUploadType(t)}
+              onEdit={(id) => setEditDocId(id)}
+              onDownload={(id) => void download(id)}
+            />
+          ) : null}
+          {optional.length > 0 ? (
+            <DocumentGroup
+              title="Documenti opzionali"
+              required={false}
+              types={optional}
+              documentsByType={documentsByType}
+              readonly={readonly}
+              onUpload={(t) => setUploadType(t)}
+              onEdit={(id) => setEditDocId(id)}
+              onDownload={(id) => void download(id)}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      <DocumentModal
+        open={uploadType !== null}
+        onClose={() => setUploadType(null)}
+        providerId={providerId}
+        prefillType={uploadType ?? undefined}
+        onSaved={() => toast('Documento caricato')}
+      />
+      <DocumentModal
+        open={editDocId !== null}
+        onClose={() => setEditDocId(null)}
+        providerId={providerId}
+        documentId={editDocId ?? undefined}
+        onSaved={() => toast('Documento aggiornato')}
+      />
+    </article>
   );
 }
 
-function DocumentModal({ open, onClose, providerId, documentId, documentTypes, onSaved }: { open: boolean; onClose: () => void; providerId: number; documentId?: number; documentTypes: DocumentType[]; onSaved: () => void }) {
+function DocumentGroup({
+  title,
+  required,
+  types,
+  documentsByType,
+  readonly,
+  onUpload,
+  onEdit,
+  onDownload,
+}: {
+  title: string;
+  required: boolean;
+  types: CategoryDocumentType[];
+  documentsByType: Map<number, ProviderDocument[]>;
+  readonly: boolean;
+  onUpload: (type: DocumentType) => void;
+  onEdit: (id: number) => void;
+  onDownload: (id: number) => void;
+}) {
+  return (
+    <div className="docGroup">
+      <span className="docGroupTitle">{title}</span>
+      <ul className="docTypeList">
+        {types.map((entry) => {
+          const docs = documentsByType.get(entry.document_type.id) ?? [];
+          const hasUsable = docs.some((d) => (d.state ?? '').toUpperCase() === 'OK');
+          const display = docs[0];
+          return (
+            <li key={entry.document_type.id} className="docTypeRow" data-required={required ? 'true' : 'false'} data-uploaded={display ? 'true' : 'false'}>
+              <span className="docTypeIndicator" aria-hidden="true">{display ? <Icon name={hasUsable ? 'check-circle' : 'circle'} size={14} /> : <Icon name="circle" size={14} />}</span>
+              <span className="docTypeName">{entry.document_type.name}</span>
+              <span className="docTypeMeta">
+                {display?.expire_date ? dateLabel(display.expire_date) : '—'}
+              </span>
+              <span className="docTypeBadges">
+                <DocumentStateBadge state={display?.state} />
+                <DocumentUrgencyBadge expireDate={display?.expire_date} />
+              </span>
+              <span className="docTypeActions">
+                {display ? (
+                  <>
+                    <Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} aria-label="Scarica documento" onClick={() => onDownload(display.id)} />
+                    {!readonly ? <Button size="sm" variant="secondary" leftIcon={<Icon name="pencil" />} aria-label="Modifica documento" onClick={() => onEdit(display.id)} /> : null}
+                  </>
+                ) : !readonly ? (
+                  <Button size="sm" variant="primary" leftIcon={<Icon name="plus" />} onClick={() => onUpload(entry.document_type)}>Carica</Button>
+                ) : <span className="muted">—</span>}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function AddCategoryModal({
+  open,
+  onClose,
+  availableCategories,
+  onSubmit,
+  pending,
+}: {
+  open: boolean;
+  onClose: () => void;
+  availableCategories: Category[];
+  onSubmit: (categoryIds: number[], critical: boolean) => void | Promise<void>;
+  pending: boolean;
+}) {
+  const [selected, setSelected] = useState<number[]>([]);
+  const [critical, setCritical] = useState(false);
+
+  function close() {
+    setSelected([]);
+    setCritical(false);
+    onClose();
+  }
+
+  return (
+    <Modal open={open} onClose={close} title="Aggiungi categoria di qualifica" size="md">
+      <div className="modalForm">
+        <label className="field">
+          <span>Categoria</span>
+          <MultiSelect options={selectOptions(availableCategories)} selected={selected} onChange={setSelected} placeholder="Seleziona una o più categorie" />
+        </label>
+        <ToggleSwitch id="add-category-critical" checked={critical} onChange={setCritical} label="Categoria critica" />
+        <div className="modalActions">
+          <Button variant="secondary" onClick={close} type="button">Annulla</Button>
+          <Button onClick={() => void onSubmit(selected, critical)} loading={pending} disabled={selected.length === 0}>Aggiungi</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function ContactsSection({ provider, readonly }: { provider: Provider; readonly: boolean }) {
   const { toast } = useToast();
   const mutations = useFornitoriMutations();
+  const refs = getProviderRefs(provider).filter((ref) => ref.reference_type !== 'QUALIFICATION_REF');
+  const [addOpen, setAddOpen] = useState(false);
+
+  async function update(ref: ProviderReference, body: ProviderReference) {
+    if (!ref.id) return;
+    await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: ref.id, body });
+    toast('Contatto aggiornato');
+  }
+
+  async function add(body: ProviderReference) {
+    await mutations.createReference.mutateAsync({ providerId: provider.id, body });
+    toast('Contatto aggiunto');
+    setAddOpen(false);
+  }
+
+  return (
+    <Panel
+      title="Contatti"
+      subtitle={refs.length === 0 ? 'Nessun contatto registrato' : `${refs.length} contatto/i`}
+      actions={!readonly ? (
+        <Button size="sm" leftIcon={<Icon name="plus" />} onClick={() => setAddOpen(true)}>Aggiungi</Button>
+      ) : undefined}
+    >
+      {refs.length === 0 && !addOpen ? stateBlock('Nessun contatto registrato', 'Aggiungi almeno un contatto amministrativo o tecnico.', 'user') : (
+        <div className="contactsList">
+          {refs.map((item) => (
+            <ContactCard key={item.id} contact={item} readonly={readonly} onSave={(body) => void update(item, body)} pending={mutations.updateReference.isPending} />
+          ))}
+        </div>
+      )}
+      <ContactAddForm open={addOpen} onClose={() => setAddOpen(false)} onSave={(body) => void add(body)} pending={mutations.createReference.isPending} />
+    </Panel>
+  );
+}
+
+function ContactCard({
+  contact,
+  readonly,
+  onSave,
+  pending,
+}: {
+  contact: ProviderReference;
+  readonly: boolean;
+  onSave: (body: ProviderReference) => void;
+  pending: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  if (!editing) {
+    return (
+      <article className="contactCard">
+        <div className="contactCardMain">
+          <span className="contactCardName">{[contact.first_name, contact.last_name].filter(Boolean).join(' ') || '—'}</span>
+          <span className="contactCardType">{referenceTypeLabel(contact.reference_type)}</span>
+        </div>
+        <div className="contactCardMeta">
+          <span>{contact.email || '—'}</span>
+          <span>{contact.phone || '—'}</span>
+        </div>
+        {!readonly ? (
+          <Button size="sm" variant="ghost" leftIcon={<Icon name="pencil" />} onClick={() => setEditing(true)}>Modifica</Button>
+        ) : null}
+      </article>
+    );
+  }
+
+  return (
+    <form
+      className="contactForm"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const body = refPayload(event.currentTarget, contact.reference_type);
+        onSave(body);
+        setEditing(false);
+      }}
+    >
+      <div className="contactFormGrid">
+        <Input name="first_name" label="Nome" defaultValue={contact.first_name} />
+        <Input name="last_name" label="Cognome" defaultValue={contact.last_name} />
+        <Input name="email" label="Email" type="email" defaultValue={contact.email} />
+        <Input name="phone" label="Telefono" defaultValue={contact.phone} />
+      </div>
+      <div className="formActions">
+        <Button variant="secondary" type="button" onClick={() => setEditing(false)}>Annulla</Button>
+        <Button type="submit" loading={pending} leftIcon={<Icon name="check" />}>Salva</Button>
+      </div>
+    </form>
+  );
+}
+
+function ContactAddForm({
+  open,
+  onClose,
+  onSave,
+  pending,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (body: ProviderReference) => void;
+  pending: boolean;
+}) {
+  const [type, setType] = useState<string>('ADMINISTRATIVE_REF');
+  if (!open) return null;
+  return (
+    <form
+      className="contactForm contactForm--new"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const body = refPayload(event.currentTarget, type);
+        onSave(body);
+      }}
+    >
+      <div className="contactFormGrid">
+        <label className="field">
+          <span>Tipo contatto</span>
+          <select value={type} onChange={(event) => setType(event.target.value)}>
+            {referenceTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+        </label>
+        <Input name="first_name" label="Nome" />
+        <Input name="last_name" label="Cognome" />
+        <Input name="email" label="Email" type="email" />
+        <Input name="phone" label="Telefono" />
+      </div>
+      <div className="formActions">
+        <Button variant="secondary" type="button" onClick={onClose}>Annulla</Button>
+        <Button type="submit" loading={pending} leftIcon={<Icon name="plus" />}>Aggiungi</Button>
+      </div>
+    </form>
+  );
+}
+
+function AnagraficaSection({
+  provider,
+  fullReadonly,
+  anagraficaLocked,
+}: {
+  provider: Provider;
+  fullReadonly: boolean;
+  anagraficaLocked: boolean;
+}) {
+  const { toast } = useToast();
+  const skipRole = useHasRole('app_fornitori_skip_qualification');
+  const mutations = useFornitoriMutations();
+  const paymentMethods = usePaymentMethods();
+  const [open, setOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const ref = qualificationRef(provider);
+  const currentPaymentCode = paymentCodeOf(provider.default_payment_method);
+
+  // Anagrafica master fields are locked when state=ACTIVE (cfr. trg_provider_state_guard).
+  // Always editable on ACTIVE: payment method, qualification ref, skip flag.
+  // Always editable on DRAFT.
+  // Never editable on INACTIVE/CEASED (fullReadonly).
+  const masterFieldsDisabled = fullReadonly || anagraficaLocked;
+  const editableSidefieldsDisabled = fullReadonly;
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const body = providerPayload(event.currentTarget);
+    const validation = validateProvider(body);
+    if (validation) {
+      toast(validation, 'warning');
+      return;
+    }
+    await mutations.updateProvider.mutateAsync({ id: provider.id, body });
+    toast('Aggiornamento completato');
+  }
+
+  async function remove() {
+    await mutations.deleteProvider.mutateAsync(provider.id);
+    setConfirmDelete(false);
+    toast('Fornitore eliminato');
+  }
+
+  return (
+    <Panel
+      title="Anagrafica"
+      subtitle={anagraficaLocked && !fullReadonly ? 'Anagrafica bloccata: provider attivo' : undefined}
+      collapsible
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
+    >
+      {open ? (
+        <>
+          <form className="formGrid" onSubmit={(event) => void submit(event)}>
+            <input type="hidden" name="state" value={provider.state ?? 'DRAFT'} />
+            <Input name="company_name" label="Ragione sociale" defaultValue={provider.company_name} disabled={masterFieldsDisabled} />
+            <Input name="vat_number" label="P.IVA" defaultValue={provider.vat_number} disabled={masterFieldsDisabled} />
+            <Input name="cf" label="CF" defaultValue={provider.cf} disabled={masterFieldsDisabled} />
+            <Input name="erp_id" label="Codice Alyante" type="number" defaultValue={provider.erp_id ?? ''} disabled={masterFieldsDisabled} />
+            <Select name="language" label="Lingua" defaultValue={provider.language ?? 'it'} options={languageOptions} disabled={masterFieldsDisabled} />
+            <Select name="country" label="Paese" defaultValue={provider.country ?? 'IT'} options={countryOptions} disabled={masterFieldsDisabled} />
+            <Select name="province" label="Provincia" defaultValue={provider.province ?? ''} options={['', ...provinces]} disabled={masterFieldsDisabled} />
+            <Input name="city" label="Città" defaultValue={provider.city} disabled={masterFieldsDisabled} />
+            <Input name="postal_code" label="CAP" defaultValue={provider.postal_code} disabled={masterFieldsDisabled} />
+            <Input name="address" label="Indirizzo" defaultValue={provider.address} disabled={masterFieldsDisabled} wide />
+            <PaymentMethodField defaultValue={currentPaymentCode} options={paymentMethods.data ?? []} disabled={editableSidefieldsDisabled} />
+            <Input name="ref_first_name" label="Nome contatto qualifica" defaultValue={ref?.first_name} disabled={editableSidefieldsDisabled} />
+            <Input name="ref_last_name" label="Cognome contatto qualifica" defaultValue={ref?.last_name} disabled={editableSidefieldsDisabled} />
+            <Input name="ref_email" label="Email contatto qualifica" type="email" defaultValue={ref?.email} disabled={editableSidefieldsDisabled} />
+            <Input name="ref_phone" label="Telefono contatto qualifica" defaultValue={ref?.phone} disabled={editableSidefieldsDisabled} />
+            {skipRole ? (
+              <label className="checkLine">
+                <input name="skip_qualification_validation" type="checkbox" disabled={editableSidefieldsDisabled} defaultChecked={false} />
+                Salta controllo qualifica
+              </label>
+            ) : null}
+            {!fullReadonly ? (
+              <div className="formActions">
+                <Button type="submit" leftIcon={<Icon name="check" />} loading={mutations.updateProvider.isPending}>Salva anagrafica</Button>
+                {!anagraficaLocked ? (
+                  <Button variant="danger" type="button" leftIcon={<Icon name="trash" />} onClick={() => setConfirmDelete(true)}>Elimina</Button>
+                ) : null}
+              </div>
+            ) : null}
+          </form>
+          <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Elimina fornitore" size="sm">
+            <p className="modalText">Confermi l'eliminazione del fornitore? L'operazione non è reversibile.</p>
+            <div className="modalActions">
+              <Button variant="secondary" onClick={() => setConfirmDelete(false)}>Annulla</Button>
+              <Button variant="danger" onClick={() => void remove()} loading={mutations.deleteProvider.isPending}>Elimina</Button>
+            </div>
+          </Modal>
+        </>
+      ) : null}
+    </Panel>
+  );
+}
+
+function PaymentMethodField({
+  defaultValue,
+  options,
+  disabled,
+}: {
+  defaultValue: string;
+  options: PaymentMethod[];
+  disabled: boolean;
+}) {
+  const selectOptionsList: SelectOption[] = [
+    { value: '', label: '—' },
+    ...options.map((item) => ({ value: item.code, label: `${item.description} (${item.code.trim()})` })),
+  ];
+  return (
+    <Select name="default_payment_method" label="Metodo di pagamento" defaultValue={defaultValue} options={selectOptionsList} disabled={disabled} />
+  );
+}
+
+function DocumentModal({
+  open,
+  onClose,
+  providerId,
+  documentId,
+  prefillType,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  providerId: number;
+  documentId?: number;
+  prefillType?: DocumentType;
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const mutations = useFornitoriMutations();
+  const documentTypes = useDocumentTypes();
+  const isEdit = documentId !== undefined && documentId !== null;
+  const showTypeSelect = !isEdit && !prefillType;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -618,19 +1071,29 @@ function DocumentModal({ open, onClose, providerId, documentId, documentTypes, o
       return;
     }
     data.set('provider_id', String(providerId));
-    if (documentId) await mutations.updateDocument.mutateAsync({ id: documentId, body: data });
+    if (prefillType) data.set('document_type_id', String(prefillType.id));
+    if (isEdit) await mutations.updateDocument.mutateAsync({ id: documentId, body: data });
     else await mutations.uploadDocument.mutateAsync(data);
     onClose();
     onSaved();
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={documentId ? 'Modifica documento' : 'Nuovo documento'} size="md">
+    <Modal open={open} onClose={onClose} title={isEdit ? 'Modifica documento' : `Nuovo documento${prefillType ? ' · ' + prefillType.name : ''}`} size="md">
       <form className="modalForm" onSubmit={(event) => void submit(event)}>
-        {!documentId ? <Select name="document_type_id" label="Tipo documento" options={documentTypes.map((item) => ({ value: String(item.id), label: item.name }))} /> : null}
+        {showTypeSelect ? (
+          <Select
+            name="document_type_id"
+            label="Tipo documento"
+            options={(documentTypes.data ?? []).map((item) => ({ value: String(item.id), label: item.name }))}
+          />
+        ) : null}
         <Input name="expire_date" label="Scadenza" type="date" />
         <label className="field"><span>File</span><input name="file" type="file" /></label>
-        <div className="modalActions"><Button variant="secondary" onClick={onClose}>Annulla</Button><Button type="submit">Salva</Button></div>
+        <div className="modalActions">
+          <Button variant="secondary" type="button" onClick={onClose}>Annulla</Button>
+          <Button type="submit" loading={mutations.uploadDocument.isPending || mutations.updateDocument.isPending}>Salva</Button>
+        </div>
       </form>
     </Modal>
   );

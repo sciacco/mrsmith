@@ -708,6 +708,353 @@ button {
   box-shadow: var(--shadow-sm);
 }
 
+.providerPage {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.providerHeader {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.providerHeaderTop {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.providerHeaderTop h2 {
+  color: var(--color-text);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.providerHeaderMeta {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.providerHeaderProgress {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.15rem;
+}
+
+.progressLabel {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.progressTrack {
+  position: relative;
+  height: 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-warning);
+  transition: width var(--duration-fast) var(--ease-out);
+}
+
+.progressFill[data-state='complete'] {
+  background: var(--color-success);
+}
+
+.progressPercent {
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.banner--info {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+  border-color: rgba(99, 91, 255, 0.24);
+}
+
+.banner--neutral {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.banner--success {
+  color: var(--color-success-strong);
+  background: var(--color-success-bg);
+  border-color: rgba(16, 185, 129, 0.24);
+}
+
+.panelHeader--button {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.panelHeader--button:hover {
+  background: var(--color-surface);
+}
+
+.panelHeader h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.panelActions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.qualificationList {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+}
+
+.qualificationCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.qualificationCard[data-state='QUALIFIED'] {
+  border-color: rgba(16, 185, 129, 0.32);
+}
+
+.qualificationCard[data-state='NOT_QUALIFIED'] {
+  border-color: rgba(245, 158, 11, 0.32);
+}
+
+.qualificationCardHeader {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+  border: 0;
+  padding: 0.7rem 0.85rem;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.qualificationCardHeader:hover {
+  background: var(--color-surface);
+}
+
+.qualificationCardTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  color: var(--color-text);
+}
+
+.qualificationCardTitle strong {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.qualificationCardSubtitle {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.criticalTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: var(--radius-full);
+  padding: 0.05rem 0.45rem;
+  color: var(--color-danger-hover);
+  background: var(--color-danger-subtle);
+  border: 1px solid rgba(239, 68, 68, 0.26);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.qualificationCardBody {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.5rem 0.85rem 0.85rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.docGroup {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.docGroupTitle {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.docTypeList {
+  list-style: none;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0;
+  margin: 0;
+}
+
+.docTypeRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+}
+
+.docTypeRow[data-uploaded='false'][data-required='true'] {
+  border-style: dashed;
+  border-color: rgba(245, 158, 11, 0.32);
+  background: color-mix(in srgb, var(--color-warning-subtle) 30%, var(--color-bg-elevated));
+}
+
+.docTypeRow[data-uploaded='false'][data-required='false'] {
+  border-style: dashed;
+  background: var(--color-surface);
+}
+
+.docTypeIndicator {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+}
+
+.docTypeRow[data-uploaded='true'] .docTypeIndicator {
+  color: var(--color-success);
+}
+
+.docTypeName {
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.docTypeMeta {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.docTypeBadges {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.docTypeActions {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.contactsList {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.contactCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.85rem;
+  background: var(--color-bg-elevated);
+}
+
+.contactCardMain {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.contactCardName {
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.contactCardType {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.contactCardMeta {
+  display: grid;
+  gap: 0.1rem;
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+}
+
+.contactForm {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 65%, var(--color-bg-elevated));
+}
+
+.contactForm--new {
+  margin: 0.25rem 0.75rem 0.75rem;
+}
+
+.contactFormGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.55rem;
+}
+
 @keyframes pageEnter {
   from {
     opacity: 0;
