@@ -181,6 +181,24 @@ button {
   overflow-wrap: anywhere;
 }
 
+.panelCount {
+  margin-left: 0.55rem;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.panelSubtitle {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .tableScroll {
   min-width: 0;
   overflow: auto;
@@ -336,6 +354,91 @@ button {
   font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.providerRowMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+}
+
+.providerRowErp {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.qualPill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  padding: 0.1rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+}
+
+.qualPill--success {
+  color: var(--color-success-strong);
+  background: var(--color-success-bg);
+  border-color: rgba(16, 185, 129, 0.24);
+}
+
+.qualPill--warning {
+  color: var(--color-warning-strong);
+  background: var(--color-warning-subtle);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.qualPill--danger {
+  color: var(--color-danger-hover);
+  background: var(--color-danger-subtle);
+  border-color: rgba(239, 68, 68, 0.26);
+}
+
+.qualPill--neutral {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.docFlag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: var(--radius-full);
+  padding: 0.1rem 0.45rem;
+  color: var(--color-warning-strong);
+  background: var(--color-warning-subtle);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.archiveToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.45rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.archiveToggle:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .detailHeader span {
@@ -516,6 +619,17 @@ button {
   text-align: center;
 }
 
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--radius-full);
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
 .emptyTitle {
   color: var(--color-text);
   font-weight: 700;
@@ -526,6 +640,41 @@ button {
   margin-top: 0.28rem;
   color: var(--color-text-secondary);
   font-size: 0.875rem;
+}
+
+.categoryChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.categoryChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 0.18rem 0.55rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.categoryChip[data-state='NOT_QUALIFIED'] {
+  color: var(--color-warning-strong);
+  background: var(--color-warning-subtle);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.categoryChip[data-critical='true']::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  flex-shrink: 0;
 }
 
 .stateCard,

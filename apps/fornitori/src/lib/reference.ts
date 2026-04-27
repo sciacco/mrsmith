@@ -11,18 +11,18 @@ export function stateLabel(value?: string | null) {
   if (!value) return '-';
   const labels: Record<string, string> = {
     ACTIVE: 'Attivo',
-    APPROVED: 'Approvato',
+    CEASED: 'Cessato',
     DRAFT: 'Bozza',
     EXPIRED: 'Scaduto',
-    INACTIVE: 'Non attivo',
-    MISSING: 'Mancante',
-    NOT_QUALIFIED: 'Non qualificato',
-    PENDING: 'In attesa',
-    QUALIFIED: 'Qualificato',
-    REJECTED: 'Respinto',
+    INACTIVE: 'Sospeso',
+    NEW: 'Nuova',
+    NOT_QUALIFIED: 'Da qualificare',
+    OK: 'Valido',
+    PENDING_VERIFY_ALL: 'In verifica',
+    PENDING_VERIFY_DATE: 'In verifica',
+    PENDING_VERIFY_DOC: 'In verifica',
+    QUALIFIED: 'Qualificata',
     REQUIRED: 'Obbligatorio',
-    TO_REVIEW: 'Da verificare',
-    VALID: 'Valido',
   };
   const key = value.toUpperCase().replace(/[-\s]+/g, '_');
   if (labels[key]) return labels[key];

@@ -14,6 +14,7 @@ import type {
   ProviderDocument,
   ProviderPayload,
   ProviderReference,
+  ProviderSummary,
 } from './types';
 import { useApiClient } from './client';
 
@@ -28,6 +29,14 @@ export function useProviders() {
   return useQuery({
     queryKey: ['fornitori', 'providers'],
     queryFn: async () => unwrap(await api.get<Provider[] | PaginatedEnvelope<Provider>>(`${root}/provider`)),
+  });
+}
+
+export function useProviderSummary() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['fornitori', 'provider-summary'],
+    queryFn: () => api.get<ProviderSummary[]>(`${root}/provider-summary`),
   });
 }
 
@@ -109,10 +118,6 @@ export function useFornitoriMutations() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['fornitori'] });
 
   return {
-    createProvider: useMutation({
-      mutationFn: (body: ProviderPayload) => api.post<Provider>(`${root}/provider`, body),
-      onSuccess: invalidate,
-    }),
     updateProvider: useMutation({
       mutationFn: ({ id, body }: { id: number; body: ProviderPayload }) => api.put<Provider>(`${root}/provider/${id}`, body),
       onSuccess: invalidate,

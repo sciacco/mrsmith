@@ -1,5 +1,5 @@
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, Modal, MultiSelect, SearchInput, Skeleton, ToggleSwitch, useToast } from '@mrsmith/ui';
+import { Button, Icon, type IconName, Modal, MultiSelect, SearchInput, Skeleton, ToggleSwitch, useToast } from '@mrsmith/ui';
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -12,14 +12,20 @@ import {
   useProvider,
   useProviderCategories,
   useProviderDocuments,
-  useProviders,
+  useProviderSummary,
 } from './api/queries';
-import type { Category, DocumentType, Provider, ProviderPayload, ProviderReference } from './api/types';
+import type { Category, DashboardCategory, DocumentType, Provider, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
 import { countries } from './lib/countries';
 import { provinces } from './lib/provinces';
 import { providerTabs, referenceTypeLabel, referenceTypes, stateLabel, type ProviderTab } from './lib/reference';
 import { saveBlob } from './lib/download';
 import { useHasRole } from './hooks/useHasRole';
+import {
+  CategoryStateBadge,
+  DocumentStateBadge,
+  DocumentUrgencyBadge,
+  ProviderStateBadge,
+} from './lib/badges';
 
 function errorTitle(error: unknown) {
   if (error instanceof ApiError) {
@@ -29,9 +35,14 @@ function errorTitle(error: unknown) {
   return 'Dati non disponibili';
 }
 
-function stateBlock(title: string, message: string) {
+function stateBlock(title: string, message: string, iconName?: IconName) {
   return (
     <div className="emptyState">
+      {iconName ? (
+        <span className="emptyIcon" aria-hidden="true">
+          <Icon name={iconName} size={28} />
+        </span>
+      ) : null}
       <p className="emptyTitle">{title}</p>
       <p className="emptyText">{message}</p>
     </div>
@@ -117,17 +128,34 @@ function validateProvider(payload: ProviderPayload): string | null {
   return null;
 }
 
+interface CategoryGroup {
+  provider_id: number;
+  company_name: string;
+  categories: { id: number; name: string; state: string; critical: boolean }[];
+}
+
+function groupCategoriesByProvider(rows: DashboardCategory[]): CategoryGroup[] {
+  const groups = new Map<number, CategoryGroup>();
+  for (const row of rows) {
+    const existing = groups.get(row.provider_id);
+    const entry = {
+      id: row.category_id,
+      name: row.category_name ?? '—',
+      state: row.state ?? 'NEW',
+      critical: row.critical,
+    };
+    if (existing) existing.categories.push(entry);
+    else groups.set(row.provider_id, { provider_id: row.provider_id, company_name: row.company_name ?? '—', categories: [entry] });
+  }
+  return Array.from(groups.values());
+}
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const { drafts, documents, categories } = useDashboard();
-  const mutations = useFornitoriMutations();
+  const groupedCategories = useMemo(() => groupCategoriesByProvider(categories.data ?? []), [categories.data]);
   const loading = drafts.isLoading || documents.isLoading || categories.isLoading;
   const error = drafts.error ?? documents.error ?? categories.error;
-
-  async function download(id: number) {
-    const blob = await mutations.downloadDocument(id);
-    saveBlob(blob, `documento-${id}`);
-  }
 
   return (
     <main className="page">
@@ -137,67 +165,133 @@ export function DashboardPage() {
           <p>Fornitori da qualificare, documenti in scadenza e categorie da gestire.</p>
         </div>
       </header>
-      {loading ? <Skeleton rows={8} /> : error ? stateBlock(errorTitle(error), 'Le attivita fornitori non possono essere caricate.') : (
+      {loading ? <Skeleton rows={8} /> : error ? stateBlock(errorTitle(error), 'Le attività fornitori non possono essere caricate.', 'triangle-alert') : (
         <>
-          <section className="metricGrid">
-            <Metric label="Bozze" value={drafts.data?.length ?? 0} />
-            <Metric label="Documenti in scadenza" value={documents.data?.length ?? 0} />
-            <Metric label="Categorie da gestire" value={categories.data?.length ?? 0} />
-          </section>
-          <section className="threeTables">
-            <Panel title="Fornitori da qualificare" className="dashboardPanel">
+          <Panel title="Da qualificare" subtitle="Fornitori in stato bozza" count={drafts.data?.length ?? 0}>
+            {(drafts.data ?? []).length === 0 ? stateBlock('Nessun fornitore in attesa', 'Tutti i fornitori arrivati da Mistra sono stati lavorati.', 'check-circle') : (
               <div className="tableScroll dashboardScroll">
-              <table className="table">
-                <thead><tr><th>Fornitore</th><th>Stato</th><th>Codice Alyante</th></tr></thead>
-                <tbody>{(drafts.data ?? []).map((row) => (
-                  <tr key={row.id} onClick={() => navigate(`/fornitori?id_provider=${row.id}&tab=Dati`)}>
-                    <td>{value(row.company_name)}</td><td>{stateLabel(row.state)}</td><td>{value(row.erp_id)}</td>
-                  </tr>
-                ))}
-                {(drafts.data ?? []).length === 0 ? <tr><td colSpan={3}>{stateBlock('Nessuna bozza', 'Non ci sono fornitori da qualificare.')}</td></tr> : null}</tbody>
-              </table>
+                <table className="table">
+                  <thead><tr><th>Ragione sociale</th><th>P.IVA</th><th>CF</th><th /></tr></thead>
+                  <tbody>{(drafts.data ?? []).map((row) => (
+                    <tr key={row.id} onClick={() => navigate(`/fornitori?id_provider=${row.id}`)}>
+                      <td>{value(row.company_name)}</td>
+                      <td>{value(row.vat_number)}</td>
+                      <td>{value(row.cf)}</td>
+                      <td className="iconCell"><Icon name="chevron-right" size={16} /></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
               </div>
-            </Panel>
-            <Panel title="Documenti in scadenza" className="dashboardPanel">
+            )}
+          </Panel>
+          <Panel title="Documenti in scadenza" subtitle="Scadenza ≤30 giorni, fornitori in bozza o attivi" count={documents.data?.length ?? 0}>
+            {(documents.data ?? []).length === 0 ? stateBlock('Nessun documento in scadenza', 'Tutti i documenti dei fornitori attivi sono in regola.', 'check-circle') : (
               <div className="tableScroll dashboardScroll">
-              <table className="table">
-                <thead><tr><th>Fornitore</th><th>Documento</th><th>Scadenza</th><th /></tr></thead>
-                <tbody>{(documents.data ?? []).map((row) => (
-                  <tr key={row.id}>
-                    <td>{value(row.company_name)}</td><td>{value(row.document_type)}</td><td>{dateLabel(row.expire_date)}</td>
-                    <td className="iconCell"><Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} aria-label="Scarica documento" title="Scarica documento" onClick={() => void download(row.id)} /></td>
-                  </tr>
-                ))}
-                {(documents.data ?? []).length === 0 ? <tr><td colSpan={4}>{stateBlock('Nessun documento', 'Non ci sono scadenze da gestire.')}</td></tr> : null}</tbody>
-              </table>
+                <table className="table">
+                  <thead><tr><th>Fornitore</th><th>Documento</th><th>Scadenza</th><th>Urgenza</th><th /></tr></thead>
+                  <tbody>{(documents.data ?? []).map((row) => (
+                    <tr key={row.id} onClick={() => navigate(`/fornitori?id_provider=${row.provider_id}&tab=Qualifica`)}>
+                      <td>{value(row.company_name)}</td>
+                      <td>{value(row.document_type)}</td>
+                      <td>{dateLabel(row.expire_date)}</td>
+                      <td><DocumentUrgencyBadge expireDate={row.expire_date} days={row.days_remaining} /></td>
+                      <td className="iconCell"><Icon name="chevron-right" size={16} /></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
               </div>
-            </Panel>
-            <Panel title="Categorie da gestire" className="dashboardPanel">
+            )}
+          </Panel>
+          <Panel title="Categorie aperte" subtitle="Categorie da qualificare per fornitori in bozza o attivi" count={groupedCategories.length} countSuffix="fornitori">
+            {groupedCategories.length === 0 ? stateBlock('Nessuna categoria aperta', 'Tutte le categorie assegnate sono qualificate.', 'check-circle') : (
               <div className="tableScroll dashboardScroll">
-              <table className="table">
-                <thead><tr><th>Fornitore</th><th>Categoria</th><th>Stato</th></tr></thead>
-                <tbody>{(categories.data ?? []).map((row) => (
-                  <tr key={`${row.provider_id}-${row.category_id}`} onClick={() => navigate(`/fornitori?id_provider=${row.provider_id}&tab=Qualifica`)}>
-                    <td>{value(row.company_name)}</td><td>{value(row.category_name)}</td><td>{stateLabel(row.state)}</td>
-                  </tr>
-                ))}
-                {(categories.data ?? []).length === 0 ? <tr><td colSpan={3}>{stateBlock('Nessuna categoria', 'Non ci sono categorie da rivedere.')}</td></tr> : null}</tbody>
-              </table>
+                <table className="table">
+                  <thead><tr><th>Fornitore</th><th>Categorie aperte</th><th /></tr></thead>
+                  <tbody>{groupedCategories.map((group) => (
+                    <tr key={group.provider_id} onClick={() => navigate(`/fornitori?id_provider=${group.provider_id}&tab=Qualifica`)}>
+                      <td>{group.company_name}</td>
+                      <td>
+                        <div className="categoryChips">
+                          {group.categories.map((category) => (
+                            <span
+                              key={category.id}
+                              className="categoryChip"
+                              data-state={category.state}
+                              data-critical={category.critical ? 'true' : 'false'}
+                              title={category.critical ? 'Categoria critica' : undefined}
+                            >
+                              {category.name}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="iconCell"><Icon name="chevron-right" size={16} /></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
               </div>
-            </Panel>
-          </section>
+            )}
+          </Panel>
         </>
       )}
     </main>
   );
 }
 
-function Metric({ label, value: count }: { label: string; value: number }) {
-  return <div className="metric"><span>{label}</span><strong>{count}</strong></div>;
+function Panel({
+  title,
+  subtitle,
+  count,
+  countSuffix,
+  children,
+  className,
+}: {
+  title: string;
+  subtitle?: string;
+  count?: number;
+  countSuffix?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`panel ${className ?? ''}`}>
+      <header className="panelHeader">
+        <div>
+          <h2>
+            {title}
+            {count !== undefined ? <span className="panelCount">{count}{countSuffix ? ` ${countSuffix}` : ''}</span> : null}
+          </h2>
+          {subtitle ? <span className="panelSubtitle">{subtitle}</span> : null}
+        </div>
+      </header>
+      {children}
+    </section>
+  );
 }
 
-function Panel({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
-  return <section className={`panel ${className ?? ''}`}><header className="panelHeader"><h2>{title}</h2></header>{children}</section>;
+const USABLE_PROVIDER_STATES = new Set(['DRAFT', 'ACTIVE']);
+
+function matchesProviderQuery(item: ProviderSummary, query: string) {
+  if (!query) return true;
+  const lower = query.toLowerCase();
+  return (
+    (item.company_name ?? '').toLowerCase().includes(lower) ||
+    (item.vat_number ?? '').toLowerCase().includes(lower) ||
+    (item.cf ?? '').toLowerCase().includes(lower) ||
+    String(item.erp_id ?? '').includes(lower)
+  );
+}
+
+function qualificationCopy(item: ProviderSummary) {
+  if (item.total_count === 0) return '—/—';
+  return `${item.qualified_count}/${item.total_count}`;
+}
+
+function qualificationVariant(item: ProviderSummary): 'success' | 'warning' | 'danger' | 'neutral' {
+  if (item.total_count === 0) return 'neutral';
+  if (item.qualified_count === item.total_count) return 'success';
+  if (item.qualified_count === 0) return 'danger';
+  return 'warning';
 }
 
 export function FornitoriPage() {
@@ -205,10 +299,18 @@ export function FornitoriPage() {
   const selectedId = Number(params.get('id_provider') ?? '') || null;
   const tab = providerTabs.includes(params.get('tab') as ProviderTab) ? (params.get('tab') as ProviderTab) : 'Dati';
   const [query, setQuery] = useState('');
-  const [showCreate, setShowCreate] = useState(false);
-  const providers = useProviders();
+  const [showArchive, setShowArchive] = useState(false);
+  const summary = useProviderSummary();
   const provider = useProvider(selectedId);
-  const filtered = useMemo(() => (providers.data ?? []).filter((item) => (item.company_name ?? '').toLowerCase().includes(query.toLowerCase())), [providers.data, query]);
+
+  const { active, archive } = useMemo(() => {
+    const all = summary.data ?? [];
+    const matched = all.filter((item) => matchesProviderQuery(item, query));
+    return {
+      active: matched.filter((item) => USABLE_PROVIDER_STATES.has((item.state ?? '').toUpperCase())),
+      archive: matched.filter((item) => !USABLE_PROVIDER_STATES.has((item.state ?? '').toUpperCase())),
+    };
+  }, [summary.data, query]);
 
   function selectProvider(id: number) {
     setParams({ id_provider: String(id), tab });
@@ -224,27 +326,32 @@ export function FornitoriPage() {
     <main className="page">
       <header className="pageHeader">
         <div><h1>Fornitori</h1><p>Anagrafica, contatti, qualifica e documenti.</p></div>
-        <Button leftIcon={<Icon name="plus" />} onClick={() => setShowCreate(true)}>Nuovo fornitore</Button>
       </header>
       <div className="workspace">
         <section className="master panel">
-          <div className="toolbar"><SearchInput value={query} onChange={setQuery} placeholder="Cerca fornitore" /></div>
-          {providers.isLoading ? <Skeleton rows={8} /> : providers.error ? stateBlock(errorTitle(providers.error), 'Elenco fornitori non disponibile.') : (
+          <div className="toolbar"><SearchInput value={query} onChange={setQuery} placeholder="Cerca per nome, P.IVA, CF, codice ERP" /></div>
+          {summary.isLoading ? <Skeleton rows={8} /> : summary.error ? stateBlock(errorTitle(summary.error), 'Elenco fornitori non disponibile.', 'triangle-alert') : (
               <div className="listRows">
-                {filtered.map((item) => (
-                  <button key={item.id} className={`listRow ${item.id === selectedId ? 'selected' : ''}`} onClick={() => selectProvider(item.id)}>
-                    <span><strong>{item.company_name}</strong><small>{stateLabel(item.state)} · {value(item.erp_id)}</small></span>
-                  <Icon name="chevron-right" size={16} />
-                </button>
-              ))}
-              {filtered.length === 0 ? stateBlock('Nessun fornitore trovato', 'Modifica la ricerca o crea un nuovo fornitore.') : null}
+                {active.map((item) => (
+                  <ProviderRow key={item.id} item={item} selected={item.id === selectedId} onSelect={selectProvider} />
+                ))}
+                {active.length === 0 && !showArchive ? stateBlock('Nessun fornitore trovato', 'Modifica i criteri di ricerca.', 'search') : null}
+                {archive.length > 0 ? (
+                  <button type="button" className="archiveToggle" onClick={() => setShowArchive((value) => !value)}>
+                    <Icon name={showArchive ? 'chevron-down' : 'chevron-right'} size={14} />
+                    <span>{showArchive ? 'Nascondi' : 'Mostra'} fornitori cessati e sospesi ({archive.length})</span>
+                  </button>
+                ) : null}
+                {showArchive ? archive.map((item) => (
+                  <ProviderRow key={item.id} item={item} selected={item.id === selectedId} onSelect={selectProvider} />
+                )) : null}
             </div>
           )}
         </section>
         <section className="detail panel">
           {!selectedId ? stateBlock('Seleziona un fornitore', 'Scegli un fornitore dalla lista per vedere i dettagli.') : provider.isLoading ? <Skeleton rows={8} /> : provider.error ? stateBlock(errorTitle(provider.error), 'Il dettaglio fornitore non puo essere caricato.') : (
             <>
-              <header className="detailHeader"><h2>{provider.data?.company_name}</h2><span>{stateLabel(provider.data?.state)}</span></header>
+              <header className="detailHeader"><h2>{provider.data?.company_name}</h2><ProviderStateBadge state={provider.data?.state} /></header>
               <div className="segments">{providerTabs.map((item) => <button key={item} className={item === tab ? 'active' : ''} onClick={() => setTab(item)}>{item}</button>)}</div>
               {tab === 'Dati' ? <ProviderData provider={provider.data} /> : null}
               {tab === 'Contatti' ? <ProviderContacts provider={provider.data} /> : null}
@@ -254,8 +361,31 @@ export function FornitoriPage() {
           )}
         </section>
       </div>
-      <ProviderCreateModal open={showCreate} onClose={() => setShowCreate(false)} />
     </main>
+  );
+}
+
+function ProviderRow({ item, selected, onSelect }: { item: ProviderSummary; selected: boolean; onSelect: (id: number) => void }) {
+  const qualVariant = qualificationVariant(item);
+  return (
+    <button className={`listRow ${selected ? 'selected' : ''}`} onClick={() => onSelect(item.id)}>
+      <span>
+        <strong>{item.company_name ?? '—'}</strong>
+        <small className="providerRowMeta">
+          <ProviderStateBadge state={item.state} />
+          <span className={`qualPill qualPill--${qualVariant}`} title="Categorie qualificate / totali">
+            {qualificationCopy(item)}
+          </span>
+          {item.has_expiring_docs ? (
+            <span className="docFlag" title="Documenti in scadenza nei prossimi 30 giorni">
+              <Icon name="triangle-alert" size={12} /> Doc
+            </span>
+          ) : null}
+          {item.erp_id !== null && item.erp_id !== undefined ? <span className="providerRowErp">ERP {item.erp_id}</span> : null}
+        </small>
+      </span>
+      <Icon name="chevron-right" size={16} />
+    </button>
   );
 }
 
@@ -414,7 +544,9 @@ function ProviderQualification({ providerId }: { providerId: number }) {
           <thead><tr><th>Categoria</th><th>Stato</th><th>Critica</th></tr></thead>
           <tbody>{(providerCategories.data ?? []).map((row) => (
             <tr key={row.category?.id} className={selectedCategory === row.category?.id ? 'selectedRow' : ''} onClick={() => setSelectedCategory(row.category?.id ?? null)}>
-              <td>{row.category?.name}</td><td>{stateLabel(row.status ?? row.state)}</td><td>{row.critical ? 'Si' : 'No'}</td>
+              <td>{row.category?.name}</td>
+              <td><CategoryStateBadge state={row.status ?? row.state} /></td>
+              <td>{row.critical ? 'Sì' : 'No'}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -423,7 +555,13 @@ function ProviderQualification({ providerId }: { providerId: number }) {
         {selectedCategory == null ? stateBlock('Seleziona una categoria', 'I documenti verranno mostrati dopo la selezione.') : documents.isLoading ? <Skeleton rows={4} /> : (
           <table className="table">
             <thead><tr><th>Tipo</th><th>Stato</th><th>Scadenza</th></tr></thead>
-            <tbody>{(documents.data ?? []).map((doc) => <tr key={doc.id}><td>{doc.document_type?.name}</td><td>{stateLabel(doc.state)}</td><td>{dateLabel(doc.expire_date)}</td></tr>)}</tbody>
+            <tbody>{(documents.data ?? []).map((doc) => (
+              <tr key={doc.id}>
+                <td>{doc.document_type?.name}</td>
+                <td><DocumentStateBadge state={doc.state} /><DocumentUrgencyBadge expireDate={doc.expire_date} /></td>
+                <td>{dateLabel(doc.expire_date)}</td>
+              </tr>
+            ))}</tbody>
           </table>
         )}
       </Panel>
@@ -451,7 +589,9 @@ function ProviderDocuments({ providerId }: { providerId: number }) {
         <thead><tr><th>Tipo</th><th>Stato</th><th>Scadenza</th><th /></tr></thead>
         <tbody>{documents.isLoading ? <tr><td colSpan={4}><Skeleton rows={4} /></td></tr> : (documents.data ?? []).map((doc) => (
           <tr key={doc.id}>
-            <td>{doc.document_type?.name}</td><td>{stateLabel(doc.state)}</td><td>{dateLabel(doc.expire_date)}</td>
+            <td>{doc.document_type?.name}</td>
+            <td><DocumentStateBadge state={doc.state} /><DocumentUrgencyBadge expireDate={doc.expire_date} /></td>
+            <td>{dateLabel(doc.expire_date)}</td>
             <td className="rowActions">
               <Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} onClick={() => void download(doc.id)}>Scarica</Button>
               <Button size="sm" variant="secondary" leftIcon={<Icon name="pencil" />} onClick={() => setEditId(doc.id)}>Modifica</Button>
@@ -491,60 +631,6 @@ function DocumentModal({ open, onClose, providerId, documentId, documentTypes, o
         <Input name="expire_date" label="Scadenza" type="date" />
         <label className="field"><span>File</span><input name="file" type="file" /></label>
         <div className="modalActions"><Button variant="secondary" onClick={onClose}>Annulla</Button><Button type="submit">Salva</Button></div>
-      </form>
-    </Modal>
-  );
-}
-
-function ProviderCreateModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { toast } = useToast();
-  const categories = useCategories();
-  const mutations = useFornitoriMutations();
-  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
-  const [critical, setCritical] = useState(false);
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const body = providerPayload(event.currentTarget);
-    const validation = validateProvider(body);
-    if (validation) {
-      toast(validation, 'warning');
-      return;
-    }
-    const created = await mutations.createProvider.mutateAsync(body);
-    if (selectedCategories.length > 0) {
-      await mutations.addProviderCategories.mutateAsync({ providerId: created.id, categoryIds: selectedCategories, critical });
-    }
-    onClose();
-    setSelectedCategories([]);
-    toast('Aggiornamento completato');
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title="Nuovo fornitore" size="wide">
-      <form className="formGrid" onSubmit={(event) => void submit(event)}>
-        <Input name="company_name" label="Ragione sociale" />
-        <Select name="state" label="Stato" defaultValue="DRAFT" options={providerStateOptions} />
-        <Input name="vat_number" label="P.IVA" />
-        <Input name="cf" label="CF" />
-        <Input name="erp_id" label="Codice Alyante" type="number" />
-        <Select name="language" label="Lingua" defaultValue="it" options={languageOptions} />
-        <Select name="country" label="Paese" defaultValue="IT" options={countryOptions} />
-        <Select name="province" label="Provincia" options={['', ...provinces]} />
-        <Input name="city" label="Citta" />
-        <Input name="postal_code" label="CAP" />
-        <Input name="address" label="Indirizzo" wide />
-        <Input name="default_payment_method" label="Pagamento predefinito" />
-        <Input name="ref_first_name" label="Nome qualifica" />
-        <Input name="ref_last_name" label="Cognome qualifica" />
-        <Input name="ref_email" label="Email qualifica" />
-        <Input name="ref_phone" label="Telefono qualifica" />
-        <div className="wideField">
-          <span className="fieldLabel">Categorie</span>
-          <MultiSelect options={selectOptions(categories.data)} selected={selectedCategories} onChange={setSelectedCategories} placeholder="Seleziona categorie" />
-        </div>
-        <ToggleSwitch id="new-critical" checked={critical} onChange={setCritical} label="Categoria critica" />
-        <div className="formActions"><Button variant="secondary" onClick={onClose}>Annulla</Button><Button type="submit">Salva</Button></div>
       </form>
     </Modal>
   );

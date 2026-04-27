@@ -95,6 +95,8 @@ func RegisterRoutes(mux *http.ServeMux, arakClient *arak.Client, arakDB *sql.DB)
 	handle("PATCH /fornitori/v1/document/{id}", h.handlePatchDocument)
 	handle("GET /fornitori/v1/document/{id}/download", h.handleDownloadDocument)
 
+	handle("GET /fornitori/v1/provider-summary", h.handleProviderSummary)
+
 	handle("GET /fornitori/v1/dashboard/drafts", h.handleDashboardDrafts)
 	handle("GET /fornitori/v1/dashboard/expiring-documents", h.handleDashboardExpiringDocuments)
 	handle("GET /fornitori/v1/dashboard/categories-to-review", h.handleDashboardCategoriesToReview)
@@ -349,12 +351,15 @@ func (h *Handler) handleDashboardExpiringDocuments(w http.ResponseWriter, r *htt
 	}
 	rows, err := h.db.QueryContext(r.Context(), `
 		SELECT d.id, d.provider_id, p.company_name, d.file_id, d.expire_date, d.state,
-		       dt.name, GREATEST(0, (d.expire_date::date - CURRENT_DATE))::int AS days_remaining
+		       dt.name, (d.expire_date::date - CURRENT_DATE)::int AS days_remaining
 		FROM provider_qualifications.document d
 		INNER JOIN provider_qualifications.provider p ON p.id = d.provider_id
 		LEFT JOIN provider_qualifications.document_type dt ON dt.id = d.document_type_id
-		WHERE d.expire_date::date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
-		ORDER BY d.expire_date ASC, p.company_name ASC`)
+		WHERE d.expire_date::date <= CURRENT_DATE + INTERVAL '30 days'
+		  AND p.state IN ('DRAFT', 'ACTIVE')
+		  AND d.deleted_at IS NULL
+		  AND p.deleted_at IS NULL
+		ORDER BY days_remaining ASC, p.company_name ASC`)
 	if err != nil {
 		httputil.InternalError(w, r, err, "dashboard expiring documents query failed")
 		return
@@ -400,6 +405,139 @@ func (h *Handler) handleDashboardCategoriesToReview(w http.ResponseWriter, r *ht
 		items = append(items, item)
 	}
 	writeRows(w, r, items, rows.Err())
+}
+
+type arakProviderItem struct {
+	ID          int64   `json:"id"`
+	CompanyName *string `json:"company_name"`
+	State       *string `json:"state"`
+	VATNumber   *string `json:"vat_number"`
+	CF          *string `json:"cf"`
+	ERPID       *int64  `json:"erp_id"`
+}
+
+type providerSummary struct {
+	ID              int64   `json:"id"`
+	CompanyName     *string `json:"company_name"`
+	State           *string `json:"state"`
+	VATNumber       *string `json:"vat_number"`
+	CF              *string `json:"cf"`
+	ERPID           *int64  `json:"erp_id"`
+	QualifiedCount  int     `json:"qualified_count"`
+	TotalCount      int     `json:"total_count"`
+	HasExpiringDocs bool    `json:"has_expiring_docs"`
+}
+
+// handleProviderSummary returns the providers list (anagrafica from Mistra) enriched with
+// qualification counts and expiring-document flag computed from the local DB.
+// One Mistra call + one SQL query, merged in-process.
+func (h *Handler) handleProviderSummary(w http.ResponseWriter, r *http.Request) {
+	if !h.requireArak(w) || !h.requireDB(w) {
+		return
+	}
+	upstreamQuery := url.Values{}
+	upstreamQuery.Set("page_number", "1")
+	upstreamQuery.Set("disable_pagination", "true")
+	if q := r.URL.Query().Get("search_string"); q != "" {
+		upstreamQuery.Set("search_string", q)
+	}
+	resp, err := h.arak.Do(http.MethodGet, arakRoot+"/provider", upstreamQuery.Encode(), nil)
+	if err != nil {
+		h.requestLogger(r, "provider_summary").Error("upstream provider list failed", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio fornitori temporaneamente non disponibile",
+			"code":  "UPSTREAM_UNAVAILABLE",
+		})
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		h.requestLogger(r, "provider_summary").Warn("upstream provider list non-2xx", "status", resp.StatusCode)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio fornitori temporaneamente non disponibile",
+			"code":  "UPSTREAM_UNAVAILABLE",
+		})
+		return
+	}
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		httputil.InternalError(w, r, err, "provider summary upstream read failed")
+		return
+	}
+	var providers []arakProviderItem
+	var envelope struct {
+		Items []arakProviderItem `json:"items"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err == nil && envelope.Items != nil {
+		providers = envelope.Items
+	} else if err := json.Unmarshal(raw, &providers); err != nil {
+		httputil.InternalError(w, r, err, "provider summary decode failed")
+		return
+	}
+	if len(providers) == 0 {
+		httputil.JSON(w, http.StatusOK, []providerSummary{})
+		return
+	}
+
+	type enrichment struct {
+		Qualified   int
+		Total       int
+		HasExpiring bool
+	}
+	enrichmentByID := make(map[int64]enrichment)
+	rows, err := h.db.QueryContext(r.Context(), `
+		SELECT
+			p.id,
+			COALESCE(SUM(CASE WHEN pc.state = 'QUALIFIED' THEN 1 ELSE 0 END), 0)::int AS qualified_count,
+			COALESCE(COUNT(pc.id), 0)::int AS total_count,
+			EXISTS (
+				SELECT 1
+				FROM provider_qualifications.document d
+				WHERE d.provider_id = p.id
+				  AND d.expire_date::date <= CURRENT_DATE + INTERVAL '30 days'
+				  AND d.deleted_at IS NULL
+			) AS has_expiring_docs
+		FROM provider_qualifications.provider p
+		LEFT JOIN provider_qualifications.provider_category pc
+			ON pc.provider_id = p.id
+			AND pc.deleted_at IS NULL
+		WHERE p.deleted_at IS NULL
+		GROUP BY p.id`)
+	if err != nil {
+		httputil.InternalError(w, r, err, "provider summary enrichment query failed")
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var e enrichment
+		if err := rows.Scan(&id, &e.Qualified, &e.Total, &e.HasExpiring); err != nil {
+			httputil.InternalError(w, r, err, "provider summary enrichment scan failed")
+			return
+		}
+		enrichmentByID[id] = e
+	}
+	if err := rows.Err(); err != nil {
+		httputil.InternalError(w, r, err, "provider summary enrichment iteration failed")
+		return
+	}
+
+	items := make([]providerSummary, 0, len(providers))
+	for _, p := range providers {
+		e := enrichmentByID[p.ID]
+		items = append(items, providerSummary{
+			ID:              p.ID,
+			CompanyName:     p.CompanyName,
+			State:           p.State,
+			VATNumber:       p.VATNumber,
+			CF:              p.CF,
+			ERPID:           p.ERPID,
+			QualifiedCount:  e.Qualified,
+			TotalCount:      e.Total,
+			HasExpiringDocs: e.HasExpiring,
+		})
+	}
+	httputil.JSON(w, http.StatusOK, items)
 }
 
 func (h *Handler) handlePaymentMethods(w http.ResponseWriter, r *http.Request) {

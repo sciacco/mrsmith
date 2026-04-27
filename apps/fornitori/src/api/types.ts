@@ -73,6 +73,18 @@ export interface ProviderDocument {
   updated_at?: string;
 }
 
+export interface ProviderSummary {
+  id: number;
+  company_name: string | null;
+  state: string | null;
+  vat_number: string | null;
+  cf: string | null;
+  erp_id: number | null;
+  qualified_count: number;
+  total_count: number;
+  has_expiring_docs: boolean;
+}
+
 export interface DashboardDraft {
   id: number;
   company_name: string | null;
