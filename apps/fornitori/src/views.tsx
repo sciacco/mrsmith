@@ -318,6 +318,7 @@ export function FornitoriPage() {
   const selectedId = Number(params.get('id_provider') ?? '') || null;
   const [query, setQuery] = useState('');
   const [showArchive, setShowArchive] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const summary = useProviderSummary();
   const summaryById = useMemo(() => {
     const map = new Map<number, ProviderSummary>();
@@ -342,6 +343,7 @@ export function FornitoriPage() {
     <main className="page">
       <header className="pageHeader">
         <div><h1>Fornitori</h1><p>Anagrafica, contatti, qualifica e documenti.</p></div>
+        <Button leftIcon={<Icon name="plus" />} onClick={() => setCreateOpen(true)}>Nuovo fornitore</Button>
       </header>
       <div className="workspace">
         <section className="master panel">
@@ -370,6 +372,14 @@ export function FornitoriPage() {
             : <ProviderPage providerId={selectedId} summary={summaryById.get(selectedId)} />}
         </section>
       </div>
+      <ProviderCreateModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(id) => {
+          setCreateOpen(false);
+          setParams({ id_provider: String(id) });
+        }}
+      />
     </main>
   );
 }
@@ -426,6 +436,115 @@ function missingForActivation(provider: Provider): string[] {
   if (!paymentCodeOf(provider.default_payment_method).trim()) missing.push('metodo di pagamento');
   if (getProviderRefs(provider).length === 0) missing.push('almeno un contatto');
   return missing;
+}
+
+function ProviderCreateModal({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (id: number) => void;
+}) {
+  const { toast } = useToast();
+  const mutations = useFornitoriMutations();
+  const paymentMethods = usePaymentMethods();
+  const [country, setCountry] = useState('IT');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  function close() {
+    setCountry('IT');
+    setShowAdvanced(false);
+    onClose();
+  }
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const body = providerPayload(event.currentTarget);
+    const validation = validateCreatePayload(body);
+    if (validation) {
+      toast(validation, 'warning');
+      return;
+    }
+    try {
+      const created = await mutations.createProvider.mutateAsync(body);
+      toast('Fornitore creato in bozza');
+      onCreated(created.id);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Creazione fornitore non riuscita';
+      toast(message, 'error');
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={close} title="Nuovo fornitore" size="md">
+      <form className="modalForm createForm" onSubmit={(event) => void submit(event)}>
+        <input type="hidden" name="state" value="DRAFT" />
+
+        <fieldset className="formSection">
+          <legend>Dati essenziali</legend>
+          <div className="formSectionGrid">
+            <Input name="company_name" label="Ragione sociale" required wide />
+            <Input name="vat_number" label="P.IVA" />
+            <Input name="cf" label="Codice fiscale" />
+            <Select name="country" label="Paese" defaultValue="IT" options={countryOptions} onChange={(event) => setCountry(event.target.value)} />
+            {country === 'IT' ? (
+              <Select name="province" label="Provincia" options={['', ...provinces]} />
+            ) : (
+              <Input name="province" label="Provincia / Stato" />
+            )}
+            <Input name="city" label="Città" />
+            <Input name="postal_code" label="CAP" />
+            <Input name="address" label="Indirizzo" wide />
+          </div>
+        </fieldset>
+
+        <fieldset className="formSection">
+          <legend>Contatto qualifica</legend>
+          <div className="formSectionGrid">
+            <Input name="ref_first_name" label="Nome" />
+            <Input name="ref_last_name" label="Cognome" />
+            <Input name="ref_email" label="Email" type="email" required />
+            <Input name="ref_phone" label="Telefono" />
+          </div>
+        </fieldset>
+
+        <button
+          type="button"
+          className="advancedToggle"
+          aria-expanded={showAdvanced}
+          onClick={() => setShowAdvanced((value) => !value)}
+        >
+          <Icon name={showAdvanced ? 'chevron-down' : 'chevron-right'} size={14} />
+          <span>Altri dettagli {showAdvanced ? '' : '(opzionale)'}</span>
+        </button>
+        {showAdvanced ? (
+          <div className="formSectionGrid">
+            <Select name="language" label="Lingua" defaultValue="it" options={languageOptions} />
+            <Input name="erp_id" label="Codice Alyante" type="number" />
+            <PaymentMethodField defaultValue="" options={paymentMethods.data ?? []} disabled={false} />
+          </div>
+        ) : null}
+
+        <div className="modalActions">
+          <Button variant="secondary" type="button" onClick={close}>Annulla</Button>
+          <Button type="submit" loading={mutations.createProvider.isPending} leftIcon={<Icon name="plus" />}>Crea fornitore</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function validateCreatePayload(payload: ProviderPayload): string | null {
+  if (!payload.company_name) return 'Inserisci la ragione sociale';
+  if (!payload.ref?.email) return 'Inserisci l\'email del contatto qualifica';
+  if (payload.country === 'IT') {
+    if (!payload.cf && !payload.vat_number) return 'Per i fornitori italiani inserisci CF o P.IVA';
+    if ((payload.postal_code?.length ?? 0) < 5) return 'Inserisci un CAP italiano valido';
+    if (!payload.province) return 'Seleziona la provincia';
+  }
+  return null;
 }
 
 function ProviderPage({ providerId, summary }: { providerId: number; summary?: ProviderSummary }) {

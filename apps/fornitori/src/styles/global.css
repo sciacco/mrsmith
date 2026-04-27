@@ -1055,6 +1055,51 @@ button {
   gap: 0.55rem;
 }
 
+.createForm {
+  gap: 1rem;
+}
+
+.formSection {
+  display: grid;
+  gap: 0.5rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.formSection legend {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.formSectionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.advancedToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  align-self: start;
+  border: 0;
+  padding: 0.25rem 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.advancedToggle:hover {
+  color: var(--color-accent);
+}
+
 @keyframes pageEnter {
   from {
     opacity: 0;

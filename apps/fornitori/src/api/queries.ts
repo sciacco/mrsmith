@@ -118,6 +118,10 @@ export function useFornitoriMutations() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['fornitori'] });
 
   return {
+    createProvider: useMutation({
+      mutationFn: (body: ProviderPayload) => api.post<Provider>(`${root}/provider`, body),
+      onSuccess: invalidate,
+    }),
     updateProvider: useMutation({
       mutationFn: ({ id, body }: { id: number; body: ProviderPayload }) => api.put<Provider>(`${root}/provider/${id}`, body),
       onSuccess: invalidate,
