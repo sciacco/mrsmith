@@ -160,6 +160,242 @@ button {
   min-height: 23rem;
 }
 
+.priorityConsole {
+  display: grid;
+  gap: 0.6rem;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 0.7rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-xs);
+}
+
+.priorityHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.45rem 0.85rem;
+}
+
+.priorityHeader h2 {
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.prioritySummary {
+  justify-self: end;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.priorityList {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.priorityItem {
+  display: grid;
+  grid-template-columns: minmax(6.4rem, 0.68fr) minmax(7.5rem, 1fr) minmax(10rem, 1.45fr) minmax(6.5rem, 0.85fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 3.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.55rem;
+  color: var(--color-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  animation: priorityEnter 0.36s var(--ease-out) both;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.priorityItem:not(:last-child) {
+  border-bottom-color: var(--color-border-subtle);
+}
+
+.priorityItem:nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.priorityItem:nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.priorityItem:nth-child(4) {
+  animation-delay: 135ms;
+}
+
+.priorityItem:nth-child(5) {
+  animation-delay: 180ms;
+}
+
+.priorityItem:nth-child(6) {
+  animation-delay: 225ms;
+}
+
+.priorityItem:nth-child(7) {
+  animation-delay: 270ms;
+}
+
+.priorityItem:nth-child(8) {
+  animation-delay: 315ms;
+}
+
+.priorityItem:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+
+.priorityItem:focus-visible {
+  outline: 0;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.priorityItem[data-severity='overdue'] {
+  --priority-color: var(--color-danger);
+  --priority-bg: var(--color-danger-subtle);
+}
+
+.priorityItem[data-severity='expiring'] {
+  --priority-color: var(--color-warning);
+  --priority-bg: var(--color-warning-subtle);
+}
+
+.priorityItem[data-severity='critical'] {
+  --priority-color: var(--color-danger);
+  --priority-bg: var(--color-danger-subtle);
+}
+
+.priorityItem[data-severity='draft'] {
+  --priority-color: var(--color-accent);
+  --priority-bg: var(--color-accent-subtle);
+}
+
+.priorityBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 0.34rem;
+  max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--priority-color) 28%, transparent);
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.55rem;
+  color: var(--priority-color);
+  background: var(--priority-bg);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.priorityBadgeDot {
+  flex: 0 0 auto;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 50%;
+  background: var(--priority-color);
+}
+
+.priorityTitle,
+.priorityDetail,
+.priorityContext {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.priorityTitle {
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.priorityDetail {
+  color: var(--color-text);
+  font-size: 0.83rem;
+  font-weight: 650;
+}
+
+.priorityContext {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.priorityAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  gap: 0.2rem;
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.priorityItem:hover .priorityAction {
+  color: var(--color-text);
+}
+
+.priorityEmpty {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 4.2rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.priorityEmptyIcon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: var(--radius-md);
+  color: var(--color-success);
+  background: var(--color-success-bg);
+}
+
+.priorityEmpty > div > strong,
+.priorityEmpty > div > span {
+  display: block;
+}
+
+.priorityEmpty > div > strong {
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.priorityEmpty > div > span {
+  margin-top: 0.1rem;
+  font-size: 0.82rem;
+}
+
 .panelHeader,
 .toolbar,
 .detailHeader {
@@ -1111,6 +1347,17 @@ button {
   }
 }
 
+@keyframes priorityEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 1180px) {
   .threeTables,
   .workspace,
@@ -1146,6 +1393,42 @@ button {
 
   .metricGrid {
     grid-template-columns: 1fr;
+  }
+
+  .priorityHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .prioritySummary {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .priorityItem {
+    grid-template-columns: minmax(5.8rem, auto) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.18rem 0.6rem;
+    min-height: 0;
+    padding: 0.55rem;
+  }
+
+  .priorityBadge {
+    grid-row: 1 / span 3;
+  }
+
+  .priorityAction {
+    grid-column: 2;
+    justify-content: flex-end;
+    justify-self: end;
+    margin-top: 0.1rem;
+  }
+
+  .priorityTitle,
+  .priorityDetail,
+  .priorityContext {
+    grid-column: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .formGrid,

@@ -14,10 +14,10 @@ import {
   useProviderDocuments,
   useProviderSummary,
 } from './api/queries';
-import type { Category, CategoryDocumentType, DashboardCategory, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
+import type { Category, CategoryDocumentType, DashboardCategory, DashboardDocument, DashboardDraft, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
 import { countries } from './lib/countries';
 import { provinces } from './lib/provinces';
-import { referenceTypeLabel, referenceTypes } from './lib/reference';
+import { referenceTypeLabel, referenceTypes, stateLabel } from './lib/reference';
 import { saveBlob } from './lib/download';
 import { useHasRole } from './hooks/useHasRole';
 import {
@@ -128,6 +128,28 @@ interface CategoryGroup {
   categories: { id: number; name: string; state: string; critical: boolean }[];
 }
 
+type PrioritySeverity = 'overdue' | 'expiring' | 'critical' | 'draft';
+
+interface PriorityItem {
+  id: string;
+  providerId: number;
+  badgeLabel: string;
+  title: string;
+  detail: string;
+  context: string;
+  actionLabel: string;
+  href: string;
+  severity: PrioritySeverity;
+  score: number;
+}
+
+interface PrioritySummary {
+  overdue: number;
+  expiring: number;
+  drafts: number;
+  openCategories: number;
+}
+
 function groupCategoriesByProvider(rows: DashboardCategory[]): CategoryGroup[] {
   const groups = new Map<number, CategoryGroup>();
   for (const row of rows) {
@@ -144,10 +166,174 @@ function groupCategoriesByProvider(rows: DashboardCategory[]): CategoryGroup[] {
   return Array.from(groups.values());
 }
 
+function expiryCopy(documentType?: string | null, days?: number | null) {
+  const label = documentType || 'Documento';
+  if (days == null) return `${label} in scadenza`;
+  if (days < 0) return `${label} scaduto da ${Math.abs(days)}gg`;
+  if (days === 0) return `${label} scade oggi`;
+  return `${label} scade tra ${days}gg`;
+}
+
+function documentPriorityScore(days: number | null | undefined) {
+  if (days == null) return 55;
+  if (days < 0) return days;
+  if (days <= 7) return 10 + days;
+  return 40 + days;
+}
+
+function categoryPriorityScore(row: DashboardCategory) {
+  if (row.critical) return 60;
+  return row.state === 'NOT_QUALIFIED' ? 72 : 88;
+}
+
+function buildPrioritySummary(
+  documents: DashboardDocument[],
+  categories: DashboardCategory[],
+  drafts: DashboardDraft[],
+): PrioritySummary {
+  return {
+    overdue: documents.filter((row) => row.days_remaining < 0).length,
+    expiring: documents.filter((row) => row.days_remaining >= 0).length,
+    drafts: drafts.length,
+    openCategories: categories.length,
+  };
+}
+
+function prioritySummaryLabel(summary: PrioritySummary) {
+  return `${summary.overdue} scaduti · ${summary.expiring} in scadenza · ${summary.drafts} bozze · ${summary.openCategories} categorie aperte`;
+}
+
+function buildDashboardPriorities(
+  documents: DashboardDocument[],
+  categories: DashboardCategory[],
+  drafts: DashboardDraft[],
+) {
+  const documentItems: PriorityItem[] = documents.map((row) => {
+    const expired = row.days_remaining < 0;
+    return {
+      id: `document-${row.id}`,
+      providerId: row.provider_id,
+      badgeLabel: expired ? 'Scaduto' : 'In scadenza',
+      title: value(row.company_name),
+      detail: expiryCopy(row.document_type, row.days_remaining),
+      context: dateLabel(row.expire_date),
+      actionLabel: 'Apri Qualifica',
+      href: `/fornitori?id_provider=${row.provider_id}&tab=Qualifica`,
+      severity: expired ? 'overdue' : 'expiring',
+      score: documentPriorityScore(row.days_remaining),
+    };
+  });
+
+  const categoryItems: PriorityItem[] = categories.map((row) => {
+    const critical = row.critical;
+    return {
+      id: `category-${row.provider_id}-${row.category_id}`,
+      providerId: row.provider_id,
+      badgeLabel: critical ? 'Critica' : 'In scadenza',
+      title: value(row.company_name),
+      detail: critical ? 'Categoria critica da qualificare' : 'Categoria da qualificare',
+      context: `${row.category_name || 'Categoria'} · ${stateLabel(row.state)}`,
+      actionLabel: 'Apri Qualifica',
+      href: `/fornitori?id_provider=${row.provider_id}&tab=Qualifica`,
+      severity: critical ? 'critical' : 'expiring',
+      score: categoryPriorityScore(row),
+    };
+  });
+
+  const draftItems: PriorityItem[] = drafts.map((row, index) => ({
+    id: `draft-${row.id}`,
+    providerId: row.id,
+    badgeLabel: 'Bozza',
+    title: value(row.company_name),
+    detail: 'Fornitore in bozza',
+    context: 'Completa i dati per la qualifica',
+    actionLabel: 'Apri Fornitore',
+    href: `/fornitori?id_provider=${row.id}`,
+    severity: 'draft',
+    score: 120 + index,
+  }));
+
+  return [...documentItems, ...categoryItems, ...draftItems]
+    .sort((a, b) => a.score - b.score || a.title.localeCompare(b.title, 'it'))
+    .slice(0, 8);
+}
+
+function PriorityConsole({
+  priorities,
+  summary,
+  onOpen,
+}: {
+  priorities: PriorityItem[];
+  summary: PrioritySummary;
+  onOpen: (href: string) => void;
+}) {
+  return (
+    <section className="priorityConsole" aria-labelledby="priority-console-title">
+      <header className="priorityHeader">
+        <h2 id="priority-console-title">Priorità di oggi</h2>
+        <p className="prioritySummary">{prioritySummaryLabel(summary)}</p>
+      </header>
+
+      {priorities.length === 0 ? (
+        <div className="priorityEmpty">
+          <span className="priorityEmptyIcon" aria-hidden="true"><Icon name="check-circle" size={20} /></span>
+          <div>
+            <strong>Nessuna priorità urgente</strong>
+            <span>Le code fornitori non hanno interventi critici in evidenza.</span>
+          </div>
+        </div>
+      ) : (
+        <div className="priorityList">
+          {priorities.map((item) => (
+            <PriorityRow key={item.id} item={item} onOpen={onOpen} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PriorityRow({
+  item,
+  onOpen,
+}: {
+  item: PriorityItem;
+  onOpen: (href: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="priorityItem"
+      data-severity={item.severity}
+      onClick={() => onOpen(item.href)}
+    >
+      <span className="priorityBadge">
+        <span className="priorityBadgeDot" aria-hidden="true" />
+        {item.badgeLabel}
+      </span>
+      <span className="priorityTitle">{item.title}</span>
+      <span className="priorityDetail">{item.detail}</span>
+      <span className="priorityContext">{item.context}</span>
+      <span className="priorityAction">
+        {item.actionLabel}
+        <Icon name="chevron-right" size={16} />
+      </span>
+    </button>
+  );
+}
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const { drafts, documents, categories } = useDashboard();
   const groupedCategories = useMemo(() => groupCategoriesByProvider(categories.data ?? []), [categories.data]);
+  const priorities = useMemo(
+    () => buildDashboardPriorities(documents.data ?? [], categories.data ?? [], drafts.data ?? []),
+    [categories.data, documents.data, drafts.data],
+  );
+  const prioritySummary = useMemo(
+    () => buildPrioritySummary(documents.data ?? [], categories.data ?? [], drafts.data ?? []),
+    [categories.data, documents.data, drafts.data],
+  );
   const loading = drafts.isLoading || documents.isLoading || categories.isLoading;
   const error = drafts.error ?? documents.error ?? categories.error;
 
@@ -161,6 +347,7 @@ export function DashboardPage() {
       </header>
       {loading ? <Skeleton rows={8} /> : error ? stateBlock(errorTitle(error), 'Le attività fornitori non possono essere caricate.', 'triangle-alert') : (
         <>
+          <PriorityConsole priorities={priorities} summary={prioritySummary} onOpen={(href) => navigate(href)} />
           <Panel title="Da qualificare" subtitle="Fornitori in stato bozza" count={drafts.data?.length ?? 0}>
             {(drafts.data ?? []).length === 0 ? stateBlock('Nessun fornitore in attesa', 'Tutti i fornitori arrivati da Mistra sono stati lavorati.', 'check-circle') : (
               <div className="tableScroll dashboardScroll">
