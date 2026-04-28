@@ -1,8 +1,13 @@
+export const QUALIFICATION_REFERENCE_TYPE = 'QUALIFICATION_REF';
+
 export const referenceTypes = [
+  { value: QUALIFICATION_REFERENCE_TYPE, label: 'Qualifica' },
   { value: 'ADMINISTRATIVE_REF', label: 'Amministrativo' },
   { value: 'TECHNICAL_REF', label: 'Tecnico' },
   { value: 'OTHER_REF', label: 'Altro' },
 ] as const;
+
+export const addableReferenceTypes = referenceTypes.filter((item) => item.value !== QUALIFICATION_REFERENCE_TYPE);
 
 export function stateLabel(value?: string | null) {
   if (!value) return '-';

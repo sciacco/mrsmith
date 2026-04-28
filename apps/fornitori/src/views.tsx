@@ -18,7 +18,7 @@ import {
 } from './api/queries';
 import type { AlyanteSupplier, Category, CategoryDocumentType, Country, DashboardCategory, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
 import { provinceSelectOptions } from './lib/provinces';
-import { referenceTypeLabel, referenceTypes, stateLabel } from './lib/reference';
+import { QUALIFICATION_REFERENCE_TYPE, addableReferenceTypes, referenceTypeLabel, referenceTypes, stateLabel } from './lib/reference';
 import { hasProviderErp, providerStateSelectOptions } from './lib/providerState';
 import { saveBlob } from './lib/download';
 import { useHasRole } from './hooks/useHasRole';
@@ -55,6 +55,15 @@ function errorTitle(error: unknown) {
   return 'Dati non disponibili';
 }
 
+function apiErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiError) {
+    const body = error.body;
+    if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') return body.error;
+    return error.message;
+  }
+  return fallback;
+}
+
 function stateBlock(title: string, message: string, iconName?: IconName) {
   return (
     <div className="emptyState">
@@ -85,10 +94,6 @@ function getProviderRefs(provider?: Provider): ProviderReference[] {
   if (!provider) return [];
   if (provider.refs?.length) return provider.refs;
   return provider.ref ? [provider.ref] : [];
-}
-
-function qualificationRef(provider?: Provider) {
-  return getProviderRefs(provider).find((ref) => ref.reference_type === 'QUALIFICATION_REF');
 }
 
 function selectOptions(items: Category[] | DocumentType[] | undefined) {
@@ -147,7 +152,7 @@ function providerPayload(form: HTMLFormElement): ProviderPayload {
       last_name: String(data.get('ref_last_name') ?? '').trim(),
       email: String(data.get('ref_email') ?? '').trim(),
       phone: String(data.get('ref_phone') ?? '').trim(),
-      reference_type: 'QUALIFICATION_REF',
+      reference_type: QUALIFICATION_REFERENCE_TYPE,
     },
   };
   if (data.get('skip_qualification_validation') === 'on') {
@@ -749,13 +754,32 @@ function ProviderRow({ item, onSelect }: { item: ProviderSummary; onSelect: (id:
 
 function refPayload(form: HTMLFormElement, type?: string): ProviderReference {
   const data = new FormData(form);
-  return {
-    first_name: String(data.get('first_name') ?? ''),
-    last_name: String(data.get('last_name') ?? ''),
-    email: String(data.get('email') ?? ''),
-    phone: String(data.get('phone') ?? ''),
-    reference_type: type,
+  const payload: ProviderReference = {
+    phone: String(data.get('phone') ?? '').trim(),
   };
+  const firstName = String(data.get('first_name') ?? '').trim();
+  const lastName = String(data.get('last_name') ?? '').trim();
+  const email = String(data.get('email') ?? '').trim();
+  if (firstName) payload.first_name = firstName;
+  if (lastName) payload.last_name = lastName;
+  if (email) payload.email = email;
+  if (type) payload.reference_type = type;
+  return payload;
+}
+
+const referenceSortRank: Record<string, number> = {
+  [QUALIFICATION_REFERENCE_TYPE]: 0,
+  ADMINISTRATIVE_REF: 1,
+  TECHNICAL_REF: 2,
+  OTHER_REF: 3,
+};
+
+function sortReferences(refs: ProviderReference[]) {
+  return [...refs].sort((a, b) => (
+    (referenceSortRank[a.reference_type ?? ''] ?? 9) - (referenceSortRank[b.reference_type ?? ''] ?? 9) ||
+    (a.id ?? 0) - (b.id ?? 0) ||
+    referenceTypeLabel(a.reference_type).localeCompare(referenceTypeLabel(b.reference_type), 'it')
+  ));
 }
 
 function paymentCodeOf(value: Provider['default_payment_method']): string {
@@ -778,15 +802,10 @@ interface ProviderFormState {
   postal_code: string;
   address: string;
   default_payment_method: string;
-  ref_first_name: string;
-  ref_last_name: string;
-  ref_email: string;
-  ref_phone: string;
   skip_qualification_validation: boolean;
 }
 
 function providerFormState(provider: Provider): ProviderFormState {
-  const ref = qualificationRef(provider);
   return {
     company_name: provider.company_name ?? '',
     state: (provider.state ?? 'DRAFT').toUpperCase(),
@@ -800,10 +819,6 @@ function providerFormState(provider: Provider): ProviderFormState {
     postal_code: provider.postal_code ?? '',
     address: provider.address ?? '',
     default_payment_method: paymentCodeOf(provider.default_payment_method),
-    ref_first_name: ref?.first_name ?? '',
-    ref_last_name: ref?.last_name ?? '',
-    ref_email: ref?.email ?? '',
-    ref_phone: ref?.phone ?? '',
     skip_qualification_validation: Boolean(provider.skip_qualification_validation),
   };
 }
@@ -822,10 +837,6 @@ function providerFormStatesEqual(a: ProviderFormState, b: ProviderFormState) {
     a.postal_code === b.postal_code &&
     a.address === b.address &&
     a.default_payment_method === b.default_payment_method &&
-    a.ref_first_name === b.ref_first_name &&
-    a.ref_last_name === b.ref_last_name &&
-    a.ref_email === b.ref_email &&
-    a.ref_phone === b.ref_phone &&
     a.skip_qualification_validation === b.skip_qualification_validation
   );
 }
@@ -845,13 +856,6 @@ function providerPayloadFromState(state: ProviderFormState): ProviderPayload {
     language: state.language || 'it',
     country: state.country || 'IT',
     default_payment_method: state.default_payment_method || null,
-    ref: {
-      first_name: state.ref_first_name.trim(),
-      last_name: state.ref_last_name.trim(),
-      email: state.ref_email.trim(),
-      phone: state.ref_phone.trim(),
-      reference_type: 'QUALIFICATION_REF',
-    },
   };
   if (state.skip_qualification_validation) payload.skip_qualification_validation = true;
   return payload;
@@ -1659,19 +1663,30 @@ function AddCategoryModal({
 function ContactsSection({ provider, readonly }: { provider: Provider; readonly: boolean }) {
   const { toast } = useToast();
   const mutations = useFornitoriMutations();
-  const refs = getProviderRefs(provider).filter((ref) => ref.reference_type !== 'QUALIFICATION_REF');
+  const refs = sortReferences(getProviderRefs(provider));
+  const hasQualificationRef = refs.some((ref) => ref.reference_type === QUALIFICATION_REFERENCE_TYPE);
   const [addOpen, setAddOpen] = useState(false);
 
   async function update(ref: ProviderReference, body: ProviderReference) {
     if (!ref.id) return;
-    await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: ref.id, body });
-    toast('Contatto aggiornato');
+    try {
+      await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: ref.id, body });
+      toast('Contatto aggiornato');
+    } catch (err) {
+      toast(apiErrorMessage(err, 'Salvataggio contatto non riuscito'), 'error');
+      throw err;
+    }
   }
 
   async function add(body: ProviderReference) {
-    await mutations.createReference.mutateAsync({ providerId: provider.id, body });
-    toast('Contatto aggiunto');
-    setAddOpen(false);
+    try {
+      await mutations.createReference.mutateAsync({ providerId: provider.id, body });
+      toast('Contatto aggiunto');
+      setAddOpen(false);
+    } catch (err) {
+      toast(apiErrorMessage(err, 'Creazione contatto non riuscita'), 'error');
+      throw err;
+    }
   }
 
   return (
@@ -1682,14 +1697,20 @@ function ContactsSection({ provider, readonly }: { provider: Provider; readonly:
         <Button size="sm" leftIcon={<Icon name="plus" />} onClick={() => setAddOpen(true)}>Aggiungi</Button>
       ) : undefined}
     >
-      {refs.length === 0 && !addOpen ? stateBlock('Nessun contatto registrato', 'Aggiungi almeno un contatto amministrativo o tecnico.', 'user') : (
+      {refs.length === 0 && !addOpen ? stateBlock('Nessun contatto registrato', 'Aggiungi almeno un contatto per completare la scheda fornitore.', 'user') : (
         <div className="contactsList">
           {refs.map((item) => (
-            <ContactCard key={item.id} contact={item} readonly={readonly} onSave={(body) => void update(item, body)} pending={mutations.updateReference.isPending} />
+            <ContactCard key={item.id} contact={item} readonly={readonly} onSave={(body) => update(item, body)} pending={mutations.updateReference.isPending} />
           ))}
         </div>
       )}
-      <ContactAddForm open={addOpen} onClose={() => setAddOpen(false)} onSave={(body) => void add(body)} pending={mutations.createReference.isPending} />
+      <ContactAddForm
+        open={addOpen}
+        allowQualification={!hasQualificationRef}
+        onClose={() => setAddOpen(false)}
+        onSave={(body) => add(body)}
+        pending={mutations.createReference.isPending}
+      />
     </Panel>
   );
 }
@@ -1702,10 +1723,21 @@ function ContactCard({
 }: {
   contact: ProviderReference;
   readonly: boolean;
-  onSave: (body: ProviderReference) => void;
+  onSave: (body: ProviderReference) => Promise<void>;
   pending: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const body = refPayload(event.currentTarget, contact.reference_type);
+    try {
+      await onSave(body);
+      setEditing(false);
+    } catch {
+      // The parent owns the toast; keep the form open for correction.
+    }
+  }
 
   if (!editing) {
     return (
@@ -1728,18 +1760,13 @@ function ContactCard({
   return (
     <form
       className="contactForm"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const body = refPayload(event.currentTarget, contact.reference_type);
-        onSave(body);
-        setEditing(false);
-      }}
+      onSubmit={(event) => void submit(event)}
     >
       <div className="contactFormGrid">
-        <Input name="first_name" label="Nome" defaultValue={contact.first_name} />
-        <Input name="last_name" label="Cognome" defaultValue={contact.last_name} />
-        <Input name="email" label="Email" type="email" defaultValue={contact.email} />
-        <Input name="phone" label="Telefono" defaultValue={contact.phone} />
+        <Input name="first_name" label="Nome" defaultValue={contact.first_name ?? ''} />
+        <Input name="last_name" label="Cognome" defaultValue={contact.last_name ?? ''} />
+        <Input name="email" label="Email" type="email" defaultValue={contact.email ?? ''} />
+        <Input name="phone" label="Telefono" defaultValue={contact.phone ?? ''} />
       </div>
       <div className="formActions">
         <Button variant="secondary" type="button" onClick={() => setEditing(false)}>Annulla</Button>
@@ -1751,31 +1778,51 @@ function ContactCard({
 
 function ContactAddForm({
   open,
+  allowQualification,
   onClose,
   onSave,
   pending,
 }: {
   open: boolean;
+  allowQualification: boolean;
   onClose: () => void;
-  onSave: (body: ProviderReference) => void;
+  onSave: (body: ProviderReference) => Promise<void>;
   pending: boolean;
 }) {
-  const [type, setType] = useState<string>('ADMINISTRATIVE_REF');
+  const typeOptions = useMemo(() => (allowQualification ? referenceTypes : addableReferenceTypes), [allowQualification]);
+  const defaultType = typeOptions[0]?.value ?? 'ADMINISTRATIVE_REF';
+  const [type, setType] = useState<string>(defaultType);
+
+  useEffect(() => {
+    if (!typeOptions.some((item) => item.value === type)) {
+      setType(defaultType);
+    }
+  }, [defaultType, type, typeOptions]);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const body = refPayload(form, type);
+    try {
+      await onSave(body);
+      form.reset();
+      setType(defaultType);
+    } catch {
+      // The parent owns the toast; keep the form open for correction.
+    }
+  }
+
   if (!open) return null;
   return (
     <form
       className="contactForm contactForm--new"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const body = refPayload(event.currentTarget, type);
-        onSave(body);
-      }}
+      onSubmit={(event) => void submit(event)}
     >
       <div className="contactFormGrid">
         <label className="field">
           <span>Tipo contatto</span>
-          <select value={type} onChange={(event) => setType(event.target.value)}>
-            {referenceTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          <select name="reference_type" value={type} onChange={(event) => setType(event.target.value)}>
+            {typeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
         </label>
         <Input name="first_name" label="Nome" />
@@ -1828,7 +1875,7 @@ function AnagraficaSection({
   }, [dirty]);
 
   // Anagrafica master fields are locked when state=ACTIVE (cfr. trg_provider_state_guard).
-  // Always editable on ACTIVE: payment method, qualification ref, skip flag.
+  // Always editable on ACTIVE: payment method and skip flag.
   // Always editable on DRAFT.
   // Never editable on INACTIVE/CEASED (fullReadonly).
   const masterFieldsDisabled = fullReadonly || anagraficaLocked;
@@ -1880,8 +1927,7 @@ function AnagraficaSection({
       subtitle={anagraficaLocked && !fullReadonly ? 'Anagrafica bloccata: fornitore attivo' : undefined}
     >
       <form className="providerDataForm" onSubmit={(event) => void submit(event)}>
-        <fieldset className="formSection">
-          <legend>Dati fornitore</legend>
+        <div className="formSection">
           <div className="formSectionGrid">
             <Input name="company_name" label="Ragione sociale" value={formState.company_name} disabled={masterFieldsDisabled} onChange={(event) => updateField('company_name', event.target.value)} wide />
             <Input name="vat_number" label="P.IVA" value={formState.vat_number} disabled={masterFieldsDisabled} onChange={(event) => updateField('vat_number', event.target.value)} />
@@ -1904,10 +1950,9 @@ function AnagraficaSection({
               onChange={(next) => updateField('default_payment_method', next)}
             />
           </div>
-        </fieldset>
+        </div>
 
-        <fieldset className="formSection">
-          <legend>Sede</legend>
+        <div className="formSection">
           <div className="formSectionGrid">
             <SearchableSelectField
               label="Paese"
@@ -1926,16 +1971,11 @@ function AnagraficaSection({
             <Input name="postal_code" label="CAP" value={formState.postal_code} disabled={masterFieldsDisabled} onChange={(event) => updateField('postal_code', event.target.value)} />
             <Input name="address" label="Indirizzo" value={formState.address} disabled={masterFieldsDisabled} onChange={(event) => updateField('address', event.target.value)} wide />
           </div>
-        </fieldset>
+        </div>
 
-        <fieldset className="formSection">
-          <legend>Contatto qualifica</legend>
-          <div className="formSectionGrid">
-            <Input name="ref_first_name" label="Nome" value={formState.ref_first_name} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_first_name', event.target.value)} />
-            <Input name="ref_last_name" label="Cognome" value={formState.ref_last_name} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_last_name', event.target.value)} />
-            <Input name="ref_email" label="Email" type="email" value={formState.ref_email} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_email', event.target.value)} />
-            <Input name="ref_phone" label="Telefono" value={formState.ref_phone} disabled={editableSidefieldsDisabled} onChange={(event) => updateField('ref_phone', event.target.value)} />
-            {skipRole ? (
+        {skipRole ? (
+          <div className="formSection">
+            <div className="formSectionGrid">
               <div className="wideField">
                 <ToggleSwitch
                   id={`skip-qualification-${provider.id}`}
@@ -1945,9 +1985,9 @@ function AnagraficaSection({
                   label="Salta controllo qualifica"
                 />
               </div>
-            ) : null}
+            </div>
           </div>
-        </fieldset>
+        ) : null}
 
         {!fullReadonly ? (
           <div className="formActions formActionsWithState">

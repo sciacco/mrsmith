@@ -306,14 +306,28 @@ export function buildDetailProviderAttention({
   if (normalizeState(provider.state) === 'DRAFT') {
     const missing = missingProviderActivationFields(provider);
     item.counts.drafts = 1;
-    item.actions.push({
-      id: `draft-${provider.id}`,
-      label: 'Completa dati',
-      detail: missing.length > 0 ? `Mancano: ${missing.join(', ')}` : 'Qualifica da completare',
-      severity: 'blocking',
-      section: 'dati',
-      score: 55 + missing.length * 2,
-    });
+    const contactMissing = missing.includes('almeno un contatto');
+    const missingData = missing.filter((field) => field !== 'almeno un contatto');
+    if (missingData.length > 0 || missing.length === 0) {
+      item.actions.push({
+        id: `draft-${provider.id}`,
+        label: 'Completa dati',
+        detail: missingData.length > 0 ? `Mancano: ${missingData.join(', ')}` : 'Qualifica da completare',
+        severity: 'blocking',
+        section: 'dati',
+        score: 55 + missingData.length * 2,
+      });
+    }
+    if (contactMissing) {
+      item.actions.push({
+        id: `draft-contact-${provider.id}`,
+        label: 'Aggiungi contatto',
+        detail: 'Manca almeno un contatto',
+        severity: 'blocking',
+        section: 'contatti',
+        score: 54,
+      });
+    }
   }
 
   for (const document of providerDocuments) {

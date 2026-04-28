@@ -104,6 +104,15 @@ Alyante ERP ID
 
 ## API and Backend Contract Quirks
 
+### Fornitori Provider Contacts Follow Appsmith Payload Semantics
+
+- Context: `apps/fornitori` provider detail contacts and backend `POST/PUT /fornitori/v1/provider/{id}/reference`.
+- Discovery: Appsmith does not send empty `first_name`, `last_name`, or `email` fields for provider contacts, while it always sends `phone` and uses an empty string when no phone is present. `QUALIFICATION_REF` is also a special reference type: Mistra's standard provider-reference functions reject creating or editing it.
+- Practical rule: Fornitori contact forms should omit empty name/email fields and include `phone` as `''` when empty. Backend contact handlers must route ordinary reference types through Mistra/Arak, but handle `QUALIFICATION_REF` with dedicated provider-ref logic instead of the generic reference endpoint.
+- Evidence: Appsmith contact-save snippet provided during the Fornitori migration; `docs/mistra-dist.yaml` provider-ref schemas; `docs/arak_schema.json` functions `provider_ref_new` and `provider_ref_edit`.
+- Used by: `apps/fornitori` detail page contacts.
+- Open questions: none.
+
 ### Manutenzioni Radar Excludes Terminal Maintenance States
 
 - Context: `GET /api/manutenzioni/v1/maintenances/radar`, used by `apps/manutenzioni` on the Registro Manutenzioni page.

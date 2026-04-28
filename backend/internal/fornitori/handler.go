@@ -34,6 +34,8 @@ const (
 	codeSkipRoleRequired      = "SKIP_QUALIFICATION_ROLE_REQUIRED"
 
 	maxUploadBytes = 25 << 20
+
+	qualificationReferenceType = "QUALIFICATION_REF"
 )
 
 const alyanteSuppliersQuery = `SELECT TOP 100
@@ -64,6 +66,13 @@ var allowedUploadTypes = map[string]struct{}{
 	"application/vnd.openxmlformats-officedocument.presentationml.presentation": {},
 }
 
+var allowedProviderReferenceTypes = map[string]struct{}{
+	qualificationReferenceType: {},
+	"OTHER_REF":                {},
+	"ADMINISTRATIVE_REF":       {},
+	"TECHNICAL_REF":            {},
+}
+
 type Handler struct {
 	arak      *arak.Client
 	db        *sql.DB
@@ -90,8 +99,8 @@ func RegisterRoutes(mux *http.ServeMux, arakClient *arak.Client, arakDB *sql.DB,
 	handle("PUT /fornitori/v1/provider/{id}", h.handlePutProvider)
 	handle("DELETE /fornitori/v1/provider/{id}", h.proxyArakPath("/provider/{id}", true))
 
-	handle("POST /fornitori/v1/provider/{id}/reference", h.proxyArakPath("/provider/{id}/reference", true))
-	handle("PUT /fornitori/v1/provider/{id}/reference/{ref_id}", h.proxyArakPath("/provider/{id}/reference/{ref_id}", true))
+	handle("POST /fornitori/v1/provider/{id}/reference", h.handleCreateProviderReference)
+	handle("PUT /fornitori/v1/provider/{id}/reference/{ref_id}", h.handleUpdateProviderReference)
 
 	handle("GET /fornitori/v1/provider/{id}/category", h.proxyArakPath("/provider/{id}/category", false))
 	handle("POST /fornitori/v1/provider/{id}/category/{category_id}", h.proxyArakPath("/provider/{id}/category/{category_id}", true))
@@ -274,6 +283,284 @@ func (h *Handler) handlePutProvider(w http.ResponseWriter, r *http.Request) {
 	}
 	path := arakRoot + "/provider/" + url.PathEscape(r.PathValue("id"))
 	h.forwardArak(w, r, path, r.URL.RawQuery, bytes.NewReader(body), nil)
+}
+
+type providerReferencePayload struct {
+	FirstName     *string
+	LastName      *string
+	Email         *string
+	Phone         string
+	ReferenceType string
+}
+
+type providerReferenceRow struct {
+	ID            int64          `json:"id"`
+	FirstName     nullableString `json:"first_name"`
+	LastName      nullableString `json:"last_name"`
+	Email         nullableString `json:"email"`
+	Phone         nullableString `json:"phone"`
+	ReferenceType string         `json:"reference_type"`
+}
+
+func (h *Handler) handleCreateProviderReference(w http.ResponseWriter, r *http.Request) {
+	payload, ok := decodeProviderReferencePayload(w, r)
+	if !ok {
+		return
+	}
+	if payload.ReferenceType == "" {
+		httputil.Error(w, http.StatusBadRequest, "Seleziona il tipo contatto")
+		return
+	}
+	if !isAllowedProviderReferenceType(payload.ReferenceType) {
+		httputil.Error(w, http.StatusBadRequest, "Tipo contatto non valido")
+		return
+	}
+	if payload.ReferenceType == qualificationReferenceType {
+		h.createQualificationReference(w, r, payload)
+		return
+	}
+	h.forwardProviderReference(w, r, "/provider/"+url.PathEscape(r.PathValue("id"))+"/reference", payload, true)
+}
+
+func (h *Handler) handleUpdateProviderReference(w http.ResponseWriter, r *http.Request) {
+	payload, ok := decodeProviderReferencePayload(w, r)
+	if !ok {
+		return
+	}
+	if payload.ReferenceType != "" && !isAllowedProviderReferenceType(payload.ReferenceType) {
+		httputil.Error(w, http.StatusBadRequest, "Tipo contatto non valido")
+		return
+	}
+	if payload.ReferenceType == "" && h.db != nil {
+		providerID, providerOK := parsePathInt(w, r, "id", "Fornitore non valido")
+		refID, refOK := parsePathInt(w, r, "ref_id", "Contatto non valido")
+		if !providerOK || !refOK {
+			return
+		}
+		var refType string
+		err := h.db.QueryRowContext(r.Context(), `
+			SELECT reference_type
+			FROM provider_qualifications.provider_ref
+			WHERE provider_id = $1 AND id = $2`, providerID, refID).Scan(&refType)
+		if err != nil && err != sql.ErrNoRows {
+			httputil.InternalError(w, r, err, "provider reference type lookup failed")
+			return
+		}
+		if err == nil {
+			payload.ReferenceType = refType
+		}
+	}
+	if payload.ReferenceType == qualificationReferenceType {
+		h.updateQualificationReference(w, r, payload)
+		return
+	}
+	h.forwardProviderReference(
+		w,
+		r,
+		"/provider/"+url.PathEscape(r.PathValue("id"))+"/reference/"+url.PathEscape(r.PathValue("ref_id")),
+		payload,
+		false,
+	)
+}
+
+func decodeProviderReferencePayload(w http.ResponseWriter, r *http.Request) (providerReferencePayload, bool) {
+	var raw map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+		return providerReferencePayload{}, false
+	}
+	var payload providerReferencePayload
+	for _, field := range []struct {
+		key string
+		dst **string
+	}{
+		{key: "first_name", dst: &payload.FirstName},
+		{key: "last_name", dst: &payload.LastName},
+		{key: "email", dst: &payload.Email},
+	} {
+		value, ok := referencePayloadString(raw, field.key)
+		if !ok {
+			httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+			return providerReferencePayload{}, false
+		}
+		if value != "" {
+			copied := value
+			*field.dst = &copied
+		}
+	}
+	phone, ok := referencePayloadString(raw, "phone")
+	if !ok {
+		httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+		return providerReferencePayload{}, false
+	}
+	payload.Phone = phone
+	refType, ok := referencePayloadString(raw, "reference_type")
+	if !ok {
+		httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+		return providerReferencePayload{}, false
+	}
+	payload.ReferenceType = strings.ToUpper(refType)
+	return payload, true
+}
+
+func referencePayloadString(raw map[string]any, key string) (string, bool) {
+	value, exists := raw[key]
+	if !exists || value == nil {
+		return "", true
+	}
+	text, ok := value.(string)
+	if !ok {
+		return "", false
+	}
+	return strings.TrimSpace(text), true
+}
+
+func isAllowedProviderReferenceType(value string) bool {
+	_, ok := allowedProviderReferenceTypes[value]
+	return ok
+}
+
+func (p providerReferencePayload) arakBody(includeType bool) ([]byte, error) {
+	body := map[string]any{"phone": p.Phone}
+	if p.FirstName != nil {
+		body["first_name"] = *p.FirstName
+	}
+	if p.LastName != nil {
+		body["last_name"] = *p.LastName
+	}
+	if p.Email != nil {
+		body["email"] = *p.Email
+	}
+	if includeType && p.ReferenceType != "" {
+		body["reference_type"] = p.ReferenceType
+	}
+	return json.Marshal(body)
+}
+
+func (h *Handler) forwardProviderReference(w http.ResponseWriter, r *http.Request, path string, payload providerReferencePayload, includeType bool) {
+	if !h.requireArak(w) {
+		return
+	}
+	body, err := payload.arakBody(includeType)
+	if err != nil {
+		httputil.InternalError(w, r, err, "provider reference body encode failed")
+		return
+	}
+	h.forwardArak(w, r, arakRoot+path, r.URL.RawQuery, bytes.NewReader(body), nil)
+}
+
+func (h *Handler) createQualificationReference(w http.ResponseWriter, r *http.Request, payload providerReferencePayload) {
+	if !h.requireDB(w) {
+		return
+	}
+	providerID, ok := parsePathInt(w, r, "id", "Fornitore non valido")
+	if !ok {
+		return
+	}
+	var existingID int64
+	err := h.db.QueryRowContext(r.Context(), `
+		SELECT id
+		FROM provider_qualifications.provider_ref
+		WHERE provider_id = $1 AND reference_type = $2
+		LIMIT 1`, providerID, qualificationReferenceType).Scan(&existingID)
+	if err == nil {
+		httputil.Error(w, http.StatusConflict, "Il contatto qualifica e' gia presente")
+		return
+	}
+	if err != sql.ErrNoRows {
+		httputil.InternalError(w, r, err, "qualification reference lookup failed")
+		return
+	}
+	row := h.db.QueryRowContext(r.Context(), `
+		INSERT INTO provider_qualifications.provider_ref (
+			provider_id,
+			first_name,
+			last_name,
+			email,
+			phone,
+			reference_type,
+			created_at,
+			updated_at
+		)
+		VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, NOW(), NOW())
+		RETURNING id, first_name, last_name, email, phone, reference_type`,
+		providerID,
+		optionalStringArg(payload.FirstName),
+		optionalStringArg(payload.LastName),
+		stringValue(payload.Email),
+		payload.Phone,
+		qualificationReferenceType,
+	)
+	writeProviderReferenceRow(w, r, row, "qualification reference create failed")
+}
+
+func (h *Handler) updateQualificationReference(w http.ResponseWriter, r *http.Request, payload providerReferencePayload) {
+	if !h.requireDB(w) {
+		return
+	}
+	providerID, providerOK := parsePathInt(w, r, "id", "Fornitore non valido")
+	refID, refOK := parsePathInt(w, r, "ref_id", "Contatto non valido")
+	if !providerOK || !refOK {
+		return
+	}
+	row := h.db.QueryRowContext(r.Context(), `
+		UPDATE provider_qualifications.provider_ref
+		SET
+			first_name = COALESCE($3, first_name),
+			last_name = COALESCE($4, last_name),
+			email = COALESCE($5, email),
+			phone = NULLIF($6, ''),
+			updated_at = NOW()
+		WHERE provider_id = $1
+		  AND id = $2
+		  AND reference_type = $7
+		RETURNING id, first_name, last_name, email, phone, reference_type`,
+		providerID,
+		refID,
+		optionalStringArg(payload.FirstName),
+		optionalStringArg(payload.LastName),
+		optionalStringArg(payload.Email),
+		payload.Phone,
+		qualificationReferenceType,
+	)
+	writeProviderReferenceRow(w, r, row, "qualification reference update failed")
+}
+
+func parsePathInt(w http.ResponseWriter, r *http.Request, key, message string) (int64, bool) {
+	value, err := strconv.ParseInt(r.PathValue(key), 10, 64)
+	if err != nil || value <= 0 {
+		httputil.Error(w, http.StatusBadRequest, message)
+		return 0, false
+	}
+	return value, true
+}
+
+func optionalStringArg(value *string) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func writeProviderReferenceRow(w http.ResponseWriter, r *http.Request, row *sql.Row, message string) {
+	var item providerReferenceRow
+	err := row.Scan(&item.ID, &item.FirstName, &item.LastName, &item.Email, &item.Phone, &item.ReferenceType)
+	if err == sql.ErrNoRows {
+		httputil.Error(w, http.StatusNotFound, "Contatto non trovato")
+		return
+	}
+	if err != nil {
+		httputil.InternalError(w, r, err, message)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, item)
 }
 
 func (h *Handler) handleUploadDocument(w http.ResponseWriter, r *http.Request) {
