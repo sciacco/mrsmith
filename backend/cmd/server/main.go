@@ -349,6 +349,9 @@ func main() {
 	{
 		filtered := make([]applaunch.Definition, 0, len(appCatalog))
 		for _, definition := range appCatalog {
+			if definition.Status == "dev" && !cfg.IncludeDevApps {
+				continue
+			}
 			if definition.ID == applaunch.CopertureAppID && cfg.DBCopertureDSN == "" {
 				continue
 			}

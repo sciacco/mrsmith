@@ -16,6 +16,11 @@ type Config struct {
 	CORSOrigins       string
 	StaticDir         string
 
+	// Include catalog entries marked Status: "dev" in the portal launcher.
+	// Default false so production hides them automatically; dev environments
+	// must opt in via INCLUDE_DEV_APPS=true.
+	IncludeDevApps bool
+
 	// Optional launcher override for split-server local development.
 	BudgetAppURL               string
 	FornitoriAppURL            string
@@ -101,6 +106,7 @@ func Load() Config {
 		KeycloakIssuerURL:            envOr("KEYCLOAK_ISSUER_URL", ""),
 		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185,http://localhost:5186,http://localhost:5187,http://localhost:5188,http://localhost:5189,http://localhost:5190"),
 		StaticDir:                    envOr("STATIC_DIR", ""),
+		IncludeDevApps:               boolEnvOr("INCLUDE_DEV_APPS", false),
 		BudgetAppURL:                 envOr("BUDGET_APP_URL", ""),
 		FornitoriAppURL:              envOr("FORNITORI_APP_URL", ""),
 		RDAAppURL:                    envOr("RDA_APP_URL", ""),
