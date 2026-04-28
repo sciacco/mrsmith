@@ -1474,23 +1474,46 @@ function DocumentGroup({
       <ul className="docTypeList">
         {types.map((entry) => {
           const docs = documentsByType.get(entry.document_type.id) ?? [];
-          const hasUsable = docs.some((d) => (d.state ?? '').toUpperCase() === 'OK');
-          const display = docs[0];
+          const display = docs.find((d) => (d.state ?? '').toUpperCase() === 'OK') ?? docs[0];
           const stateUpper = (display?.state ?? '').toUpperCase();
+          const isValid = stateUpper === 'OK';
           const expiryDays = daysUntilExpiry(display?.expire_date);
+          const isExpired = expiryDays !== null && expiryDays < 0;
+          const isCurrent = isValid && !isExpired;
+          const hasBlockingIssue = Boolean(display && !isCurrent);
           const hasStateBadge = Boolean(stateUpper && stateUpper !== 'OK');
           const hasUrgencyBadge = expiryDays !== null && expiryDays <= 30;
+          const status = display ? (hasBlockingIssue ? 'issue' : 'valid') : required ? 'missing-required' : 'missing-optional';
+          const indicatorIcon: IconName = display ? (hasBlockingIssue ? 'file-warning' : 'file-check') : 'file-plus';
           return (
-            <li key={entry.document_type.id} className="docTypeRow" data-required={required ? 'true' : 'false'} data-uploaded={display ? 'true' : 'false'}>
-              <span className="docTypeIndicator" aria-hidden="true">{display ? <Icon name={hasUsable ? 'check-circle' : 'circle'} size={14} /> : <Icon name="circle" size={14} />}</span>
+            <li
+              key={entry.document_type.id}
+              className="docTypeRow"
+              data-required={required ? 'true' : 'false'}
+              data-uploaded={display ? 'true' : 'false'}
+              data-doc-status={status}
+            >
+              <span className="docTypeIndicator" aria-hidden="true"><Icon name={indicatorIcon} size={16} /></span>
               <span className="docTypeName">{entry.document_type.name}</span>
               <span className="docTypeMeta">
                 {display?.expire_date ? dateLabel(display.expire_date) : '—'}
               </span>
               <span className="docTypeBadges">
-                <DocumentStateBadge state={display?.state} />
-                <DocumentUrgencyBadge expireDate={display?.expire_date} />
-                {display && !hasStateBadge && !hasUrgencyBadge ? <span className="muted">Valido</span> : null}
+                {display ? (
+                  <>
+                    <DocumentStateBadge state={display.state} />
+                    <DocumentUrgencyBadge expireDate={display.expire_date} />
+                    {isCurrent ? <StatusBadge value="valid" label="Valido" variant="success" dot={false} /> : null}
+                    {!isCurrent && !hasStateBadge && !hasUrgencyBadge ? <StatusBadge value="uploaded" label="Caricato" variant="neutral" dot={false} /> : null}
+                  </>
+                ) : (
+                  <StatusBadge
+                    value={required ? 'missing' : 'optional'}
+                    label={required ? 'Mancante' : 'Facoltativo'}
+                    variant={required ? 'warning' : 'neutral'}
+                    dot={false}
+                  />
+                )}
               </span>
               <span className="docTypeActions">
                 {display ? (

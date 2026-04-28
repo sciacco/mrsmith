@@ -1604,11 +1604,23 @@ button {
 
 .docTypeIndicator {
   display: inline-flex;
+  justify-content: center;
+  width: 1.1rem;
+  flex-shrink: 0;
   color: var(--color-text-secondary);
 }
 
-.docTypeRow[data-uploaded='true'] .docTypeIndicator {
+.docTypeRow[data-doc-status='valid'] .docTypeIndicator {
   color: var(--color-success);
+}
+
+.docTypeRow[data-doc-status='issue'] .docTypeIndicator,
+.docTypeRow[data-doc-status='missing-required'] .docTypeIndicator {
+  color: var(--color-warning);
+}
+
+.docTypeRow[data-doc-status='missing-optional'] .docTypeIndicator {
+  color: var(--color-text-muted);
 }
 
 .docTypeName {
