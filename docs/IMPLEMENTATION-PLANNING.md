@@ -86,6 +86,7 @@ Before approving an implementation plan, verify these explicitly:
 ### 5. Deployment Fit
 
 - Does the Docker/static output path match the runtime router?
+- If a frontend app has TypeScript test files, does the production build use a `tsconfig.build.json` that excludes them?
 - Are required env vars fully named and consistent?
 - Is the migration story real and repo-compatible, not just a placeholder?
 

@@ -268,6 +268,15 @@ Alyante ERP ID
 - Used by: `budget`, `compliance`, `kit-products`, `listini-e-sconti`, `panoramica-cliente`, `quotes`, `reports`.
 - Open questions: none.
 
+### Frontend Production Builds Must Exclude Node-Only Test Files
+
+- Context: Vite/React mini-apps with `src/**/*.test.ts` files that use Node's built-in test modules such as `node:test` or `node:assert/strict`.
+- Discovery: Docker production builds run `pnpm install --frozen-lockfile && pnpm -r build` in a fresh frontend stage. If a mini-app build script uses `tsc -b` against the default app `tsconfig.json`, TypeScript compiles tests included by `"include": ["src"]`. In that fresh deploy image, Node typings are not guaranteed to be available, so Node-only test imports can break the production build even when the app bundle itself is valid.
+- Practical rule: when adding local TypeScript test files to a frontend mini-app, add or reuse `tsconfig.build.json` that extends the app `tsconfig.json` and excludes `src/**/*.test.ts` / `src/**/*.test.tsx`, then point the package `build` script at `tsc -b tsconfig.build.json && vite build`. Keep the test script responsible for running those files directly.
+- Evidence: `apps/simulatori-vendita/tsconfig.build.json`; `apps/fornitori/tsconfig.build.json`; `make deploy-prod` failure on 2026-04-28 from `apps/fornitori/src/lib/providerAttention.test.ts` and `providerState.test.ts` importing `node:test` during the Docker frontend stage.
+- Used by: `apps/simulatori-vendita`, `apps/fornitori`.
+- Open questions: none.
+
 ### Portal Launcher Tiles Must Use Supported Portal Icon Keys
 
 - Context: adding or changing entries in `backend/internal/platform/applaunch/catalog.go`.
