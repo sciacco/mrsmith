@@ -1653,35 +1653,49 @@ button {
   font-weight: 750;
 }
 
-.contactsList {
+.contactsRoleGrid {
   display: grid;
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 0.85rem;
   padding: 0.75rem;
 }
 
-.contactCard {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
-  align-items: center;
-  gap: 0.85rem;
+.contactRole {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
-  padding: 0.65rem 0.85rem;
+  padding: 0.75rem 0.85rem;
   background: var(--color-bg-elevated);
 }
 
-.contactCardMain {
-  display: grid;
-  gap: 0.1rem;
+.contactRoleHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.contactCardName {
+.contactRoleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+}
+
+.contactRoleTitle {
   color: var(--color-text);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
-.contactCardType {
+.contactRoleCount {
+  margin-left: auto;
   color: var(--color-text-muted);
   font-size: 0.7rem;
   font-weight: 700;
@@ -1689,30 +1703,150 @@ button {
   text-transform: uppercase;
 }
 
-.contactCardMeta {
-  display: grid;
-  gap: 0.1rem;
-  color: var(--color-text-secondary);
-  font-size: 0.84rem;
+.contactRoleCount[data-empty='true'] {
+  color: color-mix(in srgb, var(--color-text-muted) 80%, transparent);
 }
 
-.contactForm {
-  display: grid;
-  gap: 0.7rem;
-  padding: 0.75rem 0.85rem;
+.contactRoleAdd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface) 65%, var(--color-bg-elevated));
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
-.contactForm--new {
-  margin: 0.25rem 0.75rem 0.75rem;
+.contactRoleAdd:hover,
+.contactRoleAdd:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  outline: none;
 }
 
-.contactFormGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: 0.55rem;
+.contactRoleEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--color-border-subtle) 80%, transparent);
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.contactRoleEmptyAdd {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.contactRoleEmptyAdd:hover,
+.contactRoleEmptyAdd:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  outline: none;
+}
+
+.contactRoleList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.contactRoleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.contactRoleRowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.contactRoleName {
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactRoleMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  min-width: 0;
+}
+
+.contactRoleMeta > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.contactRoleEdit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  flex: 0 0 auto;
+}
+
+.contactRoleEdit:hover,
+.contactRoleEdit:focus-visible {
+  border-color: var(--color-border-subtle);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  outline: none;
+}
+
+.contactDrawerForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.contactDrawerFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .createForm {

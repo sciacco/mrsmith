@@ -1,5 +1,5 @@
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, type IconName, Modal, MultiSelect, SearchInput, SingleSelect, Skeleton, StatusBadge, TabNav, ToggleSwitch, useToast, type StatusBadgeVariant } from '@mrsmith/ui';
+import { Button, Drawer, Icon, type IconName, Modal, MultiSelect, SearchInput, SingleSelect, Skeleton, StatusBadge, TabNav, ToggleSwitch, useToast, type StatusBadgeVariant } from '@mrsmith/ui';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -18,7 +18,7 @@ import {
 } from './api/queries';
 import type { AlyanteSupplier, Category, CategoryDocumentType, Country, DashboardCategory, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
 import { provinceSelectOptions } from './lib/provinces';
-import { QUALIFICATION_REFERENCE_TYPE, addableReferenceTypes, referenceTypeLabel, stateLabel } from './lib/reference';
+import { QUALIFICATION_REFERENCE_TYPE, stateLabel } from './lib/reference';
 import { hasProviderErp, providerStateSelectOptions } from './lib/providerState';
 import { saveBlob } from './lib/download';
 import { useHasRole } from './hooks/useHasRole';
@@ -765,21 +765,6 @@ function refPayload(form: HTMLFormElement, type?: string): ProviderReference {
   if (email) payload.email = email;
   if (type) payload.reference_type = type;
   return payload;
-}
-
-const referenceSortRank: Record<string, number> = {
-  [QUALIFICATION_REFERENCE_TYPE]: 0,
-  ADMINISTRATIVE_REF: 1,
-  TECHNICAL_REF: 2,
-  OTHER_REF: 3,
-};
-
-function sortReferences(refs: ProviderReference[]) {
-  return [...refs].sort((a, b) => (
-    (referenceSortRank[a.reference_type ?? ''] ?? 9) - (referenceSortRank[b.reference_type ?? ''] ?? 9) ||
-    (a.id ?? 0) - (b.id ?? 0) ||
-    referenceTypeLabel(a.reference_type).localeCompare(referenceTypeLabel(b.reference_type), 'it')
-  ));
 }
 
 function paymentCodeOf(value: Provider['default_payment_method']): string {
@@ -1660,191 +1645,252 @@ function AddCategoryModal({
   );
 }
 
+interface ContactRoleConfig {
+  key: string;
+  label: string;
+  labelLower: string;
+  icon: IconName;
+  multiple: boolean;
+}
+
+const CONTACT_ROLES: ContactRoleConfig[] = [
+  { key: QUALIFICATION_REFERENCE_TYPE, label: 'Qualifica', labelLower: 'qualifica', icon: 'check-circle', multiple: false },
+  { key: 'ADMINISTRATIVE_REF', label: 'Amministrativo', labelLower: 'amministrativo', icon: 'mail', multiple: true },
+  { key: 'TECHNICAL_REF', label: 'Tecnico', labelLower: 'tecnico', icon: 'settings', multiple: true },
+  { key: 'OTHER_REF', label: 'Altro', labelLower: 'altro', icon: 'user', multiple: true },
+];
+
+interface ContactDrawerState {
+  role: ContactRoleConfig;
+  contact: ProviderReference | null;
+}
+
 function ContactsSection({ provider, readonly }: { provider: Provider; readonly: boolean }) {
   const { toast } = useToast();
   const mutations = useFornitoriMutations();
-  const refs = sortReferences(getProviderRefs(provider));
-  const [addOpen, setAddOpen] = useState(false);
+  const [drawer, setDrawer] = useState<ContactDrawerState | null>(null);
 
-  async function update(ref: ProviderReference, body: ProviderReference) {
-    if (!ref.id) return;
+  const refs = getProviderRefs(provider);
+  const grouped = useMemo(() => {
+    const map = new Map<string, ProviderReference[]>();
+    for (const role of CONTACT_ROLES) map.set(role.key, []);
+    for (const ref of refs) {
+      const list = map.get(ref.reference_type ?? '');
+      if (list) list.push(ref);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+    }
+    return map;
+  }, [refs]);
+
+  async function handleSave(body: ProviderReference) {
+    if (!drawer) return;
+    const { role, contact } = drawer;
     try {
-      if (ref.reference_type === QUALIFICATION_REFERENCE_TYPE) {
-        // QUALIFICATION_REF is owned by Mistra and persisted via PUT /provider/{id}.
-        // The /reference endpoint refuses this type.
+      if (role.key === QUALIFICATION_REFERENCE_TYPE) {
+        // QUALIFICATION_REF is owned by Mistra and is created/updated through
+        // PUT /provider/{id} with body.ref. The /reference endpoint refuses it.
         const { reference_type: _ignored, ...refBody } = body;
         await mutations.updateProvider.mutateAsync({
           id: provider.id,
           body: { ref: refBody },
         });
+      } else if (contact?.id) {
+        await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: contact.id, body });
       } else {
-        await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: ref.id, body });
+        await mutations.createReference.mutateAsync({ providerId: provider.id, body });
       }
-      toast('Contatto aggiornato');
+      toast(contact ? 'Contatto aggiornato' : 'Contatto aggiunto');
+      setDrawer(null);
     } catch (err) {
-      toast(apiErrorMessage(err, 'Salvataggio contatto non riuscito'), 'error');
-      throw err;
+      toast(apiErrorMessage(err, contact ? 'Salvataggio contatto non riuscito' : 'Creazione contatto non riuscita'), 'error');
     }
   }
 
-  async function add(body: ProviderReference) {
-    try {
-      await mutations.createReference.mutateAsync({ providerId: provider.id, body });
-      toast('Contatto aggiunto');
-      setAddOpen(false);
-    } catch (err) {
-      toast(apiErrorMessage(err, 'Creazione contatto non riuscita'), 'error');
-      throw err;
-    }
-  }
-
-  const updatePending = mutations.updateReference.isPending || mutations.updateProvider.isPending;
+  const savePending = mutations.createReference.isPending || mutations.updateReference.isPending || mutations.updateProvider.isPending;
 
   return (
     <Panel
       title="Contatti"
-      subtitle={refs.length === 0 ? 'Nessun contatto registrato' : `${refs.length} contatto/i`}
-      actions={!readonly ? (
-        <Button size="sm" leftIcon={<Icon name="plus" />} onClick={() => setAddOpen(true)}>Aggiungi</Button>
-      ) : undefined}
+      subtitle="Riferimenti per qualifica, amministrazione e supporto tecnico"
     >
-      {refs.length === 0 && !addOpen ? stateBlock('Nessun contatto registrato', 'Aggiungi almeno un contatto per completare la scheda fornitore.', 'user') : (
-        <div className="contactsList">
-          {refs.map((item) => (
-            <ContactCard key={item.id} contact={item} readonly={readonly} onSave={(body) => update(item, body)} pending={updatePending} />
-          ))}
-        </div>
-      )}
-      <ContactAddForm
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onSave={(body) => add(body)}
-        pending={mutations.createReference.isPending}
+      <div className="contactsRoleGrid">
+        {CONTACT_ROLES.map((role) => {
+          const items = grouped.get(role.key) ?? [];
+          const canAdd = !readonly && (role.multiple || items.length === 0);
+          return (
+            <ContactRoleSection
+              key={role.key}
+              role={role}
+              items={items}
+              readonly={readonly}
+              canAdd={canAdd}
+              onAdd={() => setDrawer({ role, contact: null })}
+              onEdit={(contact) => setDrawer({ role, contact })}
+            />
+          );
+        })}
+      </div>
+      <ContactDrawer
+        state={drawer}
+        onClose={() => setDrawer(null)}
+        onSave={handleSave}
+        pending={savePending}
       />
     </Panel>
   );
 }
 
-function ContactCard({
-  contact,
+function ContactRoleSection({
+  role,
+  items,
   readonly,
-  onSave,
-  pending,
+  canAdd,
+  onAdd,
+  onEdit,
 }: {
-  contact: ProviderReference;
+  role: ContactRoleConfig;
+  items: ProviderReference[];
   readonly: boolean;
-  onSave: (body: ProviderReference) => Promise<void>;
-  pending: boolean;
+  canAdd: boolean;
+  onAdd: () => void;
+  onEdit: (contact: ProviderReference) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const body = refPayload(event.currentTarget, contact.reference_type);
-    try {
-      await onSave(body);
-      setEditing(false);
-    } catch {
-      // The parent owns the toast; keep the form open for correction.
-    }
-  }
-
-  if (!editing) {
-    return (
-      <article className="contactCard">
-        <div className="contactCardMain">
-          <span className="contactCardName">{[contact.first_name, contact.last_name].filter(Boolean).join(' ') || '—'}</span>
-          <span className="contactCardType">{referenceTypeLabel(contact.reference_type)}</span>
-        </div>
-        <div className="contactCardMeta">
-          <span>{contact.email || '—'}</span>
-          <span>{contact.phone || '—'}</span>
-        </div>
-        {!readonly ? (
-          <Button size="sm" variant="ghost" leftIcon={<Icon name="pencil" />} onClick={() => setEditing(true)}>Modifica</Button>
-        ) : null}
-      </article>
-    );
-  }
+  const countLabel = role.multiple
+    ? items.length === 0 ? 'Nessuno' : `${items.length} contatt${items.length === 1 ? 'o' : 'i'}`
+    : items.length === 0 ? 'Da compilare' : 'Compilato';
 
   return (
-    <form
-      className="contactForm"
-      onSubmit={(event) => void submit(event)}
-    >
-      <div className="contactFormGrid">
-        <Input name="first_name" label="Nome" defaultValue={contact.first_name ?? ''} />
-        <Input name="last_name" label="Cognome" defaultValue={contact.last_name ?? ''} />
-        <Input name="email" label="Email" type="email" defaultValue={contact.email ?? ''} />
-        <Input name="phone" label="Telefono" defaultValue={contact.phone ?? ''} />
-      </div>
-      <div className="formActions">
-        <Button variant="secondary" type="button" onClick={() => setEditing(false)}>Annulla</Button>
-        <Button type="submit" loading={pending} leftIcon={<Icon name="check" />}>Salva</Button>
-      </div>
-    </form>
+    <section className="contactRole" aria-label={role.label}>
+      <header className="contactRoleHeader">
+        <span className="contactRoleIcon" aria-hidden="true">
+          <Icon name={role.icon} size={16} />
+        </span>
+        <span className="contactRoleTitle">{role.label}</span>
+        <span className="contactRoleCount" data-empty={items.length === 0 ? 'true' : 'false'}>{countLabel}</span>
+        {canAdd ? (
+          <button
+            type="button"
+            className="contactRoleAdd"
+            onClick={onAdd}
+            aria-label={`Aggiungi contatto ${role.labelLower}`}
+            title={`Aggiungi contatto ${role.labelLower}`}
+          >
+            <Icon name="plus" size={14} />
+          </button>
+        ) : null}
+      </header>
+
+      {items.length === 0 ? (
+        <div className="contactRoleEmpty">
+          <span>Nessun contatto {role.labelLower}</span>
+          {canAdd ? (
+            <button type="button" className="contactRoleEmptyAdd" onClick={onAdd}>
+              <Icon name="plus" size={12} />
+              <span>Aggiungi</span>
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <ul className="contactRoleList">
+          {items.map((item, index) => (
+            <li key={item.id ?? `${role.key}-${index}`} className="contactRoleRow">
+              <div className="contactRoleRowMain">
+                <span className="contactRoleName">
+                  {[item.first_name, item.last_name].filter(Boolean).join(' ') || '—'}
+                </span>
+                <span className="contactRoleMeta">
+                  <span>{item.email || '—'}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{item.phone || '—'}</span>
+                </span>
+              </div>
+              {!readonly ? (
+                <button
+                  type="button"
+                  className="contactRoleEdit"
+                  onClick={() => onEdit(item)}
+                  aria-label={`Modifica contatto ${role.labelLower}`}
+                  title={`Modifica contatto ${role.labelLower}`}
+                >
+                  <Icon name="pencil" size={14} />
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
-function ContactAddForm({
-  open,
+function contactDrawerTitle(state: ContactDrawerState) {
+  const { role, contact } = state;
+  if (role.key === QUALIFICATION_REFERENCE_TYPE) return 'Contatto qualifica';
+  return `${contact ? 'Modifica' : 'Nuovo'} contatto ${role.labelLower}`;
+}
+
+function ContactDrawer({
+  state,
   onClose,
   onSave,
   pending,
 }: {
-  open: boolean;
+  state: ContactDrawerState | null;
   onClose: () => void;
   onSave: (body: ProviderReference) => Promise<void>;
   pending: boolean;
 }) {
-  // QUALIFICATION_REF is owned by Mistra and is created/edited via the provider
-  // PUT endpoint, so we only ever offer the non-qualification reference types here.
-  const typeOptions = addableReferenceTypes;
-  const defaultType = typeOptions[0]?.value ?? 'ADMINISTRATIVE_REF';
-  const [type, setType] = useState<string>(defaultType);
+  const formId = useId();
+  const open = state !== null;
+  const isEdit = Boolean(state?.contact);
+  const contact = state?.contact ?? null;
+  const role = state?.role ?? null;
 
-  useEffect(() => {
-    if (!typeOptions.some((item) => item.value === type)) {
-      setType(defaultType);
-    }
-  }, [defaultType, type, typeOptions]);
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const body = refPayload(form, type);
-    try {
-      await onSave(body);
-      form.reset();
-      setType(defaultType);
-    } catch {
-      // The parent owns the toast; keep the form open for correction.
-    }
+    if (!role) return;
+    const body = refPayload(event.currentTarget, role.key);
+    void onSave(body);
   }
 
-  if (!open) return null;
   return (
-    <form
-      className="contactForm contactForm--new"
-      onSubmit={(event) => void submit(event)}
+    <Drawer
+      open={open}
+      onClose={onClose}
+      size="sm"
+      side="right"
+      title={state ? contactDrawerTitle(state) : ''}
+      footer={
+        <div className="contactDrawerFooter">
+          <Button variant="secondary" type="button" onClick={onClose} disabled={pending}>Annulla</Button>
+          <Button
+            type="submit"
+            form={formId}
+            loading={pending}
+            leftIcon={<Icon name={isEdit ? 'check' : 'plus'} />}
+          >
+            {isEdit ? 'Salva' : 'Aggiungi'}
+          </Button>
+        </div>
+      }
     >
-      <div className="contactFormGrid">
-        <label className="field">
-          <span>Tipo contatto</span>
-          <select name="reference_type" value={type} onChange={(event) => setType(event.target.value)}>
-            {typeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-          </select>
-        </label>
-        <Input name="first_name" label="Nome" />
-        <Input name="last_name" label="Cognome" />
-        <Input name="email" label="Email" type="email" />
-        <Input name="phone" label="Telefono" />
-      </div>
-      <div className="formActions">
-        <Button variant="secondary" type="button" onClick={onClose}>Annulla</Button>
-        <Button type="submit" loading={pending} leftIcon={<Icon name="plus" />}>Aggiungi</Button>
-      </div>
-    </form>
+      {state ? (
+        <form
+          id={formId}
+          className="contactDrawerForm"
+          // Force the form to remount when switching contact/role so default values reset.
+          key={`${state.role.key}-${contact?.id ?? 'new'}`}
+          onSubmit={submit}
+        >
+          <Input name="first_name" label="Nome" defaultValue={contact?.first_name ?? ''} />
+          <Input name="last_name" label="Cognome" defaultValue={contact?.last_name ?? ''} />
+          <Input name="email" label="Email" type="email" defaultValue={contact?.email ?? ''} />
+          <Input name="phone" label="Telefono" defaultValue={contact?.phone ?? ''} />
+        </form>
+      ) : null}
+    </Drawer>
   );
 }
 
