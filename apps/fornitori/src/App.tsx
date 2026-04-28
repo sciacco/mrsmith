@@ -3,20 +3,19 @@ import { useRoutes } from 'react-router-dom';
 import { AppShell, TabNav } from '@mrsmith/ui';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
-import { SettingsMenu } from './components/SettingsMenu';
 
-const primaryNavItems = [
+const navItems = [
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Fornitori', path: '/fornitori' },
+  { label: 'Impostazioni qualifica', path: '/impostazioni-qualifica' },
+  { label: 'Pagamenti RDA', path: '/modalita-pagamenti-rda' },
+  { label: 'Articoli-categorie', path: '/articoli-categorie' },
 ];
 
 function Nav() {
   return (
     <div className="navRow">
-      <div className="navScroller">
-        <TabNav items={primaryNavItems} />
-      </div>
-      <SettingsMenu />
+      <TabNav items={navItems} />
     </div>
   );
 }
