@@ -96,6 +96,12 @@ function dateLabel(raw?: string | null) {
   return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium' }).format(parsed);
 }
 
+function dateInputValue(raw?: string | null) {
+  if (!raw) return '';
+  const value = raw.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+}
+
 function getProviderRefs(provider?: Provider): ProviderReference[] {
   if (!provider) return [];
   if (provider.refs?.length) return provider.refs;
@@ -1360,7 +1366,7 @@ function CategoryCard({
   const state = (providerCategory.status ?? providerCategory.state ?? 'NEW').toUpperCase();
   const [open, setOpen] = useState(state !== 'QUALIFIED');
   const [uploadType, setUploadType] = useState<DocumentType | null>(null);
-  const [editDocId, setEditDocId] = useState<number | null>(null);
+  const [replaceDocument, setReplaceDocument] = useState<ProviderDocument | null>(null);
   const { toast } = useToast();
   const mutations = useFornitoriMutations();
   const docTypes = category?.document_types ?? [];
@@ -1413,7 +1419,7 @@ function CategoryCard({
               documentsByType={documentsByType}
               readonly={readonly}
               onUpload={(t) => setUploadType(t)}
-              onEdit={(id) => setEditDocId(id)}
+              onReplace={(document) => setReplaceDocument(document)}
               onDownload={(id) => void download(id)}
             />
           ) : null}
@@ -1425,7 +1431,7 @@ function CategoryCard({
               documentsByType={documentsByType}
               readonly={readonly}
               onUpload={(t) => setUploadType(t)}
-              onEdit={(id) => setEditDocId(id)}
+              onReplace={(document) => setReplaceDocument(document)}
               onDownload={(id) => void download(id)}
             />
           ) : null}
@@ -1439,11 +1445,11 @@ function CategoryCard({
         onSaved={() => toast('Documento caricato')}
       />
       <DocumentModal
-        open={editDocId !== null}
-        onClose={() => setEditDocId(null)}
+        open={replaceDocument !== null}
+        onClose={() => setReplaceDocument(null)}
         providerId={providerId}
-        documentId={editDocId ?? undefined}
-        onSaved={() => toast('Documento aggiornato')}
+        replaceDocument={replaceDocument ?? undefined}
+        onSaved={() => toast('Documento sostituito')}
       />
     </article>
   );
@@ -1456,7 +1462,7 @@ function DocumentGroup({
   documentsByType,
   readonly,
   onUpload,
-  onEdit,
+  onReplace,
   onDownload,
 }: {
   title: string;
@@ -1465,7 +1471,7 @@ function DocumentGroup({
   documentsByType: Map<number, ProviderDocument[]>;
   readonly: boolean;
   onUpload: (type: DocumentType) => void;
-  onEdit: (id: number) => void;
+  onReplace: (document: ProviderDocument) => void;
   onDownload: (id: number) => void;
 }) {
   return (
@@ -1519,7 +1525,16 @@ function DocumentGroup({
                 {display ? (
                   <>
                     <Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} aria-label="Scarica documento" onClick={() => onDownload(display.id)} />
-                    {!readonly ? <Button size="sm" variant="secondary" leftIcon={<Icon name="pencil" />} aria-label="Modifica documento" onClick={() => onEdit(display.id)} /> : null}
+                    {!readonly ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        leftIcon={<Icon name="file-up" />}
+                        aria-label="Sostituisci documento"
+                        title="Sostituisci documento"
+                        onClick={() => onReplace(display)}
+                      />
+                    ) : null}
                   </>
                 ) : !readonly ? (
                   <Button size="sm" variant="primary" leftIcon={<Icon name="plus" />} onClick={() => onUpload(entry.document_type)}>Carica</Button>
@@ -1551,7 +1566,7 @@ function DocumentsSection({
   const { toast } = useToast();
   const mutations = useFornitoriMutations();
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [editDocId, setEditDocId] = useState<number | null>(null);
+  const [replaceDocument, setReplaceDocument] = useState<ProviderDocument | null>(null);
 
   async function download(id: number) {
     try {
@@ -1608,7 +1623,16 @@ function DocumentsSection({
                     <td data-label="Azioni">
                       <span className="docTypeActions">
                         <Button size="sm" variant="ghost" leftIcon={<Icon name="download" />} aria-label="Scarica documento" onClick={() => void download(document.id)} />
-                        {!readonly ? <Button size="sm" variant="secondary" leftIcon={<Icon name="pencil" />} aria-label="Aggiorna documento" onClick={() => setEditDocId(document.id)} /> : null}
+                        {!readonly ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            leftIcon={<Icon name="file-up" />}
+                            aria-label="Sostituisci documento"
+                            title="Sostituisci documento"
+                            onClick={() => setReplaceDocument(document)}
+                          />
+                        ) : null}
                       </span>
                     </td>
                   </tr>
@@ -1625,11 +1649,11 @@ function DocumentsSection({
         onSaved={() => toast('Documento caricato')}
       />
       <DocumentModal
-        open={editDocId !== null}
-        onClose={() => setEditDocId(null)}
+        open={replaceDocument !== null}
+        onClose={() => setReplaceDocument(null)}
         providerId={providerId}
-        documentId={editDocId ?? undefined}
-        onSaved={() => toast('Documento aggiornato')}
+        replaceDocument={replaceDocument ?? undefined}
+        onSaved={() => toast('Documento sostituito')}
       />
     </Panel>
   );
@@ -2431,54 +2455,97 @@ function DocumentModal({
   open,
   onClose,
   providerId,
-  documentId,
+  replaceDocument,
   prefillType,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   providerId: number;
-  documentId?: number;
+  replaceDocument?: ProviderDocument;
   prefillType?: DocumentType;
   onSaved: () => void;
 }) {
   const { toast } = useToast();
   const mutations = useFornitoriMutations();
   const documentTypes = useDocumentTypes();
-  const isEdit = documentId !== undefined && documentId !== null;
-  const showTypeSelect = !isEdit && !prefillType;
+  const isReplace = replaceDocument !== undefined;
+  const showTypeSelect = !isReplace && !prefillType;
+  const documentName = replaceDocument?.document_type?.name ?? prefillType?.name ?? 'Documento';
+  const title = isReplace ? `Sostituisci documento · ${documentName}` : `Nuovo documento${prefillType ? ' · ' + prefillType.name : ''}`;
+  const replaceStateUpper = (replaceDocument?.state ?? '').toUpperCase();
+  const replaceExpiryDays = daysUntilExpiry(replaceDocument?.expire_date);
+  const replaceHasStateBadge = Boolean(replaceStateUpper && replaceStateUpper !== 'OK');
+  const replaceHasUrgencyBadge = replaceExpiryDays !== null && replaceExpiryDays <= 30;
+  const pending = mutations.uploadDocument.isPending || mutations.updateDocument.isPending;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const file = data.get('file');
     if (!(file instanceof File) || file.size === 0) {
-      toast('Seleziona un file da caricare', 'warning');
+      toast(isReplace ? 'Seleziona il nuovo file del documento' : 'Seleziona un file da caricare', 'warning');
       return;
     }
-    data.set('provider_id', String(providerId));
-    if (prefillType) data.set('document_type_id', String(prefillType.id));
-    if (isEdit) await mutations.updateDocument.mutateAsync({ id: documentId, body: data });
-    else await mutations.uploadDocument.mutateAsync(data);
+    if (isReplace) {
+      await mutations.updateDocument.mutateAsync({ id: replaceDocument.id, body: data });
+    } else {
+      data.set('provider_id', String(providerId));
+      if (prefillType) data.set('document_type_id', String(prefillType.id));
+      await mutations.uploadDocument.mutateAsync(data);
+    }
     onClose();
     onSaved();
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? 'Modifica documento' : `Nuovo documento${prefillType ? ' · ' + prefillType.name : ''}`} size="md">
+    <Modal open={open} onClose={onClose} title={title} size="md">
       <form className="modalForm" onSubmit={(event) => void submit(event)}>
+        {isReplace ? (
+          <section className="currentDocumentSummary" aria-label="Documento attuale">
+            <div className="currentDocumentSummaryHeader">
+              <span className="fieldLabel">Documento attuale</span>
+              <span className="docTypeBadges">
+                <DocumentStateBadge state={replaceDocument.state} />
+                <DocumentUrgencyBadge expireDate={replaceDocument.expire_date} />
+                {!replaceHasStateBadge && !replaceHasUrgencyBadge ? <StatusBadge value="valid" label="Valido" variant="success" dot={false} /> : null}
+              </span>
+            </div>
+            <div className="currentDocumentSummaryGrid">
+              <div>
+                <span>Tipo</span>
+                <strong>{documentName}</strong>
+              </div>
+              <div>
+                <span>Scadenza attuale</span>
+                <strong>{dateLabel(replaceDocument.expire_date)}</strong>
+              </div>
+            </div>
+          </section>
+        ) : null}
         {showTypeSelect ? (
           <Select
             name="document_type_id"
             label="Tipo documento"
             options={(documentTypes.data ?? []).map((item) => ({ value: String(item.id), label: item.name }))}
+            required
           />
         ) : null}
-        <Input name="expire_date" label="Scadenza" type="date" />
-        <label className="field"><span>File</span><input name="file" type="file" /></label>
+        <Input
+          name="expire_date"
+          label={isReplace ? 'Nuova scadenza' : 'Scadenza'}
+          type="date"
+          defaultValue={isReplace ? dateInputValue(replaceDocument.expire_date) : undefined}
+          required
+        />
+        <label className="field">
+          <span>{isReplace ? 'Nuovo file' : 'File'}</span>
+          <input name="file" type="file" />
+          {isReplace ? <small className="fieldHint">La sostituzione aggiorna file e scadenza del documento corrente.</small> : null}
+        </label>
         <div className="modalActions">
           <Button variant="secondary" type="button" onClick={onClose}>Annulla</Button>
-          <Button type="submit" loading={mutations.uploadDocument.isPending || mutations.updateDocument.isPending}>Salva</Button>
+          <Button type="submit" loading={pending}>{isReplace ? 'Sostituisci' : 'Carica'}</Button>
         </div>
       </form>
     </Modal>

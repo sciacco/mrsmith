@@ -165,7 +165,7 @@ function documentAction(documentId: number, documentType: string | null | undefi
   const expired = days < 0;
   return {
     id: `document-${documentId}`,
-    label: 'Aggiorna documento',
+    label: 'Sostituisci documento',
     detail: expiryCopy(documentType, days),
     severity: expired ? 'expired' : 'expiring',
     section: 'documenti',
