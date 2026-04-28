@@ -18,7 +18,7 @@ import {
 } from './api/queries';
 import type { AlyanteSupplier, Category, CategoryDocumentType, Country, DashboardCategory, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
 import { provinceSelectOptions } from './lib/provinces';
-import { QUALIFICATION_REFERENCE_TYPE, addableReferenceTypes, referenceTypeLabel, referenceTypes, stateLabel } from './lib/reference';
+import { QUALIFICATION_REFERENCE_TYPE, addableReferenceTypes, referenceTypeLabel, stateLabel } from './lib/reference';
 import { hasProviderErp, providerStateSelectOptions } from './lib/providerState';
 import { saveBlob } from './lib/download';
 import { useHasRole } from './hooks/useHasRole';
@@ -1664,13 +1664,22 @@ function ContactsSection({ provider, readonly }: { provider: Provider; readonly:
   const { toast } = useToast();
   const mutations = useFornitoriMutations();
   const refs = sortReferences(getProviderRefs(provider));
-  const hasQualificationRef = refs.some((ref) => ref.reference_type === QUALIFICATION_REFERENCE_TYPE);
   const [addOpen, setAddOpen] = useState(false);
 
   async function update(ref: ProviderReference, body: ProviderReference) {
     if (!ref.id) return;
     try {
-      await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: ref.id, body });
+      if (ref.reference_type === QUALIFICATION_REFERENCE_TYPE) {
+        // QUALIFICATION_REF is owned by Mistra and persisted via PUT /provider/{id}.
+        // The /reference endpoint refuses this type.
+        const { reference_type: _ignored, ...refBody } = body;
+        await mutations.updateProvider.mutateAsync({
+          id: provider.id,
+          body: { ref: refBody },
+        });
+      } else {
+        await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: ref.id, body });
+      }
       toast('Contatto aggiornato');
     } catch (err) {
       toast(apiErrorMessage(err, 'Salvataggio contatto non riuscito'), 'error');
@@ -1689,6 +1698,8 @@ function ContactsSection({ provider, readonly }: { provider: Provider; readonly:
     }
   }
 
+  const updatePending = mutations.updateReference.isPending || mutations.updateProvider.isPending;
+
   return (
     <Panel
       title="Contatti"
@@ -1700,13 +1711,12 @@ function ContactsSection({ provider, readonly }: { provider: Provider; readonly:
       {refs.length === 0 && !addOpen ? stateBlock('Nessun contatto registrato', 'Aggiungi almeno un contatto per completare la scheda fornitore.', 'user') : (
         <div className="contactsList">
           {refs.map((item) => (
-            <ContactCard key={item.id} contact={item} readonly={readonly} onSave={(body) => update(item, body)} pending={mutations.updateReference.isPending} />
+            <ContactCard key={item.id} contact={item} readonly={readonly} onSave={(body) => update(item, body)} pending={updatePending} />
           ))}
         </div>
       )}
       <ContactAddForm
         open={addOpen}
-        allowQualification={!hasQualificationRef}
         onClose={() => setAddOpen(false)}
         onSave={(body) => add(body)}
         pending={mutations.createReference.isPending}
@@ -1778,18 +1788,18 @@ function ContactCard({
 
 function ContactAddForm({
   open,
-  allowQualification,
   onClose,
   onSave,
   pending,
 }: {
   open: boolean;
-  allowQualification: boolean;
   onClose: () => void;
   onSave: (body: ProviderReference) => Promise<void>;
   pending: boolean;
 }) {
-  const typeOptions = useMemo(() => (allowQualification ? referenceTypes : addableReferenceTypes), [allowQualification]);
+  // QUALIFICATION_REF is owned by Mistra and is created/edited via the provider
+  // PUT endpoint, so we only ever offer the non-qualification reference types here.
+  const typeOptions = addableReferenceTypes;
   const defaultType = typeOptions[0]?.value ?? 'ADMINISTRATIVE_REF';
   const [type, setType] = useState<string>(defaultType);
 

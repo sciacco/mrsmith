@@ -144,7 +144,7 @@ export function useFornitoriMutations() {
       onSuccess: invalidate,
     }),
     updateProvider: useMutation({
-      mutationFn: ({ id, body }: { id: number; body: ProviderPayload }) => api.put<Provider>(`${root}/provider/${id}`, body),
+      mutationFn: ({ id, body }: { id: number; body: Partial<ProviderPayload> }) => api.put<Provider>(`${root}/provider/${id}`, body),
       onSuccess: invalidate,
     }),
     deleteProvider: useMutation({
