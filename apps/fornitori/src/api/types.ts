@@ -91,6 +91,11 @@ export interface ProviderSummary {
   vat_number: string | null;
   cf: string | null;
   erp_id: number | null;
+  address?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  province?: string | null;
+  country?: string | null;
   qualified_count: number;
   total_count: number;
   has_expiring_docs: boolean;

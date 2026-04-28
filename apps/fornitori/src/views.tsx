@@ -659,7 +659,12 @@ function matchesProviderQuery(item: ProviderSummary, query: string) {
     (item.company_name ?? '').toLowerCase().includes(lower) ||
     (item.vat_number ?? '').toLowerCase().includes(lower) ||
     (item.cf ?? '').toLowerCase().includes(lower) ||
-    String(item.erp_id ?? '').includes(lower)
+    String(item.erp_id ?? '').includes(lower) ||
+    (item.address ?? '').toLowerCase().includes(lower) ||
+    (item.city ?? '').toLowerCase().includes(lower) ||
+    (item.postal_code ?? '').toLowerCase().includes(lower) ||
+    (item.province ?? '').toLowerCase().includes(lower) ||
+    (item.country ?? '').toLowerCase().includes(lower)
   );
 }
 
@@ -743,24 +748,45 @@ export function FornitoriPage() {
   );
 }
 
+function formatProviderLocation(item: ProviderSummary): string {
+  const street = (item.address ?? '').trim();
+  const postal = (item.postal_code ?? '').trim();
+  const city = (item.city ?? '').trim();
+  const province = (item.province ?? '').trim();
+  const country = (item.country ?? '').trim();
+
+  // "<postal> <city> (<province>)"
+  let cityLine = '';
+  if (postal && city) cityLine = `${postal} ${city}`;
+  else cityLine = postal || city;
+  if (province) cityLine = cityLine ? `${cityLine} (${province})` : `(${province})`;
+
+  const parts = [street, cityLine, country].filter((p) => p.length > 0);
+  return parts.join(' · ');
+}
+
 function ProviderRow({ item, onSelect }: { item: ProviderSummary; onSelect: (id: number) => void }) {
   const qualVariant = qualificationVariant(item);
+  const location = formatProviderLocation(item);
   return (
-    <button className="listRow" onClick={() => onSelect(item.id)}>
-      <span>
+    <button className="listRow listRow--provider" onClick={() => onSelect(item.id)}>
+      <span className="providerRowName">
         <strong>{item.company_name ?? '—'}</strong>
-        <small className="providerRowMeta">
-          <ProviderStateBadge state={item.state} />
-          <span className={`qualPill qualPill--${qualVariant}`} title="Categorie qualificate / totali">
-            {qualificationCopy(item)}
+        <ProviderStateBadge state={item.state} />
+      </span>
+      <span className={`providerRowLocation${location ? '' : ' providerRowLocation--missing'}`}>
+        {location || 'Indirizzo mancante'}
+      </span>
+      <span className="providerRowMeta">
+        <span className={`qualPill qualPill--${qualVariant}`} title="Categorie qualificate / totali">
+          {qualificationCopy(item)}
+        </span>
+        {item.has_expiring_docs ? (
+          <span className="docFlag" title="Documenti in scadenza nei prossimi 30 giorni">
+            <Icon name="triangle-alert" size={12} /> Doc
           </span>
-          {item.has_expiring_docs ? (
-            <span className="docFlag" title="Documenti in scadenza nei prossimi 30 giorni">
-              <Icon name="triangle-alert" size={12} /> Doc
-            </span>
-          ) : null}
-          {item.erp_id !== null && item.erp_id !== undefined ? <span className="providerRowErp">ERP {item.erp_id}</span> : null}
-        </small>
+        ) : null}
+        {item.erp_id !== null && item.erp_id !== undefined ? <span className="providerRowErp">ERP {item.erp_id}</span> : null}
       </span>
       <Icon name="chevron-right" size={16} />
     </button>

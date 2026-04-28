@@ -595,6 +595,11 @@ type arakProviderItem struct {
 	VATNumber   *string `json:"vat_number"`
 	CF          *string `json:"cf"`
 	ERPID       *int64  `json:"erp_id"`
+	Address     *string `json:"address"`
+	City        *string `json:"city"`
+	PostalCode  *string `json:"postal_code"`
+	Province    *string `json:"province"`
+	Country     *string `json:"country"`
 }
 
 type providerSummary struct {
@@ -604,6 +609,11 @@ type providerSummary struct {
 	VATNumber       *string `json:"vat_number"`
 	CF              *string `json:"cf"`
 	ERPID           *int64  `json:"erp_id"`
+	Address         *string `json:"address"`
+	City            *string `json:"city"`
+	PostalCode      *string `json:"postal_code"`
+	Province        *string `json:"province"`
+	Country         *string `json:"country"`
 	QualifiedCount  int     `json:"qualified_count"`
 	TotalCount      int     `json:"total_count"`
 	HasExpiringDocs bool    `json:"has_expiring_docs"`
@@ -718,6 +728,11 @@ func (h *Handler) handleProviderSummary(w http.ResponseWriter, r *http.Request) 
 			VATNumber:       p.VATNumber,
 			CF:              p.CF,
 			ERPID:           p.ERPID,
+			Address:         p.Address,
+			City:            p.City,
+			PostalCode:      p.PostalCode,
+			Province:        p.Province,
+			Country:         p.Country,
 			QualifiedCount:  e.Qualified,
 			TotalCount:      e.Total,
 			HasExpiringDocs: e.HasExpiring,
