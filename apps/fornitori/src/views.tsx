@@ -1163,7 +1163,7 @@ function ProviderHeader({ provider, providerCategories }: { provider: Provider; 
       </p>
       {isDraft ? (
         <p className={`providerHeaderHint providerHeaderHint--${activationBlocked ? 'blocked' : 'ready'}`}>
-          {activationBlocked ? `Mancano: ${missing.join(', ')}.` : 'Dati completi. Attivazione gestita dalla sync Mistra.'}
+          {activationBlocked ? `Mancano: ${formatActivationFieldList(missing)}.` : 'Dati completi. Attivazione gestita dalla sync Mistra.'}
         </p>
       ) : null}
       {total > 0 ? (
@@ -1249,25 +1249,28 @@ function ProviderAttentionRail({
         </div>
       ) : (
         <div className="providerAttentionActions">
-          {attention.actions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              className="providerAttentionAction"
-              onClick={() => onOpen(action)}
-            >
-              <span className="providerAttentionActionTopline">
-                <StatusBadge
-                  value={action.severity === 'blocking' ? 'Blocca attivazione' : PROVIDER_ATTENTION_LABELS[action.severity]}
-                  label={action.severity === 'blocking' ? 'Blocca attivazione' : PROVIDER_ATTENTION_LABELS[action.severity]}
-                  variant={PROVIDER_ATTENTION_BADGE[action.severity]}
-                />
-                <span>{action.label}</span>
-              </span>
-              <strong>{action.detail}</strong>
-              <span className="providerAttentionActionIcon"><Icon name="chevron-right" size={16} /></span>
-            </button>
-          ))}
+          {attention.actions.map((action) => {
+            const severityLabel = action.severity === 'blocking' ? 'Blocca attivazione' : PROVIDER_ATTENTION_LABELS[action.severity];
+            return (
+              <button
+                key={action.id}
+                type="button"
+                className="providerAttentionAction"
+                onClick={() => onOpen(action)}
+              >
+                <span className="providerAttentionActionTopline">
+                  <StatusBadge
+                    value={severityLabel}
+                    label={severityLabel}
+                    variant={PROVIDER_ATTENTION_BADGE[action.severity]}
+                  />
+                  <span>{action.label}</span>
+                </span>
+                <strong>{action.detail}</strong>
+                <span className="providerAttentionActionIcon"><Icon name="chevron-right" size={16} /></span>
+              </button>
+            );
+          })}
         </div>
       )}
     </aside>
