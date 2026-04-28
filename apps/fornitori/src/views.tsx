@@ -692,9 +692,12 @@ export function FornitoriPage() {
   const { active, archive } = useMemo(() => {
     const all = summary.data ?? [];
     const matched = all.filter((item) => matchesProviderQuery(item, query));
+    const sorted = [...matched].sort((a, b) =>
+      (a.company_name ?? '').localeCompare(b.company_name ?? '', 'it', { sensitivity: 'base' }),
+    );
     return {
-      active: matched.filter((item) => USABLE_PROVIDER_STATES.has((item.state ?? '').toUpperCase())),
-      archive: matched.filter((item) => !USABLE_PROVIDER_STATES.has((item.state ?? '').toUpperCase())),
+      active: sorted.filter((item) => USABLE_PROVIDER_STATES.has((item.state ?? '').toUpperCase())),
+      archive: sorted.filter((item) => !USABLE_PROVIDER_STATES.has((item.state ?? '').toUpperCase())),
     };
   }, [summary.data, query]);
 
@@ -987,7 +990,7 @@ function validateCreatePayload(payload: ProviderPayload): string | null {
 
 const PROVIDER_DETAIL_TABS = [
   { key: 'dati', label: 'Dati' },
-  { key: 'qualifica', label: 'Qualifica' },
+  { key: 'qualifica', label: 'Categorie Qualifica' },
   { key: 'documenti', label: 'Documenti' },
   { key: 'contatti', label: 'Contatti' },
 ];
