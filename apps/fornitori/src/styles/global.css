@@ -1458,35 +1458,163 @@ button {
   white-space: nowrap;
 }
 
-.settingsDocBadge--required {
+.settingsDocCounts .settingsDocBadge--required,
+.settingsDocumentRuleSummary .settingsDocBadge--required {
   color: var(--color-warning-strong);
   background: var(--color-warning-subtle);
   border: 1px solid rgba(245, 158, 11, 0.28);
 }
 
-.settingsDocBadge--optional {
+.settingsDocCounts .settingsDocBadge--optional,
+.settingsDocumentRuleSummary .settingsDocBadge--optional {
   color: var(--color-text-secondary);
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid var(--color-border-subtle);
 }
 
-.settingsDocBadge--empty {
+.settingsDocCounts .settingsDocBadge--empty,
+.settingsDocumentRuleSummary .settingsDocBadge--empty {
   color: var(--color-text-muted);
+  background: transparent;
+  border: 1px dashed var(--color-border-subtle);
   font-size: 0.7rem;
   font-weight: 600;
+}
+
+.settingsDocumentRuleMatrix {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.settingsDocumentRuleHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.settingsDocumentRuleSummary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.32rem;
+  min-width: 0;
+}
+
+.settingsDocumentRuleRows {
+  display: grid;
+  gap: 0.32rem;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.35rem;
+  background: color-mix(in srgb, var(--color-surface) 42%, var(--color-bg-elevated));
+}
+
+.settingsDocumentRuleRow {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.48rem 0.55rem;
+  background: rgba(255, 255, 255, 0.72);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.settingsDocumentRuleRow--required {
+  border-color: rgba(245, 158, 11, 0.18);
+  background: color-mix(in srgb, var(--color-warning-subtle) 34%, var(--color-bg-elevated));
+}
+
+.settingsDocumentRuleName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 680;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingsRuleSegment {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(6.1rem, 1fr));
+  min-width: min(100%, 20rem);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.18rem;
+  background: var(--color-bg-elevated);
+}
+
+.settingsRuleSegmentButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-width: 0;
+  min-height: 2rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.45rem;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 720;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.settingsRuleSegmentButton:hover:not(:disabled),
+.settingsRuleSegmentButton:focus-visible {
+  color: var(--color-text);
+  background: var(--color-surface);
+  outline: 0;
+}
+
+.settingsRuleSegmentButton--none.active {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-color: var(--color-border-subtle);
+}
+
+.settingsRuleSegmentButton--optional.active {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+  border-color: rgba(99, 91, 255, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(99, 91, 255, 0.04);
+}
+
+.settingsRuleSegmentButton--required.active {
+  color: var(--color-warning-strong);
+  background: var(--color-warning-subtle);
+  border-color: rgba(245, 158, 11, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.05);
+}
+
+.settingsRuleSegmentButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .settingsDetailForm {
   display: grid;
   gap: 0.85rem;
   padding: 0.9rem;
-}
-
-.settingsDocumentGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85rem;
-  min-width: 0;
 }
 
 .settingsFormActions {
@@ -2572,9 +2700,29 @@ button {
     flex-direction: column;
   }
 
-  .settingsPanelHeader--toolbar,
-  .settingsDocumentGrid {
+  .settingsPanelHeader--toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .settingsDocumentRuleHeader,
+  .settingsDocumentRuleRow {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .settingsDocumentRuleSummary {
+    justify-content: flex-start;
+  }
+
+  .settingsRuleSegment {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .settingsRuleSegmentButton {
+    padding-inline: 0.25rem;
+    font-size: 0.7rem;
   }
 
   .settingsSearch {

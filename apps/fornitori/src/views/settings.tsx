@@ -1,5 +1,5 @@
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, Modal, MultiSelect, SearchInput, Skeleton, TabNav, ToggleSwitch, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, SearchInput, Skeleton, TabNav, ToggleSwitch, useToast } from '@mrsmith/ui';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Outlet } from 'react-router-dom';
 import {
@@ -21,6 +21,13 @@ const settingsNavItems = [
 
 type CategorySelection = number | 'new' | null;
 type DocumentTypeSelection = number | 'new' | null;
+type DocumentRuleState = 'none' | 'optional' | 'required';
+
+const documentRuleOptions: Array<{ value: DocumentRuleState; label: string; ariaLabel: string }> = [
+  { value: 'none', label: 'Nessuno', ariaLabel: 'non assegnato' },
+  { value: 'optional', label: 'Facoltativo', ariaLabel: 'facoltativo' },
+  { value: 'required', label: 'Obbligatorio', ariaLabel: 'obbligatorio' },
+];
 
 export function SettingsLayout() {
   return (
@@ -53,18 +60,24 @@ export function QualificationSettingsPage() {
   const [optional, setOptional] = useState<number[]>([]);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
-  const categoryItems = categories.data ?? [];
+  const categoryItems = useMemo(
+    () => [...(categories.data ?? [])].sort(compareCategoryByName),
+    [categories.data],
+  );
   const selectedCategory = selectedCategoryId === 'new'
     ? null
     : categoryItems.find((item) => item.id === selectedCategoryId) ?? null;
   const creatingCategory = selectedCategoryId === 'new' || (!categories.isLoading && !categories.error && categoryItems.length === 0);
-  const documentOptions = useMemo(() => selectOptions(documentTypes.data), [documentTypes.data]);
+  const documentTypeItems = useMemo(
+    () => [...(documentTypes.data ?? [])].sort(compareDocumentTypeByName),
+    [documentTypes.data],
+  );
 
   useEffect(() => {
     if (selectedCategoryId !== null) return;
-    const first = categories.data?.[0];
+    const first = categoryItems[0];
     if (first) loadCategory(first);
-  }, [categories.data, selectedCategoryId]);
+  }, [categoryItems, selectedCategoryId]);
 
   function loadCategory(item: Category) {
     const draft = categoryDraft(item);
@@ -81,6 +94,17 @@ export function QualificationSettingsPage() {
     setRequired([]);
     setOptional([]);
     setConfirmDeleteOpen(false);
+  }
+
+  function setDocumentRule(documentTypeId: number, rule: DocumentRuleState) {
+    setRequired((current) => {
+      const withoutDocumentType = current.filter((id) => id !== documentTypeId);
+      return rule === 'required' ? [...withoutDocumentType, documentTypeId] : withoutDocumentType;
+    });
+    setOptional((current) => {
+      const withoutDocumentType = current.filter((id) => id !== documentTypeId);
+      return rule === 'optional' ? [...withoutDocumentType, documentTypeId] : withoutDocumentType;
+    });
   }
 
   async function saveCategory(event: FormEvent<HTMLFormElement>) {
@@ -214,16 +238,15 @@ export function QualificationSettingsPage() {
                 <span>Nome categoria</span>
                 <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} />
               </label>
-              <div className="settingsDocumentGrid">
-                <div className="field">
-                  <span className="fieldLabel">Documenti obbligatori</span>
-                  <MultiSelect options={documentOptions} selected={required} onChange={setRequired} />
-                </div>
-                <div className="field">
-                  <span className="fieldLabel">Documenti facoltativi</span>
-                  <MultiSelect options={documentOptions} selected={optional} onChange={setOptional} />
-                </div>
-              </div>
+              <DocumentRuleMatrix
+                documentTypes={documentTypeItems}
+                loading={documentTypes.isLoading}
+                error={documentTypes.error}
+                required={required}
+                optional={optional}
+                readonly={readonly}
+                onChange={setDocumentRule}
+              />
               <div className="settingsFormActions">
                 {selectedCategory ? (
                   <Button
@@ -240,7 +263,7 @@ export function QualificationSettingsPage() {
                   type="submit"
                   leftIcon={<Icon name="check" />}
                   loading={mutations.createCategory.isPending || mutations.updateCategory.isPending}
-                  disabled={readonly || documentTypes.isLoading}
+                  disabled={readonly || documentTypes.isLoading || Boolean(documentTypes.error)}
                 >
                   Salva
                 </Button>
@@ -267,6 +290,93 @@ export function QualificationSettingsPage() {
           </div>
         </div>
       </Modal>
+    </section>
+  );
+}
+
+function DocumentRuleMatrix({
+  documentTypes,
+  loading,
+  error,
+  required,
+  optional,
+  readonly,
+  onChange,
+}: {
+  documentTypes: DocumentType[];
+  loading: boolean;
+  error: unknown;
+  required: number[];
+  optional: number[];
+  readonly: boolean;
+  onChange: (documentTypeId: number, rule: DocumentRuleState) => void;
+}) {
+  const assignedDocumentIds = new Set([...required, ...optional]);
+  const unassignedCount = Math.max(documentTypes.length - assignedDocumentIds.size, 0);
+
+  function currentRule(documentTypeId: number): DocumentRuleState {
+    if (required.includes(documentTypeId)) return 'required';
+    if (optional.includes(documentTypeId)) return 'optional';
+    return 'none';
+  }
+
+  return (
+    <section className="settingsDocumentRuleMatrix" aria-label="Regola documentale">
+      <div className="settingsDocumentRuleHeader">
+        <span className="fieldLabel">Documenti categoria</span>
+        <div className="settingsDocumentRuleSummary" aria-label="Riepilogo regola documentale">
+          <span className="settingsDocBadge settingsDocBadge--required">
+            <Icon name="file-warning" size={11} />
+            {required.length} obbligator{required.length === 1 ? 'io' : 'i'}
+          </span>
+          <span className="settingsDocBadge settingsDocBadge--optional">
+            {optional.length} facoltativ{optional.length === 1 ? 'o' : 'i'}
+          </span>
+          <span className="settingsDocBadge settingsDocBadge--empty">
+            {unassignedCount} non assegnat{unassignedCount === 1 ? 'o' : 'i'}
+          </span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="settingsPanelBody">
+          <Skeleton rows={6} />
+        </div>
+      ) : error ? (
+        stateBlock(errorTitle(error), 'I tipi documento non possono essere caricati.', 'triangle-alert')
+      ) : documentTypes.length === 0 ? (
+        stateBlock('Nessun tipo documento', 'Crea i tipi documento nella tab Tipi documento per definire le regole.', 'file-plus')
+      ) : (
+        <div className="settingsDocumentRuleRows">
+          {documentTypes.map((documentType) => {
+            const rule = currentRule(documentType.id);
+            return (
+              <div key={documentType.id} className={`settingsDocumentRuleRow settingsDocumentRuleRow--${rule}`}>
+                <span className="settingsDocumentRuleName">{documentType.name}</span>
+                <div className="settingsRuleSegment" aria-label={`Regola per ${documentType.name}`}>
+                  {documentRuleOptions.map((option) => {
+                    const active = rule === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`settingsRuleSegmentButton settingsRuleSegmentButton--${option.value} ${active ? 'active' : ''}`}
+                        aria-pressed={active}
+                        aria-label={`Imposta ${documentType.name} come ${option.ariaLabel}`}
+                        disabled={readonly}
+                        onClick={() => onChange(documentType.id, option.value)}
+                      >
+                        {option.value === 'required' ? <Icon name="file-warning" size={12} /> : null}
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
@@ -719,10 +829,6 @@ function apiErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-function selectOptions(items: DocumentType[] | undefined) {
-  return items?.map((item) => ({ value: item.id, label: item.name })) ?? [];
-}
-
 function categoryDocumentCounts(category: Category) {
   const counts = { required: 0, optional: 0 };
   for (const entry of category.document_types ?? []) {
@@ -741,6 +847,16 @@ function categoryDraft(category: Category) {
     else draft.optional.push(id);
   }
   return draft;
+}
+
+function compareCategoryByName(left: Category, right: Category) {
+  const byName = left.name.localeCompare(right.name, 'it', { sensitivity: 'base' });
+  return byName || left.id - right.id;
+}
+
+function compareDocumentTypeByName(left: DocumentType, right: DocumentType) {
+  const byName = left.name.localeCompare(right.name, 'it', { sensitivity: 'base' });
+  return byName || left.id - right.id;
 }
 
 function countLabel(count: number, singular: string, plural: string) {
