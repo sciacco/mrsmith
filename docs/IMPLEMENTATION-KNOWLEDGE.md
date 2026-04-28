@@ -107,8 +107,8 @@ Alyante ERP ID
 ### Fornitori Provider Contacts Follow Appsmith Payload Semantics
 
 - Context: `apps/fornitori` provider detail contacts and backend `POST/PUT /fornitori/v1/provider/{id}/reference`.
-- Discovery: Appsmith does not send empty `first_name`, `last_name`, or `email` fields for provider contacts, while it always sends `phone` and uses an empty string when no phone is present. `QUALIFICATION_REF` is also a special reference type: Mistra's standard provider-reference functions reject creating or editing it.
-- Practical rule: Fornitori contact forms should omit empty name/email fields and include `phone` as `''` when empty. Backend contact handlers must route ordinary reference types through Mistra/Arak, but handle `QUALIFICATION_REF` with dedicated provider-ref logic instead of the generic reference endpoint.
+- Discovery: Appsmith does not send empty `first_name`, `last_name`, or `email` fields for provider contacts, while it always sends `phone` and uses an empty string when no phone is present. `QUALIFICATION_REF` is also a special reference type: Mistra's standard provider-reference functions reject creating, editing, or deleting it.
+- Practical rule: Fornitori contact forms should omit empty name/email fields and include `phone` as `''` when empty. The backend `/provider/{id}/reference` proxy must be used **only** for non-qualification reference types (`ADMINISTRATIVE_REF`, `TECHNICAL_REF`, `OTHER_REF`) and must reject `QUALIFICATION_REF` with a clear error. The QUALIFICATION_REF contact is owned by Mistra and is created/edited via `PUT /provider/{id}` (the `ref` field of `provider-edit`); never write to `provider_qualifications.provider_ref` directly from the portal backend.
 - Evidence: Appsmith contact-save snippet provided during the Fornitori migration; `docs/mistra-dist.yaml` provider-ref schemas; `docs/arak_schema.json` functions `provider_ref_new` and `provider_ref_edit`.
 - Used by: `apps/fornitori` detail page contacts.
 - Open questions: none.

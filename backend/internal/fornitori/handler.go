@@ -66,11 +66,14 @@ var allowedUploadTypes = map[string]struct{}{
 	"application/vnd.openxmlformats-officedocument.presentationml.presentation": {},
 }
 
+// allowedProviderReferenceTypes lists the reference types that can be created
+// or edited through the generic /provider/{id}/reference proxy. QUALIFICATION_REF
+// is intentionally excluded: Mistra is the owner of that contact and it is
+// persisted via PUT /provider/{id} (provider-edit `ref` field) instead.
 var allowedProviderReferenceTypes = map[string]struct{}{
-	qualificationReferenceType: {},
-	"OTHER_REF":                {},
-	"ADMINISTRATIVE_REF":       {},
-	"TECHNICAL_REF":            {},
+	"OTHER_REF":          {},
+	"ADMINISTRATIVE_REF": {},
+	"TECHNICAL_REF":      {},
 }
 
 type Handler struct {
@@ -293,15 +296,6 @@ type providerReferencePayload struct {
 	ReferenceType string
 }
 
-type providerReferenceRow struct {
-	ID            int64          `json:"id"`
-	FirstName     nullableString `json:"first_name"`
-	LastName      nullableString `json:"last_name"`
-	Email         nullableString `json:"email"`
-	Phone         nullableString `json:"phone"`
-	ReferenceType string         `json:"reference_type"`
-}
-
 func (h *Handler) handleCreateProviderReference(w http.ResponseWriter, r *http.Request) {
 	payload, ok := decodeProviderReferencePayload(w, r)
 	if !ok {
@@ -311,12 +305,12 @@ func (h *Handler) handleCreateProviderReference(w http.ResponseWriter, r *http.R
 		httputil.Error(w, http.StatusBadRequest, "Seleziona il tipo contatto")
 		return
 	}
-	if !isAllowedProviderReferenceType(payload.ReferenceType) {
-		httputil.Error(w, http.StatusBadRequest, "Tipo contatto non valido")
+	if payload.ReferenceType == qualificationReferenceType {
+		httputil.Error(w, http.StatusBadRequest, "QUALIFICATION_REF non puo' essere gestito da /reference: usa PUT /provider/{id}")
 		return
 	}
-	if payload.ReferenceType == qualificationReferenceType {
-		h.createQualificationReference(w, r, payload)
+	if !isAllowedProviderReferenceType(payload.ReferenceType) {
+		httputil.Error(w, http.StatusBadRequest, "Tipo contatto non valido")
 		return
 	}
 	h.forwardProviderReference(w, r, "/provider/"+url.PathEscape(r.PathValue("id"))+"/reference", payload, true)
@@ -327,31 +321,12 @@ func (h *Handler) handleUpdateProviderReference(w http.ResponseWriter, r *http.R
 	if !ok {
 		return
 	}
-	if payload.ReferenceType != "" && !isAllowedProviderReferenceType(payload.ReferenceType) {
-		httputil.Error(w, http.StatusBadRequest, "Tipo contatto non valido")
+	if payload.ReferenceType == qualificationReferenceType {
+		httputil.Error(w, http.StatusBadRequest, "QUALIFICATION_REF non puo' essere gestito da /reference: usa PUT /provider/{id}")
 		return
 	}
-	if payload.ReferenceType == "" && h.db != nil {
-		providerID, providerOK := parsePathInt(w, r, "id", "Fornitore non valido")
-		refID, refOK := parsePathInt(w, r, "ref_id", "Contatto non valido")
-		if !providerOK || !refOK {
-			return
-		}
-		var refType string
-		err := h.db.QueryRowContext(r.Context(), `
-			SELECT reference_type
-			FROM provider_qualifications.provider_ref
-			WHERE provider_id = $1 AND id = $2`, providerID, refID).Scan(&refType)
-		if err != nil && err != sql.ErrNoRows {
-			httputil.InternalError(w, r, err, "provider reference type lookup failed")
-			return
-		}
-		if err == nil {
-			payload.ReferenceType = refType
-		}
-	}
-	if payload.ReferenceType == qualificationReferenceType {
-		h.updateQualificationReference(w, r, payload)
+	if payload.ReferenceType != "" && !isAllowedProviderReferenceType(payload.ReferenceType) {
+		httputil.Error(w, http.StatusBadRequest, "Tipo contatto non valido")
 		return
 	}
 	h.forwardProviderReference(
@@ -447,120 +422,6 @@ func (h *Handler) forwardProviderReference(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	h.forwardArak(w, r, arakRoot+path, r.URL.RawQuery, bytes.NewReader(body), nil)
-}
-
-func (h *Handler) createQualificationReference(w http.ResponseWriter, r *http.Request, payload providerReferencePayload) {
-	if !h.requireDB(w) {
-		return
-	}
-	providerID, ok := parsePathInt(w, r, "id", "Fornitore non valido")
-	if !ok {
-		return
-	}
-	var existingID int64
-	err := h.db.QueryRowContext(r.Context(), `
-		SELECT id
-		FROM provider_qualifications.provider_ref
-		WHERE provider_id = $1 AND reference_type = $2
-		LIMIT 1`, providerID, qualificationReferenceType).Scan(&existingID)
-	if err == nil {
-		httputil.Error(w, http.StatusConflict, "Il contatto qualifica e' gia presente")
-		return
-	}
-	if err != sql.ErrNoRows {
-		httputil.InternalError(w, r, err, "qualification reference lookup failed")
-		return
-	}
-	row := h.db.QueryRowContext(r.Context(), `
-		INSERT INTO provider_qualifications.provider_ref (
-			provider_id,
-			first_name,
-			last_name,
-			email,
-			phone,
-			reference_type,
-			created_at,
-			updated_at
-		)
-		VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, NOW(), NOW())
-		RETURNING id, first_name, last_name, email, phone, reference_type`,
-		providerID,
-		optionalStringArg(payload.FirstName),
-		optionalStringArg(payload.LastName),
-		stringValue(payload.Email),
-		payload.Phone,
-		qualificationReferenceType,
-	)
-	writeProviderReferenceRow(w, r, row, "qualification reference create failed")
-}
-
-func (h *Handler) updateQualificationReference(w http.ResponseWriter, r *http.Request, payload providerReferencePayload) {
-	if !h.requireDB(w) {
-		return
-	}
-	providerID, providerOK := parsePathInt(w, r, "id", "Fornitore non valido")
-	refID, refOK := parsePathInt(w, r, "ref_id", "Contatto non valido")
-	if !providerOK || !refOK {
-		return
-	}
-	row := h.db.QueryRowContext(r.Context(), `
-		UPDATE provider_qualifications.provider_ref
-		SET
-			first_name = COALESCE($3, first_name),
-			last_name = COALESCE($4, last_name),
-			email = COALESCE($5, email),
-			phone = NULLIF($6, ''),
-			updated_at = NOW()
-		WHERE provider_id = $1
-		  AND id = $2
-		  AND reference_type = $7
-		RETURNING id, first_name, last_name, email, phone, reference_type`,
-		providerID,
-		refID,
-		optionalStringArg(payload.FirstName),
-		optionalStringArg(payload.LastName),
-		optionalStringArg(payload.Email),
-		payload.Phone,
-		qualificationReferenceType,
-	)
-	writeProviderReferenceRow(w, r, row, "qualification reference update failed")
-}
-
-func parsePathInt(w http.ResponseWriter, r *http.Request, key, message string) (int64, bool) {
-	value, err := strconv.ParseInt(r.PathValue(key), 10, 64)
-	if err != nil || value <= 0 {
-		httputil.Error(w, http.StatusBadRequest, message)
-		return 0, false
-	}
-	return value, true
-}
-
-func optionalStringArg(value *string) any {
-	if value == nil {
-		return nil
-	}
-	return *value
-}
-
-func stringValue(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}
-
-func writeProviderReferenceRow(w http.ResponseWriter, r *http.Request, row *sql.Row, message string) {
-	var item providerReferenceRow
-	err := row.Scan(&item.ID, &item.FirstName, &item.LastName, &item.Email, &item.Phone, &item.ReferenceType)
-	if err == sql.ErrNoRows {
-		httputil.Error(w, http.StatusNotFound, "Contatto non trovato")
-		return
-	}
-	if err != nil {
-		httputil.InternalError(w, r, err, message)
-		return
-	}
-	httputil.JSON(w, http.StatusOK, item)
 }
 
 func (h *Handler) handleUploadDocument(w http.ResponseWriter, r *http.Request) {
