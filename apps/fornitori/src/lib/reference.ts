@@ -1,4 +1,8 @@
 export const QUALIFICATION_REFERENCE_TYPE = 'QUALIFICATION_REF';
+export const PROVIDER_REFERENCE_PHONE_PATTERN = String.raw`\+?[0-9 ]{6,20}`;
+export const PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE = 'Inserisci un numero di telefono valido (+nnnnnn) oppure lascia il campo vuoto.';
+
+const PROVIDER_REFERENCE_PHONE_RE = /^\+?[0-9 ]{6,20}$/;
 
 export const referenceTypes = [
   { value: QUALIFICATION_REFERENCE_TYPE, label: 'Qualifica' },
@@ -38,4 +42,9 @@ export function stateLabel(value?: string | null) {
 
 export function referenceTypeLabel(value?: string | null) {
   return referenceTypes.find((item) => item.value === value)?.label ?? 'Altro';
+}
+
+export function isValidOptionalProviderRefPhone(value?: string | null) {
+  const phone = value?.trim() ?? '';
+  return phone === '' || PROVIDER_REFERENCE_PHONE_RE.test(phone);
 }

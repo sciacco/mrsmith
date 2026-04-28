@@ -2,7 +2,14 @@ import { Button, Icon, useToast } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { useProviderMutations } from '../api/queries';
 import type { PoDetail, ProviderReference, ProviderSummary } from '../api/types';
-import { availableReferenceTypes, QUALIFICATION_REF, referenceTypeLabel } from '../lib/provider-refs';
+import {
+  PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE,
+  PROVIDER_REFERENCE_PHONE_PATTERN,
+  availableReferenceTypes,
+  QUALIFICATION_REF,
+  isValidOptionalProviderRefPhone,
+  referenceTypeLabel,
+} from '../lib/provider-refs';
 
 function providerRefs(provider?: ProviderSummary): ProviderReference[] {
   if (!provider) return [];
@@ -23,6 +30,16 @@ function refFromForm(form: HTMLFormElement, referenceType: string): ProviderRefe
     phone: String(data.get('phone') ?? '').trim(),
     reference_type: referenceType,
   };
+}
+
+function phoneInputFromForm(form: HTMLFormElement) {
+  return form.elements.namedItem('phone') as HTMLInputElement | null;
+}
+
+function clearPhoneInvalid(event: React.FormEvent<HTMLInputElement>) {
+  if (isValidOptionalProviderRefPhone(event.currentTarget.value)) {
+    event.currentTarget.removeAttribute('aria-invalid');
+  }
 }
 
 export function ProviderRefTable({
@@ -50,8 +67,21 @@ export function ProviderRefTable({
     setSelected((current) => (checked ? [...new Set([...current, id])] : current.filter((item) => item !== id)));
   }
 
+  function rejectInvalidPhone(form: HTMLFormElement) {
+    const phoneInput = phoneInputFromForm(form);
+    if (!phoneInput || isValidOptionalProviderRefPhone(phoneInput.value)) {
+      phoneInput?.removeAttribute('aria-invalid');
+      return false;
+    }
+    phoneInput.setAttribute('aria-invalid', 'true');
+    phoneInput.focus();
+    toast(PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE, 'warning');
+    return true;
+  }
+
   async function update(ref: ProviderReference, form: HTMLFormElement) {
     if (!provider || !ref.id || ref.reference_type === QUALIFICATION_REF) return;
+    if (rejectInvalidPhone(form)) return;
     try {
       await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: ref.id, body: refFromForm(form, ref.reference_type ?? newType) });
       toast('Contatto aggiornato');
@@ -63,6 +93,7 @@ export function ProviderRefTable({
   async function add(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!provider) return;
+    if (rejectInvalidPhone(event.currentTarget)) return;
     try {
       await mutations.createReference.mutateAsync({ providerId: provider.id, body: refFromForm(event.currentTarget, newType) });
       event.currentTarget.reset();
@@ -88,6 +119,7 @@ export function ProviderRefTable({
                   <td colSpan={7}>
                     <form
                       className="inlineForm"
+                      noValidate
                       onSubmit={(event) => {
                         event.preventDefault();
                         void update(ref, event.currentTarget);
@@ -96,7 +128,17 @@ export function ProviderRefTable({
                       <input name="email" defaultValue={ref.email} disabled={readonly} placeholder="Email" />
                       <input name="first_name" defaultValue={ref.first_name} disabled={readonly} placeholder="Nome" />
                       <input name="last_name" defaultValue={ref.last_name} disabled={readonly} placeholder="Cognome" />
-                      <input name="phone" defaultValue={ref.phone} disabled={readonly} placeholder="Telefono" />
+                      <input
+                        name="phone"
+                        type="tel"
+                        inputMode="tel"
+                        pattern={PROVIDER_REFERENCE_PHONE_PATTERN}
+                        title={PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE}
+                        defaultValue={ref.phone}
+                        disabled={readonly}
+                        placeholder="Telefono"
+                        onInput={clearPhoneInvalid}
+                      />
                       <span>{referenceTypeLabel(ref.reference_type)}</span>
                       <input
                         type="checkbox"
@@ -119,11 +161,19 @@ export function ProviderRefTable({
         <Button leftIcon={<Icon name="check" />} disabled={!editable} onClick={() => onSaveRecipients(selected)}>Salva contatti selezionati</Button>
       </div>
       {editable ? (
-        <form className="inlineForm" onSubmit={(event) => void add(event)}>
+        <form className="inlineForm" onSubmit={(event) => void add(event)} noValidate>
           <input name="email" placeholder="Email" />
           <input name="first_name" placeholder="Nome" />
           <input name="last_name" placeholder="Cognome" />
-          <input name="phone" placeholder="Telefono" />
+          <input
+            name="phone"
+            type="tel"
+            inputMode="tel"
+            pattern={PROVIDER_REFERENCE_PHONE_PATTERN}
+            title={PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE}
+            placeholder="Telefono"
+            onInput={clearPhoneInvalid}
+          />
           <select value={newType} onChange={(event) => setNewType(event.target.value)}>
             {availableReferenceTypes().map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>

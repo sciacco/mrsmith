@@ -296,6 +296,11 @@ type providerReferencePayload struct {
 	ReferenceType string
 }
 
+type providerReferenceForwardOptions struct {
+	includeReferenceType bool
+	includeEmptyPhone    bool
+}
+
 func (h *Handler) handleCreateProviderReference(w http.ResponseWriter, r *http.Request) {
 	payload, ok := decodeProviderReferencePayload(w, r)
 	if !ok {
@@ -313,7 +318,13 @@ func (h *Handler) handleCreateProviderReference(w http.ResponseWriter, r *http.R
 		httputil.Error(w, http.StatusBadRequest, "Tipo contatto non valido")
 		return
 	}
-	h.forwardProviderReference(w, r, "/provider/"+url.PathEscape(r.PathValue("id"))+"/reference", payload, true)
+	h.forwardProviderReference(
+		w,
+		r,
+		"/provider/"+url.PathEscape(r.PathValue("id"))+"/reference",
+		payload,
+		providerReferenceForwardOptions{includeReferenceType: true},
+	)
 }
 
 func (h *Handler) handleUpdateProviderReference(w http.ResponseWriter, r *http.Request) {
@@ -334,7 +345,7 @@ func (h *Handler) handleUpdateProviderReference(w http.ResponseWriter, r *http.R
 		r,
 		"/provider/"+url.PathEscape(r.PathValue("id"))+"/reference/"+url.PathEscape(r.PathValue("ref_id")),
 		payload,
-		false,
+		providerReferenceForwardOptions{includeEmptyPhone: true},
 	)
 }
 
@@ -395,8 +406,11 @@ func isAllowedProviderReferenceType(value string) bool {
 	return ok
 }
 
-func (p providerReferencePayload) arakBody(includeType bool) ([]byte, error) {
-	body := map[string]any{"phone": p.Phone}
+func (p providerReferencePayload) arakBody(opts providerReferenceForwardOptions) ([]byte, error) {
+	body := map[string]any{}
+	if p.Phone != "" || opts.includeEmptyPhone {
+		body["phone"] = p.Phone
+	}
 	if p.FirstName != nil {
 		body["first_name"] = *p.FirstName
 	}
@@ -406,17 +420,17 @@ func (p providerReferencePayload) arakBody(includeType bool) ([]byte, error) {
 	if p.Email != nil {
 		body["email"] = *p.Email
 	}
-	if includeType && p.ReferenceType != "" {
+	if opts.includeReferenceType && p.ReferenceType != "" {
 		body["reference_type"] = p.ReferenceType
 	}
 	return json.Marshal(body)
 }
 
-func (h *Handler) forwardProviderReference(w http.ResponseWriter, r *http.Request, path string, payload providerReferencePayload, includeType bool) {
+func (h *Handler) forwardProviderReference(w http.ResponseWriter, r *http.Request, path string, payload providerReferencePayload, opts providerReferenceForwardOptions) {
 	if !h.requireArak(w) {
 		return
 	}
-	body, err := payload.arakBody(includeType)
+	body, err := payload.arakBody(opts)
 	if err != nil {
 		httputil.InternalError(w, r, err, "provider reference body encode failed")
 		return

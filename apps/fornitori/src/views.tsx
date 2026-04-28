@@ -18,7 +18,13 @@ import {
 } from './api/queries';
 import type { AlyanteSupplier, Category, CategoryDocumentType, Country, DashboardCategory, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
 import { provinceSelectOptions } from './lib/provinces';
-import { QUALIFICATION_REFERENCE_TYPE, stateLabel } from './lib/reference';
+import {
+  PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE,
+  PROVIDER_REFERENCE_PHONE_PATTERN,
+  QUALIFICATION_REFERENCE_TYPE,
+  isValidOptionalProviderRefPhone,
+  stateLabel,
+} from './lib/reference';
 import { hasProviderErp, providerStateSelectOptions } from './lib/providerState';
 import { saveBlob } from './lib/download';
 import { useHasRole } from './hooks/useHasRole';
@@ -1844,6 +1850,12 @@ function ContactField({
   optional,
   icon,
   validate,
+  invalid,
+  invalidMessage,
+  inputMode,
+  pattern,
+  title,
+  onValueChange,
 }: {
   name: string;
   label: string;
@@ -1853,11 +1865,21 @@ function ContactField({
   optional?: boolean;
   icon?: IconName;
   validate?: (value: string) => boolean;
+  invalid?: boolean;
+  invalidMessage?: string;
+  inputMode?: 'tel';
+  pattern?: string;
+  title?: string;
+  onValueChange?: (value: string) => void;
 }) {
   const [value, setValue] = useState(defaultValue ?? '');
   const [touched, setTouched] = useState(false);
   const valid = validate ? validate(value) : false;
-  const showCheck = Boolean(validate) && touched && value.length > 0 && valid;
+  const hasValue = value.trim().length > 0;
+  const showInvalid = Boolean(invalid) || Boolean(validate && invalidMessage && touched && hasValue && !valid);
+  const showCheck = Boolean(validate) && touched && hasValue && valid && !showInvalid;
+  const helperID = `contactField-${name}-helper`;
+  const helperText = showInvalid && invalidMessage ? invalidMessage : helper;
 
   return (
     <div className="contactField">
@@ -1876,7 +1898,16 @@ function ContactField({
           name={name}
           type={type}
           defaultValue={defaultValue}
-          onInput={(event) => setValue(event.currentTarget.value)}
+          inputMode={inputMode}
+          pattern={pattern}
+          title={title}
+          aria-invalid={showInvalid ? 'true' : undefined}
+          aria-describedby={helperText ? helperID : undefined}
+          onInput={(event) => {
+            const next = event.currentTarget.value;
+            setValue(next);
+            onValueChange?.(next);
+          }}
           onBlur={() => setTouched(true)}
           autoComplete="off"
         />
@@ -1886,7 +1917,11 @@ function ContactField({
           </span>
         ) : null}
       </div>
-      {helper ? <p className="contactFieldHelper">{helper}</p> : null}
+      {helperText ? (
+        <p id={helperID} className={`contactFieldHelper${showInvalid ? ' contactFieldHelper--error' : ''}`}>
+          {helperText}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -1908,17 +1943,30 @@ function ContactDrawer({
   const isEdit = Boolean(state?.contact);
   const contact = state?.contact ?? null;
   const role = state?.role ?? null;
+  const [phoneInvalid, setPhoneInvalid] = useState(false);
+
+  useEffect(() => {
+    setPhoneInvalid(false);
+  }, [contact?.id, role?.key]);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!role) return;
     const emailInput = event.currentTarget.elements.namedItem('email') as HTMLInputElement | null;
     if (!emailInput) return;
+    const phoneInput = event.currentTarget.elements.namedItem('phone') as HTMLInputElement | null;
     const email = emailInput.value.trim();
     if (!email || !emailInput.validity.valid) {
       toast('Inserisci un indirizzo email valido per il contatto.', 'warning');
       return;
     }
+    if (phoneInput && !isValidOptionalProviderRefPhone(phoneInput.value)) {
+      setPhoneInvalid(true);
+      phoneInput.focus();
+      toast(PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE, 'warning');
+      return;
+    }
+    setPhoneInvalid(false);
     const body = refPayload(event.currentTarget, role.key);
     void onSave(body);
   }
@@ -1952,6 +2000,7 @@ function ContactDrawer({
           // Force the form to remount when switching contact/role so default values reset.
           key={`${state.role.key}-${contact?.id ?? 'new'}`}
           onSubmit={submit}
+          noValidate
         >
           <ContactField name="first_name" label="Nome" defaultValue={contact?.first_name ?? ''} />
           <ContactField name="last_name" label="Cognome" defaultValue={contact?.last_name ?? ''} />
@@ -1969,6 +2018,15 @@ function ContactDrawer({
             type="tel"
             icon="phone"
             optional
+            validate={isValidOptionalProviderRefPhone}
+            invalid={phoneInvalid}
+            invalidMessage={PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE}
+            inputMode="tel"
+            pattern={PROVIDER_REFERENCE_PHONE_PATTERN}
+            title={PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE}
+            onValueChange={(value) => {
+              if (phoneInvalid && isValidOptionalProviderRefPhone(value)) setPhoneInvalid(false);
+            }}
             defaultValue={contact?.phone ?? ''}
           />
         </form>

@@ -1900,6 +1900,15 @@ button {
   box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 
+.contactFieldInputWrap input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.contactFieldInputWrap input[aria-invalid="true"]:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--color-danger-subtle);
+}
+
 .contactFieldInputWrap[data-has-icon="true"] input {
   padding-left: 2.1rem;
 }
@@ -1925,6 +1934,10 @@ button {
   margin: 0;
   font-size: 0.75rem;
   color: var(--color-text-muted);
+}
+
+.contactFieldHelper--error {
+  color: var(--color-danger);
 }
 
 .createForm {
