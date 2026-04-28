@@ -1219,7 +1219,8 @@ function CompletenessBanner({ provider }: { provider: Provider }) {
 }
 
 function formatActivationFieldList(fields: string[]) {
-  if (fields.length <= 1) return fields[0] ?? '';
+  if (fields.length === 0) return 'i dati obbligatori';
+  if (fields.length === 1) return fields[0];
   return `${fields.slice(0, -1).join(', ')} e ${fields[fields.length - 1]}`;
 }
 
