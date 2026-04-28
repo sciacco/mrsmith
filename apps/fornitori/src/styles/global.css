@@ -1286,16 +1286,60 @@ button {
 }
 
 .providerHeaderTop h2 {
+  min-width: 0;
   color: var(--color-text);
   font-size: 1.35rem;
   font-weight: 700;
   line-height: 1.2;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .providerHeaderMeta {
   color: var(--color-text-secondary);
   font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.activationBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  padding: 0.16rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.activationBadge--blocked {
+  color: var(--color-warning-strong);
+  background: var(--color-warning-subtle);
+  border-color: rgba(245, 158, 11, 0.34);
+}
+
+.activationBadge--ready {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.providerHeaderHint {
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.providerHeaderHint--blocked {
+  color: var(--color-warning-strong);
+}
+
+.providerHeaderHint strong {
+  font-weight: 800;
 }
 
 .providerHeaderProgress {
@@ -1315,9 +1359,9 @@ button {
 
 .progressTrack {
   position: relative;
-  height: 0.45rem;
+  height: 0.32rem;
   border-radius: var(--radius-full);
-  background: var(--color-surface);
+  background: var(--color-border-subtle);
   overflow: hidden;
 }
 
@@ -1329,7 +1373,7 @@ button {
 }
 
 .progressFill[data-state='complete'] {
-  background: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 58%, var(--color-bg-elevated));
 }
 
 .progressPercent {
@@ -1482,6 +1526,12 @@ button {
   color: var(--color-accent-hover);
   background: var(--color-accent-subtle);
   border-color: rgba(99, 91, 255, 0.24);
+}
+
+.banner--warning {
+  color: var(--color-warning-strong);
+  background: color-mix(in srgb, var(--color-warning-subtle) 76%, var(--color-bg-elevated));
+  border-color: rgba(245, 158, 11, 0.36);
 }
 
 .banner--neutral {
