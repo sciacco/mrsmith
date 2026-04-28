@@ -1163,7 +1163,7 @@ function ProviderHeader({ provider, providerCategories }: { provider: Provider; 
       </p>
       {isDraft ? (
         <p className={`providerHeaderHint providerHeaderHint--${activationBlocked ? 'blocked' : 'ready'}`}>
-          {activationBlocked ? `Mancano: ${formatActivationFieldList(missing)}.` : 'Dati completi. Attivazione gestita dalla sync Mistra.'}
+          {activationBlocked ? <strong>{`Mancano: ${formatActivationFieldList(missing)}.`}</strong> : 'Dati completi. Attivazione gestita dalla sync Mistra.'}
         </p>
       ) : null}
       {total > 0 ? (
@@ -1218,6 +1218,7 @@ function CompletenessBanner({ provider }: { provider: Provider }) {
   );
 }
 
+/** Formats field names as an Italian list, e.g. "campo1, campo2 e campo3". */
 function formatActivationFieldList(fields: string[]) {
   if (fields.length === 0) return 'i dati obbligatori';
   if (fields.length === 1) return fields[0];
