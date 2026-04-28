@@ -1139,12 +1139,20 @@ function ProviderHeader({ provider, providerCategories }: { provider: Provider; 
   const total = providerCategories.length;
   const qualified = providerCategories.filter((row) => (row.status ?? row.state)?.toUpperCase() === 'QUALIFIED').length;
   const percent = total > 0 ? Math.round((qualified / total) * 100) : 0;
+  const isDraft = (provider.state ?? '').toUpperCase() === 'DRAFT';
+  const missing = isDraft ? missingProviderActivationFields(provider) : [];
+  const activationBlocked = missing.length > 0;
 
   return (
     <header className="providerHeader">
       <div className="providerHeaderTop">
         <h2>{provider.company_name ?? '—'}</h2>
         <ProviderStateBadge state={provider.state} />
+        {isDraft ? (
+          <span className={`activationBadge activationBadge--${activationBlocked ? 'blocked' : 'ready'}`}>
+            {activationBlocked ? 'Non attivabile' : 'Pronto per attivazione'}
+          </span>
+        ) : null}
       </div>
       <p className="providerHeaderMeta">
         {[
@@ -1153,9 +1161,14 @@ function ProviderHeader({ provider, providerCategories }: { provider: Provider; 
           provider.erp_id ? `ERP ${provider.erp_id}` : null,
         ].filter(Boolean).join(' · ') || 'Identificativi non disponibili'}
       </p>
+      {isDraft ? (
+        <p className={`providerHeaderHint providerHeaderHint--${activationBlocked ? 'blocked' : 'ready'}`}>
+          {activationBlocked ? `Mancano: ${missing.join(', ')}.` : 'Dati completi. Attivazione gestita dalla sync Mistra.'}
+        </p>
+      ) : null}
       {total > 0 ? (
-        <div className="providerHeaderProgress" aria-label={`Completezza qualifica ${percent}%`}>
-          <div className="progressLabel">Qualifica · {qualified}/{total} categorie</div>
+        <div className="providerHeaderProgress" aria-label={`Categorie qualificate ${percent}%`}>
+          <div className="progressLabel">Categorie qualificate · {qualified}/{total}</div>
           <div className="progressTrack">
             <div className="progressFill" style={{ width: `${percent}%` }} data-state={qualified === total ? 'complete' : 'partial'} />
           </div>
@@ -1193,16 +1206,21 @@ function CompletenessBanner({ provider }: { provider: Provider }) {
     return (
       <div className="banner banner--success">
         <Icon name="check-circle" size={16} aria-hidden="true" />
-        <span>Tutti i campi obbligatori sono compilati. Il fornitore è pronto per essere attivato.</span>
+        <span>Dati obbligatori completi. Il fornitore sarà attivabile dalla sync Mistra.</span>
       </div>
     );
   }
   return (
-    <div className="banner banner--info">
-      <Icon name="info" size={16} aria-hidden="true" />
-      <span>Per attivare il fornitore: {missing.join(', ')}.</span>
+    <div className="banner banner--warning">
+      <Icon name="triangle-alert" size={16} aria-hidden="true" />
+      <span>Attivazione bloccata: aggiungi {formatActivationFieldList(missing)}.</span>
     </div>
   );
+}
+
+function formatActivationFieldList(fields: string[]) {
+  if (fields.length <= 1) return fields[0] ?? '';
+  return `${fields.slice(0, -1).join(', ')} e ${fields[fields.length - 1]}`;
 }
 
 function ProviderAttentionRail({
@@ -1216,7 +1234,7 @@ function ProviderAttentionRail({
     <aside className="providerAttentionRail" aria-labelledby="provider-attention-title">
       <header className="providerAttentionHeader">
         <div>
-          <h2 id="provider-attention-title">Da completare</h2>
+          <h2 id="provider-attention-title">Azioni richieste</h2>
           <span>{attention.openCount === 1 ? '1 attività aperta' : `${attention.openCount} attività aperte`}</span>
         </div>
       </header>
@@ -1224,7 +1242,7 @@ function ProviderAttentionRail({
         <div className="priorityEmpty providerAttentionEmpty">
           <span className="priorityEmptyIcon" aria-hidden="true"><Icon name="check-circle" size={20} /></span>
           <div>
-            <strong>Nessuna attività aperta</strong>
+            <strong>Nessuna azione richiesta</strong>
             <span>Il fornitore non richiede interventi.</span>
           </div>
         </div>
@@ -1239,8 +1257,8 @@ function ProviderAttentionRail({
             >
               <span className="providerAttentionActionTopline">
                 <StatusBadge
-                  value={PROVIDER_ATTENTION_LABELS[action.severity]}
-                  label={PROVIDER_ATTENTION_LABELS[action.severity]}
+                  value={action.severity === 'blocking' ? 'Blocca attivazione' : PROVIDER_ATTENTION_LABELS[action.severity]}
+                  label={action.severity === 'blocking' ? 'Blocca attivazione' : PROVIDER_ATTENTION_LABELS[action.severity]}
                   variant={PROVIDER_ATTENTION_BADGE[action.severity]}
                 />
                 <span>{action.label}</span>
