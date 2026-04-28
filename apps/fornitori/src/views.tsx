@@ -2598,10 +2598,34 @@ export function QualificationSettingsPage() {
   const categories = useCategories();
   const documentTypes = useDocumentTypes();
   const mutations = useFornitoriMutations();
+  const [categoryName, setCategoryName] = useState('');
   const [required, setRequired] = useState<number[]>([]);
   const [optional, setOptional] = useState<number[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedDocType, setSelectedDocType] = useState<DocumentType | null>(null);
+
+  function selectCategory(item: Category) {
+    setSelectedCategory(item);
+    setCategoryName(item.name);
+    const req: number[] = [];
+    const opt: number[] = [];
+    for (const entry of item.document_types ?? []) {
+      const id = entry.document_type?.id;
+      if (typeof id === 'number') {
+        if (entry.required) req.push(id);
+        else opt.push(id);
+      }
+    }
+    setRequired(req);
+    setOptional(opt);
+  }
+
+  function resetCategoryForm() {
+    setSelectedCategory(null);
+    setCategoryName('');
+    setRequired([]);
+    setOptional([]);
+  }
 
   async function saveCategory(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2610,13 +2634,15 @@ export function QualificationSettingsPage() {
       toast('Lo stesso tipo documento non puo essere obbligatorio e facoltativo', 'warning');
       return;
     }
-    const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
-    const body = { name, required_document_type_ids: required, optional_document_type_ids: optional };
+    const name = categoryName.trim();
+    const document_types = [
+      ...[...new Set(required)].map((id) => ({ id, required: true })),
+      ...[...new Set(optional)].map((id) => ({ id, required: false })),
+    ];
+    const body = { name, document_types };
     if (selectedCategory) await mutations.updateCategory.mutateAsync({ id: selectedCategory.id, body });
     else await mutations.createCategory.mutateAsync(body);
-    setSelectedCategory(null);
-    setRequired([]);
-    setOptional([]);
+    resetCategoryForm();
     toast('Aggiornamento completato');
   }
 
@@ -2634,9 +2660,9 @@ export function QualificationSettingsPage() {
       <header className="pageHeader"><div><h1>Impostazioni qualifica</h1><p>Categorie e tipi documento.</p></div></header>
       <div className="twoCols">
         <Panel title="Categorie">
-          <div className="tableScroll adminScroll"><table className="table"><tbody>{(categories.data ?? []).map((item) => <tr key={item.id} onClick={() => setSelectedCategory(item)}><td>{item.name}</td><td className="rightText"><Icon name="chevron-right" size={16} /></td></tr>)}</tbody></table></div>
+          <div className="tableScroll adminScroll"><table className="table"><tbody>{(categories.data ?? []).map((item) => <tr key={item.id} className={selectedCategory?.id === item.id ? 'selectedRow' : ''} onClick={() => selectCategory(item)}><td>{item.name}</td><td className="rightText"><Icon name="chevron-right" size={16} /></td></tr>)}</tbody></table></div>
           <form className="modalForm" onSubmit={(event) => void saveCategory(event)}>
-            <Input name="name" label="Categoria" defaultValue={selectedCategory?.name ?? ''} />
+            <Input name="name" label="Categoria" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} />
             <span className="fieldLabel">Documenti obbligatori</span><MultiSelect options={selectOptions(documentTypes.data)} selected={required} onChange={setRequired} />
             <span className="fieldLabel">Documenti facoltativi</span><MultiSelect options={selectOptions(documentTypes.data)} selected={optional} onChange={setOptional} />
             <div className="formActions">

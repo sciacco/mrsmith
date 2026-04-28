@@ -155,8 +155,12 @@ export interface ProviderPayload {
   ref?: ProviderReference;
 }
 
+export interface CategoryDocumentTypePayload {
+  id: number;
+  required: boolean;
+}
+
 export interface CategoryPayload {
   name: string;
-  required_document_type_ids?: number[];
-  optional_document_type_ids?: number[];
+  document_types?: CategoryDocumentTypePayload[];
 }
