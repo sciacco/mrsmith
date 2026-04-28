@@ -1355,9 +1355,9 @@ button {
 
 .progressTrack {
   position: relative;
-  height: 0.36rem;
+  height: 0.32rem;
   border-radius: var(--radius-full);
-  background: var(--color-surface);
+  background: var(--color-border-subtle);
   overflow: hidden;
 }
 
@@ -1369,7 +1369,7 @@ button {
 }
 
 .progressFill[data-state='complete'] {
-  background: rgba(16, 185, 129, 0.72);
+  background: color-mix(in srgb, var(--color-success) 58%, var(--color-bg-elevated));
 }
 
 .progressPercent {
