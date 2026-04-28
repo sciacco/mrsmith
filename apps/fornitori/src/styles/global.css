@@ -1641,25 +1641,144 @@ button {
   max-height: calc(100vh - 18rem);
 }
 
-.settingsArticleDetail {
-  min-height: 19rem;
+.settingsInlineNotice {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 0.55rem 0.85rem;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-surface) 54%, var(--color-bg-elevated));
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
-.settingsArticleSummary {
-  display: grid;
-  gap: 0.25rem;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
-  padding: 0.75rem;
-  background: var(--color-surface);
+.settingsInlineNotice svg {
+  flex: 0 0 auto;
 }
 
-.settingsArticleSummary strong {
+.settingsInlineNotice:not(.settingsInlineNotice--warning) svg {
+  animation: settingsSpin 0.9s linear infinite;
+}
+
+.settingsInlineNotice--warning {
+  color: var(--color-warning-strong);
+  background: color-mix(in srgb, var(--color-warning-subtle) 72%, var(--color-bg-elevated));
+}
+
+.settingsArticleTable {
+  min-width: 45rem;
+}
+
+.settingsArticleTable th:first-child {
+  width: 42%;
+}
+
+.settingsArticleCategoryCell {
+  min-width: 15rem;
+}
+
+.settingsArticleActionsHeader,
+.settingsArticleActionsCell {
+  width: 7.25rem;
+  text-align: right;
+}
+
+.settingsArticleEditRow td {
+  background: color-mix(in srgb, var(--color-accent-subtle) 62%, var(--color-bg-elevated));
+}
+
+.settingsArticleCategorySelect {
+  width: 100%;
+  min-width: 13rem;
+  min-height: 2.05rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.36rem 0.55rem;
   color: var(--color-text);
-  font-size: 0.92rem;
-  font-weight: 750;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
+  background: var(--color-bg-elevated);
+  font: inherit;
+  outline: none;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.settingsArticleCategorySelect:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+.settingsInlineActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.settingsRowAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-elevated);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+.settingsRowAction:hover:not(:disabled),
+.settingsRowAction:focus-visible {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-xs);
+  outline: 0;
+}
+
+.settingsRowAction:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.settingsRowAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.settingsRowAction--primary {
+  color: var(--color-text-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-accent);
+}
+
+.settingsRowAction--primary:hover:not(:disabled),
+.settingsRowAction--primary:focus-visible {
+  color: var(--color-text-on-accent);
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.settingsRowAction--loading svg {
+  animation: settingsSpin 0.9s linear infinite;
+}
+
+@keyframes settingsSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .settingsConfirm {

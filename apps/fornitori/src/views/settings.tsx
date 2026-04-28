@@ -460,49 +460,54 @@ export function ArticleCategoriesPage() {
   const categories = useCategories();
   const mutations = useFornitoriMutations();
   const [query, setQuery] = useState('');
-  const [selectedArticleCode, setSelectedArticleCode] = useState<string | null>(null);
+  const [editingArticleCode, setEditingArticleCode] = useState<string | null>(null);
   const [categoryDraft, setCategoryDraft] = useState('');
-  const [categoryBaseline, setCategoryBaseline] = useState('');
 
   const articleItems = articles.data ?? [];
   const filteredArticles = useMemo(
     () => articleItems.filter((item) => matchesArticleQuery(item, query)),
     [articleItems, query],
   );
-  const selectedArticle = selectedArticleCode
-    ? articleItems.find((item) => item.article_code === selectedArticleCode) ?? null
+  const editingArticle = editingArticleCode
+    ? articleItems.find((item) => item.article_code === editingArticleCode) ?? null
     : null;
   const categoryOptions = useMemo(
-    () => categorySelectOptions(categories.data ?? [], selectedArticle),
-    [categories.data, selectedArticle],
+    () => categorySelectOptions(categories.data ?? [], editingArticle),
+    [categories.data, editingArticle],
   );
-  const dirty = Boolean(selectedArticle) && categoryDraft !== categoryBaseline;
+  const categoryEditBlocked = categories.isLoading || Boolean(categories.error);
+  const categoryEditMessage = categories.error
+    ? 'Le categorie non possono essere caricate: la modifica e temporaneamente disabilitata.'
+    : categories.isLoading
+      ? 'Categorie in caricamento: la modifica sara disponibile a breve.'
+      : '';
 
   useEffect(() => {
-    if (articles.isLoading || articles.error) return;
-    if (filteredArticles.length === 0) {
-      setSelectedArticleCode(null);
+    if (!editingArticleCode) return;
+    const stillExists = articleItems.some((item) => item.article_code === editingArticleCode);
+    const stillVisible = filteredArticles.some((item) => item.article_code === editingArticleCode);
+    if (!stillExists || !stillVisible) {
+      cancelArticleEdit();
+    }
+  }, [articleItems, editingArticleCode, filteredArticles]);
+
+  function editArticle(item: ArticleCategory) {
+    if (categoryEditBlocked || mutations.setArticleCategory.isPending) return;
+    setEditingArticleCode(item.article_code);
+    setCategoryDraft(String(item.category_id));
+  }
+
+  function cancelArticleEdit() {
+    setEditingArticleCode(null);
+    setCategoryDraft('');
+  }
+
+  async function saveArticleCategory(item: ArticleCategory) {
+    if (editingArticleCode !== item.article_code || !categoryDraft) return;
+    if (categoryEditBlocked) {
+      toast('Le categorie non sono disponibili.', 'warning');
       return;
     }
-    if (!selectedArticleCode || !filteredArticles.some((item) => item.article_code === selectedArticleCode)) {
-      setSelectedArticleCode(filteredArticles[0]?.article_code ?? null);
-    }
-  }, [articles.error, articles.isLoading, filteredArticles, selectedArticleCode]);
-
-  useEffect(() => {
-    if (!selectedArticle) {
-      setCategoryDraft('');
-      setCategoryBaseline('');
-      return;
-    }
-    const next = String(selectedArticle.category_id);
-    setCategoryDraft(next);
-    setCategoryBaseline(next);
-  }, [selectedArticle?.article_code, selectedArticle?.category_id, selectedArticle]);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedArticle || !categoryDraft) return;
     const categoryId = Number(categoryDraft);
     if (!Number.isInteger(categoryId) || categoryId <= 0) {
       toast('Seleziona una categoria valida', 'warning');
@@ -510,8 +515,8 @@ export function ArticleCategoriesPage() {
     }
 
     try {
-      await mutations.setArticleCategory.mutateAsync({ articleCode: selectedArticle.article_code, categoryId });
-      setCategoryBaseline(categoryDraft);
+      await mutations.setArticleCategory.mutateAsync({ articleCode: item.article_code, categoryId });
+      cancelArticleEdit();
       toast('Associazione aggiornata', 'success');
     } catch (error) {
       toast(apiErrorMessage(error, "Impossibile aggiornare l'associazione."), 'error');
@@ -520,102 +525,120 @@ export function ArticleCategoriesPage() {
 
   return (
     <section className="settingsSection" aria-label="Articoli-categorie">
-      <div className="settingsWorkspace">
-        <section className="master panel settingsMasterPanel" aria-label="Articoli associati">
-          <div className="settingsPanelHeader settingsPanelHeader--toolbar">
-            <div>
-              <h2>Articoli-categorie</h2>
-              <span className="settingsPanelMeta">{countLabel(articleItems.length, 'articolo', 'articoli')}</span>
-            </div>
-            <SearchInput value={query} onChange={setQuery} placeholder="Cerca articolo o categoria" className="settingsSearch" />
+      <section className="panel settingsTablePanel" aria-label="Articoli associati">
+        <div className="settingsPanelHeader settingsPanelHeader--toolbar">
+          <div>
+            <h2>Articoli-categorie</h2>
+            <span className="settingsPanelMeta">{countLabel(articleItems.length, 'articolo', 'articoli')}</span>
           </div>
+          <SearchInput value={query} onChange={setQuery} placeholder="Cerca articolo o categoria" className="settingsSearch" />
+        </div>
 
-          {articles.isLoading ? (
-            <div className="settingsPanelBody">
-              <Skeleton rows={8} />
-            </div>
-          ) : articles.error ? (
-            stateBlock(errorTitle(articles.error), 'Gli articoli non possono essere caricati.', 'triangle-alert')
-          ) : articleItems.length === 0 ? (
-            stateBlock('Nessun articolo associato', 'Non ci sono associazioni articolo-categoria.', 'package')
-          ) : filteredArticles.length === 0 ? (
-            stateBlock('Nessun risultato', 'La ricerca non corrisponde ad alcuna associazione.', 'search')
-          ) : (
-            <div className="tableScroll settingsMappedRows">
-              <table className="table settingsTable">
-                <thead>
-                  <tr>
-                    <th>Articolo</th>
-                    <th>Categoria</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredArticles.map((item) => {
-                    const selected = selectedArticleCode === item.article_code;
-                    return (
-                      <tr
-                        key={item.article_code}
-                        className={selected ? 'selectedRow' : ''}
-                        onClick={() => setSelectedArticleCode(item.article_code)}
-                      >
-                        <td>
-                          <span className="monoCell">{item.article_code}</span>
-                          <small>{item.description || '-'}</small>
-                        </td>
-                        <td>{item.category_name || '-'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <section className="detail panel settingsDetailPanel settingsArticleDetail" aria-label="Associazione articolo-categoria">
-          <div className="settingsDetailHeader">
-            <div>
-              <h2>Associazione articolo-categoria</h2>
-              <span className="settingsPanelMeta">{selectedArticle?.article_code ?? 'Nessun articolo'}</span>
-            </div>
+        {categoryEditMessage ? (
+          <div className={`settingsInlineNotice${categories.error ? ' settingsInlineNotice--warning' : ''}`} role={categories.error ? 'alert' : 'status'}>
+            <Icon name={categories.error ? 'triangle-alert' : 'loader'} size={14} />
+            <span>{categoryEditMessage}</span>
           </div>
+        ) : null}
 
-          {!selectedArticle ? (
-            stateBlock('Seleziona un articolo', 'La categoria potra essere modificata dopo la selezione.', 'package')
-          ) : categories.error ? (
-            stateBlock(errorTitle(categories.error), 'Le categorie non possono essere caricate.', 'triangle-alert')
-          ) : (
-            <form className="settingsDetailForm" onSubmit={(event) => void submit(event)}>
-              <div className="settingsArticleSummary">
-                <span className="monoCell">{selectedArticle.article_code}</span>
-                <strong>{selectedArticle.description || '-'}</strong>
-              </div>
-              <label className="field">
-                <span>Categoria</span>
-                <select
-                  value={categoryDraft}
-                  onChange={(event) => setCategoryDraft(event.target.value)}
-                  disabled={categories.isLoading}
-                >
-                  {categoryOptions.map((item) => (
-                    <option key={item.value} value={item.value}>{item.label}</option>
-                  ))}
-                </select>
-              </label>
-              <div className="settingsFormActions">
-                <Button
-                  type="submit"
-                  leftIcon={<Icon name="check" />}
-                  loading={mutations.setArticleCategory.isPending}
-                  disabled={!dirty || categories.isLoading || categoryOptions.length === 0}
-                >
-                  Salva
-                </Button>
-              </div>
-            </form>
-          )}
-        </section>
-      </div>
+        {articles.isLoading ? (
+          <div className="settingsPanelBody">
+            <Skeleton rows={8} />
+          </div>
+        ) : articles.error ? (
+          stateBlock(errorTitle(articles.error), 'Gli articoli non possono essere caricati.', 'triangle-alert')
+        ) : articleItems.length === 0 ? (
+          stateBlock('Nessun articolo associato', 'Non ci sono associazioni articolo-categoria.', 'package')
+        ) : filteredArticles.length === 0 ? (
+          stateBlock('Nessun risultato', 'La ricerca non corrisponde ad alcuna associazione.', 'search')
+        ) : (
+          <div className="tableScroll settingsMappedRows">
+            <table className="table settingsTable settingsArticleTable">
+              <thead>
+                <tr>
+                  <th>Articolo</th>
+                  <th>Categoria</th>
+                  <th className="settingsArticleActionsHeader">Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredArticles.map((item) => {
+                  const editing = editingArticleCode === item.article_code;
+                  const saving = editing && mutations.setArticleCategory.isPending;
+                  const dirty = editing && categoryDraft !== String(item.category_id);
+                  const editDisabled = categoryEditBlocked || mutations.setArticleCategory.isPending;
+                  const editTitle = categoryEditMessage || `Modifica categoria ${item.article_code}`;
+
+                  return (
+                    <tr key={item.article_code} className={editing ? 'settingsArticleEditRow' : ''}>
+                      <td>
+                        <span className="monoCell">{item.article_code}</span>
+                        <small>{item.description || '-'}</small>
+                      </td>
+                      <td className="settingsArticleCategoryCell">
+                        {editing ? (
+                          <select
+                            className="settingsArticleCategorySelect"
+                            value={categoryDraft}
+                            onChange={(event) => setCategoryDraft(event.target.value)}
+                            disabled={saving || categoryEditBlocked}
+                            aria-label={`Categoria per ${item.article_code}`}
+                          >
+                            {categoryOptions.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          item.category_name || '-'
+                        )}
+                      </td>
+                      <td className="settingsArticleActionsCell">
+                        <div className="settingsInlineActions">
+                          {editing ? (
+                            <>
+                              <button
+                                type="button"
+                                className={`settingsRowAction settingsRowAction--primary${saving ? ' settingsRowAction--loading' : ''}`}
+                                onClick={() => void saveArticleCategory(item)}
+                                disabled={!dirty || saving || categoryEditBlocked || categoryOptions.length === 0}
+                                aria-label={`Salva categoria ${item.article_code}`}
+                                title="Salva"
+                              >
+                                <Icon name={saving ? 'loader' : 'check'} size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="settingsRowAction"
+                                onClick={() => cancelArticleEdit()}
+                                disabled={saving}
+                                aria-label={`Annulla modifica ${item.article_code}`}
+                                title="Annulla"
+                              >
+                                <Icon name="x" size={14} />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              className="settingsRowAction"
+                              onClick={() => editArticle(item)}
+                              disabled={editDisabled}
+                              aria-label={`Modifica categoria ${item.article_code}`}
+                              title={editTitle}
+                            >
+                              <Icon name="pencil" size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </section>
   );
 }
