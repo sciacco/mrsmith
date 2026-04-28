@@ -688,10 +688,32 @@ button {
 
 .fornitoriListPanel {
   min-height: min(42rem, calc(100vh - 12rem));
+  --provider-grid: minmax(0, 1fr) 3.25rem 8rem 1.25rem;
+  --provider-grid-gap: 0.65rem;
+  --provider-grid-padding-x: 1rem;
 }
 
 .fornitoriSearchRows {
-  max-height: calc(100vh - 15rem);
+  max-height: calc(100vh - 17rem);
+}
+
+.providerListHeader {
+  display: grid;
+  grid-template-columns: var(--provider-grid);
+  align-items: end;
+  gap: var(--provider-grid-gap);
+  padding: 0.5rem var(--provider-grid-padding-x) 0.55rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted, var(--color-text-secondary));
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.providerListHeaderLabel {
+  text-align: right;
+  white-space: nowrap;
 }
 
 .master,
@@ -737,10 +759,11 @@ button {
 }
 
 .listRow--provider {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: var(--provider-grid);
+  gap: var(--provider-grid-gap);
   align-items: center;
   min-height: 3.6rem;
-  padding: 0.6rem 0.75rem;
+  padding: 0.6rem var(--provider-grid-padding-x);
 }
 
 .listRow:hover,
@@ -784,11 +807,21 @@ button {
   min-width: 0;
 }
 
-.providerRowMeta {
+.providerRowQual {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  flex-wrap: nowrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.providerRowErp {
+  text-align: right;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  font-family: var(--font-mono);
+  font-weight: 600;
 }
 
 .providerRowTitle {
@@ -836,11 +869,6 @@ button {
   color: var(--color-text-muted, var(--color-text-secondary));
   font-style: italic;
   opacity: 0.75;
-}
-
-.providerRowErp {
-  color: var(--color-text-secondary);
-  font-variant-numeric: tabular-nums;
 }
 
 .qualPill {
@@ -2222,10 +2250,15 @@ button {
     flex-direction: column;
   }
 
+  .providerListHeader {
+    display: none;
+  }
+
   .listRow--provider {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 0.4rem;
     align-items: start;
+    column-gap: 0.55rem;
   }
 
   .listRow--provider .providerRowMain {
@@ -2239,10 +2272,26 @@ button {
     align-self: center;
   }
 
-  .listRow--provider .providerRowMeta {
-    grid-column: 1 / -1;
+  .listRow--provider .providerRowQual {
+    grid-column: 1 / 2;
     grid-row: 2;
-    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .listRow--provider .providerRowErp {
+    grid-column: 2 / 3;
+    grid-row: 2;
+    align-self: center;
+    text-align: right;
+  }
+
+  .listRow--provider .providerRowErp:not(:empty)::before {
+    content: 'ERP ';
+    color: var(--color-text-muted, var(--color-text-secondary));
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-right: 0.25rem;
   }
 
   .listRow--provider .providerRowLocation {

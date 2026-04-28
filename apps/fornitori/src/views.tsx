@@ -719,7 +719,14 @@ export function FornitoriPage() {
       <section className="panel fornitoriListPanel">
         <div className="toolbar"><SearchInput value={query} onChange={setQuery} placeholder="Cerca per nome, P.IVA, CF, codice ERP" /></div>
         {summary.isLoading ? <Skeleton rows={8} /> : summary.error ? stateBlock(errorTitle(summary.error), 'Elenco fornitori non disponibile.', 'triangle-alert') : (
-          <div className="listRows fornitoriSearchRows">
+          <>
+            <div className="providerListHeader" aria-hidden="true">
+              <span />
+              <span className="providerListHeaderLabel">Categorie</span>
+              <span className="providerListHeaderLabel">Codice Alyante</span>
+              <span />
+            </div>
+            <div className="listRows fornitoriSearchRows">
             {active.map((item) => (
               <ProviderRow key={item.id} item={item} onSelect={selectProvider} />
             ))}
@@ -733,7 +740,8 @@ export function FornitoriPage() {
             {showArchive ? archive.map((item) => (
               <ProviderRow key={item.id} item={item} onSelect={selectProvider} />
             )) : null}
-          </div>
+            </div>
+          </>
         )}
       </section>
       <ProviderCreateModal
@@ -768,28 +776,32 @@ function formatProviderLocation(item: ProviderSummary): string {
 function ProviderRow({ item, onSelect }: { item: ProviderSummary; onSelect: (id: number) => void }) {
   const qualVariant = qualificationVariant(item);
   const location = formatProviderLocation(item);
+  const showQualPill = item.total_count > 0;
+  const showErp = item.erp_id !== null && item.erp_id !== undefined;
   return (
     <button className="listRow listRow--provider" onClick={() => onSelect(item.id)}>
       <span className="providerRowMain">
         <span className="providerRowTitle">
           <strong>{item.company_name ?? '—'}</strong>
           <ProviderStateBadge state={item.state} />
-        </span>
-        <span className={`providerRowLocation${location ? '' : ' providerRowLocation--missing'}`}>
-          <span className="providerRowLocationText">{location || 'Indirizzo mancante'}</span>
           {item.has_expiring_docs ? (
             <span className="docFlag" title="Documenti in scadenza nei prossimi 30 giorni">
               <Icon name="triangle-alert" size={12} /> Doc
             </span>
           ) : null}
         </span>
-      </span>
-      <span className="providerRowMeta">
-        <span className={`qualPill qualPill--${qualVariant}`} title="Categorie qualificate / totali">
-          {qualificationCopy(item)}
+        <span className={`providerRowLocation${location ? '' : ' providerRowLocation--missing'}`}>
+          <span className="providerRowLocationText">{location || 'Indirizzo mancante'}</span>
         </span>
-        {item.erp_id !== null && item.erp_id !== undefined ? <span className="providerRowErp">ERP {item.erp_id}</span> : null}
       </span>
+      <span className="providerRowQual">
+        {showQualPill ? (
+          <span className={`qualPill qualPill--${qualVariant}`} title="Categorie qualificate / totali">
+            {qualificationCopy(item)}
+          </span>
+        ) : null}
+      </span>
+      <span className="providerRowErp">{showErp ? item.erp_id : null}</span>
       <Icon name="chevron-right" size={16} />
     </button>
   );
@@ -1087,7 +1099,6 @@ export function ProviderDetailPage() {
   const stateUpper = (data.state ?? '').toUpperCase();
   const isUsable = USABLE_PROVIDER_STATES.has(stateUpper);
   const isActive = stateUpper === 'ACTIVE';
-  const isDraft = stateUpper === 'DRAFT';
   const fullReadonly = !isUsable;
   const attention = buildDetailProviderAttention({
     provider: data,
