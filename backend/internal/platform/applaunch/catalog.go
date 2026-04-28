@@ -151,7 +151,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			Description:   "Richieste di acquisto e approvazioni.",
 			Icon:          "cart",
 			Href:          RDAAppHref,
-			Status:        "ready",
+			Status:        "dev",
 			CategoryID:    "acquisti",
 			CategoryTitle: "Acquisti",
 			AccessRoles:   RDAAccessRoles(),

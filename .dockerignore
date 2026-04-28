@@ -1,0 +1,31 @@
+.git
+.gitignore
+.DS_Store
+
+# Dependencies and package-manager caches
+node_modules
+**/node_modules
+.pnpm-store
+**/.pnpm-store
+
+# Build and test outputs should be regenerated inside the image
+dist
+**/dist
+coverage
+**/coverage
+artifacts
+**/artifacts
+backend/bin
+
+# Local environment files must never enter Vite production build contexts.
+# Vite inlines VITE_* values at build time, including dev auth bypass flags.
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Keep committed examples available for documentation/reference.
+!.env.example
+!.env.*.example
+!**/.env.example
+!**/.env.*.example

@@ -277,6 +277,15 @@ Alyante ERP ID
 - Used by: `apps/simulatori-vendita`, `apps/fornitori`.
 - Open questions: none.
 
+### Docker Frontend Builds Must Exclude Local Vite Env Files
+
+- Context: Vite mini-app production images built by `deploy/Dockerfile`.
+- Discovery: `.gitignore` excludes `.env.local`, but Docker does not use `.gitignore`. Without a matching `.dockerignore`, `COPY apps/ apps/` can copy app-local Vite env files into the frontend build stage. Vite then inlines `VITE_*` values at build time, so a local `VITE_DEV_AUTH_BYPASS=true` can produce a production bundle that bypasses Keycloak and sends the literal `dev-token`.
+- Practical rule: production Docker contexts must exclude `**/.env.local` and `**/.env.*.local`, and production bundles should be checked for dev-auth markers such as `dev-token` or `VITE_DEV_AUTH_BYPASS=true` before deploy. Runtime env changes cannot repair an already-built Vite bundle; rebuild from a clean context.
+- Evidence: `deploy/Dockerfile` copies `apps/` wholesale; no repo `.dockerignore` was present during the 2026-04-28 Fornitori production auth incident; `apps/fornitori/.env.local` contained `VITE_DEV_AUTH_BYPASS=true`; the built `apps/fornitori/dist` bundle inlined the bypass condition as true and included `dev-token`.
+- Used by: all Vite mini-app production builds, especially apps using `@mrsmith/auth-client`.
+- Open questions: whether to add a hard production-build guard in `@mrsmith/auth-client` in addition to Docker context hygiene.
+
 ### Portal Launcher Tiles Must Use Supported Portal Icon Keys
 
 - Context: adding or changing entries in `backend/internal/platform/applaunch/catalog.go`.
