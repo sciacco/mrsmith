@@ -1854,8 +1854,8 @@ function ContactDrawer({
     if (!role) return;
     const emailInput = event.currentTarget.elements.namedItem('email') as HTMLInputElement | null;
     if (!emailInput) return;
-    emailInput.value = emailInput.value.trim();
-    if (!emailInput.value || !emailInput.validity.valid) {
+    const email = emailInput.value.trim();
+    if (!email || !emailInput.validity.valid) {
       toast('Inserisci un indirizzo email valido per il contatto.', 'warning');
       return;
     }
