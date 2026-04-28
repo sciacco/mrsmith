@@ -4,6 +4,7 @@ import type {
   ArticleCategory,
   Category,
   CategoryPayload,
+  CategoryUpdatePayload,
   Country,
   DashboardCategory,
   DashboardDocument,
@@ -164,13 +165,14 @@ export function useFornitoriMutations() {
       onSuccess: invalidate,
     }),
     updateCategory: useMutation({
-      mutationFn: ({ id, body }: { id: number; body: CategoryPayload }) => api.put<Category>(`${root}/category/${id}`, body),
+      mutationFn: ({ id, body }: { id: number; body: CategoryUpdatePayload }) => api.put<Category>(`${root}/category/${id}`, body),
       onSuccess: invalidate,
     }),
     deleteCategory: useMutation({
       mutationFn: (id: number) => api.delete<void>(`${root}/category/${id}`),
       onSuccess: invalidate,
     }),
+    getCategory: (id: number) => api.get<Category>(`${root}/category/${id}`),
     createDocumentType: useMutation({
       mutationFn: (body: { name: string }) => api.post<DocumentType>(`${root}/document-type`, body),
       onSuccess: invalidate,

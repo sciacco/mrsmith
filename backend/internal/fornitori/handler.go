@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/authz"
@@ -109,7 +110,7 @@ func RegisterRoutes(mux *http.ServeMux, arakClient *arak.Client, arakDB *sql.DB,
 	handle("GET /fornitori/v1/category", h.proxyArak("/category", false))
 	handle("GET /fornitori/v1/category/{id}", h.proxyArakPath("/category/{id}", true))
 	handle("POST /fornitori/v1/category", h.proxyArak("/category", true))
-	handle("PUT /fornitori/v1/category/{id}", h.proxyArakPath("/category/{id}", true))
+	handle("PUT /fornitori/v1/category/{id}", h.handlePutCategory)
 	handle("DELETE /fornitori/v1/category/{id}", h.proxyArakPath("/category/{id}", true))
 
 	handle("GET /fornitori/v1/document-type", h.proxyArak("/document-type", false))
@@ -188,6 +189,111 @@ func (h *Handler) proxyToArak(pathFn func(*http.Request) string, defaultPaginati
 		}
 		h.forwardArak(w, r, arakRoot+pathFn(r), queryWithDefaults(r, defaultPagination), r.Body, nil)
 	}
+}
+
+func (h *Handler) handlePutCategory(w http.ResponseWriter, r *http.Request) {
+	if !h.requireDB(w) {
+		return
+	}
+
+	categoryID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || categoryID <= 0 {
+		httputil.Error(w, http.StatusBadRequest, "Categoria non valida")
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+		return
+	}
+	if message := validateCategoryEditBody(body); message != "" {
+		httputil.Error(w, http.StatusBadRequest, message)
+		return
+	}
+
+	// Temporary workaround for Mistra gateway losing document_types: [] before DAO marshal.
+	if _, err := h.db.ExecContext(r.Context(), `
+		SELECT provider_qualifications.category_edit($1, $2::json)`, categoryID, string(body)); err != nil {
+		h.handleCategoryStoreError(w, r, err, "category edit stored procedure failed")
+		return
+	}
+
+	var categoryJSON string
+	err = h.db.QueryRowContext(r.Context(), `
+		SELECT provider_qualifications.category_get($1)::text`, categoryID).Scan(&categoryJSON)
+	if err != nil {
+		h.handleCategoryStoreError(w, r, err, "category get after edit failed")
+		return
+	}
+	if !json.Valid([]byte(categoryJSON)) {
+		httputil.InternalError(w, r, errors.New("category_get returned invalid json"), "category get after edit returned invalid json")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(categoryJSON))
+}
+
+func validateCategoryEditBody(body []byte) string {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return "Richiesta non valida"
+	}
+	if raw == nil {
+		return "Richiesta non valida"
+	}
+
+	if rawName, ok := raw["name"]; ok {
+		if bytes.Equal(bytes.TrimSpace(rawName), []byte("null")) {
+			return "Nome categoria non valido"
+		}
+		var name string
+		if err := json.Unmarshal(rawName, &name); err != nil {
+			return "Nome categoria non valido"
+		}
+	}
+
+	if rawDocumentTypes, ok := raw["document_types"]; ok {
+		if bytes.Equal(bytes.TrimSpace(rawDocumentTypes), []byte("null")) {
+			return "Regole documentali non valide"
+		}
+		var documentTypes []struct {
+			ID       *int64 `json:"id"`
+			Required *bool  `json:"required"`
+		}
+		if err := json.Unmarshal(rawDocumentTypes, &documentTypes); err != nil {
+			return "Regole documentali non valide"
+		}
+		for _, documentType := range documentTypes {
+			if documentType.ID == nil || *documentType.ID <= 0 || documentType.Required == nil {
+				return "Regole documentali non valide"
+			}
+		}
+	}
+
+	return ""
+}
+
+func (h *Handler) handleCategoryStoreError(w http.ResponseWriter, r *http.Request, err error, logMessage string) {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		h.requestLogger(r, "category_update_direct_sp").Warn(logMessage, "error", err, "pg_code", pgErr.Code)
+		switch pgErr.Code {
+		case "T3QZ0":
+			httputil.Error(w, http.StatusNotFound, "Categoria non trovata")
+		case "T3QZ1":
+			httputil.Error(w, http.StatusConflict, "Nome categoria gia presente")
+		case "T9JZ3":
+			httputil.Error(w, http.StatusBadRequest, "Tipo documento non valido")
+		default:
+			httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+		}
+		return
+	}
+
+	httputil.InternalError(w, r, err, logMessage)
 }
 
 func queryWithDefaults(r *http.Request, defaultPagination bool) string {

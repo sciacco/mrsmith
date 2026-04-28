@@ -164,3 +164,8 @@ export interface CategoryPayload {
   name: string;
   document_types?: CategoryDocumentTypePayload[];
 }
+
+export interface CategoryUpdatePayload {
+  name?: string;
+  document_types: CategoryDocumentTypePayload[];
+}

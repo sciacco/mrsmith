@@ -1,6 +1,6 @@
 import { ApiError } from '@mrsmith/api-client';
 import { Button, Icon, Modal, SearchInput, Skeleton, TabNav, ToggleSwitch, useToast } from '@mrsmith/ui';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Outlet } from 'react-router-dom';
 import {
   useArticleCategories,
@@ -9,7 +9,7 @@ import {
   useFornitoriMutations,
   usePaymentMethods,
 } from '../api/queries';
-import type { ArticleCategory, Category, DocumentType } from '../api/types';
+import type { ArticleCategory, Category, CategoryUpdatePayload, DocumentType } from '../api/types';
 
 const settingsNavItems = [
   { label: 'Qualifica', path: '/impostazioni/qualifica' },
@@ -57,6 +57,7 @@ export function QualificationSettingsPage() {
   const [required, setRequired] = useState<number[]>([]);
   const [optional, setOptional] = useState<number[]>([]);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const categoryLoadSeq = useRef(0);
 
   const categoryItems = useMemo(
     () => [...(categories.data ?? [])].sort(compareCategoryByName),
@@ -74,19 +75,35 @@ export function QualificationSettingsPage() {
   useEffect(() => {
     if (selectedCategoryId !== null) return;
     const first = categoryItems[0];
-    if (first) loadCategory(first);
+    if (first) void loadCategory(first);
   }, [categoryItems, selectedCategoryId]);
 
-  function loadCategory(item: Category) {
+  function applyCategoryDetail(item: Category) {
     const draft = categoryDraft(item);
-    setSelectedCategoryId(item.id);
     setCategoryName(item.name);
     setRequired(draft.required);
     setOptional(draft.optional);
+  }
+
+  async function loadCategory(item: Category) {
+    const seq = categoryLoadSeq.current + 1;
+    categoryLoadSeq.current = seq;
+    setSelectedCategoryId(item.id);
+    applyCategoryDetail(item);
     setConfirmDeleteOpen(false);
+
+    try {
+      const detail = await mutations.getCategory(item.id);
+      if (categoryLoadSeq.current !== seq) return;
+      applyCategoryDetail(detail);
+    } catch (error) {
+      if (categoryLoadSeq.current !== seq) return;
+      toast(apiErrorMessage(error, 'Impossibile caricare il dettaglio categoria.'), 'error');
+    }
   }
 
   function startNewCategory() {
+    categoryLoadSeq.current += 1;
     setSelectedCategoryId('new');
     setCategoryName('');
     setRequired([]);
@@ -105,6 +122,32 @@ export function QualificationSettingsPage() {
     });
   }
 
+  async function updateCategoryAndReadBack(
+    categoryId: number,
+    bodies: CategoryUpdatePayload[],
+    expectedRequired: number[],
+    expectedOptional: number[],
+  ) {
+    let latest: Category | null = null;
+    let lastError: unknown;
+
+    for (const body of bodies) {
+      try {
+        await mutations.updateCategory.mutateAsync({ id: categoryId, body });
+        latest = await mutations.getCategory(categoryId);
+        const draft = categoryDraft(latest);
+        if (sameNumberMembers(draft.required, expectedRequired) && sameNumberMembers(draft.optional, expectedOptional)) {
+          return latest;
+        }
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (latest) return latest;
+    throw lastError instanceof Error ? lastError : new Error('Impossibile salvare la categoria');
+  }
+
   async function saveCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = categoryName.trim();
@@ -121,22 +164,32 @@ export function QualificationSettingsPage() {
 
     const uniqueRequired = [...new Set(required)];
     const uniqueOptional = [...new Set(optional)];
-    const body = {
-      name,
-      document_types: [
-        ...uniqueRequired.map((id) => ({ id, required: true })),
-        ...uniqueOptional.map((id) => ({ id, required: false })),
-      ],
-    };
+    const documentTypes = [
+      ...uniqueRequired.map((id) => ({ id, required: true })),
+      ...uniqueOptional.map((id) => ({ id, required: false })),
+    ];
 
     try {
-      const saved = selectedCategory && !creatingCategory
-        ? await mutations.updateCategory.mutateAsync({ id: selectedCategory.id, body })
-        : await mutations.createCategory.mutateAsync(body);
-      setSelectedCategoryId(saved.id);
-      setCategoryName(name);
-      setRequired(uniqueRequired);
-      setOptional(uniqueOptional);
+      if (selectedCategory && !creatingCategory) {
+        const bodies: CategoryUpdatePayload[] = name === selectedCategory.name
+          ? [{ document_types: documentTypes }]
+          : [{ name, document_types: documentTypes }];
+        const saved = await updateCategoryAndReadBack(selectedCategory.id, bodies, uniqueRequired, uniqueOptional);
+        const persistedDraft = categoryDraft(saved);
+        categoryLoadSeq.current += 1;
+        setSelectedCategoryId(selectedCategory.id);
+        applyCategoryDetail(saved);
+        if (!sameNumberMembers(persistedDraft.required, uniqueRequired) || !sameNumberMembers(persistedDraft.optional, uniqueOptional)) {
+          toast('Mistra ha accettato il salvataggio ma la regola documentale non risulta aggiornata.', 'error');
+          return;
+        }
+      } else {
+        const saved = await mutations.createCategory.mutateAsync({ name, document_types: documentTypes });
+        setSelectedCategoryId(saved.id);
+        setCategoryName(name);
+        setRequired(uniqueRequired);
+        setOptional(uniqueOptional);
+      }
       toast('Categoria salvata', 'success');
     } catch (error) {
       toast(apiErrorMessage(error, 'Impossibile salvare la categoria.'), 'error');
@@ -188,7 +241,7 @@ export function QualificationSettingsPage() {
                     type="button"
                     className={`settingsListRow settingsCategoryRow ${selected ? 'selected' : ''}`}
                     aria-current={selected ? 'true' : undefined}
-                    onClick={() => loadCategory(item)}
+                    onClick={() => void loadCategory(item)}
                   >
                     <span className="settingsListMain settingsCategoryMain">
                       <span className="settingsCategoryName">{item.name}</span>
@@ -857,6 +910,12 @@ function categoryDraft(category: Category) {
     else draft.optional.push(id);
   }
   return draft;
+}
+
+function sameNumberMembers(left: number[], right: number[]) {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((id) => rightSet.has(id));
 }
 
 function compareCategoryByName(left: Category, right: Category) {
