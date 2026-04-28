@@ -770,22 +770,24 @@ function ProviderRow({ item, onSelect }: { item: ProviderSummary; onSelect: (id:
   const location = formatProviderLocation(item);
   return (
     <button className="listRow listRow--provider" onClick={() => onSelect(item.id)}>
-      <span className="providerRowName">
-        <strong>{item.company_name ?? '—'}</strong>
-        <ProviderStateBadge state={item.state} />
-      </span>
-      <span className={`providerRowLocation${location ? '' : ' providerRowLocation--missing'}`}>
-        {location || 'Indirizzo mancante'}
+      <span className="providerRowMain">
+        <span className="providerRowTitle">
+          <strong>{item.company_name ?? '—'}</strong>
+          <ProviderStateBadge state={item.state} />
+        </span>
+        <span className={`providerRowLocation${location ? '' : ' providerRowLocation--missing'}`}>
+          <span className="providerRowLocationText">{location || 'Indirizzo mancante'}</span>
+          {item.has_expiring_docs ? (
+            <span className="docFlag" title="Documenti in scadenza nei prossimi 30 giorni">
+              <Icon name="triangle-alert" size={12} /> Doc
+            </span>
+          ) : null}
+        </span>
       </span>
       <span className="providerRowMeta">
         <span className={`qualPill qualPill--${qualVariant}`} title="Categorie qualificate / totali">
           {qualificationCopy(item)}
         </span>
-        {item.has_expiring_docs ? (
-          <span className="docFlag" title="Documenti in scadenza nei prossimi 30 giorni">
-            <Icon name="triangle-alert" size={12} /> Doc
-          </span>
-        ) : null}
         {item.erp_id !== null && item.erp_id !== undefined ? <span className="providerRowErp">ERP {item.erp_id}</span> : null}
       </span>
       <Icon name="chevron-right" size={16} />
