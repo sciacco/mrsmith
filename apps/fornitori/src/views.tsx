@@ -1145,7 +1145,6 @@ export function ProviderDetailPage() {
       </div>
       <ProviderHeader provider={data} providerCategories={providerCategories.data ?? []} />
       {fullReadonly ? <StateBanner state={data.state} /> : null}
-      {isDraft ? <CompletenessBanner provider={data} /> : null}
       <section className="providerDetailNav" aria-label="Sezioni fornitore">
         <TabNav
           items={PROVIDER_DETAIL_TABS}
@@ -1183,16 +1182,10 @@ function ProviderHeader({ provider, providerCategories }: { provider: Provider; 
           </span>
         ) : null}
       </div>
-      <p className="providerHeaderMeta">
-        {[
-          provider.vat_number ? `P.IVA ${provider.vat_number}` : null,
-          provider.cf ? `CF ${provider.cf}` : null,
-          provider.erp_id ? `ERP ${provider.erp_id}` : null,
-        ].filter(Boolean).join(' · ') || 'Identificativi non disponibili'}
-      </p>
-      {isDraft ? (
-        <p className={`providerHeaderHint providerHeaderHint--${activationBlocked ? 'blocked' : 'ready'}`}>
-          {activationBlocked ? <strong>{`Mancano: ${formatActivationFieldList(missing)}.`}</strong> : 'Dati completi. Attivazione gestita dalla sync Mistra.'}
+      {isDraft && activationBlocked ? (
+        <p className="providerHeaderHint providerHeaderHint--blocked">
+          <Icon name="triangle-alert" size={16} aria-hidden="true" />
+          <span>{`Mancano ${formatActivationFieldList(missing)}.`}</span>
         </p>
       ) : null}
       {total > 0 ? (
@@ -1227,24 +1220,6 @@ function StateBanner({ state }: { state?: string | null }) {
     );
   }
   return null;
-}
-
-function CompletenessBanner({ provider }: { provider: Provider }) {
-  const missing = missingProviderActivationFields(provider);
-  if (missing.length === 0) {
-    return (
-      <div className="banner banner--success">
-        <Icon name="check-circle" size={16} aria-hidden="true" />
-        <span>Dati obbligatori completi. Il fornitore sarà attivabile dalla sync Mistra.</span>
-      </div>
-    );
-  }
-  return (
-    <div className="banner banner--warning">
-      <Icon name="triangle-alert" size={16} aria-hidden="true" />
-      <span>Attivazione bloccata: aggiungi {formatActivationFieldList(missing)}.</span>
-    </div>
-  );
 }
 
 /** Formats field names as an Italian list, e.g. "campo1, campo2 e campo3". */

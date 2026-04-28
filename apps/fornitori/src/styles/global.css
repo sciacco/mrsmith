@@ -1334,12 +1334,6 @@ button {
   overflow-wrap: anywhere;
 }
 
-.providerHeaderMeta {
-  color: var(--color-text-secondary);
-  font-size: 0.85rem;
-  overflow-wrap: anywhere;
-}
-
 .activationBadge {
   display: inline-flex;
   align-items: center;
@@ -1366,19 +1360,22 @@ button {
 }
 
 .providerHeaderHint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
   color: var(--color-text-secondary);
   font-size: 0.84rem;
   font-weight: 600;
   line-height: 1.35;
+}
+
+.providerHeaderHint span {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .providerHeaderHint--blocked {
   color: var(--color-warning-strong);
-}
-
-.providerHeaderHint strong {
-  font-weight: 800;
 }
 
 .providerHeaderProgress {
