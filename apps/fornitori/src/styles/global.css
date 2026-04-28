@@ -1840,13 +1840,91 @@ button {
 .contactDrawerForm {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 1.1rem;
+  padding: 1.25rem 1.5rem;
 }
 
 .contactDrawerFooter {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+
+.contactField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.contactFieldLabel {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.contactFieldOptional {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.contactFieldInputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.contactFieldInputWrap input {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.contactFieldInputWrap input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.contactFieldInputWrap input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.contactFieldInputWrap[data-has-icon="true"] input {
+  padding-left: 2.1rem;
+}
+
+.contactFieldIcon {
+  position: absolute;
+  left: 0.7rem;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.contactFieldCheck {
+  position: absolute;
+  right: 0.7rem;
+  align-items: center;
+  color: var(--color-success);
+  pointer-events: none;
+}
+
+.contactFieldHelper {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
 }
 
 .createForm {

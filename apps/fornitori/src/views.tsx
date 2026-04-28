@@ -1663,6 +1663,7 @@ const CONTACT_ROLES: ContactRoleConfig[] = [
 interface ContactDrawerState {
   role: ContactRoleConfig;
   contact: ProviderReference | null;
+  providerName: string;
 }
 
 function ContactsSection({ provider, readonly }: { provider: Provider; readonly: boolean }) {
@@ -1726,8 +1727,8 @@ function ContactsSection({ provider, readonly }: { provider: Provider; readonly:
               items={items}
               readonly={readonly}
               canAdd={canAdd}
-              onAdd={() => setDrawer({ role, contact: null })}
-              onEdit={(contact) => setDrawer({ role, contact })}
+              onAdd={() => setDrawer({ role, contact: null, providerName: provider.company_name ?? '' })}
+              onEdit={(contact) => setDrawer({ role, contact, providerName: provider.company_name ?? '' })}
             />
           );
         })}
@@ -1831,6 +1832,65 @@ function contactDrawerTitle(state: ContactDrawerState) {
   return `${contact ? 'Modifica' : 'Nuovo'} contatto ${role.labelLower}`;
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const isLikelyEmail = (v: string) => EMAIL_RE.test(v.trim());
+
+function ContactField({
+  name,
+  label,
+  type = 'text',
+  defaultValue,
+  helper,
+  optional,
+  icon,
+  validate,
+}: {
+  name: string;
+  label: string;
+  type?: 'text' | 'email' | 'tel';
+  defaultValue?: string;
+  helper?: string;
+  optional?: boolean;
+  icon?: IconName;
+  validate?: (value: string) => boolean;
+}) {
+  const [value, setValue] = useState(defaultValue ?? '');
+  const [touched, setTouched] = useState(false);
+  const valid = validate ? validate(value) : false;
+  const showCheck = Boolean(validate) && touched && value.length > 0 && valid;
+
+  return (
+    <div className="contactField">
+      <label className="contactFieldLabel" htmlFor={`contactField-${name}`}>
+        <span>{label}</span>
+        {optional ? <span className="contactFieldOptional"> · opzionale</span> : null}
+      </label>
+      <div className="contactFieldInputWrap" data-has-icon={icon ? 'true' : 'false'}>
+        {icon ? (
+          <span className="contactFieldIcon" aria-hidden="true">
+            <Icon name={icon} size={14} />
+          </span>
+        ) : null}
+        <input
+          id={`contactField-${name}`}
+          name={name}
+          type={type}
+          defaultValue={defaultValue}
+          onInput={(event) => setValue(event.currentTarget.value)}
+          onBlur={() => setTouched(true)}
+          autoComplete="off"
+        />
+        {showCheck ? (
+          <span className="contactFieldCheck" aria-hidden="true">
+            <Icon name="check" size={14} />
+          </span>
+        ) : null}
+      </div>
+      {helper ? <p className="contactFieldHelper">{helper}</p> : null}
+    </div>
+  );
+}
+
 function ContactDrawer({
   state,
   onClose,
@@ -1870,6 +1930,7 @@ function ContactDrawer({
       size="sm"
       side="right"
       title={state ? contactDrawerTitle(state) : ''}
+      subtitle={state?.providerName || undefined}
       footer={
         <div className="contactDrawerFooter">
           <Button variant="secondary" type="button" onClick={onClose} disabled={pending}>Annulla</Button>
@@ -1892,10 +1953,24 @@ function ContactDrawer({
           key={`${state.role.key}-${contact?.id ?? 'new'}`}
           onSubmit={submit}
         >
-          <Input name="first_name" label="Nome" defaultValue={contact?.first_name ?? ''} />
-          <Input name="last_name" label="Cognome" defaultValue={contact?.last_name ?? ''} />
-          <Input name="email" label="Email" type="email" defaultValue={contact?.email ?? ''} required />
-          <Input name="phone" label="Telefono" defaultValue={contact?.phone ?? ''} />
+          <ContactField name="first_name" label="Nome" defaultValue={contact?.first_name ?? ''} />
+          <ContactField name="last_name" label="Cognome" defaultValue={contact?.last_name ?? ''} />
+          <ContactField
+            name="email"
+            label="Email"
+            type="email"
+            icon="mail"
+            validate={isLikelyEmail}
+            defaultValue={contact?.email ?? ''}
+          />
+          <ContactField
+            name="phone"
+            label="Telefono"
+            type="tel"
+            icon="phone"
+            optional
+            defaultValue={contact?.phone ?? ''}
+          />
         </form>
       ) : null}
     </Drawer>
