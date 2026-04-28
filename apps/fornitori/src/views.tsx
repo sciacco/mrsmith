@@ -1863,6 +1863,7 @@ function AnagraficaSection({
   }, [baseline]);
 
   const dirty = !providerFormStatesEqual(formState, baseline);
+  const qualificationRef = (provider.refs ?? []).find((r) => r.reference_type === QUALIFICATION_REFERENCE_TYPE);
 
   useEffect(() => {
     if (!dirty) return;
@@ -1970,6 +1971,16 @@ function AnagraficaSection({
             <Input name="city" label="Città" value={formState.city} disabled={masterFieldsDisabled} onChange={(event) => updateField('city', event.target.value)} />
             <Input name="postal_code" label="CAP" value={formState.postal_code} disabled={masterFieldsDisabled} onChange={(event) => updateField('postal_code', event.target.value)} />
             <Input name="address" label="Indirizzo" value={formState.address} disabled={masterFieldsDisabled} onChange={(event) => updateField('address', event.target.value)} wide />
+            {qualificationRef ? (
+              <p className="wideField addressContact">
+                {'Contatto: '}
+                {[
+                  [qualificationRef.first_name, qualificationRef.last_name].filter(Boolean).join(' '),
+                  qualificationRef.email,
+                  qualificationRef.phone,
+                ].filter(Boolean).join(' · ')}
+              </p>
+            ) : null}
           </div>
         </div>
 

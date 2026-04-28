@@ -956,6 +956,12 @@ button {
   grid-column: 1 / -1;
 }
 
+.addressContact {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-top: -0.1rem;
+}
+
 .alyanteLookup {
   position: relative;
   min-width: 0;
