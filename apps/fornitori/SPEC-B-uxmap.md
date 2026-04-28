@@ -220,9 +220,7 @@ L'espressione `TBL_supply.selectedRow.id || appsmith.URL.queryParams.id_provider
 - Add categoria: nome + lista doc_types richiesti.
 - Edit categoria: nome opzionale (solo se cambiato), doc_types obbligatori — replicato 1:1.
 
-**Authz**:
-- Se l'utente è nel gruppo `Acquisti RDA AFC` (Keycloak) → tutto in **read-only** (Save / Delete disabilitati).
-- Migrazione: ruolo Keycloak `app_fornitori_readonly` (o nome equivalente — definito in Phase D), enforce sia FE (disable button) sia BE (403 sulle write).
+**Authz**: chiunque abbia `app_fornitori_access` può creare/modificare/eliminare. Il gate Appsmith `Acquisti RDA AFC → read-only` non è stato portato.
 
 ---
 
@@ -237,9 +235,7 @@ L'espressione `TBL_supply.selectedRow.id || appsmith.URL.queryParams.id_provider
 - EditActions per riga: save / discard.
 - Save → `UpdateAvailability` (oggi UPDATE SQL diretto, target: `PUT /api/fornitori/v1/payment-method/{code}/rda-available` body `{rda_available}`).
 
-**Authz**:
-- Stesso gate `Acquisti RDA AFC` → read-only (anche se l'audit non lo nota esplicitamente per questa pagina, va verificato; nel porting **lo applichiamo per coerenza** — la feature è admin-only).
-- ❓ **Q-B8**: confermi che anche Modalità Pagamenti RDA va gated sul ruolo `app_fornitori_readonly`? L'audit lista questo gate solo su Imp.Qualifica e Articoli-Categorie, ma logicamente è una pagina admin alla pari.
+**Authz**: write disponibile a chiunque abbia `app_fornitori_access`.
 
 **Niente add / niente delete**: la lista metodi di pagamento è popolata da Postgres come master data, nessun CRUD esposto in UI.
 
@@ -262,7 +258,7 @@ L'espressione `TBL_supply.selectedRow.id || appsmith.URL.queryParams.id_provider
 **Note di porting**:
 - Stesso discorso di §3 sul container imperativo → ❓ **Q-B9** (gemella di Q-B7): nel porting layout naturale o show/hide? **Default: layout naturale.**
 - Articoli orfani: rimangono nascosti (Q-A11 → inner join 1:1).
-- Authz: `app_fornitori_readonly` disabilita Save/Reset.
+- Authz: write disponibile a chiunque abbia `app_fornitori_access`.
 
 ---
 
@@ -274,14 +270,7 @@ La Dashboard naviga a Fornitori passando `?id_provider=X` + chiama `storeValue('
 
 ### Pattern di authz
 
-Due ruoli effettivi nell'esperienza:
-
-| Ruolo | Accesso | Pagine |
-| --- | --- | --- |
-| Standard (operatore qualifica) | RW | Dashboard, Fornitori, Imp.Qualifica, Modalità Pagamenti, Articoli-Categorie |
-| Read-only ("Acquisti RDA AFC") | RW Dashboard + Fornitori; **R-only** Imp.Qualifica + Articoli-Categorie (+ Modalità Pagamenti se Q-B8 conferma) | tutte |
-
-In Keycloak: ruolo di accesso `app_fornitori_access` (entrambi i ruoli devono averlo) + ruolo aggiuntivo `app_fornitori_readonly` (per gli utenti read-only). La Phase D dettaglierà.
+Un solo livello effettivo: chi ha `app_fornitori_access` può eseguire tutte le operazioni dell'app. Il gate Appsmith `Acquisti RDA AFC → read-only` (audit §1, §2.3, §2.5) non è stato portato — capability privilegiata distinta `app_fornitori_skip_qualification` per il switch sul tab Dati.
 
 ### Copy
 
@@ -300,7 +289,7 @@ Modalità Pagamenti RDA e Tab Contatti usano il pattern Appsmith Table v2 + colo
 | Dashboard | Operational landing | Q-B1 (semantica counter "categorie scadute") |
 | Fornitori | Master-detail con tab + modali | Q-B2 (visibilità switch privilegiato), Q-B3 (delete reference?), Q-B4 (filtro `category_id` su /document), Q-B5 (Edit doc richiede file?), Q-B6 (Storico Modifiche da omettere?) |
 | Impostazioni Qualifica | Doppio CRUD admin | Q-B7 (layout naturale vs show/hide imperativo) |
-| Modalità Pagamenti RDA | Tabella inline-edit | Q-B8 (gating `app_fornitori_readonly` qui?) |
+| Modalità Pagamenti RDA | Tabella inline-edit | — |
 | Articoli - Categorie | Master-detail snello | Q-B9 (layout naturale, gemella di Q-B7) |
 
 Le 9 Q-B sono tutte conferme di default ragionevoli. Sblocco Phase C dopo conferma.
@@ -316,5 +305,5 @@ Le 9 Q-B sono tutte conferme di default ragionevoli. Sblocco Phase C dopo confer
 | Q-B5 | ✅ Edit documento richiede file + scadenza (1:1 con `document-edit` API). |
 | Q-B6 | ✅ Tab "Storico Modifiche" omessa nel porting. |
 | Q-B7 | ✅ Layout naturale al posto di setVisibility imperative (Imp.Qualifica). |
-| Q-B8 | ✅ Modalità Pagamenti RDA gated su `app_fornitori_readonly`. |
+| Q-B8 | ⛔ Superato — gate readonly rimosso, Modalità Pagamenti scrivibile a chi ha `app_fornitori_access`. |
 | Q-B9 | ✅ Layout naturale (Articoli-Categorie). |

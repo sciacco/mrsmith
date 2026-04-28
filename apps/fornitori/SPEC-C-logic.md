@@ -112,35 +112,31 @@ Dalla §4 dell'audit + le sezioni di Phase A:
 | 8 | **`skip_qualification_validation`** è un payload privilegiato | **BE** (gating) + **FE** (visibilità switch) | BE: 403 se non hai il ruolo (vedi §3 authz). FE: switch nascosto se ruolo assente (Q-B2). |
 | 9 | **Reference categories** = enum 4 valori; add esclude QUALIFICATION_REF | **FE** | Costanti in `lib/reference.ts`. Mistra non documenta enum, conferma runtime. |
 | 10 | **provider×category.critical** boolean, settato a creazione | **FE** | Replicato. |
-| 11 | **`Acquisti RDA AFC` → read-only** su Imp.Qualifica + Articoli-Categorie + Modalità Pagamenti | **BE** + **FE** | BE: 403 sulle write per il ruolo `app_fornitori_readonly`. FE: button disabled. |
 
 ---
 
 ## 3. Authz — placement
 
-**Decisione**: spostiamo l'enforcement da client-side (oggi `appsmith.user.groups.includes('Acquisti RDA AFC')`, bypassabile triviale) a **backend** primario + **frontend** echo per UX.
+**Decisione**: l'unico ruolo richiesto per scrivere è `app_fornitori_access`. Il gate Appsmith `Acquisti RDA AFC → read-only` (audit §1) non è stato portato — chi accede all'app può eseguire tutte le operazioni. Resta una capability privilegiata distinta per il payload `skip_qualification_validation`.
 
-### Ruoli Keycloak (proposti)
+### Ruoli Keycloak
 
-| Ruolo | Scopo | Mappa al gruppo Appsmith |
-| --- | --- | --- |
-| `app_fornitori_access` | Accesso alla mini-app (deve averlo chiunque acceda) | (nessuno specifico — è l'access role del portale) |
-| `app_fornitori_readonly` | Sola lettura su Imp.Qualifica, Articoli-Categorie, Modalità Pagamenti | `Acquisti RDA AFC` |
-| `app_fornitori_skip_qualification` | Può attivare lo switch `skip_qualification_validation` su `PUT /provider/{id}` | (oggi nessun gating, novità del porting) |
+| Ruolo | Scopo |
+| --- | --- |
+| `app_fornitori_access` | Accesso alla mini-app + write su tutti gli endpoint admin |
+| `app_fornitori_skip_qualification` | Può attivare lo switch `skip_qualification_validation` su `PUT /provider/{id}` |
 
 ### Enforcement BE
 
-| Endpoint | Default | Read-only | Skip-qual |
-| --- | --- | --- | --- |
-| `GET /api/fornitori/v1/...` | 200 | 200 | 200 |
-| `POST/PUT/DELETE /api/fornitori/v1/category[…]` | 200 | **403** | 200 |
-| `POST/PUT/DELETE /api/fornitori/v1/document-type[…]` | 200 | **403** | 200 |
-| `PUT /api/fornitori/v1/payment-method/{code}/rda-available` | 200 | **403** | 200 |
-| `PUT /api/fornitori/v1/article-category/{code}` | 200 | **403** | 200 |
-| `PUT /api/fornitori/v1/provider/{id}` con `skip_qualification_validation: true` nel body | **403** | **403** | 200 |
-| `PUT /api/fornitori/v1/provider/{id}` senza `skip_qualification_validation` | 200 | 200 | 200 |
-
-❓ **Q-C1**: Il portale espone già gating `app_<name>_access` per accesso alla mini-app (vedi `applaunch/catalog.go`). Confermo nuovi ruoli `app_fornitori_readonly` e `app_fornitori_skip_qualification` con questi nomi? (in linea con la naming convention `app_{appname}_<scope>` di CLAUDE.md). Se preferisci nomi diversi va bene.
+| Endpoint | Default | Skip-qual |
+| --- | --- | --- |
+| `GET /api/fornitori/v1/...` | 200 | 200 |
+| `POST/PUT/DELETE /api/fornitori/v1/category[…]` | 200 | 200 |
+| `POST/PUT/DELETE /api/fornitori/v1/document-type[…]` | 200 | 200 |
+| `PUT /api/fornitori/v1/payment-method/{code}/rda-available` | 200 | 200 |
+| `PUT /api/fornitori/v1/article-category/{code}` | 200 | 200 |
+| `PUT /api/fornitori/v1/provider/{id}` con `skip_qualification_validation: true` nel body | **403** | 200 |
+| `PUT /api/fornitori/v1/provider/{id}` senza `skip_qualification_validation` | 200 | 200 |
 
 ❓ **Q-C2**: Il `skip_qualification_validation` oggi è una PUT al `/provider/{id}` di Arak — non sotto il nostro controllo. Per fare gating dobbiamo: (a) il backend nostro intercetta il body, valida il ruolo, poi forwarda; oppure (b) il frontend chiama Arak via il nostro proxy `/api/fornitori/v1/provider/{id}` (che fa la validazione e poi chiama Arak via il client Go). **Default proposto: (b)** — passiamo sempre dal nostro backend per le write, mai chiamate dirette FE → Arak. Coerente con altre mini-app?
 
@@ -231,7 +227,7 @@ Niente Redux / Zustand: l'app è state-light (un master + dettagli derivati dall
 
 | ID | Topic | Quesito | Default |
 | --- | --- | --- | --- |
-| Q-C1 | Naming Keycloak roles | OK `app_fornitori_access`, `app_fornitori_readonly`, `app_fornitori_skip_qualification`? | Sì |
+| Q-C1 | Naming Keycloak roles | OK `app_fornitori_access` + `app_fornitori_skip_qualification`? | Sì |
 | Q-C2 | Skip-qual gating | FE → backend nostro → Arak (non chiamate dirette FE → Arak)? | Sì |
 | Q-C3 | Download documento | Backend stream pass-through (no redirect 302)? | Sì |
 | Q-C4 | Toast/alert UI | Riusare component shared se esiste, altrimenti inline? | Sì (verifico in Phase E) |
@@ -242,7 +238,7 @@ Tutte conferme di default. Sblocco Phase D dopo conferma.
 
 | ID | Esito |
 | --- | --- |
-| Q-C1 | ✅ Ruoli `app_fornitori_access`, `app_fornitori_readonly`, `app_fornitori_skip_qualification`. |
+| Q-C1 | ✅ Ruoli `app_fornitori_access` + `app_fornitori_skip_qualification`. |
 | Q-C2 | ✅ FE chiama sempre il backend nostro; mai FE → Arak diretto. |
 | Q-C3 | ✅ Stream pass-through del download. |
 | Q-C4 | ✅ Riuso `ToastProvider` + `useToast` da `@mrsmith/ui` (`packages/ui/src/components/Toast/ToastProvider.tsx`). |

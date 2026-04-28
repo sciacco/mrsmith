@@ -11,7 +11,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -30,7 +29,6 @@ const (
 	arakRoot  = "/arak/provider-qualification/v1"
 
 	codeDependencyUnavailable = "DEPENDENCY_UNAVAILABLE"
-	codeReadonlyDenied        = "READONLY_DENIED"
 	codeSkipRoleRequired      = "SKIP_QUALIFICATION_ROLE_REQUIRED"
 
 	maxUploadBytes = 25 << 20
@@ -110,14 +108,14 @@ func RegisterRoutes(mux *http.ServeMux, arakClient *arak.Client, arakDB *sql.DB,
 
 	handle("GET /fornitori/v1/category", h.proxyArak("/category", false))
 	handle("GET /fornitori/v1/category/{id}", h.proxyArakPath("/category/{id}", true))
-	handle("POST /fornitori/v1/category", h.requireWritable(h.proxyArak("/category", true)))
-	handle("PUT /fornitori/v1/category/{id}", h.requireWritable(h.proxyArakPath("/category/{id}", true)))
-	handle("DELETE /fornitori/v1/category/{id}", h.requireWritable(h.proxyArakPath("/category/{id}", true)))
+	handle("POST /fornitori/v1/category", h.proxyArak("/category", true))
+	handle("PUT /fornitori/v1/category/{id}", h.proxyArakPath("/category/{id}", true))
+	handle("DELETE /fornitori/v1/category/{id}", h.proxyArakPath("/category/{id}", true))
 
 	handle("GET /fornitori/v1/document-type", h.proxyArak("/document-type", false))
-	handle("POST /fornitori/v1/document-type", h.requireWritable(h.proxyArak("/document-type", true)))
-	handle("PUT /fornitori/v1/document-type/{id}", h.requireWritable(h.proxyArakPath("/document-type/{id}", true)))
-	handle("DELETE /fornitori/v1/document-type/{id}", h.requireWritable(h.proxyArakPath("/document-type/{id}", true)))
+	handle("POST /fornitori/v1/document-type", h.proxyArak("/document-type", true))
+	handle("PUT /fornitori/v1/document-type/{id}", h.proxyArakPath("/document-type/{id}", true))
+	handle("DELETE /fornitori/v1/document-type/{id}", h.proxyArakPath("/document-type/{id}", true))
 
 	handle("GET /fornitori/v1/document", h.proxyArak("/document", false))
 	handle("POST /fornitori/v1/document", h.handleUploadDocument)
@@ -132,11 +130,11 @@ func RegisterRoutes(mux *http.ServeMux, arakClient *arak.Client, arakDB *sql.DB,
 	handle("GET /fornitori/v1/dashboard/categories-to-review", h.handleDashboardCategoriesToReview)
 
 	handle("GET /fornitori/v1/payment-method", h.handlePaymentMethods)
-	handle("PUT /fornitori/v1/payment-method/{code}/rda-available", h.requireWritable(h.handlePaymentMethodAvailability))
+	handle("PUT /fornitori/v1/payment-method/{code}/rda-available", h.handlePaymentMethodAvailability)
 	handle("GET /fornitori/v1/country", h.handleCountries)
 
 	handle("GET /fornitori/v1/article-category", h.handleArticleCategories)
-	handle("PUT /fornitori/v1/article-category/{article_code}", h.requireWritable(h.handleArticleCategoryUpdate))
+	handle("PUT /fornitori/v1/article-category/{article_code}", h.handleArticleCategoryUpdate)
 }
 
 func (h *Handler) requestLogger(r *http.Request, operation string, attrs ...any) *slog.Logger {
@@ -165,20 +163,6 @@ func (h *Handler) requireDB(w http.ResponseWriter) bool {
 		"code":  codeDependencyUnavailable,
 	})
 	return false
-}
-
-func (h *Handler) requireWritable(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		claims, ok := auth.GetClaims(r.Context())
-		if ok && slices.Contains(claims.Roles, "app_fornitori_readonly") && !slices.Contains(claims.Roles, authz.DevAdminRole) {
-			httputil.JSON(w, http.StatusForbidden, map[string]string{
-				"error": "Operazione non consentita per il tuo profilo",
-				"code":  codeReadonlyDenied,
-			})
-			return
-		}
-		next(w, r)
-	}
 }
 
 func (h *Handler) proxyArak(path string, defaults bool) http.HandlerFunc {

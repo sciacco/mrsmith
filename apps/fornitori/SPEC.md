@@ -156,7 +156,7 @@ Documenti di lavoro per Phase A/B/C/D: vedi `apps/fornitori/SPEC-A-entities.md`,
   - List: `GET /api/fornitori/v1/payment-method` → `SELECT code, description, rda_available FROM provider_qualifications.payment_method`
   - Toggle: `PUT /api/fornitori/v1/payment-method/{code}/rda-available` body `{rda_available: bool}` → `UPDATE … SET rda_available=$1 WHERE code=$2`
 - **Fields**: `code` (PK), `description`, `rda_available` (bool).
-- **Constraints**: nessun add/delete in UI; toggle gated su ruolo `app_fornitori_readonly` (no write) ✓ Q-B8.
+- **Constraints**: nessun add/delete in UI; toggle disponibile a chiunque abbia `app_fornitori_access`.
 - **Open questions**: nessuna.
 
 ### Entity: Article × Category mapping
@@ -166,7 +166,7 @@ Documenti di lavoro per Phase A/B/C/D: vedi `apps/fornitori/SPEC-A-entities.md`,
   - List: `GET /api/fornitori/v1/article-category` → INNER JOIN `articles.article_category × articles.article × provider_qualifications.service_category` (orfani nascosti ✓ Q-A11)
   - Update: `PUT /api/fornitori/v1/article-category/{article_code}` body `{category_id}` → `UPDATE articles.article_category SET category_id=$1, updated_at=now() WHERE article_code=$2`
 - **Fields**: `article_code` (PK), `description`, `category_id`, `category_name` (denormalizzato).
-- **Constraints**: gated `app_fornitori_readonly`.
+- **Constraints**: scrivibile da chiunque abbia `app_fornitori_access`.
 - **Open questions**: nessuna.
 
 ---
@@ -245,21 +245,19 @@ Documenti di lavoro per Phase A/B/C/D: vedi `apps/fornitori/SPEC-A-entities.md`,
   - Document type: lista, add modal, detail con form semplice.
 - **Notes**:
   - Validazione no-overlap fixata ✓ Q-A5.
-  - Read-only se utente in `app_fornitori_readonly` ✓ Q-C1.
 
 ### View: Modalità Pagamenti RDA
 
 - **User intent**: admin abilita/disabilita `rda_available` per metodo di pagamento.
 - **Pattern**: tabella inline-edit single-column.
 - **Key actions**: save inline → `PUT /payment-method/{code}/rda-available`.
-- **Notes**: read-only se `app_fornitori_readonly` ✓ Q-B8.
 
 ### View: Articoli - Categorie
 
 - **User intent**: associare articolo ERP → categoria di qualifica.
 - **Pattern**: master-detail snello (tabella + form contestuale layout naturale ✓ Q-B9).
 - **Key actions**: selezione riga → form con DDL category attivo + Save → `PUT /article-category/{code}`.
-- **Notes**: orfani nascosti ✓ Q-A11; read-only se `app_fornitori_readonly`.
+- **Notes**: orfani nascosti ✓ Q-A11.
 
 ---
 
@@ -274,7 +272,6 @@ Documenti di lavoro per Phase A/B/C/D: vedi `apps/fornitori/SPEC-A-entities.md`,
   - 2 article-category (list + update) — SQL diretto.
 - Authz primaria (Keycloak role check):
   - `app_fornitori_access` — accesso alla mini-app (precondizione su tutti gli endpoint).
-  - `app_fornitori_readonly` — 403 sulle write di Imp.Qualifica, Modalità Pagamenti, Articoli-Categorie.
   - `app_fornitori_skip_qualification` — 403 su `PUT /provider/{id}` se body contiene `skip_qualification_validation: true`.
 - Stream pass-through del download documento (✓ Q-C3, no redirect 302).
 - Calcolo `days_remaining` per dashboard expiring-documents.
@@ -289,7 +286,7 @@ Documenti di lavoro per Phase A/B/C/D: vedi `apps/fornitori/SPEC-A-entities.md`,
 - Layout naturali (no setVisibility imperativo) per Imp.Qualifica e Articoli-Categorie ✓ Q-B7, Q-B9.
 - Toast italiano (`useToast` + `ToastProvider` da `@mrsmith/ui` ✓ Q-C4) con messaggi letterali dell'app Appsmith ("Aggiornamento completato", "Inserimento completato", "Errore nel salvataggio del contatto: …").
 - URL come unica source of truth per provider selezionato + tab attiva (`useSearchParams`).
-- Hook `useHasRole('app_fornitori_readonly' | 'app_fornitori_skip_qualification')` per disable/hide button + switch privilegiato.
+- Hook `useHasRole('app_fornitori_skip_qualification')` per hide del switch privilegiato.
 
 ### Shared validation or formatting
 
@@ -370,15 +367,15 @@ I cambi di stato `document.state` (PENDING_VERIFY_*, EXPIRED, OK) e `provider_ca
 #### Category
 - `GET /category`
 - `GET /category/{id}`
-- `POST /category` — write gated `app_fornitori_readonly`
-- `PUT /category/{id}` — write gated
-- `DELETE /category/{id}` — write gated
+- `POST /category`
+- `PUT /category/{id}`
+- `DELETE /category/{id}`
 
 #### Document Type
 - `GET /document-type`
-- `POST /document-type` — write gated
-- `PUT /document-type/{id}` — write gated
-- `DELETE /document-type/{id}` — write gated
+- `POST /document-type`
+- `PUT /document-type/{id}`
+- `DELETE /document-type/{id}`
 
 #### Provider Category
 - `GET /provider/{id}/category`
@@ -397,11 +394,11 @@ I cambi di stato `document.state` (PENDING_VERIFY_*, EXPIRED, OK) e `provider_ca
 
 #### Payment Method (nuovi)
 - `GET /payment-method`
-- `PUT /payment-method/{code}/rda-available` — write gated `app_fornitori_readonly`
+- `PUT /payment-method/{code}/rda-available`
 
 #### Article Category (nuovi)
 - `GET /article-category`
-- `PUT /article-category/{code}` — write gated `app_fornitori_readonly`
+- `PUT /article-category/{code}`
 
 ### Outbound (backend → ext)
 
@@ -420,7 +417,7 @@ I cambi di stato `document.state` (PENDING_VERIFY_*, EXPIRED, OK) e `provider_ca
 
 ### Security or compliance
 
-- **Authz primaria server-side**, mai più solo client-side (tre ruoli Keycloak: `app_fornitori_access`, `app_fornitori_readonly`, `app_fornitori_skip_qualification`).
+- **Authz primaria server-side**, mai più solo client-side (due ruoli Keycloak: `app_fornitori_access`, `app_fornitori_skip_qualification`).
 - Mai chiamate dirette FE → Arak: **tutto passa dal backend nostro** ✓ Q-C2.
 - Token Mistra **non esposto al browser**: download = stream pass-through ✓ Q-C3.
 - Mantenere isolamento sandbox per il file upload (validazione MIME + size).

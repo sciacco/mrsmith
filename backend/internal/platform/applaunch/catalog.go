@@ -63,7 +63,6 @@ const (
 var (
 	budgetAccessRoles                = []string{"app_budget_access"}
 	fornitoriAccessRoles             = []string{"app_fornitori_access"}
-	fornitoriReadonlyRoles           = []string{"app_fornitori_readonly"}
 	fornitoriSkipQualificationRoles  = []string{"app_fornitori_skip_qualification"}
 	rdaAccessRoles                   = []string{"app_rda_access"}
 	rdaApproverL1L2Roles             = []string{"app_rda_approver_l1l2"}
@@ -415,10 +414,6 @@ func FornitoriAccessRoles() []string {
 	return slices.Clone(fornitoriAccessRoles)
 }
 
-func FornitoriReadonlyRoles() []string {
-	return slices.Clone(fornitoriReadonlyRoles)
-}
-
 func FornitoriSkipQualificationRoles() []string {
 	return slices.Clone(fornitoriSkipQualificationRoles)
 }
@@ -531,7 +526,6 @@ func AllRoles() []string {
 	groups := [][]string{
 		budgetAccessRoles,
 		fornitoriAccessRoles,
-		fornitoriReadonlyRoles,
 		fornitoriSkipQualificationRoles,
 		rdaAccessRoles,
 		rdaApproverL1L2Roles,

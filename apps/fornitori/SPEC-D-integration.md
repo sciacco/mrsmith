@@ -127,7 +127,7 @@ Impostazioni Qualifica
 └─ TBL_document_type: stesso pattern per document type
 ```
 
-Read-only se ruolo `app_fornitori_readonly` (button disabled FE + 403 BE).
+Scrittura disponibile a chiunque abbia `app_fornitori_access`.
 
 ### Journey J5 — "Toggle disponibilità RDA"
 
@@ -190,7 +190,7 @@ Cose che oggi accadono "per magia" Appsmith e vanno esplicitate nel porting:
 
 | Comportamento Appsmith | Nel porting React |
 | --- | --- |
-| `appsmith.user.groups.includes(...)` | Hook custom `useHasRole('app_fornitori_readonly')` che legge dal token Keycloak |
+| `appsmith.user.groups.includes(...)` | Non portato — il gate Appsmith su `Acquisti RDA AFC` è stato rimosso, chi ha `app_fornitori_access` può scrivere ovunque. `useHasRole` resta solo per `app_fornitori_skip_qualification`. |
 | `appsmith.URL.queryParams.id_provider` | `useSearchParams()` |
 | `storeValue('selectedTab', 'Dati')` + `appsmith.store.selectedTab` | `searchParams.set('tab', 'Dati')` (URL come unica source of truth, niente storage globale) |
 | `setVisibility(true|false)` imperative | Layout naturale (Q-B7, Q-B9) o conditional rendering React |
@@ -212,7 +212,7 @@ Cose che oggi accadono "per magia" Appsmith e vanno esplicitate nel porting:
 | `backend/.env` | `ARAK_DSN=postgres://<user>:<pass>@10.129.32.20:5432/<db>?sslmode=disable` |
 | `backend/internal/platform/config/config.go` | Campo `ArakDSN string` + `envOr("ARAK_DSN", "")` |
 | `backend/cmd/server/main.go` | Init `arakDB *sql.DB` se `cfg.ArakDSN != ""`; import `internal/fornitori`; `fornitori.RegisterRoutes(api, arakCli, arakDB)`; gating su `cfg.ArakDSN`/`arakCli` come fanno altre app |
-| `backend/internal/platform/applaunch/catalog.go` | `FornitoriAppID = "fornitori"`, `FornitoriAppHref`, ruoli `app_fornitori_access` + `app_fornitori_readonly` + `app_fornitori_skip_qualification` (?), entry catalog |
+| `backend/internal/platform/applaunch/catalog.go` | `FornitoriAppID = "fornitori"`, `FornitoriAppHref`, ruoli `app_fornitori_access` + `app_fornitori_skip_qualification`, entry catalog |
 | `package.json` (root) | `dev:fornitori` script + concurrently entry (name + color + filter) |
 | `Makefile` | `dev-fornitori` target + `.PHONY` |
 | `apps/fornitori/` | Vite+React app (workspace `mrsmith-fornitori`, package name) |

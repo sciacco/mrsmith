@@ -10,7 +10,6 @@ import {
   usePaymentMethods,
 } from '../api/queries';
 import type { ArticleCategory, Category, DocumentType } from '../api/types';
-import { useHasRole } from '../hooks/useHasRole';
 
 const settingsNavItems = [
   { label: 'Qualifica', path: '/impostazioni/qualifica' },
@@ -49,7 +48,6 @@ export function SettingsLayout() {
 }
 
 export function QualificationSettingsPage() {
-  const readonly = useHasRole('app_fornitori_readonly');
   const { toast } = useToast();
   const categories = useCategories();
   const documentTypes = useDocumentTypes();
@@ -166,7 +164,7 @@ export function QualificationSettingsPage() {
               <h2>Categorie qualifica</h2>
               <span className="settingsPanelMeta">{countLabel(categoryItems.length, 'categoria', 'categorie')}</span>
             </div>
-            <Button size="sm" leftIcon={<Icon name="plus" />} onClick={startNewCategory} disabled={readonly}>
+            <Button size="sm" leftIcon={<Icon name="plus" />} onClick={startNewCategory}>
               Nuova categoria
             </Button>
           </div>
@@ -244,7 +242,6 @@ export function QualificationSettingsPage() {
                 error={documentTypes.error}
                 required={required}
                 optional={optional}
-                readonly={readonly}
                 onChange={setDocumentRule}
               />
               <div className="settingsFormActions">
@@ -253,7 +250,6 @@ export function QualificationSettingsPage() {
                     type="button"
                     variant="danger"
                     leftIcon={<Icon name="trash" />}
-                    disabled={readonly}
                     onClick={() => setConfirmDeleteOpen(true)}
                   >
                     Elimina
@@ -263,7 +259,7 @@ export function QualificationSettingsPage() {
                   type="submit"
                   leftIcon={<Icon name="check" />}
                   loading={mutations.createCategory.isPending || mutations.updateCategory.isPending}
-                  disabled={readonly || documentTypes.isLoading || Boolean(documentTypes.error)}
+                  disabled={documentTypes.isLoading || Boolean(documentTypes.error)}
                 >
                   Salva
                 </Button>
@@ -283,7 +279,6 @@ export function QualificationSettingsPage() {
               leftIcon={<Icon name="trash" />}
               loading={mutations.deleteCategory.isPending}
               onClick={() => void deleteCategory()}
-              disabled={readonly}
             >
               Elimina
             </Button>
@@ -300,7 +295,6 @@ function DocumentRuleMatrix({
   error,
   required,
   optional,
-  readonly,
   onChange,
 }: {
   documentTypes: DocumentType[];
@@ -308,7 +302,6 @@ function DocumentRuleMatrix({
   error: unknown;
   required: number[];
   optional: number[];
-  readonly: boolean;
   onChange: (documentTypeId: number, rule: DocumentRuleState) => void;
 }) {
   const assignedDocumentIds = new Set([...required, ...optional]);
@@ -363,7 +356,6 @@ function DocumentRuleMatrix({
                         className={`settingsRuleSegmentButton settingsRuleSegmentButton--${option.value} ${active ? 'active' : ''}`}
                         aria-pressed={active}
                         aria-label={`Imposta ${documentType.name} come ${option.ariaLabel}`}
-                        disabled={readonly}
                         onClick={() => onChange(documentType.id, option.value)}
                       >
                         {option.value === 'required' ? <Icon name="file-warning" size={12} /> : null}
@@ -382,7 +374,6 @@ function DocumentRuleMatrix({
 }
 
 export function PaymentMethodsPage() {
-  const readonly = useHasRole('app_fornitori_readonly');
   const { toast } = useToast();
   const methods = usePaymentMethods();
   const mutations = useFornitoriMutations();
@@ -447,7 +438,7 @@ export function PaymentMethodsPage() {
                       <ToggleSwitch
                         id={`rda-${item.code}`}
                         checked={Boolean(item.rda_available)}
-                        disabled={readonly || pendingCode === item.code}
+                        disabled={pendingCode === item.code}
                         aria-label={`Disponibile per RDA ${item.code}`}
                         onChange={(checked) => void toggle(item.code, checked)}
                       />
@@ -464,7 +455,6 @@ export function PaymentMethodsPage() {
 }
 
 export function ArticleCategoriesPage() {
-  const readonly = useHasRole('app_fornitori_readonly');
   const { toast } = useToast();
   const articles = useArticleCategories();
   const categories = useCategories();
@@ -605,7 +595,7 @@ export function ArticleCategoriesPage() {
                 <select
                   value={categoryDraft}
                   onChange={(event) => setCategoryDraft(event.target.value)}
-                  disabled={readonly || categories.isLoading}
+                  disabled={categories.isLoading}
                 >
                   {categoryOptions.map((item) => (
                     <option key={item.value} value={item.value}>{item.label}</option>
@@ -617,7 +607,7 @@ export function ArticleCategoriesPage() {
                   type="submit"
                   leftIcon={<Icon name="check" />}
                   loading={mutations.setArticleCategory.isPending}
-                  disabled={readonly || !dirty || categories.isLoading || categoryOptions.length === 0}
+                  disabled={!dirty || categories.isLoading || categoryOptions.length === 0}
                 >
                   Salva
                 </Button>
@@ -631,7 +621,6 @@ export function ArticleCategoriesPage() {
 }
 
 export function DocumentTypesPage() {
-  const readonly = useHasRole('app_fornitori_readonly');
   const { toast } = useToast();
   const documentTypes = useDocumentTypes();
   const mutations = useFornitoriMutations();
@@ -700,7 +689,7 @@ export function DocumentTypesPage() {
               <h2>Tipi documento</h2>
               <span className="settingsPanelMeta">{countLabel(documentTypeItems.length, 'tipo documento', 'tipi documento')}</span>
             </div>
-            <Button size="sm" leftIcon={<Icon name="plus" />} onClick={startNewDocumentType} disabled={readonly}>
+            <Button size="sm" leftIcon={<Icon name="plus" />} onClick={startNewDocumentType}>
               Nuovo tipo documento
             </Button>
           </div>
@@ -750,7 +739,7 @@ export function DocumentTypesPage() {
             <form className="settingsDetailForm" onSubmit={(event) => void saveDocumentType(event)}>
               <label className="field">
                 <span>Nome tipo documento</span>
-                <input value={name} onChange={(event) => setName(event.target.value)} disabled={readonly} />
+                <input value={name} onChange={(event) => setName(event.target.value)} />
               </label>
               <div className="settingsFormActions">
                 {selectedDocumentType ? (
@@ -758,7 +747,6 @@ export function DocumentTypesPage() {
                     type="button"
                     variant="danger"
                     leftIcon={<Icon name="trash" />}
-                    disabled={readonly}
                     onClick={() => setConfirmDeleteOpen(true)}
                   >
                     Elimina
@@ -767,7 +755,7 @@ export function DocumentTypesPage() {
                 <Button
                   type="submit"
                   leftIcon={<Icon name="check" />}
-                  disabled={readonly || saving}
+                  disabled={saving}
                   loading={saving}
                 >
                   Salva
@@ -788,7 +776,6 @@ export function DocumentTypesPage() {
               leftIcon={<Icon name="trash" />}
               loading={mutations.deleteDocumentType.isPending}
               onClick={() => void deleteDocumentType()}
-              disabled={readonly}
             >
               Elimina
             </Button>

@@ -47,28 +47,6 @@ func TestMissingArakReturnsServiceUnavailable(t *testing.T) {
 	}
 }
 
-func TestReadonlyRoleBlocksAdminWrites(t *testing.T) {
-	mux := http.NewServeMux()
-	RegisterRoutes(mux, nil, nil, nil)
-
-	req := authedRequest(
-		http.MethodPost,
-		"/fornitori/v1/category",
-		strings.NewReader(`{"name":"DURC"}`),
-		"app_fornitori_access",
-		"app_fornitori_readonly",
-	)
-	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("expected 403 for readonly write, got %d body=%s", rec.Code, rec.Body.String())
-	}
-	if !strings.Contains(rec.Body.String(), codeReadonlyDenied) {
-		t.Fatalf("expected readonly code in response, got %s", rec.Body.String())
-	}
-}
-
 func TestSkipQualificationRequiresRole(t *testing.T) {
 	arakSrv := fakeArakServer(t)
 	defer arakSrv.Close()
