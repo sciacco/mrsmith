@@ -1842,6 +1842,7 @@ function ContactDrawer({
   onSave: (body: ProviderReference) => Promise<void>;
   pending: boolean;
 }) {
+  const { toast } = useToast();
   const formId = useId();
   const open = state !== null;
   const isEdit = Boolean(state?.contact);
@@ -1851,6 +1852,13 @@ function ContactDrawer({
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!role) return;
+    const emailInput = event.currentTarget.elements.namedItem('email') as HTMLInputElement | null;
+    if (!emailInput) return;
+    emailInput.value = emailInput.value.trim();
+    if (!emailInput.value || !emailInput.validity.valid) {
+      toast('Inserisci un indirizzo email valido per il contatto.', 'warning');
+      return;
+    }
     const body = refPayload(event.currentTarget, role.key);
     void onSave(body);
   }
@@ -1886,7 +1894,7 @@ function ContactDrawer({
         >
           <Input name="first_name" label="Nome" defaultValue={contact?.first_name ?? ''} />
           <Input name="last_name" label="Cognome" defaultValue={contact?.last_name ?? ''} />
-          <Input name="email" label="Email" type="email" defaultValue={contact?.email ?? ''} />
+          <Input name="email" label="Email" type="email" defaultValue={contact?.email ?? ''} required />
           <Input name="phone" label="Telefono" defaultValue={contact?.phone ?? ''} />
         </form>
       ) : null}
