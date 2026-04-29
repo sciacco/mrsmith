@@ -212,6 +212,7 @@ export interface RowPayload {
   product_code: string;
   product_description: string;
   price?: number;
+  monthly_fee?: number;
   montly_fee?: number;
   activation_price?: number;
   payment_detail: {

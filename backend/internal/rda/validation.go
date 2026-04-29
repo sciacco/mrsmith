@@ -66,8 +66,8 @@ func (h *Handler) handleCreateRow(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	body["requester_email"] = email
-	encoded, err := encodeJSONBody(body)
+	upstreamBody := buildRowCreateBody(body, email)
+	encoded, err := encodeJSONBody(upstreamBody)
 	if err != nil {
 		httputil.InternalError(w, r, err, "rda row body encode failed")
 		return
@@ -109,9 +109,9 @@ func validateRow(body map[string]any) error {
 	if startAt != "activation_date" && startAt != "specific_date" {
 		return errors.New("Decorrenza non valida")
 	}
-	mrc := numberValue(body["montly_fee"])
+	mrc := numberValue(body["monthly_fee"])
 	if mrc == 0 {
-		mrc = numberValue(body["monthly_fee"])
+		mrc = numberValue(body["montly_fee"])
 	}
 	nrc := numberValue(body["activation_price"])
 	if nrc == 0 {
@@ -130,7 +130,67 @@ func validateRow(body map[string]any) error {
 	if boolValue(renewDetail["automatic_renew"]) && strings.TrimSpace(stringValue(renewDetail["cancellation_advice"])) == "" {
 		return errors.New("Inserisci il preavviso di disdetta")
 	}
+	if boolValue(renewDetail["automatic_renew"]) && numberValue(renewDetail["cancellation_advice"]) <= 0 {
+		return errors.New("Inserisci il preavviso di disdetta")
+	}
 	return nil
+}
+
+func buildRowCreateBody(body map[string]any, email string) map[string]any {
+	rowType := strings.TrimSpace(stringValue(body["type"]))
+	paymentDetail, _ := body["payment_detail"].(map[string]any)
+
+	out := map[string]any{
+		"type":                rowType,
+		"description":         strings.TrimSpace(stringValue(body["description"])),
+		"requester_email":     email,
+		"product_code":        strings.TrimSpace(stringValue(body["product_code"])),
+		"product_description": strings.TrimSpace(stringValue(body["product_description"])),
+		"qty":                 int64Value(body["qty"]),
+		"payment_detail": map[string]any{
+			"start_at": strings.TrimSpace(stringValue(paymentDetail["start_at"])),
+		},
+	}
+
+	outPaymentDetail := out["payment_detail"].(map[string]any)
+	if startAtDate := strings.TrimSpace(stringValue(paymentDetail["start_at_date"])); startAtDate != "" {
+		outPaymentDetail["start_at_date"] = startAtDate
+	}
+
+	if rowType == "good" {
+		out["price"] = decimalString(body["price"])
+		return out
+	}
+
+	mrc := body["monthly_fee"]
+	if numberValue(mrc) == 0 {
+		mrc = body["montly_fee"]
+	}
+	nrc := body["activation_price"]
+	if numberValue(nrc) == 0 {
+		nrc = body["activation_fee"]
+	}
+	renewDetail, _ := body["renew_detail"].(map[string]any)
+
+	out["price"] = decimalString(mrc)
+	out["activation_price"] = decimalString(nrc)
+	outPaymentDetail["is_recurrent"] = numberValue(mrc) > 0
+	outPaymentDetail["month_recursion"] = int64Value(paymentDetail["month_recursion"])
+
+	autoRenew := boolValue(renewDetail["automatic_renew"])
+	outRenewDetail := map[string]any{
+		"initial_subscription_months": int64Value(renewDetail["initial_subscription_months"]),
+		"automatic_renew":             autoRenew,
+	}
+	if autoRenew {
+		outRenewDetail["cancellation_advice"] = int64Value(renewDetail["cancellation_advice"])
+	}
+	out["renew_detail"] = outRenewDetail
+	return out
+}
+
+func decimalString(value any) string {
+	return strconv.FormatFloat(numberValue(value), 'f', -1, 64)
 }
 
 func (h *Handler) handleDeleteRow(w http.ResponseWriter, r *http.Request) {

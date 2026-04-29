@@ -2,6 +2,7 @@ import { Button, Icon, useToast } from '@mrsmith/ui';
 import { useMemo, useState, type FormEvent } from 'react';
 import { useArticles, useCreateRow, useDeleteRow } from '../api/queries';
 import type { PoRow, RowPayload } from '../api/types';
+import { apiErrorMessage } from '../lib/api-error';
 import { formatMoneyEUR } from '../lib/format';
 import { firstError, validateRow, type ValidationResult } from '../lib/validation';
 import { ArticleCombobox } from './ArticleCombobox';
@@ -69,7 +70,7 @@ export function RowComposer({
       qty,
       product_code: articleCode,
       product_description: selectedArticle?.description ?? '',
-      ...(type === 'good' ? { price } : { montly_fee: mrc, activation_price: nrc }),
+      ...(type === 'good' ? { price } : { monthly_fee: mrc, activation_price: nrc }),
       payment_detail: {
         start_at: startAt,
         ...(startAt === 'specific_date' ? { start_at_date: startDate } : {}),
@@ -101,8 +102,8 @@ export function RowComposer({
       await createRow.mutateAsync({ id: poId, body });
       toast('Riga aggiunta');
       reset();
-    } catch {
-      toast('Salvataggio non riuscito', 'error');
+    } catch (error) {
+      toast(apiErrorMessage(error, 'Salvataggio non riuscito'), 'error');
     }
   }
 

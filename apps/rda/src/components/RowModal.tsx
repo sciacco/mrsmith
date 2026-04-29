@@ -2,6 +2,7 @@ import { Button, Icon, Modal, useToast } from '@mrsmith/ui';
 import { useMemo, useState } from 'react';
 import { useArticles, useCreateRow } from '../api/queries';
 import type { RowPayload } from '../api/types';
+import { apiErrorMessage } from '../lib/api-error';
 import { formatMoneyEUR } from '../lib/format';
 import { firstError, validateRow } from '../lib/validation';
 
@@ -52,7 +53,7 @@ export function RowModal({ poId, open, onClose }: { poId: number; open: boolean;
       qty,
       product_code: articleCode,
       product_description: selectedArticle?.description ?? '',
-      ...(type === 'good' ? { price } : { montly_fee: mrc, activation_price: nrc }),
+      ...(type === 'good' ? { price } : { monthly_fee: mrc, activation_price: nrc }),
       payment_detail: {
         start_at: startAt,
         ...(startAt === 'specific_date' ? { start_at_date: startDate } : {}),
@@ -78,8 +79,8 @@ export function RowModal({ poId, open, onClose }: { poId: number; open: boolean;
       toast('Riga aggiunta');
       reset();
       onClose();
-    } catch {
-      toast('Salvataggio non riuscito', 'error');
+    } catch (error) {
+      toast(apiErrorMessage(error, 'Salvataggio non riuscito'), 'error');
     }
   }
 

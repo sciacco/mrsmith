@@ -29,7 +29,7 @@ export function validateRow(body: RowPayload): ValidationResult {
   if (!body.description.trim()) result.fieldErrors.description = 'Inserisci la descrizione';
   if (body.qty <= 0) result.fieldErrors.qty = 'Inserisci una quantita maggiore di zero';
   if (body.type === 'good' && (body.price ?? 0) <= 0) result.fieldErrors.price = 'Inserisci un costo unitario';
-  if (body.type === 'service' && (body.montly_fee ?? 0) <= 0 && (body.activation_price ?? 0) <= 0) {
+  if (body.type === 'service' && (body.monthly_fee ?? body.montly_fee ?? 0) <= 0 && (body.activation_price ?? 0) <= 0) {
     result.formErrors.push('Inserisci almeno MRC o NRC.');
   }
   if (body.payment_detail.start_at === 'specific_date' && !body.payment_detail.start_at_date) {
