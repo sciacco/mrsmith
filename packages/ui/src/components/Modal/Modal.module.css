@@ -80,6 +80,11 @@
   max-width: 860px;
 }
 
+.xwide {
+  width: 80vw;
+  max-width: 80vw;
+}
+
 @keyframes backdropIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -93,5 +98,12 @@
   to {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .xwide {
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
   }
 }

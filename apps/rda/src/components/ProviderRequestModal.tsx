@@ -14,8 +14,12 @@ interface ProviderRequestModalProps {
 interface FieldErrors {
   company_name?: string;
   tax_id?: string;
+  address?: string;
+  city?: string;
   postal_code?: string;
   province?: string;
+  first_name?: string;
+  last_name?: string;
   email?: string;
 }
 
@@ -37,7 +41,18 @@ function countrySelectOptions(countries: Country[] | undefined, current?: string
 }
 
 function firstError(errors: FieldErrors) {
-  return errors.company_name ?? errors.tax_id ?? errors.postal_code ?? errors.province ?? errors.email ?? null;
+  return (
+    errors.company_name ??
+    errors.tax_id ??
+    errors.address ??
+    errors.city ??
+    errors.postal_code ??
+    errors.province ??
+    errors.first_name ??
+    errors.last_name ??
+    errors.email ??
+    null
+  );
 }
 
 export function ProviderRequestModal({ open, initialCompanyName, onClose, onCreated }: ProviderRequestModalProps) {
@@ -94,19 +109,27 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
     const companyName = String(formData.get('company_name') ?? '').trim();
     const vatNumber = String(formData.get('vat_number') ?? '').trim();
     const cf = String(formData.get('cf') ?? '').trim();
+    const address = String(formData.get('address') ?? '').trim();
+    const city = String(formData.get('city') ?? '').trim();
     const postalCode = String(formData.get('postal_code') ?? '').trim();
     const selectedCountry = String(formData.get('country') || 'IT');
     const selectedLanguage = String(formData.get('language') || 'it');
     const selectedProvince = String(formData.get('province') ?? '').trim();
+    const firstName = String(formData.get('first_name') ?? '').trim();
+    const lastName = String(formData.get('last_name') ?? '').trim();
     const email = String(formData.get('email') ?? '').trim();
     const nextErrors: FieldErrors = {};
 
     if (!companyName) nextErrors.company_name = 'Inserisci la ragione sociale';
+    if (!address) nextErrors.address = "Inserisci l'indirizzo";
+    if (!city) nextErrors.city = 'Inserisci la citta';
     if (selectedCountry === 'IT') {
       if (!vatNumber && !cf) nextErrors.tax_id = 'Per i fornitori italiani inserisci CF o P.IVA';
-      if (postalCode.length < 5) nextErrors.postal_code = 'Inserisci un CAP italiano valido';
+      if (postalCode.length < 5) nextErrors.postal_code = 'CAP non valido';
       if (!selectedProvince) nextErrors.province = 'Seleziona la provincia';
     }
+    if (!firstName) nextErrors.first_name = 'Inserisci il nome';
+    if (!lastName) nextErrors.last_name = 'Inserisci il cognome';
     if (!email) nextErrors.email = "Inserisci l'email del contatto qualifica";
 
     const validationMessage = firstError(nextErrors);
@@ -117,11 +140,19 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
         ? 'company_name'
         : nextErrors.tax_id
           ? 'vat_number'
-          : nextErrors.postal_code
-            ? 'postal_code'
-            : nextErrors.email
-              ? 'email'
-              : 'province';
+          : nextErrors.address
+            ? 'address'
+            : nextErrors.city
+              ? 'city'
+              : nextErrors.postal_code
+                ? 'postal_code'
+                : nextErrors.province
+                  ? 'province'
+                  : nextErrors.first_name
+                    ? 'first_name'
+                    : nextErrors.last_name
+                      ? 'last_name'
+                      : 'email';
       const field = form.elements.namedItem(fieldName);
       if (field instanceof HTMLElement) field.focus();
       return;
@@ -136,11 +167,11 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
       cf: cf || undefined,
       postal_code: postalCode || undefined,
       province: selectedProvince || undefined,
-      city: String(formData.get('city') ?? '').trim() || undefined,
-      address: String(formData.get('address') ?? '').trim() || undefined,
+      city,
+      address,
       ref: {
-        first_name: String(formData.get('first_name') ?? '').trim(),
-        last_name: String(formData.get('last_name') ?? '').trim(),
+        first_name: firstName,
+        last_name: lastName,
         email,
         phone: String(formData.get('phone') ?? '').trim(),
         reference_type: 'QUALIFICATION_REF',
@@ -163,15 +194,16 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
   }
 
   return (
-    <Modal open={open} onClose={closeModal} title="Nuovo fornitore" size="wide" dismissible={!createProvider.isPending}>
+    <Modal open={open} onClose={closeModal} title="Nuovo fornitore" size="xwide" dismissible={!createProvider.isPending}>
       <form ref={formRef} className={styles.form} noValidate onSubmit={(event) => void submit(event)}>
         <fieldset className={styles.section}>
           <legend>Azienda</legend>
-          <div className={styles.sectionGrid}>
+          <div className={`${styles.sectionGrid} ${styles.companyGrid}`}>
             <div className={`field ${styles.span2}`}>
               <label>Ragione sociale</label>
               <input
                 name="company_name"
+                required
                 aria-invalid={Boolean(errors.company_name)}
                 onChange={() => clearError('company_name')}
               />
@@ -196,9 +228,8 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
                 onChange={() => clearError('tax_id')}
               />
             </div>
-            {errors.tax_id ? <p id="provider-tax-error" className={`fieldError ${styles.groupError}`}>{errors.tax_id}</p> : null}
 
-            <div className="field">
+            <div className={`field ${styles.countryField}`}>
               <label>Paese</label>
               <SingleSelect<string>
                 options={countryOptions}
@@ -208,9 +239,8 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
                 disabled={countriesQuery.isLoading || countriesQuery.isError}
               />
               <input type="hidden" name="country" value={country} />
-              {countriesQuery.isError ? <p className="fieldError">Elenco paesi non disponibile</p> : null}
             </div>
-            <div className="field">
+            <div className={`field ${styles.languageField}`}>
               <label>Lingua</label>
               <SingleSelect<string>
                 options={LANGUAGE_OPTIONS}
@@ -220,30 +250,46 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
               />
               <input type="hidden" name="language" value={language} />
             </div>
+            {errors.tax_id || countriesQuery.isError ? (
+              <div className={styles.companyErrorRow}>
+                {errors.tax_id ? <p id="provider-tax-error" className={`fieldError ${styles.companyTaxError}`}>{errors.tax_id}</p> : <span className={styles.companyTaxError} />}
+                {countriesQuery.isError ? <p className={`fieldError ${styles.companyCountryError}`}>Elenco paesi non disponibile</p> : <span className={styles.companyCountryError} />}
+              </div>
+            ) : null}
           </div>
         </fieldset>
 
         <fieldset className={styles.section}>
-          <legend>Indirizzo</legend>
-          <div className={styles.sectionGrid}>
+          <legend>Sede aziendale</legend>
+          <div className={`${styles.sectionGrid} ${styles.siteGrid}`}>
             <div className={`field ${styles.span2}`}>
               <label>Indirizzo</label>
-              <input name="address" />
+              <input
+                name="address"
+                required
+                aria-invalid={Boolean(errors.address)}
+                onChange={() => clearError('address')}
+              />
+              {errors.address ? <p className="fieldError">{errors.address}</p> : null}
             </div>
-            <div className="field">
+            <div className={`field ${styles.cityField}`}>
               <label>Citta</label>
-              <input name="city" />
+              <input
+                name="city"
+                required
+                aria-invalid={Boolean(errors.city)}
+                onChange={() => clearError('city')}
+              />
             </div>
-            <div className="field">
+            <div className={`field ${styles.postalCodeField}`}>
               <label>CAP</label>
               <input
                 name="postal_code"
                 aria-invalid={Boolean(errors.postal_code)}
                 onChange={() => clearError('postal_code')}
               />
-              {errors.postal_code ? <p className="fieldError">{errors.postal_code}</p> : null}
             </div>
-            <div className={`field ${styles.span2}`}>
+            <div className={`field ${styles.provinceField}`}>
               <label>{country === 'IT' ? 'Provincia' : 'Provincia / Stato'}</label>
               {country === 'IT' ? (
                 <>
@@ -268,36 +314,63 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
                   }}
                 />
               )}
-              {errors.province ? <p className="fieldError">{errors.province}</p> : null}
             </div>
+            {errors.city || errors.postal_code || errors.province ? (
+              <div className={styles.siteErrorRow}>
+                {errors.city ? <p className={`fieldError ${styles.siteCityError}`}>{errors.city}</p> : <span className={styles.siteCityError} />}
+                {errors.postal_code ? <p className={`fieldError ${styles.sitePostalError}`}>{errors.postal_code}</p> : <span className={styles.sitePostalError} />}
+                {errors.province ? <p className={`fieldError ${styles.siteProvinceError}`}>{errors.province}</p> : <span className={styles.siteProvinceError} />}
+              </div>
+            ) : null}
           </div>
         </fieldset>
 
         <fieldset className={`${styles.section} ${styles.contactSection}`}>
           <legend>Referente qualifica</legend>
-          <div className={styles.sectionGrid}>
-            <div className="field">
+          <div className={`${styles.sectionGrid} ${styles.contactGrid}`}>
+            <div className={`field ${styles.contactFirstField}`}>
               <label>Nome</label>
-              <input name="first_name" />
+              <input
+                name="first_name"
+                required
+                aria-invalid={Boolean(errors.first_name)}
+                onChange={() => clearError('first_name')}
+              />
             </div>
-            <div className="field">
+            <div className={`field ${styles.contactLastField}`}>
               <label>Cognome</label>
-              <input name="last_name" />
+              <input
+                name="last_name"
+                required
+                aria-invalid={Boolean(errors.last_name)}
+                onChange={() => clearError('last_name')}
+              />
             </div>
-            <div className="field">
+            {errors.first_name || errors.last_name ? (
+              <div className={styles.contactErrorRow}>
+                {errors.first_name ? <p className={`fieldError ${styles.contactFirstError}`}>{errors.first_name}</p> : <span className={styles.contactFirstError} />}
+                {errors.last_name ? <p className={`fieldError ${styles.contactLastError}`}>{errors.last_name}</p> : <span className={styles.contactLastError} />}
+              </div>
+            ) : null}
+            <div className={`field ${styles.contactEmailField}`}>
               <label>Email qualifica</label>
               <input
                 name="email"
                 type="email"
+                required
                 aria-invalid={Boolean(errors.email)}
                 onChange={() => clearError('email')}
               />
-              {errors.email ? <p className="fieldError">{errors.email}</p> : null}
             </div>
-            <div className="field">
+            <div className={`field ${styles.contactPhoneField}`}>
               <label>Telefono</label>
               <input name="phone" />
             </div>
+            {errors.email ? (
+              <div className={styles.contactErrorRow}>
+                <p className={`fieldError ${styles.contactEmailError}`}>{errors.email}</p>
+              </div>
+            ) : null}
           </div>
         </fieldset>
 

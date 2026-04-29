@@ -15,6 +15,7 @@ interface SingleSelectProps<V extends string | number = string | number> {
   allowClear?: boolean;
   clearLabel?: string;
   disabled?: boolean;
+  searchable?: boolean;
 }
 
 const DROPDOWN_GAP = 6;
@@ -29,6 +30,7 @@ export function SingleSelect<V extends string | number = string | number>({
   allowClear,
   clearLabel = 'Tutti',
   disabled = false,
+  searchable,
 }: SingleSelectProps<V>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -89,8 +91,10 @@ export function SingleSelect<V extends string | number = string | number>({
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  const showSearch = searchable ?? options.length > 2;
+  const activeSearch = showSearch ? search : '';
   const filtered = options.filter((o) =>
-    o.label.toLowerCase().includes(search.toLowerCase()),
+    o.label.toLowerCase().includes(activeSearch.toLowerCase()),
   );
 
   const selectedOption = options.find((o) => o.value === selected);
@@ -127,16 +131,18 @@ export function SingleSelect<V extends string | number = string | number>({
             }
       }
     >
-      <input
-        className={styles.search}
-        type="text"
-        placeholder="Cerca..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        autoFocus
-      />
+      {showSearch ? (
+        <input
+          className={styles.search}
+          type="text"
+          placeholder="Cerca..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          autoFocus
+        />
+      ) : null}
       <div className={styles.options}>
-        {allowClear && !search && (
+        {allowClear && !activeSearch && (
           <div
             className={`${styles.option} ${selected === null ? styles.optionSelected : ''}`}
             onClick={handleClear}
