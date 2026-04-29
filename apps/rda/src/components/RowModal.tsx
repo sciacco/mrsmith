@@ -203,7 +203,7 @@ export function RowModal({
                 </label>
                 {draft.automaticRenew ? (
                   <div className="field">
-                    <label>Preavviso disdetta</label>
+                    <label>Preavviso disdetta (giorni)</label>
                     <input value={draft.cancellationAdvice} onChange={(event) => updateDraft('cancellationAdvice', event.target.value)} />
                     {validation.fieldErrors.cancellation_advice ? <p className="fieldError">{validation.fieldErrors.cancellation_advice}</p> : null}
                   </div>

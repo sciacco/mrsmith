@@ -42,21 +42,34 @@ function clearPhoneInvalid(event: React.FormEvent<HTMLInputElement>) {
   }
 }
 
+function refKey(ref: ProviderReference): string {
+  return ref.id ? `ref-${ref.id}` : `email-${ref.email ?? 'unknown'}`;
+}
+
+function contactName(ref: ProviderReference): string {
+  const name = [ref.first_name, ref.last_name].filter(Boolean).join(' ').trim();
+  return name || ref.email || 'Contatto senza nome';
+}
+
 export function ProviderRefTable({
   po,
   provider,
   editable,
   onSelectionChange,
   onSaveRecipients,
+  showSaveAction = true,
 }: {
   po: PoDetail;
   provider?: ProviderSummary;
   editable: boolean;
   onSelectionChange?: (ids: number[]) => void;
-  onSaveRecipients: (ids: number[]) => void;
+  onSaveRecipients?: (ids: number[]) => void;
+  showSaveAction?: boolean;
 }) {
   const [selected, setSelected] = useState<number[]>(() => recipientIDs(po));
   const [newType, setNewType] = useState<string>(availableReferenceTypes()[0]?.value ?? 'ADMINISTRATIVE_REF');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const mutations = useProviderMutations();
   const { toast } = useToast();
   const refs = useMemo(() => providerRefs(provider), [provider]);
@@ -90,6 +103,7 @@ export function ProviderRefTable({
     if (rejectInvalidPhone(form)) return;
     try {
       await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: ref.id, body: refFromForm(form, ref.reference_type ?? newType) });
+      setEditing(null);
       toast('Contatto aggiornato');
     } catch {
       toast('Salvataggio contatto non riuscito', 'error');
@@ -103,6 +117,7 @@ export function ProviderRefTable({
     try {
       await mutations.createReference.mutateAsync({ providerId: provider.id, body: refFromForm(event.currentTarget, newType) });
       event.currentTarget.reset();
+      setAdding(false);
       toast('Contatto aggiunto');
     } catch {
       toast('Salvataggio contatto non riuscito', 'error');
@@ -110,30 +125,105 @@ export function ProviderRefTable({
   }
 
   return (
-    <div className="stack">
-      <p className="muted">Seleziona i contatti a cui inviare l&apos;ordine. Se non viene spuntato alcun contatto, verra utilizzato il contatto di tipo qualifica.</p>
-      <div className="tableScroll">
-        <table className="dataTable">
-          <thead>
-            <tr><th>Email</th><th>Nome</th><th>Cognome</th><th>Telefono</th><th>Tipo</th><th>Destinatario</th><th className="actionsCell">Azioni</th></tr>
-          </thead>
-          <tbody>
-            {refs.map((ref) => {
-              const readonly = ref.reference_type === QUALIFICATION_REF || !editable;
-              return (
-                <tr key={ref.id ?? ref.email}>
-                  <td colSpan={7}>
-                    <form
-                      className="inlineForm"
-                      noValidate
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        void update(ref, event.currentTarget);
-                      }}
-                    >
-                      <input name="email" defaultValue={ref.email} disabled={readonly} placeholder="Email" />
-                      <input name="first_name" defaultValue={ref.first_name} disabled={readonly} placeholder="Nome" />
-                      <input name="last_name" defaultValue={ref.last_name} disabled={readonly} placeholder="Cognome" />
+    <div className="contactPicker">
+      <div className="contactPickerHeader">
+        <div>
+          <h3>Destinatari ordine</h3>
+          <p className="muted">Seleziona i contatti che riceveranno il PO. Senza selezione viene usato il contatto Qualifica.</p>
+        </div>
+        {editable ? (
+          <Button size="sm" variant="secondary" leftIcon={<Icon name={adding ? 'x' : 'plus'} />} onClick={() => setAdding((current) => !current)}>
+            {adding ? 'Chiudi' : 'Aggiungi contatto'}
+          </Button>
+        ) : null}
+      </div>
+
+      {adding && editable ? (
+        <form className="contactEditorForm contactEditorPanel" onSubmit={(event) => void add(event)} noValidate>
+          <div className="field"><label>Email</label><input name="email" type="email" placeholder="nome@azienda.it" /></div>
+          <div className="field"><label>Nome</label><input name="first_name" placeholder="Nome" /></div>
+          <div className="field"><label>Cognome</label><input name="last_name" placeholder="Cognome" /></div>
+          <div className="field">
+            <label>Telefono</label>
+            <input
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              pattern={PROVIDER_REFERENCE_PHONE_PATTERN}
+              title={PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE}
+              placeholder="+39..."
+              onInput={clearPhoneInvalid}
+            />
+          </div>
+          <div className="field">
+            <label>Tipo</label>
+            <select value={newType} onChange={(event) => setNewType(event.target.value)}>
+              {availableReferenceTypes().map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </div>
+          <div className="contactEditorActions">
+            <Button size="sm" type="submit" leftIcon={<Icon name="plus" />} loading={mutations.createReference.isPending}>Aggiungi</Button>
+          </div>
+        </form>
+      ) : null}
+
+      <div className="contactCardList">
+        {refs.map((ref) => {
+          const key = refKey(ref);
+          const isQualification = ref.reference_type === QUALIFICATION_REF;
+          const isSelected = Boolean(ref.id && selected.includes(ref.id));
+          const canSelect = editable && !isQualification && Boolean(ref.id);
+          const canEdit = editable && !isQualification && Boolean(ref.id);
+
+          return (
+            <article key={key} className={`providerContactCard ${isSelected ? 'selected' : ''} ${isQualification ? 'fallback' : ''}`}>
+              <label className="providerContactSelect">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  disabled={!canSelect}
+                  aria-label={`Seleziona ${contactName(ref)} come destinatario`}
+                  onChange={(event) => ref.id && toggle(ref.id, event.target.checked)}
+                />
+              </label>
+              <div className="providerContactMain">
+                <div className="providerContactTitleRow">
+                  <strong>{contactName(ref)}</strong>
+                  <span className={`badge ${isQualification ? 'info' : ''}`}>
+                    {referenceTypeLabel(ref.reference_type)}{isQualification ? ' · fallback automatico' : ''}
+                  </span>
+                </div>
+                <div className="providerContactMeta">
+                  <span><Icon name="mail" size={15} />{ref.email || '-'}</span>
+                  <span><Icon name="phone" size={15} />{ref.phone || '-'}</span>
+                </div>
+              </div>
+              {canEdit ? (
+                <button
+                  className="iconButton"
+                  type="button"
+                  aria-label={editing === key ? 'Chiudi modifica contatto' : 'Modifica contatto'}
+                  title={editing === key ? 'Chiudi' : 'Modifica'}
+                  onClick={() => setEditing((current) => (current === key ? null : key))}
+                >
+                  <Icon name={editing === key ? 'x' : 'pencil'} size={16} />
+                </button>
+              ) : null}
+              {editing === key ? (
+                <div className="providerContactEditor">
+                  <form
+                    className="contactEditorForm"
+                    noValidate
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void update(ref, event.currentTarget);
+                    }}
+                  >
+                    <div className="field"><label>Email</label><input name="email" type="email" defaultValue={ref.email} placeholder="Email" /></div>
+                    <div className="field"><label>Nome</label><input name="first_name" defaultValue={ref.first_name} placeholder="Nome" /></div>
+                    <div className="field"><label>Cognome</label><input name="last_name" defaultValue={ref.last_name} placeholder="Cognome" /></div>
+                    <div className="field">
+                      <label>Telefono</label>
                       <input
                         name="phone"
                         type="tel"
@@ -141,51 +231,32 @@ export function ProviderRefTable({
                         pattern={PROVIDER_REFERENCE_PHONE_PATTERN}
                         title={PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE}
                         defaultValue={ref.phone}
-                        disabled={readonly}
                         placeholder="Telefono"
                         onInput={clearPhoneInvalid}
                       />
-                      <span>{referenceTypeLabel(ref.reference_type)}</span>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(ref.id && selected.includes(ref.id))}
-                        disabled={!editable || ref.reference_type === QUALIFICATION_REF || !ref.id}
-                        aria-label="Seleziona destinatario"
-                        onChange={(event) => ref.id && toggle(ref.id, event.target.checked)}
-                      />
-                      <Button size="sm" type="submit" disabled={readonly} loading={mutations.updateReference.isPending}>Salva</Button>
-                    </form>
-                  </td>
-                </tr>
-              );
-            })}
-            {refs.length === 0 ? <tr><td colSpan={7} className="emptyInline">Nessun contatto disponibile.</td></tr> : null}
-          </tbody>
-        </table>
+                    </div>
+                    <div className="contactEditorActions">
+                      <Button size="sm" type="submit" leftIcon={<Icon name="check" />} loading={mutations.updateReference.isPending}>Salva</Button>
+                    </div>
+                  </form>
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
+
+        {refs.length === 0 ? (
+          <div className="contactEmptyState">
+            <Icon name="info" size={18} />
+            <span>Nessun contatto disponibile per questo fornitore.</span>
+          </div>
+        ) : null}
       </div>
-      <div className="actionRow">
-        <Button leftIcon={<Icon name="check" />} disabled={!editable} onClick={() => onSaveRecipients(selected)}>Salva contatti selezionati</Button>
-      </div>
-      {editable ? (
-        <form className="inlineForm" onSubmit={(event) => void add(event)} noValidate>
-          <input name="email" placeholder="Email" />
-          <input name="first_name" placeholder="Nome" />
-          <input name="last_name" placeholder="Cognome" />
-          <input
-            name="phone"
-            type="tel"
-            inputMode="tel"
-            pattern={PROVIDER_REFERENCE_PHONE_PATTERN}
-            title={PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE}
-            placeholder="Telefono"
-            onInput={clearPhoneInvalid}
-          />
-          <select value={newType} onChange={(event) => setNewType(event.target.value)}>
-            {availableReferenceTypes().map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-          </select>
-          <span />
-          <Button size="sm" type="submit" leftIcon={<Icon name="plus" />} loading={mutations.createReference.isPending}>Aggiungi</Button>
-        </form>
+
+      {showSaveAction && onSaveRecipients ? (
+        <div className="actionRow">
+          <Button leftIcon={<Icon name="check" />} disabled={!editable} onClick={() => onSaveRecipients(selected)}>Salva destinatari</Button>
+        </div>
       ) : null}
     </div>
   );

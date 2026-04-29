@@ -56,7 +56,7 @@ import { QUALIFICATION_REF } from '../lib/provider-refs';
 import { PO_STATES } from '../lib/state-labels';
 import { firstError, validateNewPO } from '../lib/validation';
 
-const steps = ['Dati richiesta', 'Righe', 'Allegati', 'Contatti e note', 'Invio'];
+const steps = ['Dati richiesta', 'Righe', 'Allegati', 'Invio fornitore', 'Approvazione'];
 
 interface WizardHeaderState extends POHeaderDraft {
   type: POType;
@@ -215,7 +215,8 @@ export function NewRdaWizardPage() {
   const displayCurrency = normalizeCurrency(detail?.currency ?? header.currency);
   const total = parseMistraMoney(detail?.total_price);
   const quoteRuleBlocked = total >= 3000 && attachments.length < 2;
-  const contactsReady = contactDraftIds.length > 0 || hasQualificationFallback(fullProvider);
+  const sendsToProvider = header.type !== 'ECOMMERCE';
+  const contactsReady = !sendsToProvider || contactDraftIds.length > 0 || hasQualificationFallback(fullProvider);
   const readinessItems: ReadinessItem[] = [
     {
       id: 'header',
@@ -240,9 +241,13 @@ export function NewRdaWizardPage() {
     },
     {
       id: 'contacts',
-      label: 'Contatti',
+      label: 'Invio fornitore',
       ready: contactsReady,
-      detail: contactsReady ? 'Destinatari selezionati o referente qualifica disponibile.' : 'Seleziona un contatto o completa il referente qualifica.',
+      detail: sendsToProvider
+        ? contactsReady
+          ? 'Destinatari selezionati o referente qualifica disponibile.'
+          : 'Seleziona un contatto o completa il referente qualifica.'
+        : 'PO e-commerce: nessun invio automatico al fornitore.',
     },
   ];
   const readyToSubmit = draftEditable && readinessItems.every((item) => item.ready);
@@ -262,6 +267,9 @@ export function NewRdaWizardPage() {
         payment_method: preferredPaymentMethodCode(nextProvider, defaultPayment.data?.code ?? ''),
       }));
       return;
+    }
+    if (key === 'type' && value === 'ECOMMERCE') {
+      setContactDraftIds([]);
     }
     setHeader((current) => ({ ...current, [key]: value }));
   }
@@ -322,11 +330,14 @@ export function NewRdaWizardPage() {
     }
   }
 
-  async function saveContactsAndNotes(): Promise<boolean> {
+  async function saveSupplierDelivery(): Promise<boolean> {
     if (poId == null) return false;
+    const deliveryHeader = header.type === 'ECOMMERCE' ? { ...header, note: '' } : header;
+    const recipientIds = header.type === 'ECOMMERCE' ? [] : contactDraftIds;
     try {
-      await patchPO.mutateAsync(buildPatchPOPayload(header, budgets.data ?? [], false, contactDraftIds));
-      toast('Contatti e note salvati');
+      await patchPO.mutateAsync(buildPatchPOPayload(deliveryHeader, budgets.data ?? [], false, recipientIds));
+      if (header.type === 'ECOMMERCE') setContactDraftIds([]);
+      toast('Invio al fornitore salvato');
       return true;
     } catch {
       toast('Salvataggio non riuscito', 'error');
@@ -340,7 +351,7 @@ export function NewRdaWizardPage() {
       return;
     }
     if (step === 3) {
-      if (await saveContactsAndNotes()) setStep(4);
+      if (await saveSupplierDelivery()) setStep(4);
       return;
     }
     if (step === 4) {
@@ -357,7 +368,7 @@ export function NewRdaWizardPage() {
       return;
     }
     if (step === 3 && next > 3) {
-      if (await saveContactsAndNotes()) setStep(next);
+      if (await saveSupplierDelivery()) setStep(next);
       return;
     }
     setStep(next);
@@ -431,8 +442,10 @@ export function NewRdaWizardPage() {
 
   async function submitPO() {
     if (!detail || poId == null || !readyToSubmit) return;
+    const deliveryHeader = header.type === 'ECOMMERCE' ? { ...header, note: '' } : header;
+    const recipientIds = header.type === 'ECOMMERCE' ? [] : contactDraftIds;
     try {
-      if (headerDirty || providerChanged) await patchPO.mutateAsync(buildPatchPOPayload(header, budgets.data ?? [], providerChanged, contactDraftIds));
+      if (headerDirty || providerChanged) await patchPO.mutateAsync(buildPatchPOPayload(deliveryHeader, budgets.data ?? [], providerChanged, recipientIds));
       await transition.mutateAsync({ id: detail.id, action: 'submit' });
       toast('Richiesta mandata in approvazione');
       navigate('/rda');
@@ -530,14 +543,7 @@ export function NewRdaWizardPage() {
                   {headerFieldError('payment_method') ? <p className="fieldError">{headerFieldError('payment_method')}</p> : null}
                 </div>
               </div>
-              <div className="poMetaGrid">
-                <div className="field">
-                  <label>Tipo PO</label>
-                  <select value={header.type} onChange={(event) => updateHeader('type', event.target.value as POType)}>
-                    <option value="STANDARD">Con invio del PO al fornitore</option>
-                    <option value="ECOMMERCE">Senza inviare PO al fornitore</option>
-                  </select>
-                </div>
+              <div className="formGrid three fullWidth">
                 <div className="field">
                   <label>Riferimento offerta del fornitore</label>
                   <input value={header.provider_offer_code} onChange={(event) => updateHeader('provider_offer_code', event.target.value)} />
@@ -561,10 +567,6 @@ export function NewRdaWizardPage() {
               <div className="field wide">
                 <label>Descrizione ad uso interno</label>
                 <textarea rows={4} value={header.description} onChange={(event) => updateHeader('description', event.target.value)} />
-              </div>
-              <div className="field wide">
-                <label>Note da trasmettere al fornitore</label>
-                <textarea rows={4} value={header.note} onChange={(event) => updateHeader('note', event.target.value)} />
               </div>
               {attemptedHeader && headerValidation.formErrors.length ? <p className="fieldError fullWidth">{headerValidation.formErrors[0]}</p> : null}
             </div>
@@ -654,34 +656,66 @@ export function NewRdaWizardPage() {
           <div className="wizardPanel">
             <div className="surfaceHeader compactHeader">
               <div>
-                <h2>Contatti e note</h2>
-                <p className="muted">Scegli i destinatari e completa le note prima del riepilogo.</p>
+                <h2>Invio al fornitore</h2>
+                <p className="muted">Definisci se il PO deve essere trasmesso al fornitore e a quali destinatari.</p>
               </div>
             </div>
             <div className="tabBody stack">
-              <div className="formGrid">
-                <div className="field wide">
-                  <label>Note fornitore</label>
-                  <textarea rows={5} value={header.note} onChange={(event) => updateHeader('note', event.target.value)} />
+              <fieldset className="poTypeChoice">
+                <legend>Tipo PO</legend>
+                <label className={`poTypeOption ${header.type === 'STANDARD' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="po_type"
+                    value="STANDARD"
+                    checked={header.type === 'STANDARD'}
+                    onChange={() => updateHeader('type', 'STANDARD')}
+                  />
+                  <span className="poTypeIcon"><Icon name="mail" size={18} /></span>
+                  <span className="poTypeCopy">
+                    <strong>Standard</strong>
+                    <small>Invia il PO al fornitore.</small>
+                  </span>
+                </label>
+                <label className={`poTypeOption ${header.type === 'ECOMMERCE' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="po_type"
+                    value="ECOMMERCE"
+                    checked={header.type === 'ECOMMERCE'}
+                    onChange={() => updateHeader('type', 'ECOMMERCE')}
+                  />
+                  <span className="poTypeIcon"><Icon name="package" size={18} /></span>
+                  <span className="poTypeCopy">
+                    <strong>E-commerce</strong>
+                    <small>Nessun invio automatico al fornitore.</small>
+                  </span>
+                </label>
+              </fieldset>
+
+              {sendsToProvider ? (
+                <>
+                  <div className="field wide">
+                    <label>Note da trasmettere al fornitore</label>
+                    <textarea rows={4} value={header.note} onChange={(event) => updateHeader('note', event.target.value)} />
+                  </div>
+                  <ProviderRefTable
+                    po={detail}
+                    provider={fullProvider}
+                    editable={draftEditable}
+                    showSaveAction={false}
+                    onSelectionChange={setContactDraftIds}
+                  />
+                </>
+              ) : (
+                <div className="deliveryEmptyState">
+                  <span className="deliveryEmptyIcon"><Icon name="check-circle" size={20} /></span>
+                  <div>
+                    <strong>Invio fornitore non previsto</strong>
+                    <p>Per i PO e-commerce il wizard non richiede destinatari e salva l&apos;ordine senza contatti di invio.</p>
+                  </div>
                 </div>
-                <div className="field wide">
-                  <label>Descrizione interna</label>
-                  <textarea rows={5} value={header.description} onChange={(event) => updateHeader('description', event.target.value)} />
-                </div>
-              </div>
-              <ProviderRefTable
-                po={detail}
-                provider={fullProvider}
-                editable={draftEditable}
-                onSelectionChange={setContactDraftIds}
-                onSaveRecipients={(ids) => {
-                  setContactDraftIds(ids);
-                  void patchPO.mutateAsync(buildPatchPOPayload(header, budgets.data ?? [], false, ids)).then(
-                    () => toast('Contatti aggiornati'),
-                    () => toast('Salvataggio contatti non riuscito', 'error'),
-                  );
-                }}
-              />
+              )}
             </div>
           </div>
         ) : null}
@@ -690,7 +724,7 @@ export function NewRdaWizardPage() {
           <div className="wizardPanel">
             <div className="surfaceHeader compactHeader">
               <div>
-                <h2>Invio</h2>
+                <h2>Approvazione</h2>
                 <p className="muted">Controlla la richiesta e mandala in approvazione.</p>
               </div>
               <span className={`badge ${readyToSubmit ? 'success' : 'warning'}`}>{readyToSubmit ? 'Pronta per invio' : 'Completa dati'}</span>
@@ -705,6 +739,10 @@ export function NewRdaWizardPage() {
                 <div>
                   <span>Fornitore</span>
                   <strong>{fullProvider?.company_name ?? '-'}</strong>
+                </div>
+                <div>
+                  <span>Tipo PO</span>
+                  <strong>{sendsToProvider ? 'Standard, invio al fornitore' : 'E-commerce, nessun invio fornitore'}</strong>
                 </div>
                 <div>
                   <span>Totale PO</span>
