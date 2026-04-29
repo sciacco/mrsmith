@@ -41,6 +41,8 @@ type poDetail struct {
 	CurrentApprovalLevel any               `json:"current_approval_level,omitempty"`
 	TotalPrice           string            `json:"total_price,omitempty"`
 	Requester            userRef           `json:"requester,omitempty"`
+	Provider             providerDetail    `json:"provider,omitempty"`
+	PaymentMethod        json.RawMessage   `json:"payment_method,omitempty"`
 	Rows                 []json.RawMessage `json:"rows,omitempty"`
 	Attachments          []json.RawMessage `json:"attachments,omitempty"`
 	Approvers            []approverRef     `json:"approvers,omitempty"`

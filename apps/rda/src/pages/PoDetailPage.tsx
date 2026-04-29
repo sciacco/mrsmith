@@ -24,7 +24,8 @@ import { headerStateFromPO, PoHeaderForm, type HeaderFormState } from '../compon
 import { PoTabs } from '../components/PoTabs';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { coerceID, downloadBlob, isRequester, parseMistraMoney } from '../lib/format';
-import { buildPatchPOPayload, methodUnion } from '../lib/po-payload';
+import { buildPatchPOPayload } from '../lib/po-payload';
+import { buildPaymentMethodOptions, paymentCodeFromProvider, requiresPaymentMethodVerification } from '../lib/payment-options';
 import { PO_STATES } from '../lib/state-labels';
 
 function afterTransitionRoute(po: PoDetail, action: TransitionAction): string | null {
@@ -100,7 +101,16 @@ export function PoDetailPage() {
   const total = parseMistraMoney(detail.total_price);
   const quoteRuleBlocked = total >= 3000 && (detail.attachments?.length ?? 0) < 2;
   const canSubmit = draftEditable && (detail.rows?.length ?? 0) > 0 && !quoteRuleBlocked;
-  const paymentOptions = methodUnion(methods.data ?? [], currentHeader.payment_method, defaultPayment.data?.code ?? '');
+  const fullProvider = provider.data ?? detail.provider;
+  const providerDefault = paymentCodeFromProvider(fullProvider);
+  const cdlanDefault = defaultPayment.data?.code ?? '';
+  const paymentOptions = buildPaymentMethodOptions({
+    methods: methods.data ?? [],
+    providerDefault: fullProvider?.default_payment_method,
+    cdlanDefaultCode: cdlanDefault,
+    currentCode: currentHeader.payment_method,
+  });
+  const paymentRequiresVerification = requiresPaymentMethodVerification(currentHeader.payment_method, providerDefault, cdlanDefault);
 
   async function saveHeader() {
     if (!draftEditable) return;
@@ -190,6 +200,7 @@ export function PoDetailPage() {
             budgets={budgets.data ?? []}
             providers={providers.data ?? []}
             paymentMethods={paymentOptions}
+            paymentRequiresVerification={paymentRequiresVerification}
             draftEditable={draftEditable}
             paymentEditable={paymentEditable}
             onChange={setHeader}

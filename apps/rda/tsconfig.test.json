@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": false,
+    "outDir": "/tmp/mrsmith-rda-payment-options",
+    "rootDir": "src",
+    "sourceMap": false
+  },
+  "include": ["src/lib/payment-options.ts", "src/lib/payment-options.test.ts"]
+}

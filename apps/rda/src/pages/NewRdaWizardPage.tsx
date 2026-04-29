@@ -31,11 +31,15 @@ import { coerceID, downloadBlob, formatDateIT, formatMoneyEUR, isRequester, pars
 import {
   buildCreatePOPayload,
   buildPatchPOPayload,
-  methodUnion,
-  paymentCodeFromProvider,
   type POHeaderDraft,
   type POType,
 } from '../lib/po-payload';
+import {
+  buildPaymentMethodOptions,
+  paymentCodeFromProvider,
+  preferredPaymentMethodCode,
+  requiresPaymentMethodVerification,
+} from '../lib/payment-options';
 import { QUALIFICATION_REF } from '../lib/provider-refs';
 import { PO_STATES } from '../lib/state-labels';
 import { firstError, validateNewPO } from '../lib/validation';
@@ -141,6 +145,7 @@ export function NewRdaWizardPage() {
   const selectedProvider = providerOptions.find((providerItem) => providerItem.id === header.provider_id);
   const providerID = typeof header.provider_id === 'number' ? header.provider_id : null;
   const provider = useProvider(providerID);
+  const fullProvider = provider.data ?? selectedProvider;
 
   useEffect(() => {
     if (!po.data) return;
@@ -151,9 +156,9 @@ export function NewRdaWizardPage() {
 
   useEffect(() => {
     if (poId != null || header.payment_method) return;
-    const next = paymentCodeFromProvider(selectedProvider) || defaultPayment.data?.code || '';
+    const next = preferredPaymentMethodCode(fullProvider, defaultPayment.data?.code ?? '');
     if (next) setHeader((current) => ({ ...current, payment_method: next }));
-  }, [defaultPayment.data?.code, header.payment_method, poId, selectedProvider]);
+  }, [defaultPayment.data?.code, fullProvider, header.payment_method, poId]);
 
   if (rawPoId && poId == null) return <Navigate to="/rda/new" replace />;
 
@@ -171,9 +176,19 @@ export function NewRdaWizardPage() {
   const headerDirty = detail ? JSON.stringify(header) !== JSON.stringify(initialHeader) : true;
   const requester = isRequester(detail, user?.email);
   const draftEditable = !detail || (detail.state === PO_STATES.DRAFT && requester);
-  const fullProvider = provider.data ?? selectedProvider;
   const providerDefault = paymentCodeFromProvider(fullProvider);
-  const paymentOptions = methodUnion(methods.data ?? [], providerDefault, defaultPayment.data?.code ?? '', header.payment_method);
+  const cdlanDefault = defaultPayment.data?.code ?? '';
+  const paymentOptions = useMemo(
+    () =>
+      buildPaymentMethodOptions({
+        methods: methods.data ?? [],
+        providerDefault: fullProvider?.default_payment_method,
+        cdlanDefaultCode: cdlanDefault,
+        currentCode: header.payment_method,
+      }),
+    [cdlanDefault, fullProvider?.default_payment_method, header.payment_method, methods.data],
+  );
+  const paymentRequiresVerification = requiresPaymentMethodVerification(header.payment_method, providerDefault, cdlanDefault);
   const createPayload = useMemo(() => buildCreatePOPayload(header, budgets.data ?? []), [budgets.data, header]);
   const headerValidation = useMemo(() => validateNewPO(createPayload), [createPayload]);
   const headerReady = firstError(headerValidation) == null;
@@ -225,7 +240,7 @@ export function NewRdaWizardPage() {
       setHeader((current) => ({
         ...current,
         [key]: value,
-        payment_method: paymentCodeFromProvider(nextProvider) || defaultPayment.data?.code || current.payment_method,
+        payment_method: preferredPaymentMethodCode(nextProvider, defaultPayment.data?.code ?? ''),
       }));
       return;
     }
@@ -241,7 +256,7 @@ export function NewRdaWizardPage() {
     setHeader((current) => ({
       ...current,
       provider_id: providerCreated.id,
-      payment_method: paymentCodeFromProvider(providerCreated) || defaultPayment.data?.code || current.payment_method,
+      payment_method: preferredPaymentMethodCode(providerCreated, defaultPayment.data?.code ?? ''),
     }));
   }
 
@@ -438,16 +453,11 @@ export function NewRdaWizardPage() {
               <div className="field">
                 <label>Tipo PO</label>
                 <select value={header.type} onChange={(event) => updateHeader('type', event.target.value as POType)}>
-                  <option value="STANDARD">Standard</option>
-                  <option value="ECOMMERCE">E-commerce</option>
+                  <option value="STANDARD">Con invio del PO al fornitore</option>
+                  <option value="ECOMMERCE">Senza inviare PO al fornitore</option>
                 </select>
               </div>
-              <div className="field">
-                <label>Metodo pagamento</label>
-                <PaymentMethodSelect methods={paymentOptions} value={header.payment_method} onChange={(next) => updateHeader('payment_method', next)} />
-                {headerFieldError('payment_method') ? <p className="fieldError">{headerFieldError('payment_method')}</p> : null}
-              </div>
-              <div className="field wide">
+              <div className="field twoThirds">
                 <label>Fornitore</label>
                 <ProviderCombobox
                   providers={providerOptions}
@@ -459,6 +469,12 @@ export function NewRdaWizardPage() {
                   }}
                 />
                 {headerFieldError('provider_id') ? <p className="fieldError">{headerFieldError('provider_id')}</p> : null}
+              </div>
+              <div className="field">
+                <label>Modalità di pagamento</label>
+                <PaymentMethodSelect methods={paymentOptions} value={header.payment_method} onChange={(next) => updateHeader('payment_method', next)} />
+                {paymentRequiresVerification ? <span className="badge warning">Richiede verifica metodo pagamento</span> : null}
+                {headerFieldError('payment_method') ? <p className="fieldError">{headerFieldError('payment_method')}</p> : null}
               </div>
               <div className="field">
                 <label>Progetto</label>

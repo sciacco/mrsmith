@@ -322,23 +322,24 @@ func (h *Handler) handleCreatePO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	provider := h.fetchProviderForCreate(r, req.ProviderID)
-	paymentMethod := strings.TrimSpace(req.PaymentMethod)
-	if paymentMethod == "" {
-		paymentMethod = providerDefaultPaymentMethod(provider)
+	if !h.requireArakDB(w) {
+		return
 	}
-	if paymentMethod == "" {
-		if !h.requireArakDB(w) {
-			return
-		}
-		code, err := h.defaultPaymentMethodCode(r.Context())
-		if err != nil {
-			httputil.InternalError(w, r, err, "rda default payment method query failed")
-			return
-		}
-		paymentMethod = code
+	paymentMethod, providerDefault, err := h.resolvePaymentMethod(r.Context(), req.PaymentMethod, provider)
+	if err != nil {
+		httputil.InternalError(w, r, err, "rda payment method resolve failed")
+		return
 	}
 	if paymentMethod == "" {
 		httputil.Error(w, http.StatusBadRequest, "Seleziona un metodo di pagamento")
+		return
+	}
+	if err := h.validateEffectivePaymentMethod(r.Context(), paymentMethod, providerDefault); err != nil {
+		if errors.Is(err, errPaymentMethodNotAllowed) {
+			httputil.Error(w, http.StatusBadRequest, "Seleziona un metodo di pagamento valido")
+			return
+		}
+		httputil.InternalError(w, r, err, "rda payment method validation failed")
 		return
 	}
 
@@ -401,6 +402,22 @@ func (h *Handler) handlePatchPO(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httputil.Error(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if patchAffectsPaymentRule(body) {
+		if !h.requireArakDB(w) {
+			return
+		}
+		if err := h.applyPatchPaymentMethodRule(r, body, po); err != nil {
+			switch {
+			case errors.Is(err, errPaymentProviderRequired):
+				httputil.Error(w, http.StatusBadRequest, "Seleziona un fornitore")
+			case errors.Is(err, errPaymentMethodNotAllowed):
+				httputil.Error(w, http.StatusBadRequest, "Seleziona un metodo di pagamento valido")
+			default:
+				httputil.InternalError(w, r, err, "rda patch payment method validation failed")
+			}
+			return
+		}
 	}
 	encoded, err := encodeJSONBody(body)
 	if err != nil {
@@ -528,7 +545,15 @@ func providerCAP(provider providerDetail) string {
 }
 
 func providerDefaultPaymentMethod(provider providerDetail) string {
-	raw := bytes.TrimSpace(provider.DefaultPaymentMethod)
+	return paymentCodeFromRawMessage(provider.DefaultPaymentMethod)
+}
+
+func poPaymentMethodCode(po poDetail) string {
+	return paymentCodeFromRawMessage(po.PaymentMethod)
+}
+
+func paymentCodeFromRawMessage(value json.RawMessage) string {
+	raw := bytes.TrimSpace(value)
 	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
 		return ""
 	}
@@ -571,6 +596,52 @@ func decodeAllowedPatch(reader io.Reader) (map[string]any, error) {
 		return nil, errors.New("Nessun campo da aggiornare")
 	}
 	return out, nil
+}
+
+func patchAffectsPaymentRule(body map[string]any) bool {
+	_, hasPayment := body["payment_method"]
+	_, hasProvider := body["provider_id"]
+	return hasPayment || hasProvider
+}
+
+func (h *Handler) applyPatchPaymentMethodRule(r *http.Request, body map[string]any, po poDetail) error {
+	providerID := po.Provider.ID
+	providerChanged := false
+	if rawProviderID, ok := body["provider_id"]; ok {
+		providerID = int64Value(rawProviderID)
+		providerChanged = true
+	}
+	if providerID <= 0 {
+		return errPaymentProviderRequired
+	}
+
+	provider := po.Provider
+	if provider.ID != providerID || providerDefaultPaymentMethod(provider) == "" {
+		provider = h.fetchProviderForCreate(r, providerID)
+	}
+
+	requestedPayment := ""
+	if rawPayment, ok := body["payment_method"]; ok {
+		requestedPayment = strings.TrimSpace(stringValue(rawPayment))
+		if requestedPayment == "" {
+			return errPaymentMethodNotAllowed
+		}
+	} else if !providerChanged {
+		requestedPayment = poPaymentMethodCode(po)
+	}
+
+	paymentMethod, providerDefault, err := h.resolvePaymentMethod(r.Context(), requestedPayment, provider)
+	if err != nil {
+		return err
+	}
+	if paymentMethod == "" {
+		return errPaymentMethodNotAllowed
+	}
+	if err := h.validateEffectivePaymentMethod(r.Context(), paymentMethod, providerDefault); err != nil {
+		return err
+	}
+	body["payment_method"] = paymentMethod
+	return nil
 }
 
 func multipartContentType(header *multipart.FileHeader) string {

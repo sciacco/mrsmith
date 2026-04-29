@@ -122,6 +122,15 @@ Alyante ERP ID
 - Used by: `apps/rda` `/rda/new` supplier request modal and legacy inline new-provider form.
 - Open questions: none.
 
+### RDA Payment Method Standard Rule
+
+- Context: `apps/rda` PO create/edit flows and backend `POST/PATCH /api/rda/v1/pos`.
+- Discovery: the standard payment methods for an RDA PO are the selected supplier default and the CDLAN default from `provider_qualifications.payment_method_default_cdlan`. Other payment methods are valid only when the catalog row exists and `provider_qualifications.payment_method.rda_available` is true.
+- Practical rule: show supplier default first, CDLAN default second, then RDA-available methods. Warn users only when the selected method is neither supplier default nor CDLAN default. Backend create/patch must validate the effective payment code against `provider_qualifications.payment_method`, allowing a non-RDA method only when it matches the selected supplier default.
+- Evidence: legacy RDA audit payment option rule, `provider_qualifications.payment_method`, `provider_qualifications.payment_method_default_cdlan`, and backend validation in `backend/internal/rda`.
+- Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, and RDA backend PO create/patch validation.
+- Open questions: none.
+
 ### Manutenzioni Radar Excludes Terminal Maintenance States
 
 - Context: `GET /api/manutenzioni/v1/maintenances/radar`, used by `apps/manutenzioni` on the Registro Manutenzioni page.

@@ -4,26 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import { useCreatePO } from '../api/queries';
 import type { BudgetForUser, CreatePOPayload, PaymentMethod, ProviderSummary } from '../api/types';
 import { coerceID } from '../lib/format';
+import {
+  buildPaymentMethodOptions,
+  paymentCodeFromProvider,
+  requiresPaymentMethodVerification,
+} from '../lib/payment-options';
 import { firstError, validateNewPO } from '../lib/validation';
 import { BudgetSelect, findBudget } from './BudgetSelect';
 import { NewProviderInlineForm } from './NewProviderInlineForm';
 import { PaymentMethodSelect } from './PaymentMethodSelect';
 import { ProviderSelect } from './ProviderSelect';
-
-function paymentCodeFromProvider(provider: ProviderSummary | undefined): string {
-  const value = provider?.default_payment_method;
-  if (!value) return '';
-  if (typeof value === 'object') return value.code;
-  return String(value);
-}
-
-function methodUnion(methods: PaymentMethod[], providerDefault: string, cdlanDefault: string): PaymentMethod[] {
-  const byCode = new Map<string, PaymentMethod>();
-  for (const method of methods) byCode.set(method.code, method);
-  if (cdlanDefault && !byCode.has(cdlanDefault)) byCode.set(cdlanDefault, { code: cdlanDefault, description: cdlanDefault });
-  if (providerDefault && !byCode.has(providerDefault)) byCode.set(providerDefault, { code: providerDefault, description: providerDefault });
-  return Array.from(byCode.values()).sort((a, b) => a.description.localeCompare(b.description));
-}
 
 export function NewPoModal({
   open,
@@ -57,9 +47,16 @@ export function NewPoModal({
   const provider = providers.find((item) => item.id === providerId);
   const providerDefault = paymentCodeFromProvider(provider);
   const paymentOptions = useMemo(
-    () => methodUnion(methods, providerDefault, cdlanDefault),
-    [cdlanDefault, methods, providerDefault],
+    () =>
+      buildPaymentMethodOptions({
+        methods,
+        providerDefault: provider?.default_payment_method,
+        cdlanDefaultCode: cdlanDefault,
+        currentCode: paymentMethod,
+      }),
+    [cdlanDefault, methods, paymentMethod, provider?.default_payment_method],
   );
+  const paymentRequiresVerification = requiresPaymentMethodVerification(paymentMethod, providerDefault, cdlanDefault);
 
   useEffect(() => {
     if (!open) return;
@@ -148,11 +145,9 @@ export function NewPoModal({
           <ProviderSelect providers={providers} value={providerId} onChange={setProviderId} />
         </div>
         <div className="field">
-          <label>Metodo pagamento</label>
+          <label>Modalità di pagamento</label>
           <PaymentMethodSelect methods={paymentOptions} value={paymentMethod} onChange={setPaymentMethod} />
-          {paymentMethod && cdlanDefault && paymentMethod !== cdlanDefault ? (
-            <p className="muted">Il PO sara sottoposto ad approvazione metodo pagamento.</p>
-          ) : null}
+          {paymentRequiresVerification ? <span className="badge warning">Richiede verifica metodo pagamento</span> : null}
         </div>
         <div className="field">
           <label>Riferimento preventivo</label>

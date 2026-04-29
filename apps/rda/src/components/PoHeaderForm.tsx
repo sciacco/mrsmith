@@ -1,5 +1,6 @@
-import type { BudgetForUser, PaymentMethod, PoDetail, ProviderSummary } from '../api/types';
+import type { BudgetForUser, PoDetail, ProviderSummary } from '../api/types';
 import { formatDateIT } from '../lib/format';
+import type { PaymentMethodOption } from '../lib/payment-options';
 import { stateLabel } from '../lib/state-labels';
 import { BudgetSelect } from './BudgetSelect';
 import { PaymentMethodSelect } from './PaymentMethodSelect';
@@ -44,6 +45,7 @@ export function PoHeaderForm({
   budgets,
   providers,
   paymentMethods,
+  paymentRequiresVerification,
   draftEditable,
   paymentEditable,
   onChange,
@@ -52,7 +54,8 @@ export function PoHeaderForm({
   value: HeaderFormState;
   budgets: BudgetForUser[];
   providers: ProviderSummary[];
-  paymentMethods: PaymentMethod[];
+  paymentMethods: PaymentMethodOption[];
+  paymentRequiresVerification?: boolean;
   draftEditable: boolean;
   paymentEditable: boolean;
   onChange: (value: HeaderFormState) => void;
@@ -81,18 +84,19 @@ export function PoHeaderForm({
           <label>Progetto</label>
           <input value={value.project} disabled={!draftEditable} maxLength={50} onChange={(event) => update('project', event.target.value)} />
         </div>
-        <div className="field">
+        <div className="field twoThirds">
           <label>Fornitore</label>
           <ProviderSelect providers={providers} value={value.provider_id} disabled={!draftEditable} onChange={(next) => update('provider_id', next)} />
         </div>
         <div className="field">
-          <label>Metodo pagamento</label>
+          <label>Modalità di pagamento</label>
           <PaymentMethodSelect
             methods={paymentMethods}
             value={value.payment_method}
             disabled={!draftEditable && !paymentEditable}
             onChange={(next) => update('payment_method', next)}
           />
+          {paymentRequiresVerification ? <span className="badge warning">Richiede verifica metodo pagamento</span> : null}
         </div>
         <div className="field">
           <label>Riferimento preventivo</label>

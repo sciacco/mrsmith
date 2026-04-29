@@ -4,9 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+)
+
+var (
+	errPaymentMethodNotAllowed = errors.New("payment method not allowed for RDA")
+	errPaymentProviderRequired = errors.New("payment provider required")
 )
 
 func (h *Handler) handlePaymentMethods(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +70,52 @@ func (h *Handler) defaultPaymentMethodCode(ctx context.Context) (string, error) 
 		FROM provider_qualifications.payment_method_default_cdlan
 		LIMIT 1`).Scan(&code)
 	return code, err
+}
+
+func (h *Handler) resolvePaymentMethod(ctx context.Context, requested string, provider providerDetail) (string, string, error) {
+	providerDefault := providerDefaultPaymentMethod(provider)
+	paymentMethod := strings.TrimSpace(requested)
+	if paymentMethod == "" {
+		paymentMethod = providerDefault
+	}
+	if paymentMethod == "" {
+		code, err := h.defaultPaymentMethodCode(ctx)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return "", providerDefault, nil
+			}
+			return "", providerDefault, err
+		}
+		paymentMethod = strings.TrimSpace(code)
+	}
+	return paymentMethod, providerDefault, nil
+}
+
+func (h *Handler) validateEffectivePaymentMethod(ctx context.Context, code string, providerDefault string) error {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return errPaymentMethodNotAllowed
+	}
+	method, err := h.paymentMethodByCode(ctx, code)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errPaymentMethodNotAllowed
+		}
+		return err
+	}
+	if method.RDAAvailable || code == strings.TrimSpace(providerDefault) {
+		return nil
+	}
+	return errPaymentMethodNotAllowed
+}
+
+func (h *Handler) paymentMethodByCode(ctx context.Context, code string) (paymentMethod, error) {
+	var method paymentMethod
+	err := h.arakDB.QueryRowContext(ctx, `
+		SELECT code, description, COALESCE(rda_available, false)
+		FROM provider_qualifications.payment_method
+		WHERE code = $1`, strings.TrimSpace(code)).Scan(&method.Code, &method.Description, &method.RDAAvailable)
+	return method, err
 }
 
 func (m defaultPaymentMethod) MarshalJSON() ([]byte, error) {

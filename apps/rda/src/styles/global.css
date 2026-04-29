@@ -298,12 +298,20 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.field.twoThirds {
+  grid-column: span 2;
+}
+
 .field label {
   color: var(--color-text-secondary);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.field > .badge {
+  justify-self: start;
 }
 
 .field input,
@@ -874,6 +882,10 @@ textarea {
   .rowComposer,
   .submitGrid {
     grid-template-columns: 1fr;
+  }
+
+  .field.twoThirds {
+    grid-column: 1 / -1;
   }
 
   .wizardPage {
