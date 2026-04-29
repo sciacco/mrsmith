@@ -74,10 +74,11 @@ func main() {
 	// Frontend config (no auth — needed before auth initializes)
 	mux.HandleFunc("GET /config", func(w http.ResponseWriter, _ *http.Request) {
 		httputil.JSON(w, http.StatusOK, map[string]any{
-			"keycloakUrl": cfg.KeycloakFrontendURL,
-			"realm":       cfg.KeycloakFrontendRealm,
-			"clientId":    cfg.KeycloakFrontendClientId,
-			"arakEnabled": arakCli != nil,
+			"keycloakUrl":       cfg.KeycloakFrontendURL,
+			"realm":             cfg.KeycloakFrontendRealm,
+			"clientId":          cfg.KeycloakFrontendClientId,
+			"arakEnabled":       arakCli != nil,
+			"rdaQuoteThreshold": cfg.RDAQuoteThreshold,
 		})
 	})
 
@@ -403,7 +404,7 @@ func main() {
 	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
-	rda.RegisterRoutes(api, rda.Deps{Arak: arakCli, ArakDB: arakDB, Logger: logger})
+	rda.RegisterRoutes(api, rda.Deps{Arak: arakCli, ArakDB: arakDB, Logger: logger, QuoteThreshold: cfg.RDAQuoteThreshold})
 	compliance.RegisterRoutes(api, anisettaDB)
 	coperture.RegisterRoutes(api, dbCoperture)
 	cpbackoffice.RegisterRoutes(api, cpbackoffice.Deps{

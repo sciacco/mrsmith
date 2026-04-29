@@ -3,12 +3,15 @@ package rda
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	platformconfig "github.com/sciacco/mrsmith/internal/platform/config"
 )
 
 func TestUploadAttachmentForwardsSelectedType(t *testing.T) {
@@ -59,7 +62,7 @@ func TestUploadAttachmentKeepsLegacyDefaultWhenTypeIsMissing(t *testing.T) {
 func TestSubmitPORequiresTwoQuoteAttachmentsAboveThreshold(t *testing.T) {
 	t.Run("rejects when second attachment is not quote", func(t *testing.T) {
 		h, arakState := newPaymentValidationHandler(t, paymentValidationFixture{
-			poDetail: poDetailForSubmit("3000.00", []string{"quote", "other"}),
+			poDetail: poDetailForSubmit(fmt.Sprintf("%.2f", platformconfig.DefaultRDAQuoteThreshold), []string{"quote", "other"}),
 		})
 
 		rec := httptest.NewRecorder()
@@ -77,7 +80,7 @@ func TestSubmitPORequiresTwoQuoteAttachmentsAboveThreshold(t *testing.T) {
 
 	t.Run("allows two quote attachments", func(t *testing.T) {
 		h, arakState := newPaymentValidationHandler(t, paymentValidationFixture{
-			poDetail: poDetailForSubmit("3000.00", []string{"quote", "quote"}),
+			poDetail: poDetailForSubmit(fmt.Sprintf("%.2f", platformconfig.DefaultRDAQuoteThreshold), []string{"quote", "quote"}),
 		})
 
 		rec := httptest.NewRecorder()
@@ -90,6 +93,46 @@ func TestSubmitPORequiresTwoQuoteAttachmentsAboveThreshold(t *testing.T) {
 		}
 		if got := arakState.count(http.MethodPost, "/arak/rda/v1/po/42/submit"); got != 1 {
 			t.Fatalf("expected one upstream submit, got %d", got)
+		}
+	})
+}
+
+func TestSubmitPOUsesConfiguredQuoteThreshold(t *testing.T) {
+	t.Run("allows mixed attachments below configured threshold", func(t *testing.T) {
+		h, arakState := newPaymentValidationHandler(t, paymentValidationFixture{
+			poDetail:       poDetailForSubmit("4000.00", []string{"quote", "other"}),
+			quoteThreshold: 5000,
+		})
+
+		rec := httptest.NewRecorder()
+		req := authedRDARequest(http.MethodPost, "/rda/v1/pos/42/submit", nil)
+		req.SetPathValue("id", "42")
+		h.handleSubmitPO(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+		if got := arakState.count(http.MethodPost, "/arak/rda/v1/po/42/submit"); got != 1 {
+			t.Fatalf("expected one upstream submit, got %d", got)
+		}
+	})
+
+	t.Run("requires two quotes at configured threshold", func(t *testing.T) {
+		h, arakState := newPaymentValidationHandler(t, paymentValidationFixture{
+			poDetail:       poDetailForSubmit("5000.00", []string{"quote", "other"}),
+			quoteThreshold: 5000,
+		})
+
+		rec := httptest.NewRecorder()
+		req := authedRDARequest(http.MethodPost, "/rda/v1/pos/42/submit", nil)
+		req.SetPathValue("id", "42")
+		h.handleSubmitPO(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+		if got := arakState.count(http.MethodPost, "/arak/rda/v1/po/42/submit"); got != 0 {
+			t.Fatalf("expected no upstream submit, got %d", got)
 		}
 	})
 }

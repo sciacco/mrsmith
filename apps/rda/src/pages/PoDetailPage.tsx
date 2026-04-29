@@ -1,6 +1,7 @@
 import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { getRdaQuoteThreshold } from '../runtime-config';
 import {
   useBudgets,
   usePatchPaymentMethod,
@@ -138,7 +139,7 @@ export function PoDetailPage() {
   const draftEditable = detail.state === PO_STATES.DRAFT && requester;
   const paymentEditable = detail.state === PO_STATES.PENDING_APPROVAL_PAYMENT_METHOD && requester;
   const total = parseMistraMoney(detail.total_price);
-  const quoteRuleBlocked = total >= 3000 && countQuoteAttachments(detail.attachments) < 2;
+  const quoteRuleBlocked = total >= getRdaQuoteThreshold() && countQuoteAttachments(detail.attachments) < 2;
   const canSubmit = draftEditable && (detail.rows?.length ?? 0) > 0 && !quoteRuleBlocked;
   const fullProvider = fullProviderForDraft ?? detail.provider;
   const providerDefault = paymentCodeFromProvider(fullProvider);

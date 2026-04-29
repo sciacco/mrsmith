@@ -253,6 +253,7 @@ type paymentValidationFixture struct {
 	rowCreateBody    string
 	rowDeleteStatus  int
 	rowDeleteBody    string
+	quoteThreshold   float64
 }
 
 func newPaymentValidationHandler(t *testing.T, fixture paymentValidationFixture) (*Handler, *paymentValidationArakState) {
@@ -268,7 +269,7 @@ func newPaymentValidationHandler(t *testing.T, fixture paymentValidationFixture)
 		ClientSecret: "secret",
 	})
 
-	return &Handler{arak: client, arakDB: openPaymentValidationDB(t, fixture)}, state
+	return &Handler{arak: client, arakDB: openPaymentValidationDB(t, fixture), quoteThreshold: normalizeQuoteThreshold(fixture.quoteThreshold)}, state
 }
 
 type capturedArakRequest struct {

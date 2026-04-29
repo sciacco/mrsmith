@@ -9,15 +9,17 @@ import (
 )
 
 type Deps struct {
-	Arak   *arak.Client
-	ArakDB *sql.DB
-	Logger *slog.Logger
+	Arak           *arak.Client
+	ArakDB         *sql.DB
+	Logger         *slog.Logger
+	QuoteThreshold float64
 }
 
 type Handler struct {
-	arak   *arak.Client
-	arakDB *sql.DB
-	logger *slog.Logger
+	arak           *arak.Client
+	arakDB         *sql.DB
+	logger         *slog.Logger
+	quoteThreshold float64
 }
 
 type userRef struct {

@@ -9,6 +9,8 @@ import (
 	"github.com/sciacco/mrsmith/internal/simulatorivendita"
 )
 
+const DefaultRDAQuoteThreshold float64 = 3000
+
 type Config struct {
 	Port              string
 	LogLevel          string
@@ -92,6 +94,9 @@ type Config struct {
 	KeycloakFrontendRealm    string
 	KeycloakFrontendClientId string
 
+	// Public RDA runtime settings served to browser via GET /config.
+	RDAQuoteThreshold float64
+
 	// Arak / MISTRA-NG API proxy (service account client credentials)
 	ArakBaseURL         string
 	ArakServiceClientID string
@@ -151,6 +156,7 @@ func Load() Config {
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),
 		KeycloakFrontendClientId: envOr("KEYCLOAK_FRONTEND_CLIENT_ID", ""),
+		RDAQuoteThreshold:        positiveFloatEnvOr("RDA_QUOTE_THRESHOLD", DefaultRDAQuoteThreshold),
 
 		ArakBaseURL:         envOr("ARAK_BASE_URL", ""),
 		ArakServiceClientID: envOr("ARAK_SERVICE_CLIENT_ID", ""),
@@ -176,6 +182,18 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func positiveFloatEnvOr(key string, fallback float64) float64 {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseFloat(strings.ReplaceAll(value, ",", "."), 64)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
 
 func intListEnvOr(key string, fallback []int) []int {

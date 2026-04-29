@@ -1,6 +1,7 @@
 import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { getRdaQuoteThreshold } from '../runtime-config';
 import {
   useBudgets,
   useCreatePO,
@@ -97,7 +98,7 @@ function headerFromPO(po: PoDetail): WizardHeaderState {
 function suggestedStep(po: PoDetail): number {
   const total = parseMistraMoney(po.total_price);
   if ((po.rows ?? []).length === 0) return 1;
-  if (total >= 3000 && countQuoteAttachments(po.attachments) < 2) return 2;
+  if (total >= getRdaQuoteThreshold() && countQuoteAttachments(po.attachments) < 2) return 2;
   return 3;
 }
 
@@ -221,7 +222,8 @@ export function NewRdaWizardPage() {
   const quoteCount = countQuoteAttachments(attachments);
   const displayCurrency = normalizeCurrency(detail?.currency ?? header.currency);
   const total = parseMistraMoney(detail?.total_price);
-  const quoteRuleBlocked = total >= 3000 && quoteCount < 2;
+  const quoteThreshold = getRdaQuoteThreshold();
+  const quoteRuleBlocked = total >= quoteThreshold && quoteCount < 2;
   const sendsToProvider = header.type !== 'ECOMMERCE';
   const contactsReady = !sendsToProvider || contactDraftIds.length > 0 || hasQualificationFallback(fullProvider);
   const readinessItems: ReadinessItem[] = [
@@ -242,7 +244,7 @@ export function NewRdaWizardPage() {
       label: 'Preventivi',
       ready: !quoteRuleBlocked,
       detail:
-        total >= 3000
+        total >= quoteThreshold
           ? `${quoteCount}/2 preventiv${quoteCount === 1 ? 'o caricato' : 'i caricati'} per ${formatMoney(total, displayCurrency)}.`
           : 'La soglia preventivi non richiede altri allegati.',
     },
@@ -611,11 +613,11 @@ export function NewRdaWizardPage() {
               <div>
                 <h2>Allegati</h2>
                 <p className="muted">
-                  {total >= 3000 ? `Carica almeno 2 preventivi per un totale PO di ${formatMoney(total, displayCurrency)}.` : 'Carica preventivi e documenti utili alla richiesta.'}
+                  {total >= quoteThreshold ? `Carica almeno 2 preventivi per un totale PO di ${formatMoney(total, displayCurrency)}.` : 'Carica preventivi e documenti utili alla richiesta.'}
                 </p>
               </div>
               <span className={`badge ${quoteRuleBlocked ? 'warning' : 'success'}`}>
-                {total >= 3000 ? `${quoteCount}/2 preventivi` : `${attachments.length} allegat${attachments.length === 1 ? 'o' : 'i'}`}
+                {total >= quoteThreshold ? `${quoteCount}/2 preventivi` : `${attachments.length} allegat${attachments.length === 1 ? 'o' : 'i'}`}
               </span>
             </div>
             <div className="tabBody stack">

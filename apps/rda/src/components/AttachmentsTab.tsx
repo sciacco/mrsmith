@@ -1,5 +1,6 @@
 import { Icon, useToast } from '@mrsmith/ui';
 import { useEffect, useState, type ChangeEvent } from 'react';
+import { getRdaQuoteThreshold } from '../runtime-config';
 import { useDeleteAttachment, useRdaDownloads, useUploadAttachment } from '../api/queries';
 import type { AttachmentType, PoAttachment, PoDetail } from '../api/types';
 import {
@@ -7,7 +8,7 @@ import {
   attachmentTypeLabel,
   defaultAttachmentTypeForPOState,
 } from '../lib/attachments';
-import { downloadBlob, formatDateIT } from '../lib/format';
+import { downloadBlob, formatDateIT, formatMoney } from '../lib/format';
 import { ConfirmDialog } from './ConfirmDialog';
 
 export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boolean }) {
@@ -19,6 +20,7 @@ export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boole
   const { toast } = useToast();
   const poId = po.id;
   const canUpload = po.state === 'DRAFT' || po.state === 'PENDING_VERIFICATION';
+  const quoteThreshold = getRdaQuoteThreshold();
 
   useEffect(() => {
     setAttachmentType(defaultAttachmentTypeForPOState(po.state));
@@ -66,7 +68,7 @@ export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boole
 
   return (
     <div className="stack">
-      <p className="muted">Per importi maggiori di 3.000 € sono necessari almeno 2 allegati di tipo Preventivo.</p>
+      <p className="muted">Per importi maggiori di {formatMoney(quoteThreshold, po.currency)} sono necessari almeno 2 allegati di tipo Preventivo.</p>
       {canUpload ? (
         <div className="attachmentUploadControls compact">
           <div className="field">

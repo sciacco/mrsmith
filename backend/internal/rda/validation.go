@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
+	platformconfig "github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
@@ -596,8 +597,8 @@ func (h *Handler) handleSubmitPO(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "Aggiungi almeno una riga PO")
 		return
 	}
-	if parseTotalPrice(po.TotalPrice) >= 3000 && countQuoteAttachments(po.Attachments) < 2 {
-		httputil.Error(w, http.StatusBadRequest, "Per importi superiori a 3.000 euro sono necessari almeno 2 preventivi")
+	if parseTotalPrice(po.TotalPrice) >= h.quoteThreshold && countQuoteAttachments(po.Attachments) < 2 {
+		httputil.Error(w, http.StatusBadRequest, "Per importi superiori alla soglia configurata sono necessari almeno 2 preventivi")
 		return
 	}
 	h.forwardArak(w, r, http.MethodPost, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/submit", "", nil, requesterHeaders(email))
@@ -784,6 +785,13 @@ func countQuoteAttachments(attachments []json.RawMessage) int {
 		}
 	}
 	return count
+}
+
+func normalizeQuoteThreshold(value float64) float64 {
+	if value <= 0 || math.IsNaN(value) || math.IsInf(value, 0) {
+		return platformconfig.DefaultRDAQuoteThreshold
+	}
+	return value
 }
 
 func stringValue(value any) string {

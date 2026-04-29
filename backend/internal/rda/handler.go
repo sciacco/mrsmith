@@ -40,9 +40,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		logger = slog.Default()
 	}
 	h := &Handler{
-		arak:   deps.Arak,
-		arakDB: deps.ArakDB,
-		logger: logger.With("component", component),
+		arak:           deps.Arak,
+		arakDB:         deps.ArakDB,
+		logger:         logger.With("component", component),
+		quoteThreshold: normalizeQuoteThreshold(deps.QuoteThreshold),
 	}
 
 	protect := acl.RequireRole(applaunch.RDAAccessRoles()...)

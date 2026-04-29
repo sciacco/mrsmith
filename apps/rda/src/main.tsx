@@ -6,6 +6,7 @@ import { ToastProvider } from '@mrsmith/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
+import { setRuntimeConfig } from './runtime-config';
 import './styles/global.css';
 
 document.documentElement.dataset.theme = 'clean';
@@ -32,12 +33,14 @@ interface BootstrapConfig {
   keycloakUrl: string;
   realm: string;
   clientId: string;
+  rdaQuoteThreshold: number;
 }
 
 async function bootstrap() {
   const res = await fetch('/config');
   if (!res.ok) throw new Error(`RDA bootstrap failed with status ${res.status}.`);
   const config: BootstrapConfig = await res.json();
+  setRuntimeConfig({ rdaQuoteThreshold: config.rdaQuoteThreshold });
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
