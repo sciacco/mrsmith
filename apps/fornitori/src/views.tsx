@@ -16,7 +16,7 @@ import {
   useProviderSummary,
 } from './api/queries';
 import type { AlyanteSupplier, Category, CategoryDocumentType, Country, DashboardCategory, DocumentType, PaymentMethod, Provider, ProviderCategory, ProviderDocument, ProviderPayload, ProviderReference, ProviderSummary } from './api/types';
-import { provinceSelectOptions } from './lib/provinces';
+import { provinceSelectOptions } from '@mrsmith/ui';
 import {
   PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE,
   PROVIDER_REFERENCE_PHONE_PATTERN,
