@@ -84,6 +84,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handle("GET /rda/v1/pos/{id}/pdf", h.handlePDF)
 
 	handle("POST /rda/v1/pos/{id}/rows", h.handleCreateRow)
+	handle("PUT /rda/v1/pos/{id}/rows/{rowId}", h.handleReplaceRow)
 	handle("DELETE /rda/v1/pos/{id}/rows/{rowId}", h.handleDeleteRow)
 
 	handle("POST /rda/v1/pos/{id}/attachments", h.handleUploadAttachment)

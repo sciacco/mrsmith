@@ -149,6 +149,15 @@ Alyante ERP ID
 - Used by: `apps/rda` row composer and row modal.
 - Open questions: none.
 
+### RDA Row Edit Is A BFF Replace Operation
+
+- Context: `apps/rda` PO row editing in `/rda/new` and PO detail.
+- Discovery: Mistra exposes row create and delete (`POST /arak/rda/v1/po/{id}/row`, `DELETE /arak/rda/v1/po/{id}/row/{rowid}`) but no real row update endpoint.
+- Practical rule: expose row edit to the browser only through `PUT /api/rda/v1/pos/{id}/rows/{rowId}`. The BFF must validate the caller and draft PO, create the replacement row first, and delete the old row only after create succeeds. If delete fails after create, return `409 ROW_REPLACE_DELETE_FAILED` so the UI refetches and shows the operator that both rows may be present.
+- Evidence: `docs/mistra-dist.yaml` RDA row paths and backend `backend/internal/rda/validation.go`.
+- Used by: `apps/rda` row modal and row tables.
+- Open questions: none.
+
 ### RDA Article Catalog Type Comes From The BFF
 
 - Context: `apps/rda` row creation in `/rda/new` and PO detail row modal.

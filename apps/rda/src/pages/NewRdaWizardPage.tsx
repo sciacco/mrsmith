@@ -11,11 +11,12 @@ import {
   useProvider,
   useProviders,
   useRdaDownloads,
+  useDeleteRow,
   useTransitionMutation,
   useUploadAttachment,
   usePatchPO,
 } from '../api/queries';
-import type { PoAttachment, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
+import type { PoAttachment, PoDetail, PoRow, ProviderReference, ProviderSummary } from '../api/types';
 import { BudgetSelect } from '../components/BudgetSelect';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { PaymentMethodSelect } from '../components/PaymentMethodSelect';
@@ -24,7 +25,8 @@ import { ProviderCombobox } from '../components/ProviderCombobox';
 import { ProviderRequestModal } from '../components/ProviderRequestModal';
 import { ProviderRefTable } from '../components/ProviderRefTable';
 import { ReadinessChecklist, type ReadinessItem } from '../components/ReadinessChecklist';
-import { RowComposer } from '../components/RowComposer';
+import { RowModal } from '../components/RowModal';
+import { RowTable } from '../components/RowTable';
 import { WizardStepper } from '../components/WizardStepper';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { coerceID, downloadBlob, formatDateIT, formatMoneyEUR, isRequester, parseMistraMoney } from '../lib/format';
@@ -124,7 +126,9 @@ export function NewRdaWizardPage() {
   const [requestedProviders, setRequestedProviders] = useState<ProviderSummary[]>([]);
   const [providerRequestOpen, setProviderRequestOpen] = useState(false);
   const [providerRequestSearch, setProviderRequestSearch] = useState('');
-  const [rowPreviewTotal, setRowPreviewTotal] = useState(0);
+  const [rowModalOpen, setRowModalOpen] = useState(false);
+  const [editRowTarget, setEditRowTarget] = useState<PoRow | null>(null);
+  const [deleteRowTarget, setDeleteRowTarget] = useState<PoRow | null>(null);
 
   const budgets = useBudgets();
   const providers = useProviders();
@@ -136,6 +140,7 @@ export function NewRdaWizardPage() {
   const transition = useTransitionMutation();
   const upload = useUploadAttachment();
   const removeAttachment = useDeleteAttachment();
+  const removeRow = useDeleteRow();
   const downloads = useRdaDownloads();
   const providerOptions = useMemo(() => {
     const byID = new Map<number, ProviderSummary>();
@@ -160,10 +165,6 @@ export function NewRdaWizardPage() {
     const next = preferredPaymentMethodCode(fullProvider, defaultPayment.data?.code ?? '');
     if (next) setHeader((current) => ({ ...current, payment_method: next }));
   }, [defaultPayment.data?.code, fullProvider, header.payment_method, poId]);
-
-  useEffect(() => {
-    if (step !== 1) setRowPreviewTotal(0);
-  }, [step]);
 
   if (rawPoId && poId == null) return <Navigate to="/rda/new" replace />;
 
@@ -200,9 +201,6 @@ export function NewRdaWizardPage() {
   const rows = detail?.rows ?? [];
   const attachments = detail?.attachments ?? [];
   const total = parseMistraMoney(detail?.total_price);
-  const previewDelta = Number.isFinite(rowPreviewTotal) ? rowPreviewTotal : 0;
-  const showPreviewTotal = step === 1 && previewDelta > 0;
-  const previewTotal = total + previewDelta;
   const quoteRuleBlocked = total >= 3000 && attachments.length < 2;
   const contactsReady = contactDraftIds.length > 0 || hasQualificationFallback(fullProvider);
   const readinessItems: ReadinessItem[] = [
@@ -381,6 +379,32 @@ export function NewRdaWizardPage() {
     }
   }
 
+  function openNewRow() {
+    setEditRowTarget(null);
+    setRowModalOpen(true);
+  }
+
+  function openEditRow(row: PoRow) {
+    setEditRowTarget(row);
+    setRowModalOpen(true);
+  }
+
+  function closeRowModal() {
+    setRowModalOpen(false);
+    setEditRowTarget(null);
+  }
+
+  async function confirmDeleteRow() {
+    if (!deleteRowTarget || poId == null) return;
+    try {
+      await removeRow.mutateAsync({ id: poId, rowId: deleteRowTarget.id });
+      toast('Riga eliminata');
+      setDeleteRowTarget(null);
+    } catch {
+      toast('Eliminazione non riuscita', 'error');
+    }
+  }
+
   async function confirmDeleteAttachment() {
     if (!deleteAttachment || poId == null) return;
     try {
@@ -528,20 +552,12 @@ export function NewRdaWizardPage() {
                 <h2>Righe</h2>
                 <p className="muted">Aggiungi beni o servizi alla bozza.</p>
               </div>
-              {showPreviewTotal ? (
-                <span className="rowPreviewTotal">
-                  <span>Totale riga</span>
-                  <strong>{formatMoneyEUR(previewDelta)}</strong>
-                </span>
-              ) : null}
+              <Button size="sm" leftIcon={<Icon name="plus" />} disabled={!draftEditable} onClick={openNewRow}>
+                Nuova riga
+              </Button>
             </div>
             <div className="tabBody">
-              <RowComposer
-                poId={detail.id}
-                rows={rows}
-                editable={draftEditable}
-                onPreviewTotalChange={setRowPreviewTotal}
-              />
+              <RowTable rows={rows} editable={draftEditable} emptyLabel="Nessuna riga inserita." onEdit={openEditRow} onDelete={setDeleteRowTarget} />
             </div>
           </div>
         ) : null}
@@ -681,12 +697,6 @@ export function NewRdaWizardPage() {
             <span>Totale PO</span>
             <strong>{formatMoneyEUR(total)}</strong>
           </span>
-          {showPreviewTotal ? (
-            <span className="wizardFooterMetric preview">
-              <span>Con riga</span>
-              <strong>{formatMoneyEUR(previewTotal)}</strong>
-            </span>
-          ) : null}
           {!detail ? <span className="wizardFooterDraft">Bozza non ancora creata</span> : null}
         </div>
         <Button
@@ -698,6 +708,19 @@ export function NewRdaWizardPage() {
           {step === 0 && poId == null ? 'Crea bozza' : step === steps.length - 1 ? 'Manda in approvazione' : 'Continua'}
         </Button>
       </div>
+
+      {detail ? <RowModal poId={detail.id} open={rowModalOpen} row={editRowTarget} onClose={closeRowModal} /> : null}
+
+      <ConfirmDialog
+        open={deleteRowTarget != null}
+        title="Elimina riga"
+        message="Confermi eliminazione della riga selezionata?"
+        confirmLabel="Elimina"
+        danger
+        loading={removeRow.isPending}
+        onClose={() => setDeleteRowTarget(null)}
+        onConfirm={() => void confirmDeleteRow()}
+      />
 
       <ConfirmDialog
         open={deleteAttachment != null}

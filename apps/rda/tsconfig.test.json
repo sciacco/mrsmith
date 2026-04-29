@@ -12,6 +12,7 @@
   "include": [
     "src/lib/payment-options.ts",
     "src/lib/payment-options.test.ts",
+    "src/lib/format.ts",
     "src/lib/row-payload.ts",
     "src/lib/row-payload.test.ts"
   ]

@@ -32,7 +32,7 @@ Keep these constraints intact:
 - Reuse the existing Mistra NG `/arak/rda/...` API wire surface unchanged.
 - Reuse the existing `fornitori` module for provider/provider-reference UI calls.
 - Keep the app desktop-first and clean mini-app styled; no launcher-style Matrix UI.
-- Hide row edit in v1. Users delete and recreate a PO row.
+- Row edit is exposed through the BFF as a create-then-delete replacement because Mistra has no row update endpoint.
 - Keep @-mentions cosmetic in v1. Do not send `mentioned_user_ids`.
 - Do not add automated tests unless the user explicitly approves them in the implementation session.
 
@@ -514,7 +514,13 @@ Rows:
   - Require requester + `DRAFT`.
   - Optionally verify the row exists under this PO before forwarding for clearer 404.
   - Forward `DELETE /arak/rda/v1/po/{id}/row/{rowId}`.
-- Do not implement `PUT /rows/{rowId}`.
+- `PUT /rows/{rowId}`
+  - Fetch PO detail.
+  - Require requester + `DRAFT`.
+  - Verify the target row exists under this PO.
+  - Validate and build the same row body used by `POST /rows`.
+  - Forward create first, then delete the old row only after create succeeds.
+  - If delete fails after create, return `409 ROW_REPLACE_DELETE_FAILED` so the frontend refetches and warns the operator.
 
 Attachments:
 
@@ -1037,9 +1043,8 @@ Rows tab:
   - Q.tà
   - Tipo
   - Totale riga, using backend value if present; do not recompute as source of truth.
+  - Edit icon enabled only DRAFT requester.
   - Delete icon enabled only DRAFT requester.
-- Hide edit pencil in v1.
-- If users need to change a row, show copy near disabled edit affordance only if necessary: `Elimina e ricrea la riga per modificarla.`
 
 Row modal:
 
@@ -1360,7 +1365,7 @@ Record these in implementation notes and update `docs/TODO.md` only if the work 
 - Keycloak group bundling: ensure RDA users also receive `app_fornitori_access`.
 - Mistra OpenAPI should eventually add `recipients[]` and `approvers[]` to `rda-document-detail`.
 - Mistra should eventually fix `total_price` formatting so frontend parsing can be simplified.
-- Mistra should eventually add row update support; until then row edit remains hidden.
+- Mistra should eventually add native row update support; until then BFF row edit remains a non-atomic replacement flow.
 - If implementation proves comment creation needs a numeric user id, document the exact lookup and add it to `docs/IMPLEMENTATION-KNOWLEDGE.md`.
 
 ## Test Policy

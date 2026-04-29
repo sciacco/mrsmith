@@ -568,17 +568,6 @@ textarea {
   font-weight: 600;
 }
 
-.rowComposer {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.85rem;
-  min-width: 0;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
-  padding: 0.9rem;
-  background: color-mix(in srgb, var(--color-surface) 52%, #fff 48%);
-}
-
 .articleQuantityRow {
   display: grid;
   align-items: start;
@@ -638,31 +627,6 @@ textarea {
 .checkboxField input {
   width: auto;
   justify-self: end;
-}
-
-.rowPreviewTotal {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-left: auto;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-full);
-  padding: 0.32rem 0.56rem;
-  background: color-mix(in srgb, var(--color-surface) 60%, #fff 40%);
-}
-
-.rowPreviewTotal span {
-  color: var(--color-text-muted);
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.rowPreviewTotal strong {
-  color: var(--color-text);
-  font-family: var(--font-mono);
-  font-size: 0.86rem;
-  white-space: nowrap;
 }
 
 .uploadDrop {
@@ -1036,7 +1000,6 @@ textarea {
   .providerPaymentGrid,
   .detailLayout,
   .inlineForm,
-  .rowComposer,
   .articleQuantityRow,
   .submitGrid {
     grid-template-columns: 1fr;
@@ -1093,10 +1056,6 @@ textarea {
 
   .wizardFooterMetric {
     justify-content: center;
-  }
-
-  .rowPreviewTotal {
-    align-self: flex-end;
   }
 
   .wizardFooterStep,

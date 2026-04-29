@@ -246,6 +246,18 @@ export function useDeleteRow() {
   });
 }
 
+export function useReplaceRow() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, rowId, body }: { id: number; rowId: number; body: RowPayload }) =>
+      api.put<void>(`${rdaRoot}/pos/${id}/rows/${rowId}`, body),
+    onSettled: (_data, _error, variables) => {
+      if (variables) invalidatePO(queryClient, variables.id);
+    },
+  });
+}
+
 export function useUploadAttachment() {
   const api = useApiClient();
   const queryClient = useQueryClient();

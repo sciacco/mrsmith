@@ -249,6 +249,10 @@ type paymentValidationFixture struct {
 	providerDefault  string
 	providerDefaults map[int64]string
 	poDetail         string
+	rowCreateStatus  int
+	rowCreateBody    string
+	rowDeleteStatus  int
+	rowDeleteBody    string
 }
 
 func newPaymentValidationHandler(t *testing.T, fixture paymentValidationFixture) (*Handler, *paymentValidationArakState) {
@@ -313,6 +317,24 @@ func (s *paymentValidationArakState) ServeHTTP(w http.ResponseWriter, r *http.Re
 			return
 		}
 		_, _ = w.Write([]byte(poDetailJSON(s.fixture.providerDefault, s.fixture.providerDefault)))
+	case r.Method == http.MethodPost && r.URL.Path == "/arak/rda/v1/po/42/row":
+		if s.fixture.rowCreateStatus != 0 {
+			w.WriteHeader(s.fixture.rowCreateStatus)
+		}
+		if s.fixture.rowCreateBody != "" {
+			_, _ = w.Write([]byte(s.fixture.rowCreateBody))
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":9001}`))
+	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/arak/rda/v1/po/42/row/"):
+		if s.fixture.rowDeleteStatus != 0 {
+			w.WriteHeader(s.fixture.rowDeleteStatus)
+		}
+		if s.fixture.rowDeleteBody != "" {
+			_, _ = w.Write([]byte(s.fixture.rowDeleteBody))
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	default:
 		_, _ = w.Write([]byte(`{"ok":true}`))
 	}

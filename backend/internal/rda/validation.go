@@ -18,6 +18,14 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
+const codeRowReplaceDeleteFailed = "ROW_REPLACE_DELETE_FAILED"
+
+type upstreamBodyResponse struct {
+	status int
+	header http.Header
+	body   []byte
+}
+
 func validateCreatePO(req createPORequest) error {
 	if req.Type != "STANDARD" && req.Type != "ECOMMERCE" {
 		return errors.New("Seleziona il tipo PO")
@@ -72,32 +80,35 @@ func (h *Handler) handleCreateRow(w http.ResponseWriter, r *http.Request) {
 		httputil.InternalError(w, r, err, "rda row body encode failed")
 		return
 	}
-	h.forwardCreateRow(w, r, email, encoded)
-}
-
-func (h *Handler) forwardCreateRow(w http.ResponseWriter, r *http.Request, email string, body io.Reader) {
-	path := arakRDARoot + "/po/" + url.PathEscape(r.PathValue("id")) + "/row"
-	resp, err := h.arak.DoWithHeaders(http.MethodPost, path, "", body, mergeHeaders(requesterHeaders(email), jsonHeaders()))
+	response, err := h.createRowUpstream(email, r.PathValue("id"), encoded)
 	if err != nil {
-		h.requestLogger(r, "rda_create_row", "upstream_path", path).Error("upstream request failed", "error", err)
+		h.requestLogger(r, "rda_create_row", "upstream_path", arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/row").Error("upstream request failed", "error", err)
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "Servizio RDA temporaneamente non disponibile",
 			"code":  codeUpstreamUnavailable,
 		})
 		return
+	}
+	h.writeCreateRowResponse(w, r, response)
+}
+
+func (h *Handler) createRowUpstream(email string, poID string, body io.Reader) (upstreamBodyResponse, error) {
+	path := arakRDARoot + "/po/" + url.PathEscape(poID) + "/row"
+	resp, err := h.arak.DoWithHeaders(http.MethodPost, path, "", body, mergeHeaders(requesterHeaders(email), jsonHeaders()))
+	if err != nil {
+		return upstreamBodyResponse{}, err
 	}
 	defer resp.Body.Close()
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		h.requestLogger(r, "rda_create_row", "upstream_path", path).Error("failed to read upstream response", "error", err)
-		httputil.JSON(w, http.StatusBadGateway, map[string]string{
-			"error": "Servizio RDA temporaneamente non disponibile",
-			"code":  codeUpstreamUnavailable,
-		})
-		return
+		return upstreamBodyResponse{}, err
 	}
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	return upstreamBodyResponse{status: resp.StatusCode, header: resp.Header.Clone(), body: responseBody}, nil
+}
+
+func (h *Handler) writeCreateRowResponse(w http.ResponseWriter, r *http.Request, response upstreamBodyResponse) {
+	if response.status == http.StatusUnauthorized || response.status == http.StatusForbidden {
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "Autorizzazione verso il servizio RDA non riuscita",
 			"code":  codeUpstreamAuthFailed,
@@ -105,23 +116,24 @@ func (h *Handler) forwardCreateRow(w http.ResponseWriter, r *http.Request, email
 		return
 	}
 
-	copyResponseHeaders(w.Header(), resp.Header)
+	copyResponseHeaders(w.Header(), response.header)
 	w.Header().Del("Content-Length")
 	if w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", "application/json")
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		h.requestLogger(r, "rda_create_row", "upstream_path", path, "upstream_status", resp.StatusCode).Warn("upstream row create rejected", "body", string(responseBody))
-		w.WriteHeader(resp.StatusCode)
-		_, _ = w.Write(responseBody)
+	if response.status < 200 || response.status >= 300 {
+		h.requestLogger(r, "rda_create_row", "upstream_status", response.status).Warn("upstream row create rejected", "body", string(response.body))
+		w.WriteHeader(response.status)
+		_, _ = w.Write(response.body)
 		return
 	}
 
+	responseBody := response.body
 	normalized, err := normalizePODetailRows(responseBody, nil)
 	if err == nil {
 		responseBody = normalized
 	}
-	w.WriteHeader(resp.StatusCode)
+	w.WriteHeader(response.status)
 	_, _ = w.Write(responseBody)
 }
 
@@ -257,6 +269,142 @@ func rowCreateTotal(rowType string, body map[string]any, mrcOrPrice any, nrc any
 
 func decimalString(value any) string {
 	return strconv.FormatFloat(numberValue(value), 'f', -1, 64)
+}
+
+func (h *Handler) handleReplaceRow(w http.ResponseWriter, r *http.Request) {
+	if !h.requireArak(w) {
+		return
+	}
+	email, po, ok := h.loadPOForWrite(w, r)
+	if !ok {
+		return
+	}
+	if !isRequester(po, email) || po.State != "DRAFT" {
+		httputil.Error(w, http.StatusForbidden, "Le righe possono essere modificate solo dal richiedente in bozza")
+		return
+	}
+	rowID := strings.TrimSpace(r.PathValue("rowId"))
+	if !poHasRow(po, rowID) {
+		httputil.Error(w, http.StatusNotFound, "Riga non disponibile")
+		return
+	}
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+		return
+	}
+	if err := validateRow(body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	upstreamBody := buildRowCreateBody(body, email)
+	encoded, err := encodeJSONBody(upstreamBody)
+	if err != nil {
+		httputil.InternalError(w, r, err, "rda row body encode failed")
+		return
+	}
+
+	createResponse, err := h.createRowUpstream(email, r.PathValue("id"), encoded)
+	if err != nil {
+		h.requestLogger(r, "rda_replace_row", "po_id", r.PathValue("id"), "row_id", rowID).Error("upstream row create failed", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio RDA temporaneamente non disponibile",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	if createResponse.status == http.StatusUnauthorized || createResponse.status == http.StatusForbidden {
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Autorizzazione verso il servizio RDA non riuscita",
+			"code":  codeUpstreamAuthFailed,
+		})
+		return
+	}
+	if createResponse.status < 200 || createResponse.status >= 300 {
+		copyResponseHeaders(w.Header(), createResponse.header)
+		w.Header().Del("Content-Length")
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", "application/json")
+		}
+		h.requestLogger(r, "rda_replace_row", "po_id", r.PathValue("id"), "row_id", rowID, "upstream_status", createResponse.status).Warn("upstream replacement row create rejected", "body", string(createResponse.body))
+		w.WriteHeader(createResponse.status)
+		_, _ = w.Write(createResponse.body)
+		return
+	}
+
+	deleteResponse, err := h.deleteRowUpstream(r, email, r.PathValue("id"), rowID)
+	if err != nil {
+		h.writeRowReplaceDeleteFailure(w, r, rowID, rowResponseID(createResponse.body), 0, nil, err)
+		return
+	}
+	if deleteResponse.status < 200 || deleteResponse.status >= 300 {
+		h.writeRowReplaceDeleteFailure(w, r, rowID, rowResponseID(createResponse.body), deleteResponse.status, deleteResponse.body, nil)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) deleteRowUpstream(r *http.Request, email string, poID string, rowID string) (upstreamBodyResponse, error) {
+	path := arakRDARoot + "/po/" + url.PathEscape(poID) + "/row/" + url.PathEscape(rowID)
+	resp, err := h.arak.DoWithHeaders(http.MethodDelete, path, "", nil, requesterHeaders(email))
+	if err != nil {
+		return upstreamBodyResponse{}, err
+	}
+	defer resp.Body.Close()
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return upstreamBodyResponse{}, err
+	}
+	return upstreamBodyResponse{status: resp.StatusCode, header: resp.Header.Clone(), body: responseBody}, nil
+}
+
+func (h *Handler) writeRowReplaceDeleteFailure(w http.ResponseWriter, r *http.Request, rowID string, createdRowID string, status int, body []byte, err error) {
+	attrs := []any{"po_id", r.PathValue("id"), "row_id", rowID, "created_row_id", createdRowID}
+	if status != 0 {
+		attrs = append(attrs, "upstream_status", status, "body", string(body))
+	}
+	if err != nil {
+		attrs = append(attrs, "error", err)
+	}
+	h.requestLogger(r, "rda_replace_row_delete").Error("replacement row created but old row delete failed", attrs...)
+
+	payload := map[string]string{
+		"error": "Nuova riga creata, ma la riga precedente non e stata eliminata. Controlla le righe prima di inviare la richiesta.",
+		"code":  codeRowReplaceDeleteFailed,
+	}
+	if createdRowID != "" {
+		payload["created_row_id"] = createdRowID
+	}
+	httputil.JSON(w, http.StatusConflict, payload)
+}
+
+func poHasRow(po poDetail, rowID string) bool {
+	needle := strings.TrimSpace(rowID)
+	if needle == "" {
+		return false
+	}
+	for _, raw := range po.Rows {
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.UseNumber()
+		var row map[string]any
+		if err := decoder.Decode(&row); err != nil {
+			continue
+		}
+		if rowIDKey(row["id"]) == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func rowResponseID(body []byte) string {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	var payload map[string]any
+	if err := decoder.Decode(&payload); err != nil {
+		return ""
+	}
+	return rowIDKey(payload["id"])
 }
 
 func (h *Handler) handleDeleteRow(w http.ResponseWriter, r *http.Request) {

@@ -1,124 +1,138 @@
+import { ApiError } from '@mrsmith/api-client';
 import { Button, Icon, Modal, useToast } from '@mrsmith/ui';
-import { useState } from 'react';
-import { useArticleCatalog, useCreateRow } from '../api/queries';
-import type { Article } from '../api/types';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useArticleCatalog, useCreateRow, useReplaceRow } from '../api/queries';
+import type { Article, PoRow } from '../api/types';
 import { apiErrorMessage } from '../lib/api-error';
 import { formatMoneyEUR } from '../lib/format';
-import { buildRowPayload, rowPreviewTotal } from '../lib/row-payload';
-import { firstError, validateRow } from '../lib/validation';
+import { buildRowPayload, draftFromPoRow, emptyRowDraft, rowPreviewTotal, type RowPayloadDraft } from '../lib/row-payload';
+import { firstError, validateRow, type ValidationResult } from '../lib/validation';
 import { ArticleCombobox } from './ArticleCombobox';
 
-export function RowModal({ poId, open, onClose }: { poId: number; open: boolean; onClose: () => void }) {
+function emptyValidation(): ValidationResult {
+  return { fieldErrors: {}, formErrors: [] };
+}
+
+function isReplaceDeleteFailure(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+  const body = error.body;
+  return typeof body === 'object' && body !== null && 'code' in body && body.code === 'ROW_REPLACE_DELETE_FAILED';
+}
+
+export function RowModal({
+  poId,
+  open,
+  row,
+  onClose,
+}: {
+  poId: number;
+  open: boolean;
+  row?: PoRow | null;
+  onClose: () => void;
+}) {
   const [articleSearch, setArticleSearch] = useState('');
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [description, setDescription] = useState('');
-  const [qty, setQty] = useState(1);
-  const [price, setPrice] = useState(0);
-  const [nrc, setNrc] = useState(0);
-  const [mrc, setMrc] = useState(0);
-  const [duration, setDuration] = useState(12);
-  const [recurrence, setRecurrence] = useState(1);
-  const [startAt, setStartAt] = useState('activation_date');
-  const [startDate, setStartDate] = useState('');
-  const [automaticRenew, setAutomaticRenew] = useState(false);
-  const [cancellationAdvice, setCancellationAdvice] = useState('');
+  const [draft, setDraft] = useState<RowPayloadDraft>(() => emptyRowDraft());
+  const [validation, setValidation] = useState<ValidationResult>(emptyValidation);
   const articles = useArticleCatalog();
   const createRow = useCreateRow();
+  const replaceRow = useReplaceRow();
   const { toast } = useToast();
 
-  const draft = {
-    article: selectedArticle,
-    description,
-    qty,
-    price,
-    nrc,
-    mrc,
-    duration,
-    recurrence,
-    startAt,
-    startDate,
-    automaticRenew,
-    cancellationAdvice,
-  };
-  const preview = selectedArticle ? rowPreviewTotal(draft) : 0;
-  const selectedType = selectedArticle?.type;
+  const catalog = useMemo(() => articles.data ?? [], [articles.data]);
+  const editing = row != null;
+  const preview = draft.article ? rowPreviewTotal(draft) : 0;
+  const selectedType = draft.article?.type;
+  const saving = createRow.isPending || replaceRow.isPending;
 
-  function reset() {
-    setSelectedArticle(null);
+  useEffect(() => {
+    if (!open) return;
     setArticleSearch('');
-    setDescription('');
-    setQty(1);
-    setPrice(0);
-    setNrc(0);
-    setMrc(0);
-    setDuration(12);
-    setRecurrence(1);
-    setStartAt('activation_date');
-    setStartDate('');
-    setAutomaticRenew(false);
-    setCancellationAdvice('');
+    setValidation(emptyValidation());
+    setDraft(row ? draftFromPoRow(row, catalog) : emptyRowDraft());
+  }, [catalog, open, row]);
+
+  function updateDraft<K extends keyof RowPayloadDraft>(key: K, value: RowPayloadDraft[K]) {
+    setDraft((current) => ({ ...current, [key]: value }));
+    setValidation(emptyValidation());
   }
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  function selectArticle(article: Article | null) {
+    const previousType = draft.article?.type;
+    setValidation(emptyValidation());
+    setDraft((current) => {
+      if (!article) return { ...current, article: null };
+      const next: RowPayloadDraft = {
+        ...current,
+        article,
+        description: article.description ?? article.code,
+      };
+      if (previousType && previousType !== article.type) {
+        if (article.type === 'good') {
+          next.nrc = 0;
+          next.mrc = 0;
+          next.duration = 12;
+          next.recurrence = 1;
+          next.automaticRenew = false;
+          next.cancellationAdvice = '';
+        } else {
+          next.price = 0;
+          if (next.startAt === 'advance_payment') next.startAt = 'activation_date';
+        }
+      }
+      return next;
+    });
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const body = buildRowPayload(draft);
-    const message = firstError(validateRow(body));
+    const result = validateRow(body);
+    setValidation(result);
+    const message = firstError(result);
     if (message) {
       toast(message, 'warning');
       return;
     }
     try {
-      await createRow.mutateAsync({ id: poId, body });
-      toast('Riga aggiunta');
-      reset();
+      if (row) {
+        await replaceRow.mutateAsync({ id: poId, rowId: row.id, body });
+        toast('Riga aggiornata');
+      } else {
+        await createRow.mutateAsync({ id: poId, body });
+        toast('Riga aggiunta');
+      }
+      setDraft(emptyRowDraft());
       onClose();
     } catch (error) {
-      toast(apiErrorMessage(error, 'Salvataggio non riuscito'), 'error');
-    }
-  }
-
-  function selectArticle(article: Article | null) {
-    const previousType = selectedArticle?.type;
-    setSelectedArticle(article);
-    if (!article) return;
-    setDescription(article.description ?? article.code);
-    if (previousType && previousType !== article.type) {
-      if (article.type === 'good') {
-        setNrc(0);
-        setMrc(0);
-        setDuration(12);
-        setRecurrence(1);
-        setAutomaticRenew(false);
-        setCancellationAdvice('');
-      } else {
-        setPrice(0);
-        if (startAt === 'advance_payment') setStartAt('activation_date');
-      }
+      toast(apiErrorMessage(error, 'Salvataggio non riuscito'), isReplaceDeleteFailure(error) ? 'warning' : 'error');
+      if (isReplaceDeleteFailure(error)) onClose();
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Nuova riga PO" size="wide">
+    <Modal open={open} onClose={onClose} title={editing ? 'Modifica riga' : 'Nuova riga PO'} size="wide">
       <form className="formGrid three" onSubmit={(event) => void submit(event)}>
         <div className="articleQuantityRow">
           <div className="field quantityField">
             <label>Quantita</label>
-            <input type="number" min="0" step="1" value={qty} onChange={(event) => setQty(Number(event.target.value))} />
+            <input type="number" min="0" step="1" value={draft.qty} onChange={(event) => updateDraft('qty', Number(event.target.value))} />
+            {validation.fieldErrors.qty ? <p className="fieldError">{validation.fieldErrors.qty}</p> : null}
           </div>
           <div className="field">
             <label>Articolo</label>
             <ArticleCombobox
-              articles={articles.data ?? []}
-              value={selectedArticle}
+              articles={catalog}
+              value={draft.article}
               search={articleSearch}
               loading={articles.isLoading}
-              disabled={articles.isLoading && !selectedArticle}
+              disabled={articles.isLoading && !draft.article}
               onSearchChange={setArticleSearch}
               onChange={selectArticle}
             />
+            {validation.fieldErrors.product_code ? <p className="fieldError">{validation.fieldErrors.product_code}</p> : null}
           </div>
         </div>
-        {!selectedArticle ? (
+        {!draft.article ? (
           <div className="lineBuilderEmpty wide">
             <Icon name="package" size={22} />
             <strong>Seleziona un articolo</strong>
@@ -126,52 +140,84 @@ export function RowModal({ poId, open, onClose }: { poId: number; open: boolean;
           </div>
         ) : (
           <>
-        <div className="field wide">
-          <label>Descrizione</label>
-          <input value={description} onChange={(event) => setDescription(event.target.value)} />
-        </div>
-        {selectedType === 'good' ? (
-          <div className="field">
-            <label>Costo unitario</label>
-            <input type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(Number(event.target.value))} />
-          </div>
-        ) : (
-          <>
-            <div className="field"><label>NRC</label><input type="number" min="0" step="0.01" value={nrc} onChange={(event) => setNrc(Number(event.target.value))} /></div>
-            <div className="field"><label>MRC</label><input type="number" min="0" step="0.01" value={mrc} onChange={(event) => setMrc(Number(event.target.value))} /></div>
-            <div className="field"><label>Durata mesi</label><input type="number" min="1" value={duration} onChange={(event) => setDuration(Number(event.target.value))} /></div>
+            <div className="field wide">
+              <label>Descrizione</label>
+              <input value={draft.description} onChange={(event) => updateDraft('description', event.target.value)} />
+              {validation.fieldErrors.description ? <p className="fieldError">{validation.fieldErrors.description}</p> : null}
+            </div>
+            {selectedType === 'good' ? (
+              <div className="field">
+                <label>Costo unitario</label>
+                <input type="number" min="0" step="0.01" value={draft.price} onChange={(event) => updateDraft('price', Number(event.target.value))} />
+                {validation.fieldErrors.price ? <p className="fieldError">{validation.fieldErrors.price}</p> : null}
+              </div>
+            ) : (
+              <>
+                <div className="field">
+                  <label>NRC</label>
+                  <input type="number" min="0" step="0.01" value={draft.nrc} onChange={(event) => updateDraft('nrc', Number(event.target.value))} />
+                </div>
+                <div className="field">
+                  <label>MRC</label>
+                  <input type="number" min="0" step="0.01" value={draft.mrc} onChange={(event) => updateDraft('mrc', Number(event.target.value))} />
+                </div>
+                <div className="field">
+                  <label>Durata mesi</label>
+                  <input type="number" min="1" value={draft.duration} onChange={(event) => updateDraft('duration', Number(event.target.value))} />
+                  {validation.fieldErrors.initial_subscription_months ? <p className="fieldError">{validation.fieldErrors.initial_subscription_months}</p> : null}
+                </div>
+                <div className="field">
+                  <label>Ricorrenza mesi</label>
+                  <select value={draft.recurrence} onChange={(event) => updateDraft('recurrence', Number(event.target.value))}>
+                    {[1, 3, 6, 12].map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
             <div className="field">
-              <label>Ricorrenza mesi</label>
-              <select value={recurrence} onChange={(event) => setRecurrence(Number(event.target.value))}>
-                {[1, 3, 6, 12].map((value) => <option key={value} value={value}>{value}</option>)}
+              <label>Decorrenza</label>
+              <select value={draft.startAt} onChange={(event) => updateDraft('startAt', event.target.value)}>
+                <option value="activation_date">Data attivazione</option>
+                {selectedType === 'good' ? <option value="advance_payment">Pagamento anticipato</option> : null}
+                <option value="specific_date">Data specifica</option>
               </select>
             </div>
-          </>
-        )}
-        <div className="field">
-          <label>Decorrenza</label>
-          <select value={startAt} onChange={(event) => setStartAt(event.target.value)}>
-            <option value="activation_date">Data attivazione</option>
-            {selectedType === 'good' ? <option value="advance_payment">Pagamento anticipato</option> : null}
-            <option value="specific_date">Data specifica</option>
-          </select>
-        </div>
-        {startAt === 'specific_date' ? (
-          <div className="field"><label>Data decorrenza</label><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></div>
-        ) : null}
-        {selectedType === 'service' ? (
-          <>
-            <label className="field"><span>Rinnovo automatico</span><input type="checkbox" checked={automaticRenew} onChange={(event) => setAutomaticRenew(event.target.checked)} /></label>
-            {automaticRenew ? (
-              <div className="field"><label>Preavviso disdetta</label><input value={cancellationAdvice} onChange={(event) => setCancellationAdvice(event.target.value)} /></div>
+            {draft.startAt === 'specific_date' ? (
+              <div className="field">
+                <label>Data decorrenza</label>
+                <input type="date" value={draft.startDate} onChange={(event) => updateDraft('startDate', event.target.value)} />
+                {validation.fieldErrors.start_at_date ? <p className="fieldError">{validation.fieldErrors.start_at_date}</p> : null}
+              </div>
             ) : null}
-          </>
-        ) : null}
-        <p className="muted fullWidth">Anteprima totale: {formatMoneyEUR(preview)}. Il totale finale e calcolato dal servizio RDA.</p>
-        <div className="modalActions fullWidth">
-          <Button variant="secondary" onClick={onClose}>Annulla</Button>
-          <Button type="submit" leftIcon={<Icon name="plus" />} loading={createRow.isPending}>Aggiungi riga</Button>
-        </div>
+            {selectedType === 'service' ? (
+              <>
+                <label className="field checkboxField">
+                  <span>Rinnovo automatico</span>
+                  <input type="checkbox" checked={draft.automaticRenew} onChange={(event) => updateDraft('automaticRenew', event.target.checked)} />
+                </label>
+                {draft.automaticRenew ? (
+                  <div className="field">
+                    <label>Preavviso disdetta</label>
+                    <input value={draft.cancellationAdvice} onChange={(event) => updateDraft('cancellationAdvice', event.target.value)} />
+                    {validation.fieldErrors.cancellation_advice ? <p className="fieldError">{validation.fieldErrors.cancellation_advice}</p> : null}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+            {validation.formErrors.length ? <p className="fieldError fullWidth">{validation.formErrors[0]}</p> : null}
+            <p className="muted fullWidth">Anteprima totale: {formatMoneyEUR(preview)}. Il totale finale e calcolato dal servizio RDA.</p>
+            <div className="modalActions fullWidth">
+              <Button variant="secondary" onClick={onClose}>
+                Annulla
+              </Button>
+              <Button type="submit" leftIcon={<Icon name={editing ? 'check' : 'plus'} />} loading={saving}>
+                {editing ? 'Salva modifiche' : 'Aggiungi riga'}
+              </Button>
+            </div>
           </>
         )}
       </form>
