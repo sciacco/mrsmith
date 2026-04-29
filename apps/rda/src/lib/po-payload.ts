@@ -36,8 +36,17 @@ export function methodUnion(methods: PaymentMethod[], ...extraCodes: string[]): 
 export function selectedBudgetBinding(budgets: BudgetForUser[], budgetId: number | '') {
   const budget = budgets.find((item) => (item.budget_id ?? item.id ?? 0) === budgetId);
   if (!budget) return {};
-  if (budget.cost_center) return { cost_center: budget.cost_center, budget_user_id: null };
-  return { budget_user_id: budget.budget_user_id ?? budget.user_id ?? null, cost_center: null };
+  if (budget.cost_center) return { cost_center: budget.cost_center };
+  const budgetUserId = budget.budget_user_id ?? budget.user_id;
+  return budgetUserId ? { budget_user_id: budgetUserId } : {};
+}
+
+function selectedBudgetPatchBinding(budgets: BudgetForUser[], budgetId: number | ''): Pick<PatchPOPayload, 'budget_user_id' | 'cost_center'> {
+  const budget = budgets.find((item) => (item.budget_id ?? item.id ?? 0) === budgetId);
+  if (!budget) return {};
+  if (budget.cost_center) return { cost_center: budget.cost_center };
+  const budgetUserId = budget.budget_user_id ?? budget.user_id;
+  return budgetUserId ? { budget_user_id: budgetUserId, cost_center: null } : {};
 }
 
 export function buildCreatePOPayload(header: POHeaderDraft, budgets: BudgetForUser[]): CreatePOPayload {
@@ -68,16 +77,16 @@ export function buildPatchPOPayload(
   return {
     ...(header.type ? { type: header.type } : {}),
     budget_id: Number(header.budget_id),
-    ...selectedBudgetBinding(budgets, header.budget_id),
+    ...selectedBudgetPatchBinding(budgets, header.budget_id),
     object: header.object.trim(),
     project: header.project.trim(),
     provider_id: Number(header.provider_id),
     payment_method: header.payment_method,
     currency: normalizeCurrency(header.currency || DEFAULT_RDA_CURRENCY),
-    provider_offer_code: header.provider_offer_code.trim() || null,
-    provider_offer_date: header.provider_offer_date || null,
-    description: header.description.trim() || null,
-    note: header.note.trim() || null,
+    provider_offer_code: header.provider_offer_code.trim(),
+    provider_offer_date: header.provider_offer_date || undefined,
+    description: header.description.trim(),
+    note: header.note.trim(),
     reference_warehouse: 'MILANO',
     ...(providerChanged ? { recipient_ids: [] } : {}),
     ...(recipientIds ? { recipient_ids: recipientIds } : {}),

@@ -178,18 +178,18 @@ export interface CreatePOPayload {
 export interface PatchPOPayload {
   type?: string;
   budget_id?: number;
-  budget_user_id?: number | null;
+  budget_user_id?: number;
   cost_center?: string | null;
-  description?: string | null;
+  description?: string;
   object?: string;
-  note?: string | null;
+  note?: string;
   payment_method?: string;
   currency?: CurrencyCode;
   reference_warehouse?: string;
   provider_id?: number;
   project?: string;
-  provider_offer_code?: string | null;
-  provider_offer_date?: string | null;
+  provider_offer_code?: string;
+  provider_offer_date?: string;
   recipient_ids?: number[];
 }
 

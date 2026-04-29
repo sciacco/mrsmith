@@ -140,6 +140,15 @@ Alyante ERP ID
 - Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, PO lists, inboxes, row composer, and RDA backend PO create/patch.
 - Open questions: none.
 
+### RDA Patch Payload Null Semantics
+
+- Context: `apps/rda` PO header edits forwarded to Mistra `rda-patch`.
+- Discovery: Mistra rejects `budget_user_id: null` with `Value is not nullable`; in `rda-patch`, only `cost_center` is nullable. Optional text fields such as `description`, `note`, and `provider_offer_code` are strings, and `provider_offer_date` must be a valid date when present.
+- Practical rule: for RDA PATCH payloads, omit `budget_user_id` for cost-center budgets, send `cost_center: null` only when switching to a user budget, and send optional text fields as strings rather than `null`. Omit an empty `provider_offer_date` instead of sending `null` or an invalid empty date.
+- Evidence: `docs/mistra-dist.yaml` schema `rda-patch`; observed Mistra 400 response from `PATCH /rda/v1/pos/{id}`; implementation in `apps/rda/src/lib/po-payload.ts`.
+- Used by: `apps/rda` PO detail and new-RDA wizard header save flows.
+- Open questions: whether Mistra exposes a supported way to clear an existing `provider_offer_date`; the current safe behavior omits empty dates on PATCH.
+
 ### RDA Row Totals Are Normalized By The BFF
 
 - Context: `apps/rda` PO row tables in the new wizard and PO detail page.
