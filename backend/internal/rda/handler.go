@@ -31,6 +31,7 @@ const (
 	codeDependencyUnavailable = "DEPENDENCY_UNAVAILABLE"
 	codeUpstreamUnavailable   = "UPSTREAM_UNAVAILABLE"
 	codeUpstreamAuthFailed    = "UPSTREAM_AUTH_FAILED"
+	codeUpstreamRejected      = "UPSTREAM_REJECTED"
 )
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
@@ -182,6 +183,11 @@ func (h *Handler) forwardArak(w http.ResponseWriter, r *http.Request, method, pa
 		return
 	}
 
+	if resp.StatusCode >= http.StatusBadRequest && resp.StatusCode <= 599 {
+		h.writeUpstreamRejected(w, r, resp, path, rawQuery)
+		return
+	}
+
 	copyResponseHeaders(w.Header(), resp.Header)
 	if w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", "application/json")
@@ -190,6 +196,79 @@ func (h *Handler) forwardArak(w http.ResponseWriter, r *http.Request, method, pa
 	if _, err := io.Copy(w, resp.Body); err != nil {
 		h.requestLogger(r, "proxy_to_arak", "upstream_path", path).Warn("failed to stream upstream response", "error", err)
 	}
+}
+
+func (h *Handler) writeUpstreamRejected(w http.ResponseWriter, r *http.Request, resp *http.Response, path, rawQuery string) {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		h.requestLogger(r, "proxy_to_arak", "upstream_path", path, "upstream_status", resp.StatusCode).Warn("failed to read upstream rejection body", "error", err)
+	}
+
+	parsedBody := parseUpstreamRejectionBody(body)
+	message := upstreamRejectionMessage(parsedBody)
+	contentType := resp.Header.Get("Content-Type")
+
+	httputil.JSON(w, resp.StatusCode, map[string]any{
+		"error": message,
+		"code":  codeUpstreamRejected,
+		"upstream": map[string]any{
+			"service":      "mistra",
+			"status":       resp.StatusCode,
+			"path":         upstreamPathWithQuery(path, rawQuery),
+			"content_type": contentType,
+			"body":         parsedBody,
+		},
+	})
+}
+
+func parseUpstreamRejectionBody(body []byte) any {
+	body = bytes.TrimSpace(body)
+	if len(body) == 0 {
+		return ""
+	}
+
+	var parsed any
+	if json.Valid(body) && json.Unmarshal(body, &parsed) == nil {
+		return parsed
+	}
+	return string(body)
+}
+
+func upstreamRejectionMessage(body any) string {
+	if message := upstreamRejectionMessageValue(body); message != "" {
+		return message
+	}
+	return "Richiesta RDA rifiutata da Mistra"
+}
+
+func upstreamRejectionMessageValue(value any) string {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case map[string]any:
+		for _, key := range []string{"error", "message", "detail", "title", "description"} {
+			if message := upstreamRejectionMessageValue(v[key]); message != "" {
+				return message
+			}
+		}
+		if message := upstreamRejectionMessageValue(v["errors"]); message != "" {
+			return message
+		}
+	case []any:
+		for _, item := range v {
+			if message := upstreamRejectionMessageValue(item); message != "" {
+				return message
+			}
+		}
+	}
+	return ""
+}
+
+func upstreamPathWithQuery(path, rawQuery string) string {
+	if rawQuery == "" {
+		return path
+	}
+	return path + "?" + rawQuery
 }
 
 func copyResponseHeaders(dst, src http.Header) {
