@@ -441,7 +441,6 @@ export function NewRdaWizardPage() {
             <div className="surfaceHeader compactHeader">
               <div>
                 <h2>Dati richiesta</h2>
-                <p className="muted">Compila le informazioni principali e crea la bozza.</p>
               </div>
             </div>
             <div className="tabBody formGrid three">
@@ -451,11 +450,14 @@ export function NewRdaWizardPage() {
                 {headerFieldError('budget_id') ? <p className="fieldError">{headerFieldError('budget_id')}</p> : null}
               </div>
               <div className="field">
-                <label>Tipo PO</label>
-                <select value={header.type} onChange={(event) => updateHeader('type', event.target.value as POType)}>
-                  <option value="STANDARD">Con invio del PO al fornitore</option>
-                  <option value="ECOMMERCE">Senza inviare PO al fornitore</option>
-                </select>
+                <label>Progetto</label>
+                <input value={header.project} maxLength={50} onChange={(event) => updateHeader('project', event.target.value)} />
+                {headerFieldError('project') ? <p className="fieldError">{headerFieldError('project')}</p> : null}
+              </div>
+              <div className="field">
+                <label>Oggetto</label>
+                <input value={header.object} onChange={(event) => updateHeader('object', event.target.value)} />
+                {headerFieldError('object') ? <p className="fieldError">{headerFieldError('object')}</p> : null}
               </div>
               <div className="providerPaymentGrid">
                 <div className="field providerPaymentProvider">
@@ -484,29 +486,26 @@ export function NewRdaWizardPage() {
                 </div>
               </div>
               <div className="field">
-                <label>Progetto</label>
-                <input value={header.project} maxLength={50} onChange={(event) => updateHeader('project', event.target.value)} />
-                {headerFieldError('project') ? <p className="fieldError">{headerFieldError('project')}</p> : null}
+                <label>Tipo PO</label>
+                <select value={header.type} onChange={(event) => updateHeader('type', event.target.value as POType)}>
+                  <option value="STANDARD">Con invio del PO al fornitore</option>
+                  <option value="ECOMMERCE">Senza inviare PO al fornitore</option>
+                </select>
               </div>
               <div className="field">
-                <label>Oggetto</label>
-                <input value={header.object} onChange={(event) => updateHeader('object', event.target.value)} />
-                {headerFieldError('object') ? <p className="fieldError">{headerFieldError('object')}</p> : null}
-              </div>
-              <div className="field">
-                <label>Riferimento preventivo</label>
+                <label>Riferimento offerta del fornitore</label>
                 <input value={header.provider_offer_code} onChange={(event) => updateHeader('provider_offer_code', event.target.value)} />
               </div>
               <div className="field">
-                <label>Data preventivo</label>
+                <label>Data offerta</label>
                 <input type="date" value={header.provider_offer_date} onChange={(event) => updateHeader('provider_offer_date', event.target.value)} />
               </div>
               <div className="field wide">
-                <label>Descrizione interna</label>
+                <label>Descrizione ad uso interno</label>
                 <textarea rows={4} value={header.description} onChange={(event) => updateHeader('description', event.target.value)} />
               </div>
               <div className="field wide">
-                <label>Note fornitore</label>
+                <label>Note da trasmettere al fornitore</label>
                 <textarea rows={4} value={header.note} onChange={(event) => updateHeader('note', event.target.value)} />
               </div>
               {attemptedHeader && headerValidation.formErrors.length ? <p className="fieldError fullWidth">{headerValidation.formErrors[0]}</p> : null}
