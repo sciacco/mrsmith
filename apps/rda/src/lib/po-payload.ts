@@ -1,4 +1,5 @@
 import type { BudgetForUser, CreatePOPayload, PatchPOPayload, PaymentMethod, ProviderSummary } from '../api/types';
+import { DEFAULT_RDA_CURRENCY, normalizeCurrency } from './format';
 
 export type POType = 'STANDARD' | 'ECOMMERCE';
 
@@ -9,6 +10,7 @@ export interface POHeaderDraft {
   project: string;
   provider_id: number | '';
   payment_method: string;
+  currency: string;
   provider_offer_code: string;
   provider_offer_date: string;
   description: string;
@@ -45,6 +47,7 @@ export function buildCreatePOPayload(header: POHeaderDraft, budgets: BudgetForUs
     budget_id: Number(header.budget_id),
     provider_id: Number(header.provider_id),
     payment_method: header.payment_method,
+    currency: normalizeCurrency(header.currency || DEFAULT_RDA_CURRENCY),
     project: header.project.trim(),
     object: header.object.trim(),
     description: header.description.trim() || undefined,
@@ -70,6 +73,7 @@ export function buildPatchPOPayload(
     project: header.project.trim(),
     provider_id: Number(header.provider_id),
     payment_method: header.payment_method,
+    currency: normalizeCurrency(header.currency || DEFAULT_RDA_CURRENCY),
     provider_offer_code: header.provider_offer_code.trim() || null,
     provider_offer_date: header.provider_offer_date || null,
     description: header.description.trim() || null,

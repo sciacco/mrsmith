@@ -1,7 +1,7 @@
 import { Icon, Tooltip } from '@mrsmith/ui';
 import { useNavigate } from 'react-router-dom';
 import type { PoPreview } from '../api/types';
-import { extractApproverList, formatDateIT, formatMoneyEUR } from '../lib/format';
+import { extractApproverList, formatDateIT, formatMoney } from '../lib/format';
 import { StateBadge } from './StateBadge';
 
 interface PoListTableProps {
@@ -112,7 +112,7 @@ export function PoListTable({ rows, mode, currentEmail, onDelete }: PoListTableP
                 <td>{po.code ?? po.id}</td>
                 <td>{po.provider?.company_name ?? '-'}</td>
                 <td>{po.project ?? '-'}</td>
-                <td>{formatMoneyEUR(po.total_price)}</td>
+                <td>{formatMoney(po.total_price, po.currency)}</td>
               </tr>
             );
           })}

@@ -29,7 +29,17 @@ import { RowModal } from '../components/RowModal';
 import { RowTable } from '../components/RowTable';
 import { WizardStepper } from '../components/WizardStepper';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
-import { coerceID, downloadBlob, formatDateIT, formatMoneyEUR, isRequester, parseMistraMoney } from '../lib/format';
+import {
+  coerceID,
+  DEFAULT_RDA_CURRENCY,
+  downloadBlob,
+  formatDateIT,
+  formatMoney,
+  isRequester,
+  normalizeCurrency,
+  parseMistraMoney,
+  RDA_CURRENCIES,
+} from '../lib/format';
 import {
   buildCreatePOPayload,
   buildPatchPOPayload,
@@ -59,6 +69,7 @@ const emptyHeader: WizardHeaderState = {
   project: '',
   provider_id: '',
   payment_method: '',
+  currency: DEFAULT_RDA_CURRENCY,
   provider_offer_code: '',
   provider_offer_date: '',
   description: '',
@@ -73,6 +84,7 @@ function headerFromPO(po: PoDetail): WizardHeaderState {
   return {
     ...headerStateFromPO(po),
     type: po.type === 'ECOMMERCE' ? 'ECOMMERCE' : 'STANDARD',
+    currency: normalizeCurrency(po.currency),
   };
 }
 
@@ -200,6 +212,7 @@ export function NewRdaWizardPage() {
   const headerReady = firstError(headerValidation) == null;
   const rows = detail?.rows ?? [];
   const attachments = detail?.attachments ?? [];
+  const displayCurrency = normalizeCurrency(detail?.currency ?? header.currency);
   const total = parseMistraMoney(detail?.total_price);
   const quoteRuleBlocked = total >= 3000 && attachments.length < 2;
   const contactsReady = contactDraftIds.length > 0 || hasQualificationFallback(fullProvider);
@@ -222,7 +235,7 @@ export function NewRdaWizardPage() {
       ready: !quoteRuleBlocked,
       detail:
         total >= 3000
-          ? `${attachments.length}/2 preventiv${attachments.length === 1 ? 'o caricato' : 'i caricati'} per ${formatMoneyEUR(total)}.`
+          ? `${attachments.length}/2 preventiv${attachments.length === 1 ? 'o caricato' : 'i caricati'} per ${formatMoney(total, displayCurrency)}.`
           : 'La soglia preventivi non richiede altri allegati.',
     },
     {
@@ -517,20 +530,33 @@ export function NewRdaWizardPage() {
                   {headerFieldError('payment_method') ? <p className="fieldError">{headerFieldError('payment_method')}</p> : null}
                 </div>
               </div>
-              <div className="field">
-                <label>Tipo PO</label>
-                <select value={header.type} onChange={(event) => updateHeader('type', event.target.value as POType)}>
-                  <option value="STANDARD">Con invio del PO al fornitore</option>
-                  <option value="ECOMMERCE">Senza inviare PO al fornitore</option>
-                </select>
-              </div>
-              <div className="field">
-                <label>Riferimento offerta del fornitore</label>
-                <input value={header.provider_offer_code} onChange={(event) => updateHeader('provider_offer_code', event.target.value)} />
-              </div>
-              <div className="field">
-                <label>Data offerta</label>
-                <input type="date" value={header.provider_offer_date} onChange={(event) => updateHeader('provider_offer_date', event.target.value)} />
+              <div className="poMetaGrid">
+                <div className="field">
+                  <label>Tipo PO</label>
+                  <select value={header.type} onChange={(event) => updateHeader('type', event.target.value as POType)}>
+                    <option value="STANDARD">Con invio del PO al fornitore</option>
+                    <option value="ECOMMERCE">Senza inviare PO al fornitore</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Riferimento offerta del fornitore</label>
+                  <input value={header.provider_offer_code} onChange={(event) => updateHeader('provider_offer_code', event.target.value)} />
+                </div>
+                <div className="field">
+                  <label>Data offerta</label>
+                  <input type="date" value={header.provider_offer_date} onChange={(event) => updateHeader('provider_offer_date', event.target.value)} />
+                </div>
+                <div className="field">
+                  <label>Valuta</label>
+                  <select value={header.currency} onChange={(event) => updateHeader('currency', normalizeCurrency(event.target.value))}>
+                    {RDA_CURRENCIES.map((currency) => (
+                      <option key={currency} value={currency}>
+                        {currency}
+                      </option>
+                    ))}
+                  </select>
+                  {headerFieldError('currency') ? <p className="fieldError">{headerFieldError('currency')}</p> : null}
+                </div>
               </div>
               <div className="field wide">
                 <label>Descrizione ad uso interno</label>
@@ -557,7 +583,14 @@ export function NewRdaWizardPage() {
               </Button>
             </div>
             <div className="tabBody">
-              <RowTable rows={rows} editable={draftEditable} emptyLabel="Nessuna riga inserita." onEdit={openEditRow} onDelete={setDeleteRowTarget} />
+              <RowTable
+                rows={rows}
+                currency={displayCurrency}
+                editable={draftEditable}
+                emptyLabel="Nessuna riga inserita."
+                onEdit={openEditRow}
+                onDelete={setDeleteRowTarget}
+              />
             </div>
           </div>
         ) : null}
@@ -568,7 +601,7 @@ export function NewRdaWizardPage() {
               <div>
                 <h2>Allegati</h2>
                 <p className="muted">
-                  {total >= 3000 ? `Carica almeno 2 preventivi per un totale PO di ${formatMoneyEUR(total)}.` : 'Carica preventivi e documenti utili alla richiesta.'}
+                  {total >= 3000 ? `Carica almeno 2 preventivi per un totale PO di ${formatMoney(total, displayCurrency)}.` : 'Carica preventivi e documenti utili alla richiesta.'}
                 </p>
               </div>
               <span className={`badge ${quoteRuleBlocked ? 'warning' : 'success'}`}>{attachments.length} allegat{attachments.length === 1 ? 'o' : 'i'}</span>
@@ -675,7 +708,7 @@ export function NewRdaWizardPage() {
                 </div>
                 <div>
                   <span>Totale PO</span>
-                  <strong>{formatMoneyEUR(detail.total_price)}</strong>
+                  <strong>{formatMoney(detail.total_price, displayCurrency)}</strong>
                 </div>
                 <div>
                   <span>Righe</span>
@@ -695,7 +728,7 @@ export function NewRdaWizardPage() {
           <span className="wizardFooterStep">Passo {step + 1} di {steps.length}</span>
           <span className="wizardFooterMetric total">
             <span>Totale PO</span>
-            <strong>{formatMoneyEUR(total)}</strong>
+            <strong>{formatMoney(total, displayCurrency)}</strong>
           </span>
           {!detail ? <span className="wizardFooterDraft">Bozza non ancora creata</span> : null}
         </div>
@@ -709,7 +742,7 @@ export function NewRdaWizardPage() {
         </Button>
       </div>
 
-      {detail ? <RowModal poId={detail.id} open={rowModalOpen} row={editRowTarget} onClose={closeRowModal} /> : null}
+      {detail ? <RowModal poId={detail.id} currency={displayCurrency} open={rowModalOpen} row={editRowTarget} onClose={closeRowModal} /> : null}
 
       <ConfirmDialog
         open={deleteRowTarget != null}

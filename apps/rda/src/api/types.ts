@@ -59,6 +59,8 @@ export interface DefaultPaymentMethod {
   code: string;
 }
 
+export type CurrencyCode = 'EUR' | 'USD' | 'GBP';
+
 export interface Article {
   code: string;
   description?: string;
@@ -122,6 +124,7 @@ export interface PoPreview {
   project?: string;
   object?: string;
   total_price?: string;
+  currency?: CurrencyCode | string;
   created?: string;
   creation_date?: string;
   updated?: string;
@@ -134,7 +137,6 @@ export interface PoPreview {
 
 export interface PoDetail extends PoPreview {
   type?: string;
-  currency?: string;
   language?: string;
   description?: string;
   note?: string;
@@ -164,6 +166,7 @@ export interface CreatePOPayload {
   budget_user_id?: number;
   provider_id: number;
   payment_method: string;
+  currency: CurrencyCode;
   project: string;
   object: string;
   description?: string;
@@ -181,6 +184,7 @@ export interface PatchPOPayload {
   object?: string;
   note?: string | null;
   payment_method?: string;
+  currency?: CurrencyCode;
   reference_warehouse?: string;
   provider_id?: number;
   project?: string;

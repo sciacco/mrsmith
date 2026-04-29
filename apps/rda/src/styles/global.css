@@ -305,6 +305,15 @@ textarea {
   grid-column: span 1;
 }
 
+.poMetaGrid {
+  display: grid;
+  align-items: start;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(10rem, 0.95fr) minmax(0, 1.35fr) minmax(9rem, 0.85fr) minmax(6rem, 0.55fr);
+  gap: 0.85rem;
+  min-width: 0;
+}
+
 .field {
   display: grid;
   align-content: start;
@@ -998,6 +1007,7 @@ textarea {
   .formGrid,
   .formGrid.three,
   .providerPaymentGrid,
+  .poMetaGrid,
   .detailLayout,
   .inlineForm,
   .articleQuantityRow,

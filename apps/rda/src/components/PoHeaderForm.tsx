@@ -1,5 +1,5 @@
 import type { BudgetForUser, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
-import { formatDateIT } from '../lib/format';
+import { formatDateIT, normalizeCurrency, RDA_CURRENCIES } from '../lib/format';
 import type { PaymentMethodOption } from '../lib/payment-options';
 import { stateLabel } from '../lib/state-labels';
 import { BudgetSelect } from './BudgetSelect';
@@ -13,6 +13,7 @@ export interface HeaderFormState {
   project: string;
   provider_id: number | '';
   payment_method: string;
+  currency: string;
   provider_offer_code: string;
   provider_offer_date: string;
   description: string;
@@ -32,6 +33,7 @@ export function headerStateFromPO(po: PoDetail): HeaderFormState {
     project: po.project ?? '',
     provider_id: po.provider?.id ?? '',
     payment_method: paymentCode(po),
+    currency: normalizeCurrency(po.currency),
     provider_offer_code: po.provider_offer_code ?? '',
     provider_offer_date: po.provider_offer_date?.slice(0, 10) ?? '',
     description: po.description ?? '',
@@ -120,6 +122,16 @@ export function PoHeaderForm({
         <div className="field">
           <label>Data preventivo</label>
           <input type="date" value={value.provider_offer_date} disabled={!draftEditable} onChange={(event) => update('provider_offer_date', event.target.value)} />
+        </div>
+        <div className="field">
+          <label>Valuta</label>
+          <select value={value.currency} disabled={!draftEditable} onChange={(event) => update('currency', normalizeCurrency(event.target.value))}>
+            {RDA_CURRENCIES.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="field wide">
           <label>Contatti selezionati</label>

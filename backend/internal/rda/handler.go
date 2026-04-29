@@ -394,6 +394,11 @@ func (h *Handler) handleCreatePO(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	currency, err := createPOCurrency(req.Currency)
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	provider := h.fetchProviderForCreate(r, req.ProviderID)
 	if !h.requireArakDB(w) {
@@ -424,7 +429,7 @@ func (h *Handler) handleCreatePO(w http.ResponseWriter, r *http.Request) {
 		"project":             req.Project,
 		"object":              req.Object,
 		"reference_warehouse": "MILANO",
-		"currency":            "EUR",
+		"currency":            currency,
 		"language":            providerLanguage(provider),
 		"payment_method":      paymentMethod,
 		"recipient_ids":       []int64{},
@@ -476,6 +481,14 @@ func (h *Handler) handlePatchPO(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httputil.Error(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if rawCurrency, ok := body["currency"]; ok {
+		currency, err := patchPOCurrency(rawCurrency)
+		if err != nil {
+			httputil.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		body["currency"] = currency
 	}
 	if patchAffectsPaymentRule(body) {
 		if !h.requireArakDB(w) {
@@ -658,7 +671,7 @@ func decodeAllowedPatch(reader io.Reader) (map[string]any, error) {
 	allowed := map[string]struct{}{
 		"type": {}, "budget_id": {}, "budget_user_id": {}, "cost_center": {}, "description": {},
 		"object": {}, "note": {}, "payment_method": {}, "reference_warehouse": {}, "provider_id": {},
-		"project": {}, "provider_offer_code": {}, "provider_offer_date": {}, "recipient_ids": {},
+		"project": {}, "provider_offer_code": {}, "provider_offer_date": {}, "currency": {}, "recipient_ids": {},
 	}
 	out := make(map[string]any)
 	for key, value := range raw {

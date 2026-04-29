@@ -1,7 +1,7 @@
 import { Button, Icon, Tooltip } from '@mrsmith/ui';
 import type { RdaPermissions, PoDetail } from '../api/types';
 import type { TransitionAction } from '../api/queries';
-import { isApprover, isRequester } from '../lib/format';
+import { formatMoney, isApprover, isRequester } from '../lib/format';
 import { PO_STATES } from '../lib/state-labels';
 
 interface ActionBarProps {
@@ -59,7 +59,7 @@ export function ActionBar({
         {po.state !== PO_STATES.DRAFT ? (
           <Button variant="secondary" leftIcon={<Icon name="download" />} onClick={onPDF} loading={transitioning}>Genera PDF</Button>
         ) : null}
-        {quoteRuleBlocked ? <span className="warningText">Attenzione: importo superiore a 3.000 €. Aggiungi 2 preventivi.</span> : null}
+        {quoteRuleBlocked ? <span className="warningText">Attenzione: importo superiore a {formatMoney(3000, po.currency)}. Aggiungi 2 preventivi.</span> : null}
       </div>
       <div className="actionBarGroup">
         {draftRequester ? (

@@ -131,6 +131,15 @@ Alyante ERP ID
 - Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, and RDA backend PO create/patch validation.
 - Open questions: none.
 
+### RDA Currency Is A PO-Level Display Contract
+
+- Context: `apps/rda` PO create/edit flows, PO lists, inboxes, row tables, and attachment threshold messaging.
+- Discovery: RDA currency belongs to the PO header (`currency` on Mistra RDA create/detail/preview/patch), not to rows. It selects the displayed money symbol for PO and row amounts; it does not convert values, recalculate totals, or change row payloads.
+- Practical rule: persist only `EUR`, `USD`, or `GBP` at PO level, default existing/missing values to `EUR`, and pass the PO currency into all money formatting. Keep numeric thresholds, row economics, and Mistra row create/replace payloads unchanged.
+- Evidence: `docs/mistra-dist.yaml` RDA `currency` fields; implementation in `apps/rda/src/lib/format.ts`, `apps/rda/src/lib/po-payload.ts`, and `backend/internal/rda`.
+- Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, PO lists, inboxes, row composer, and RDA backend PO create/patch.
+- Open questions: none.
+
 ### RDA Row Totals Are Normalized By The BFF
 
 - Context: `apps/rda` PO row tables in the new wizard and PO detail page.

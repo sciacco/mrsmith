@@ -1,4 +1,5 @@
 import type { CreatePOPayload, RowPayload } from '../api/types';
+import { RDA_CURRENCIES } from './format';
 
 export interface ValidationResult {
   fieldErrors: Record<string, string>;
@@ -14,6 +15,7 @@ export function validateNewPO(body: CreatePOPayload): ValidationResult {
   if (!body.budget_id) result.fieldErrors.budget_id = 'Seleziona un budget';
   if (!body.provider_id) result.fieldErrors.provider_id = 'Seleziona un fornitore';
   if (!body.payment_method) result.fieldErrors.payment_method = 'Seleziona un metodo di pagamento';
+  if (!RDA_CURRENCIES.includes(body.currency)) result.fieldErrors.currency = 'Seleziona una valuta valida';
   if (!body.project.trim()) result.fieldErrors.project = 'Inserisci il progetto';
   if (body.project.trim().length > 50) result.fieldErrors.project = 'Massimo 50 caratteri';
   if (!body.object.trim()) result.fieldErrors.object = "Inserisci l'oggetto";

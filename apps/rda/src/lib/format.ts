@@ -1,4 +1,12 @@
-import type { PoApprover, PoDetail } from '../api/types';
+import type { CurrencyCode, PoApprover, PoDetail } from '../api/types';
+
+export const DEFAULT_RDA_CURRENCY: CurrencyCode = 'EUR';
+export const RDA_CURRENCIES: CurrencyCode[] = ['EUR', 'USD', 'GBP'];
+
+export function normalizeCurrency(value?: string | null): CurrencyCode {
+  const normalized = value?.trim().toUpperCase();
+  return RDA_CURRENCIES.includes(normalized as CurrencyCode) ? (normalized as CurrencyCode) : DEFAULT_RDA_CURRENCY;
+}
 
 export function formatDateIT(raw?: string | null): string {
   if (!raw) return '-';
@@ -27,8 +35,12 @@ export function parseMistraMoney(value?: string | number | null): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function formatMoneyEUR(value?: string | number | null): string {
-  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(parseMistraMoney(value));
+export function formatMoney(value?: string | number | null, currency?: string | null): string {
+  return new Intl.NumberFormat('it-IT', {
+    style: 'currency',
+    currency: normalizeCurrency(currency),
+    currencyDisplay: 'narrowSymbol',
+  }).format(parseMistraMoney(value));
 }
 
 export function extractApproverList(approvers?: PoApprover[]): string {

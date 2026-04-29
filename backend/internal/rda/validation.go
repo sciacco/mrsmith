@@ -19,6 +19,13 @@ import (
 )
 
 const codeRowReplaceDeleteFailed = "ROW_REPLACE_DELETE_FAILED"
+const defaultPOCurrency = "EUR"
+
+var allowedPOCurrencies = map[string]struct{}{
+	"EUR": {},
+	"USD": {},
+	"GBP": {},
+}
 
 type upstreamBodyResponse struct {
 	status int
@@ -51,6 +58,29 @@ func validateCreatePO(req createPORequest) error {
 		return errors.New("Il budget deve indicare un solo centro di costo o utente")
 	}
 	return nil
+}
+
+func createPOCurrency(value string) (string, error) {
+	currency := strings.ToUpper(strings.TrimSpace(value))
+	if currency == "" {
+		return defaultPOCurrency, nil
+	}
+	if _, ok := allowedPOCurrencies[currency]; !ok {
+		return "", errors.New("Seleziona una valuta valida")
+	}
+	return currency, nil
+}
+
+func patchPOCurrency(value any) (string, error) {
+	currency, ok := value.(string)
+	if !ok {
+		return "", errors.New("Seleziona una valuta valida")
+	}
+	currency = strings.ToUpper(strings.TrimSpace(currency))
+	if _, ok := allowedPOCurrencies[currency]; !ok {
+		return "", errors.New("Seleziona una valuta valida")
+	}
+	return currency, nil
 }
 
 func (h *Handler) handleCreateRow(w http.ResponseWriter, r *http.Request) {

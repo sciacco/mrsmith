@@ -1,15 +1,17 @@
 import { Icon } from '@mrsmith/ui';
 import type { PoRow } from '../api/types';
-import { formatMoneyEUR } from '../lib/format';
+import { formatMoney } from '../lib/format';
 
 export function RowTable({
   rows,
+  currency,
   editable,
   emptyLabel,
   onEdit,
   onDelete,
 }: {
   rows: PoRow[];
+  currency?: string | null;
   editable: boolean;
   emptyLabel: string;
   onEdit: (row: PoRow) => void;
@@ -41,13 +43,13 @@ export function RowTable({
                   <span className={`badge ${row.type === 'good' ? 'success' : 'info'}`}>{row.type === 'good' ? 'Bene' : 'Servizio'}</span>
                   <small>
                     {row.type === 'good'
-                      ? `Unitario ${formatMoneyEUR(row.price)}`
-                      : `NRC ${formatMoneyEUR(row.activation_fee ?? row.activation_price)} · MRC ${formatMoneyEUR(row.montly_fee ?? row.monthly_fee)}`}
+                      ? `Unitario ${formatMoney(row.price, currency)}`
+                      : `NRC ${formatMoney(row.activation_fee ?? row.activation_price, currency)} · MRC ${formatMoney(row.montly_fee ?? row.monthly_fee, currency)}`}
                   </small>
                 </div>
               </td>
               <td>{row.qty ?? '-'}</td>
-              <td>{formatMoneyEUR(row.total_price)}</td>
+              <td>{formatMoney(row.total_price, currency)}</td>
               <td className="actionsCell">
                 <span className="iconActions">
                   <button

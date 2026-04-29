@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreatePO } from '../api/queries';
 import type { BudgetForUser, CreatePOPayload, PaymentMethod, ProviderSummary } from '../api/types';
-import { coerceID } from '../lib/format';
+import { coerceID, DEFAULT_RDA_CURRENCY, normalizeCurrency, RDA_CURRENCIES } from '../lib/format';
 import {
   buildPaymentMethodOptions,
   paymentCodeFromProvider,
@@ -34,6 +34,7 @@ export function NewPoModal({
   const [budgetId, setBudgetId] = useState<number | ''>('');
   const [providerId, setProviderId] = useState<number | ''>('');
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [currency, setCurrency] = useState(DEFAULT_RDA_CURRENCY);
   const [project, setProject] = useState('');
   const [object, setObject] = useState('');
   const [description, setDescription] = useState('');
@@ -69,6 +70,7 @@ export function NewPoModal({
     setBudgetId('');
     setProviderId('');
     setPaymentMethod('');
+    setCurrency(DEFAULT_RDA_CURRENCY);
     setProject('');
     setObject('');
     setDescription('');
@@ -85,6 +87,7 @@ export function NewPoModal({
       budget_id: Number(budgetId),
       provider_id: Number(providerId),
       payment_method: paymentMethod,
+      currency,
       project: project.trim(),
       object: object.trim(),
       description: description.trim() || undefined,
@@ -163,6 +166,16 @@ export function NewPoModal({
         <div className="field">
           <label>Data preventivo</label>
           <input type="date" value={offerDate} onChange={(event) => setOfferDate(event.target.value)} />
+        </div>
+        <div className="field">
+          <label>Valuta</label>
+          <select value={currency} onChange={(event) => setCurrency(normalizeCurrency(event.target.value))}>
+            {RDA_CURRENCIES.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="field wide">
           <label>Descrizione interna</label>

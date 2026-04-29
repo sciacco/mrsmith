@@ -2,7 +2,7 @@ import { Button, Icon, useToast } from '@mrsmith/ui';
 import { useState } from 'react';
 import { useDeleteRow } from '../api/queries';
 import type { PoDetail, PoRow } from '../api/types';
-import { formatMoneyEUR } from '../lib/format';
+import { formatMoney } from '../lib/format';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RowModal } from './RowModal';
 import { RowTable } from './RowTable';
@@ -43,13 +43,20 @@ export function RowsTab({ po, editable }: { po: PoDetail; editable: boolean }) {
   return (
     <div className="stack">
       <div className="surfaceHeader">
-        <h2>Totale PO: {formatMoneyEUR(po.total_price)}</h2>
+        <h2>Totale PO: {formatMoney(po.total_price, po.currency)}</h2>
         <Button size="sm" leftIcon={<Icon name="plus" />} disabled={!editable} onClick={openNewRow}>
           Nuova riga
         </Button>
       </div>
-      <RowTable rows={po.rows ?? []} editable={editable} emptyLabel="Nessuna riga PO presente." onEdit={openEditRow} onDelete={setDeleteTarget} />
-      <RowModal poId={po.id} open={modalOpen} row={editTarget} onClose={closeModal} />
+      <RowTable
+        rows={po.rows ?? []}
+        currency={po.currency}
+        editable={editable}
+        emptyLabel="Nessuna riga PO presente."
+        onEdit={openEditRow}
+        onDelete={setDeleteTarget}
+      />
+      <RowModal poId={po.id} currency={po.currency} open={modalOpen} row={editTarget} onClose={closeModal} />
       <ConfirmDialog
         open={deleteTarget != null}
         title="Elimina riga"

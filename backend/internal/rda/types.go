@@ -81,6 +81,7 @@ type createPORequest struct {
 	BudgetUserID      int64  `json:"budget_user_id,omitempty"`
 	ProviderID        int64  `json:"provider_id"`
 	PaymentMethod     string `json:"payment_method,omitempty"`
+	Currency          string `json:"currency,omitempty"`
 	Project           string `json:"project"`
 	Object            string `json:"object"`
 	Description       string `json:"description,omitempty"`

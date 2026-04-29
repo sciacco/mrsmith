@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useArticleCatalog, useCreateRow, useReplaceRow } from '../api/queries';
 import type { Article, PoRow } from '../api/types';
 import { apiErrorMessage } from '../lib/api-error';
-import { formatMoneyEUR } from '../lib/format';
+import { formatMoney } from '../lib/format';
 import { buildRowPayload, draftFromPoRow, emptyRowDraft, rowPreviewTotal, type RowPayloadDraft } from '../lib/row-payload';
 import { firstError, validateRow, type ValidationResult } from '../lib/validation';
 import { ArticleCombobox } from './ArticleCombobox';
@@ -21,11 +21,13 @@ function isReplaceDeleteFailure(error: unknown): boolean {
 
 export function RowModal({
   poId,
+  currency,
   open,
   row,
   onClose,
 }: {
   poId: number;
+  currency?: string | null;
   open: boolean;
   row?: PoRow | null;
   onClose: () => void;
@@ -209,7 +211,7 @@ export function RowModal({
               </>
             ) : null}
             {validation.formErrors.length ? <p className="fieldError fullWidth">{validation.formErrors[0]}</p> : null}
-            <p className="muted fullWidth">Anteprima totale: {formatMoneyEUR(preview)}. Il totale finale e calcolato dal servizio RDA.</p>
+            <p className="muted fullWidth">Anteprima totale: {formatMoney(preview, currency)}. Il totale finale e calcolato dal servizio RDA.</p>
             <div className="modalActions fullWidth">
               <Button variant="secondary" onClick={onClose}>
                 Annulla
