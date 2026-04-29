@@ -62,7 +62,7 @@ export interface DefaultPaymentMethod {
 export interface Article {
   code: string;
   description?: string;
-  type?: 'good' | 'service' | string;
+  type: 'good' | 'service';
 }
 
 export interface RdaPermissions {

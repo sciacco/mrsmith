@@ -523,7 +523,7 @@ export function NewRdaWizardPage() {
               <span className="badge info">Totale PO: {formatMoneyEUR(detail.total_price)}</span>
             </div>
             <div className="tabBody">
-              <RowComposer poId={detail.id} rows={rows} editable={draftEditable} />
+              <RowComposer poId={detail.id} poTotal={detail.total_price} rows={rows} editable={draftEditable} />
             </div>
           </div>
         ) : null}

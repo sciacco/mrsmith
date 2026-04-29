@@ -1,9 +1,10 @@
 import { Button, Icon, useToast } from '@mrsmith/ui';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useArticles, useCreateRow, useDeleteRow } from '../api/queries';
-import type { PoRow, RowPayload } from '../api/types';
+import type { Article, PoRow } from '../api/types';
 import { apiErrorMessage } from '../lib/api-error';
-import { formatMoneyEUR } from '../lib/format';
+import { formatMoneyEUR, parseMistraMoney } from '../lib/format';
+import { buildRowPayload, rowPreviewTotal } from '../lib/row-payload';
 import { firstError, validateRow, type ValidationResult } from '../lib/validation';
 import { ArticleCombobox } from './ArticleCombobox';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -14,15 +15,17 @@ function emptyValidation(): ValidationResult {
 
 export function RowComposer({
   poId,
+  poTotal,
   rows,
   editable,
 }: {
   poId: number;
+  poTotal?: string | number;
   rows: PoRow[];
   editable: boolean;
 }) {
-  const [type, setType] = useState<'good' | 'service'>('service');
-  const [articleCode, setArticleCode] = useState('');
+  const [articleSearch, setArticleSearch] = useState('');
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [description, setDescription] = useState('');
   const [qty, setQty] = useState(1);
   const [price, setPrice] = useState(0);
@@ -36,19 +39,32 @@ export function RowComposer({
   const [cancellationAdvice, setCancellationAdvice] = useState('');
   const [validation, setValidation] = useState<ValidationResult>(emptyValidation);
   const [deleteTarget, setDeleteTarget] = useState<PoRow | null>(null);
-  const articles = useArticles(type, '');
+  const articles = useArticles(articleSearch);
   const createRow = useCreateRow();
   const remove = useDeleteRow();
   const { toast } = useToast();
 
-  const selectedArticle = (articles.data ?? []).find((article) => article.code === articleCode);
-  const preview = useMemo(() => {
-    if (type === 'good') return price * qty;
-    return mrc * qty * duration + nrc * qty;
-  }, [duration, mrc, nrc, price, qty, type]);
+  const draft = {
+    article: selectedArticle,
+    description,
+    qty,
+    price,
+    nrc,
+    mrc,
+    duration,
+    recurrence,
+    startAt,
+    startDate,
+    automaticRenew,
+    cancellationAdvice,
+  };
+  const preview = selectedArticle ? rowPreviewTotal(draft) : 0;
+  const updatedTotal = parseMistraMoney(poTotal) + preview;
+  const selectedType = selectedArticle?.type;
 
   function reset() {
-    setArticleCode('');
+    setSelectedArticle(null);
+    setArticleSearch('');
     setDescription('');
     setQty(1);
     setPrice(0);
@@ -63,34 +79,9 @@ export function RowComposer({
     setValidation(emptyValidation());
   }
 
-  function buildPayload(): RowPayload {
-    return {
-      type,
-      description: description.trim(),
-      qty,
-      product_code: articleCode,
-      product_description: selectedArticle?.description ?? '',
-      ...(type === 'good' ? { price } : { monthly_fee: mrc, activation_price: nrc }),
-      payment_detail: {
-        start_at: startAt,
-        ...(startAt === 'specific_date' ? { start_at_date: startDate } : {}),
-        ...(type === 'service' ? { month_recursion: recurrence } : {}),
-      },
-      ...(type === 'service'
-        ? {
-            renew_detail: {
-              initial_subscription_months: duration,
-              automatic_renew: automaticRenew,
-              cancellation_advice: cancellationAdvice,
-            },
-          }
-        : {}),
-    };
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const body = buildPayload();
+    const body = buildRowPayload(draft);
     const result = validateRow(body);
     setValidation(result);
     const message = firstError(result);
@@ -118,45 +109,65 @@ export function RowComposer({
     }
   }
 
-  function selectArticle(code: string) {
-    setArticleCode(code);
-    const article = (articles.data ?? []).find((item) => item.code === code);
-    if (article?.description && !description.trim()) setDescription(article.description);
-  }
-
-  function switchType(next: 'good' | 'service') {
-    setType(next);
-    setArticleCode('');
+  function selectArticle(article: Article | null) {
+    const previousType = selectedArticle?.type;
+    setSelectedArticle(article);
     setValidation(emptyValidation());
+    if (!article) return;
+    setDescription(article.description ?? article.code);
+    if (previousType && previousType !== article.type) {
+      if (article.type === 'good') {
+        setNrc(0);
+        setMrc(0);
+        setDuration(12);
+        setRecurrence(1);
+        setAutomaticRenew(false);
+        setCancellationAdvice('');
+      } else {
+        setPrice(0);
+        if (startAt === 'advance_payment') setStartAt('activation_date');
+      }
+    }
   }
 
   return (
     <div className="stack">
       {editable ? (
         <form className="rowComposer" onSubmit={(event) => void submit(event)}>
-          <div className="field">
-            <label>Tipo riga</label>
-            <select value={type} onChange={(event) => switchType(event.target.value as 'good' | 'service')}>
-              <option value="service">Servizio</option>
-              <option value="good">Bene</option>
-            </select>
+          <div className="articleQuantityRow">
+            <div className="field quantityField">
+              <label>Quantita</label>
+              <input type="number" min="0" step="1" value={qty} onChange={(event) => setQty(Number(event.target.value))} />
+              {validation.fieldErrors.qty ? <p className="fieldError">{validation.fieldErrors.qty}</p> : null}
+            </div>
+            <div className="field">
+              <label>Articolo</label>
+              <ArticleCombobox
+                articles={articles.data ?? []}
+                value={selectedArticle}
+                search={articleSearch}
+                loading={articles.isLoading}
+                disabled={articles.isLoading && !selectedArticle}
+                onSearchChange={setArticleSearch}
+                onChange={selectArticle}
+              />
+              {validation.fieldErrors.product_code ? <p className="fieldError">{validation.fieldErrors.product_code}</p> : null}
+            </div>
           </div>
-          <div className="field wide">
-            <label>Articolo</label>
-            <ArticleCombobox articles={articles.data ?? []} value={articleCode} disabled={articles.isLoading} onChange={selectArticle} />
-            {validation.fieldErrors.product_code ? <p className="fieldError">{validation.fieldErrors.product_code}</p> : null}
-          </div>
-          <div className="field">
-            <label>Quantita</label>
-            <input type="number" min="0" step="1" value={qty} onChange={(event) => setQty(Number(event.target.value))} />
-            {validation.fieldErrors.qty ? <p className="fieldError">{validation.fieldErrors.qty}</p> : null}
-          </div>
+          {!selectedArticle ? (
+            <div className="lineBuilderEmpty wide">
+              <Icon name="package" size={22} />
+              <strong>Seleziona un articolo</strong>
+              <span>Catalogo beni e servizi RDA</span>
+            </div>
+          ) : (
+            <>
           <div className="field wide">
             <label>Descrizione</label>
             <input value={description} onChange={(event) => setDescription(event.target.value)} />
             {validation.fieldErrors.description ? <p className="fieldError">{validation.fieldErrors.description}</p> : null}
           </div>
-          {type === 'good' ? (
+          {selectedType === 'good' ? (
             <div className="field">
               <label>Costo unitario</label>
               <input type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(Number(event.target.value))} />
@@ -183,7 +194,7 @@ export function RowComposer({
             <label>Decorrenza</label>
             <select value={startAt} onChange={(event) => setStartAt(event.target.value)}>
               <option value="activation_date">Data attivazione</option>
-              {type === 'good' ? <option value="advance_payment">Pagamento anticipato</option> : null}
+              {selectedType === 'good' ? <option value="advance_payment">Pagamento anticipato</option> : null}
               <option value="specific_date">Data specifica</option>
             </select>
           </div>
@@ -194,7 +205,7 @@ export function RowComposer({
               {validation.fieldErrors.start_at_date ? <p className="fieldError">{validation.fieldErrors.start_at_date}</p> : null}
             </div>
           ) : null}
-          {type === 'service' ? (
+          {selectedType === 'service' ? (
             <>
               <label className="field checkboxField">
                 <span>Rinnovo automatico</span>
@@ -210,31 +221,47 @@ export function RowComposer({
             </>
           ) : null}
           {validation.formErrors.length ? <p className="fieldError wide">{validation.formErrors[0]}</p> : null}
-          <div className="composerTotal">
-            <span>Anteprima totale</span>
-            <strong>{formatMoneyEUR(preview)}</strong>
+          <div className="composerTotals">
+            <div className="composerTotal">
+              <span>Totale riga</span>
+              <strong>{formatMoneyEUR(preview)}</strong>
+            </div>
+            <div className="composerTotal">
+              <span>Totale PO aggiornato</span>
+              <strong>{formatMoneyEUR(updatedTotal)}</strong>
+            </div>
           </div>
           <div className="actionRow fullWidth">
             <Button type="submit" leftIcon={<Icon name="plus" />} loading={createRow.isPending}>Aggiungi riga</Button>
           </div>
+            </>
+          )}
         </form>
       ) : null}
 
       <div className="tableScroll">
-        <table className="dataTable">
+        <table className="dataTable rowTable">
           <thead>
             <tr>
-              <th>Descrizione</th><th>Costo unitario</th><th>Canone mensile</th><th>Q.ta</th><th>Tipo</th><th>Totale riga</th><th className="actionsCell">Azioni</th>
+              <th>Riga</th><th>Economia</th><th>Q.ta</th><th>Totale riga</th><th className="actionsCell">Azioni</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
-                <td>{row.description ?? row.product_description ?? '-'}</td>
-                <td>{formatMoneyEUR(row.type === 'good' ? row.price : row.activation_fee ?? row.activation_price)}</td>
-                <td>{formatMoneyEUR(row.montly_fee ?? row.monthly_fee)}</td>
+                <td>
+                  <div className="rowTitleCell">
+                    <strong>{row.description ?? row.product_description ?? '-'}</strong>
+                    <span>{row.product_code ?? row.product_description ?? '-'}</span>
+                  </div>
+                </td>
+                <td>
+                  <div className="economicBreakdown">
+                    <span className={`badge ${row.type === 'good' ? 'success' : 'info'}`}>{row.type === 'good' ? 'Bene' : 'Servizio'}</span>
+                    <small>{row.type === 'good' ? `Unitario ${formatMoneyEUR(row.price)}` : `NRC ${formatMoneyEUR(row.activation_fee ?? row.activation_price)} · MRC ${formatMoneyEUR(row.montly_fee ?? row.monthly_fee)}`}</small>
+                  </div>
+                </td>
                 <td>{row.qty ?? '-'}</td>
-                <td>{row.type === 'good' ? 'Bene' : 'Servizio'}</td>
                 <td>{formatMoneyEUR(row.total_price)}</td>
                 <td className="actionsCell">
                   <button
@@ -250,7 +277,7 @@ export function RowComposer({
                 </td>
               </tr>
             ))}
-            {rows.length === 0 ? <tr><td colSpan={7} className="emptyInline">Aggiungi almeno una riga.</td></tr> : null}
+            {rows.length === 0 ? <tr><td colSpan={5} className="emptyInline">Nessuna riga inserita.</td></tr> : null}
           </tbody>
         </table>
       </div>

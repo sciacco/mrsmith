@@ -131,6 +131,15 @@ Alyante ERP ID
 - Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, and RDA backend PO create/patch validation.
 - Open questions: none.
 
+### RDA Article Catalog Type Comes From The BFF
+
+- Context: `apps/rda` row creation in `/rda/new` and PO detail row modal.
+- Discovery: Mistra exposes RDA articles filtered by `type=good|service`, but the row UI must select an article first and derive the row type from that selected catalog item.
+- Practical rule: call `GET /api/rda/v1/articles?search=...` for the unified picker. The RDA BFF fetches both good and service catalogs when `type` is omitted, normalizes every item to `{code, description, type}`, and deduplicates by `code`. Keep `?type=good|service` only for compatibility or deliberately typed consumers.
+- Evidence: backend `backend/internal/rda/articles.go`; frontend `apps/rda/src/components/ArticleCombobox.tsx` and `apps/rda/src/lib/row-payload.ts`.
+- Used by: `apps/rda` `/rda/new` row composer and PO detail row modal.
+- Open questions: none.
+
 ### Manutenzioni Radar Excludes Terminal Maintenance States
 
 - Context: `GET /api/manutenzioni/v1/maintenances/radar`, used by `apps/manutenzioni` on the Registro Manutenzioni page.

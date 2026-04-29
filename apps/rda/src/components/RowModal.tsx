@@ -1,14 +1,16 @@
 import { Button, Icon, Modal, useToast } from '@mrsmith/ui';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useArticles, useCreateRow } from '../api/queries';
-import type { RowPayload } from '../api/types';
+import type { Article } from '../api/types';
 import { apiErrorMessage } from '../lib/api-error';
 import { formatMoneyEUR } from '../lib/format';
+import { buildRowPayload, rowPreviewTotal } from '../lib/row-payload';
 import { firstError, validateRow } from '../lib/validation';
+import { ArticleCombobox } from './ArticleCombobox';
 
 export function RowModal({ poId, open, onClose }: { poId: number; open: boolean; onClose: () => void }) {
-  const [type, setType] = useState<'good' | 'service'>('service');
-  const [articleCode, setArticleCode] = useState('');
+  const [articleSearch, setArticleSearch] = useState('');
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [description, setDescription] = useState('');
   const [qty, setQty] = useState(1);
   const [price, setPrice] = useState(0);
@@ -20,18 +22,30 @@ export function RowModal({ poId, open, onClose }: { poId: number; open: boolean;
   const [startDate, setStartDate] = useState('');
   const [automaticRenew, setAutomaticRenew] = useState(false);
   const [cancellationAdvice, setCancellationAdvice] = useState('');
-  const articles = useArticles(type, '');
+  const articles = useArticles(articleSearch);
   const createRow = useCreateRow();
   const { toast } = useToast();
 
-  const selectedArticle = (articles.data ?? []).find((article) => article.code === articleCode);
-  const preview = useMemo(() => {
-    if (type === 'good') return price * qty;
-    return mrc * qty * duration + nrc * qty;
-  }, [duration, mrc, nrc, price, qty, type]);
+  const draft = {
+    article: selectedArticle,
+    description,
+    qty,
+    price,
+    nrc,
+    mrc,
+    duration,
+    recurrence,
+    startAt,
+    startDate,
+    automaticRenew,
+    cancellationAdvice,
+  };
+  const preview = selectedArticle ? rowPreviewTotal(draft) : 0;
+  const selectedType = selectedArticle?.type;
 
   function reset() {
-    setArticleCode('');
+    setSelectedArticle(null);
+    setArticleSearch('');
     setDescription('');
     setQty(1);
     setPrice(0);
@@ -47,28 +61,7 @@ export function RowModal({ poId, open, onClose }: { poId: number; open: boolean;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const body: RowPayload = {
-      type,
-      description: description.trim(),
-      qty,
-      product_code: articleCode,
-      product_description: selectedArticle?.description ?? '',
-      ...(type === 'good' ? { price } : { monthly_fee: mrc, activation_price: nrc }),
-      payment_detail: {
-        start_at: startAt,
-        ...(startAt === 'specific_date' ? { start_at_date: startDate } : {}),
-        ...(type === 'service' ? { month_recursion: recurrence } : {}),
-      },
-      ...(type === 'service'
-        ? {
-            renew_detail: {
-              initial_subscription_months: duration,
-              automatic_renew: automaticRenew,
-              cancellation_advice: cancellationAdvice,
-            },
-          }
-        : {}),
-    };
+    const body = buildRowPayload(draft);
     const message = firstError(validateRow(body));
     if (message) {
       toast(message, 'warning');
@@ -84,34 +77,60 @@ export function RowModal({ poId, open, onClose }: { poId: number; open: boolean;
     }
   }
 
+  function selectArticle(article: Article | null) {
+    const previousType = selectedArticle?.type;
+    setSelectedArticle(article);
+    if (!article) return;
+    setDescription(article.description ?? article.code);
+    if (previousType && previousType !== article.type) {
+      if (article.type === 'good') {
+        setNrc(0);
+        setMrc(0);
+        setDuration(12);
+        setRecurrence(1);
+        setAutomaticRenew(false);
+        setCancellationAdvice('');
+      } else {
+        setPrice(0);
+        if (startAt === 'advance_payment') setStartAt('activation_date');
+      }
+    }
+  }
+
   return (
     <Modal open={open} onClose={onClose} title="Nuova riga PO" size="wide">
       <form className="formGrid three" onSubmit={(event) => void submit(event)}>
-        <div className="field">
-          <label>Tipo</label>
-          <select value={type} onChange={(event) => setType(event.target.value as 'good' | 'service')}>
-            <option value="service">Servizio</option>
-            <option value="good">Bene</option>
-          </select>
+        <div className="articleQuantityRow">
+          <div className="field quantityField">
+            <label>Quantita</label>
+            <input type="number" min="0" step="1" value={qty} onChange={(event) => setQty(Number(event.target.value))} />
+          </div>
+          <div className="field">
+            <label>Articolo</label>
+            <ArticleCombobox
+              articles={articles.data ?? []}
+              value={selectedArticle}
+              search={articleSearch}
+              loading={articles.isLoading}
+              disabled={articles.isLoading && !selectedArticle}
+              onSearchChange={setArticleSearch}
+              onChange={selectArticle}
+            />
+          </div>
         </div>
-        <div className="field">
-          <label>Articolo</label>
-          <select value={articleCode} onChange={(event) => setArticleCode(event.target.value)}>
-            <option value="">Seleziona articolo</option>
-            {(articles.data ?? []).map((article) => (
-              <option key={article.code} value={article.code}>{article.description ?? article.code}</option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Quantita</label>
-          <input type="number" min="0" step="1" value={qty} onChange={(event) => setQty(Number(event.target.value))} />
-        </div>
+        {!selectedArticle ? (
+          <div className="lineBuilderEmpty wide">
+            <Icon name="package" size={22} />
+            <strong>Seleziona un articolo</strong>
+            <span>Catalogo beni e servizi RDA</span>
+          </div>
+        ) : (
+          <>
         <div className="field wide">
           <label>Descrizione</label>
           <input value={description} onChange={(event) => setDescription(event.target.value)} />
         </div>
-        {type === 'good' ? (
+        {selectedType === 'good' ? (
           <div className="field">
             <label>Costo unitario</label>
             <input type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(Number(event.target.value))} />
@@ -133,14 +152,14 @@ export function RowModal({ poId, open, onClose }: { poId: number; open: boolean;
           <label>Decorrenza</label>
           <select value={startAt} onChange={(event) => setStartAt(event.target.value)}>
             <option value="activation_date">Data attivazione</option>
-            {type === 'good' ? <option value="advance_payment">Pagamento anticipato</option> : null}
+            {selectedType === 'good' ? <option value="advance_payment">Pagamento anticipato</option> : null}
             <option value="specific_date">Data specifica</option>
           </select>
         </div>
         {startAt === 'specific_date' ? (
           <div className="field"><label>Data decorrenza</label><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></div>
         ) : null}
-        {type === 'service' ? (
+        {selectedType === 'service' ? (
           <>
             <label className="field"><span>Rinnovo automatico</span><input type="checkbox" checked={automaticRenew} onChange={(event) => setAutomaticRenew(event.target.checked)} /></label>
             {automaticRenew ? (
@@ -153,6 +172,8 @@ export function RowModal({ poId, open, onClose }: { poId: number; open: boolean;
           <Button variant="secondary" onClick={onClose}>Annulla</Button>
           <Button type="submit" leftIcon={<Icon name="plus" />} loading={createRow.isPending}>Aggiungi riga</Button>
         </div>
+          </>
+        )}
       </form>
     </Modal>
   );

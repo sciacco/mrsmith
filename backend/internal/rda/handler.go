@@ -223,17 +223,39 @@ func (h *Handler) handleArticles(w http.ResponseWriter, r *http.Request) {
 	if !h.requireArak(w) {
 		return
 	}
-	values := r.URL.Query()
-	if search := strings.TrimSpace(values.Get("search")); search != "" && values.Get("search_string") == "" {
-		values.Set("search_string", search)
+	articles, err := h.fetchNormalizedArticles(r)
+	if err != nil {
+		var statusErr *upstreamStatusError
+		if errors.As(err, &statusErr) {
+			if statusErr.status == http.StatusUnauthorized || statusErr.status == http.StatusForbidden {
+				httputil.JSON(w, http.StatusBadGateway, map[string]string{
+					"error": "Autorizzazione verso il servizio RDA non riuscita",
+					"code":  codeUpstreamAuthFailed,
+				})
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(statusErr.status)
+			_, _ = w.Write(statusErr.body)
+			return
+		}
+		if errors.Is(err, errInvalidArticleType) {
+			httputil.Error(w, http.StatusBadRequest, "Tipo articolo non valido")
+			return
+		}
+		h.requestLogger(r, "rda_articles").Error("article catalog load failed", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Catalogo articoli temporaneamente non disponibile",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
 	}
-	if values.Get("page_number") == "" {
-		values.Set("page_number", "1")
-	}
-	if values.Get("disable_pagination") == "" {
-		values.Set("disable_pagination", "true")
-	}
-	h.forwardArak(w, r, http.MethodGet, arakRDARoot+"/article", values.Encode(), nil, nil)
+	httputil.JSON(w, http.StatusOK, articleCatalogResponse{
+		TotalNumber: len(articles),
+		CurrentPage: 1,
+		TotalPages:  1,
+		Items:       articles,
+	})
 }
 
 func (h *Handler) handleUsers(w http.ResponseWriter, r *http.Request) {

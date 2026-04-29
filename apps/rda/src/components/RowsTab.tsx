@@ -30,20 +30,28 @@ export function RowsTab({ po, editable }: { po: PoDetail; editable: boolean }) {
         <Button size="sm" leftIcon={<Icon name="plus" />} disabled={!editable} onClick={() => setModalOpen(true)}>Nuova riga</Button>
       </div>
       <div className="tableScroll">
-        <table className="dataTable">
+        <table className="dataTable rowTable">
           <thead>
             <tr>
-              <th>Descrizione</th><th>Costo unitario / NRC</th><th>MRC</th><th>Q.ta</th><th>Tipo</th><th>Totale riga</th><th className="actionsCell">Azioni</th>
+              <th>Riga</th><th>Economia</th><th>Q.ta</th><th>Totale riga</th><th className="actionsCell">Azioni</th>
             </tr>
           </thead>
           <tbody>
             {(po.rows ?? []).map((row) => (
               <tr key={row.id}>
-                <td>{row.description ?? row.product_description ?? '-'}</td>
-                <td>{formatMoneyEUR(row.type === 'good' ? row.price : row.activation_fee ?? row.activation_price)}</td>
-                <td>{formatMoneyEUR(row.montly_fee ?? row.monthly_fee)}</td>
+                <td>
+                  <div className="rowTitleCell">
+                    <strong>{row.description ?? row.product_description ?? '-'}</strong>
+                    <span>{row.product_code ?? row.product_description ?? '-'}</span>
+                  </div>
+                </td>
+                <td>
+                  <div className="economicBreakdown">
+                    <span className={`badge ${row.type === 'good' ? 'success' : 'info'}`}>{row.type === 'good' ? 'Bene' : 'Servizio'}</span>
+                    <small>{row.type === 'good' ? `Unitario ${formatMoneyEUR(row.price)}` : `NRC ${formatMoneyEUR(row.activation_fee ?? row.activation_price)} · MRC ${formatMoneyEUR(row.montly_fee ?? row.monthly_fee)}`}</small>
+                  </div>
+                </td>
                 <td>{row.qty ?? '-'}</td>
-                <td>{row.type === 'good' ? 'Bene' : 'Servizio'}</td>
                 <td>{formatMoneyEUR(row.total_price)}</td>
                 <td className="actionsCell">
                   <span className="iconActions">
@@ -64,7 +72,7 @@ export function RowsTab({ po, editable }: { po: PoDetail; editable: boolean }) {
                 </td>
               </tr>
             ))}
-            {(po.rows ?? []).length === 0 ? <tr><td colSpan={7} className="emptyInline">Nessuna riga PO presente.</td></tr> : null}
+            {(po.rows ?? []).length === 0 ? <tr><td colSpan={5} className="emptyInline">Nessuna riga PO presente.</td></tr> : null}
           </tbody>
         </table>
       </div>
