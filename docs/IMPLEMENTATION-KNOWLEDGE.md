@@ -135,8 +135,8 @@ Alyante ERP ID
 
 - Context: `apps/rda` row creation in `/rda/new` and PO detail row modal.
 - Discovery: Mistra exposes RDA articles filtered by `type=good|service`, but the row UI must select an article first and derive the row type from that selected catalog item.
-- Practical rule: call `GET /api/rda/v1/articles?search=...` for the unified picker. The RDA BFF fetches both good and service catalogs when `type` is omitted, normalizes every item to `{code, description, type}`, and deduplicates by `code`. Keep `?type=good|service` only for compatibility or deliberately typed consumers.
-- Evidence: backend `backend/internal/rda/articles.go`; frontend `apps/rda/src/components/ArticleCombobox.tsx` and `apps/rda/src/lib/row-payload.ts`.
+- Practical rule: the RDA row picker should load the unified catalog once with `GET /api/rda/v1/articles`, then filter locally by code, description, and the Italian type labels (`bene` / `servizio`). The RDA BFF fetches both good and service catalogs when `type` is omitted, normalizes every item to `{code, description, type}`, and deduplicates by `code`. Keep `?search=...` and `?type=good|service` only for compatibility or deliberately typed consumers.
+- Evidence: backend `backend/internal/rda/articles.go`; frontend `apps/rda/src/api/queries.ts`, `apps/rda/src/components/ArticleCombobox.tsx`, and `apps/rda/src/lib/row-payload.ts`.
 - Used by: `apps/rda` `/rda/new` row composer and PO detail row modal.
 - Open questions: none.
 

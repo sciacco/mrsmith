@@ -84,17 +84,11 @@ export function usePaymentMethodDefault() {
   });
 }
 
-export function useArticles(search: string, type?: 'good' | 'service') {
+export function useArticleCatalog() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['rda', 'articles', type ?? 'all', search],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (type) params.set('type', type);
-      if (search.trim()) params.set('search', search.trim());
-      const query = params.toString();
-      return unwrap(await api.get<Article[] | PagedEnvelope<Article>>(`${rdaRoot}/articles${query ? `?${query}` : ''}`));
-    },
+    queryKey: ['rda', 'articles', 'catalog'],
+    queryFn: async () => unwrap(await api.get<Article[] | PagedEnvelope<Article>>(`${rdaRoot}/articles`)),
   });
 }
 

@@ -124,6 +124,7 @@ export function NewRdaWizardPage() {
   const [requestedProviders, setRequestedProviders] = useState<ProviderSummary[]>([]);
   const [providerRequestOpen, setProviderRequestOpen] = useState(false);
   const [providerRequestSearch, setProviderRequestSearch] = useState('');
+  const [rowPreviewTotal, setRowPreviewTotal] = useState(0);
 
   const budgets = useBudgets();
   const providers = useProviders();
@@ -160,6 +161,10 @@ export function NewRdaWizardPage() {
     if (next) setHeader((current) => ({ ...current, payment_method: next }));
   }, [defaultPayment.data?.code, fullProvider, header.payment_method, poId]);
 
+  useEffect(() => {
+    if (step !== 1) setRowPreviewTotal(0);
+  }, [step]);
+
   if (rawPoId && poId == null) return <Navigate to="/rda/new" replace />;
 
   const loading =
@@ -195,6 +200,9 @@ export function NewRdaWizardPage() {
   const rows = detail?.rows ?? [];
   const attachments = detail?.attachments ?? [];
   const total = parseMistraMoney(detail?.total_price);
+  const previewDelta = Number.isFinite(rowPreviewTotal) ? rowPreviewTotal : 0;
+  const showPreviewTotal = step === 1 && previewDelta > 0;
+  const previewTotal = total + previewDelta;
   const quoteRuleBlocked = total >= 3000 && attachments.length < 2;
   const contactsReady = contactDraftIds.length > 0 || hasQualificationFallback(fullProvider);
   const readinessItems: ReadinessItem[] = [
@@ -428,7 +436,7 @@ export function NewRdaWizardPage() {
       <header className="pageHeader wizardHeader">
         <div>
           <h1>Nuova richiesta</h1>
-          <p>{detail ? `Bozza ${detail.code ?? detail.id} · ${formatMoneyEUR(detail.total_price)}` : 'Completa i dati iniziali per creare la bozza.'}</p>
+          <p>{detail ? `Bozza ${detail.code ?? detail.id}` : 'Completa i dati iniziali per creare la bozza.'}</p>
         </div>
         <Button variant="secondary" leftIcon={<Icon name="arrow-left" />} onClick={() => navigate('/rda')}>Le mie RDA</Button>
       </header>
@@ -520,10 +528,20 @@ export function NewRdaWizardPage() {
                 <h2>Righe</h2>
                 <p className="muted">Aggiungi beni o servizi alla bozza.</p>
               </div>
-              <span className="badge info">Totale PO: {formatMoneyEUR(detail.total_price)}</span>
+              {showPreviewTotal ? (
+                <span className="rowPreviewTotal">
+                  <span>Totale riga</span>
+                  <strong>{formatMoneyEUR(previewDelta)}</strong>
+                </span>
+              ) : null}
             </div>
             <div className="tabBody">
-              <RowComposer poId={detail.id} poTotal={detail.total_price} rows={rows} editable={draftEditable} />
+              <RowComposer
+                poId={detail.id}
+                rows={rows}
+                editable={draftEditable}
+                onPreviewTotalChange={setRowPreviewTotal}
+              />
             </div>
           </div>
         ) : null}
@@ -657,7 +675,20 @@ export function NewRdaWizardPage() {
         <Button variant="ghost" disabled={step === 0 || createPO.isPending || patchPO.isPending || transition.isPending} onClick={() => setStep((current) => Math.max(0, current - 1))}>
           Indietro
         </Button>
-        <span>Passo {step + 1} di {steps.length}</span>
+        <div className="wizardFooterSummary" aria-live="polite">
+          <span className="wizardFooterStep">Passo {step + 1} di {steps.length}</span>
+          <span className="wizardFooterMetric total">
+            <span>Totale PO</span>
+            <strong>{formatMoneyEUR(total)}</strong>
+          </span>
+          {showPreviewTotal ? (
+            <span className="wizardFooterMetric preview">
+              <span>Con riga</span>
+              <strong>{formatMoneyEUR(previewTotal)}</strong>
+            </span>
+          ) : null}
+          {!detail ? <span className="wizardFooterDraft">Bozza non ancora creata</span> : null}
+        </div>
         <Button
           leftIcon={step === steps.length - 1 ? <Icon name="check" /> : <Icon name="arrow-right" />}
           disabled={(step === steps.length - 1 && !readyToSubmit) || createPO.isPending || patchPO.isPending || transition.isPending}

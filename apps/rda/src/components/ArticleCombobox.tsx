@@ -16,6 +16,14 @@ function articleSearchValue(article: Article): string {
   return [article.code, article.description, article.type === 'good' ? 'bene' : 'servizio'].filter(Boolean).join(' ').toLowerCase();
 }
 
+function compareArticles(left: Article, right: Article): number {
+  const byLabel = articleLabel(left).localeCompare(articleLabel(right), 'it', { sensitivity: 'base' });
+  if (byLabel !== 0) return byLabel;
+  const byCode = left.code.localeCompare(right.code, 'it', { sensitivity: 'base' });
+  if (byCode !== 0) return byCode;
+  return left.type.localeCompare(right.type);
+}
+
 function ArticleTypeBadge({ type }: { type: Article['type'] }) {
   return <span className={`${styles.typeBadge} ${type === 'good' ? styles.good : styles.service}`}>{type === 'good' ? 'Bene' : 'Servizio'}</span>;
 }
@@ -44,11 +52,12 @@ export function ArticleCombobox({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const orderedArticles = useMemo(() => [...articles].sort(compareArticles), [articles]);
   const filtered = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    if (!normalized) return articles;
-    return articles.filter((article) => articleSearchValue(article).includes(normalized));
-  }, [articles, search]);
+    if (!normalized) return orderedArticles;
+    return orderedArticles.filter((article) => articleSearchValue(article).includes(normalized));
+  }, [orderedArticles, search]);
 
   const renderInline = Boolean(triggerRef.current?.closest('dialog[open]'));
 

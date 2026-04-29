@@ -1,9 +1,9 @@
 import { Button, Icon, useToast } from '@mrsmith/ui';
-import { useState, type FormEvent } from 'react';
-import { useArticles, useCreateRow, useDeleteRow } from '../api/queries';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useArticleCatalog, useCreateRow, useDeleteRow } from '../api/queries';
 import type { Article, PoRow } from '../api/types';
 import { apiErrorMessage } from '../lib/api-error';
-import { formatMoneyEUR, parseMistraMoney } from '../lib/format';
+import { formatMoneyEUR } from '../lib/format';
 import { buildRowPayload, rowPreviewTotal } from '../lib/row-payload';
 import { firstError, validateRow, type ValidationResult } from '../lib/validation';
 import { ArticleCombobox } from './ArticleCombobox';
@@ -15,14 +15,14 @@ function emptyValidation(): ValidationResult {
 
 export function RowComposer({
   poId,
-  poTotal,
   rows,
   editable,
+  onPreviewTotalChange,
 }: {
   poId: number;
-  poTotal?: string | number;
   rows: PoRow[];
   editable: boolean;
+  onPreviewTotalChange?: (previewTotal: number) => void;
 }) {
   const [articleSearch, setArticleSearch] = useState('');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
@@ -39,7 +39,7 @@ export function RowComposer({
   const [cancellationAdvice, setCancellationAdvice] = useState('');
   const [validation, setValidation] = useState<ValidationResult>(emptyValidation);
   const [deleteTarget, setDeleteTarget] = useState<PoRow | null>(null);
-  const articles = useArticles(articleSearch);
+  const articles = useArticleCatalog();
   const createRow = useCreateRow();
   const remove = useDeleteRow();
   const { toast } = useToast();
@@ -59,8 +59,13 @@ export function RowComposer({
     cancellationAdvice,
   };
   const preview = selectedArticle ? rowPreviewTotal(draft) : 0;
-  const updatedTotal = parseMistraMoney(poTotal) + preview;
   const selectedType = selectedArticle?.type;
+
+  useEffect(() => {
+    onPreviewTotalChange?.(preview);
+  }, [onPreviewTotalChange, preview]);
+
+  useEffect(() => () => onPreviewTotalChange?.(0), [onPreviewTotalChange]);
 
   function reset() {
     setSelectedArticle(null);
@@ -221,16 +226,6 @@ export function RowComposer({
             </>
           ) : null}
           {validation.formErrors.length ? <p className="fieldError wide">{validation.formErrors[0]}</p> : null}
-          <div className="composerTotals">
-            <div className="composerTotal">
-              <span>Totale riga</span>
-              <strong>{formatMoneyEUR(preview)}</strong>
-            </div>
-            <div className="composerTotal">
-              <span>Totale PO aggiornato</span>
-              <strong>{formatMoneyEUR(updatedTotal)}</strong>
-            </div>
-          </div>
           <div className="actionRow fullWidth">
             <Button type="submit" leftIcon={<Icon name="plus" />} loading={createRow.isPending}>Aggiungi riga</Button>
           </div>

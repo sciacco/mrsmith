@@ -1,12 +1,14 @@
 package rda
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 )
 
@@ -31,7 +33,12 @@ func (h *Handler) fetchNormalizedArticles(r *http.Request) ([]article, error) {
 		return nil, err
 	}
 	if articleType != "" {
-		return h.fetchArticleType(articleType, values)
+		items, err := h.fetchArticleType(articleType, values)
+		if err != nil {
+			return nil, err
+		}
+		sortArticles(items)
+		return items, nil
 	}
 
 	merged := make([]article, 0)
@@ -54,6 +61,7 @@ func (h *Handler) fetchNormalizedArticles(r *http.Request) ([]article, error) {
 			merged = append(merged, item)
 		}
 	}
+	sortArticles(merged)
 	return merged, nil
 }
 
@@ -107,18 +115,53 @@ func (h *Handler) fetchArticleType(articleType string, values url.Values) ([]art
 }
 
 func decodeArticleItems(body []byte, articleType string) ([]article, error) {
-	var envelope struct {
-		Items []article `json:"items"`
-	}
-	if err := json.Unmarshal(body, &envelope); err == nil && envelope.Items != nil {
-		return normalizeArticles(envelope.Items, articleType), nil
-	}
-
-	var items []article
-	if err := json.Unmarshal(body, &items); err != nil {
+	items, err := decodeArticleItemsRaw(bytes.TrimSpace(body))
+	if err != nil {
 		return nil, err
 	}
 	return normalizeArticles(items, articleType), nil
+}
+
+func decodeArticleItemsRaw(raw json.RawMessage) ([]article, error) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 {
+		return nil, errors.New("empty article catalog response")
+	}
+	switch raw[0] {
+	case '[':
+		var items []article
+		if err := json.Unmarshal(raw, &items); err != nil {
+			return nil, err
+		}
+		return items, nil
+	case '{':
+		return decodeArticleItemsObject(raw)
+	default:
+		return nil, fmt.Errorf("unexpected article catalog JSON token %q", raw[0])
+	}
+}
+
+func decodeArticleItemsObject(raw json.RawMessage) ([]article, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, err
+	}
+	for _, key := range []string{"items", "data", "results", "rows"} {
+		value, ok := fields[key]
+		if !ok || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			continue
+		}
+		items, err := decodeArticleItemsRaw(value)
+		if err == nil {
+			return items, nil
+		}
+	}
+
+	var item article
+	if err := json.Unmarshal(raw, &item); err == nil && strings.TrimSpace(item.Code) != "" {
+		return []article{item}, nil
+	}
+	return nil, errors.New("article catalog response does not contain an items array")
 }
 
 func normalizeArticles(input []article, fallbackType string) []article {
@@ -147,4 +190,28 @@ func normalizeArticles(input []article, fallbackType string) []article {
 		})
 	}
 	return normalized
+}
+
+func sortArticles(items []article) {
+	sort.SliceStable(items, func(i, j int) bool {
+		leftLabel := articleSortLabel(items[i])
+		rightLabel := articleSortLabel(items[j])
+		if leftLabel != rightLabel {
+			return leftLabel < rightLabel
+		}
+		leftCode := strings.ToLower(strings.TrimSpace(items[i].Code))
+		rightCode := strings.ToLower(strings.TrimSpace(items[j].Code))
+		if leftCode != rightCode {
+			return leftCode < rightCode
+		}
+		return items[i].Type < items[j].Type
+	})
+}
+
+func articleSortLabel(item article) string {
+	label := strings.TrimSpace(item.Description)
+	if label == "" {
+		label = strings.TrimSpace(item.Code)
+	}
+	return strings.ToLower(label)
 }

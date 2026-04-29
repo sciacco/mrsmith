@@ -1,6 +1,6 @@
 import { Button, Icon, Modal, useToast } from '@mrsmith/ui';
 import { useState } from 'react';
-import { useArticles, useCreateRow } from '../api/queries';
+import { useArticleCatalog, useCreateRow } from '../api/queries';
 import type { Article } from '../api/types';
 import { apiErrorMessage } from '../lib/api-error';
 import { formatMoneyEUR } from '../lib/format';
@@ -22,7 +22,7 @@ export function RowModal({ poId, open, onClose }: { poId: number; open: boolean;
   const [startDate, setStartDate] = useState('');
   const [automaticRenew, setAutomaticRenew] = useState(false);
   const [cancellationAdvice, setCancellationAdvice] = useState('');
-  const articles = useArticles(articleSearch);
+  const articles = useArticleCatalog();
   const createRow = useCreateRow();
   const { toast } = useToast();
 
