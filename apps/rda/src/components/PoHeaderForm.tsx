@@ -84,19 +84,22 @@ export function PoHeaderForm({
           <label>Progetto</label>
           <input value={value.project} disabled={!draftEditable} maxLength={50} onChange={(event) => update('project', event.target.value)} />
         </div>
-        <div className="field twoThirds">
-          <label>Fornitore</label>
-          <ProviderSelect providers={providers} value={value.provider_id} disabled={!draftEditable} onChange={(next) => update('provider_id', next)} />
-        </div>
-        <div className="field">
-          <label>Modalità di pagamento</label>
-          <PaymentMethodSelect
-            methods={paymentMethods}
-            value={value.payment_method}
-            disabled={!draftEditable && !paymentEditable}
-            onChange={(next) => update('payment_method', next)}
-          />
-          {paymentRequiresVerification ? <span className="badge warning">Richiede verifica metodo pagamento</span> : null}
+        <div className="providerPaymentGrid">
+          <div className="field providerPaymentProvider">
+            <label>Fornitore</label>
+            <ProviderSelect providers={providers} value={value.provider_id} disabled={!draftEditable} onChange={(next) => update('provider_id', next)} />
+          </div>
+          <div className="field providerPaymentMethod">
+            <label>Modalità di pagamento</label>
+            <PaymentMethodSelect
+              methods={paymentMethods}
+              value={value.payment_method}
+              disabled={!draftEditable && !paymentEditable}
+              requiresVerification={paymentRequiresVerification}
+              onChange={(next) => update('payment_method', next)}
+            />
+            {paymentRequiresVerification ? <p className="fieldWarning">Richiede approvazione metodo pagamento</p> : null}
+          </div>
         </div>
         <div className="field">
           <label>Riferimento preventivo</label>

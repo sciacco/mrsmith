@@ -287,6 +287,23 @@ textarea {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.providerPaymentGrid {
+  display: grid;
+  align-items: start;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.providerPaymentProvider {
+  grid-column: span 2;
+}
+
+.providerPaymentMethod {
+  grid-column: span 1;
+}
+
 .field {
   display: grid;
   gap: 0.35rem;
@@ -400,6 +417,12 @@ textarea {
 .warningText {
   color: #92400e;
   font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.fieldWarning {
+  color: #92400e;
+  font-size: 0.78rem;
   font-weight: 600;
 }
 
@@ -877,6 +900,7 @@ textarea {
 
   .formGrid,
   .formGrid.three,
+  .providerPaymentGrid,
   .detailLayout,
   .inlineForm,
   .rowComposer,
@@ -884,6 +908,8 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .providerPaymentProvider,
+  .providerPaymentMethod,
   .field.twoThirds {
     grid-column: 1 / -1;
   }

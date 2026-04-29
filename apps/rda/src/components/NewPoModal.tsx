@@ -140,14 +140,21 @@ export function NewPoModal({
           <input value={object} onChange={(event) => setObject(event.target.value)} />
         </div>
         <h3 className="sectionTitle">Fornitore e pagamento</h3>
-        <div className="field">
-          <label>Fornitore</label>
-          <ProviderSelect providers={providers} value={providerId} onChange={setProviderId} />
-        </div>
-        <div className="field">
-          <label>Modalità di pagamento</label>
-          <PaymentMethodSelect methods={paymentOptions} value={paymentMethod} onChange={setPaymentMethod} />
-          {paymentRequiresVerification ? <span className="badge warning">Richiede verifica metodo pagamento</span> : null}
+        <div className="providerPaymentGrid">
+          <div className="field providerPaymentProvider">
+            <label>Fornitore</label>
+            <ProviderSelect providers={providers} value={providerId} onChange={setProviderId} />
+          </div>
+          <div className="field providerPaymentMethod">
+            <label>Modalità di pagamento</label>
+            <PaymentMethodSelect
+              methods={paymentOptions}
+              value={paymentMethod}
+              requiresVerification={paymentRequiresVerification}
+              onChange={setPaymentMethod}
+            />
+            {paymentRequiresVerification ? <p className="fieldWarning">Richiede approvazione metodo pagamento</p> : null}
+          </div>
         </div>
         <div className="field">
           <label>Riferimento preventivo</label>

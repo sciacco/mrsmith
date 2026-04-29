@@ -12,11 +12,13 @@ export function PaymentMethodSelect({
   methods,
   value,
   disabled,
+  requiresVerification,
   onChange,
 }: {
   methods: PaymentMethodOption[];
   value: string;
   disabled?: boolean;
+  requiresVerification?: boolean;
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -201,7 +203,7 @@ export function PaymentMethodSelect({
       <button
         ref={triggerRef}
         type="button"
-        className={`${styles.trigger} ${open && !disabled ? styles.triggerOpen : ''}`}
+        className={`${styles.trigger} ${open && !disabled ? styles.triggerOpen : ''} ${requiresVerification ? styles.triggerWarning : ''}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}
@@ -216,6 +218,7 @@ export function PaymentMethodSelect({
             <span className={styles.optionLabel}>{selected.label}</span>
             {selected.isNotPreapproved ? <NonPreapprovedBadge /> : null}
             {selected.code !== selected.label ? <span className={styles.selectedCode}>{selected.code}</span> : null}
+            {requiresVerification ? <VerificationBadge /> : null}
           </span>
         ) : (
           <span className={styles.placeholder}>Seleziona pagamento</span>
@@ -256,4 +259,8 @@ function PaymentMethodOptionContent({ method }: { method: PaymentMethodOption })
 
 function NonPreapprovedBadge() {
   return <span className={`${styles.pill} ${styles.pillNotPreapproved}`}>NON PREAPPROVATA</span>;
+}
+
+function VerificationBadge() {
+  return <span className={`${styles.pill} ${styles.pillVerification}`}>DA APPROVARE</span>;
 }

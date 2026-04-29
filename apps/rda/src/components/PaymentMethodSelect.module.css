@@ -36,6 +36,16 @@
   box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
+.triggerWarning:not(:disabled) {
+  border-color: rgba(245, 158, 11, 0.38);
+}
+
+.triggerWarning:focus-visible,
+.triggerWarning.triggerOpen {
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
 .trigger:disabled {
   color: var(--color-text-faint);
   background: var(--color-surface);
@@ -238,6 +248,12 @@
 }
 
 .pillNotPreapproved {
+  border-color: rgba(245, 158, 11, 0.25);
+  color: #92400e;
+  background: #fffbeb;
+}
+
+.pillVerification {
   border-color: rgba(245, 158, 11, 0.25);
   color: #92400e;
   background: #fffbeb;

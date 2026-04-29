@@ -457,24 +457,31 @@ export function NewRdaWizardPage() {
                   <option value="ECOMMERCE">Senza inviare PO al fornitore</option>
                 </select>
               </div>
-              <div className="field twoThirds">
-                <label>Fornitore</label>
-                <ProviderCombobox
-                  providers={providerOptions}
-                  value={header.provider_id}
-                  onChange={(next) => updateHeader('provider_id', next)}
-                  onRequestNewProvider={(search) => {
-                    setProviderRequestSearch(search);
-                    setProviderRequestOpen(true);
-                  }}
-                />
-                {headerFieldError('provider_id') ? <p className="fieldError">{headerFieldError('provider_id')}</p> : null}
-              </div>
-              <div className="field">
-                <label>Modalità di pagamento</label>
-                <PaymentMethodSelect methods={paymentOptions} value={header.payment_method} onChange={(next) => updateHeader('payment_method', next)} />
-                {paymentRequiresVerification ? <span className="badge warning">Richiede verifica metodo pagamento</span> : null}
-                {headerFieldError('payment_method') ? <p className="fieldError">{headerFieldError('payment_method')}</p> : null}
+              <div className="providerPaymentGrid">
+                <div className="field providerPaymentProvider">
+                  <label>Fornitore</label>
+                  <ProviderCombobox
+                    providers={providerOptions}
+                    value={header.provider_id}
+                    onChange={(next) => updateHeader('provider_id', next)}
+                    onRequestNewProvider={(search) => {
+                      setProviderRequestSearch(search);
+                      setProviderRequestOpen(true);
+                    }}
+                  />
+                  {headerFieldError('provider_id') ? <p className="fieldError">{headerFieldError('provider_id')}</p> : null}
+                </div>
+                <div className="field providerPaymentMethod">
+                  <label>Modalità di pagamento</label>
+                  <PaymentMethodSelect
+                    methods={paymentOptions}
+                    value={header.payment_method}
+                    requiresVerification={paymentRequiresVerification}
+                    onChange={(next) => updateHeader('payment_method', next)}
+                  />
+                  {paymentRequiresVerification ? <p className="fieldWarning">Richiede approvazione metodo pagamento</p> : null}
+                  {headerFieldError('payment_method') ? <p className="fieldError">{headerFieldError('payment_method')}</p> : null}
+                </div>
               </div>
               <div className="field">
                 <label>Progetto</label>
