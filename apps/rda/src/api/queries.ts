@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  AttachmentType,
   Article,
   BudgetForUser,
   Country,
@@ -262,9 +263,10 @@ export function useUploadAttachment() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, file }: { id: number; file: File }) => {
+    mutationFn: ({ id, file, attachmentType }: { id: number; file: File; attachmentType: AttachmentType }) => {
       const body = new FormData();
       body.append('file', file);
+      body.append('attachment_type', attachmentType);
       return api.postFormData<unknown>(`${rdaRoot}/pos/${id}/attachments`, body);
     },
     onSuccess: (_data, variables) => invalidatePO(queryClient, variables.id),

@@ -59,7 +59,7 @@ export function ActionBar({
         {po.state !== PO_STATES.DRAFT ? (
           <Button variant="secondary" leftIcon={<Icon name="download" />} onClick={onPDF} loading={transitioning}>Genera PDF</Button>
         ) : null}
-        {quoteRuleBlocked ? <span className="warningText">Attenzione: importo superiore a {formatMoney(3000, po.currency)}. Aggiungi 2 preventivi.</span> : null}
+        {quoteRuleBlocked ? <span className="warningText">Attenzione: importo superiore a {formatMoney(3000, po.currency)}. Carica almeno 2 preventivi.</span> : null}
       </div>
       <div className="actionBarGroup">
         {draftRequester ? (

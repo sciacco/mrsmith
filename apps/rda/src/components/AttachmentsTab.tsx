@@ -1,18 +1,18 @@
 import { Icon, useToast } from '@mrsmith/ui';
-import { useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useDeleteAttachment, useRdaDownloads, useUploadAttachment } from '../api/queries';
-import type { PoAttachment, PoDetail } from '../api/types';
+import type { AttachmentType, PoAttachment, PoDetail } from '../api/types';
+import {
+  ATTACHMENT_TYPE_OPTIONS,
+  attachmentTypeLabel,
+  defaultAttachmentTypeForPOState,
+} from '../lib/attachments';
 import { downloadBlob, formatDateIT } from '../lib/format';
 import { ConfirmDialog } from './ConfirmDialog';
 
-function attachmentTypeLabel(value?: string): string {
-  if (value === 'quote') return 'Preventivo';
-  if (value === 'transport_document') return 'Documento di trasporto';
-  return 'Altro';
-}
-
 export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boolean }) {
   const [deleteTarget, setDeleteTarget] = useState<PoAttachment | null>(null);
+  const [attachmentType, setAttachmentType] = useState<AttachmentType>(() => defaultAttachmentTypeForPOState(po.state));
   const upload = useUploadAttachment();
   const remove = useDeleteAttachment();
   const downloads = useRdaDownloads();
@@ -20,16 +20,28 @@ export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boole
   const poId = po.id;
   const canUpload = po.state === 'DRAFT' || po.state === 'PENDING_VERIFICATION';
 
+  useEffect(() => {
+    setAttachmentType(defaultAttachmentTypeForPOState(po.state));
+  }, [po.state]);
+
   async function uploadFiles(files: FileList | null) {
     if (!files) return;
+    const selectedType = attachmentType;
     try {
       for (const file of Array.from(files)) {
-        await upload.mutateAsync({ id: poId, file });
+        await upload.mutateAsync({ id: poId, file, attachmentType: selectedType });
       }
       toast('Allegati caricati');
     } catch {
       toast('Caricamento non riuscito', 'error');
     }
+  }
+
+  function handleUpload(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    void uploadFiles(input.files).finally(() => {
+      input.value = '';
+    });
   }
 
   async function download(attachment: PoAttachment) {
@@ -54,11 +66,26 @@ export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boole
 
   return (
     <div className="stack">
-      <p className="muted">Per importi maggiori di 3.000 € sono necessari almeno 2 preventivi.</p>
+      <p className="muted">Per importi maggiori di 3.000 € sono necessari almeno 2 allegati di tipo Preventivo.</p>
       {canUpload ? (
-        <div className="field">
-          <label>Carica allegati</label>
-          <input type="file" multiple onChange={(event) => void uploadFiles(event.target.files)} disabled={upload.isPending} />
+        <div className="attachmentUploadControls compact">
+          <div className="field">
+            <label htmlFor="po-attachment-type">Tipo documento</label>
+            <select
+              id="po-attachment-type"
+              value={attachmentType}
+              disabled={upload.isPending}
+              onChange={(event) => setAttachmentType(event.target.value as AttachmentType)}
+            >
+              {ATTACHMENT_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>Carica allegati</label>
+            <input type="file" multiple onChange={handleUpload} disabled={upload.isPending} />
+          </div>
         </div>
       ) : null}
       <div className="tableScroll">

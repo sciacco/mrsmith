@@ -16,7 +16,7 @@ import {
   useUploadAttachment,
   usePatchPO,
 } from '../api/queries';
-import type { PoAttachment, PoDetail, PoRow, ProviderReference, ProviderSummary } from '../api/types';
+import type { AttachmentType, PoAttachment, PoDetail, PoRow, ProviderReference, ProviderSummary } from '../api/types';
 import { BudgetSelect } from '../components/BudgetSelect';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { PaymentMethodSelect } from '../components/PaymentMethodSelect';
@@ -29,6 +29,12 @@ import { RowModal } from '../components/RowModal';
 import { RowTable } from '../components/RowTable';
 import { WizardStepper } from '../components/WizardStepper';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
+import {
+  ATTACHMENT_TYPE_OPTIONS,
+  attachmentTypeLabel,
+  countQuoteAttachments,
+  defaultAttachmentTypeForPOState,
+} from '../lib/attachments';
 import {
   coerceID,
   DEFAULT_RDA_CURRENCY,
@@ -91,7 +97,7 @@ function headerFromPO(po: PoDetail): WizardHeaderState {
 function suggestedStep(po: PoDetail): number {
   const total = parseMistraMoney(po.total_price);
   if ((po.rows ?? []).length === 0) return 1;
-  if (total >= 3000 && (po.attachments ?? []).length < 2) return 2;
+  if (total >= 3000 && countQuoteAttachments(po.attachments) < 2) return 2;
   return 3;
 }
 
@@ -103,12 +109,6 @@ function providerRefs(provider?: ProviderSummary): ProviderReference[] {
 
 function hasQualificationFallback(provider?: ProviderSummary): boolean {
   return providerRefs(provider).some((ref) => ref.reference_type === QUALIFICATION_REF && Boolean(ref.email));
-}
-
-function attachmentTypeLabel(value?: string): string {
-  if (value === 'quote') return 'Preventivo';
-  if (value === 'transport_document') return 'Documento di trasporto';
-  return 'Altro';
 }
 
 function errorState(title: string, message: string) {
@@ -134,6 +134,7 @@ export function NewRdaWizardPage() {
   const [attemptedHeader, setAttemptedHeader] = useState(false);
   const [contactDraftIds, setContactDraftIds] = useState<number[]>([]);
   const [deleteAttachment, setDeleteAttachment] = useState<PoAttachment | null>(null);
+  const [attachmentType, setAttachmentType] = useState<AttachmentType>('quote');
   const [submitConfirm, setSubmitConfirm] = useState(false);
   const [requestedProviders, setRequestedProviders] = useState<ProviderSummary[]>([]);
   const [providerRequestOpen, setProviderRequestOpen] = useState(false);
@@ -171,6 +172,11 @@ export function NewRdaWizardPage() {
     setContactDraftIds(recipientIDs(po.data.recipients));
     setStep((current) => (current === 0 ? suggestedStep(po.data) : current));
   }, [po.data]);
+
+  useEffect(() => {
+    if (!po.data) return;
+    setAttachmentType(defaultAttachmentTypeForPOState(po.data.state));
+  }, [po.data?.state]);
 
   useEffect(() => {
     if (poId != null || header.payment_method) return;
@@ -212,9 +218,10 @@ export function NewRdaWizardPage() {
   const headerReady = firstError(headerValidation) == null;
   const rows = detail?.rows ?? [];
   const attachments = detail?.attachments ?? [];
+  const quoteCount = countQuoteAttachments(attachments);
   const displayCurrency = normalizeCurrency(detail?.currency ?? header.currency);
   const total = parseMistraMoney(detail?.total_price);
-  const quoteRuleBlocked = total >= 3000 && attachments.length < 2;
+  const quoteRuleBlocked = total >= 3000 && quoteCount < 2;
   const sendsToProvider = header.type !== 'ECOMMERCE';
   const contactsReady = !sendsToProvider || contactDraftIds.length > 0 || hasQualificationFallback(fullProvider);
   const readinessItems: ReadinessItem[] = [
@@ -236,7 +243,7 @@ export function NewRdaWizardPage() {
       ready: !quoteRuleBlocked,
       detail:
         total >= 3000
-          ? `${attachments.length}/2 preventiv${attachments.length === 1 ? 'o caricato' : 'i caricati'} per ${formatMoney(total, displayCurrency)}.`
+          ? `${quoteCount}/2 preventiv${quoteCount === 1 ? 'o caricato' : 'i caricati'} per ${formatMoney(total, displayCurrency)}.`
           : 'La soglia preventivi non richiede altri allegati.',
     },
     {
@@ -376,9 +383,10 @@ export function NewRdaWizardPage() {
 
   async function uploadFiles(files: FileList | null) {
     if (!files || poId == null) return;
+    const selectedType = attachmentType;
     try {
       for (const file of Array.from(files)) {
-        await upload.mutateAsync({ id: poId, file });
+        await upload.mutateAsync({ id: poId, file, attachmentType: selectedType });
       }
       toast('Allegati caricati');
     } catch {
@@ -606,15 +614,32 @@ export function NewRdaWizardPage() {
                   {total >= 3000 ? `Carica almeno 2 preventivi per un totale PO di ${formatMoney(total, displayCurrency)}.` : 'Carica preventivi e documenti utili alla richiesta.'}
                 </p>
               </div>
-              <span className={`badge ${quoteRuleBlocked ? 'warning' : 'success'}`}>{attachments.length} allegat{attachments.length === 1 ? 'o' : 'i'}</span>
+              <span className={`badge ${quoteRuleBlocked ? 'warning' : 'success'}`}>
+                {total >= 3000 ? `${quoteCount}/2 preventivi` : `${attachments.length} allegat${attachments.length === 1 ? 'o' : 'i'}`}
+              </span>
             </div>
             <div className="tabBody stack">
-              <label className="uploadDrop">
-                <Icon name="file-up" size={22} />
-                <span>Carica preventivi</span>
-                <small>Puoi selezionare piu file insieme.</small>
-                <input type="file" multiple disabled={upload.isPending} onChange={handleUpload} />
-              </label>
+              <div className="attachmentUploadControls">
+                <div className="field">
+                  <label htmlFor="new-rda-attachment-type">Tipo documento</label>
+                  <select
+                    id="new-rda-attachment-type"
+                    value={attachmentType}
+                    disabled={upload.isPending}
+                    onChange={(event) => setAttachmentType(event.target.value as AttachmentType)}
+                  >
+                    {ATTACHMENT_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <label className="uploadDrop">
+                  <Icon name="file-up" size={22} />
+                  <span>Carica allegati</span>
+                  <small>Il tipo selezionato vale per tutti i file scelti.</small>
+                  <input type="file" multiple disabled={upload.isPending} onChange={handleUpload} />
+                </label>
+              </div>
               <div className="tableScroll">
                 <table className="dataTable">
                   <thead>

@@ -274,6 +274,7 @@ func newPaymentValidationHandler(t *testing.T, fixture paymentValidationFixture)
 type capturedArakRequest struct {
 	method string
 	path   string
+	header http.Header
 	body   []byte
 }
 
@@ -292,7 +293,7 @@ func (s *paymentValidationArakState) ServeHTTP(w http.ResponseWriter, r *http.Re
 
 	body, _ := io.ReadAll(r.Body)
 	s.mu.Lock()
-	s.requests = append(s.requests, capturedArakRequest{method: r.Method, path: r.URL.Path, body: body})
+	s.requests = append(s.requests, capturedArakRequest{method: r.Method, path: r.URL.Path, header: r.Header.Clone(), body: body})
 	s.mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")

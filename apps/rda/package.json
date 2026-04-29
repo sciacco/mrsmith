@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "tsc --noEmit",
-    "test": "tsc -p tsconfig.test.json && node /tmp/mrsmith-rda-tests/lib/payment-options.test.js && node /tmp/mrsmith-rda-tests/lib/row-payload.test.js",
+    "test": "tsc -p tsconfig.test.json && node /tmp/mrsmith-rda-tests/lib/payment-options.test.js && node /tmp/mrsmith-rda-tests/lib/row-payload.test.js && node /tmp/mrsmith-rda-tests/lib/attachments.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

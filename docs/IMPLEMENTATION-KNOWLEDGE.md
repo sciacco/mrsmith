@@ -140,6 +140,15 @@ Alyante ERP ID
 - Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, PO lists, inboxes, row composer, and RDA backend PO create/patch.
 - Open questions: none.
 
+### RDA Attachment Type Is User-Selected At Upload
+
+- Context: `apps/rda` PO attachment uploads and draft submit validation.
+- Discovery: Mistra `POST /arak/rda/v1/po/{id}/attachment` requires multipart `attachment_type` with enum `quote`, `transport_document`, or `other`. RDA users need to choose that type during upload; the 3.000 euro submit threshold is a quote rule, not a generic attachment count.
+- Practical rule: the RDA frontend should send the selected `attachment_type` with every uploaded file. The BFF must validate the enum and forward it to Mistra, keeping the legacy fallback only when old clients omit the field (`DRAFT -> quote`, `PENDING_VERIFICATION -> transport_document`). For `total_price >= 3000`, submit requires at least two attachments with `attachment_type == quote`.
+- Evidence: `docs/mistra-dist.yaml` schema `po-attachment-upload`; RDA backend `handleUploadAttachment` and `handleSubmitPO`; frontend attachment helper in `apps/rda/src/lib/attachments.ts`.
+- Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, and RDA backend attachment upload/submit validation.
+- Open questions: none.
+
 ### RDA Patch Payload Null Semantics
 
 - Context: `apps/rda` PO header edits forwarded to Mistra `rda-patch`.

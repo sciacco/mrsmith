@@ -60,6 +60,7 @@ export interface DefaultPaymentMethod {
 }
 
 export type CurrencyCode = 'EUR' | 'USD' | 'GBP';
+export type AttachmentType = 'quote' | 'transport_document' | 'other';
 
 export interface Article {
   code: string;
@@ -81,7 +82,7 @@ export interface PoApprover {
 
 export interface PoAttachment {
   id: number;
-  attachment_type?: string;
+  attachment_type?: AttachmentType | string;
   file_id?: string;
   file_name?: string;
   created_at?: string;

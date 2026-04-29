@@ -27,6 +27,12 @@ var allowedPOCurrencies = map[string]struct{}{
 	"GBP": {},
 }
 
+var allowedAttachmentTypes = map[string]struct{}{
+	"quote":              {},
+	"transport_document": {},
+	"other":              {},
+}
+
 type upstreamBodyResponse struct {
 	status int
 	header http.Header
@@ -492,9 +498,10 @@ func (h *Handler) handleUploadAttachment(w http.ResponseWriter, r *http.Request)
 		httputil.Error(w, http.StatusBadRequest, "Il file non puo essere letto")
 		return
 	}
-	attachmentType := "transport_document"
-	if po.State == "DRAFT" {
-		attachmentType = "quote"
+	attachmentType, err := attachmentTypeFromUpload(po.State, r.FormValue("attachment_type"))
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, err.Error())
+		return
 	}
 	if err := writer.WriteField("attachment_type", attachmentType); err != nil {
 		httputil.InternalError(w, r, err, "rda attachment field write failed")
@@ -589,7 +596,7 @@ func (h *Handler) handleSubmitPO(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "Aggiungi almeno una riga PO")
 		return
 	}
-	if parseTotalPrice(po.TotalPrice) >= 3000 && len(po.Attachments) < 2 {
+	if parseTotalPrice(po.TotalPrice) >= 3000 && countQuoteAttachments(po.Attachments) < 2 {
 		httputil.Error(w, http.StatusBadRequest, "Per importi superiori a 3.000 euro sono necessari almeno 2 preventivi")
 		return
 	}
@@ -750,6 +757,33 @@ func parseTotalPrice(value string) float64 {
 		return 0
 	}
 	return parsed
+}
+
+func attachmentTypeFromUpload(poState string, raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		if poState == "DRAFT" {
+			return "quote", nil
+		}
+		return "transport_document", nil
+	}
+	if _, ok := allowedAttachmentTypes[value]; !ok {
+		return "", errors.New("Seleziona un tipo documento valido")
+	}
+	return value, nil
+}
+
+func countQuoteAttachments(attachments []json.RawMessage) int {
+	count := 0
+	for _, attachment := range attachments {
+		var body struct {
+			AttachmentType string `json:"attachment_type"`
+		}
+		if err := json.Unmarshal(attachment, &body); err == nil && body.AttachmentType == "quote" {
+			count++
+		}
+	}
+	return count
 }
 
 func stringValue(value any) string {

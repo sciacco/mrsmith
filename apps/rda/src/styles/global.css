@@ -671,6 +671,19 @@ textarea {
   cursor: pointer;
 }
 
+.attachmentUploadControls {
+  display: grid;
+  grid-template-columns: minmax(11rem, 0.35fr) minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.attachmentUploadControls.compact {
+  grid-template-columns: minmax(11rem, 0.42fr) minmax(0, 1fr);
+  align-items: end;
+}
+
 .readinessList {
   display: grid;
   gap: 0.65rem;
@@ -1275,10 +1288,11 @@ textarea {
   .inlineForm,
   .poTypeChoice,
   .contactEditorForm,
-  .articleQuantityRow,
-  .submitGrid {
-    grid-template-columns: 1fr;
-  }
+	  .articleQuantityRow,
+	  .attachmentUploadControls,
+	  .submitGrid {
+	    grid-template-columns: 1fr;
+	  }
 
   .providerContactEditor .contactEditorForm {
     grid-template-columns: 1fr;

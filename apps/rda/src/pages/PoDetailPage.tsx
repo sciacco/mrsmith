@@ -24,6 +24,7 @@ import { headerStateFromPO, PoHeaderForm, type HeaderFormState } from '../compon
 import { PoTabs } from '../components/PoTabs';
 import { ProviderRequestModal } from '../components/ProviderRequestModal';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
+import { countQuoteAttachments } from '../lib/attachments';
 import { coerceID, downloadBlob, isRequester, parseMistraMoney } from '../lib/format';
 import { buildPatchPOPayload } from '../lib/po-payload';
 import { buildPaymentMethodOptions, paymentCodeFromProvider, preferredPaymentMethodCode, requiresPaymentMethodVerification } from '../lib/payment-options';
@@ -137,7 +138,7 @@ export function PoDetailPage() {
   const draftEditable = detail.state === PO_STATES.DRAFT && requester;
   const paymentEditable = detail.state === PO_STATES.PENDING_APPROVAL_PAYMENT_METHOD && requester;
   const total = parseMistraMoney(detail.total_price);
-  const quoteRuleBlocked = total >= 3000 && (detail.attachments?.length ?? 0) < 2;
+  const quoteRuleBlocked = total >= 3000 && countQuoteAttachments(detail.attachments) < 2;
   const canSubmit = draftEditable && (detail.rows?.length ?? 0) > 0 && !quoteRuleBlocked;
   const fullProvider = fullProviderForDraft ?? detail.provider;
   const providerDefault = paymentCodeFromProvider(fullProvider);
