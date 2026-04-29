@@ -328,6 +328,8 @@ textarea {
   box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
+.field input[aria-invalid="true"],
+.field textarea[aria-invalid="true"],
 .inlineForm input[aria-invalid="true"] {
   border-color: var(--color-danger);
   box-shadow: 0 0 0 3px var(--color-danger-subtle);

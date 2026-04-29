@@ -1,0 +1,32 @@
+.form {
+  max-height: min(34rem, calc(100dvh - 10rem));
+  align-content: start;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.actions {
+  position: sticky;
+  bottom: 0;
+  margin-top: 0.25rem;
+  padding-top: 0.75rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0), var(--color-bg-elevated) 32%),
+    var(--color-bg-elevated);
+}
+
+@media (max-width: 640px) {
+  .form {
+    max-height: calc(100dvh - 9rem);
+    padding-right: 0;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+}

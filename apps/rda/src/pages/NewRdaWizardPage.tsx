@@ -18,10 +18,10 @@ import {
 import type { PoAttachment, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
 import { BudgetSelect } from '../components/BudgetSelect';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { NewProviderInlineForm } from '../components/NewProviderInlineForm';
 import { PaymentMethodSelect } from '../components/PaymentMethodSelect';
 import { headerStateFromPO } from '../components/PoHeaderForm';
 import { ProviderCombobox } from '../components/ProviderCombobox';
+import { ProviderRequestModal } from '../components/ProviderRequestModal';
 import { ProviderRefTable } from '../components/ProviderRefTable';
 import { ReadinessChecklist, type ReadinessItem } from '../components/ReadinessChecklist';
 import { RowComposer } from '../components/RowComposer';
@@ -117,6 +117,9 @@ export function NewRdaWizardPage() {
   const [contactDraftIds, setContactDraftIds] = useState<number[]>([]);
   const [deleteAttachment, setDeleteAttachment] = useState<PoAttachment | null>(null);
   const [submitConfirm, setSubmitConfirm] = useState(false);
+  const [requestedProviders, setRequestedProviders] = useState<ProviderSummary[]>([]);
+  const [providerRequestOpen, setProviderRequestOpen] = useState(false);
+  const [providerRequestSearch, setProviderRequestSearch] = useState('');
 
   const budgets = useBudgets();
   const providers = useProviders();
@@ -129,7 +132,13 @@ export function NewRdaWizardPage() {
   const upload = useUploadAttachment();
   const removeAttachment = useDeleteAttachment();
   const downloads = useRdaDownloads();
-  const selectedProvider = (providers.data ?? []).find((provider) => provider.id === header.provider_id);
+  const providerOptions = useMemo(() => {
+    const byID = new Map<number, ProviderSummary>();
+    for (const providerItem of providers.data ?? []) byID.set(providerItem.id, providerItem);
+    for (const providerItem of requestedProviders) byID.set(providerItem.id, providerItem);
+    return Array.from(byID.values());
+  }, [providers.data, requestedProviders]);
+  const selectedProvider = providerOptions.find((providerItem) => providerItem.id === header.provider_id);
   const providerID = typeof header.provider_id === 'number' ? header.provider_id : null;
   const provider = useProvider(providerID);
 
@@ -211,7 +220,7 @@ export function NewRdaWizardPage() {
 
   function updateHeader<K extends keyof WizardHeaderState>(key: K, value: WizardHeaderState[K]) {
     if (key === 'provider_id') {
-      const nextProvider = (providers.data ?? []).find((item) => item.id === value);
+      const nextProvider = providerOptions.find((item) => item.id === value);
       setContactDraftIds([]);
       setHeader((current) => ({
         ...current,
@@ -221,6 +230,19 @@ export function NewRdaWizardPage() {
       return;
     }
     setHeader((current) => ({ ...current, [key]: value }));
+  }
+
+  function handleProviderRequestCreated(providerCreated: ProviderSummary) {
+    setRequestedProviders((current) => {
+      const withoutProvider = current.filter((item) => item.id !== providerCreated.id);
+      return [...withoutProvider, providerCreated];
+    });
+    setContactDraftIds([]);
+    setHeader((current) => ({
+      ...current,
+      provider_id: providerCreated.id,
+      payment_method: paymentCodeFromProvider(providerCreated) || defaultPayment.data?.code || current.payment_method,
+    }));
   }
 
   async function createDraft(): Promise<boolean> {
@@ -427,7 +449,15 @@ export function NewRdaWizardPage() {
               </div>
               <div className="field wide">
                 <label>Fornitore</label>
-                <ProviderCombobox providers={providers.data ?? []} value={header.provider_id} onChange={(next) => updateHeader('provider_id', next)} />
+                <ProviderCombobox
+                  providers={providerOptions}
+                  value={header.provider_id}
+                  onChange={(next) => updateHeader('provider_id', next)}
+                  onRequestNewProvider={(search) => {
+                    setProviderRequestSearch(search);
+                    setProviderRequestOpen(true);
+                  }}
+                />
                 {headerFieldError('provider_id') ? <p className="fieldError">{headerFieldError('provider_id')}</p> : null}
               </div>
               <div className="field">
@@ -457,7 +487,6 @@ export function NewRdaWizardPage() {
                 <textarea rows={4} value={header.note} onChange={(event) => updateHeader('note', event.target.value)} />
               </div>
               {attemptedHeader && headerValidation.formErrors.length ? <p className="fieldError fullWidth">{headerValidation.formErrors[0]}</p> : null}
-              <NewProviderInlineForm onCreated={(providerCreated) => updateHeader('provider_id', providerCreated.id)} />
             </div>
           </div>
         ) : null}
@@ -626,6 +655,12 @@ export function NewRdaWizardPage() {
         loading={removeAttachment.isPending}
         onClose={() => setDeleteAttachment(null)}
         onConfirm={() => void confirmDeleteAttachment()}
+      />
+      <ProviderRequestModal
+        open={providerRequestOpen}
+        initialCompanyName={providerRequestSearch}
+        onClose={() => setProviderRequestOpen(false)}
+        onCreated={handleProviderRequestCreated}
       />
       <ConfirmDialog
         open={submitConfirm}
