@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Article,
   BudgetForUser,
+  Country,
   CreatePOPayload,
   DefaultPaymentMethod,
   PagedEnvelope,
@@ -133,6 +134,14 @@ export function useProviders() {
       const params = new URLSearchParams({ disable_pagination: 'true', page_number: '1', usable: 'true' });
       return unwrap(await api.get<ProviderSummary[] | PagedEnvelope<ProviderSummary>>(`${fornitoriRoot}/provider?${params}`));
     },
+  });
+}
+
+export function useCountries() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['fornitori', 'countries'],
+    queryFn: () => api.get<Country[]>(`${fornitoriRoot}/country`),
   });
 }
 

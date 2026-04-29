@@ -1,8 +1,55 @@
 .form {
+  display: grid;
+  gap: 1rem;
   max-height: min(34rem, calc(100dvh - 10rem));
   align-content: start;
   overflow-y: auto;
   padding-right: 0.2rem;
+}
+
+.section {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.section legend {
+  width: 100%;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-accent-hover);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.sectionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.span2,
+.groupError {
+  grid-column: 1 / -1;
+}
+
+.groupError {
+  margin-top: -0.35rem;
+}
+
+.contactSection {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-accent-subtle) 42%, transparent), transparent 78%),
+    var(--color-bg-elevated);
 }
 
 .actions {
@@ -19,6 +66,10 @@
   .form {
     max-height: calc(100dvh - 9rem);
     padding-right: 0;
+  }
+
+  .sectionGrid {
+    grid-template-columns: 1fr;
   }
 
   .actions {

@@ -50,6 +50,11 @@ export interface PaymentMethod {
   rda_available?: boolean;
 }
 
+export interface Country {
+  code: string;
+  name: string;
+}
+
 export interface DefaultPaymentMethod {
   code: string;
 }
