@@ -1,10 +1,10 @@
-import type { BudgetForUser, PoDetail, ProviderSummary } from '../api/types';
+import type { BudgetForUser, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
 import { formatDateIT } from '../lib/format';
 import type { PaymentMethodOption } from '../lib/payment-options';
 import { stateLabel } from '../lib/state-labels';
 import { BudgetSelect } from './BudgetSelect';
 import { PaymentMethodSelect } from './PaymentMethodSelect';
-import { ProviderSelect } from './ProviderSelect';
+import { ProviderCombobox } from './ProviderCombobox';
 import { RecipientsList } from './RecipientsList';
 
 export interface HeaderFormState {
@@ -46,9 +46,12 @@ export function PoHeaderForm({
   providers,
   paymentMethods,
   paymentRequiresVerification,
+  recipients,
   draftEditable,
   paymentEditable,
   onChange,
+  onProviderChange,
+  onRequestNewProvider,
 }: {
   po: PoDetail;
   value: HeaderFormState;
@@ -56,9 +59,12 @@ export function PoHeaderForm({
   providers: ProviderSummary[];
   paymentMethods: PaymentMethodOption[];
   paymentRequiresVerification?: boolean;
+  recipients?: ProviderReference[];
   draftEditable: boolean;
   paymentEditable: boolean;
   onChange: (value: HeaderFormState) => void;
+  onProviderChange: (value: number | '') => void;
+  onRequestNewProvider: (search: string) => void;
 }) {
   const update = <K extends keyof HeaderFormState>(key: K, next: HeaderFormState[K]) => onChange({ ...value, [key]: next });
   const headerDate = po.created ?? po.creation_date ?? po.updated;
@@ -87,7 +93,13 @@ export function PoHeaderForm({
         <div className="providerPaymentGrid">
           <div className="field providerPaymentProvider">
             <label>Fornitore</label>
-            <ProviderSelect providers={providers} value={value.provider_id} disabled={!draftEditable} onChange={(next) => update('provider_id', next)} />
+            <ProviderCombobox
+              providers={providers}
+              value={value.provider_id}
+              disabled={!draftEditable}
+              onChange={onProviderChange}
+              onRequestNewProvider={onRequestNewProvider}
+            />
           </div>
           <div className="field providerPaymentMethod">
             <label>Modalità di pagamento</label>
@@ -111,7 +123,7 @@ export function PoHeaderForm({
         </div>
         <div className="field wide">
           <label>Contatti selezionati</label>
-          <RecipientsList recipients={po.recipients} />
+          <RecipientsList recipients={recipients ?? po.recipients} />
         </div>
       </div>
     </section>

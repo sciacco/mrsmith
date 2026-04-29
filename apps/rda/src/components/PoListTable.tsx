@@ -12,7 +12,12 @@ interface PoListTableProps {
 }
 
 function canEdit(po: PoPreview, currentEmail?: string | null): boolean {
-  return Boolean(po.state === 'DRAFT' && po.requester?.email && currentEmail && po.requester.email.toLowerCase() === currentEmail.toLowerCase());
+  return Boolean(
+    po.state === 'DRAFT' &&
+      po.requester?.email &&
+      currentEmail &&
+      po.requester.email.toLowerCase() === currentEmail.toLowerCase(),
+  );
 }
 
 function rowDate(po: PoPreview): string {
@@ -53,47 +58,37 @@ export function PoListTable({ rows, mode, currentEmail, onDelete }: PoListTableP
           {rows.map((po) => {
             const editable = canEdit(po, currentEmail);
             const path = `/rda/po/${po.id}`;
+            const openLabel = editable ? 'Modifica richiesta' : 'Visualizza richiesta';
             return (
               <tr key={po.id}>
                 <td className="actionsCell">
                   <span className="iconActions">
                     {mode === 'requester' ? (
                       <>
-                        <Tooltip content={editable ? 'Modifica' : 'Modifica disponibile solo in bozza'}>
+                        <Tooltip content={openLabel}>
                           <button
                             className="iconButton"
                             type="button"
-                            aria-label="Modifica richiesta"
-                            title="Modifica richiesta"
-                            disabled={!editable}
+                            aria-label={openLabel}
+                            title={openLabel}
                             onClick={() => navigate(path)}
                           >
-                            <Icon name="pencil" size={16} />
+                            <Icon name={editable ? 'pencil' : 'eye'} size={16} />
                           </button>
                         </Tooltip>
-                        <Tooltip content={editable ? 'Elimina' : 'Elimina disponibile solo in bozza'}>
-                          <button
-                            className="iconButton dangerButton"
-                            type="button"
-                            aria-label="Elimina richiesta"
-                            title="Elimina richiesta"
-                            disabled={!editable}
-                            onClick={() => onDelete?.(po)}
-                          >
-                            <Icon name="trash" size={16} />
-                          </button>
-                        </Tooltip>
-                        <Tooltip content={po.state === 'DRAFT' ? 'Apri bozza' : 'Visualizza'}>
-                          <button
-                            className="iconButton"
-                            type="button"
-                            aria-label="Visualizza richiesta"
-                            title="Visualizza richiesta"
-                            onClick={() => navigate(path)}
-                          >
-                            <Icon name="eye" size={16} />
-                          </button>
-                        </Tooltip>
+                        {editable ? (
+                          <Tooltip content="Elimina richiesta">
+                            <button
+                              className="iconButton dangerButton"
+                              type="button"
+                              aria-label="Elimina richiesta"
+                              title="Elimina richiesta"
+                              onClick={() => onDelete?.(po)}
+                            >
+                              <Icon name="trash" size={16} />
+                            </button>
+                          </Tooltip>
+                        ) : null}
                       </>
                     ) : (
                       <Tooltip content="Gestisci">

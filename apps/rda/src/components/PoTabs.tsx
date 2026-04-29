@@ -22,6 +22,7 @@ export function PoTabs({
   header,
   saving,
   onHeaderChange,
+  onRecipientSelectionChange,
   onSaveHeader,
   onSaveRecipients,
 }: {
@@ -31,6 +32,7 @@ export function PoTabs({
   header: HeaderFormState;
   saving: boolean;
   onHeaderChange: (value: HeaderFormState) => void;
+  onRecipientSelectionChange?: (ids: number[]) => void;
   onSaveHeader: () => void;
   onSaveRecipients: (ids: number[]) => void;
 }) {
@@ -51,7 +53,13 @@ export function PoTabs({
           <NotesTab value={header} editable={editable} saving={saving} onChange={onHeaderChange} onSave={onSaveHeader} />
         ) : null}
         {active === 'contacts' ? (
-          <ProviderRefTable po={po} provider={provider} editable={editable} onSaveRecipients={onSaveRecipients} />
+          <ProviderRefTable
+            po={po}
+            provider={provider}
+            editable={editable}
+            onSelectionChange={onRecipientSelectionChange}
+            onSaveRecipients={onSaveRecipients}
+          />
         ) : null}
       </div>
     </section>
