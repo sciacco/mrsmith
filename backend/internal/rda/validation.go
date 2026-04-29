@@ -72,7 +72,57 @@ func (h *Handler) handleCreateRow(w http.ResponseWriter, r *http.Request) {
 		httputil.InternalError(w, r, err, "rda row body encode failed")
 		return
 	}
-	h.forwardArak(w, r, http.MethodPost, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/row", "", encoded, mergeHeaders(requesterHeaders(email), jsonHeaders()))
+	h.forwardCreateRow(w, r, email, encoded)
+}
+
+func (h *Handler) forwardCreateRow(w http.ResponseWriter, r *http.Request, email string, body io.Reader) {
+	path := arakRDARoot + "/po/" + url.PathEscape(r.PathValue("id")) + "/row"
+	resp, err := h.arak.DoWithHeaders(http.MethodPost, path, "", body, mergeHeaders(requesterHeaders(email), jsonHeaders()))
+	if err != nil {
+		h.requestLogger(r, "rda_create_row", "upstream_path", path).Error("upstream request failed", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio RDA temporaneamente non disponibile",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		h.requestLogger(r, "rda_create_row", "upstream_path", path).Error("failed to read upstream response", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio RDA temporaneamente non disponibile",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Autorizzazione verso il servizio RDA non riuscita",
+			"code":  codeUpstreamAuthFailed,
+		})
+		return
+	}
+
+	copyResponseHeaders(w.Header(), resp.Header)
+	w.Header().Del("Content-Length")
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		h.requestLogger(r, "rda_create_row", "upstream_path", path, "upstream_status", resp.StatusCode).Warn("upstream row create rejected", "body", string(responseBody))
+		w.WriteHeader(resp.StatusCode)
+		_, _ = w.Write(responseBody)
+		return
+	}
+
+	normalized, err := normalizePODetailRows(responseBody, nil)
+	if err == nil {
+		responseBody = normalized
+	}
+	w.WriteHeader(resp.StatusCode)
+	_, _ = w.Write(responseBody)
 }
 
 func validateRow(body map[string]any) error {
@@ -159,6 +209,8 @@ func buildRowCreateBody(body map[string]any, email string) map[string]any {
 
 	if rowType == "good" {
 		out["price"] = decimalString(body["price"])
+		out["total"] = decimalString(rowCreateTotal(rowType, body, body["price"], nil))
+		out["renew_detail"] = map[string]any{}
 		return out
 	}
 
@@ -174,6 +226,7 @@ func buildRowCreateBody(body map[string]any, email string) map[string]any {
 
 	out["price"] = decimalString(mrc)
 	out["activation_price"] = decimalString(nrc)
+	out["total"] = decimalString(rowCreateTotal(rowType, body, mrc, nrc))
 	outPaymentDetail["is_recurrent"] = numberValue(mrc) > 0
 	outPaymentDetail["month_recursion"] = int64Value(paymentDetail["month_recursion"])
 
@@ -187,6 +240,19 @@ func buildRowCreateBody(body map[string]any, email string) map[string]any {
 	}
 	out["renew_detail"] = outRenewDetail
 	return out
+}
+
+func rowCreateTotal(rowType string, body map[string]any, mrcOrPrice any, nrc any) float64 {
+	qty := numberValue(body["qty"])
+	if qty <= 0 {
+		return 0
+	}
+	if rowType == "good" {
+		return numberValue(mrcOrPrice) * qty
+	}
+	renewDetail, _ := body["renew_detail"].(map[string]any)
+	duration := numberValue(renewDetail["initial_subscription_months"])
+	return (numberValue(mrcOrPrice) * qty * duration) + (numberValue(nrc) * qty)
 }
 
 func decimalString(value any) string {

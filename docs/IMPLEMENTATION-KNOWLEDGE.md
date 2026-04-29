@@ -131,6 +131,24 @@ Alyante ERP ID
 - Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, and RDA backend PO create/patch validation.
 - Open questions: none.
 
+### RDA Row Totals Are Normalized By The BFF
+
+- Context: `apps/rda` PO row tables in the new wizard and PO detail page.
+- Discovery: Mistra exposes the PO aggregate `total_price`, but row responses may not include a useful `total_price` per row. Legacy Appsmith displayed a computed row total instead.
+- Practical rule: `GET /api/rda/v1/pos/{id}` should normalize every row with `price` for goods and `total_price` before returning it to the frontend. Preserve a positive upstream `total_price` or `total` when present; otherwise calculate goods as `price * qty` and services as `(MRC * qty * initial_subscription_months) + (NRC * qty)`, using read names `montly_fee` and `activation_fee`. Because Arak's detail function may omit the stored good `price`, enrich rows from `rda.purchase_order_row` when available.
+- Evidence: `docs/mistra-dist.yaml` `rda-row`; `docs/arak_schema.json` functions `get_purchase_order_rows_detail` and `create_purchase_order_row`; Appsmith audit row-total notes; backend `backend/internal/rda/row_totals.go`.
+- Used by: `apps/rda` row tables and wizard row composer.
+- Open questions: none.
+
+### RDA Good Row Create Still Needs Empty Renew Detail
+
+- Context: backend `POST /api/rda/v1/pos/{id}/rows` for RDA goods.
+- Discovery: Mistra's `rda-row-create` schema requires `renew_detail` at the root even for `type=good`, although no renew fields are meaningful for goods. Omitting it returns `400` with `property "renew_detail" is missing`.
+- Practical rule: when creating good rows, forward `renew_detail: {}` along with `price` and the calculated `total`. Do not include service-only renewal fields for goods. Send calculated `total` for service rows too, because Arak stores it in `purchase_order_row.total` and the PO aggregate sums that column.
+- Evidence: Mistra schema `docs/mistra-dist.yaml` `rda-row-create`; `docs/arak_schema.json` functions `create_purchase_order_row` and `purchase_order_total_calculation`; observed upstream 400 during PO row create; backend `backend/internal/rda/validation.go`.
+- Used by: `apps/rda` row composer and row modal.
+- Open questions: none.
+
 ### RDA Article Catalog Type Comes From The BFF
 
 - Context: `apps/rda` row creation in `/rda/new` and PO detail row modal.

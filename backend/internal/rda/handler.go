@@ -321,7 +321,58 @@ func (h *Handler) handleGetPO(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusUnauthorized, "Accesso richiesto")
 		return
 	}
-	h.forwardArak(w, r, http.MethodGet, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id")), r.URL.RawQuery, nil, requesterHeaders(email))
+	resp, err := h.arak.DoWithHeaders(http.MethodGet, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id")), r.URL.RawQuery, nil, requesterHeaders(email))
+	if err != nil {
+		h.requestLogger(r, "rda_po_detail", "upstream_path", arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))).Error("upstream request failed", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio RDA temporaneamente non disponibile",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		h.requestLogger(r, "rda_po_detail").Error("failed to read upstream response", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Richiesta non disponibile in questo momento",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Autorizzazione verso il servizio RDA non riuscita",
+			"code":  codeUpstreamAuthFailed,
+		})
+		return
+	}
+	copyResponseHeaders(w.Header(), resp.Header)
+	w.Header().Del("Content-Length")
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		w.WriteHeader(resp.StatusCode)
+		_, _ = w.Write(body)
+		return
+	}
+	rowEconomics, err := h.fetchPORowEconomics(r.Context(), r.PathValue("id"))
+	if err != nil {
+		h.requestLogger(r, "rda_po_detail").Warn("failed to load PO row economics", "error", err)
+	}
+	normalized, err := normalizePODetailRows(body, rowEconomics)
+	if err != nil {
+		h.requestLogger(r, "rda_po_detail").Error("failed to normalize PO rows", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Richiesta non disponibile in questo momento",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(normalized)
 }
 
 func (h *Handler) handleCreatePO(w http.ResponseWriter, r *http.Request) {

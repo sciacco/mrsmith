@@ -29,8 +29,20 @@ func (h *Handler) fetchPODetail(r *http.Request, email, id string) (poDetail, er
 		body, _ := io.ReadAll(resp.Body)
 		return poDetail{}, &upstreamStatusError{status: resp.StatusCode, body: body}
 	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return poDetail{}, err
+	}
+	rowEconomics, err := h.fetchPORowEconomics(r.Context(), id)
+	if err != nil {
+		h.requestLogger(r, "rda_po_detail").Warn("failed to load PO row economics", "error", err)
+	} else if normalized, err := normalizePODetailRows(body, rowEconomics); err == nil {
+		body = normalized
+	} else {
+		return poDetail{}, err
+	}
 	var po poDetail
-	if err := json.NewDecoder(resp.Body).Decode(&po); err != nil {
+	if err := json.Unmarshal(body, &po); err != nil {
 		return poDetail{}, err
 	}
 	return po, nil

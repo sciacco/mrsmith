@@ -48,6 +48,9 @@ func TestCreateRowNormalizesServicePayload(t *testing.T) {
 	if got := body["activation_price"]; got != "0" {
 		t.Fatalf("expected NRC to be forwarded as activation_price string, got %#v", got)
 	}
+	if got := body["total"]; got != "12" {
+		t.Fatalf("expected row total to be forwarded, got %#v", got)
+	}
 	if _, ok := body["monthly_fee"]; ok {
 		t.Fatalf("expected monthly_fee not to be forwarded")
 	}
@@ -140,14 +143,17 @@ func TestCreateRowNormalizesGoodPayload(t *testing.T) {
 	if got := body["price"]; got != "12.5" {
 		t.Fatalf("expected unit price string, got %#v", got)
 	}
+	if got := body["total"]; got != "25" {
+		t.Fatalf("expected row total to be forwarded, got %#v", got)
+	}
 	if _, ok := body["monthly_fee"]; ok {
 		t.Fatalf("expected monthly_fee not to be forwarded for goods")
 	}
 	if _, ok := body["activation_price"]; ok {
 		t.Fatalf("expected activation_price not to be forwarded for goods")
 	}
-	if _, ok := body["renew_detail"]; ok {
-		t.Fatalf("expected renew_detail not to be forwarded for goods")
+	if renewDetail, ok := body["renew_detail"].(map[string]any); !ok || len(renewDetail) != 0 {
+		t.Fatalf("expected empty renew_detail for goods to satisfy Mistra schema, got %#v", body["renew_detail"])
 	}
 }
 
