@@ -17,7 +17,7 @@ export function validateNewPO(body: CreatePOPayload): ValidationResult {
   if (!body.project.trim()) result.fieldErrors.project = 'Inserisci il progetto';
   if (body.project.trim().length > 50) result.fieldErrors.project = 'Massimo 50 caratteri';
   if (!body.object.trim()) result.fieldErrors.object = "Inserisci l'oggetto";
-  if (Boolean(body.cost_center) === Boolean(body.budget_user_id)) {
+  if (body.budget_id && Boolean(body.cost_center) === Boolean(body.budget_user_id)) {
     result.formErrors.push('Il budget deve indicare un solo centro di costo o utente.');
   }
   return result;

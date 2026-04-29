@@ -46,11 +46,13 @@ export function ProviderRefTable({
   po,
   provider,
   editable,
+  onSelectionChange,
   onSaveRecipients,
 }: {
   po: PoDetail;
   provider?: ProviderSummary;
   editable: boolean;
+  onSelectionChange?: (ids: number[]) => void;
   onSaveRecipients: (ids: number[]) => void;
 }) {
   const [selected, setSelected] = useState<number[]>(() => recipientIDs(po));
@@ -64,7 +66,11 @@ export function ProviderRefTable({
   }, [po]);
 
   function toggle(id: number, checked: boolean) {
-    setSelected((current) => (checked ? [...new Set([...current, id])] : current.filter((item) => item !== id)));
+    setSelected((current) => {
+      const next = checked ? [...new Set([...current, id])] : current.filter((item) => item !== id);
+      onSelectionChange?.(next);
+      return next;
+    });
   }
 
   function rejectInvalidPhone(form: HTMLFormElement) {

@@ -1,10 +1,10 @@
 import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
 import { useState } from 'react';
 import { ApiError } from '@mrsmith/api-client';
-import { useBudgets, useDeletePO, useMyPOs, usePaymentMethodDefault, usePaymentMethods, useProviders } from '../api/queries';
+import { useNavigate } from 'react-router-dom';
+import { useDeletePO, useMyPOs } from '../api/queries';
 import type { PoPreview } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { NewPoModal } from '../components/NewPoModal';
 import { PoListTable } from '../components/PoListTable';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 
@@ -14,19 +14,15 @@ function errorMessage(error: unknown): string {
 }
 
 export function RdaListPage() {
-  const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PoPreview | null>(null);
+  const navigate = useNavigate();
   const pos = useMyPOs();
-  const budgets = useBudgets();
-  const providers = useProviders();
-  const methods = usePaymentMethods();
-  const paymentDefault = usePaymentMethodDefault();
   const deletePO = useDeletePO();
   const { user } = useOptionalAuth();
   const { toast } = useToast();
 
-  const loading = pos.isLoading || budgets.isLoading || providers.isLoading || methods.isLoading || paymentDefault.isLoading;
-  const error = pos.error ?? budgets.error ?? providers.error ?? methods.error ?? paymentDefault.error;
+  const loading = pos.isLoading;
+  const error = pos.error;
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -46,7 +42,7 @@ export function RdaListPage() {
           <h1>Richieste di acquisto</h1>
           <p>Consulta le tue richieste e crea nuove bozze.</p>
         </div>
-        <Button leftIcon={<Icon name="plus" />} onClick={() => setCreateOpen(true)}>
+        <Button leftIcon={<Icon name="plus" />} onClick={() => navigate('/rda/new')}>
           Nuova richiesta
         </Button>
       </header>
@@ -68,15 +64,6 @@ export function RdaListPage() {
           <PoListTable rows={pos.data ?? []} mode="requester" currentEmail={user?.email} onDelete={setDeleteTarget} />
         )}
       </section>
-
-      <NewPoModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        budgets={budgets.data ?? []}
-        providers={providers.data ?? []}
-        methods={methods.data ?? []}
-        cdlanDefault={paymentDefault.data?.code ?? ''}
-      />
 
       <ConfirmDialog
         open={deleteTarget != null}

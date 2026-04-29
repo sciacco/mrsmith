@@ -16,48 +16,16 @@ import {
   useTransitionMutation,
   type TransitionAction,
 } from '../api/queries';
-import type { BudgetForUser, PatchPOPayload, PaymentMethod, PoDetail } from '../api/types';
+import type { PoDetail } from '../api/types';
 import { ActionBar } from '../components/ActionBar';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { CommentsPanel } from '../components/CommentsPanel';
-import { findBudget } from '../components/BudgetSelect';
 import { headerStateFromPO, PoHeaderForm, type HeaderFormState } from '../components/PoHeaderForm';
 import { PoTabs } from '../components/PoTabs';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { coerceID, downloadBlob, isRequester, parseMistraMoney } from '../lib/format';
+import { buildPatchPOPayload, methodUnion } from '../lib/po-payload';
 import { PO_STATES } from '../lib/state-labels';
-
-function paymentMethodsWithCurrent(methods: PaymentMethod[], current: string, defaultCode: string): PaymentMethod[] {
-  const byCode = new Map(methods.map((method) => [method.code, method]));
-  for (const code of [current, defaultCode]) {
-    if (code && !byCode.has(code)) byCode.set(code, { code, description: code });
-  }
-  return Array.from(byCode.values()).sort((a, b) => a.description.localeCompare(b.description));
-}
-
-function selectedBudgetBinding(budgets: BudgetForUser[], budgetId: number | '') {
-  const budget = findBudget(budgets, budgetId);
-  if (!budget) return {};
-  if (budget.cost_center) return { cost_center: budget.cost_center, budget_user_id: null };
-  return { budget_user_id: budget.budget_user_id ?? budget.user_id ?? null, cost_center: null };
-}
-
-function buildPatch(header: HeaderFormState, budgets: BudgetForUser[], providerChanged: boolean): PatchPOPayload {
-  return {
-    budget_id: Number(header.budget_id),
-    ...selectedBudgetBinding(budgets, header.budget_id),
-    object: header.object.trim(),
-    project: header.project.trim(),
-    provider_id: Number(header.provider_id),
-    payment_method: header.payment_method,
-    provider_offer_code: header.provider_offer_code.trim() || null,
-    provider_offer_date: header.provider_offer_date || null,
-    description: header.description.trim() || null,
-    note: header.note.trim() || null,
-    reference_warehouse: 'MILANO',
-    ...(providerChanged ? { recipient_ids: [] } : {}),
-  };
-}
 
 function afterTransitionRoute(po: PoDetail, action: TransitionAction): string | null {
   if (action === 'send-to-provider') return '/rda';
@@ -132,12 +100,12 @@ export function PoDetailPage() {
   const total = parseMistraMoney(detail.total_price);
   const quoteRuleBlocked = total >= 3000 && (detail.attachments?.length ?? 0) < 2;
   const canSubmit = draftEditable && (detail.rows?.length ?? 0) > 0 && !quoteRuleBlocked;
-  const paymentOptions = paymentMethodsWithCurrent(methods.data ?? [], currentHeader.payment_method, defaultPayment.data?.code ?? '');
+  const paymentOptions = methodUnion(methods.data ?? [], currentHeader.payment_method, defaultPayment.data?.code ?? '');
 
   async function saveHeader() {
     if (!draftEditable) return;
     try {
-      await patchPO.mutateAsync(buildPatch(currentHeader, budgets.data ?? [], providerChanged));
+      await patchPO.mutateAsync(buildPatchPOPayload(currentHeader, budgets.data ?? [], providerChanged));
       toast('Bozza aggiornata');
     } catch {
       toast('Salvataggio non riuscito', 'error');
@@ -156,7 +124,7 @@ export function PoDetailPage() {
 
   async function submitPO() {
     try {
-      if (dirty) await patchPO.mutateAsync(buildPatch(currentHeader, budgets.data ?? [], providerChanged));
+      if (dirty) await patchPO.mutateAsync(buildPatchPOPayload(currentHeader, budgets.data ?? [], providerChanged));
       await transition.mutateAsync({ id: detail.id, action: 'submit' });
       toast('Richiesta mandata in approvazione');
       setSubmitConfirm(false);

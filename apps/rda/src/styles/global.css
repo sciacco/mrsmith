@@ -422,6 +422,327 @@ textarea {
   padding: 0.9rem;
 }
 
+.wizardPage {
+  animation: none;
+  padding-bottom: 5.75rem;
+}
+
+.wizardHeader {
+  align-items: center;
+}
+
+.wizardSurface {
+  overflow: hidden;
+}
+
+.compactHeader p {
+  margin-top: 0.15rem;
+}
+
+.wizardStepper {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 0.45rem;
+  background: color-mix(in srgb, var(--color-bg-elevated) 94%, transparent);
+  box-shadow: var(--shadow-xs);
+}
+
+.wizardStep {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  min-height: 2.7rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.65rem;
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.wizardStep:hover:not(:disabled),
+.wizardStep:focus-visible {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  outline: none;
+}
+
+.wizardStep:disabled {
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+.wizardStep.active {
+  border-color: var(--color-accent-muted);
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+}
+
+.wizardStep.completed {
+  color: var(--color-text);
+}
+
+.wizardStepMarker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.65rem;
+  height: 1.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  background: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.wizardStep.active .wizardStepMarker,
+.wizardStep.completed .wizardStepMarker {
+  border-color: var(--color-accent);
+  color: #fff;
+  background: var(--color-accent);
+}
+
+.wizardStepLabel {
+  min-width: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.wizardPanel {
+  min-width: 0;
+}
+
+.fieldError {
+  color: var(--color-danger);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rowComposer {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+  min-width: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.9rem;
+  background: color-mix(in srgb, var(--color-surface) 52%, #fff 48%);
+}
+
+.checkboxField {
+  align-self: end;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 2.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.58rem 0.68rem;
+  background: #fff;
+}
+
+.checkboxField span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.checkboxField input {
+  width: auto;
+  justify-self: end;
+}
+
+.composerTotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  grid-column: 1 / -1;
+  border: 1px solid var(--color-accent-muted);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.85rem;
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+}
+
+.composerTotal span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.composerTotal strong {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+}
+
+.uploadDrop {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 0.25rem;
+  min-height: 9rem;
+  border: 1px dashed var(--color-accent-muted);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+  text-align: center;
+  cursor: pointer;
+}
+
+.uploadDrop span {
+  color: var(--color-text);
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.uploadDrop small {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
+.uploadDrop input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.readinessList {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.readinessItem {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.72rem;
+  background: #fff;
+}
+
+.readinessItem.ready {
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.readinessItem.blocked {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: #fffbeb;
+}
+
+.readinessIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  color: #047857;
+  background: var(--color-success-bg);
+}
+
+.readinessItem.blocked .readinessIcon {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.readinessItem strong {
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.readinessItem p {
+  margin-top: 0.12rem;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
+.submitGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(17rem, 0.8fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.submitSummary {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+  background: var(--color-surface);
+}
+
+.submitSummary div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.submitSummary span {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.submitSummary strong {
+  color: var(--color-text);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.wizardFooter {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  min-height: 4.5rem;
+  border-top: 1px solid var(--color-border);
+  padding: 0.85rem max(1rem, calc((100vw - 1580px) / 2));
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.wizardFooter > :last-child {
+  justify-self: end;
+}
+
+.wizardFooter > span {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .commentsPanel {
   display: grid;
   gap: 0.75rem;
@@ -547,8 +868,51 @@ textarea {
   .formGrid,
   .formGrid.three,
   .detailLayout,
-  .inlineForm {
+  .inlineForm,
+  .rowComposer,
+  .submitGrid {
     grid-template-columns: 1fr;
+  }
+
+  .wizardPage {
+    padding-bottom: 7.5rem;
+  }
+
+  .wizardHeader {
+    align-items: stretch;
+  }
+
+  .wizardStepper {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .wizardStep {
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.3rem;
+    min-height: 4.05rem;
+    padding: 0.45rem 0.25rem;
+    text-align: center;
+  }
+
+  .wizardStepLabel {
+    font-size: 0.68rem;
+  }
+
+  .wizardFooter {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+    min-height: auto;
+    padding: 0.75rem 1rem;
+  }
+
+  .wizardFooter > :last-child {
+    justify-self: stretch;
+  }
+
+  .wizardFooter span {
+    justify-self: center;
   }
 
   .actionsCell {
