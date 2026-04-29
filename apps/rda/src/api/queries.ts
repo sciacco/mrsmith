@@ -23,8 +23,24 @@ import { useApiClient } from './client';
 const rdaRoot = '/rda/v1';
 const fornitoriRoot = '/fornitori/v1';
 
+type DraftProviderResponse = Partial<ProviderSummary> & Pick<ProviderSummary, 'id'>;
+
 function unwrap<T>(value: T[] | PagedEnvelope<T>): T[] {
   return Array.isArray(value) ? value : value.items ?? [];
+}
+
+function providerSummaryFromDraft(response: DraftProviderResponse, body: ProviderPayload): ProviderSummary {
+  return {
+    ...response,
+    id: response.id,
+    company_name: response.company_name ?? body.company_name,
+    state: response.state ?? body.state,
+    default_payment_method: response.default_payment_method ?? body.default_payment_method ?? null,
+    language: response.language ?? body.language,
+    vat_number: response.vat_number ?? body.vat_number,
+    ref: response.ref ?? body.ref,
+    refs: response.refs ?? (response.ref ? [response.ref] : body.ref ? [body.ref] : undefined),
+  };
 }
 
 function invalidatePO(queryClient: ReturnType<typeof useQueryClient>, id?: number) {
@@ -281,7 +297,10 @@ export function useProviderMutations() {
   const invalidateProviders = () => queryClient.invalidateQueries({ queryKey: ['fornitori'] });
   return {
     createProvider: useMutation({
-      mutationFn: (body: ProviderPayload) => api.post<ProviderSummary>(`${fornitoriRoot}/provider`, body),
+      mutationFn: async (body: ProviderPayload) => {
+        const response = await api.post<DraftProviderResponse>(`${fornitoriRoot}/provider/draft`, body);
+        return providerSummaryFromDraft(response, body);
+      },
       onSuccess: invalidateProviders,
     }),
     createReference: useMutation({

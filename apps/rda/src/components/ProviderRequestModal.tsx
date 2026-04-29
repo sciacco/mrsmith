@@ -2,6 +2,7 @@ import { Button, Icon, Modal, SingleSelect, provinceSelectOptions, useToast } fr
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useCountries, useProviderMutations } from '../api/queries';
 import type { Country, ProviderPayload, ProviderSummary } from '../api/types';
+import { apiErrorMessage } from '../lib/api-error';
 import styles from './ProviderRequestModal.module.css';
 
 interface ProviderRequestModalProps {
@@ -188,8 +189,8 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
       setErrors({});
       onCreated(provider);
       onClose();
-    } catch {
-      toast('Dati fornitore non disponibili in questo momento', 'error');
+    } catch (error) {
+      toast(apiErrorMessage(error, 'Dati fornitore non disponibili in questo momento'), 'error');
     }
   }
 

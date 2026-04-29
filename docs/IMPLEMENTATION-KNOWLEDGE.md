@@ -113,6 +113,15 @@ Alyante ERP ID
 - Used by: `apps/fornitori` detail page contacts.
 - Open questions: none.
 
+### RDA New Supplier Requests Must Use Provider Draft Create
+
+- Context: `apps/rda` supplier creation from `/rda/new` and any RDA inline new-provider form.
+- Discovery: Mistra `POST /arak/provider-qualification/v1/provider` follows the full provider-create schema and requires `default_payment_method`, while the RDA flow only requests a supplier census draft. The legacy RDA datasource used `POST /arak/provider-qualification/v1/provider/draft`.
+- Practical rule: RDA must create new suppliers through `POST /api/fornitori/v1/provider/draft`, not the full `POST /api/fornitori/v1/provider`. Keep full provider create for the Fornitori app where users can manage complete provider records.
+- Evidence: `docs/mistra-dist.yaml` schemas `provider-new` and `provider-draft-new`; `docs/arak_schema.json` functions `provider_new` and `provider_draft_new`; RDA audit datasource `nuovoFornitore`.
+- Used by: `apps/rda` `/rda/new` supplier request modal and legacy inline new-provider form.
+- Open questions: none.
+
 ### Manutenzioni Radar Excludes Terminal Maintenance States
 
 - Context: `GET /api/manutenzioni/v1/maintenances/radar`, used by `apps/manutenzioni` on the Registro Manutenzioni page.

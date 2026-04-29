@@ -116,6 +116,45 @@ func TestDevAdminCanSetSkipQualification(t *testing.T) {
 	}
 }
 
+func TestProviderDraftCreateUsesDraftEndpoint(t *testing.T) {
+	var gotPath string
+	var gotBody string
+	arakSrv := fakeArakServer(t, func(r *http.Request, body []byte) {
+		gotPath = r.URL.Path
+		gotBody = string(body)
+	})
+	defer arakSrv.Close()
+
+	client := arak.New(arak.Config{
+		BaseURL:      arakSrv.URL,
+		TokenURL:     arakSrv.URL + "/token",
+		ClientID:     "client",
+		ClientSecret: "secret",
+	})
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, client, nil, nil)
+
+	payload := `{"company_name":"ACME","state":"DRAFT","country":"IT","language":"it","ref":{"email":"qa@example.com"}}`
+	req := authedRequest(
+		http.MethodPost,
+		"/fornitori/v1/provider/draft",
+		strings.NewReader(payload),
+		"app_fornitori_access",
+	)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for draft provider create, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if gotPath != "/arak/provider-qualification/v1/provider/draft" {
+		t.Fatalf("unexpected upstream path %q", gotPath)
+	}
+	if gotBody != payload {
+		t.Fatalf("unexpected upstream body %q", gotBody)
+	}
+}
+
 func TestHandleCountriesReturnsArakCountries(t *testing.T) {
 	h := &Handler{db: openFornitoriTestDB(t, "countries")}
 

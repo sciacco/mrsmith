@@ -2,6 +2,7 @@ import { Button, Icon, useToast } from '@mrsmith/ui';
 import { useState } from 'react';
 import { useProviderMutations } from '../api/queries';
 import type { ProviderPayload, ProviderSummary } from '../api/types';
+import { apiErrorMessage } from '../lib/api-error';
 
 export function NewProviderInlineForm({ onCreated }: { onCreated: (provider: ProviderSummary) => void }) {
   const { createProvider } = useProviderMutations();
@@ -46,8 +47,8 @@ export function NewProviderInlineForm({ onCreated }: { onCreated: (provider: Pro
       onCreated(provider);
       setOpen(false);
       event.currentTarget.reset();
-    } catch {
-      toast('Dati fornitore non disponibili in questo momento', 'error');
+    } catch (error) {
+      toast(apiErrorMessage(error, 'Dati fornitore non disponibili in questo momento'), 'error');
     }
   }
 

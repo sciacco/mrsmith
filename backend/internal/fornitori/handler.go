@@ -98,6 +98,7 @@ func RegisterRoutes(mux *http.ServeMux, arakClient *arak.Client, arakDB *sql.DB,
 	handle("GET /fornitori/v1/provider", h.proxyArak("/provider", false))
 	handle("GET /fornitori/v1/provider/{id}", h.proxyArakPath("/provider/{id}", true))
 	handle("POST /fornitori/v1/provider", h.proxyArak("/provider", true))
+	handle("POST /fornitori/v1/provider/draft", h.proxyArak("/provider/draft", true))
 	handle("PUT /fornitori/v1/provider/{id}", h.handlePutProvider)
 	handle("DELETE /fornitori/v1/provider/{id}", h.proxyArakPath("/provider/{id}", true))
 
