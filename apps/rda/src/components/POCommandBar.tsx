@@ -28,17 +28,13 @@ const transitionActions: readonly TransitionAction[] = [
 interface POCommandBarProps {
   po: PoDetail;
   selectedMode: string;
-  dirty: boolean;
   canSubmit: boolean;
   quoteRuleBlocked: boolean;
-  paymentEditable: boolean;
   saving: boolean;
   transitioning: boolean;
   onModeChange: (modeID: string) => void;
   onClose: () => void;
-  onSaveDraft: () => void;
   onSubmit: () => void;
-  onSavePayment: () => void;
   onTransition: (action: TransitionAction) => void;
   onPDF: () => void;
 }
@@ -138,17 +134,13 @@ function ActionButton({
 export function POCommandBar({
   po,
   selectedMode,
-  dirty,
   canSubmit,
   quoteRuleBlocked,
-  paymentEditable,
   saving,
   transitioning,
   onModeChange,
   onClose,
-  onSaveDraft,
   onSubmit,
-  onSavePayment,
   onTransition,
   onPDF,
 }: POCommandBarProps) {
@@ -226,24 +218,13 @@ export function POCommandBar({
           ) : null}
 
           {modeID === 'requester_draft' ? (
-            <>
-              <Button variant="secondary" leftIcon={<Icon name="check" />} onClick={onSaveDraft} loading={saving} disabled={!dirty}>
-                Salva bozza
-              </Button>
-              <Tooltip content={!canSubmit || serverSubmitBlocked ? submitBlockedReason : 'La richiesta passa agli approvatori.'}>
-                <span>
-                  <Button leftIcon={<Icon name="arrow-right" />} onClick={onSubmit} loading={busy} disabled={!canSubmit || serverSubmitBlocked}>
-                    Manda in approvazione
-                  </Button>
-                </span>
-              </Tooltip>
-            </>
-          ) : null}
-
-          {modeID === 'requester_payment_update' ? (
-            <Button leftIcon={<Icon name="check" />} loading={saving} disabled={!paymentEditable} onClick={onSavePayment}>
-              Aggiorna metodo pagamento
-            </Button>
+            <Tooltip content={!canSubmit || serverSubmitBlocked ? submitBlockedReason : 'La richiesta passa agli approvatori.'}>
+              <span>
+                <Button leftIcon={<Icon name="arrow-right" />} onClick={onSubmit} loading={busy} disabled={!canSubmit || serverSubmitBlocked}>
+                  Manda in approvazione
+                </Button>
+              </span>
+            </Tooltip>
           ) : null}
 
           {modeID !== 'requester_draft' && modeID !== 'requester_payment_update'

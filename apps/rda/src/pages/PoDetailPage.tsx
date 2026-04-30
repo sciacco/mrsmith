@@ -19,7 +19,7 @@ import {
 import type { PoDetail, ProviderReference, ProviderSummary } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { CommentsPanel } from '../components/CommentsPanel';
-import { headerStateFromPO, PoHeaderForm, type HeaderFormState } from '../components/PoHeaderForm';
+import { headerStateFromPO, PoHeaderEditModal, PoHeaderSummary, type HeaderFormState } from '../components/PoHeaderForm';
 import { POCommandBar } from '../components/POCommandBar';
 import { POReadinessPanel, POWorkflowRail } from '../components/POWorkspacePanels';
 import { PoTabs } from '../components/PoTabs';
@@ -68,6 +68,8 @@ export function PoDetailPage() {
   const [providerRequestOpen, setProviderRequestOpen] = useState(false);
   const [providerRequestSearch, setProviderRequestSearch] = useState('');
   const [selectedActionMode, setSelectedActionMode] = useState<string>('read_only');
+  const [headerModalOpen, setHeaderModalOpen] = useState(false);
+  const [editHeader, setEditHeader] = useState<HeaderFormState | null>(null);
 
   const po = usePODetail(poId);
   const comments = usePOComments(poId);
@@ -75,8 +77,10 @@ export function PoDetailPage() {
   const providers = useProviders();
   const methods = usePaymentMethods();
   const defaultPayment = usePaymentMethodDefault();
-  const providerID = header?.provider_id || po.data?.provider?.id || null;
-  const provider = useProvider(typeof providerID === 'number' ? providerID : null);
+  const persistedProviderID = typeof header?.provider_id === 'number' ? header.provider_id : po.data?.provider?.id ?? null;
+  const editProviderID = typeof editHeader?.provider_id === 'number' ? editHeader.provider_id : null;
+  const provider = useProvider(persistedProviderID);
+  const editProvider = useProvider(editProviderID && editProviderID !== persistedProviderID ? editProviderID : null);
   const patchPO = usePatchPO(poId);
   const patchPayment = usePatchPaymentMethod(poId);
   const transition = useTransitionMutation();
@@ -86,11 +90,14 @@ export function PoDetailPage() {
     for (const providerItem of providers.data ?? []) byID.set(providerItem.id, providerItem);
     if (po.data?.provider) byID.set(po.data.provider.id, po.data.provider);
     if (provider.data) byID.set(provider.data.id, provider.data);
+    if (editProvider.data) byID.set(editProvider.data.id, editProvider.data);
     for (const providerItem of requestedProviders) byID.set(providerItem.id, providerItem);
     return Array.from(byID.values());
-  }, [po.data?.provider, provider.data, providers.data, requestedProviders]);
-  const selectedProvider = providerOptions.find((providerItem) => providerItem.id === header?.provider_id);
-  const fullProviderForDraft = provider.data ?? selectedProvider ?? po.data?.provider;
+  }, [editProvider.data, po.data?.provider, provider.data, providers.data, requestedProviders]);
+  const selectedPersistedProvider = providerOptions.find((providerItem) => providerItem.id === header?.provider_id);
+  const selectedEditProvider = providerOptions.find((providerItem) => providerItem.id === editHeader?.provider_id);
+  const fullProviderForDraft = provider.data ?? selectedPersistedProvider ?? po.data?.provider;
+  const fullProviderForEdit = editProvider.data ?? (editProviderID === persistedProviderID ? provider.data : undefined) ?? selectedEditProvider ?? fullProviderForDraft;
   const providerChangedForDraft = Boolean(header && po.data && header.provider_id !== (po.data.provider?.id ?? ''));
   const displayedRecipients = useMemo(() => {
     if (!providerChangedForDraft) return po.data?.recipients;
@@ -152,15 +159,20 @@ export function PoDetailPage() {
   const currentHeader = header;
   const initialHeader = headerStateFromPO(detail);
   const providerChanged = currentHeader.provider_id !== initialHeader.provider_id;
-  const dirty = JSON.stringify(currentHeader) !== JSON.stringify(initialHeader);
   const requester = isRequester(detail, user?.email);
   const draftEditable = detail.state === PO_STATES.DRAFT && requester;
   const paymentEditable = detail.state === PO_STATES.PENDING_APPROVAL_PAYMENT_METHOD && requester;
+  const headerCanEdit = draftEditable || paymentEditable;
+  const headerEditDisabledReason = requester
+    ? 'I dati di testata non sono modificabili in questo stato.'
+    : 'Solo il richiedente puo modificare i dati della richiesta.';
   const total = parseMistraMoney(detail.total_price);
   const quoteRuleBlocked = total >= getRdaQuoteThreshold() && countQuoteAttachments(detail.attachments) < 2;
   const canSubmit = draftEditable && (detail.rows?.length ?? 0) > 0 && !quoteRuleBlocked;
   const fullProvider = fullProviderForDraft ?? detail.provider;
+  const editProviderForPayment = fullProviderForEdit ?? detail.provider;
   const providerDefault = paymentCodeFromProvider(fullProvider);
+  const editProviderDefault = paymentCodeFromProvider(editProviderForPayment);
   const cdlanDefault = defaultPayment.data?.code ?? '';
   const paymentOptions = buildPaymentMethodOptions({
     methods: methods.data ?? [],
@@ -168,7 +180,14 @@ export function PoDetailPage() {
     cdlanDefaultCode: cdlanDefault,
     currentCode: currentHeader.payment_method,
   });
+  const editPaymentOptions = buildPaymentMethodOptions({
+    methods: methods.data ?? [],
+    providerDefault: editProviderForPayment?.default_payment_method,
+    cdlanDefaultCode: cdlanDefault,
+    currentCode: (editHeader ?? currentHeader).payment_method,
+  });
   const paymentRequiresVerification = requiresPaymentMethodVerification(currentHeader.payment_method, providerDefault, cdlanDefault);
+  const editPaymentRequiresVerification = requiresPaymentMethodVerification((editHeader ?? currentHeader).payment_method, editProviderDefault, cdlanDefault);
   const readinessItems = buildPOReadinessItems(detailWithDisplayedRecipients ?? detail, currentHeader, {
     provider: fullProvider,
     recipients: displayedRecipients,
@@ -178,8 +197,7 @@ export function PoDetailPage() {
 
   function handleProviderChange(value: number | '') {
     const nextProvider = providerOptions.find((item) => item.id === value);
-    setRecipientDraftIds([]);
-    setHeader((current) =>
+    setEditHeader((current) =>
       current
         ? {
             ...current,
@@ -195,8 +213,7 @@ export function PoDetailPage() {
       const withoutProvider = current.filter((item) => item.id !== providerCreated.id);
       return [...withoutProvider, providerCreated];
     });
-    setRecipientDraftIds([]);
-    setHeader((current) =>
+    setEditHeader((current) =>
       current
         ? {
             ...current,
@@ -207,29 +224,53 @@ export function PoDetailPage() {
     );
   }
 
-  async function saveHeader() {
+  function openHeaderModal() {
+    if (!headerCanEdit) return;
+    setEditHeader(currentHeader);
+    setHeaderModalOpen(true);
+  }
+
+  function closeHeaderModal() {
+    setHeaderModalOpen(false);
+    setEditHeader(null);
+  }
+
+  async function saveHeader(nextHeader: HeaderFormState) {
     if (!draftEditable) return;
     try {
-      await patchPO.mutateAsync(buildPatchPOPayload(currentHeader, budgets.data ?? [], providerChanged));
+      const nextProviderChanged = nextHeader.provider_id !== initialHeader.provider_id;
+      await patchPO.mutateAsync(buildPatchPOPayload(nextHeader, budgets.data ?? [], nextProviderChanged));
+      if (nextProviderChanged) setRecipientDraftIds([]);
       toast('Bozza aggiornata');
+      closeHeaderModal();
     } catch {
       toast('Salvataggio non riuscito', 'error');
     }
   }
 
-  async function savePaymentMethod() {
+  async function savePaymentMethod(paymentMethod = currentHeader.payment_method) {
     if (!paymentEditable) return;
     try {
-      await patchPayment.mutateAsync(currentHeader.payment_method);
+      await patchPayment.mutateAsync(paymentMethod);
       toast('Metodo pagamento aggiornato');
+      closeHeaderModal();
     } catch {
       toast('Salvataggio non riuscito', 'error');
+    }
+  }
+
+  async function saveHeaderModal(nextHeader: HeaderFormState) {
+    if (draftEditable) {
+      await saveHeader(nextHeader);
+      return;
+    }
+    if (paymentEditable) {
+      await savePaymentMethod(nextHeader.payment_method);
     }
   }
 
   async function submitPO() {
     try {
-      if (dirty) await patchPO.mutateAsync(buildPatchPOPayload(currentHeader, budgets.data ?? [], providerChanged));
       await transition.mutateAsync({ id: detail.id, action: 'submit' });
       toast('Richiesta mandata in approvazione');
       setSubmitConfirm(false);
@@ -280,23 +321,19 @@ export function PoDetailPage() {
       <POCommandBar
         po={detail}
         selectedMode={selectedActionMode}
-        dirty={dirty}
         canSubmit={canSubmit}
         quoteRuleBlocked={quoteRuleBlocked}
-        paymentEditable={paymentEditable}
         saving={patchPO.isPending || patchPayment.isPending}
         transitioning={transition.isPending}
         onModeChange={setSelectedActionMode}
         onClose={() => navigate('/rda')}
-        onSaveDraft={() => void saveHeader()}
         onSubmit={() => setSubmitConfirm(true)}
-        onSavePayment={() => void savePaymentMethod()}
         onTransition={(action) => void runTransition(action)}
         onPDF={() => void downloadPDF()}
       />
       <div className="detailLayout">
         <div className="detailMain">
-          <PoHeaderForm
+          <PoHeaderSummary
             po={detail}
             value={currentHeader}
             budgets={budgets.data ?? []}
@@ -304,15 +341,9 @@ export function PoDetailPage() {
             paymentMethods={paymentOptions}
             paymentRequiresVerification={paymentRequiresVerification}
             recipients={displayedRecipients}
-            draftEditable={draftEditable}
-            paymentEditable={paymentEditable}
-            onChange={setHeader}
-            onProviderChange={handleProviderChange}
-            onRequestNewProvider={(search) => {
-              if (!draftEditable) return;
-              setProviderRequestSearch(search);
-              setProviderRequestOpen(true);
-            }}
+            canEdit={headerCanEdit}
+            editDisabledReason={headerEditDisabledReason}
+            onEdit={openHeaderModal}
           />
           <PoTabs
             po={detailWithDisplayedRecipients ?? detail}
@@ -320,10 +351,7 @@ export function PoDetailPage() {
             editable={draftEditable}
             header={currentHeader}
             badges={tabBadges}
-            saving={patchPO.isPending}
-            onHeaderChange={setHeader}
             onRecipientSelectionChange={setRecipientDraftIds}
-            onSaveHeader={() => void saveHeader()}
             onSaveRecipients={(ids) => void saveRecipients(ids)}
           />
         </div>
@@ -341,6 +369,27 @@ export function PoDetailPage() {
         loading={patchPO.isPending || transition.isPending}
         onClose={() => setSubmitConfirm(false)}
         onConfirm={() => void submitPO()}
+      />
+      <PoHeaderEditModal
+        open={headerModalOpen}
+        po={detail}
+        value={editHeader ?? currentHeader}
+        budgets={budgets.data ?? []}
+        providers={providerOptions}
+        paymentMethods={editPaymentOptions}
+        paymentRequiresVerification={editPaymentRequiresVerification}
+        draftEditable={draftEditable}
+        paymentEditable={paymentEditable}
+        saving={patchPO.isPending || patchPayment.isPending}
+        onChange={setEditHeader}
+        onSave={(next) => void saveHeaderModal(next)}
+        onClose={closeHeaderModal}
+        onProviderChange={handleProviderChange}
+        onRequestNewProvider={(search) => {
+          if (!draftEditable) return;
+          setProviderRequestSearch(search);
+          setProviderRequestOpen(true);
+        }}
       />
       {draftEditable ? (
         <ProviderRequestModal

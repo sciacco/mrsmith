@@ -85,6 +85,11 @@
   max-width: 80vw;
 }
 
+.fluid {
+  width: 90vw;
+  max-width: 90vw;
+}
+
 @keyframes backdropIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -102,6 +107,7 @@
 }
 
 @media (max-width: 640px) {
+  .fluid,
   .xwide {
     width: calc(100vw - 32px);
     max-width: calc(100vw - 32px);

@@ -1,31 +1,19 @@
-import { Button, Icon } from '@mrsmith/ui';
 import type { HeaderFormState } from './PoHeaderForm';
 
-export function NotesTab({
-  value,
-  editable,
-  saving,
-  onChange,
-  onSave,
-}: {
-  value: HeaderFormState;
-  editable: boolean;
-  saving: boolean;
-  onChange: (value: HeaderFormState) => void;
-  onSave: () => void;
-}) {
+function noteValue(value: string): string {
+  return value.trim() || '-';
+}
+
+export function NotesTab({ value }: { value: HeaderFormState }) {
   return (
-    <div className="formGrid">
-      <div className="field wide">
-        <label>Note fornitore</label>
-        <textarea rows={5} value={value.note} disabled={!editable} onChange={(event) => onChange({ ...value, note: event.target.value })} />
+    <div className="summaryNotesGrid notesReadOnly">
+      <div className="summaryItem wide">
+        <span>Note fornitore</span>
+        <strong>{noteValue(value.note)}</strong>
       </div>
-      <div className="field wide">
-        <label>Descrizione interna</label>
-        <textarea rows={5} value={value.description} disabled={!editable} onChange={(event) => onChange({ ...value, description: event.target.value })} />
-      </div>
-      <div className="actionRow fullWidth">
-        <Button leftIcon={<Icon name="check" />} disabled={!editable} loading={saving} onClick={onSave}>Salva note</Button>
+      <div className="summaryItem wide">
+        <span>Descrizione ad uso interno</span>
+        <strong>{noteValue(value.description)}</strong>
       </div>
     </div>
   );

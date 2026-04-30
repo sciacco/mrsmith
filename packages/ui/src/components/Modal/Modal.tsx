@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode, type SyntheticEvent } from 'react';
 import styles from './Modal.module.css';
 
-export type ModalSize = 'sm' | 'md' | 'lg' | 'wide' | 'xwide';
+export type ModalSize = 'sm' | 'md' | 'lg' | 'wide' | 'xwide' | 'fluid';
 
 interface ModalProps {
   open: boolean;

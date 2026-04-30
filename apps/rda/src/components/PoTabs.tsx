@@ -22,10 +22,7 @@ export function PoTabs({
   editable,
   header,
   badges,
-  saving,
-  onHeaderChange,
   onRecipientSelectionChange,
-  onSaveHeader,
   onSaveRecipients,
 }: {
   po: PoDetail;
@@ -33,10 +30,7 @@ export function PoTabs({
   editable: boolean;
   header: HeaderFormState;
   badges: TabBadgeModel;
-  saving: boolean;
-  onHeaderChange: (value: HeaderFormState) => void;
   onRecipientSelectionChange?: (ids: number[]) => void;
-  onSaveHeader: () => void;
   onSaveRecipients: (ids: number[]) => void;
 }) {
   const [active, setActive] = useState<TabID>('attachments');
@@ -56,9 +50,7 @@ export function PoTabs({
       <div className="tabBody">
         {active === 'attachments' ? <AttachmentsTab po={po} editable={editable} /> : null}
         {active === 'rows' ? <RowsTab po={po} editable={editable} /> : null}
-        {active === 'notes' ? (
-          <NotesTab value={header} editable={editable} saving={saving} onChange={onHeaderChange} onSave={onSaveHeader} />
-        ) : null}
+        {active === 'notes' ? <NotesTab value={header} /> : null}
         {active === 'contacts' ? (
           <ProviderRefTable
             po={po}
