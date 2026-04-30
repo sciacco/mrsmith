@@ -49,6 +49,16 @@ function paymentLabel(po: PoDetail): string {
   return typeof payment === 'string' ? payment : payment.description || payment.code || '-';
 }
 
+function providerLabel(po: PoDetail): string {
+  return po.provider?.company_name?.trim() || (po.provider?.id ? `Fornitore ${po.provider.id}` : '-');
+}
+
+function budgetLabel(po: PoDetail): string {
+  const budget = po.budget;
+  if (!budget) return '-';
+  return budget.name ?? `Budget ${budget.budget_id ?? budget.id ?? '-'}`;
+}
+
 function actionIcon(action: PoAction): 'check' | 'check-circle' | 'arrow-right' | 'mail' | 'x' | 'x-circle' {
   if (action.tone === 'danger') return action.id.includes('conformity') ? 'x-circle' : 'x';
   if (action.id === 'send-to-provider') return 'mail';
@@ -68,6 +78,18 @@ function SummaryChip({ label, value, tone }: { label: string; value: string; ton
       <span>{label}</span>
       <strong>{value}</strong>
     </span>
+  );
+}
+
+function CommandContext({ po }: { po: PoDetail }) {
+  return (
+    <div className="commandContext">
+      <span className="commandContextIcon"><Icon name="file-text" size={18} /></span>
+      <div className="commandContextText">
+        <strong>{po.object?.trim() || po.code || `PO ${po.id}`}</strong>
+        <p>{providerLabel(po)} · {budgetLabel(po)}</p>
+      </div>
+    </div>
   );
 }
 
@@ -185,10 +207,7 @@ export function POCommandBar({
     <section className="surface poCommandBar">
       <div className="commandTop">
         <Button variant="secondary" leftIcon={<Icon name="arrow-left" />} onClick={onClose}>Chiudi</Button>
-        <div className="commandTitle">
-          <span className="eyebrow">Cruscotto PO</span>
-          <strong>{po.code ?? `PO ${po.id}`}</strong>
-        </div>
+        <CommandContext po={po} />
         <ModePicker modes={modes} selected={modeID} onChange={onModeChange} />
       </div>
 

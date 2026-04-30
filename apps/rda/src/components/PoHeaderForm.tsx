@@ -1,13 +1,13 @@
 import { Button, Icon, Modal, Tooltip } from '@mrsmith/ui';
 import { useEffect, useState, type FormEvent } from 'react';
-import type { BudgetForUser, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
+import type { BudgetForUser, PoDetail, ProviderSummary } from '../api/types';
 import { formatDateIT, normalizeCurrency, RDA_CURRENCIES } from '../lib/format';
 import type { PaymentMethodOption } from '../lib/payment-options';
 import { stateLabel } from '../lib/state-labels';
 import { BudgetSelect } from './BudgetSelect';
 import { PaymentMethodSelect } from './PaymentMethodSelect';
+import { PoNotesDisclosures } from './PoNotesDisclosures';
 import { ProviderCombobox } from './ProviderCombobox';
-import { RecipientsList } from './RecipientsList';
 
 export interface HeaderFormState {
   budget_id: number | '';
@@ -95,7 +95,6 @@ export function PoHeaderSummary({
   providers,
   paymentMethods,
   paymentRequiresVerification,
-  recipients,
   canEdit,
   editDisabledReason,
   onEdit,
@@ -106,7 +105,6 @@ export function PoHeaderSummary({
   providers: ProviderSummary[];
   paymentMethods: PaymentMethodOption[];
   paymentRequiresVerification?: boolean;
-  recipients?: ProviderReference[];
   canEdit: boolean;
   editDisabledReason: string;
   onEdit: () => void;
@@ -132,15 +130,6 @@ export function PoHeaderSummary({
         {canEdit ? editButton : <Tooltip content={editDisabledReason}>{editButton}</Tooltip>}
       </div>
       <div className="poSummaryBody">
-        <div className="poSummaryLead">
-          <span className="poSummaryIcon"><Icon name="file-text" size={20} /></span>
-          <div className="poSummaryLeadMain">
-            <span className="eyebrow">Oggetto</span>
-            <strong>{optionalText(value.object)}</strong>
-            <p>{providerLabel(provider)} · {budgetLabel(budgets, value.budget_id, po.budget)}</p>
-          </div>
-        </div>
-
         <div className="poSummaryGrid">
           <SummaryItem label="Budget" value={budgetLabel(budgets, value.budget_id, po.budget)} />
           <SummaryItem label="Progetto" value={optionalText(value.project)} />
@@ -151,15 +140,7 @@ export function PoHeaderSummary({
           <SummaryItem label="Valuta" value={normalizeCurrency(value.currency)} />
         </div>
 
-        <div className="summaryNotesGrid">
-          <SummaryItem label="Note fornitore" value={optionalText(value.note)} wide />
-          <SummaryItem label="Descrizione ad uso interno" value={optionalText(value.description)} wide />
-        </div>
-
-        <div className="summaryContacts">
-          <span className="eyebrow">Contatti selezionati</span>
-          <RecipientsList recipients={recipients ?? po.recipients} />
-        </div>
+        <PoNotesDisclosures note={value.note} description={value.description} />
       </div>
     </section>
   );

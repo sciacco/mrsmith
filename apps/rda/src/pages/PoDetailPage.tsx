@@ -340,7 +340,6 @@ export function PoDetailPage() {
             providers={providerOptions}
             paymentMethods={paymentOptions}
             paymentRequiresVerification={paymentRequiresVerification}
-            recipients={displayedRecipients}
             canEdit={headerCanEdit}
             editDisabledReason={headerEditDisabledReason}
             onEdit={openHeaderModal}

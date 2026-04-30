@@ -442,6 +442,53 @@ textarea {
   min-width: 0;
 }
 
+.commandContext {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.56rem 0.68rem;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-accent-subtle) 68%, #fff 32%), #fff 74%);
+}
+
+.commandContextIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-full);
+  color: var(--color-accent-hover);
+  background: #fff;
+  box-shadow: var(--shadow-xs);
+}
+
+.commandContextText {
+  display: grid;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.commandContextText strong {
+  color: var(--color-text);
+  font-size: 0.98rem;
+  font-weight: 850;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.commandContextText p {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .commandTitle {
   display: grid;
   gap: 0.08rem;
@@ -652,7 +699,7 @@ textarea {
 
 .poSummaryBody {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.65rem;
   padding: 0.9rem;
 }
 
@@ -773,6 +820,90 @@ textarea {
 
 .notesReadOnly {
   grid-template-columns: 1fr;
+}
+
+.poNotesDisclosures {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.poNoteDisclosure {
+  min-width: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, var(--color-surface) 12%);
+}
+
+.poNoteDisclosure summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.65rem;
+  padding: 0.62rem 0.72rem;
+  color: var(--color-text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.poNoteDisclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.poNoteDisclosure summary::after {
+  content: '+';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-elevated);
+  font-size: 0.9rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.poNoteDisclosure[open] {
+  border-color: var(--color-accent-muted);
+  background: #fff;
+}
+
+.poNoteDisclosure[open] summary::after {
+  content: '-';
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+}
+
+.poNoteDisclosure summary:focus-visible {
+  outline: 3px solid var(--color-accent-glow);
+  outline-offset: 2px;
+}
+
+.poNoteDisclosure summary span {
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.poNoteDisclosure p {
+  border-top: 1px solid var(--color-border-subtle);
+  padding: 0.7rem 0.72rem 0.78rem;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .poEditForm {
@@ -1850,6 +1981,10 @@ textarea {
   .commandBottom {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .commandContext {
+    width: 100%;
   }
 
   .commandSummary {
