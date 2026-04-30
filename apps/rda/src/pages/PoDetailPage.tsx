@@ -1,4 +1,4 @@
-import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
+import { Skeleton, useToast } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { getRdaQuoteThreshold } from '../runtime-config';
@@ -8,7 +8,6 @@ import {
   usePatchPO,
   usePaymentMethodDefault,
   usePaymentMethods,
-  usePermissions,
   usePODetail,
   usePOComments,
   useProvider,
@@ -18,16 +17,18 @@ import {
   type TransitionAction,
 } from '../api/queries';
 import type { PoDetail, ProviderReference, ProviderSummary } from '../api/types';
-import { ActionBar } from '../components/ActionBar';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { CommentsPanel } from '../components/CommentsPanel';
 import { headerStateFromPO, PoHeaderForm, type HeaderFormState } from '../components/PoHeaderForm';
+import { POCommandBar } from '../components/POCommandBar';
+import { POReadinessPanel, POWorkflowRail } from '../components/POWorkspacePanels';
 import { PoTabs } from '../components/PoTabs';
 import { ProviderRequestModal } from '../components/ProviderRequestModal';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { countQuoteAttachments } from '../lib/attachments';
 import { coerceID, downloadBlob, isRequester, parseMistraMoney } from '../lib/format';
 import { buildPatchPOPayload } from '../lib/po-payload';
+import { buildPOReadinessItems, buildTabBadges, selectedModeID } from '../lib/po-detail-view-model';
 import { buildPaymentMethodOptions, paymentCodeFromProvider, preferredPaymentMethodCode, requiresPaymentMethodVerification } from '../lib/payment-options';
 import { PO_STATES } from '../lib/state-labels';
 
@@ -66,10 +67,10 @@ export function PoDetailPage() {
   const [requestedProviders, setRequestedProviders] = useState<ProviderSummary[]>([]);
   const [providerRequestOpen, setProviderRequestOpen] = useState(false);
   const [providerRequestSearch, setProviderRequestSearch] = useState('');
+  const [selectedActionMode, setSelectedActionMode] = useState<string>('read_only');
 
   const po = usePODetail(poId);
   const comments = usePOComments(poId);
-  const permissions = usePermissions();
   const budgets = useBudgets();
   const providers = useProviders();
   const methods = usePaymentMethods();
@@ -108,9 +109,26 @@ export function PoDetailPage() {
     setRecipientDraftIds(recipientIDs(po.data.recipients));
   }, [po.data]);
 
+  useEffect(() => {
+    if (!po.data?.action_model) return;
+    setSelectedActionMode((current) => selectedModeID(po.data?.action_model, current));
+  }, [po.data?.action_model]);
+
   if (poId == null) return <Navigate to="/rda" replace />;
 
-  if (po.isLoading || !header) {
+  if (po.error) {
+    return (
+      <main className="rdaPage">
+        <section className="stateCard">
+          <p className="eyebrow">Richiesta</p>
+          <h1>Richiesta non disponibile</h1>
+          <p>La richiesta selezionata non puo essere caricata in questo momento.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (po.isLoading) {
     return (
       <main className="rdaPage">
         <section className="stateCard"><Skeleton rows={10} /></section>
@@ -118,7 +136,7 @@ export function PoDetailPage() {
     );
   }
 
-  if (po.error || !po.data) {
+  if (!po.data || !header) {
     return (
       <main className="rdaPage">
         <section className="stateCard">
@@ -151,6 +169,12 @@ export function PoDetailPage() {
     currentCode: currentHeader.payment_method,
   });
   const paymentRequiresVerification = requiresPaymentMethodVerification(currentHeader.payment_method, providerDefault, cdlanDefault);
+  const readinessItems = buildPOReadinessItems(detailWithDisplayedRecipients ?? detail, currentHeader, {
+    provider: fullProvider,
+    recipients: displayedRecipients,
+    quoteThreshold: getRdaQuoteThreshold(),
+  });
+  const tabBadges = buildTabBadges(detailWithDisplayedRecipients ?? detail, currentHeader, initialHeader, fullProvider, getRdaQuoteThreshold());
 
   function handleProviderChange(value: number | '') {
     const nextProvider = providerOptions.find((item) => item.id === value);
@@ -253,18 +277,20 @@ export function PoDetailPage() {
 
   return (
     <main className="rdaPage">
-      <ActionBar
+      <POCommandBar
         po={detail}
-        permissions={permissions.data}
-        currentEmail={user?.email}
+        selectedMode={selectedActionMode}
         dirty={dirty}
         canSubmit={canSubmit}
         quoteRuleBlocked={quoteRuleBlocked}
+        paymentEditable={paymentEditable}
         saving={patchPO.isPending || patchPayment.isPending}
         transitioning={transition.isPending}
+        onModeChange={setSelectedActionMode}
         onClose={() => navigate('/rda')}
-        onSave={() => void saveHeader()}
+        onSaveDraft={() => void saveHeader()}
         onSubmit={() => setSubmitConfirm(true)}
+        onSavePayment={() => void savePaymentMethod()}
         onTransition={(action) => void runTransition(action)}
         onPDF={() => void downloadPDF()}
       />
@@ -288,19 +314,12 @@ export function PoDetailPage() {
               setProviderRequestOpen(true);
             }}
           />
-          {paymentEditable ? (
-            <section className="surface actionBar">
-              <span className="muted">Aggiorna il metodo di pagamento richiesto.</span>
-              <Button leftIcon={<Icon name="check" />} loading={patchPayment.isPending} onClick={() => void savePaymentMethod()}>
-                Aggiorna metodo pagamento
-              </Button>
-            </section>
-          ) : null}
           <PoTabs
             po={detailWithDisplayedRecipients ?? detail}
             provider={fullProvider}
             editable={draftEditable}
             header={currentHeader}
+            badges={tabBadges}
             saving={patchPO.isPending}
             onHeaderChange={setHeader}
             onRecipientSelectionChange={setRecipientDraftIds}
@@ -308,7 +327,11 @@ export function PoDetailPage() {
             onSaveRecipients={(ids) => void saveRecipients(ids)}
           />
         </div>
-        <CommentsPanel poId={detail.id} comments={comments.data ?? []} />
+        <div className="detailSide">
+          <POWorkflowRail stage={detail.action_model?.workflow_stage} />
+          <POReadinessPanel items={readinessItems} />
+          <CommentsPanel poId={detail.id} comments={comments.data ?? []} />
+        </div>
       </div>
       <ConfirmDialog
         open={submitConfirm}

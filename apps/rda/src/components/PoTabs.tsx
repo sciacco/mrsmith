@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { PoDetail, ProviderSummary } from '../api/types';
+import type { TabBadgeModel } from '../lib/po-detail-view-model';
 import { AttachmentsTab } from './AttachmentsTab';
 import type { HeaderFormState } from './PoHeaderForm';
 import { NotesTab } from './NotesTab';
@@ -12,7 +13,7 @@ const tabs: { id: TabID; label: string }[] = [
   { id: 'attachments', label: 'Allegati' },
   { id: 'rows', label: 'Righe PO' },
   { id: 'notes', label: 'Note' },
-  { id: 'contacts', label: 'Contatti Fornitore' },
+  { id: 'contacts', label: 'Contatti' },
 ];
 
 export function PoTabs({
@@ -20,6 +21,7 @@ export function PoTabs({
   provider,
   editable,
   header,
+  badges,
   saving,
   onHeaderChange,
   onRecipientSelectionChange,
@@ -30,6 +32,7 @@ export function PoTabs({
   provider?: ProviderSummary;
   editable: boolean;
   header: HeaderFormState;
+  badges: TabBadgeModel;
   saving: boolean;
   onHeaderChange: (value: HeaderFormState) => void;
   onRecipientSelectionChange?: (ids: number[]) => void;
@@ -42,7 +45,11 @@ export function PoTabs({
       <div className="tabs">
         {tabs.map((tab) => (
           <button key={tab.id} className={`tab ${active === tab.id ? 'active' : ''}`} type="button" onClick={() => setActive(tab.id)}>
-            {tab.label}
+            <span>{tab.label}</span>
+            {tab.id === 'attachments' ? <span className="tabBadge">{badges.attachments}</span> : null}
+            {tab.id === 'rows' ? <span className="tabBadge">{badges.rows}</span> : null}
+            {tab.id === 'notes' && badges.notesDirty ? <span className="tabDot" aria-label="Note modificate" /> : null}
+            {tab.id === 'contacts' ? <span className="tabBadge">{badges.contacts}</span> : null}
           </button>
         ))}
       </div>

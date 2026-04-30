@@ -32,13 +32,13 @@ export function RowTable({
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td>
+              <td data-label="Riga">
                 <div className="rowTitleCell">
                   <strong>{row.description ?? row.product_description ?? '-'}</strong>
                   <span>{row.product_code ?? row.product_description ?? '-'}</span>
                 </div>
               </td>
-              <td>
+              <td data-label="Economia">
                 <div className="economicBreakdown">
                   <span className={`badge ${row.type === 'good' ? 'success' : 'info'}`}>{row.type === 'good' ? 'Bene' : 'Servizio'}</span>
                   <small>
@@ -48,9 +48,9 @@ export function RowTable({
                   </small>
                 </div>
               </td>
-              <td>{row.qty ?? '-'}</td>
-              <td>{formatMoney(row.total_price, currency)}</td>
-              <td className="actionsCell">
+              <td data-label="Q.ta">{row.qty ?? '-'}</td>
+              <td data-label="Totale riga">{formatMoney(row.total_price, currency)}</td>
+              <td data-label="Azioni" className="actionsCell">
                 <span className="iconActions">
                   <button
                     className="iconButton"

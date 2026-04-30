@@ -136,6 +136,49 @@ export interface PoPreview {
   budget_increment_needed?: number | string;
 }
 
+export type PoActionPermissionStatus = 'available' | 'unavailable';
+export type PoWorkflowStage = 'draft' | 'approval' | 'method_budget' | 'send' | 'verification' | 'closure';
+
+export interface PoActionMode {
+  id: string;
+  label: string;
+  description: string;
+  reason?: string;
+  action_ids: string[];
+}
+
+export interface PoAction {
+  id: string;
+  mode_id: string;
+  label: string;
+  description: string;
+  next?: string;
+  tone?: 'primary' | 'danger' | 'secondary' | string;
+  primary: boolean;
+  disabled: boolean;
+  disabled_reason?: string;
+}
+
+export interface PoActionSummary {
+  state?: string;
+  total_price?: string;
+  currency?: string;
+  row_count: number;
+  attachment_count: number;
+  quote_count: number;
+  recipient_count: number;
+  payment_method?: string;
+}
+
+export interface PoActionModel {
+  permission_status: PoActionPermissionStatus | string;
+  modes: PoActionMode[];
+  primary_mode_id?: string;
+  actions: PoAction[];
+  workflow_stage: PoWorkflowStage | string;
+  summary: PoActionSummary;
+}
+
 export interface PoDetail extends PoPreview {
   type?: string;
   language?: string;
@@ -148,6 +191,7 @@ export interface PoDetail extends PoPreview {
   rows?: PoRow[];
   attachments?: PoAttachment[];
   recipients?: ProviderReference[];
+  action_model?: PoActionModel;
 }
 
 export interface PoComment {

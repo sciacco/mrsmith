@@ -56,15 +56,19 @@ export function CommentsPanel({ poId, comments }: { poId: number; comments: PoCo
 
   return (
     <aside className="surface commentsPanel">
-      <div>
-        <h2>Commenti</h2>
-        <p className="muted">Discussione sulla richiesta.</p>
-      </div>
-      <div className="commentList">
-        {comments.map((comment) => <CommentItem key={comment.id} comment={comment} />)}
-        {comments.length === 0 ? <p className="muted">Nessun commento presente.</p> : null}
-      </div>
-      <MentionInput submitting={post.isPending} onSubmit={(comment) => void submit(comment)} />
+      <details className="commentsDetails" open>
+        <summary>
+          <span>
+            <strong>Commenti</strong>
+            <small>Discussione sulla richiesta.</small>
+          </span>
+        </summary>
+        <div className="commentList">
+          {comments.map((comment) => <CommentItem key={comment.id} comment={comment} />)}
+          {comments.length === 0 ? <p className="muted">Nessun commento presente.</p> : null}
+        </div>
+        <MentionInput submitting={post.isPending} onSubmit={(comment) => void submit(comment)} />
+      </details>
     </aside>
   );
 }

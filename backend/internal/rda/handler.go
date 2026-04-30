@@ -442,6 +442,15 @@ func (h *Handler) handleGetPO(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 		return
 	}
+	actionPermissions := poActionPermissions{Status: poPermissionAvailable}
+	if permissions, err := h.permissionsForEmail(r.Context(), email); err == nil {
+		actionPermissions.rdaPermissions = permissions
+	} else {
+		actionPermissions.Status = poPermissionUnavailable
+		if !errors.Is(err, errRDAPermissionsUnavailable) {
+			h.requestLogger(r, "rda_permissions").Warn("permission load failed for PO action model", "error", err)
+		}
+	}
 	rowEconomics, err := h.fetchPORowEconomics(r.Context(), r.PathValue("id"))
 	if err != nil {
 		h.requestLogger(r, "rda_po_detail").Warn("failed to load PO row economics", "error", err)
@@ -455,8 +464,26 @@ func (h *Handler) handleGetPO(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	var po poDetail
+	if err := json.Unmarshal(normalized, &po); err != nil {
+		h.requestLogger(r, "rda_po_detail").Error("failed to decode PO detail", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Richiesta non disponibile in questo momento",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	withActions, err := addPOActionModel(normalized, buildPOActionModel(po, actionPermissions, email, h.quoteThreshold))
+	if err != nil {
+		h.requestLogger(r, "rda_po_detail").Error("failed to build PO action model", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Richiesta non disponibile in questo momento",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(normalized)
+	_, _ = w.Write(withActions)
 }
 
 func (h *Handler) handleCreatePO(w http.ResponseWriter, r *http.Request) {

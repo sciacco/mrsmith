@@ -18,6 +18,9 @@
     "src/lib/payment-options.test.ts",
     "src/lib/format.ts",
     "src/lib/row-payload.ts",
-    "src/lib/row-payload.test.ts"
+    "src/lib/row-payload.test.ts",
+    "src/lib/provider-refs.ts",
+    "src/lib/po-detail-view-model.ts",
+    "src/lib/po-detail-view-model.test.ts"
   ]
 }

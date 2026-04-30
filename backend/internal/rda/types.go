@@ -42,12 +42,59 @@ type poDetail struct {
 	State                string            `json:"state,omitempty"`
 	CurrentApprovalLevel any               `json:"current_approval_level,omitempty"`
 	TotalPrice           string            `json:"total_price,omitempty"`
+	Currency             string            `json:"currency,omitempty"`
 	Requester            userRef           `json:"requester,omitempty"`
 	Provider             providerDetail    `json:"provider,omitempty"`
 	PaymentMethod        json.RawMessage   `json:"payment_method,omitempty"`
 	Rows                 []json.RawMessage `json:"rows,omitempty"`
 	Attachments          []json.RawMessage `json:"attachments,omitempty"`
+	Recipients           []json.RawMessage `json:"recipients,omitempty"`
 	Approvers            []approverRef     `json:"approvers,omitempty"`
+}
+
+type poActionPermissions struct {
+	rdaPermissions
+	Status string
+}
+
+type poActionModel struct {
+	PermissionStatus string          `json:"permission_status"`
+	Modes            []poActionMode  `json:"modes"`
+	PrimaryModeID    string          `json:"primary_mode_id,omitempty"`
+	Actions          []poAction      `json:"actions"`
+	WorkflowStage    string          `json:"workflow_stage"`
+	Summary          poActionSummary `json:"summary"`
+}
+
+type poActionMode struct {
+	ID          string   `json:"id"`
+	Label       string   `json:"label"`
+	Description string   `json:"description"`
+	Reason      string   `json:"reason,omitempty"`
+	ActionIDs   []string `json:"action_ids"`
+}
+
+type poAction struct {
+	ID             string `json:"id"`
+	ModeID         string `json:"mode_id"`
+	Label          string `json:"label"`
+	Description    string `json:"description"`
+	Next           string `json:"next,omitempty"`
+	Tone           string `json:"tone,omitempty"`
+	Primary        bool   `json:"primary"`
+	Disabled       bool   `json:"disabled"`
+	DisabledReason string `json:"disabled_reason,omitempty"`
+}
+
+type poActionSummary struct {
+	State           string `json:"state,omitempty"`
+	TotalPrice      string `json:"total_price,omitempty"`
+	Currency        string `json:"currency,omitempty"`
+	RowCount        int    `json:"row_count"`
+	AttachmentCount int    `json:"attachment_count"`
+	QuoteCount      int    `json:"quote_count"`
+	RecipientCount  int    `json:"recipient_count"`
+	PaymentMethod   string `json:"payment_method,omitempty"`
 }
 
 type paymentMethod struct {

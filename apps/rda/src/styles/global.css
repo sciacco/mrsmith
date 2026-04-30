@@ -410,12 +410,162 @@ textarea {
   min-width: 0;
 }
 
+.detailSide {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
 .actionBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 0.9rem;
+}
+
+.poCommandBar {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 20;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+}
+
+.commandTop,
+.commandBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.commandTitle {
+  display: grid;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.commandTitle strong {
+  color: var(--color-text);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.commandModeSingle,
+.commandModeSelect {
+  display: grid;
+  gap: 0.2rem;
+  min-width: min(13rem, 100%);
+}
+
+.commandModeSingle span,
+.commandModeSelect span,
+.commandChip span {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.commandModeSingle strong {
+  color: var(--color-text);
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.commandModeSelect select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.6rem;
+  color: var(--color-text);
+  background: #fff;
+  outline: none;
+}
+
+.commandModeSelect select:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+.commandSummary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.commandChip {
+  display: grid;
+  gap: 0.16rem;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.58rem;
+  background: var(--color-surface);
+}
+
+.commandChip strong {
+  color: var(--color-text);
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.commandChip.info {
+  border-color: var(--color-accent-muted);
+  background: var(--color-accent-subtle);
+}
+
+.commandChip.warning {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: #fffbeb;
+}
+
+.commandChip.success {
+  border-color: rgba(16, 185, 129, 0.25);
+  background: var(--color-success-bg);
+}
+
+.commandReason {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.commandReason strong {
+  color: var(--color-text);
+  font-size: 0.92rem;
+  line-height: 1.25;
+}
+
+.commandReason span {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.commandActions,
+.commandDangerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.commandDangerActions {
+  border-left: 1px solid var(--color-border);
+  padding-left: 0.5rem;
 }
 
 .actionBarGroup {
@@ -446,6 +596,9 @@ textarea {
 }
 
 .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   border: 0;
   border-bottom: 2px solid transparent;
   color: var(--color-text-secondary);
@@ -460,6 +613,33 @@ textarea {
 .tab.active {
   border-bottom-color: var(--color-accent);
   color: var(--color-accent);
+}
+
+.tabBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  min-height: 1.25rem;
+  border-radius: var(--radius-full);
+  padding: 0.1rem 0.38rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tab.active .tabBadge {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+}
+
+.tabDot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--color-warning);
 }
 
 .tabBody {
@@ -671,6 +851,16 @@ textarea {
   cursor: pointer;
 }
 
+.uploadDrop.disabled {
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  cursor: progress;
+}
+
+.uploadDrop.disabled svg {
+  animation: spin 0.9s linear infinite;
+}
+
 .attachmentUploadControls {
   display: grid;
   grid-template-columns: minmax(11rem, 0.35fr) minmax(0, 1fr);
@@ -682,6 +872,23 @@ textarea {
 .attachmentUploadControls.compact {
   grid-template-columns: minmax(11rem, 0.42fr) minmax(0, 1fr);
   align-items: end;
+}
+
+.attachmentUploadControls.detailDropzone {
+  grid-template-columns: minmax(12rem, 0.36fr) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.attachmentBusinessMessage {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.attachmentBusinessMessage p {
+  margin-top: 0;
 }
 
 .readinessList {
@@ -736,6 +943,86 @@ textarea {
   margin-top: 0.12rem;
   color: var(--color-text-secondary);
   font-size: 0.82rem;
+}
+
+.poSidePanel {
+  overflow: hidden;
+}
+
+.compactPanelHeader {
+  align-items: flex-start;
+}
+
+.compactPanelHeader p {
+  margin-top: 0.1rem;
+}
+
+.poSidePanelBody {
+  padding: 0.85rem;
+}
+
+.workflowRail {
+  display: grid;
+  gap: 0;
+  padding: 0.75rem 0.85rem 0.9rem;
+}
+
+.workflowStep {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+  min-height: 2.35rem;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.workflowStep::before {
+  content: '';
+  position: absolute;
+  top: calc(50% + 0.88rem);
+  bottom: calc(-50% + 0.88rem);
+  left: 0.86rem;
+  width: 1px;
+  background: var(--color-border);
+}
+
+.workflowStep:last-child::before {
+  display: none;
+}
+
+.workflowStep.complete,
+.workflowStep.current {
+  color: var(--color-text);
+}
+
+.workflowMarker {
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  background: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.workflowStep.complete .workflowMarker {
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #047857;
+  background: var(--color-success-bg);
+}
+
+.workflowStep.current .workflowMarker {
+  border-color: var(--color-accent);
+  color: #fff;
+  background: var(--color-accent);
 }
 
 .submitGrid {
@@ -884,9 +1171,66 @@ textarea {
 }
 
 .commentsPanel {
+  padding: 0.9rem;
+}
+
+.commentsDetails {
   display: grid;
   gap: 0.75rem;
-  padding: 0.9rem;
+}
+
+.commentsDetails summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.commentsDetails summary::-webkit-details-marker {
+  display: none;
+}
+
+.commentsDetails summary::after {
+  content: '+';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-weight: 800;
+}
+
+.commentsDetails[open] summary::after {
+  content: '-';
+}
+
+.commentsDetails summary span {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.commentsDetails summary strong {
+  color: var(--color-text);
+  font-size: 0.98rem;
+}
+
+.commentsDetails summary small {
+  color: var(--color-text-muted);
+  font-size: 0.83rem;
+}
+
+.commentsDetails[open] .commentList {
+  margin-top: 0.75rem;
+}
+
+.commentsDetails[open] .mentionInput {
+  margin-top: 0.75rem;
 }
 
 .commentList {
@@ -1294,7 +1638,18 @@ textarea {
   }
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 980px) {
+  .rdaPage {
+    animation: none;
+    padding-bottom: 17rem;
+  }
+
   .pageHeader,
   .surfaceHeader,
   .toolbar,
@@ -1308,14 +1663,72 @@ textarea {
   .providerPaymentGrid,
   .poMetaGrid,
   .detailLayout,
+  .commandSummary,
   .inlineForm,
   .poTypeChoice,
   .contactEditorForm,
-	  .articleQuantityRow,
-	  .attachmentUploadControls,
-	  .submitGrid {
-	    grid-template-columns: 1fr;
-	  }
+  .articleQuantityRow,
+  .attachmentUploadControls,
+  .attachmentUploadControls.detailDropzone,
+  .submitGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .poCommandBar {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    max-height: 76vh;
+    overflow: auto;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+    box-shadow: var(--shadow-float);
+  }
+
+  .commandTop,
+  .commandBottom {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .commandSummary {
+    display: flex;
+    gap: 0.45rem;
+    overflow-x: auto;
+    padding-bottom: 0.1rem;
+  }
+
+  .commandChip {
+    flex: 0 0 7.35rem;
+    padding: 0.46rem 0.54rem;
+  }
+
+  .commandActions,
+  .commandDangerActions {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .commandActions button,
+  .commandActions a,
+  .commandActions > span {
+    width: 100%;
+  }
+
+  .commandDangerActions {
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+    padding-top: 0.5rem;
+    padding-left: 0;
+  }
 
   .providerContactEditor .contactEditorForm {
     grid-template-columns: 1fr;
@@ -1416,5 +1829,66 @@ textarea {
 
   .actionsCell {
     width: auto;
+  }
+}
+
+@media (max-width: 680px) {
+  .tabs {
+    gap: 0.2rem;
+  }
+
+  .tab {
+    padding: 0.5rem 0.5rem;
+    font-size: 0.78rem;
+  }
+
+  .rowTable,
+  .rowTable tbody,
+  .rowTable tr,
+  .rowTable td {
+    display: block;
+  }
+
+  .rowTable thead {
+    display: none;
+  }
+
+  .rowTable tr {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: 0.65rem;
+    padding: 0.55rem;
+    background: #fff;
+  }
+
+  .rowTable td {
+    display: grid;
+    grid-template-columns: minmax(5.75rem, 0.38fr) minmax(0, 1fr);
+    gap: 0.6rem;
+    align-items: start;
+    border-bottom: 0;
+    padding: 0.38rem 0.2rem;
+  }
+
+  .rowTable td::before {
+    content: attr(data-label);
+    color: var(--color-text-muted);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .rowTable td:first-child {
+    grid-template-columns: 1fr;
+    padding-top: 0.1rem;
+  }
+
+  .rowTable td:first-child::before {
+    display: none;
+  }
+
+  .rowTable .actionsCell .iconActions {
+    justify-content: flex-start;
   }
 }

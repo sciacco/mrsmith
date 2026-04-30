@@ -1,5 +1,5 @@
 import { Icon, useToast } from '@mrsmith/ui';
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type DragEvent } from 'react';
 import { getRdaQuoteThreshold } from '../runtime-config';
 import { useDeleteAttachment, useRdaDownloads, useUploadAttachment } from '../api/queries';
 import type { AttachmentType, PoAttachment, PoDetail } from '../api/types';
@@ -8,7 +8,7 @@ import {
   attachmentTypeLabel,
   defaultAttachmentTypeForPOState,
 } from '../lib/attachments';
-import { downloadBlob, formatDateIT, formatMoney } from '../lib/format';
+import { downloadBlob, formatDateIT, formatMoney, parseMistraMoney } from '../lib/format';
 import { ConfirmDialog } from './ConfirmDialog';
 
 export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boolean }) {
@@ -21,6 +21,8 @@ export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boole
   const poId = po.id;
   const canUpload = po.state === 'DRAFT' || po.state === 'PENDING_VERIFICATION';
   const quoteThreshold = getRdaQuoteThreshold();
+  const quoteCount = (po.attachments ?? []).filter((attachment) => attachment.attachment_type === 'quote').length;
+  const quoteRequired = parseMistraMoney(po.total_price) >= quoteThreshold;
 
   useEffect(() => {
     setAttachmentType(defaultAttachmentTypeForPOState(po.state));
@@ -46,6 +48,12 @@ export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boole
     });
   }
 
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    if (upload.isPending) return;
+    void uploadFiles(event.dataTransfer.files);
+  }
+
   async function download(attachment: PoAttachment) {
     try {
       const blob = await downloads.attachment(poId, attachment.id);
@@ -68,9 +76,14 @@ export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boole
 
   return (
     <div className="stack">
-      <p className="muted">Per importi maggiori di {formatMoney(quoteThreshold, po.currency)} sono necessari almeno 2 allegati di tipo Preventivo.</p>
+      <div className="attachmentBusinessMessage">
+        <span className={`badge ${quoteRequired && quoteCount < 2 ? 'warning' : 'success'}`}>
+          {quoteRequired ? `${quoteCount}/2 preventivi` : `${po.attachments?.length ?? 0} allegat${(po.attachments?.length ?? 0) === 1 ? 'o' : 'i'}`}
+        </span>
+        <p className="muted">Per importi maggiori di {formatMoney(quoteThreshold, po.currency)} sono necessari almeno 2 preventivi.</p>
+      </div>
       {canUpload ? (
-        <div className="attachmentUploadControls compact">
+        <div className="attachmentUploadControls detailDropzone">
           <div className="field">
             <label htmlFor="po-attachment-type">Tipo documento</label>
             <select
@@ -84,10 +97,16 @@ export function AttachmentsTab({ po, editable }: { po: PoDetail; editable: boole
               ))}
             </select>
           </div>
-          <div className="field">
-            <label>Carica allegati</label>
+          <label
+            className={`uploadDrop ${upload.isPending ? 'disabled' : ''}`}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={handleDrop}
+          >
+            <Icon name={upload.isPending ? 'loader' : 'file-up'} size={22} />
+            <span>{upload.isPending ? 'Caricamento in corso' : 'Trascina o scegli file'}</span>
+            <small>{attachmentTypeLabel(attachmentType)}</small>
             <input type="file" multiple onChange={handleUpload} disabled={upload.isPending} />
-          </div>
+          </label>
         </div>
       ) : null}
       <div className="tableScroll">
