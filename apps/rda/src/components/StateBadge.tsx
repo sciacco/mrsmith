@@ -6,7 +6,9 @@ export function StateBadge({ state }: { state?: string | null }) {
   const label = stateLabel(state);
   return (
     <Tooltip content={stateFullLabel(state)}>
-      <span className={`badge ${tone === 'neutral' ? '' : tone}`}>{label}</span>
+      <span className={`badge ${tone}`}>
+        <span className="badgeText">{label}</span>
+      </span>
     </Tooltip>
   );
 }

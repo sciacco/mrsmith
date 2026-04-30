@@ -70,7 +70,7 @@ export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
             const contextTooltip = po.contexts.map((context) => context.label).join(', ');
 
             return (
-              <tr key={po.id}>
+              <tr key={po.id} onDoubleClick={() => navigate(`/rda/po/${po.id}`)}>
                 <td>
                   <div className="requestCell">
                     <span className="requestCode">{code}</span>
@@ -100,7 +100,7 @@ export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
                 </td>
                 <td className="dateCell">{rowDate(po)}</td>
                 <td className="moneyCell">{formatMoney(po.total_price, po.currency)}</td>
-                <td className="actionsCell">
+                <td className="actionsCell" onDoubleClick={(event) => event.stopPropagation()}>
                   <span className="iconActions">
                     <Tooltip content={label}>
                       <button

@@ -22,6 +22,7 @@ const labels: Record<string, string> = {
   PENDING_BUDGET_INCREMENT: 'Attesa budget',
   PENDING_SEND: 'Da inviare',
   PENDING_VERIFICATION: 'Attesa conformità',
+  DELIVERED_AND_COMPLIANT: 'Erogata conforme',
   SENT: 'Inviata',
   CLOSED: 'Chiusa',
 };
@@ -38,6 +39,7 @@ const fullLabels: Record<string, string> = {
   PENDING_BUDGET_INCREMENT: 'In attesa incremento budget',
   PENDING_SEND: 'In attesa invio al fornitore',
   PENDING_VERIFICATION: 'In attesa verifica conformità',
+  DELIVERED_AND_COMPLIANT: 'Erogata e conforme',
   SENT: 'Inviata al fornitore',
   CLOSED: 'Chiusa',
 };
@@ -52,11 +54,35 @@ export function stateFullLabel(state?: string | null): string {
   return fullLabels[state] ?? state.replaceAll('_', ' ');
 }
 
-export function stateTone(state?: string | null): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
+export type StateTone =
+  | 'neutral'
+  | 'approved'
+  | 'closed'
+  | 'compliant'
+  | 'danger'
+  | 'approval'
+  | 'budget'
+  | 'draft'
+  | 'leasing'
+  | 'payment'
+  | 'send'
+  | 'sent'
+  | 'verification';
+
+export function stateTone(state?: string | null): StateTone {
   if (!state) return 'neutral';
-  if (state === 'DRAFT') return 'neutral';
+  if (state === 'DRAFT') return 'draft';
   if (state.includes('REJECT')) return 'danger';
-  if (state.includes('APPROVED') || state === 'CLOSED' || state === 'SENT') return 'success';
-  if (state.includes('PENDING')) return 'warning';
-  return 'info';
+  if (state === 'APPROVED') return 'approved';
+  if (state === 'DELIVERED_AND_COMPLIANT') return 'compliant';
+  if (state === 'SENT') return 'sent';
+  if (state === 'CLOSED') return 'closed';
+  if (state === 'PENDING_APPROVAL') return 'approval';
+  if (state === 'PENDING_BUDGET_INCREMENT') return 'budget';
+  if (state === 'PENDING_APPROVAL_PAYMENT_METHOD') return 'payment';
+  if (state === 'PENDING_LEASING' || state === 'PENDING_LEASING_ORDER_CREATION') return 'leasing';
+  if (state === 'PENDING_SEND') return 'send';
+  if (state === 'PENDING_VERIFICATION') return 'verification';
+  if (state === 'PENDING_APPROVAL_NO_LEASING') return 'approval';
+  return 'neutral';
 }
