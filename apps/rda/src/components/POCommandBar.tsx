@@ -43,12 +43,6 @@ function isTransitionAction(value: string): value is TransitionAction {
   return transitionActions.includes(value as TransitionAction);
 }
 
-function paymentLabel(po: PoDetail): string {
-  const payment = po.payment_method;
-  if (!payment) return '-';
-  return typeof payment === 'string' ? payment : payment.description || payment.code || '-';
-}
-
 function providerLabel(po: PoDetail): string {
   return po.provider?.company_name?.trim() || (po.provider?.id ? `Fornitore ${po.provider.id}` : '-');
 }
@@ -221,7 +215,7 @@ export function POCommandBar({
           tone={quoteRequired && quoteCount < 2 ? 'warning' : 'success'}
         />
         <SummaryChip label="Destinatari" value={summaryValue(summary?.recipient_count ?? po.recipients?.length, '0')} />
-        <SummaryChip label="Pagamento" value={summary?.payment_method || paymentLabel(po)} />
+        <SummaryChip label="Tipo ordine" value={summaryValue(po.type)} />
       </div>
 
       <div className="commandBottom">
