@@ -62,22 +62,22 @@ func isApprover(po poDetail, email string) bool {
 }
 
 type inboxRoute struct {
-	upstreamPath string
-	roles        []string
+	upstreamPath       string
+	requiredPermission rdaPermissionFlag
 }
 
 func inboxConfig(kind string) (inboxRoute, bool) {
 	switch kind {
 	case "level1-2":
-		return inboxRoute{upstreamPath: "/po/pending-approval", roles: applaunchRDAApproverL1L2Roles()}, true
+		return inboxRoute{upstreamPath: "/po/pending-approval", requiredPermission: permissionApprover}, true
 	case "leasing":
-		return inboxRoute{upstreamPath: "/po/pending-leasing", roles: applaunchRDAApproverAFCRoles()}, true
+		return inboxRoute{upstreamPath: "/po/pending-leasing", requiredPermission: permissionAFC}, true
 	case "no-leasing":
-		return inboxRoute{upstreamPath: "/po/pending-approval-no-leasing", roles: applaunchRDAApproverNoLeasingRoles()}, true
+		return inboxRoute{upstreamPath: "/po/pending-approval-no-leasing", requiredPermission: permissionApproverNoLeasing}, true
 	case "payment-method":
-		return inboxRoute{upstreamPath: "/po/pending-approval-payment-method", roles: applaunchRDAApproverAFCRoles()}, true
+		return inboxRoute{upstreamPath: "/po/pending-approval-payment-method", requiredPermission: permissionAFC}, true
 	case "budget-increment":
-		return inboxRoute{upstreamPath: "/po-pending-budget-increment", roles: applaunchRDAApproverExtraBudgetRoles()}, true
+		return inboxRoute{upstreamPath: "/po-pending-budget-increment", requiredPermission: permissionExtraBudget}, true
 	default:
 		return inboxRoute{}, false
 	}

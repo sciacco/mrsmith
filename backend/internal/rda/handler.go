@@ -14,7 +14,6 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/auth"
-	"github.com/sciacco/mrsmith/internal/authz"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
@@ -72,11 +71,11 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handle("POST /rda/v1/pos/{id}/submit", h.handleSubmitPO)
 	handle("POST /rda/v1/pos/{id}/approve", h.handleApprovePO)
 	handle("POST /rda/v1/pos/{id}/reject", h.handleRejectPO)
-	handle("POST /rda/v1/pos/{id}/leasing/approve", h.handleRoleTransition(applaunch.RDAApproverAFCRoles(), "/leasing/approve", "approva leasing"))
-	handle("POST /rda/v1/pos/{id}/leasing/reject", h.handleRoleTransition(applaunch.RDAApproverAFCRoles(), "/leasing/reject", "rifiuta leasing"))
-	handle("POST /rda/v1/pos/{id}/leasing/created", h.handleRoleTransition(applaunch.RDAApproverAFCRoles(), "/leasing/created", "leasing creato"))
-	handle("POST /rda/v1/pos/{id}/no-leasing/approve", h.handleRoleTransition(applaunch.RDAApproverNoLeasingRoles(), "/no-leasing/approve", "approva no leasing"))
-	handle("POST /rda/v1/pos/{id}/payment-method/approve", h.handleRoleTransition(applaunch.RDAApproverAFCRoles(), "/payment-method/approve", "approva metodo pagamento"))
+	handle("POST /rda/v1/pos/{id}/leasing/approve", h.handlePermissionTransition(permissionAFC, "/leasing/approve", "approva leasing"))
+	handle("POST /rda/v1/pos/{id}/leasing/reject", h.handlePermissionTransition(permissionAFC, "/leasing/reject", "rifiuta leasing"))
+	handle("POST /rda/v1/pos/{id}/leasing/created", h.handlePermissionTransition(permissionAFC, "/leasing/created", "leasing creato"))
+	handle("POST /rda/v1/pos/{id}/no-leasing/approve", h.handlePermissionTransition(permissionApproverNoLeasing, "/no-leasing/approve", "approva no leasing"))
+	handle("POST /rda/v1/pos/{id}/payment-method/approve", h.handlePermissionTransition(permissionAFC, "/payment-method/approve", "approva metodo pagamento"))
 	handle("PATCH /rda/v1/pos/{id}/payment-method", h.handlePatchPaymentMethod)
 	handle("POST /rda/v1/pos/{id}/budget-increment/approve", h.handleBudgetIncrement(true))
 	handle("POST /rda/v1/pos/{id}/budget-increment/reject", h.handleBudgetIncrement(false))
@@ -386,7 +385,11 @@ func (h *Handler) handlePOInbox(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusNotFound, "Pagina non disponibile")
 		return
 	}
-	if !h.hasAnyRole(r, cfg.roles...) {
+	permissions, ok := h.loadPermissionsForRequest(w, r, email)
+	if !ok {
+		return
+	}
+	if !permissions.has(cfg.requiredPermission) {
 		httputil.Error(w, http.StatusForbidden, "Operazione riservata agli utenti abilitati")
 		return
 	}
@@ -667,11 +670,6 @@ func (h *Handler) handleFetchPOError(w http.ResponseWriter, r *http.Request, err
 		"error": "Richiesta non disponibile in questo momento",
 		"code":  codeUpstreamUnavailable,
 	})
-}
-
-func (h *Handler) hasAnyRole(r *http.Request, roles ...string) bool {
-	claims, ok := currentClaims(r)
-	return ok && authz.HasAnyRole(claims.Roles, roles...)
 }
 
 func (h *Handler) fetchProviderForCreate(r *http.Request, providerID int64) providerDetail {

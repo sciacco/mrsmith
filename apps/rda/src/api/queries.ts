@@ -53,10 +53,11 @@ function invalidatePO(queryClient: ReturnType<typeof useQueryClient>, id?: numbe
   }
 }
 
-export function usePermissions() {
+export function usePermissions(enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: ['rda', 'permissions'],
+    enabled,
     queryFn: () => api.get<RdaPermissions>(`${rdaRoot}/me/permissions`),
   });
 }
@@ -113,11 +114,11 @@ export function useMyPOs() {
   });
 }
 
-export function useInbox(kind: string | undefined) {
+export function useInbox(kind: string | undefined, enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: ['rda', 'inbox', kind],
-    enabled: Boolean(kind),
+    enabled: Boolean(kind) && enabled,
     queryFn: async () => unwrap(await api.get<PoPreview[] | PagedEnvelope<PoPreview>>(`${rdaRoot}/pos/inbox/${kind}`)),
   });
 }

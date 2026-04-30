@@ -1,15 +1,9 @@
 import { Suspense, useMemo } from 'react';
-import { hasRole } from '@mrsmith/auth-client';
 import { AppShell, TabNav } from '@mrsmith/ui';
 import { useRoutes } from 'react-router-dom';
+import { usePermissions } from './api/queries';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
-import {
-  RDA_APPROVER_AFC_ROLE,
-  RDA_APPROVER_EXTRA_BUDGET_ROLE,
-  RDA_APPROVER_L1L2_ROLE,
-  RDA_APPROVER_NO_LEASING_ROLE,
-} from './lib/roles';
 
 function AccessState({ title, message }: { title: string; message: string }) {
   return (
@@ -24,23 +18,24 @@ function AccessState({ title, message }: { title: string; message: string }) {
 export function App() {
   const { user, authenticated, loading, logout, status } = useOptionalAuth();
   const element = useRoutes(routes);
+  const permissions = usePermissions(authenticated && !loading && status !== 'reauthenticating');
   const navItems = useMemo(() => {
-    const roles = user?.roles;
+    const flags = authenticated ? permissions.data : undefined;
     return [
       { label: 'Le mie RDA', path: '/rda' },
-      ...(hasRole(roles, RDA_APPROVER_L1L2_ROLE) ? [{ label: 'I/II livello', path: '/rda/inbox/level1-2' }] : []),
-      ...(hasRole(roles, RDA_APPROVER_AFC_ROLE)
+      ...(flags?.is_approver ? [{ label: 'I/II livello', path: '/rda/inbox/level1-2' }] : []),
+      ...(flags?.is_afc
         ? [
             { label: 'Leasing', path: '/rda/inbox/leasing' },
             { label: 'Metodo pagamento', path: '/rda/inbox/payment-method' },
           ]
         : []),
-      ...(hasRole(roles, RDA_APPROVER_NO_LEASING_ROLE) ? [{ label: 'No leasing', path: '/rda/inbox/no-leasing' }] : []),
-      ...(hasRole(roles, RDA_APPROVER_EXTRA_BUDGET_ROLE)
+      ...(flags?.is_approver_no_leasing ? [{ label: 'No leasing', path: '/rda/inbox/no-leasing' }] : []),
+      ...(flags?.is_approver_extra_budget
         ? [{ label: 'Incremento budget', path: '/rda/inbox/budget-increment' }]
         : []),
     ];
-  }, [user?.roles]);
+  }, [authenticated, permissions.data]);
 
   if (loading) return null;
 

@@ -1,9 +1,8 @@
 import { ApiError } from '@mrsmith/api-client';
 import { Skeleton } from '@mrsmith/ui';
 import { Navigate, useParams } from 'react-router-dom';
-import { useInbox } from '../api/queries';
+import { useInbox, usePermissions } from '../api/queries';
 import { PoListTable } from '../components/PoListTable';
-import { useHasRole } from '../hooks/useHasRole';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { inboxConfig, isInboxKind } from '../lib/inbox';
 
@@ -12,17 +11,51 @@ function inboxError(error: unknown): string {
   return 'La lista non e disponibile in questo momento.';
 }
 
+function permissionError(error: unknown): { title: string; message: string } {
+  if (error instanceof ApiError && error.status === 401) {
+    return { title: 'Accesso richiesto', message: "Ricarica la pagina o riapri l'app dal portale." };
+  }
+  if (error instanceof ApiError && error.status === 403) {
+    return { title: 'Accesso riservato', message: 'Questa lista e disponibile solo agli utenti abilitati.' };
+  }
+  return { title: 'Le approvazioni non sono disponibili in questo momento', message: 'Riprova piu tardi.' };
+}
+
 export function InboxPage() {
   const { kind } = useParams();
   const valid = isInboxKind(kind);
   const config = valid ? inboxConfig[kind] : inboxConfig['level1-2'];
-  const hasRole = useHasRole(valid ? config.role : '');
-  const inbox = useInbox(kind);
+  const permissions = usePermissions(valid);
+  const hasPermission = valid && Boolean(permissions.data?.[config.permission]);
+  const inbox = useInbox(kind, valid && hasPermission);
   const { user } = useOptionalAuth();
 
   if (!valid) return <Navigate to="/rda" replace />;
 
-  if (!hasRole) {
+  if (permissions.isLoading) {
+    return (
+      <main className="rdaPage">
+        <section className="stateCard">
+          <Skeleton rows={4} />
+        </section>
+      </main>
+    );
+  }
+
+  if (permissions.error) {
+    const state = permissionError(permissions.error);
+    return (
+      <main className="rdaPage">
+        <section className="stateCard">
+          <p className="eyebrow">Autorizzazione</p>
+          <h1>{state.title}</h1>
+          <p>{state.message}</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!hasPermission) {
     return (
       <main className="rdaPage">
         <section className="stateCard">

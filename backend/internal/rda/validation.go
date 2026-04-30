@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	platformconfig "github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
@@ -612,7 +611,15 @@ func (h *Handler) handleApprovePO(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if po.State != "PENDING_APPROVAL" || !h.hasAnyRole(r, applaunch.RDAApproverL1L2Roles()...) || !isApprover(po, email) {
+	if po.State != "PENDING_APPROVAL" || !isApprover(po, email) {
+		httputil.Error(w, http.StatusForbidden, "Operazione riservata agli approvatori assegnati")
+		return
+	}
+	permissions, ok := h.loadPermissionsForRequest(w, r, email)
+	if !ok {
+		return
+	}
+	if !permissions.has(permissionApprover) {
 		httputil.Error(w, http.StatusForbidden, "Operazione riservata agli approvatori assegnati")
 		return
 	}
@@ -627,24 +634,28 @@ func (h *Handler) handleRejectPO(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	var requiredPermission rdaPermissionFlag
 	switch po.State {
 	case "PENDING_APPROVAL":
-		if !h.hasAnyRole(r, applaunch.RDAApproverL1L2Roles()...) || !isApprover(po, email) {
+		if !isApprover(po, email) {
 			httputil.Error(w, http.StatusForbidden, "Operazione riservata agli approvatori assegnati")
 			return
 		}
+		requiredPermission = permissionApprover
 	case "PENDING_APPROVAL_PAYMENT_METHOD":
-		if !h.hasAnyRole(r, applaunch.RDAApproverAFCRoles()...) {
-			httputil.Error(w, http.StatusForbidden, "Operazione riservata agli utenti abilitati")
-			return
-		}
+		requiredPermission = permissionAFC
 	case "PENDING_APPROVAL_NO_LEASING":
-		if !h.hasAnyRole(r, applaunch.RDAApproverNoLeasingRoles()...) {
-			httputil.Error(w, http.StatusForbidden, "Operazione riservata agli utenti abilitati")
-			return
-		}
+		requiredPermission = permissionApproverNoLeasing
 	default:
 		httputil.Error(w, http.StatusConflict, "Azione non disponibile nello stato attuale")
+		return
+	}
+	permissions, ok := h.loadPermissionsForRequest(w, r, email)
+	if !ok {
+		return
+	}
+	if !permissions.has(requiredPermission) {
+		httputil.Error(w, http.StatusForbidden, "Operazione riservata agli utenti abilitati")
 		return
 	}
 	h.forwardArak(w, r, http.MethodPost, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/reject", "", nil, requesterHeaders(email))
@@ -677,7 +688,7 @@ func (h *Handler) handlePatchPaymentMethod(w http.ResponseWriter, r *http.Reques
 	h.forwardArak(w, r, http.MethodPatch, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/payment-method", "", encoded, mergeHeaders(requesterHeaders(email), jsonHeaders()))
 }
 
-func (h *Handler) handleRoleTransition(roles []string, suffix string, operation string) http.HandlerFunc {
+func (h *Handler) handlePermissionTransition(requiredPermission rdaPermissionFlag, suffix string, operation string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !h.requireArak(w) {
 			return
@@ -687,7 +698,11 @@ func (h *Handler) handleRoleTransition(roles []string, suffix string, operation 
 			httputil.Error(w, http.StatusUnauthorized, "Accesso richiesto")
 			return
 		}
-		if !h.hasAnyRole(r, roles...) {
+		permissions, ok := h.loadPermissionsForRequest(w, r, email)
+		if !ok {
+			return
+		}
+		if !permissions.has(requiredPermission) {
 			httputil.Error(w, http.StatusForbidden, "Operazione riservata agli utenti abilitati")
 			return
 		}
@@ -724,7 +739,11 @@ func (h *Handler) handleBudgetIncrement(approve bool) http.HandlerFunc {
 			httputil.Error(w, http.StatusUnauthorized, "Accesso richiesto")
 			return
 		}
-		if !h.hasAnyRole(r, applaunch.RDAApproverExtraBudgetRoles()...) {
+		permissions, ok := h.loadPermissionsForRequest(w, r, email)
+		if !ok {
+			return
+		}
+		if !permissions.has(permissionExtraBudget) {
 			httputil.Error(w, http.StatusForbidden, "Operazione riservata agli utenti abilitati")
 			return
 		}

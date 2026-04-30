@@ -132,12 +132,9 @@ API prefix:
 Access roles:
 
 - `app_rda_access`: base app access and launcher tile.
-- `app_rda_approver_l1l2`: L1/L2 inbox and L1/L2 approve/reject.
-- `app_rda_approver_afc`: leasing, payment-method, and leasing-created actions.
-- `app_rda_approver_no_leasing`: no-leasing inbox and approve/reject.
-- `app_rda_approver_extra_budget`: budget-increment inbox and approve/reject.
+- RDA approval permissions are not Keycloak roles. The backend reads the four operational flags from `users_int.user` joined to `users_int.role` by the token email and exposes them through `/api/rda/v1/me/permissions`.
 - `app_fornitori_access` must be bundled at Keycloak group level with `app_rda_access` for v1.
-- `app_devadmin` bypasses role checks through existing authz helpers.
+- `app_devadmin` may satisfy the base launcher/access role through existing authz helpers, but it must not override the four RDA approval booleans.
 
 Dev port / proxy:
 
@@ -246,13 +243,14 @@ Frontend scaffold:
   - Derive basename from `import.meta.env.BASE_URL`.
 - `App.tsx`
   - Use `AppShell` with app name `RDA`.
-  - Use `TabNav` with role-aware items:
+  - Use `TabNav` with permission-aware items from `/me/permissions`:
     - Always show `Le mie RDA` -> `/rda`.
-    - Show `I/II livello` -> `/rda/inbox/level1-2` when the user has `app_rda_approver_l1l2`.
-    - Show `Leasing` -> `/rda/inbox/leasing` when `app_rda_approver_afc`.
-    - Show `Metodo pagamento` -> `/rda/inbox/payment-method` when `app_rda_approver_afc`.
-    - Show `No leasing` -> `/rda/inbox/no-leasing` when `app_rda_approver_no_leasing`.
-    - Show `Incremento budget` -> `/rda/inbox/budget-increment` when `app_rda_approver_extra_budget`.
+    - Show `I/II livello` -> `/rda/inbox/level1-2` when `is_approver`.
+    - Show `Leasing` -> `/rda/inbox/leasing` when `is_afc`.
+    - Show `Metodo pagamento` -> `/rda/inbox/payment-method` when `is_afc`.
+    - Show `No leasing` -> `/rda/inbox/no-leasing` when `is_approver_no_leasing`.
+    - Show `Incremento budget` -> `/rda/inbox/budget-increment` when `is_approver_extra_budget`.
+    - During permission loading/errors, show only `Le mie RDA`.
   - Do not show a separate launcher-like home page.
 - `routes.tsx`
   - `{ index: true, element: <Navigate to="/rda" replace /> }`
@@ -300,7 +298,7 @@ Backend config/main:
 - Load from `RDA_APP_URL`.
 - Add default CORS origin `http://localhost:5190`.
 - Add RDA href override in `main.go`.
-- Add catalog filter: hide RDA when `arakCli == nil || arakDB == nil` because RDA needs both Mistra Arak and Arak Postgres payment-method reads.
+- Add catalog filter: hide RDA when `arakCli == nil || arakDB == nil` because RDA needs both Mistra Arak and Arak Postgres payment-method and permission reads.
 - Import `backend/internal/rda`.
 - Call `rda.RegisterRoutes(api, rda.Deps{Arak: arakCli, ArakDB: arakDB, Logger: logger})` after dependencies are initialized.
 
@@ -366,7 +364,7 @@ Core helpers:
 
 Route registration:
 
-Use `acl.RequireRole(applaunch.RDAAccessRoles()...)` for every RDA endpoint. For inboxes and privileged transitions, add explicit role checks in handlers or nested middleware.
+Use `acl.RequireRole(applaunch.RDAAccessRoles()...)` for every RDA endpoint. For inboxes and privileged transitions, load `/me/permissions` server-side from `users_int.role` and check the required boolean before forwarding to Mistra.
 
 Register public routes under:
 
@@ -416,13 +414,13 @@ Do not register `/rda/v1/providers...`; RDA frontend uses `/fornitori/v1/...`.
 
 Identity and permissions:
 
-- `/me/permissions` reads `auth.Claims.Roles` and returns:
+- `/me/permissions` reads `users_int.user` joined to `users_int.role` with the trusted token email and returns:
   - `is_approver`
   - `is_afc`
   - `is_approver_no_leasing`
   - `is_approver_extra_budget`
-- Use `authz.HasAnyRole` so `app_devadmin` works.
-- Do not query `users_int.role`.
+- Missing DB rows return all flags `false`; DB dependency failures are sanitized for clients.
+- Do not derive these booleans from Keycloak roles or `app_devadmin`.
 
 Catalog endpoints:
 
@@ -439,11 +437,11 @@ PO list and inbox endpoints:
 
 - `/pos` forwards to `/arak/rda/v1/po`.
 - `/pos/inbox/{kind}` mapping:
-  - `level1-2` -> `/arak/rda/v1/po/pending-approval`, role `app_rda_approver_l1l2`
-  - `leasing` -> `/arak/rda/v1/po/pending-leasing`, role `app_rda_approver_afc`
-  - `no-leasing` -> `/arak/rda/v1/po/pending-approval-no-leasing`, role `app_rda_approver_no_leasing`
-  - `payment-method` -> `/arak/rda/v1/po/pending-approval-payment-method`, role `app_rda_approver_afc`
-  - `budget-increment` -> `/arak/rda/v1/po-pending-budget-increment`, role `app_rda_approver_extra_budget`
+  - `level1-2` -> `/arak/rda/v1/po/pending-approval`, permission `is_approver`
+  - `leasing` -> `/arak/rda/v1/po/pending-leasing`, permission `is_afc`
+  - `no-leasing` -> `/arak/rda/v1/po/pending-approval-no-leasing`, permission `is_approver_no_leasing`
+  - `payment-method` -> `/arak/rda/v1/po/pending-approval-payment-method`, permission `is_afc`
+  - `budget-increment` -> `/arak/rda/v1/po-pending-budget-increment`, permission `is_approver_extra_budget`
 - Unknown kind returns 404.
 - All forwards set `Requester-Email` from claims.
 
@@ -562,25 +560,25 @@ Transitions:
 - `approve`
   - Fetch PO detail.
   - Require state `PENDING_APPROVAL`.
-  - Require role `app_rda_approver_l1l2`.
+  - Require permission `is_approver`.
   - Require current email in `approvers[]`.
   - Forward `/approve`.
 - `reject`
-  - Fetch PO detail and choose role by state:
-    - `PENDING_APPROVAL`: `app_rda_approver_l1l2` and email in `approvers[]`
-    - `PENDING_APPROVAL_PAYMENT_METHOD`: `app_rda_approver_afc`
-    - `PENDING_APPROVAL_NO_LEASING`: `app_rda_approver_no_leasing`
+  - Fetch PO detail and choose permission by state:
+    - `PENDING_APPROVAL`: `is_approver` and email in `approvers[]`
+    - `PENDING_APPROVAL_PAYMENT_METHOD`: `is_afc`
+    - `PENDING_APPROVAL_NO_LEASING`: `is_approver_no_leasing`
   - Forward `/reject`.
   - Unknown state returns 403 or 409 with business-facing error.
-- `payment-method/approve`: require `app_rda_approver_afc`; forward.
+- `payment-method/approve`: require `is_afc`; forward.
 - `payment-method` PATCH:
   - Fetch PO detail.
   - Require requester.
   - Require state `PENDING_APPROVAL_PAYMENT_METHOD`.
   - Forward `{payment_method}` to `/payment-method`.
-- `leasing/approve`, `leasing/reject`, `leasing/created`: require `app_rda_approver_afc`; forward.
-- `no-leasing/approve`: require `app_rda_approver_no_leasing`; forward.
-- `budget-increment/approve` and `budget-increment/reject`: require `app_rda_approver_extra_budget`.
+- `leasing/approve`, `leasing/reject`, `leasing/created`: require `is_afc`; forward.
+- `no-leasing/approve`: require `is_approver_no_leasing`; forward.
+- `budget-increment/approve` and `budget-increment/reject`: require `is_approver_extra_budget`.
   - For approve, body must contain `increment_promise`.
   - For reject, final spec says same body in public contract; OpenAPI does not require it for reject. Preserve the public body shape and forward only what Mistra accepts. If Mistra rejects a body on reject, send no body and document it.
 - `send-to-provider`: no role beyond base access; forward state-only.
@@ -847,19 +845,19 @@ Create files:
 ```ts
 level1-2:
   title: "Approvazioni I° / II° livello"
-  role: "app_rda_approver_l1l2"
+  permission: "is_approver"
 leasing:
   title: "Approvazioni Leasing"
-  role: "app_rda_approver_afc"
+  permission: "is_afc"
 no-leasing:
   title: "Approvazioni No-Leasing"
-  role: "app_rda_approver_no_leasing"
+  permission: "is_approver_no_leasing"
 payment-method:
   title: "Approvazioni Metodo Pagamento"
-  role: "app_rda_approver_afc"
+  permission: "is_afc"
 budget-increment:
   title: "Approvazioni Incremento Budget"
-  role: "app_rda_approver_extra_budget"
+  permission: "is_approver_extra_budget"
 ```
 
 Page behavior:
@@ -923,7 +921,7 @@ Action derivation:
   - `isApproverForPO`
   - `canSubmit`
   - `quoteRuleBlocked`
-  - role booleans from `/me/permissions`
+  - permission booleans from `/me/permissions`
 - `canSubmit`:
   - state `DRAFT`
   - requester
@@ -1377,10 +1375,10 @@ For this implementation:
 - Do run existing build/typecheck/test commands as verification.
 - Do not create new test files by default.
 - If the user approves tests later, prioritize narrow backend tests for:
-  - role mapping in `/me/permissions`
-  - inbox role enforcement
+  - DB-backed permission mapping in `/me/permissions`
+  - inbox permission enforcement
   - submit prerequisites
-  - generic reject state-to-role mapping
+  - generic reject state-to-permission mapping
   - attachment auto-tag
   - patch body preserving explicit empty values
 

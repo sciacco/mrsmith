@@ -6,6 +6,7 @@
 - **Audit source:** `apps/rda/audit/00_inventory.md` … `06_jsobject_methods.md` (Appsmith export at `apps/rda/rda.json.gz`)
 - **Spec status:** complete; ready for `portal-miniapp-generator` (Phase 3 — implementation planning)
 - **Last updated decisions:** Q-A1..A13 resolved (see Phase A); B+C+D phases produced no further blocking questions; D.Q-1..D.Q-4 carry sensible defaults
+- **A2 supersedure:** approval permissions are now sourced from `users_int.user`/`users_int.role` via the backend, not from the Phase D `app_rda_approver_*` Keycloak role mapping.
 - **Migration intent:** **1:1 functional port** of the Appsmith app to a React + Go portal mini-app, **reusing the existing Mistra NG `/arak/rda/...` API surface unchanged** at the wire level; legacy security and quality issues are fixed at the new module's boundary.
 
 ## Current-State Evidence
@@ -77,7 +78,7 @@
 - **Purpose:** per-PO approver assignment with level (1 or 2).
 - **Operations:** read only (assigned by Mistra at submit time).
 - **Fields:** `{user:{email}, level:'1'|'2'}`.
-- **Constraints (B-7):** approve/reject buttons require both the matching Keycloak role AND `currentUser.email ∈ approvers[*].user.email`.
+- **Constraints (B-7):** approve/reject buttons require both the matching DB-derived RDA permission flag AND `currentUser.email ∈ approvers[*].user.email`.
 
 ### Entity: Provider, ProviderReference, Budget, PaymentMethod, Article, User, UserPermissions
 
@@ -88,7 +89,7 @@ Read-only (or quasi-read-only) catalogs / identity entities. Field maps in Phase
 - **PaymentMethod**: read directly from `arak_db (nuovo)` Postgres in the new RDA module (no Mistra REST equivalent).
 - **Article**: read via Mistra `GET /arak/rda/v1/article?type=service|good`.
 - **User search**: read via Mistra `GET /arak/users-int/v1/user?search_string=…` (used only for the @-mention popup).
-- **UserPermissions**: derived from Keycloak token claims; surfaced via `/api/rda/v1/me/permissions`. Replaces the legacy `users_int.role` SQL.
+- **UserPermissions**: derived by the backend from `users_int.user` joined to `users_int.role` using the trusted token email; surfaced via `/api/rda/v1/me/permissions`.
 
 ---
 
@@ -113,10 +114,10 @@ Read-only (or quasi-read-only) catalogs / identity entities. Field maps in Phase
 - **Interaction pattern:** list with a single "Gestisci" row action.
 - **Main data shown:** a subset of `PurchaseOrder` columns (`state, requester.email, created, code, provider.company_name, project, total_price`).
 - **Key actions:** drill down to `/rda/po/:id`.
-- **Entry and exit points:** entry from the launcher tile (visible only when the relevant role is held); exit to PO Details.
+- **Entry and exit points:** entry from the launcher tile and permission-aware RDA nav (visible only when the relevant `/me/permissions` flag is true); exit to PO Details.
 - **Notes on current vs intended behavior:**
   - 5 legacy pages collapse to one parameterised view.
-  - Per-route Keycloak role enforced both client-side (route guard) and server-side (`acl.RequireRole`).
+  - Per-route permission flag enforced both client-side (route guard) and server-side before forwarding to Mistra.
   - URL anomaly preserved at the Mistra wire (`/po-pending-budget-increment`, Q-A10) but the public RDA endpoint is uniform: `/api/rda/v1/pos/inbox/budget-increment`.
 
 ### View: `/rda/po/:poId` — PO Details (workflow editor)
@@ -140,12 +141,12 @@ Read-only (or quasi-read-only) catalogs / identity entities. Field maps in Phase
 ### Backend responsibilities (`backend/internal/rda/`)
 
 - **Auth boundary:** read OIDC `email` claim, inject as `Requester-Email` header into every Mistra call.
-- **Permission derivation:** map 4 Keycloak roles to the legacy 4 boolean flags; expose `GET /api/rda/v1/me/permissions`.
+- **Permission derivation:** read the 4 legacy boolean flags from `users_int.user`/`users_int.role` by token email; expose `GET /api/rda/v1/me/permissions`.
 - **Body shaping** for `POST /pos`, `PATCH /pos/{id}`, `POST /pos/{id}/rows`, `PATCH /provider/.../reference/...` (asymmetric phone/email semantics) — Go DTOs replace the legacy IIFE bodies.
 - **Attachment auto-tag** (B-3): server reads current PO state, sets `attachment_type`.
 - **PDF / file download:** return signed URL (302) or stream; no client-side base64.
 - **Catalog reads** that today are direct PG: `payment_method`, `payment_method_default_cdlan`. Same SQL, server-side.
-- **Inbox role enforcement** via `acl.RequireRole` on each `/inbox/:kind` route.
+- **Inbox permission enforcement** via the DB-derived `/me/permissions` flags on each `/inbox/:kind` route.
 - **Defence-in-depth approver guard:** re-check `email ∈ approvers[]` before forwarding any approve/reject call.
 
 ### Frontend responsibilities (`apps/rda/`)
@@ -153,7 +154,7 @@ Read-only (or quasi-read-only) catalogs / identity entities. Field maps in Phase
 - 3 routes (`/rda`, `/rda/inbox/:kind`, `/rda/po/:poId`).
 - 8 shared components (Phase B §B.5): `PoListTable`, `StateBadge`, `ActionBar`, `RecipientsList`, `MentionInput`, `ProviderRefTable`, `BudgetSelect`, `PaymentMethodSelect`.
 - Form schemas (Zod or equivalent) for: new-PO, new-provider, item, provider-ref edit/add.
-- Action bar derives a single `permissions` object from `state + role + checkMailIsPresent + isRequester`; passed via context to children.
+- Action bar derives a single `permissions` object from `state + DB-derived permission flags + checkMailIsPresent + isRequester`; passed via context to children.
 - React Query (or equivalent) for caching shared catalogs across views.
 - Routing, modal/dialog state, toast, navigation post-action.
 
@@ -205,7 +206,7 @@ None on our side. The state machine is server-side at Mistra; our module has no 
 
 - PO aggregate, providers, budgets, articles, files, PDFs → **Mistra** owns; we proxy.
 - Payment-method catalog → read directly from Arak Postgres (server-side).
-- User identity & roles → Keycloak (token).
+- User identity and base app roles → Keycloak (token); RDA approval permission flags → `users_int.role`.
 - **No new tables, no new schemas, no migrations** introduced by RDA in v1.
 
 ### Cross-module coupling inside the portal
@@ -350,7 +351,7 @@ All blocking questions are resolved. The following are deferred decisions with s
 |---|----------|---------|----------------|
 | **D.Q-1** | Bundle `app_fornitori_access` with `app_rda_access` at Keycloak group level (D-R1) vs UI fallback (D-R2)? | D-R1; track in `docs/TODO.md` | ops + tech-lead |
 | **D.Q-2** | Does `POST /comment` on Mistra need a body `user_id`? | No; derived from `Requester-Email` | implementation team (validate in dev) |
-| **D.Q-3** | Inbox role enforcement server-side in the Go module? | Yes — `acl.RequireRole` per inbox kind | tech-lead |
+| **D.Q-3** | Inbox authorization enforcement server-side in the Go module? | Yes — DB-derived RDA permission flag per inbox kind | tech-lead |
 | **D.Q-4** | Is the dead `Acquisti RDA approvers I-II` Keycloak group still in use? | Treated as dead; not bound | ops |
 | **M-6** | When does Mistra add `PUT /po/{id}/row/{rowId}`? | Tracked in `docs/TODO.md`; UI hides the pencil until then | Mistra/Arak team |
 | **F-1** | When does Mistra fix `total_price` trailing-character bug? | Frontend parses to number; tracked | Mistra/Arak team |
