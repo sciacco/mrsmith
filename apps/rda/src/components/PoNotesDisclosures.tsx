@@ -1,3 +1,5 @@
+import { Icon } from '@mrsmith/ui';
+
 interface NoteSection {
   id: string;
   label: string;
@@ -28,6 +30,9 @@ export function PoNotesDisclosures({
         <details key={section.id} className="poNoteDisclosure">
           <summary>
             <span>{section.label}</span>
+            <span className="poNoteDisclosureIcon">
+              <Icon name="chevron-right" size={16} />
+            </span>
           </summary>
           <p>{section.value}</p>
         </details>

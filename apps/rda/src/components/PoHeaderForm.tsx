@@ -3,7 +3,6 @@ import { useEffect, useState, type FormEvent } from 'react';
 import type { BudgetForUser, PoDetail, ProviderSummary } from '../api/types';
 import { formatDateIT, normalizeCurrency, RDA_CURRENCIES } from '../lib/format';
 import type { PaymentMethodOption } from '../lib/payment-options';
-import { stateLabel } from '../lib/state-labels';
 import { BudgetSelect } from './BudgetSelect';
 import { PaymentMethodSelect } from './PaymentMethodSelect';
 import { PoNotesDisclosures } from './PoNotesDisclosures';
@@ -66,24 +65,39 @@ function optionalText(value?: string | null): string {
   return value?.trim() || '-';
 }
 
-function SummaryItem({
+function InspectorRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="poInspectorRow">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function InspectorFact({
   label,
   value,
   detail,
-  wide,
   warning,
 }: {
   label: string;
   value: string;
   detail?: string;
-  wide?: boolean;
   warning?: boolean;
 }) {
   return (
-    <div className={`summaryItem ${wide ? 'wide' : ''} ${warning ? 'warning' : ''}`}>
+    <div className={`poInspectorFact ${warning ? 'warning' : ''}`}>
       <span>{label}</span>
-      <strong>{value}</strong>
-      {detail ? <p>{detail}</p> : null}
+      <div className="poInspectorFactValue">
+        <strong>{value}</strong>
+        {detail ? <p>{detail}</p> : null}
+      </div>
     </div>
   );
 }
@@ -125,19 +139,28 @@ export function PoHeaderSummary({
       <div className="surfaceHeader">
         <div>
           <h2>Ordine Numero: {po.code ?? po.id} del {formatDateIT(headerDate)}</h2>
-          <p className="muted">Stato Attuale: {stateLabel(po.state)}</p>
+          <p className="muted">{optionalText(value.object)}</p>
         </div>
         {canEdit ? editButton : <Tooltip content={editDisabledReason}>{editButton}</Tooltip>}
       </div>
       <div className="poSummaryBody">
-        <div className="poSummaryGrid">
-          <SummaryItem label="Budget" value={budgetLabel(budgets, value.budget_id, po.budget)} />
-          <SummaryItem label="Progetto" value={optionalText(value.project)} />
-          <SummaryItem label="Fornitore" value={providerLabel(provider)} />
-          <SummaryItem label="Pagamento" value={payment} warning={paymentRequiresVerification} detail={paymentRequiresVerification ? 'Richiede approvazione metodo pagamento' : undefined} />
-          <SummaryItem label="Riferimento preventivo" value={optionalText(value.provider_offer_code)} />
-          <SummaryItem label="Data preventivo" value={value.provider_offer_date ? formatDateIT(value.provider_offer_date) : '-'} />
-          <SummaryItem label="Valuta" value={normalizeCurrency(value.currency)} />
+        <div className="poInspectorPanel">
+          <div className="poInspectorPrimary">
+            <InspectorRow label="Budget" value={budgetLabel(budgets, value.budget_id, po.budget)} />
+            <InspectorRow label="Progetto" value={optionalText(value.project)} />
+            <InspectorRow label="Fornitore" value={providerLabel(provider)} />
+          </div>
+          <div className="poInspectorFacts" aria-label="Dettagli preventivo e pagamento">
+            <InspectorFact
+              label="Pagamento"
+              value={payment}
+              warning={paymentRequiresVerification}
+              detail={paymentRequiresVerification ? 'Richiede approvazione metodo pagamento' : undefined}
+            />
+            <InspectorFact label="Riferimento" value={optionalText(value.provider_offer_code)} />
+            <InspectorFact label="Data" value={value.provider_offer_date ? formatDateIT(value.provider_offer_date) : '-'} />
+            <InspectorFact label="Valuta" value={normalizeCurrency(value.currency)} />
+          </div>
         </div>
 
         <PoNotesDisclosures note={value.note} description={value.description} />
