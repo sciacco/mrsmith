@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './Toast.module.css';
 
@@ -25,6 +25,7 @@ type ToastViewportElement = HTMLDivElement & {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [portalTargetVersion, setPortalTargetVersion] = useState(0);
   const viewportRef = useRef<ToastViewportElement | null>(null);
 
   const addToast = useCallback((message: string, type: ToastType = 'success') => {
@@ -35,7 +36,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }, 4000);
   }, []);
 
-  const portalTarget = getToastPortalTarget();
+  const portalTarget = useMemo(() => getToastPortalTarget(), [portalTargetVersion, toasts.length]);
+
+  useEffect(() => {
+    if (toasts.length === 0 || typeof document === 'undefined') return undefined;
+
+    const dialogs = Array.from(document.querySelectorAll<HTMLDialogElement>('dialog[open]'));
+    if (dialogs.length === 0) return undefined;
+
+    const refreshPortalTarget = () => setPortalTargetVersion((current) => current + 1);
+    for (const dialog of dialogs) dialog.addEventListener('close', refreshPortalTarget);
+
+    return () => {
+      for (const dialog of dialogs) dialog.removeEventListener('close', refreshPortalTarget);
+    };
+  }, [portalTarget, toasts.length]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
