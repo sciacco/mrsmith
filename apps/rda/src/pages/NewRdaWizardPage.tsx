@@ -260,6 +260,7 @@ export function NewRdaWizardPage() {
     },
   ];
   const readyToSubmit = draftEditable && readinessItems.every((item) => item.ready);
+  const footerBusy = createPO.isPending || patchPO.isPending || transition.isPending;
 
   function headerFieldError(key: string): string | undefined {
     if (!attemptedHeader) return undefined;
@@ -346,7 +347,7 @@ export function NewRdaWizardPage() {
     try {
       await patchPO.mutateAsync(buildPatchPOPayload(deliveryHeader, budgets.data ?? [], false, recipientIds));
       if (header.type === 'ECOMMERCE') setContactDraftIds([]);
-      toast('Invio al fornitore salvato');
+      toast('Contenuto del PO aggiornato');
       return true;
     } catch {
       toast('Salvataggio non riuscito', 'error');
@@ -786,25 +787,48 @@ export function NewRdaWizardPage() {
       </section>
 
       <div className="wizardFooter">
-        <Button variant="ghost" disabled={step === 0 || createPO.isPending || patchPO.isPending || transition.isPending} onClick={() => setStep((current) => Math.max(0, current - 1))}>
+        <Button variant="ghost" disabled={step === 0 || footerBusy} onClick={() => setStep((current) => Math.max(0, current - 1))}>
           Indietro
         </Button>
         <div className="wizardFooterSummary" aria-live="polite">
-          <span className="wizardFooterStep">Passo {step + 1} di {steps.length}</span>
           <span className="wizardFooterMetric total">
             <span>Totale PO</span>
             <strong>{formatMoney(total, displayCurrency)}</strong>
           </span>
+          <span className="wizardFooterStep">Passo {step + 1} di {steps.length}</span>
           {!detail ? <span className="wizardFooterDraft">Bozza non ancora creata</span> : null}
         </div>
-        <Button
-          leftIcon={step === steps.length - 1 ? <Icon name="check" /> : <Icon name="arrow-right" />}
-          disabled={(step === steps.length - 1 && !readyToSubmit) || createPO.isPending || patchPO.isPending || transition.isPending}
-          loading={createPO.isPending || patchPO.isPending || transition.isPending}
-          onClick={() => void nextStep()}
-        >
-          {step === 0 && poId == null ? 'Crea bozza' : step === steps.length - 1 ? 'Manda in approvazione' : 'Continua'}
-        </Button>
+        {step === steps.length - 1 ? (
+          <div className="wizardFooterActions">
+            <Button
+              variant="secondary"
+              leftIcon={<Icon name="pencil" />}
+              disabled={!detail || footerBusy}
+              onClick={() => {
+                if (detail) navigate(`/rda/po/${detail.id}`);
+              }}
+            >
+              Apri la bozza
+            </Button>
+            <Button
+              leftIcon={<Icon name="check" />}
+              disabled={!readyToSubmit || footerBusy}
+              loading={patchPO.isPending || transition.isPending}
+              onClick={() => void nextStep()}
+            >
+              Manda in approvazione
+            </Button>
+          </div>
+        ) : (
+          <Button
+            leftIcon={<Icon name="arrow-right" />}
+            disabled={footerBusy}
+            loading={footerBusy}
+            onClick={() => void nextStep()}
+          >
+            {step === 0 && poId == null ? 'Crea bozza' : 'Continua'}
+          </Button>
+        )}
       </div>
 
       {detail ? <RowModal poId={detail.id} currency={displayCurrency} open={rowModalOpen} row={editRowTarget} onClose={closeRowModal} /> : null}
