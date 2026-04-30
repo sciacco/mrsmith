@@ -73,6 +73,8 @@ export interface RdaPermissions {
   is_afc: boolean;
   is_approver_no_leasing: boolean;
   is_approver_extra_budget: boolean;
+  can_see_all_po: boolean;
+  skip_approval: boolean;
 }
 
 export interface PoApprover {

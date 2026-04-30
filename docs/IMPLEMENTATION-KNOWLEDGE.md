@@ -382,7 +382,7 @@ Alyante ERP ID
 
 - Context: `apps/rda` approver inboxes, PO action bar, and privileged RDA transitions.
 - Discovery: Keycloak controls only base RDA app access with `app_rda_access`. The operational RDA approval flags are stored in Arak Postgres under `users_int.user.role -> users_int.role` and must be read by the backend using the authenticated user's token email.
-- Practical rule: expose and consume `GET /api/rda/v1/me/permissions` for `is_approver`, `is_afc`, `is_approver_no_leasing`, and `is_approver_extra_budget`. Inboxes and privileged transitions must check these DB-derived booleans, not `app_rda_approver_*` Keycloak roles or `app_devadmin` overrides, because Mistra/Arak validates the same domain permissions with `Requester-Email`.
+- Practical rule: expose and consume `GET /api/rda/v1/me/permissions` for `is_approver`, `is_afc`, `is_approver_no_leasing`, `is_approver_extra_budget`, `can_see_all_po`, and `skip_approval`. Inboxes and privileged transitions must check only the action booleans, not `app_rda_approver_*` Keycloak roles, `app_devadmin` overrides, `can_see_all_po`, or `skip_approval`, because Mistra/Arak validates the same domain permissions with `Requester-Email`. Treat `can_see_all_po` as list/detail visibility and `skip_approval` as non-authoritative for manual approval of existing POs.
 - Evidence: legacy RDA `user_permissions` SQL in `apps/rda/audit/05_datasource_catalog.md`; A2 plan in `artifacts/A2.md`; backend implementation in `backend/internal/rda/permissions.go`, `arak.go`, and `validation.go`.
 - Used by: `apps/rda` navigation, inbox guards, `ActionBar`, and RDA backend transition handlers.
 - Open questions: none.

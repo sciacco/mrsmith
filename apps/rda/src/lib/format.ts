@@ -1,4 +1,4 @@
-import type { CurrencyCode, PoApprover, PoDetail } from '../api/types';
+import type { CurrencyCode, PoApprover, PoDetail, PoPreview } from '../api/types';
 
 export const DEFAULT_RDA_CURRENCY: CurrencyCode = 'EUR';
 export const RDA_CURRENCIES: CurrencyCode[] = ['EUR', 'USD', 'GBP'];
@@ -54,9 +54,19 @@ export function isRequester(po: PoDetail | undefined, userEmail?: string | null)
   return Boolean(po?.requester?.email && userEmail && po.requester.email.toLowerCase() === userEmail.toLowerCase());
 }
 
-export function isApprover(po: PoDetail | undefined, userEmail?: string | null): boolean {
-  if (!po || !userEmail) return false;
-  return (po.approvers ?? []).some((approver) => approver.user?.email?.toLowerCase() === userEmail.toLowerCase());
+function approvalLevel(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+export function isApprover(po: Pick<PoPreview, 'approvers' | 'current_approval_level'> | undefined, userEmail?: string | null): boolean {
+  const normalizedEmail = userEmail?.trim().toLowerCase();
+  if (!po || !normalizedEmail) return false;
+  const currentLevel = approvalLevel(po.current_approval_level);
+  return (po.approvers ?? []).some((approver) => {
+    if (approver.user?.email?.trim().toLowerCase() !== normalizedEmail) return false;
+    const approverLevel = approvalLevel(approver.level);
+    return currentLevel === '' || approverLevel === '' || approverLevel === currentLevel;
+  });
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

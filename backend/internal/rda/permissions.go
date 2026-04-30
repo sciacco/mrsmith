@@ -46,7 +46,9 @@ func (h *Handler) permissionsForEmail(ctx context.Context, email string) (rdaPer
 			COALESCE(r.is_approver, false),
 			COALESCE(r.is_afc, false),
 			COALESCE(r.is_approver_no_leasing, false),
-			COALESCE(r.is_approver_extra_budget, false)
+			COALESCE(r.is_approver_extra_budget, false),
+			COALESCE(r.can_see_all_po, false),
+			COALESCE(r.skip_approval, false)
 		FROM users_int."user" u
 		JOIN users_int.role r ON u.role = r.name
 		WHERE u.email = $1
@@ -55,6 +57,8 @@ func (h *Handler) permissionsForEmail(ctx context.Context, email string) (rdaPer
 		&permissions.IsAFC,
 		&permissions.IsApproverNoLeasing,
 		&permissions.IsApproverExtraBudget,
+		&permissions.CanSeeAllPO,
+		&permissions.SkipApproval,
 	)
 	if err == nil {
 		return permissions, nil

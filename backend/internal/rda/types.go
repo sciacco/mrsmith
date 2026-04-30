@@ -112,6 +112,8 @@ type rdaPermissions struct {
 	IsAFC                 bool `json:"is_afc"`
 	IsApproverNoLeasing   bool `json:"is_approver_no_leasing"`
 	IsApproverExtraBudget bool `json:"is_approver_extra_budget"`
+	CanSeeAllPO           bool `json:"can_see_all_po"`
+	SkipApproval          bool `json:"skip_approval"`
 }
 
 type providerDetail struct {

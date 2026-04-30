@@ -98,6 +98,173 @@ textarea {
   font-size: 0.875rem;
 }
 
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.rdaCountStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: var(--shadow-xs);
+}
+
+.rdaCountStrip div {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+  padding: 0.72rem 0.9rem;
+}
+
+.rdaCountStrip div + div {
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.rdaCountStrip strong {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 1.22rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.rdaCountStrip span {
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.rdaWorkspace {
+  overflow: hidden;
+}
+
+.rdaWorkspaceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.72rem 0.85rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.rdaViewTabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.22rem;
+  background: var(--color-surface);
+}
+
+.rdaViewTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-height: 2rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.36rem 0.58rem;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.rdaViewTab strong {
+  min-width: 1.35rem;
+  border-radius: var(--radius-full);
+  padding: 0.08rem 0.34rem;
+  color: var(--color-text-muted);
+  background: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.rdaViewTab:hover,
+.rdaViewTab:focus-visible {
+  color: var(--color-accent-hover);
+  background: #fff;
+  outline: none;
+}
+
+.rdaViewTab.active {
+  border-color: var(--color-accent-muted);
+  color: var(--color-accent-hover);
+  background: #fff;
+  box-shadow: var(--shadow-xs);
+}
+
+.rdaViewTab.active strong {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+}
+
+.rdaResultCount {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.rdaFilterBar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.72rem 0.85rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: color-mix(in srgb, var(--color-bg-elevated) 86%, var(--color-surface) 14%);
+}
+
+.rdaFilterSearch {
+  flex: 1 1 22rem;
+  min-width: 16rem;
+}
+
+.rdaFilterSelect {
+  flex: 0 0 13.5rem;
+  min-width: 0;
+}
+
+.filterReset {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.48rem 0.58rem;
+  color: var(--color-accent-hover);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.filterReset:hover,
+.filterReset:focus-visible {
+  background: var(--color-accent-subtle);
+  outline: none;
+}
+
 .eyebrow {
   color: var(--color-text-muted);
   font-size: 0.72rem;
@@ -194,6 +361,141 @@ textarea {
   font-size: 0.76rem;
 }
 
+.rdaDashboardTable th:first-child,
+.rdaDashboardTable td:first-child {
+  width: 13rem;
+  min-width: 13rem;
+}
+
+.rdaDashboardTable th:nth-child(2),
+.rdaDashboardTable td:nth-child(2) {
+  width: 11.5rem;
+  min-width: 11.5rem;
+}
+
+.rdaDashboardTable th:nth-child(3),
+.rdaDashboardTable td:nth-child(3) {
+  width: 8.5rem;
+  min-width: 8.5rem;
+}
+
+.rdaDashboardTable th:nth-child(4),
+.rdaDashboardTable td:nth-child(4) {
+  width: 11rem;
+}
+
+.rdaDashboardTable th:nth-child(5),
+.rdaDashboardTable td:nth-child(5) {
+  width: 10.5rem;
+}
+
+.rdaDashboardTable th:nth-child(6),
+.rdaDashboardTable td:nth-child(6) {
+  width: 6.4rem;
+}
+
+.rdaDashboardTable th:nth-child(7),
+.rdaDashboardTable td:nth-child(7) {
+  width: 6.6rem;
+}
+
+.rdaDashboardTable .actionsCell {
+  position: sticky;
+  right: 0;
+  width: 4.5rem;
+  min-width: 4.5rem;
+  background: var(--color-bg-elevated);
+  box-shadow: -8px 0 12px -14px rgba(15, 23, 42, 0.4);
+  text-align: center;
+}
+
+.rdaDashboardTable {
+  min-width: 72rem;
+  table-layout: fixed;
+}
+
+.rdaDashboardTable thead .actionsCell {
+  z-index: 2;
+  background: var(--color-surface);
+}
+
+.rdaDashboardTable tbody tr:hover .actionsCell {
+  background: color-mix(in srgb, var(--color-accent-subtle) 72%, #fff 28%);
+}
+
+.requestCell,
+.nextStepCell {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.requestCell strong,
+.nextStepCell strong {
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.22;
+  overflow-wrap: anywhere;
+}
+
+.requestCode {
+  color: var(--color-accent-hover);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  white-space: nowrap;
+}
+
+.queuePills {
+  display: flex;
+  align-items: center;
+  gap: 0.24rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.queuePill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.24rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  padding: 0.1rem 0.38rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.mutedPill {
+  color: var(--color-text-muted);
+  background: #fff;
+}
+
+.textCell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.dateCell,
+.moneyCell {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.moneyCell {
+  text-align: right;
+}
+
 .actionsCell {
   width: 7.75rem;
   white-space: nowrap;
@@ -258,7 +560,8 @@ textarea {
   font-size: 0.72rem;
   font-weight: 700;
   line-height: 1.1;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  white-space: nowrap;
 }
 
 .badge.warning {
@@ -1938,10 +2241,60 @@ textarea {
 
   .pageHeader,
   .surfaceHeader,
+  .rdaWorkspaceHeader,
   .toolbar,
   .actionBar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .headerActions,
+  .headerActions button {
+    width: 100%;
+  }
+
+  .headerActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .rdaCountStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rdaCountStrip div:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .rdaCountStrip div:nth-child(n + 3) {
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .rdaViewTabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .rdaViewTab {
+    flex: 1 0 auto;
+    justify-content: center;
+  }
+
+  .rdaResultCount {
+    align-self: flex-start;
+  }
+
+  .rdaFilterBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rdaFilterSearch,
+  .rdaFilterSelect,
+  .filterReset {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
   }
 
   .formGrid,
@@ -2139,6 +2492,15 @@ textarea {
 }
 
 @media (max-width: 680px) {
+  .rdaCountStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .rdaCountStrip div + div {
+    border-top: 1px solid var(--color-border-subtle);
+    border-left: 0;
+  }
+
   .tabs {
     gap: 0.2rem;
   }

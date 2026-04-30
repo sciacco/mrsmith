@@ -11,24 +11,45 @@ export const PO_STATES = {
 } as const;
 
 const labels: Record<string, string> = {
-  DRAFT: 'BOZZA',
-  PENDING_APPROVAL: 'IN ATTESA APPROVAZIONE',
-  APPROVED: 'APPROVATO',
-  REJECTED: 'RIFIUTATO',
-  PENDING_APPROVAL_PAYMENT_METHOD: 'IN ATTESA METODO PAGAMENTO',
-  PENDING_LEASING: 'IN ATTESA LEASING',
-  PENDING_LEASING_ORDER_CREATION: 'IN ATTESA CREAZIONE LEASING',
-  PENDING_APPROVAL_NO_LEASING: 'IN ATTESA NO LEASING',
-  PENDING_BUDGET_INCREMENT: 'IN ATTESA INCREMENTO BUDGET',
-  PENDING_SEND: 'IN ATTESA INVIO',
-  PENDING_VERIFICATION: 'IN ATTESA VERIFICA CONFORMITÀ',
-  SENT: 'INVIATO',
-  CLOSED: 'CHIUSO',
+  DRAFT: 'Bozza',
+  PENDING_APPROVAL: 'Attesa approvazione',
+  APPROVED: 'Approvata',
+  REJECTED: 'Rifiutata',
+  PENDING_APPROVAL_PAYMENT_METHOD: 'Attesa metodo',
+  PENDING_LEASING: 'Attesa leasing',
+  PENDING_LEASING_ORDER_CREATION: 'Ordine leasing',
+  PENDING_APPROVAL_NO_LEASING: 'Attesa no leasing',
+  PENDING_BUDGET_INCREMENT: 'Attesa budget',
+  PENDING_SEND: 'Da inviare',
+  PENDING_VERIFICATION: 'Attesa conformità',
+  SENT: 'Inviata',
+  CLOSED: 'Chiusa',
+};
+
+const fullLabels: Record<string, string> = {
+  DRAFT: 'Bozza',
+  PENDING_APPROVAL: 'In attesa approvazione',
+  APPROVED: 'Approvata',
+  REJECTED: 'Rifiutata',
+  PENDING_APPROVAL_PAYMENT_METHOD: 'In attesa approvazione metodo pagamento',
+  PENDING_LEASING: 'In attesa leasing',
+  PENDING_LEASING_ORDER_CREATION: 'In attesa creazione ordine leasing',
+  PENDING_APPROVAL_NO_LEASING: 'In attesa approvazione no leasing',
+  PENDING_BUDGET_INCREMENT: 'In attesa incremento budget',
+  PENDING_SEND: 'In attesa invio al fornitore',
+  PENDING_VERIFICATION: 'In attesa verifica conformità',
+  SENT: 'Inviata al fornitore',
+  CLOSED: 'Chiusa',
 };
 
 export function stateLabel(state?: string | null): string {
   if (!state) return '-';
   return labels[state] ?? state.replaceAll('_', ' ');
+}
+
+export function stateFullLabel(state?: string | null): string {
+  if (!state) return '-';
+  return fullLabels[state] ?? state.replaceAll('_', ' ');
 }
 
 export function stateTone(state?: string | null): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {

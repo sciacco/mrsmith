@@ -54,11 +54,33 @@ func isRequester(po poDetail, email string) bool {
 
 func isApprover(po poDetail, email string) bool {
 	for _, approver := range po.Approvers {
-		if strings.EqualFold(strings.TrimSpace(approver.User.Email), strings.TrimSpace(email)) {
+		if strings.EqualFold(strings.TrimSpace(approver.User.Email), strings.TrimSpace(email)) && approverLevelMatches(po, approver) {
 			return true
 		}
 	}
 	return false
+}
+
+func approverLevelMatches(po poDetail, approver approverRef) bool {
+	current := normalizeApprovalLevel(po.CurrentApprovalLevel)
+	if current == "" {
+		return true
+	}
+	level := normalizeApprovalLevel(approver.Level)
+	return level == "" || level == current
+}
+
+func normalizeApprovalLevel(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return strings.TrimSpace(typed)
+	case json.Number:
+		return strings.TrimSpace(typed.String())
+	default:
+		return strings.TrimSpace(fmt.Sprint(typed))
+	}
 }
 
 type inboxRoute struct {

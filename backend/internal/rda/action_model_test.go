@@ -117,6 +117,56 @@ func TestBuildPOActionModelApproverNotAssignedDoesNotSeeApprove(t *testing.T) {
 	}
 }
 
+func TestBuildPOActionModelApproverWrongLevelDoesNotSeeApprove(t *testing.T) {
+	var approver approverRef
+	approver.Level = "2"
+	approver.User.Email = "user@example.com"
+	po := poForActionModel("PENDING_APPROVAL", "requester@example.com")
+	po.CurrentApprovalLevel = "1"
+	po.Approvers = []approverRef{approver}
+
+	model := buildPOActionModel(
+		po,
+		poActionPermissions{rdaPermissions: rdaPermissions{IsApprover: true}, Status: poPermissionAvailable},
+		"user@example.com",
+		3000,
+	)
+
+	if _, ok := findAction(model, "approve", "approver_l1_l2"); ok {
+		t.Fatalf("wrong-level approver should not see approve action: %#v", model.Actions)
+	}
+}
+
+func TestRDAPermissionsJSONIncludesVisibilityFlags(t *testing.T) {
+	encoded, err := json.Marshal(rdaPermissions{
+		IsApprover:            true,
+		IsAFC:                 true,
+		IsApproverNoLeasing:   true,
+		IsApproverExtraBudget: true,
+		CanSeeAllPO:           true,
+		SkipApproval:          true,
+	})
+	if err != nil {
+		t.Fatalf("failed to encode permissions: %v", err)
+	}
+	var body map[string]bool
+	if err := json.Unmarshal(encoded, &body); err != nil {
+		t.Fatalf("failed to decode permissions: %v", err)
+	}
+	for _, key := range []string{
+		"is_approver",
+		"is_afc",
+		"is_approver_no_leasing",
+		"is_approver_extra_budget",
+		"can_see_all_po",
+		"skip_approval",
+	} {
+		if !body[key] {
+			t.Fatalf("expected permission flag %q in %s", key, encoded)
+		}
+	}
+}
+
 func TestBuildPOActionModelSubmitReadiness(t *testing.T) {
 	po := poForActionModel("DRAFT", "user@example.com")
 	po.TotalPrice = "3500.00"
