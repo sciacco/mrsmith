@@ -81,17 +81,15 @@ test('readiness accepts qualification fallback for contacts', () => {
   assertEqual(contacts?.ready, true, 'qualification contact should make recipients ready');
 });
 
-test('tab badges expose quote progress, row total, notes dirty, and contacts fallback', () => {
+test('tab badges expose quote progress, row total, and contacts fallback', () => {
   const provider: ProviderSummary = {
     id: 20,
     ref: { id: 30, reference_type: 'QUALIFICATION_REF', email: 'qualifica@example.com' },
   };
-  const header = { ...completeHeader, note: 'Nuova nota' };
-  const badges = buildTabBadges(poFixture(), header, completeHeader, provider, 3000);
+  const badges = buildTabBadges(poFixture(), provider, 3000);
 
   assertEqual(badges.attachments, '1/2 prev.', 'quote progress badge');
   assert(badges.rows.includes('1 - '), 'row badge should include count and total');
-  assertEqual(badges.notesDirty, true, 'notes dirty badge');
   assertEqual(badges.contacts, 'Qualifica', 'qualification fallback badge');
 });
 

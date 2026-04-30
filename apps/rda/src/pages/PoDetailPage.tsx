@@ -193,7 +193,7 @@ export function PoDetailPage() {
     recipients: displayedRecipients,
     quoteThreshold: getRdaQuoteThreshold(),
   });
-  const tabBadges = buildTabBadges(detailWithDisplayedRecipients ?? detail, currentHeader, initialHeader, fullProvider, getRdaQuoteThreshold());
+  const tabBadges = buildTabBadges(detailWithDisplayedRecipients ?? detail, fullProvider, getRdaQuoteThreshold());
 
   function handleProviderChange(value: number | '') {
     const nextProvider = providerOptions.find((item) => item.id === value);
@@ -348,7 +348,6 @@ export function PoDetailPage() {
             po={detailWithDisplayedRecipients ?? detail}
             provider={fullProvider}
             editable={draftEditable}
-            header={currentHeader}
             badges={tabBadges}
             onRecipientSelectionChange={setRecipientDraftIds}
             onSaveRecipients={(ids) => void saveRecipients(ids)}

@@ -32,7 +32,6 @@ export interface POHeaderState {
 export interface TabBadgeModel {
   attachments: string;
   rows: string;
-  notesDirty: boolean;
   contacts: string;
 }
 
@@ -118,8 +117,6 @@ export function buildPOReadinessItems(po: PoDetail, header: POHeaderState, optio
 
 export function buildTabBadges(
   po: PoDetail,
-  header: POHeaderState,
-  initialHeader: POHeaderState,
   provider?: ProviderSummary,
   quoteThreshold = 3000,
 ): TabBadgeModel {
@@ -134,7 +131,6 @@ export function buildTabBadges(
   return {
     attachments,
     rows,
-    notesDirty: header.note !== initialHeader.note || header.description !== initialHeader.description,
     contacts,
   };
 }

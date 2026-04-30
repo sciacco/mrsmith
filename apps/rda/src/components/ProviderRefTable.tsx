@@ -129,7 +129,7 @@ export function ProviderRefTable({
       <div className="contactPickerHeader">
         <div>
           <h3>Destinatari ordine</h3>
-          <p className="muted">Seleziona i contatti che riceveranno il PO. Senza selezione viene usato il contatto Qualifica.</p>
+          <p className="muted">Seleziona i contatti che riceveranno il PO, incluso Qualifica se serve. Senza selezione viene usato Qualifica automaticamente.</p>
         </div>
         {editable ? (
           <Button size="sm" variant="secondary" leftIcon={<Icon name={adding ? 'x' : 'plus'} />} onClick={() => setAdding((current) => !current)}>
@@ -172,7 +172,7 @@ export function ProviderRefTable({
           const key = refKey(ref);
           const isQualification = ref.reference_type === QUALIFICATION_REF;
           const isSelected = Boolean(ref.id && selected.includes(ref.id));
-          const canSelect = editable && !isQualification && Boolean(ref.id);
+          const canSelect = editable && Boolean(ref.id);
           const canEdit = editable && !isQualification && Boolean(ref.id);
 
           return (
@@ -190,7 +190,7 @@ export function ProviderRefTable({
                 <div className="providerContactTitleRow">
                   <strong>{contactName(ref)}</strong>
                   <span className={`badge ${isQualification ? 'info' : ''}`}>
-                    {referenceTypeLabel(ref.reference_type)}{isQualification ? ' · fallback automatico' : ''}
+                    {referenceTypeLabel(ref.reference_type)}
                   </span>
                 </div>
                 <div className="providerContactMeta">

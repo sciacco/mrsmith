@@ -61,6 +61,10 @@ textarea {
 }
 
 .rdaPage {
+  --rda-sticky-app-header-height: 45px;
+  --rda-sticky-gap: 0.75rem;
+  --rda-sticky-offset: calc(var(--rda-sticky-app-header-height) + var(--rda-sticky-gap));
+
   display: grid;
   gap: 1rem;
   min-width: 0;
@@ -191,7 +195,7 @@ textarea {
 }
 
 .actionsCell {
-  width: 5.75rem;
+  width: 7.75rem;
   white-space: nowrap;
 }
 
@@ -229,6 +233,10 @@ textarea {
 .iconButton:disabled {
   color: var(--color-text-faint);
   cursor: not-allowed;
+}
+
+.iconButton.loading svg {
+  animation: spin 0.9s linear infinite;
 }
 
 .dangerButton:hover:not(:disabled),
@@ -426,7 +434,7 @@ textarea {
 
 .poCommandBar {
   position: sticky;
-  top: 0.75rem;
+  top: var(--rda-sticky-offset);
   z-index: 20;
   display: grid;
   gap: 0.75rem;
@@ -680,13 +688,6 @@ textarea {
 .tab.active .tabBadge {
   color: var(--color-accent-hover);
   background: var(--color-accent-subtle);
-}
-
-.tabDot {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: var(--radius-full);
-  background: var(--color-warning);
 }
 
 .tabBody {
@@ -1149,6 +1150,27 @@ textarea {
 
 .attachmentBusinessMessage p {
   margin-top: 0;
+}
+
+.attachmentBusinessAction {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.attachmentPreviewShell {
+  min-height: min(72vh, 760px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.attachmentPreviewFrame {
+  display: block;
+  width: 100%;
+  height: min(72vh, 760px);
+  border: 0;
+  background: #fff;
 }
 
 .readinessList {
@@ -1739,6 +1761,10 @@ textarea {
 
 .providerContactCard.fallback {
   background: var(--color-surface);
+}
+
+.providerContactCard.fallback.selected {
+  background: color-mix(in srgb, var(--color-accent-subtle) 58%, #fff 42%);
 }
 
 .providerContactSelect {
