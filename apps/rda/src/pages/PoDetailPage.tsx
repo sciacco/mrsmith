@@ -191,6 +191,7 @@ export function PoDetailPage() {
   const readinessItems = buildPOReadinessItems(detailWithDisplayedRecipients ?? detail, currentHeader, {
     provider: fullProvider,
     recipients: displayedRecipients,
+    paymentRequiresVerification,
     quoteThreshold: getRdaQuoteThreshold(),
   });
   const tabBadges = buildTabBadges(detailWithDisplayedRecipients ?? detail, fullProvider, getRdaQuoteThreshold());

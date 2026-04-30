@@ -115,6 +115,10 @@ export function RdaListPage() {
   );
 
   const hasFilters = qFilter !== '' || stateFilter !== '' || queueFilter !== '';
+  const hasWorkToManage = dashboard.counts.toManage > 0;
+  let toManageMessage = 'Nessuna richiesta richiede azione.';
+  if (dashboard.counts.toManage === 1) toManageMessage = '1 richiesta richiede azione.';
+  if (dashboard.counts.toManage > 1) toManageMessage = `${dashboard.counts.toManage} richieste richiedono azione.`;
 
   function updateParam(key: 'q' | 'state' | 'queue', value: string) {
     setParams((previous) => {
@@ -162,44 +166,68 @@ export function RdaListPage() {
 
   return (
     <main className="rdaPage">
-      <header className="pageHeader">
-        <div>
-          <h1>Cruscotto RDA</h1>
-          <p>Gestisci le richieste in carico e segui le tue RDA aperte.</p>
+      <header className="pageHeader rdaDashboardHeader">
+        <div className="rdaHeaderTop">
+          <div className="rdaHeaderCopy">
+            <span className="rdaHeaderEyebrow">
+              <Icon name="sparkles" size={14} />
+              Dashboard operativo
+            </span>
+            <h1>Cruscotto RDA</h1>
+            <p>Gestisci le richieste in carico e segui le tue RDA aperte.</p>
+          </div>
+          <div className="headerActions">
+            <Button
+              variant="secondary"
+              leftIcon={<Icon name="loader" />}
+              loading={refreshing && !loading}
+              onClick={refreshDashboard}
+            >
+              Aggiorna
+            </Button>
+            <Button leftIcon={<Icon name="plus" />} onClick={() => navigate('/rda/new')}>
+              Nuova richiesta
+            </Button>
+          </div>
         </div>
-        <div className="headerActions">
-          <Button
-            variant="secondary"
-            leftIcon={<Icon name="loader" />}
-            loading={refreshing && !loading}
-            onClick={refreshDashboard}
-          >
-            Aggiorna
-          </Button>
-          <Button leftIcon={<Icon name="plus" />} onClick={() => navigate('/rda/new')}>
-            Nuova richiesta
-          </Button>
-        </div>
-      </header>
 
-      <section className="rdaCountStrip" aria-label="Riepilogo code RDA">
-        <div>
-          <strong>{dashboard.counts.toManage}</strong>
-          <span>RDA da gestire</span>
-        </div>
-        <div>
-          <strong>{dashboard.counts.ownDrafts}</strong>
-          <span>Bozze proprie</span>
-        </div>
-        <div>
-          <strong>{dashboard.counts.ownOpen}</strong>
-          <span>Richieste proprie aperte</span>
-        </div>
-        <div>
-          <strong>{dashboard.counts.totalAccessible}</strong>
-          <span>Totale accessibile</span>
-        </div>
-      </section>
+        <section className="rdaHeaderSummary" aria-label="Riepilogo code RDA">
+          <div className={`rdaFocusMetric ${hasWorkToManage ? 'attention' : 'clear'}`}>
+            <span className="rdaMetricIcon">
+              <Icon name={hasWorkToManage ? 'file-warning' : 'check-circle'} size={19} />
+            </span>
+            <div className="rdaFocusMetricBody">
+              <span className="rdaMetricLabel">RDA da gestire</span>
+              <strong>{dashboard.counts.toManage}</strong>
+              <p>{toManageMessage}</p>
+            </div>
+          </div>
+
+          <div className="rdaQuickStats">
+            <div className="rdaQuickStat">
+              <span className="rdaMetricIcon compact"><Icon name="file-text" size={17} /></span>
+              <div>
+                <strong>{dashboard.counts.ownDrafts}</strong>
+                <span>Bozze proprie</span>
+              </div>
+            </div>
+            <div className="rdaQuickStat">
+              <span className="rdaMetricIcon compact"><Icon name="clock" size={17} /></span>
+              <div>
+                <strong>{dashboard.counts.ownOpen}</strong>
+                <span>Richieste proprie aperte</span>
+              </div>
+            </div>
+            <div className="rdaQuickStat">
+              <span className="rdaMetricIcon compact"><Icon name="bar-chart-2" size={17} /></span>
+              <div>
+                <strong>{dashboard.counts.totalAccessible}</strong>
+                <span>Totale accessibile</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </header>
 
       <section className="surface rdaWorkspace">
         <div className="rdaWorkspaceHeader">

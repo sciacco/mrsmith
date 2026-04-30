@@ -6,6 +6,7 @@ import { QUALIFICATION_REF } from './provider-refs.js';
 export interface POReadinessOptions {
   provider?: ProviderSummary;
   recipients?: ProviderReference[];
+  paymentRequiresVerification?: boolean;
   quoteThreshold: number;
 }
 
@@ -109,8 +110,12 @@ export function buildPOReadinessItems(po: PoDetail, header: POHeaderState, optio
     {
       id: 'payment',
       label: 'Pagamento',
-      ready: header.payment_method.trim() !== '',
-      detail: header.payment_method.trim() ? `Metodo selezionato: ${header.payment_method.trim()}.` : 'Seleziona un metodo di pagamento.',
+      ready: header.payment_method.trim() !== '' && !options.paymentRequiresVerification,
+      detail: header.payment_method.trim()
+        ? options.paymentRequiresVerification
+          ? 'Richiede approvazione metodo pagamento.'
+          : 'Metodo di pagamento selezionato.'
+        : 'Seleziona un metodo di pagamento.',
     },
   ];
 }
