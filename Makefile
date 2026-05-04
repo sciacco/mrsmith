@@ -96,10 +96,10 @@ docker-build-amd64:   ## Build immagine produzione linux/amd64
 package-prod-amd64:   ## Build + export tar produzione linux/amd64 in artifacts/releases
 	./scripts/deploy/prod.sh package --build
 
-deploy-prod:          ## Build + export + upload + load + restart del servizio produzione
-	./scripts/deploy/prod.sh deploy --build
+deploy-prod:          ## Stream sorgente + build remoto + restart del servizio produzione
+	./scripts/deploy/prod.sh deploy
 
-rollback-prod:        ## Ricarica una release remota esistente con RELEASE_TS=YYYYmmddHHMMSS
+rollback-prod:        ## Retag + restart di una release remota con RELEASE_TS=YYYYmmddHHMMSS
 	RELEASE_TS=$(RELEASE_TS) ./scripts/deploy/prod.sh rollback
 
 # Test ─────────────────────────────────────────

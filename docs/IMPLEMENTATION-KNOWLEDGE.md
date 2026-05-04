@@ -367,6 +367,15 @@ Alyante ERP ID
 - Used by: all Vite mini-app production builds, especially apps using `@mrsmith/auth-client`.
 - Open questions: whether to add a hard production-build guard in `@mrsmith/auth-client` in addition to Docker context hygiene.
 
+### Production Deploy Builds Run On The Target Host From A Git Archive
+
+- Context: `make deploy-prod` production releases.
+- Discovery: developer workstations may not have Docker available, or may use incompatible local container tooling on Apple Silicon. Production deploys therefore stream a committed Git archive over SSH and run `docker buildx build --load -` directly on the production host.
+- Practical rule: production deploys require only `git` and `ssh` locally, but require Docker Engine, buildx, compose v2, and outbound build-network access on the target host. Deploys use committed source only and default to a clean-worktree guard; rollback retags immutable release image tags like `mrsmith:prod-YYYYmmddHHMMSS` instead of loading uploaded tarballs. If `deploy/Dockerfile` starts copying new root paths, update the `git archive` allowlist in `scripts/deploy/prod.sh` in the same change.
+- Evidence: `scripts/deploy/prod.sh`, `Makefile`, `.env.deploy.prod.example`, and `docs/PROD-DEPLOY.md`.
+- Used by: production deploy and rollback workflow.
+- Open questions: none.
+
 ### Portal Launcher Tiles Must Use Supported Portal Icon Keys
 
 - Context: adding or changing entries in `backend/internal/platform/applaunch/catalog.go`.
