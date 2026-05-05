@@ -32,6 +32,7 @@ import type {
   WindowBody,
 } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ImpactWorkbench } from '../components/ImpactWorkbench';
 import { MaintenanceCockpit } from '../components/MaintenanceCockpit';
 import { SiteSelectField } from '../components/SiteSelectField';
 import { StatusPill, statusTone } from '../components/StatusPill';
@@ -1201,16 +1202,7 @@ function ImpactTab({
   if (!reference) return <Skeleton rows={5} />;
   return (
     <>
-      <ClassificationSection
-        title="Servizi"
-        resource="service-taxonomy"
-        items={detail.service_taxonomy}
-        options={reference.service_taxonomy}
-        technicalDomainId={detail.technical_domain.id}
-        maintenanceId={detail.maintenance_id}
-        canOperate={canOperate}
-        primary
-      />
+      <ImpactWorkbench detail={detail} reference={reference} canOperate={canOperate} />
       <ClassificationSection
         title="Motivi"
         resource="reason-classes"
@@ -1412,6 +1404,8 @@ function TargetsTab({
   const mutations = useTargetMutations(detail.maintenance_id);
   const toast = useToast();
   const [removeId, setRemoveId] = useState<number | null>(null);
+  const [editTarget, setEditTarget] = useState<MaintenanceDetail['targets'][number] | null>(null);
+  const [editForm, setEditForm] = useState<TargetBody | null>(null);
   const [form, setForm] = useState<TargetBody>({
     target_type_id: 0,
     service_taxonomy_id: null,
@@ -1431,6 +1425,34 @@ function TargetsTab({
       toast.toast('Target aggiunto.');
     } catch (error) {
       toast.toast(errorMessage(error, 'Salvataggio target non riuscito.'), 'error');
+    }
+  }
+
+  function openEdit(target: MaintenanceDetail['targets'][number]) {
+    setEditTarget(target);
+    setEditForm(targetBodyFromTarget(target));
+  }
+
+  function closeEdit() {
+    setEditTarget(null);
+    setEditForm(null);
+  }
+
+  async function saveEdit() {
+    if (!editTarget || !editForm) return;
+    if (!editForm.target_type_id || !editForm.display_name.trim()) {
+      toast.toast('Completa tipo e nome target.', 'error');
+      return;
+    }
+    try {
+      await mutations.update.mutateAsync({
+        targetId: editTarget.maintenance_target_id,
+        body: editForm,
+      });
+      closeEdit();
+      toast.toast('Target aggiornato.');
+    } catch (error) {
+      toast.toast(errorMessage(error, 'Aggiornamento target non riuscito.'), 'error');
     }
   }
 
@@ -1506,13 +1528,24 @@ function TargetsTab({
                     <td>{item.is_primary ? 'Sì' : '-'}</td>
                     <td className={shared.actionsCell}>
                       {canOperate && (
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => setRemoveId(item.maintenance_target_id)}
-                        >
-                          Rimuovi
-                        </Button>
+                        <div className={shared.actionRow}>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openEdit(item)}
+                            leftIcon={<Icon name="pencil" size={14} />}
+                          >
+                            Modifica
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => setRemoveId(item.maintenance_target_id)}
+                            leftIcon={<Icon name="trash" size={14} />}
+                          >
+                            Rimuovi
+                          </Button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -1540,8 +1573,98 @@ function TargetsTab({
           }
         }}
       />
+      <Modal
+        open={editTarget !== null}
+        onClose={closeEdit}
+        title="Modifica target"
+        size="md"
+      >
+        {editForm && reference ? (
+          <div className={shared.modalBody}>
+            <label className={shared.label}>
+              Tipo target
+              <select
+                className={shared.select}
+                value={editForm.target_type_id || ''}
+                onChange={(event) =>
+                  setEditForm({ ...editForm, target_type_id: Number(event.target.value) })
+                }
+              >
+                <option value="">Tipo target</option>
+                {reference.target_types.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name_it}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={shared.label}>
+              Nome target
+              <input
+                className={shared.field}
+                value={editForm.display_name}
+                onChange={(event) =>
+                  setEditForm({ ...editForm, display_name: event.target.value })
+                }
+              />
+            </label>
+            <label className={shared.label}>
+              Servizio collegato
+              <select
+                className={shared.select}
+                value={editForm.service_taxonomy_id ?? ''}
+                onChange={(event) =>
+                  setEditForm({
+                    ...editForm,
+                    service_taxonomy_id: event.target.value ? Number(event.target.value) : null,
+                  })
+                }
+              >
+                <option value="">Nessun servizio collegato</option>
+                {reference.service_taxonomy.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name_it}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={shared.label}>
+              Principale
+              <input
+                type="checkbox"
+                checked={Boolean(editForm.is_primary)}
+                onChange={(event) =>
+                  setEditForm({ ...editForm, is_primary: event.target.checked })
+                }
+              />
+            </label>
+            <div className={shared.formActions}>
+              <Button variant="secondary" onClick={closeEdit} disabled={mutations.update.isPending}>
+                Annulla
+              </Button>
+              <Button onClick={saveEdit} loading={mutations.update.isPending}>
+                Salva
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
+}
+
+function targetBodyFromTarget(target: MaintenanceDetail['targets'][number]): TargetBody {
+  return {
+    target_type_id: target.target_type.id,
+    service_taxonomy_id: target.service_taxonomy_id ?? null,
+    reference_table: target.reference_table ?? null,
+    reference_id: target.reference_id ?? null,
+    external_key: target.external_key ?? null,
+    display_name: target.display_name,
+    source: target.source,
+    confidence: target.confidence ?? null,
+    is_primary: target.is_primary,
+  };
 }
 
 function CustomersTab({ detail, canOperate }: { detail: MaintenanceDetail; canOperate: boolean }) {
