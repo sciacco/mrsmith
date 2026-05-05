@@ -19,6 +19,7 @@ import type {
 import { CatalogCombobox } from './CatalogCombobox';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CreateServiceTaxonomyModal } from './CreateServiceTaxonomyModal';
+import { EffectsSection } from './EffectsSection';
 import { OperatedDetailPanel } from './OperatedDetailPanel';
 import { errorMessage } from '../lib/format';
 import type { ImpactSelectionView } from './impactTypes';
@@ -90,50 +91,30 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
 
   const allDependencies = dependencies.data ?? [];
 
-  const suggestionsForSelected = useMemo(() => {
-    if (!selectedOperated) return [] as ServiceDependency[];
-    return dedupeSuggestions(
-      allDependencies,
-      selectedOperated.reference.id,
-      selectedIds,
-      ignoredSuggestionIds,
-    );
-  }, [allDependencies, ignoredSuggestionIds, selectedIds, selectedOperated]);
-
-  const declaredForSelected = useMemo(() => {
-    if (!selectedOperated) return [] as ImpactSelectionView[];
-    const operatedId = selectedOperated.reference.id;
-    return dependentSelections.filter((sel) =>
-      allDependencies.some(
-        (d) => d.upstream_service_id === operatedId && d.downstream_service_id === sel.reference.id,
-      ),
-    );
-  }, [allDependencies, dependentSelections, selectedOperated]);
-
   const operatedIdSet = useMemo(
     () => new Set(operatedSelections.map((item) => item.reference.id)),
     [operatedSelections],
   );
 
-  const orphanDependents = useMemo(() => {
-    return dependentSelections.filter(
-      (sel) =>
-        !allDependencies.some(
-          (d) => operatedIdSet.has(d.upstream_service_id) && d.downstream_service_id === sel.reference.id,
-        ),
-    );
-  }, [allDependencies, dependentSelections, operatedIdSet]);
+  const dependentIdSet = useMemo(
+    () => new Set(dependentSelections.map((item) => item.reference.id)),
+    [dependentSelections],
+  );
 
-  const effectsCountByOperated = useMemo(() => {
-    const counts = new Map<number, number>();
-    const dependentIds = new Set(dependentSelections.map((sel) => sel.reference.id));
+  const suggestionsForMaintenance = useMemo(
+    () => dedupeSuggestions(allDependencies, operatedIdSet, dependentIdSet, ignoredSuggestionIds),
+    [allDependencies, dependentIdSet, ignoredSuggestionIds, operatedIdSet],
+  );
+
+  const ignoredSuggestionsCount = useMemo(() => {
+    let count = 0;
     for (const dep of allDependencies) {
       if (!operatedIdSet.has(dep.upstream_service_id)) continue;
-      if (!dependentIds.has(dep.downstream_service_id)) continue;
-      counts.set(dep.upstream_service_id, (counts.get(dep.upstream_service_id) ?? 0) + 1);
+      if (dependentIdSet.has(dep.downstream_service_id)) continue;
+      if (ignoredSuggestionIds.has(dep.service_dependency_id)) count += 1;
     }
-    return counts;
-  }, [allDependencies, dependentSelections, operatedIdSet]);
+    return count;
+  }, [allDependencies, dependentIdSet, ignoredSuggestionIds, operatedIdSet]);
 
   const crossDomainOperatedCount = operatedSelections.filter(
     (item) =>
@@ -281,14 +262,12 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
         <div>
           <h2>Impatto operativo</h2>
           <p>
-            Seleziona un servizio in manutenzione per modellarne istanze, effetti propagati e
-            override.
+            Modella servizi in manutenzione e effetti propagati ad altri sistemi.
           </p>
         </div>
         <div className={styles.summaryChips} aria-label="Sintesi impatto">
           <span>{operatedSelections.length} in manutenzione</span>
-          <span>{dependentSelections.length} effetti</span>
-          <span>{detail.targets.length} istanze</span>
+          <span>+{dependentSelections.length} impattati</span>
         </div>
       </header>
 
@@ -323,8 +302,6 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
             <ul className={styles.railList}>
               {operatedSelections.map((item) => {
                 const isSelected = item.reference.id === selectedOperatedId;
-                const targetsCount = (targetsByService.get(item.reference.id) ?? []).length;
-                const effectsCount = effectsCountByOperated.get(item.reference.id) ?? 0;
                 const crossDomain =
                   item.reference.technical_domain_id != null &&
                   item.reference.technical_domain_id !== detail.technical_domain.id;
@@ -338,10 +315,6 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
                       <span className={styles.railItemName}>{item.reference.name_it}</span>
                       <span className={styles.railItemMeta}>
                         {item.reference.technical_domain_name ?? 'Dominio non indicato'}
-                      </span>
-                      <span className={styles.railItemStats}>
-                        <span>{effectsCount} effetti</span>
-                        <span>{targetsCount} istanze</span>
                       </span>
                     </button>
                   </li>
@@ -363,36 +336,13 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
               selection={selectedOperated}
               targets={targetsByService.get(selectedOperated.reference.id) ?? []}
               maintenanceDomainId={detail.technical_domain.id}
-              suggestions={suggestionsForSelected}
-              suggestionsLoading={dependencies.isLoading}
-              suggestionsUnavailable={Boolean(dependencies.error)}
-              ignoredCount={countIgnoredForOperated(
-                allDependencies,
-                selectedOperated.reference.id,
-                ignoredSuggestionIds,
-              )}
-              declaredEffects={declaredForSelected.map((sel) => ({
-                selection: sel,
-                dependency: allDependencies.find(
-                  (d) =>
-                    d.upstream_service_id === selectedOperated.reference.id &&
-                    d.downstream_service_id === sel.reference.id,
-                ),
-                targets: targetsByService.get(sel.reference.id) ?? [],
-              }))}
-              orphanEffects={orphanDependents.map((sel) => ({
-                selection: sel,
-                targets: targetsByService.get(sel.reference.id) ?? [],
-              }))}
-              manualEffectCatalog={reference.service_taxonomy}
-              excludedEffectIds={selectedIds}
               canOperate={canOperate}
               busy={busy}
               onSelectionAudienceChange={(audience) =>
                 updateSelection(
                   selectedOperated.reference.id,
                   { expectedAudience: audience },
-                  'Audience aggiornata.',
+                  'Destinatari aggiornati.',
                 )
               }
               onSelectionSeverityChange={(severity) =>
@@ -407,19 +357,6 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
                 void createTarget(selectedOperated.reference, displayName)
               }
               onRequestRemoveTarget={setRemoveTarget}
-              onAcceptSuggestions={acceptSuggestions}
-              onIgnoreSuggestion={ignoreSuggestion}
-              onResetIgnored={resetIgnoredSuggestions}
-              onAddManualEffect={(item) => addService(item, 'dependent', 'manual', 'degraded')}
-              onCreateManualEffectRequest={(name) => requestCreateTaxonomy(name, 'dependent')}
-              onEffectSeverityChange={(serviceId, severity) =>
-                updateSelection(serviceId, { expectedSeverity: severity }, 'Severità aggiornata.')
-              }
-              onEffectAudienceChange={(serviceId, audience) =>
-                updateSelection(serviceId, { expectedAudience: audience }, 'Audience aggiornata.')
-              }
-              onEffectCreateTarget={(service, displayName) => void createTarget(service, displayName)}
-              onEffectRemove={removeService}
             />
           ) : (
             <div className={styles.detailEmpty}>
@@ -427,12 +364,42 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
               <strong>Nessun servizio selezionato</strong>
               <p>
                 Aggiungi un servizio in manutenzione dalla colonna a sinistra per modellare istanze
-                e propagazione degli effetti.
+                e severità.
               </p>
             </div>
           )}
         </section>
       </div>
+
+      <EffectsSection
+        dependentSelections={dependentSelections}
+        targetsByService={targetsByService}
+        dependencies={allDependencies}
+        operatedSelections={operatedSelections}
+        suggestions={suggestionsForMaintenance}
+        suggestionsLoading={dependencies.isLoading}
+        suggestionsUnavailable={Boolean(dependencies.error)}
+        ignoredCount={ignoredSuggestionsCount}
+        manualCatalog={reference.service_taxonomy}
+        excludedIds={selectedIds}
+        maintenanceDomainId={detail.technical_domain.id}
+        canOperate={canOperate}
+        busy={busy}
+        onAcceptSuggestions={acceptSuggestions}
+        onIgnoreSuggestion={ignoreSuggestion}
+        onResetIgnored={resetIgnoredSuggestions}
+        onAddManual={(item) => addService(item, 'dependent', 'manual', 'degraded')}
+        onCreateManualRequest={(name) => requestCreateTaxonomy(name, 'dependent')}
+        onSeverityChange={(serviceId, severity) =>
+          updateSelection(serviceId, { expectedSeverity: severity }, 'Severità aggiornata.')
+        }
+        onAudienceChange={(serviceId, audience) =>
+          updateSelection(serviceId, { expectedAudience: audience }, 'Destinatari aggiornati.')
+        }
+        onCreateTarget={(service, displayName) => void createTarget(service, displayName)}
+        onRequestRemoveTarget={setRemoveTarget}
+        onRemove={removeService}
+      />
 
       <CreateServiceTaxonomyModal
         open={createTaxonomyContext !== null}
@@ -551,14 +518,14 @@ function targetsGroupedByService(targets: MaintenanceTarget[]): Map<number, Main
 
 function dedupeSuggestions(
   dependencies: ServiceDependency[],
-  upstreamId: number,
-  selectedIds: Set<number>,
+  upstreamIds: Set<number>,
+  takenDownstreamIds: Set<number>,
   ignoredIds: Set<number>,
 ): ServiceDependency[] {
   const byDownstream = new Map<number, ServiceDependency>();
   for (const dependency of dependencies) {
-    if (dependency.upstream_service_id !== upstreamId) continue;
-    if (selectedIds.has(dependency.downstream_service_id)) continue;
+    if (!upstreamIds.has(dependency.upstream_service_id)) continue;
+    if (takenDownstreamIds.has(dependency.downstream_service_id)) continue;
     if (ignoredIds.has(dependency.service_dependency_id)) continue;
     const current = byDownstream.get(dependency.downstream_service_id);
     if (!current || severityRank(dependency.default_severity) > severityRank(current.default_severity)) {
@@ -568,18 +535,6 @@ function dedupeSuggestions(
   return Array.from(byDownstream.values()).sort((a, b) =>
     a.downstream_service.name_it.localeCompare(b.downstream_service.name_it),
   );
-}
-
-function countIgnoredForOperated(
-  dependencies: ServiceDependency[],
-  upstreamId: number,
-  ignoredIds: Set<number>,
-): number {
-  let count = 0;
-  for (const dep of dependencies) {
-    if (dep.upstream_service_id === upstreamId && ignoredIds.has(dep.service_dependency_id)) count += 1;
-  }
-  return count;
 }
 
 function severityRank(value: SeverityValue): number {

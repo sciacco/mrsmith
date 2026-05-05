@@ -11,10 +11,15 @@ import { audienceLabel, dependencyTypeLabel, severityLabel } from '../lib/format
 import { impactSourceLabel, type ImpactSelectionView } from './impactTypes';
 import styles from './ImpactWorkbench.module.css';
 
+export interface EffectAttribution {
+  operatedName: string;
+  dependencyType: ServiceDependency['dependency_type'];
+}
+
 interface Props {
   selection: ImpactSelectionView;
   targets: MaintenanceTarget[];
-  dependency?: ServiceDependency;
+  attribution?: EffectAttribution;
   canOperate: boolean;
   busy: boolean;
   onSeverityChange: (severity: SeverityValue | null) => void;
@@ -27,7 +32,7 @@ interface Props {
 export function EffectRow({
   selection,
   targets,
-  dependency,
+  attribution,
   canOperate,
   busy,
   onSeverityChange,
@@ -64,10 +69,7 @@ export function EffectRow({
         </button>
         <div className={styles.effectIdentity}>
           <strong>{service.name_it}</strong>
-          <span>
-            {service.technical_domain_name ?? 'Dominio non indicato'}
-            {dependency ? <> · {dependencyTypeLabel(dependency.dependency_type)}</> : null}
-          </span>
+          <span>{service.technical_domain_name ?? 'Dominio non indicato'}</span>
         </div>
         <div className={styles.effectMeta}>
           {canOperate ? (
@@ -83,6 +85,11 @@ export function EffectRow({
           )}
           {targets.length > 0 ? (
             <span className={styles.effectInstanceCount}>{targets.length} ist.</span>
+          ) : null}
+          {attribution ? (
+            <span className={styles.badgeAttribution}>
+              via {attribution.operatedName} · {dependencyTypeLabel(attribution.dependencyType)}
+            </span>
           ) : null}
           {showSourceBadge ? (
             <span className={styles.badgeSuggested}>{impactSourceLabel(selection.source)}</span>
@@ -116,9 +123,9 @@ export function EffectRow({
                 disabled={busy || !canOperate}
               >
                 <option value="">Da definire</option>
-                <option value="internal">Interna</option>
-                <option value="external">Esterna</option>
-                <option value="both">Interna ed esterna</option>
+                <option value="internal">Solo utenti interni</option>
+                <option value="external">Clienti ed altre entità esterne</option>
+                <option value="both">Utenti interni e Clienti</option>
               </select>
               {selection.expectedAudience ? null : (
                 <small className={styles.controlHint}>
