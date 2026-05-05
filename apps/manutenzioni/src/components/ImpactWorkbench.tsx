@@ -476,13 +476,18 @@ function compareSelections(a: ImpactSelectionView, b: ImpactSelectionView): numb
 }
 
 function selectionInputs(items: ImpactSelectionView[]): ClassificationInput[] {
+  const existingOperatedPrimaryId =
+    items.find((item) => item.role === 'operated' && item.isPrimary)?.reference.id ?? null;
   const firstOperatedId = items.find((item) => item.role === 'operated')?.reference.id ?? null;
+  const existingPrimaryId = items.find((item) => item.isPrimary)?.reference.id ?? null;
+  const primaryId = existingOperatedPrimaryId ?? firstOperatedId ?? existingPrimaryId;
+
   return items.map((item) => ({
     reference_id: item.reference.id,
     service_taxonomy_id: item.reference.id,
     source: item.source,
     confidence: item.confidence ?? null,
-    is_primary: item.reference.id === firstOperatedId || item.isPrimary,
+    is_primary: item.reference.id === primaryId,
     role: item.role,
     expected_severity: item.expectedSeverity ?? undefined,
     expected_audience: item.expectedAudience,
