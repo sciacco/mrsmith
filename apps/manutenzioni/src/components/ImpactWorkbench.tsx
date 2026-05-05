@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icon, useToast } from '@mrsmith/ui';
 import {
   useReplaceClassifications,
@@ -19,9 +19,9 @@ import type {
 import { CatalogCombobox } from './CatalogCombobox';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CreateServiceTaxonomyModal } from './CreateServiceTaxonomyModal';
-import { ImpactRelationRail } from './ImpactRelationRail';
-import { ImpactServiceCard, type ImpactSelectionView } from './ImpactServiceCard';
-import { errorMessage, severityLabel } from '../lib/format';
+import { OperatedDetailPanel } from './OperatedDetailPanel';
+import { errorMessage } from '../lib/format';
+import type { ImpactSelectionView } from './impactTypes';
 import styles from './ImpactWorkbench.module.css';
 
 interface Props {
@@ -43,6 +43,7 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
     initialName: string;
   } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<MaintenanceTarget | null>(null);
+  const [selectedOperatedId, setSelectedOperatedId] = useState<number | null>(null);
 
   const selections = useMemo(
     () => normalizeImpactSelections(detail.service_taxonomy, detail.technical_domain.id),
@@ -61,6 +62,24 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
     [selections],
   );
   const targetsByService = useMemo(() => targetsGroupedByService(detail.targets), [detail.targets]);
+
+  useEffect(() => {
+    if (operatedSelections.length === 0) {
+      if (selectedOperatedId !== null) setSelectedOperatedId(null);
+      return;
+    }
+    const stillSelected = operatedSelections.some((item) => item.reference.id === selectedOperatedId);
+    if (!stillSelected) {
+      const primary = operatedSelections.find((item) => item.isPrimary);
+      setSelectedOperatedId(primary?.reference.id ?? operatedSelections[0]?.reference.id ?? null);
+    }
+  }, [operatedSelections, selectedOperatedId]);
+
+  const selectedOperated = useMemo(
+    () => operatedSelections.find((item) => item.reference.id === selectedOperatedId) ?? null,
+    [operatedSelections, selectedOperatedId],
+  );
+
   const operatedCatalog = useMemo(
     () =>
       reference.service_taxonomy.filter(
@@ -68,15 +87,54 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
       ),
     [detail.technical_domain.id, reference.service_taxonomy],
   );
-  const directSuggestions = useMemo(
-    () =>
-      dedupeDirectSuggestions(
-        dependencies.data ?? [],
-        new Set(operatedSelections.map((item) => item.reference.id)),
-        selectedIds,
+
+  const allDependencies = dependencies.data ?? [];
+
+  const suggestionsForSelected = useMemo(() => {
+    if (!selectedOperated) return [] as ServiceDependency[];
+    return dedupeSuggestions(
+      allDependencies,
+      selectedOperated.reference.id,
+      selectedIds,
+      ignoredSuggestionIds,
+    );
+  }, [allDependencies, ignoredSuggestionIds, selectedIds, selectedOperated]);
+
+  const declaredForSelected = useMemo(() => {
+    if (!selectedOperated) return [] as ImpactSelectionView[];
+    const operatedId = selectedOperated.reference.id;
+    return dependentSelections.filter((sel) =>
+      allDependencies.some(
+        (d) => d.upstream_service_id === operatedId && d.downstream_service_id === sel.reference.id,
       ),
-    [dependencies.data, operatedSelections, selectedIds],
+    );
+  }, [allDependencies, dependentSelections, selectedOperated]);
+
+  const operatedIdSet = useMemo(
+    () => new Set(operatedSelections.map((item) => item.reference.id)),
+    [operatedSelections],
   );
+
+  const orphanDependents = useMemo(() => {
+    return dependentSelections.filter(
+      (sel) =>
+        !allDependencies.some(
+          (d) => operatedIdSet.has(d.upstream_service_id) && d.downstream_service_id === sel.reference.id,
+        ),
+    );
+  }, [allDependencies, dependentSelections, operatedIdSet]);
+
+  const effectsCountByOperated = useMemo(() => {
+    const counts = new Map<number, number>();
+    const dependentIds = new Set(dependentSelections.map((sel) => sel.reference.id));
+    for (const dep of allDependencies) {
+      if (!operatedIdSet.has(dep.upstream_service_id)) continue;
+      if (!dependentIds.has(dep.downstream_service_id)) continue;
+      counts.set(dep.upstream_service_id, (counts.get(dep.upstream_service_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [allDependencies, dependentSelections, operatedIdSet]);
+
   const crossDomainOperatedCount = operatedSelections.filter(
     (item) =>
       item.reference.technical_domain_id != null &&
@@ -114,6 +172,7 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
       expectedAudience: null,
     };
     const next = mergeSelection(selections, nextSelection);
+    if (role === 'operated') setSelectedOperatedId(service.id);
     void saveSelections(next, role === 'operated' ? 'Servizio in manutenzione aggiunto.' : 'Effetto aggiunto.');
   }
 
@@ -123,7 +182,8 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
 
   function handleTaxonomyCreated(item: ReferenceItem) {
     if (!createTaxonomyContext) return;
-    addService(item, createTaxonomyContext.role, 'manual', 'unavailable');
+    const role = createTaxonomyContext.role;
+    addService(item, role, 'manual', role === 'operated' ? 'unavailable' : 'degraded');
     setCreateTaxonomyContext(null);
   }
 
@@ -180,6 +240,10 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
     });
   }
 
+  function resetIgnoredSuggestions() {
+    setIgnoredSuggestionIds(new Set());
+  }
+
   async function createTarget(service: ReferenceItem, displayName: string) {
     if (!service.target_type_id) {
       toast.toast('Tipo target mancante: aggiunta istanza non disponibile.', 'error');
@@ -205,9 +269,9 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
     try {
       await targetMutations.remove.mutateAsync(removeTarget.maintenance_target_id);
       setRemoveTarget(null);
-      toast.toast('Target rimosso.');
+      toast.toast('Istanza rimossa.');
     } catch (error) {
-      toast.toast(errorMessage(error, 'Rimozione target non riuscita.'), 'error');
+      toast.toast(errorMessage(error, 'Rimozione istanza non riuscita.'), 'error');
     }
   }
 
@@ -217,7 +281,8 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
         <div>
           <h2>Impatto operativo</h2>
           <p>
-            Modella cosa entra in manutenzione, cosa ne subisce l'effetto e quali istanze sono coinvolte.
+            Seleziona un servizio in manutenzione per modellarne istanze, effetti propagati e
+            override.
           </p>
         </div>
         <div className={styles.summaryChips} aria-label="Sintesi impatto">
@@ -238,125 +303,134 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
         </div>
       ) : null}
 
-      <div className={styles.workspaceGrid}>
-        <section className={styles.serviceColumn}>
-          <ColumnHeader
-            title="In manutenzione"
-            subtitle={detail.technical_domain.name_it}
-            count={operatedSelections.length}
-          />
+      <div className={styles.shell}>
+        <aside className={styles.rail} aria-label="Servizi in manutenzione">
+          <div className={styles.railHeader}>
+            <span>In manutenzione</span>
+            <span className={styles.railCount}>{operatedSelections.length}</span>
+          </div>
           {canOperate ? (
             <CatalogCombobox
               options={operatedCatalog}
               excludedIds={selectedIds}
               domainHintId={detail.technical_domain.id}
-              placeholder="Cerca servizio in manutenzione"
+              placeholder="Aggiungi servizio in manutenzione"
               onSelect={(item) => addService(item, 'operated', 'manual', 'unavailable')}
               onCreateRequest={(name) => requestCreateTaxonomy(name, 'operated')}
             />
           ) : null}
-          <div className={styles.cardStack}>
-            {operatedSelections.length > 0 ? (
-              operatedSelections.map((selection) => (
-                <ImpactServiceCard
-                  key={selection.reference.id}
-                  selection={selection}
-                  targets={targetsByService.get(selection.reference.id) ?? []}
-                  maintenanceDomainId={detail.technical_domain.id}
-                  canOperate={canOperate}
-                  busy={busy}
-                  onRoleChange={(serviceId, role) =>
-                    updateSelection(serviceId, { role }, 'Ruolo aggiornato.')
-                  }
-                  onSeverityChange={(serviceId, severity) =>
-                    updateSelection(serviceId, { expectedSeverity: severity }, 'Severità aggiornata.')
-                  }
-                  onAudienceChange={(serviceId, audience) =>
-                    updateSelection(serviceId, { expectedAudience: audience }, 'Audience aggiornata.')
-                  }
-                  onCreateTarget={(service, displayName) => void createTarget(service, displayName)}
-                  onRequestRemoveTarget={setRemoveTarget}
-                  onRemoveService={removeService}
-                />
-              ))
-            ) : (
-              <EmptyColumn
-                icon="package"
-                title="Nessun servizio in manutenzione"
-                text="Aggiungi l'oggetto su cui interviene questa finestra."
-              />
-            )}
-          </div>
-        </section>
+          {operatedSelections.length > 0 ? (
+            <ul className={styles.railList}>
+              {operatedSelections.map((item) => {
+                const isSelected = item.reference.id === selectedOperatedId;
+                const targetsCount = (targetsByService.get(item.reference.id) ?? []).length;
+                const effectsCount = effectsCountByOperated.get(item.reference.id) ?? 0;
+                const crossDomain =
+                  item.reference.technical_domain_id != null &&
+                  item.reference.technical_domain_id !== detail.technical_domain.id;
+                return (
+                  <li key={item.reference.id}>
+                    <button
+                      type="button"
+                      className={`${styles.railItem} ${isSelected ? styles.railItemSelected : ''} ${crossDomain ? styles.railItemWarning : ''}`}
+                      onClick={() => setSelectedOperatedId(item.reference.id)}
+                    >
+                      <span className={styles.railItemName}>{item.reference.name_it}</span>
+                      <span className={styles.railItemMeta}>
+                        {item.reference.technical_domain_name ?? 'Dominio non indicato'}
+                      </span>
+                      <span className={styles.railItemStats}>
+                        <span>{effectsCount} effetti</span>
+                        <span>{targetsCount} istanze</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className={styles.railEmpty}>
+              <Icon name="package" size={18} />
+              <p>Aggiungi un servizio per iniziare.</p>
+            </div>
+          )}
+        </aside>
 
-        <ImpactRelationRail
-          operated={operatedSelections}
-          dependent={dependentSelections}
-          suggestions={directSuggestions}
-          ignoredSuggestionIds={ignoredSuggestionIds}
-          dependenciesLoading={dependencies.isLoading}
-          dependenciesUnavailable={Boolean(dependencies.error)}
-          canOperate={canOperate}
-          onAcceptSuggestions={acceptSuggestions}
-          onIgnoreSuggestion={ignoreSuggestion}
-        />
-
-        <section className={styles.serviceColumn}>
-          <ColumnHeader
-            title="Effetti su altri sistemi"
-            subtitle="Cross-dominio"
-            count={dependentSelections.length}
-          />
-          {canOperate ? (
-            <CatalogCombobox
-              options={reference.service_taxonomy}
-              excludedIds={selectedIds}
-              domainHintId={detail.technical_domain.id}
-              placeholder="Cerca sistema impattato"
-              onSelect={(item) => addService(item, 'dependent', 'manual', 'degraded')}
-              onCreateRequest={(name) => requestCreateTaxonomy(name, 'dependent')}
+        <section className={styles.detail} aria-label="Dettaglio servizio in manutenzione">
+          {selectedOperated ? (
+            <OperatedDetailPanel
+              key={selectedOperated.reference.id}
+              selection={selectedOperated}
+              targets={targetsByService.get(selectedOperated.reference.id) ?? []}
+              maintenanceDomainId={detail.technical_domain.id}
+              suggestions={suggestionsForSelected}
+              suggestionsLoading={dependencies.isLoading}
+              suggestionsUnavailable={Boolean(dependencies.error)}
+              ignoredCount={countIgnoredForOperated(
+                allDependencies,
+                selectedOperated.reference.id,
+                ignoredSuggestionIds,
+              )}
+              declaredEffects={declaredForSelected.map((sel) => ({
+                selection: sel,
+                dependency: allDependencies.find(
+                  (d) =>
+                    d.upstream_service_id === selectedOperated.reference.id &&
+                    d.downstream_service_id === sel.reference.id,
+                ),
+                targets: targetsByService.get(sel.reference.id) ?? [],
+              }))}
+              orphanEffects={orphanDependents.map((sel) => ({
+                selection: sel,
+                targets: targetsByService.get(sel.reference.id) ?? [],
+              }))}
+              manualEffectCatalog={reference.service_taxonomy}
+              excludedEffectIds={selectedIds}
+              canOperate={canOperate}
+              busy={busy}
+              onSelectionAudienceChange={(audience) =>
+                updateSelection(
+                  selectedOperated.reference.id,
+                  { expectedAudience: audience },
+                  'Audience aggiornata.',
+                )
+              }
+              onSelectionSeverityChange={(severity) =>
+                updateSelection(
+                  selectedOperated.reference.id,
+                  { expectedSeverity: severity },
+                  'Severità aggiornata.',
+                )
+              }
+              onRemoveOperated={() => removeService(selectedOperated.reference.id)}
+              onCreateTarget={(displayName) =>
+                void createTarget(selectedOperated.reference, displayName)
+              }
+              onRequestRemoveTarget={setRemoveTarget}
+              onAcceptSuggestions={acceptSuggestions}
+              onIgnoreSuggestion={ignoreSuggestion}
+              onResetIgnored={resetIgnoredSuggestions}
+              onAddManualEffect={(item) => addService(item, 'dependent', 'manual', 'degraded')}
+              onCreateManualEffectRequest={(name) => requestCreateTaxonomy(name, 'dependent')}
+              onEffectSeverityChange={(serviceId, severity) =>
+                updateSelection(serviceId, { expectedSeverity: severity }, 'Severità aggiornata.')
+              }
+              onEffectAudienceChange={(serviceId, audience) =>
+                updateSelection(serviceId, { expectedAudience: audience }, 'Audience aggiornata.')
+              }
+              onEffectCreateTarget={(service, displayName) => void createTarget(service, displayName)}
+              onEffectRemove={removeService}
             />
-          ) : null}
-          <div className={styles.cardStack}>
-            {dependentSelections.length > 0 ? (
-              severityGroups(dependentSelections).map((group) => (
-                <div key={group.key} className={styles.severityGroup}>
-                  <div className={styles.severityGroupHeader}>
-                    <span>{group.label}</span>
-                    <span>{group.items.length}</span>
-                  </div>
-                  {group.items.map((selection) => (
-                    <ImpactServiceCard
-                      key={selection.reference.id}
-                      selection={selection}
-                      targets={targetsByService.get(selection.reference.id) ?? []}
-                      maintenanceDomainId={detail.technical_domain.id}
-                      canOperate={canOperate}
-                      busy={busy}
-                      onRoleChange={(serviceId, role) =>
-                        updateSelection(serviceId, { role }, 'Ruolo aggiornato.')
-                      }
-                      onSeverityChange={(serviceId, severity) =>
-                        updateSelection(serviceId, { expectedSeverity: severity }, 'Severità aggiornata.')
-                      }
-                      onAudienceChange={(serviceId, audience) =>
-                        updateSelection(serviceId, { expectedAudience: audience }, 'Audience aggiornata.')
-                      }
-                      onCreateTarget={(service, displayName) => void createTarget(service, displayName)}
-                      onRequestRemoveTarget={setRemoveTarget}
-                      onRemoveService={removeService}
-                    />
-                  ))}
-                </div>
-              ))
-            ) : (
-              <EmptyColumn
-                icon="link"
-                title="Nessun effetto indicato"
-                text="Aggiungi sistemi collegati o accetta un suggerimento dalle dipendenze."
-              />
-            )}
-          </div>
+          ) : (
+            <div className={styles.detailEmpty}>
+              <Icon name="box" size={28} />
+              <strong>Nessun servizio selezionato</strong>
+              <p>
+                Aggiungi un servizio in manutenzione dalla colonna a sinistra per modellare istanze
+                e propagazione degli effetti.
+              </p>
+            </div>
+          )}
         </section>
       </div>
 
@@ -372,47 +446,17 @@ export function ImpactWorkbench({ detail, reference, canOperate }: Props) {
 
       <ConfirmDialog
         open={removeTarget !== null}
-        title="Rimuovi target"
+        title="Rimuovi istanza"
         message={
           removeTarget
-            ? `Il target "${removeTarget.display_name}" sarà rimosso da questa manutenzione.`
-            : 'Il target sarà rimosso da questa manutenzione.'
+            ? `L'istanza "${removeTarget.display_name}" sarà rimossa da questa manutenzione.`
+            : "L'istanza sarà rimossa da questa manutenzione."
         }
         confirmLabel="Rimuovi"
         busy={targetMutations.remove.isPending}
         onClose={() => setRemoveTarget(null)}
         onConfirm={confirmRemoveTarget}
       />
-    </div>
-  );
-}
-
-function ColumnHeader({ title, subtitle, count }: { title: string; subtitle: string; count: number }) {
-  return (
-    <div className={styles.columnHeader}>
-      <div>
-        <h3>{title}</h3>
-        <p>{subtitle}</p>
-      </div>
-      <span>{count}</span>
-    </div>
-  );
-}
-
-function EmptyColumn({
-  icon,
-  title,
-  text,
-}: {
-  icon: 'package' | 'link';
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className={styles.emptyColumn}>
-      <Icon name={icon} size={19} />
-      <strong>{title}</strong>
-      <p>{text}</p>
     </div>
   );
 }
@@ -505,15 +549,17 @@ function targetsGroupedByService(targets: MaintenanceTarget[]): Map<number, Main
   return map;
 }
 
-function dedupeDirectSuggestions(
+function dedupeSuggestions(
   dependencies: ServiceDependency[],
-  operatedIds: Set<number>,
+  upstreamId: number,
   selectedIds: Set<number>,
+  ignoredIds: Set<number>,
 ): ServiceDependency[] {
   const byDownstream = new Map<number, ServiceDependency>();
   for (const dependency of dependencies) {
-    if (!operatedIds.has(dependency.upstream_service_id)) continue;
+    if (dependency.upstream_service_id !== upstreamId) continue;
     if (selectedIds.has(dependency.downstream_service_id)) continue;
+    if (ignoredIds.has(dependency.service_dependency_id)) continue;
     const current = byDownstream.get(dependency.downstream_service_id);
     if (!current || severityRank(dependency.default_severity) > severityRank(current.default_severity)) {
       byDownstream.set(dependency.downstream_service_id, dependency);
@@ -524,26 +570,20 @@ function dedupeDirectSuggestions(
   );
 }
 
+function countIgnoredForOperated(
+  dependencies: ServiceDependency[],
+  upstreamId: number,
+  ignoredIds: Set<number>,
+): number {
+  let count = 0;
+  for (const dep of dependencies) {
+    if (dep.upstream_service_id === upstreamId && ignoredIds.has(dep.service_dependency_id)) count += 1;
+  }
+  return count;
+}
+
 function severityRank(value: SeverityValue): number {
   if (value === 'unavailable') return 3;
   if (value === 'degraded') return 2;
   return 1;
-}
-
-function severityGroups(items: ImpactSelectionView[]): Array<{
-  key: string;
-  label: string;
-  items: ImpactSelectionView[];
-}> {
-  const order: Array<SeverityValue | 'unset'> = ['unavailable', 'degraded', 'none', 'unset'];
-  return order
-    .map((key) => {
-      const groupItems = items.filter((item) => (item.expectedSeverity ?? 'unset') === key);
-      return {
-        key,
-        label: key === 'unset' ? 'Severità da definire' : severityLabel(key),
-        items: groupItems,
-      };
-    })
-    .filter((group) => group.items.length > 0);
 }
