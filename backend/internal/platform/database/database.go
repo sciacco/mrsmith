@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 type Config struct {
@@ -17,6 +18,10 @@ func New(cfg Config) (*sql.DB, error) {
 		if err != nil {
 			return nil, fmt.Errorf("open %s: %w", cfg.Driver, err)
 		}
+		db.SetMaxOpenConns(50)
+		db.SetMaxIdleConns(5)
+		db.SetConnMaxLifetime(5 * time.Minute)
+		db.SetConnMaxIdleTime(1 * time.Minute)
 		if err := db.Ping(); err != nil {
 			return nil, fmt.Errorf("ping %s: %w", cfg.Driver, err)
 		}
