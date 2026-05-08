@@ -1,51 +1,29 @@
-import { Suspense, useMemo } from 'react';
-import { AppShell, TabNav } from '@mrsmith/ui';
+import { Suspense } from 'react';
+import { APP_ACCESS_ROLES, getAppAccessState } from '@mrsmith/auth-client';
+import { AccessNotice, AppShell, TabNav } from '@mrsmith/ui';
 import { useRoutes } from 'react-router-dom';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 
-function AccessState({ title, message }: { title: string; message: string }) {
-  return (
-    <section className="stateCard">
-      <p className="eyebrow">Autenticazione</p>
-      <h1>{title}</h1>
-      <p>{message}</p>
-    </section>
-  );
+const navItems = [
+  { label: 'Cruscotto', path: '/rda' },
+];
+
+function AppRoutes() {
+  const element = useRoutes(routes);
+  return <>{element}</>;
 }
 
 export function App() {
-  const { user, authenticated, loading, logout, status } = useOptionalAuth();
-  const element = useRoutes(routes);
-  const navItems = useMemo(() => {
-    return [
-      { label: 'Cruscotto', path: '/rda' },
-    ];
-  }, []);
+  const auth = useOptionalAuth();
+  const { user, logout } = auth;
+  const accessState = getAppAccessState(auth, APP_ACCESS_ROLES.rda);
 
-  if (loading) return null;
-
-  if (status === 'reauthenticating') {
+  if (accessState !== 'allowed') {
     return (
-      <AppShell appName="RDA" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
-        <AppShell.Nav>
-          <div className="navRow"><TabNav items={navItems} /></div>
-        </AppShell.Nav>
+      <AppShell appName="RDA" userName={user?.name} onLogout={logout}>
         <AppShell.Content>
-          <AccessState title="Sessione in ripristino" message="Reindirizzamento in corso." />
-        </AppShell.Content>
-      </AppShell>
-    );
-  }
-
-  if (!authenticated) {
-    return (
-      <AppShell appName="RDA" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
-        <AppShell.Nav>
-          <div className="navRow"><TabNav items={navItems} /></div>
-        </AppShell.Nav>
-        <AppShell.Content>
-          <AccessState title="Accesso richiesto" message="Ricarica la pagina o riapri l'app dal portale." />
+          <AccessNotice state={accessState} />
         </AppShell.Content>
       </AppShell>
     );
@@ -58,7 +36,7 @@ export function App() {
       </AppShell.Nav>
       <AppShell.Content>
         <Suspense fallback={<section className="stateCard"><h1>Caricamento in corso</h1></section>}>
-          {element}
+          <AppRoutes />
         </Suspense>
       </AppShell.Content>
     </AppShell>

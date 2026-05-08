@@ -1,4 +1,6 @@
 export { AppShell } from './components/AppShell/AppShell';
+export { AccessNotice } from './components/AccessNotice/AccessNotice';
+export type { AccessNoticeState } from './components/AccessNotice/AccessNotice';
 export { UserMenu } from './components/UserMenu/UserMenu';
 export { TabNav } from './components/TabNav/TabNav';
 export type { TabNavItem, TabNavDotIndicator } from './components/TabNav/TabNav';

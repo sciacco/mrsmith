@@ -1,15 +1,13 @@
-import { AppShell, TabNavGroup, type TabGroup } from '@mrsmith/ui';
-import { hasAnyRole } from '@mrsmith/auth-client';
+import { APP_ACCESS_ROLES, getAppAccessState, hasAnyRole } from '@mrsmith/auth-client';
+import { AccessNotice, AppShell, TabNavGroup, type TabGroup } from '@mrsmith/ui';
 import { useRoutes } from 'react-router-dom';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 import { MANUTENZIONI_APPROVAL_ROLES } from './lib/roles';
 import styles from './App.module.css';
 
-export function App() {
-  const { user, authenticated, loading, logout, status } = useOptionalAuth();
-  const canConfigure = hasAnyRole(user?.roles, MANUTENZIONI_APPROVAL_ROLES);
-  const navGroups: TabGroup[] = [
+function buildNavGroups(canConfigure: boolean): TabGroup[] {
+  return [
     {
       label: 'Registro',
       items: [
@@ -26,47 +24,30 @@ export function App() {
         ]
       : []),
   ];
+}
+
+function AppRoutes() {
   const element = useRoutes(routes);
+  return <>{element}</>;
+}
 
-  if (loading) return null;
+export function App() {
+  const auth = useOptionalAuth();
+  const { user, logout } = auth;
+  const accessState = getAppAccessState(auth, APP_ACCESS_ROLES.manutenzioni);
 
-  if (status === 'reauthenticating') {
+  if (accessState !== 'allowed') {
     return (
-      <AppShell appName="Manutenzioni" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
-        <AppShell.Nav>
-          <div className={styles.navRow}>
-            <TabNavGroup groups={navGroups} />
-          </div>
-        </AppShell.Nav>
+      <AppShell appName="Manutenzioni" userName={user?.name} onLogout={logout}>
         <AppShell.Content>
-          <section className={styles.noticeCard}>
-            <p className={styles.eyebrow}>Autenticazione</p>
-            <h1>Sessione in ripristino</h1>
-            <p>Reindirizzamento in corso.</p>
-          </section>
+          <AccessNotice state={accessState} />
         </AppShell.Content>
       </AppShell>
     );
   }
 
-  if (!authenticated) {
-    return (
-      <AppShell appName="Manutenzioni" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
-        <AppShell.Nav>
-          <div className={styles.navRow}>
-            <TabNavGroup groups={navGroups} />
-          </div>
-        </AppShell.Nav>
-        <AppShell.Content>
-          <section className={styles.noticeCard}>
-            <p className={styles.eyebrow}>Autenticazione</p>
-            <h1>Accesso richiesto</h1>
-            <p>Riapri l&apos;app dal portale o ricarica la pagina.</p>
-          </section>
-        </AppShell.Content>
-      </AppShell>
-    );
-  }
+  const canConfigure = hasAnyRole(user?.roles, MANUTENZIONI_APPROVAL_ROLES);
+  const navGroups = buildNavGroups(canConfigure);
 
   return (
     <AppShell appName="Manutenzioni" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
@@ -75,7 +56,7 @@ export function App() {
           <TabNavGroup groups={navGroups} />
         </div>
       </AppShell.Nav>
-      <AppShell.Content>{element}</AppShell.Content>
+      <AppShell.Content><AppRoutes /></AppShell.Content>
     </AppShell>
   );
 }

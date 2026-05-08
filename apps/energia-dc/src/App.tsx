@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { useRoutes } from 'react-router-dom';
-import { AppShell, TabNav } from '@mrsmith/ui';
+import { APP_ACCESS_ROLES, getAppAccessState } from '@mrsmith/auth-client';
+import { AccessNotice, AppShell, TabNav } from '@mrsmith/ui';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 import { ViewState } from './components/ViewState';
@@ -26,41 +27,21 @@ function Nav() {
   );
 }
 
-export function App() {
-  const { user, authenticated, loading, logout, status } = useOptionalAuth();
+function AppRoutes() {
   const element = useRoutes(routes);
+  return <>{element}</>;
+}
 
-  if (loading) return null;
+export function App() {
+  const auth = useOptionalAuth();
+  const { user, logout } = auth;
+  const accessState = getAppAccessState(auth, APP_ACCESS_ROLES['energia-dc']);
 
-  if (status === 'reauthenticating') {
+  if (accessState !== 'allowed') {
     return (
-      <AppShell appName="Energia in DC" userName={user?.name ?? 'John Doe'} onLogout={logout}>
-        <AppShell.Nav>
-          <Nav />
-        </AppShell.Nav>
+      <AppShell appName="Energia in DC" userName={user?.name} onLogout={logout}>
         <AppShell.Content>
-          <section className={styles.reauthCard}>
-            <p className={styles.eyebrow}>Autenticazione</p>
-            <h1>Sessione in ripristino</h1>
-            <p>La sessione e scaduta durante l&apos;inattivita. Reindirizzamento a Keycloak in corso.</p>
-          </section>
-        </AppShell.Content>
-      </AppShell>
-    );
-  }
-
-  if (!authenticated) {
-    return (
-      <AppShell appName="Energia in DC" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
-        <AppShell.Nav>
-          <Nav />
-        </AppShell.Nav>
-        <AppShell.Content>
-          <section className={styles.reauthCard}>
-            <p className={styles.eyebrow}>Autenticazione</p>
-            <h1>Accesso richiesto</h1>
-            <p>La sessione Keycloak non e disponibile. Ricarica la pagina o riapri l&apos;app dal portale.</p>
-          </section>
+          <AccessNotice state={accessState} />
         </AppShell.Content>
       </AppShell>
     );
@@ -80,7 +61,7 @@ export function App() {
             />
           }
         >
-          {element}
+          <AppRoutes />
         </Suspense>
       </AppShell.Content>
     </AppShell>

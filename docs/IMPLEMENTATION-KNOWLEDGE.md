@@ -432,6 +432,15 @@ Alyante ERP ID
 - Used by: all mini-apps consuming `@mrsmith/auth-client` and `@mrsmith/api-client`.
 - Open questions: none.
 
+### Mini-App Shells Must Gate Routes With Launcher Roles
+
+- Context: direct browser entry to `/apps/<app>/` while authenticated in Keycloak but missing that app's launcher role.
+- Discovery: launcher visibility and backend ACL were already role-gated, but mini-app roots rendered their nav and route trees after checking only authentication. This let unassigned users see app workspaces, empty tables, or data-error states before backend ACL stopped data access.
+- Practical rule: every mini-app root must use `getAppAccessState()` with `APP_ACCESS_ROLES` before rendering app nav or calling `useRoutes`. Non-allowed states should render only the shared shell header and `AccessNotice`; `app_devadmin` remains the central bypass through `hasAnyRole()`.
+- Evidence: `packages/auth-client/src/roles.ts`, `packages/ui/src/components/AccessNotice/AccessNotice.tsx`, and `apps/*/src/App.tsx`.
+- Used by: all Vite mini-apps mounted under `/apps/<app>/`.
+- Open questions: none.
+
 ## Legacy Data Model Constraints
 
 ### Alyante Product Translation Write Contract

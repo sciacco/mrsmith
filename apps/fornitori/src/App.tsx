@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { useRoutes } from 'react-router-dom';
-import { AppShell, TabNav } from '@mrsmith/ui';
+import { APP_ACCESS_ROLES, getAppAccessState } from '@mrsmith/auth-client';
+import { AccessNotice, AppShell, TabNav } from '@mrsmith/ui';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 import { SettingsMenu } from './components/SettingsMenu';
@@ -21,39 +22,21 @@ function Nav() {
   );
 }
 
-function AccessState({ title, message }: { title: string; message: string }) {
-  return (
-    <section className="stateCard">
-      <p className="eyebrow">Autenticazione</p>
-      <h1>{title}</h1>
-      <p>{message}</p>
-    </section>
-  );
+function AppRoutes() {
+  const element = useRoutes(routes);
+  return <>{element}</>;
 }
 
 export function App() {
-  const { user, authenticated, loading, logout, status } = useOptionalAuth();
-  const element = useRoutes(routes);
+  const auth = useOptionalAuth();
+  const { user, logout } = auth;
+  const accessState = getAppAccessState(auth, APP_ACCESS_ROLES.fornitori);
 
-  if (loading) return null;
-
-  if (status === 'reauthenticating') {
+  if (accessState !== 'allowed') {
     return (
-      <AppShell appName="Fornitori" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
-        <AppShell.Nav><Nav /></AppShell.Nav>
+      <AppShell appName="Fornitori" userName={user?.name} onLogout={logout}>
         <AppShell.Content>
-          <AccessState title="Sessione in ripristino" message="Reindirizzamento in corso." />
-        </AppShell.Content>
-      </AppShell>
-    );
-  }
-
-  if (!authenticated) {
-    return (
-      <AppShell appName="Fornitori" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
-        <AppShell.Nav><Nav /></AppShell.Nav>
-        <AppShell.Content>
-          <AccessState title="Accesso richiesto" message="Ricarica la pagina o riapri l'app dal portale." />
+          <AccessNotice state={accessState} />
         </AppShell.Content>
       </AppShell>
     );
@@ -64,7 +47,7 @@ export function App() {
       <AppShell.Nav><Nav /></AppShell.Nav>
       <AppShell.Content>
         <Suspense fallback={<section className="stateCard"><h1>Caricamento in corso</h1></section>}>
-          {element}
+          <AppRoutes />
         </Suspense>
       </AppShell.Content>
     </AppShell>
