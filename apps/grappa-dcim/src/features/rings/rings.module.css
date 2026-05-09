@@ -1,0 +1,106 @@
+.topologyGrid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.55fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.ringCanvas {
+  min-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(rgba(99, 91, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 91, 255, 0.045) 1px, transparent 1px),
+    rgba(255, 255, 255, 0.94);
+  background-size: 28px 28px;
+  padding: var(--space-4);
+}
+
+.nodeMap {
+  position: relative;
+  min-width: 560px;
+  min-height: 360px;
+}
+
+.nodeButton {
+  position: absolute;
+  width: 4rem;
+  height: 4rem;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid rgba(99, 91, 255, 0.36);
+  border-radius: var(--radius-full);
+  background: #ffffff;
+  color: var(--color-accent);
+  font-weight: 800;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.nodeButtonActive {
+  background: var(--color-accent);
+  color: #ffffff;
+  box-shadow: var(--shadow-accent);
+}
+
+.arcList,
+.artifactList {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.arcButton,
+.artifactRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.92);
+  padding: var(--space-3);
+  color: var(--color-text);
+  text-align: left;
+}
+
+.arcButton {
+  cursor: pointer;
+}
+
+.arcButtonActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.rowTitle {
+  font-weight: 800;
+}
+
+.rowMeta {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.blockedNote {
+  color: var(--color-danger);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.confirmNote {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+@media (max-width: 920px) {
+  .topologyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ringCanvas {
+    min-height: 320px;
+  }
+}
