@@ -14,7 +14,8 @@
 
 ## Workflow Notes
 
-- Appsmith flow is now: `appsmith-audit -> appsmith-migration-spec -> portal-miniapp-generator -> portal-miniapp-ui-review pre-gate -> portal-miniapp-ui-fixer -> portal-miniapp-ui-review post-gate`.
+- Generic legacy flow is now: `legacy-app-auditor -> legacy-migration-spec -> portal-miniapp-generator -> portal-miniapp-ui-review pre-gate -> portal-miniapp-ui-fixer -> portal-miniapp-ui-review post-gate`.
+- Appsmith remains source-specific: `appsmith-audit -> appsmith-migration-spec -> portal-miniapp-generator -> portal-miniapp-ui-review pre-gate -> portal-miniapp-ui-fixer -> portal-miniapp-ui-review post-gate`.
 - The plan produced by this skill is the per-app contract and the handoff artifact for both the fixer and the blocking UI reviewer.
 - Keep the `.claude/skills` copy in sync until the repo fully switches to native Codex paths.
 - New mini-app plans must describe backend wiring using the repo's real server pattern: DB handles are opened in `backend/cmd/server/main.go` via `database.New(...)`, module routes are registered on the `api` sub-mux, and `/api` is added only once via `http.StripPrefix("/api", api)`.

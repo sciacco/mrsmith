@@ -1,0 +1,4 @@
+interface:
+  display_name: "Legacy App Auditor"
+  short_description: "Reverse engineer legacy apps into migration evidence"
+  default_prompt: "Use $legacy-app-auditor to audit this legacy application source and produce evidence-based migration artifacts and a fact sheet."
