@@ -4,6 +4,30 @@ import { useEffect, useMemo, useState } from 'react';
 import { Portal } from './components/Portal';
 import type { Category, PortalUser } from './types';
 
+const BOOTSTRAP_STATUS_DELAY_MS = 500;
+
+function useDelayedFlag(active: boolean, delayMs: number): boolean {
+  const [visible, setVisible] = useState(() => !active);
+
+  useEffect(() => {
+    if (!active) {
+      setVisible(false);
+      return undefined;
+    }
+
+    setVisible(false);
+    const timeout = window.setTimeout(() => {
+      setVisible(true);
+    }, delayMs);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [active, delayMs]);
+
+  return visible;
+}
+
 export function App() {
   const { authenticated, loading, status, getAccessToken, forceRefreshToken, logout } = useAuth();
   const api = useMemo(
@@ -20,6 +44,8 @@ export function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [bootstrapping, setBootstrapping] = useState(true);
+  const isTransientBootstrap = loading || bootstrapping || status === 'reauthenticating';
+  const showBootstrapStatus = useDelayedFlag(isTransientBootstrap, BOOTSTRAP_STATUS_DELAY_MS);
 
   useEffect(() => {
     if (loading) return;
@@ -62,7 +88,11 @@ export function App() {
     };
   }, [api, authenticated, loading, status]);
 
-  if (loading || bootstrapping || status === 'reauthenticating') {
+  if (isTransientBootstrap) {
+    if (!showBootstrapStatus) {
+      return <Portal categories={[]} userName="Agent Session" />;
+    }
+
     return (
       <Portal
         categories={[]}

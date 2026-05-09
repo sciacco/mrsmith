@@ -423,6 +423,15 @@ Alyante ERP ID
 - Used by: portal and all mini-apps using the shared API/auth client stack.
 - Open questions: none.
 
+### Keycloak Initialization Must Be Idempotent In AuthProvider
+
+- Context: frontend apps wrapped in React `StrictMode` while using `@mrsmith/auth-client`.
+- Discovery: React 18 development mode can rerun effects, and calling `keycloak.init()` more than once on the same Keycloak instance can produce a transient failed bootstrap that surfaces as `unauthenticated` and shows the mini-app "Accesso richiesto" page.
+- Practical rule: `AuthProvider` must start Keycloak initialization once per provider instance and let repeated effect executions subscribe to the same init promise. Stale effect results must not overwrite a newer/authenticated state.
+- Evidence: `packages/auth-client/src/AuthProvider.tsx`; observed mini-app entry flicker after adding root role gates.
+- Used by: all portal mini-apps and the portal launcher in development and production builds.
+- Open questions: none.
+
 ### Mini-App Auth Fallbacks Must Fail Closed and Retry Local Preflight Unauthorized Errors
 
 - Context: Vite mini-app bootstraps using `useOptionalAuth()`, app-shell auth gates, and React Query startup fetches.

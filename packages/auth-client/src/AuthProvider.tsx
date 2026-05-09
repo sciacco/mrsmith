@@ -154,6 +154,7 @@ function KeycloakAuthProvider({ keycloakUrl, realm, clientId, children }: AuthPr
     user: null,
   });
   const loginTriggeredRef = useRef(false);
+  const initPromiseRef = useRef<Promise<boolean> | null>(null);
   const pendingRefreshRef = useRef<Promise<string | undefined> | null>(null);
 
   const syncAuthState = useCallback(
@@ -273,6 +274,8 @@ function KeycloakAuthProvider({ keycloakUrl, realm, clientId, children }: AuthPr
   );
 
   useEffect(() => {
+    let active = true;
+
     keycloak.onAuthSuccess = () => {
       loginTriggeredRef.current = false;
       syncAuthState();
@@ -295,15 +298,24 @@ function KeycloakAuthProvider({ keycloakUrl, realm, clientId, children }: AuthPr
       void getAccessToken(0);
     };
 
-    keycloak
-      .init({ onLoad: 'login-required', checkLoginIframe: false })
+    if (!initPromiseRef.current) {
+      initPromiseRef.current = keycloak.init({ onLoad: 'login-required', checkLoginIframe: false });
+    }
+
+    void initPromiseRef.current
       .then((auth) => {
+        if (!active) return;
         loginTriggeredRef.current = false;
-        syncAuthState(auth ? 'authenticated' : 'unauthenticated');
+        syncAuthState(
+          auth || (keycloak.authenticated && keycloak.token) ? 'authenticated' : 'unauthenticated',
+        );
       })
       .catch(() => {
+        if (!active) return;
         loginTriggeredRef.current = false;
-        syncAuthState('unauthenticated');
+        syncAuthState(
+          keycloak.authenticated && keycloak.token ? 'authenticated' : 'unauthenticated',
+        );
       });
 
     const interval = setInterval(() => {
@@ -325,6 +337,7 @@ function KeycloakAuthProvider({ keycloakUrl, realm, clientId, children }: AuthPr
     window.addEventListener('focus', onVisibilityChange);
 
     return () => {
+      active = false;
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('focus', onVisibilityChange);

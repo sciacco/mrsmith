@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { ArrowLeft, Loader2, Lock, LogIn, ShieldAlert } from 'lucide-react';
 import styles from './AccessNotice.module.css';
 
 export type AccessNoticeState = 'loading' | 'reauthenticating' | 'unauthenticated' | 'forbidden';
+const DEFAULT_TRANSIENT_DEFER_MS = 450;
 
 interface AccessNoticeCopy {
   eyebrow: string;
@@ -14,13 +16,14 @@ interface AccessNoticeProps {
   title?: string;
   message?: string;
   portalHref?: string;
+  deferTransientMs?: number;
 }
 
 const copyByState: Record<AccessNoticeState, AccessNoticeCopy> = {
   loading: {
-    eyebrow: 'Autenticazione',
-    title: 'Verifica accesso',
-    message: 'Controllo del profilo in corso.',
+    eyebrow: 'Apertura applicazione',
+    title: 'Preparazione area di lavoro',
+    message: 'Caricamento della sessione in corso.',
   },
   reauthenticating: {
     eyebrow: 'Autenticazione',
@@ -52,11 +55,41 @@ function NoticeIcon({ state }: { state: AccessNoticeState }) {
   return <Lock size={22} strokeWidth={1.8} aria-hidden="true" />;
 }
 
-export function AccessNotice({ state, title, message, portalHref = '/' }: AccessNoticeProps) {
+export function AccessNotice({
+  state,
+  title,
+  message,
+  portalHref = '/',
+  deferTransientMs = DEFAULT_TRANSIENT_DEFER_MS,
+}: AccessNoticeProps) {
   const copy = copyByState[state];
   const isTransient = state === 'loading' || state === 'reauthenticating';
+  const [visibleTransientState, setVisibleTransientState] = useState<AccessNoticeState | null>(() =>
+    isTransient && deferTransientMs <= 0 ? state : null,
+  );
 
-  return (
+  useEffect(() => {
+    if (!isTransient) {
+      setVisibleTransientState(null);
+      return undefined;
+    }
+
+    if (deferTransientMs <= 0) {
+      setVisibleTransientState(state);
+      return undefined;
+    }
+
+    setVisibleTransientState(null);
+    const timeout = window.setTimeout(() => {
+      setVisibleTransientState(state);
+    }, deferTransientMs);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [deferTransientMs, isTransient, state]);
+
+  const notice = (
     <section
       className={styles.notice}
       role={isTransient ? 'status' : 'alert'}
@@ -76,4 +109,14 @@ export function AccessNotice({ state, title, message, portalHref = '/' }: Access
       )}
     </section>
   );
+
+  if (isTransient) {
+    return (
+      <div className={styles.transientSurface} aria-hidden={visibleTransientState !== state}>
+        {visibleTransientState === state ? notice : null}
+      </div>
+    );
+  }
+
+  return notice;
 }

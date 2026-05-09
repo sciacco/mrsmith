@@ -1,3 +1,17 @@
+.transientSurface {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  overflow: auto;
+  padding: var(--space-10, 40px) var(--space-12, 48px);
+  background:
+    radial-gradient(circle at top left, rgba(99, 91, 255, 0.06), transparent 28%),
+    linear-gradient(180deg, var(--color-bg) 0%, var(--color-surface) 100%);
+}
+
 .notice {
   width: min(100%, 40rem);
   margin: clamp(var(--space-10, 40px), 10vh, var(--space-16, 64px)) auto;
@@ -6,6 +20,10 @@
   border-radius: var(--radius-lg, 14px);
   background: var(--color-bg-elevated);
   box-shadow: var(--shadow-md);
+}
+
+.transientSurface .notice {
+  margin-top: clamp(var(--space-10, 40px), 14vh, var(--space-16, 64px));
 }
 
 .iconWrap {
@@ -92,6 +110,12 @@
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
 }
 
 @media (max-width: 640px) {
