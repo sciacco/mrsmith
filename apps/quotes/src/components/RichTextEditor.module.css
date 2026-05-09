@@ -20,6 +20,7 @@
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
   padding: var(--space-2);
   border-bottom: 1px solid var(--color-border-subtle);
@@ -133,6 +134,39 @@
   color: var(--color-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.compact .toolbar {
+  gap: 2px;
+  padding: 4px 6px;
+}
+
+.compact .toolBtn {
+  width: 28px;
+  height: 28px;
+  font-size: 0.75rem;
+}
+
+.compact .separator {
+  margin: 4px 3px;
+}
+
+.compact .editor {
+  min-height: 76px;
+  max-height: 180px;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.compact .editor p {
+  margin-bottom: var(--space-1);
+}
+
+.compact .editor ul,
+.compact .editor ol {
+  margin-left: var(--space-4);
+  margin-bottom: var(--space-1);
 }
 
 /* ── Color popover ── */

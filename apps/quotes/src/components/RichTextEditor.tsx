@@ -17,6 +17,8 @@ interface RichTextEditorProps {
   placeholder?: string;
   disabled?: boolean;
   standalone?: boolean;
+  variant?: 'full' | 'compact';
+  ariaLabel?: string;
 }
 
 const TEXT_COLORS = [
@@ -49,9 +51,18 @@ const COLOR_TITLES: Record<string, string> = {
   '#fecaca': 'Rosso',
 };
 
-export function RichTextEditor({ value, onChange, disabled, standalone, placeholder }: RichTextEditorProps) {
+export function RichTextEditor({
+  value,
+  onChange,
+  disabled,
+  standalone,
+  placeholder,
+  variant = 'full',
+  ariaLabel,
+}: RichTextEditorProps) {
   const [colorOpen, setColorOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const compact = variant === 'compact';
 
   const editor = useEditor({
     extensions: [
@@ -66,6 +77,11 @@ export function RichTextEditor({ value, onChange, disabled, standalone, placehol
     ],
     content: value,
     editable: !disabled,
+    editorProps: {
+      attributes: {
+        'aria-label': ariaLabel ?? placeholder ?? 'Editor di testo',
+      },
+    },
     onUpdate: ({ editor: e }) => {
       onChange(e.getHTML());
     },
@@ -106,38 +122,42 @@ export function RichTextEditor({ value, onChange, disabled, standalone, placehol
   const activeHighlightColor = (editor.getAttributes('highlight').color as string) ?? '';
 
   return (
-    <div className={`${styles.wrap} ${standalone ? styles.standalone : ''} ${disabled ? styles.disabled : ''}`}>
+    <div className={`${styles.wrap} ${standalone ? styles.standalone : ''} ${compact ? styles.compact : ''} ${disabled ? styles.disabled : ''}`}>
       <div className={styles.toolbar}>
         {/* ── Headings ── */}
-        <button
-          type="button"
-          className={`${styles.toolBtn} ${editor.isActive('heading', { level: 2 }) ? styles.toolBtnActive : ''}`}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          title="Titolo 2"
-          aria-label="Titolo 2"
-        >
-          <Icon name="heading2" size={16} />
-        </button>
-        <button
-          type="button"
-          className={`${styles.toolBtn} ${editor.isActive('heading', { level: 3 }) ? styles.toolBtnActive : ''}`}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          title="Titolo 3"
-          aria-label="Titolo 3"
-        >
-          <Icon name="heading3" size={16} />
-        </button>
-        <button
-          type="button"
-          className={`${styles.toolBtn} ${editor.isActive('heading', { level: 4 }) ? styles.toolBtnActive : ''}`}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
-          title="Titolo 4"
-          aria-label="Titolo 4"
-        >
-          <Icon name="heading4" size={16} />
-        </button>
+        {!compact && (
+          <>
+            <button
+              type="button"
+              className={`${styles.toolBtn} ${editor.isActive('heading', { level: 2 }) ? styles.toolBtnActive : ''}`}
+              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              title="Titolo 2"
+              aria-label="Titolo 2"
+            >
+              <Icon name="heading2" size={16} />
+            </button>
+            <button
+              type="button"
+              className={`${styles.toolBtn} ${editor.isActive('heading', { level: 3 }) ? styles.toolBtnActive : ''}`}
+              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+              title="Titolo 3"
+              aria-label="Titolo 3"
+            >
+              <Icon name="heading3" size={16} />
+            </button>
+            <button
+              type="button"
+              className={`${styles.toolBtn} ${editor.isActive('heading', { level: 4 }) ? styles.toolBtnActive : ''}`}
+              onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
+              title="Titolo 4"
+              aria-label="Titolo 4"
+            >
+              <Icon name="heading4" size={16} />
+            </button>
 
-        <div className={styles.separator} />
+            <div className={styles.separator} />
+          </>
+        )}
 
         {/* ── Text formatting ── */}
         <button
@@ -145,6 +165,7 @@ export function RichTextEditor({ value, onChange, disabled, standalone, placehol
           className={`${styles.toolBtn} ${editor.isActive('bold') ? styles.toolBtnActive : ''}`}
           onClick={() => editor.chain().focus().toggleBold().run()}
           title="Grassetto"
+          aria-label="Grassetto"
         >
           B
         </button>
@@ -153,99 +174,107 @@ export function RichTextEditor({ value, onChange, disabled, standalone, placehol
           className={`${styles.toolBtn} ${editor.isActive('italic') ? styles.toolBtnActive : ''}`}
           onClick={() => editor.chain().focus().toggleItalic().run()}
           title="Corsivo"
+          aria-label="Corsivo"
           style={{ fontStyle: 'italic' }}
         >
           I
         </button>
-        <button
-          type="button"
-          className={`${styles.toolBtn} ${editor.isActive('underline') ? styles.toolBtnActive : ''}`}
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          title="Sottolineato"
-          style={{ textDecoration: 'underline' }}
-        >
-          U
-        </button>
+        {!compact && (
+          <button
+            type="button"
+            className={`${styles.toolBtn} ${editor.isActive('underline') ? styles.toolBtnActive : ''}`}
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            title="Sottolineato"
+            aria-label="Sottolineato"
+            style={{ textDecoration: 'underline' }}
+          >
+            U
+          </button>
+        )}
 
         <div className={styles.separator} />
 
         {/* ── Color popover ── */}
-        <div className={styles.popoverAnchor} ref={popoverRef}>
-          <button
-            type="button"
-            className={`${styles.toolBtn} ${colorOpen ? styles.toolBtnActive : ''}`}
-            onClick={() => setColorOpen(o => !o)}
-            title="Colori"
-            aria-label="Colori"
-          >
-            <span className={styles.colorIndicator}>
-              A
-              <span
-                className={styles.colorBar}
-                style={{ background: activeTextColor || 'var(--color-text)' }}
-              />
-            </span>
-          </button>
-          {colorOpen && (
-            <div className={styles.colorPopover}>
-              <span className={styles.colorLabel}>Colore</span>
-              <div className={styles.colorGrid}>
-                {TEXT_COLORS.map(c => (
-                  <button
-                    key={`t-${c}`}
-                    type="button"
-                    className={`${styles.swatch} ${activeTextColor === c ? styles.swatchActive : ''}`}
-                    title={COLOR_TITLES[c] ?? c}
-                    onClick={() => {
-                      if (c) {
-                        editor.chain().focus().setColor(c).run();
-                      } else {
-                        editor.chain().focus().unsetColor().run();
-                      }
-                    }}
-                  >
-                    {c ? (
-                      <span className={styles.swatchFill} style={{ background: c }} />
-                    ) : (
-                      <span className={styles.swatchReset}>
-                        <Icon name="x" size={12} />
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
+        {!compact && (
+          <>
+            <div className={styles.popoverAnchor} ref={popoverRef}>
+              <button
+                type="button"
+                className={`${styles.toolBtn} ${colorOpen ? styles.toolBtnActive : ''}`}
+                onClick={() => setColorOpen(o => !o)}
+                title="Colori"
+                aria-label="Colori"
+              >
+                <span className={styles.colorIndicator}>
+                  A
+                  <span
+                    className={styles.colorBar}
+                    style={{ background: activeTextColor || 'var(--color-text)' }}
+                  />
+                </span>
+              </button>
+              {colorOpen && (
+                <div className={styles.colorPopover}>
+                  <span className={styles.colorLabel}>Colore</span>
+                  <div className={styles.colorGrid}>
+                    {TEXT_COLORS.map(c => (
+                      <button
+                        key={`t-${c}`}
+                        type="button"
+                        className={`${styles.swatch} ${activeTextColor === c ? styles.swatchActive : ''}`}
+                        title={COLOR_TITLES[c] ?? c}
+                        onClick={() => {
+                          if (c) {
+                            editor.chain().focus().setColor(c).run();
+                          } else {
+                            editor.chain().focus().unsetColor().run();
+                          }
+                        }}
+                      >
+                        {c ? (
+                          <span className={styles.swatchFill} style={{ background: c }} />
+                        ) : (
+                          <span className={styles.swatchReset}>
+                            <Icon name="x" size={12} />
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
 
-              <span className={styles.colorLabel}>Sfondo</span>
-              <div className={styles.colorGrid}>
-                {HIGHLIGHT_COLORS.map(c => (
-                  <button
-                    key={`h-${c}`}
-                    type="button"
-                    className={`${styles.swatch} ${activeHighlightColor === c ? styles.swatchActive : ''}`}
-                    title={COLOR_TITLES[c] ?? c}
-                    onClick={() => {
-                      if (c) {
-                        editor.chain().focus().toggleHighlight({ color: c }).run();
-                      } else {
-                        editor.chain().focus().unsetHighlight().run();
-                      }
-                    }}
-                  >
-                    {c ? (
-                      <span className={styles.swatchFill} style={{ background: c }} />
-                    ) : (
-                      <span className={styles.swatchReset}>
-                        <Icon name="x" size={12} />
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
+                  <span className={styles.colorLabel}>Sfondo</span>
+                  <div className={styles.colorGrid}>
+                    {HIGHLIGHT_COLORS.map(c => (
+                      <button
+                        key={`h-${c}`}
+                        type="button"
+                        className={`${styles.swatch} ${activeHighlightColor === c ? styles.swatchActive : ''}`}
+                        title={COLOR_TITLES[c] ?? c}
+                        onClick={() => {
+                          if (c) {
+                            editor.chain().focus().toggleHighlight({ color: c }).run();
+                          } else {
+                            editor.chain().focus().unsetHighlight().run();
+                          }
+                        }}
+                      >
+                        {c ? (
+                          <span className={styles.swatchFill} style={{ background: c }} />
+                        ) : (
+                          <span className={styles.swatchReset}>
+                            <Icon name="x" size={12} />
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className={styles.separator} />
+            <div className={styles.separator} />
+          </>
+        )}
 
         {/* ── Lists ── */}
         <button
@@ -270,35 +299,39 @@ export function RichTextEditor({ value, onChange, disabled, standalone, placehol
         <div className={styles.separator} />
 
         {/* ── Alignment ── */}
-        <button
-          type="button"
-          className={`${styles.toolBtn} ${editor.isActive({ textAlign: 'left' }) ? styles.toolBtnActive : ''}`}
-          onClick={() => editor.chain().focus().setTextAlign('left').run()}
-          title="Allinea a sinistra"
-          aria-label="Allinea a sinistra"
-        >
-          <Icon name="align-left" size={16} />
-        </button>
-        <button
-          type="button"
-          className={`${styles.toolBtn} ${editor.isActive({ textAlign: 'center' }) ? styles.toolBtnActive : ''}`}
-          onClick={() => editor.chain().focus().setTextAlign('center').run()}
-          title="Centra"
-          aria-label="Centra"
-        >
-          <Icon name="align-center" size={16} />
-        </button>
-        <button
-          type="button"
-          className={`${styles.toolBtn} ${editor.isActive({ textAlign: 'right' }) ? styles.toolBtnActive : ''}`}
-          onClick={() => editor.chain().focus().setTextAlign('right').run()}
-          title="Allinea a destra"
-          aria-label="Allinea a destra"
-        >
-          <Icon name="align-right" size={16} />
-        </button>
+        {!compact && (
+          <>
+            <button
+              type="button"
+              className={`${styles.toolBtn} ${editor.isActive({ textAlign: 'left' }) ? styles.toolBtnActive : ''}`}
+              onClick={() => editor.chain().focus().setTextAlign('left').run()}
+              title="Allinea a sinistra"
+              aria-label="Allinea a sinistra"
+            >
+              <Icon name="align-left" size={16} />
+            </button>
+            <button
+              type="button"
+              className={`${styles.toolBtn} ${editor.isActive({ textAlign: 'center' }) ? styles.toolBtnActive : ''}`}
+              onClick={() => editor.chain().focus().setTextAlign('center').run()}
+              title="Centra"
+              aria-label="Centra"
+            >
+              <Icon name="align-center" size={16} />
+            </button>
+            <button
+              type="button"
+              className={`${styles.toolBtn} ${editor.isActive({ textAlign: 'right' }) ? styles.toolBtnActive : ''}`}
+              onClick={() => editor.chain().focus().setTextAlign('right').run()}
+              title="Allinea a destra"
+              aria-label="Allinea a destra"
+            >
+              <Icon name="align-right" size={16} />
+            </button>
 
-        <div className={styles.separator} />
+            <div className={styles.separator} />
+          </>
+        )}
 
         {/* ── Link + clear ── */}
         <button

@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from 'react';
 import { Icon } from '@mrsmith/ui';
 import type { DocumentType, ProductGroup, ProductVariant } from '../api/types';
 import type { KitEditorForm } from '../hooks/useKitEditorForm';
+import { RichTextEditor } from './RichTextEditor';
 import styles from './ProductGroupEditor.module.css';
 
 interface ProductGroupEditorProps {
@@ -28,6 +29,11 @@ function isRedundant(groupName: string, variantName: string): boolean {
 
 function formatPrice(value: number): string {
   return value.toFixed(2);
+}
+
+function normalizeRichTextDescription(html: string): string | null {
+  const next = html.trim();
+  return next === '' || next === '<p></p>' || next === '<p><br></p>' ? null : next;
 }
 
 export function ProductGroupEditor({ group, documentType, form, isMissing }: ProductGroupEditorProps) {
@@ -217,19 +223,16 @@ function ProductRow({
               />
             </Field>
           </div>
-          <Field label="Descrizione aggiuntiva">
-            <textarea
-              className={styles.textarea}
-              rows={2}
-              placeholder="Personalizza la descrizione per questo cliente…"
+          <Field label="Descrizione aggiuntiva" as="div">
+            <RichTextEditor
               value={entry.extended_description ?? ''}
-              onChange={e =>
-                form.setProductField(
-                  variant.id,
-                  'extended_description',
-                  e.target.value === '' ? null : e.target.value,
-                )
+              onChange={html =>
+                form.setProductField(variant.id, 'extended_description', normalizeRichTextDescription(html))
               }
+              placeholder="Personalizza la descrizione per questo cliente…"
+              standalone
+              variant="compact"
+              ariaLabel={`Descrizione aggiuntiva per ${variant.product_name}`}
             />
           </Field>
         </div>
@@ -238,12 +241,21 @@ function ProductRow({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  label,
+  children,
+  as = 'label',
+}: {
+  label: string;
+  children: ReactNode;
+  as?: 'label' | 'div';
+}) {
+  const Component = as;
   return (
-    <label className={styles.field}>
+    <Component className={styles.field}>
       <span className={styles.fieldLabel}>{label}</span>
       {children}
-    </label>
+    </Component>
   );
 }
 
