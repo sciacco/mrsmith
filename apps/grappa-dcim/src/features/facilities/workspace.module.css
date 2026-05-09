@@ -365,16 +365,285 @@
   gap: var(--space-2);
 }
 
+.layoutCommandBar {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.42fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.layoutSelectField {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.layoutSelectField label {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.layoutStatusStrip {
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.layoutStatusStrip span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  box-shadow: var(--shadow-xs);
+}
+
+.layoutStatusStrip strong {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.layoutWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.layoutMain {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.layoutScene {
+  position: relative;
+  min-height: 580px;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(240, 253, 250, 0.48)),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(239, 246, 255, 0.72));
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.72), var(--shadow-sm);
+}
+
+.layoutSceneViewport {
+  position: absolute;
+  inset: 0;
+}
+
+.layoutCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.layoutCanvas:active {
+  cursor: grabbing;
+}
+
+.layoutLegend {
+  position: absolute;
+  left: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2);
+  border: 1px solid rgba(226, 232, 240, 0.82);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-xs);
+}
+
+.layoutLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.layoutLegend i {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: var(--radius-full);
+  display: inline-block;
+}
+
+.legendFree {
+  background: var(--color-success);
+}
+
+.legendOccupied {
+  background: var(--color-accent);
+}
+
+.legendReserved {
+  background: var(--color-warning);
+}
+
+.layoutSceneFallback {
+  min-height: 580px;
+  display: grid;
+  align-content: center;
+  gap: var(--space-2);
+  border: 1px dashed rgba(148, 163, 184, 0.48);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.82);
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.layoutQuickPanel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-xs);
+}
+
+.layoutRail,
+.positionRail {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+
+.layoutRailButton,
+.positionRailButton {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--color-text);
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  min-width: 8.5rem;
+  padding: var(--space-3);
+  text-align: left;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.positionRailButton {
+  min-width: 5.5rem;
+}
+
+.layoutRailButton span,
+.positionRailButton span {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.layoutRailButton:hover,
+.positionRailButton:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-accent-muted);
+  box-shadow: var(--shadow-sm);
+}
+
+.layoutRailButtonActive,
+.positionRailButtonActive {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+.layoutInspector {
+  position: sticky;
+  top: calc(60px + var(--space-5));
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-5);
+}
+
+.inspectorTitleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.inspectorTitle {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.inspectorActions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.batchBox {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.batchGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
 @media (max-width: 920px) {
   .page {
     padding-inline: var(--space-4);
+    padding-top: var(--space-12);
   }
 
   .split,
+  .layoutCommandBar,
+  .layoutWorkspace,
   .formGrid,
   .detailGrid,
-  .socketRow {
+  .socketRow,
+  .batchGrid {
     grid-template-columns: 1fr;
+  }
+
+  .layoutStatusStrip {
+    justify-content: flex-start;
+  }
+
+  .layoutScene,
+  .layoutSceneFallback {
+    min-height: 430px;
+  }
+
+  .layoutInspector {
+    position: static;
   }
 
   .rowEnd {
