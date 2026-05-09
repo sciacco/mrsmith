@@ -52,6 +52,11 @@ The "Consumi < 1A" view lists rack sockets whose average ampere falls below a th
 ### Addebiti PDF Export (deferred from v1)
 The "Addebiti" view ships CSV export in v1. A future pass should add a PDF export option — likely via the shared Carbone template manager (see "Listini e Sconti App → Portal Admin Module — Carbone Template Management") so the template ID isn't hardcoded in this app.
 
+## Grappa DCIM App
+
+### CWDM Investigation Before Implementation
+The legacy DCIM audit lists `cwdm` as a verified source surface, but current product review treats it as likely abandoned/residual. Do not implement CWDM in V1. Before any future implementation, investigate live usage, data freshness, operational ownership, mirror/channel semantics, active wavelength dependencies, and whether the feature should be redesigned, archived read-only, or dropped entirely.
+
 ## Simulatori di Vendita App
 
 ### DB-Backed Pricing + Admin View (deferred from v1)
