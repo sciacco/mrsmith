@@ -24,6 +24,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/diagnostics"
 	"github.com/sciacco/mrsmith/internal/energiadc"
 	"github.com/sciacco/mrsmith/internal/fornitori"
+	"github.com/sciacco/mrsmith/internal/grappadcim"
 	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/listini"
 	"github.com/sciacco/mrsmith/internal/manutenzioni"
@@ -373,6 +374,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.EnergiaDCAppID] = "http://localhost:5184"
 	}
+	if cfg.GrappaDCIMAppURL != "" {
+		hrefOverrides[applaunch.GrappaDCIMAppID] = cfg.GrappaDCIMAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.GrappaDCIMAppID] = "http://localhost:5191"
+	}
 	if cfg.KitProductsAppURL != "" {
 		hrefOverrides[applaunch.KitProductsAppID] = cfg.KitProductsAppURL
 	} else if cfg.StaticDir == "" {
@@ -458,6 +464,9 @@ func main() {
 			if definition.ID == applaunch.EnergiaDCAppID && cfg.GrappaDSN == "" {
 				continue
 			}
+			if definition.ID == applaunch.GrappaDCIMAppID && cfg.GrappaDSN == "" {
+				continue
+			}
 			if definition.ID == applaunch.KitProductsAppID && cfg.MistraDSN == "" {
 				continue
 			}
@@ -519,6 +528,11 @@ func main() {
 	})
 	energiadc.RegisterRoutes(api, grappaDB, energiadc.ModuleConfig{
 		ExcludedCustomerIDs: cfg.EnergiaDCExcludedCustomerIDs,
+	})
+	grappadcim.RegisterRoutes(api, grappadcim.Deps{
+		Grappa:       grappaDB,
+		Logger:       logger,
+		ArtifactRoot: cfg.GrappaDCIMArtifactRoot,
 	})
 	var alyanteAdapter *kitproducts.AlyanteAdapter
 	if alyanteDB != nil {

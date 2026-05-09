@@ -33,6 +33,7 @@ type Config struct {
 	CopertureAppURL            string
 	CPBackofficeAppURL         string
 	EnergiaDCAppURL            string
+	GrappaDCIMAppURL           string
 	KitProductsAppURL          string
 	ListiniAppURL              string
 	ManutenzioniAppURL         string
@@ -63,6 +64,9 @@ type Config struct {
 
 	// Grappa MySQL (listini module)
 	GrappaDSN string
+
+	// Durable local/shared storage root for Grappa DCIM uploaded artifacts.
+	GrappaDCIMArtifactRoot string
 
 	// Vodka/daiquiri MySQL (AFC Tools — Sales/CRM orders DB)
 	VodkaDSN string
@@ -173,6 +177,7 @@ func Load() Config {
 		CopertureAppURL:              envOr("COPERTURE_APP_URL", ""),
 		CPBackofficeAppURL:           envOr("CP_BACKOFFICE_APP_URL", ""),
 		EnergiaDCAppURL:              envOr("ENERGIA_DC_APP_URL", ""),
+		GrappaDCIMAppURL:             envOr("GRAPPA_DCIM_APP_URL", ""),
 		KitProductsAppURL:            envOr("KIT_PRODUCTS_APP_URL", ""),
 		ListiniAppURL:                envOr("LISTINI_APP_URL", ""),
 		ManutenzioniAppURL:           envOr("MANUTENZIONI_APP_URL", ""),
@@ -191,6 +196,7 @@ func Load() Config {
 		ManutenzioniDSN:              envOr("MANUTENZIONI_DSN", ""),
 		AlyanteDSN:                   envOr("ALYANTE_DSN", ""),
 		GrappaDSN:                    envOr("GRAPPA_DSN", ""),
+		GrappaDCIMArtifactRoot:       envOr("GRAPPA_DCIM_ARTIFACT_ROOT", ""),
 		VodkaDSN:                     envOr("VODKA_DSN", ""),
 		WhmcsDSN:                     envOr("WHMCS_DSN", ""),
 		EnergiaDCExcludedCustomerIDs: intListEnvOr("ENERGIA_DC_EXCLUDED_CUSTOMER_IDS", []int{3}),

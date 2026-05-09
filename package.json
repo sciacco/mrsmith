@@ -22,6 +22,7 @@
     "dev:reports": "pnpm --filter mrsmith-reports dev",
     "dev:coperture": "pnpm --filter mrsmith-coperture dev",
     "dev:energia-dc": "pnpm --filter mrsmith-energia-dc dev",
+    "dev:grappa-dcim": "pnpm --filter mrsmith-grappa-dcim dev",
     "dev:simulatori-vendita": "pnpm --filter mrsmith-simulatori-vendita dev",
     "dev:afc-tools": "pnpm --filter @mrsmith/afc-tools dev",
     "dev:cp-backoffice": "pnpm --filter mrsmith-cp-backoffice dev",

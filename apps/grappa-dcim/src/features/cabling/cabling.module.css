@@ -1,0 +1,81 @@
+.matrixWrap {
+  overflow: auto;
+  max-height: 42rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.96);
+  padding: var(--space-3);
+}
+
+.matrix {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(420px, 1fr));
+  gap: var(--space-3);
+  min-width: 860px;
+}
+
+.slot {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+.slotHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.cells {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(28px, 1fr));
+  gap: 4px;
+}
+
+.cell {
+  min-width: 28px;
+  min-height: 28px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-success-bg);
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  cursor: default;
+}
+
+.cellLinked {
+  background: var(--color-accent-subtle);
+  border-color: rgba(99, 91, 255, 0.32);
+  color: var(--color-accent);
+}
+
+.cellMissing {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.hint {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 920px) {
+  .matrix {
+    grid-template-columns: repeat(2, minmax(360px, 1fr));
+    min-width: 740px;
+  }
+}

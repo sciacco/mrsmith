@@ -14,11 +14,16 @@ spec:
       labels:
         app: mrsmith
     spec:
+      securityContext:
+        fsGroup: 65532
       containers:
         - name: mrsmith
           image: mrsmith:latest
           ports:
             - containerPort: 8080
+          volumeMounts:
+            - name: grappa-dcim-artifacts
+              mountPath: /var/lib/mrsmith/grappa-dcim-artifacts
           envFrom:
             - configMapRef:
                 name: mrsmith-config
@@ -126,3 +131,7 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+      volumes:
+        - name: grappa-dcim-artifacts
+          persistentVolumeClaim:
+            claimName: mrsmith-grappa-dcim-artifacts

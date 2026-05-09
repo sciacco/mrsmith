@@ -1,0 +1,94 @@
+.page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding-inline: var(--space-6);
+  display: grid;
+  gap: var(--space-5);
+  animation: pageEnter 0.45s var(--ease-out) both;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.titleBlock {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.eyebrow,
+.stateEyebrow {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.subtitle {
+  max-width: 60rem;
+  color: var(--color-text-secondary);
+}
+
+.emptyCard,
+.statePanel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-6);
+}
+
+.emptyCard {
+  min-height: 18rem;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.statePanel {
+  max-width: 46rem;
+  margin: var(--space-16) auto;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.statePanelError {
+  border-color: rgba(239, 68, 68, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(254, 242, 242, 0.92));
+}
+
+.stateTitle {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.stateMessage {
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding-inline: var(--space-4);
+  }
+
+  .emptyCard,
+  .statePanel {
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+  }
+}

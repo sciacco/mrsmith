@@ -29,6 +29,9 @@ const (
 	EnergiaDCAppID   = "energia-dc"
 	EnergiaDCAppHref = "/apps/energia-dc/"
 
+	GrappaDCIMAppID   = "grappa-dcim"
+	GrappaDCIMAppHref = "/apps/grappa-dcim/"
+
 	KitProductsAppID   = "kit-e-prodotti"
 	KitProductsAppHref = "/apps/kit-products/"
 
@@ -76,6 +79,8 @@ var (
 	cpBackofficeAccessRoles          = []string{"app_cpbackoffice_access"}
 	cpBackofficeBiometricAccessRoles = []string{"app_cpbackoffice_biometric_access"}
 	energiaDCAccessRoles             = []string{"app_energiadc_access"}
+	grappaDCIMViewerRoles            = []string{"app_grappadcim_viewer"}
+	grappaDCIMOperativoRoles         = []string{"app_grappadcim_operativo"}
 	kitProductsAccessRoles           = []string{"app_kitproducts_access"}
 	listiniAccessRoles               = []string{"app_listini_access"}
 	manutenzioniAccessRoles          = []string{"app_manutenzioni_access"}
@@ -293,6 +298,17 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			AccessRoles:   EnergiaDCAccessRoles(),
 		},
 		{
+			ID:            GrappaDCIMAppID,
+			Name:          "Grappa DCIM",
+			Description:   "Inventario e workspace operativo datacenter.",
+			Icon:          "database",
+			Href:          GrappaDCIMAppHref,
+			Status:        "ready",
+			CategoryID:    "tech",
+			CategoryTitle: "TECH",
+			AccessRoles:   GrappaDCIMAccessRoles(),
+		},
+		{
 			ID:            ManutenzioniAppID,
 			Name:          "Manutenzioni",
 			Icon:          "wrench",
@@ -476,6 +492,19 @@ func EnergiaDCAccessRoles() []string {
 	return slices.Clone(energiaDCAccessRoles)
 }
 
+func GrappaDCIMViewerRoles() []string {
+	return slices.Clone(grappaDCIMViewerRoles)
+}
+
+func GrappaDCIMOperativoRoles() []string {
+	return slices.Clone(grappaDCIMOperativoRoles)
+}
+
+func GrappaDCIMAccessRoles() []string {
+	roles := slices.Clone(grappaDCIMViewerRoles)
+	return append(roles, grappaDCIMOperativoRoles...)
+}
+
 func KitProductsAccessRoles() []string {
 	return slices.Clone(kitProductsAccessRoles)
 }
@@ -576,6 +605,8 @@ func AllRoles() []string {
 		cpBackofficeAccessRoles,
 		cpBackofficeBiometricAccessRoles,
 		energiaDCAccessRoles,
+		grappaDCIMViewerRoles,
+		grappaDCIMOperativoRoles,
 		kitProductsAccessRoles,
 		listiniAccessRoles,
 		manutenzioniAccessRoles,
