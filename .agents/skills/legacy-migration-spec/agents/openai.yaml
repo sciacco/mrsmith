@@ -1,0 +1,4 @@
+interface:
+  display_name: "Legacy Migration Spec"
+  short_description: "Turn legacy audit evidence into a migration spec"
+  default_prompt: "Use $legacy-migration-spec to convert these legacy audit artifacts into an approved implementation-neutral migration specification."

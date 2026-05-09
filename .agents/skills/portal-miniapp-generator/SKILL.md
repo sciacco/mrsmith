@@ -1,6 +1,6 @@
 ---
 name: portal-miniapp-generator
-description: Use this skill for MrSmith portal mini-app generation and implementation planning. It turns a feature request or an approved Appsmith migration spec into a repo-fit implementation plan, selects an approved screen archetype, and prepares the UI review gates that must pass before coding and before signoff.
+description: Use this skill for MrSmith portal mini-app generation and implementation planning. It turns a feature request or an approved migration spec from Appsmith or another legacy source into a repo-fit implementation plan, selects an approved screen archetype, and prepares the UI review gates that must pass before coding and before signoff.
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash
@@ -12,7 +12,7 @@ This is the canonical repo-specific skill for MrSmith mini-apps.
 
 Use it to:
 - plan new mini-apps that fit the existing portal family
-- convert an approved Appsmith migration spec into a repo-fit implementation plan
+- convert an approved migration spec into a repo-fit implementation plan
 - prepare the UI review inputs and exceptions for blocking review
 - hand off implementation to the dedicated UI fixer without leaving visual decisions implicit
 
@@ -25,17 +25,18 @@ Do not create a parallel rule system in ad hoc planning notes.
 Use this skill when:
 - building a new mini-app under `apps/`
 - planning backend + frontend work for a mini-app feature
-- an Appsmith migration spec is approved and the next step is implementation planning
+- an approved migration spec from Appsmith or another legacy source is ready for implementation planning
 
 Do not use this skill when:
-- auditing raw Appsmith exports or repositories
-- extracting business behavior from Appsmith without an approved migration spec
+- auditing raw legacy exports or repositories
+- extracting business behavior from a legacy source without an approved migration spec
 - working on the Matrix-style launcher UI instead of a mini-app workspace
 - performing the blocking UI review of a planned or implemented mini-app screen
 
 Use these companion skills first when needed:
-- `appsmith-audit` for reverse engineering the current Appsmith app
-- `appsmith-migration-spec` for expert-in-the-loop specification drafting
+- `legacy-app-auditor` for reverse engineering non-Appsmith source applications
+- `legacy-migration-spec` for expert-in-the-loop specification drafting from non-Appsmith audits
+- `appsmith-audit` and `appsmith-migration-spec` for Appsmith-specific migrations when those skills are available
 
 Use this companion skill next when needed:
 - `portal-miniapp-ui-fixer` for implementing the app UI once the plan and pre-gate are clear
@@ -49,7 +50,8 @@ Before locking a plan or review:
 - read `docs/UI-UX.md`
 - inspect at least 2 comparable mini-app screens already present in the repo
 
-If the source is an Appsmith migration, also read the approved migration spec before making layout or runtime decisions.
+For migration work, also read the approved migration spec before making layout or runtime decisions.
+For non-Appsmith legacy migrations, read any linked migration fact sheet.
 
 # Bundled resources
 
@@ -148,5 +150,5 @@ This skill is complete when:
 - copy, metrics, and layout expectations are explicit enough for blocking review
 - repo/runtime fit is specified before implementation
 - any deviation is documented as an explicit exception
-- an Appsmith migration can move from approved spec to implementation without inventing UI behavior ad hoc
+- a migration can move from approved spec to implementation without inventing UI behavior ad hoc
 - the plan is ready to be handed to `portal-miniapp-ui-fixer` for implementation and `portal-miniapp-ui-review` for approval
