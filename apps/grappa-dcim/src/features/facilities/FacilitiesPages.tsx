@@ -1,5 +1,5 @@
 import { Button, Icon, Modal, SearchInput, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useBuildings,
@@ -9,13 +9,14 @@ import {
   useGrappaDCIMMeta,
   useIslets,
   useLayoutMutations,
-  usePositions,
 } from '../../api/queries';
 import type { Building, BuildingInput, Datacenter, DatacenterInput, DatacenterMap, Islet, Position } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
+import type { LayoutSelection } from './LayoutScene';
 import styles from './workspace.module.css';
 
 const destructiveBody = { confirmPrimary: true, confirmSecondary: true };
+const LayoutSceneView = lazy(() => import('./LayoutScene').then((module) => ({ default: module.LayoutScene })));
 
 function valueOrDash(value: unknown) {
   if (value === undefined || value === null || value === '') return '-';
@@ -292,11 +293,12 @@ export function DatacentersPage() {
 
 export function LayoutPage() {
   const toast = useToast();
+  const navigate = useNavigate();
   const meta = useGrappaDCIMMeta();
   const canOperate = Boolean(meta.data?.canOperate);
   const datacenters = useDatacenters({ kind: 'all', status: 'active' });
   const [datacenterId, setDatacenterId] = useState<number | null>(null);
-  const [isletId, setIsletId] = useState<number | null>(null);
+  const [selection, setSelection] = useState<LayoutSelection>(null);
   const [editingIslet, setEditingIslet] = useState<Islet | null | 'new'>(null);
   const [deletingIslet, setDeletingIslet] = useState<Islet | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
@@ -304,21 +306,50 @@ export function LayoutPage() {
   const [batchCount, setBatchCount] = useState(0);
   const [batchType, setBatchType] = useState('full');
   const islets = useIslets(datacenterId);
-  const positions = usePositions(isletId);
+  const map = useDatacenterMap(datacenterId);
   const mutations = useLayoutMutations();
 
-  const selectedIslet = islets.data?.find((item) => item.id === isletId) ?? null;
+  const selectedDatacenter = datacenters.data?.find((item) => item.id === datacenterId) ?? null;
+  const sceneIslets = useMemo(() => map.data?.islets ?? islets.data ?? [], [islets.data, map.data?.islets]);
+  const scenePositions = useMemo(() => map.data?.positions ?? [], [map.data?.positions]);
+  const selectedPosition = selection?.type === 'position' ? scenePositions.find((item) => item.id === selection.id) ?? null : null;
+  const selectedIslet = selection?.type === 'islet'
+    ? sceneIslets.find((item) => item.id === selection.id) ?? null
+    : selectedPosition
+      ? sceneIslets.find((item) => item.id === selectedPosition.isletId) ?? null
+      : null;
   const datacenterOptions = useMemo(
     () => datacenters.data?.map((item) => ({ value: item.id, label: `${item.name}${item.isMmr ? ' - MMR' : ''}` })) ?? [],
     [datacenters.data],
   );
+  const occupancy = useMemo(() => {
+    const free = scenePositions.filter((item) => item.status === 'free').length;
+    const occupied = scenePositions.filter((item) => item.status === 'occupied').length;
+    const reserved = scenePositions.filter((item) => item.status === 'reserved').length;
+    return { free, occupied, reserved, total: scenePositions.length };
+  }, [scenePositions]);
+
+  useEffect(() => {
+    const firstDatacenter = datacenters.data?.[0];
+    if (datacenterId !== null || !firstDatacenter) return;
+    setDatacenterId(firstDatacenter.id);
+  }, [datacenterId, datacenters.data]);
+
+  useEffect(() => {
+    if (!selection) return;
+    const valid = selection.type === 'islet'
+      ? sceneIslets.some((item) => item.id === selection.id)
+      : scenePositions.some((item) => item.id === selection.id);
+    if (!valid) setSelection(null);
+  }, [sceneIslets, scenePositions, selection]);
 
   async function createBatch() {
-    if (!isletId) return;
+    if (!selectedIslet) return;
     try {
-      const result = await mutations.createPositions.mutateAsync({ isletId, count: batchCount, type: batchType });
+      const result = await mutations.createPositions.mutateAsync({ isletId: selectedIslet.id, count: batchCount, type: batchType });
       toast.toast(result.message || 'Posizioni create.');
       setBatchCount(0);
+      setSelection({ type: 'islet', id: selectedIslet.id });
     } catch (error) {
       toast.toast(errorText(error, 'Creazione posizioni non riuscita.'), 'error');
     }
@@ -329,7 +360,7 @@ export function LayoutPage() {
       const result = await mutations.saveIslet.mutateAsync(input);
       toast.toast(result.message || 'Isola salvata.');
       setEditingIslet(null);
-      if (result.id && !input.id) setIsletId(result.id);
+      if (result.id && !input.id) setSelection({ type: 'islet', id: result.id });
     } catch (error) {
       toast.toast(errorText(error, 'Salvataggio isola non riuscito.'), 'error');
     }
@@ -341,7 +372,7 @@ export function LayoutPage() {
       const result = await mutations.deleteIslet.mutateAsync({ id: deletingIslet.id, body: destructiveBody });
       toast.toast(result.message || 'Isola eliminata.');
       setDeletingIslet(null);
-      if (isletId === deletingIslet.id) setIsletId(null);
+      if (selection?.type === 'islet' && selection.id === deletingIslet.id) setSelection(null);
     } catch (error) {
       toast.toast(errorText(error, 'Eliminazione bloccata da dipendenze operative.'), 'error');
     }
@@ -352,6 +383,7 @@ export function LayoutPage() {
       const result = await mutations.savePosition.mutateAsync(input);
       toast.toast(result.message || 'Posizione salvata.');
       setEditingPosition(null);
+      setSelection({ type: 'position', id: input.id });
     } catch (error) {
       toast.toast(errorText(error, 'Salvataggio posizione non riuscito.'), 'error');
     }
@@ -363,6 +395,7 @@ export function LayoutPage() {
       const result = await mutations.deletePosition.mutateAsync({ id: deletingPosition.id, body: destructiveBody });
       toast.toast(result.message || 'Posizione eliminata.');
       setDeletingPosition(null);
+      if (selection?.type === 'position' && selection.id === deletingPosition.id) setSelection(null);
     } catch (error) {
       toast.toast(errorText(error, 'Eliminazione bloccata da dipendenze operative.'), 'error');
     }
@@ -374,87 +407,81 @@ export function LayoutPage() {
         <div className={styles.titleBlock}>
           <span className={styles.eyebrow}>Layout</span>
           <h1 className={styles.title}>Isole e posizioni</h1>
-          <p className={styles.subtitle}>Amministrazione delle isole fisiche e delle posizioni rack disponibili.</p>
+          <p className={styles.subtitle}>Vista fisica della sala, con occupazione rack e azioni operative sul punto selezionato.</p>
         </div>
         {canOperate ? <Button onClick={() => setEditingIslet('new')} disabled={!datacenterId} leftIcon={<Icon name="plus" size={16} />}>Nuova isola</Button> : null}
       </div>
-      <div className={styles.toolbar}>
-        <SingleSelect options={datacenterOptions} selected={datacenterId} onChange={(value) => { setDatacenterId(value); setIsletId(null); }} placeholder="Seleziona sala" />
-        <SingleSelect options={islets.data?.map((item) => ({ value: item.id, label: item.name })) ?? []} selected={isletId} onChange={setIsletId} placeholder="Seleziona isola" disabled={!datacenterId} />
+      <div className={styles.layoutCommandBar}>
+        <div className={styles.layoutSelectField}>
+          <label>Sala</label>
+          <SingleSelect
+            options={datacenterOptions}
+            selected={datacenterId}
+            onChange={(value) => {
+              setDatacenterId(value);
+              setSelection(null);
+            }}
+            placeholder="Seleziona sala"
+          />
+        </div>
+        <div className={styles.layoutStatusStrip} aria-label="Occupazione posizioni">
+          <span><strong>{occupancy.total}</strong> posizioni</span>
+          <span><strong>{occupancy.free}</strong> libere</span>
+          <span><strong>{occupancy.occupied}</strong> occupate</span>
+          <span><strong>{occupancy.reserved}</strong> riservate</span>
+        </div>
       </div>
-      <div className={styles.split}>
-        <div className={styles.panel}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.emptyTitle}>Isole</h2>
-            {canOperate ? <Button size="sm" variant="secondary" onClick={() => setEditingIslet('new')} disabled={!datacenterId}>Nuova</Button> : null}
-          </div>
-          {islets.isLoading ? <Skeleton rows={5} /> : (islets.data?.length ?? 0) === 0 ? (
-            <p className={styles.emptyText}>Nessuna isola configurata per la sala selezionata.</p>
+
+      <div className={styles.layoutWorkspace}>
+        <div className={styles.layoutMain}>
+          {datacenterId === null ? (
+            <div className={styles.layoutSceneFallback}>
+              <h3 className={styles.emptyTitle}>Seleziona una sala</h3>
+              <p className={styles.emptyText}>La vista fisica si aggiorna con isole, posizioni e rack disponibili.</p>
+            </div>
+          ) : map.isLoading || islets.isLoading ? (
+            <div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>
+          ) : map.error ? (
+            <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la mappa fisica della sala." tone="error" />
           ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead><tr><th>Isola</th><th>Tipo</th><th>Piano</th><th>Posizioni</th><th>Azioni</th></tr></thead>
-                <tbody>
-                  {islets.data?.map((item) => (
-                    <tr key={item.id} className={`${styles.clickable} ${isletId === item.id ? styles.selectedRow : ''}`} onClick={() => setIsletId(item.id)}>
-                      <td><strong>{item.name}</strong></td>
-                      <td>{item.type}</td>
-                      <td>{item.floor}</td>
-                      <td>{item.occupiedCount} / {item.positionCount || item.rackNum}</td>
-                      <td>
-                        <div className={styles.actions}>
-                          {canOperate ? <Button size="sm" variant="secondary" onClick={(event) => { event.stopPropagation(); setEditingIslet(item); }}>Modifica</Button> : null}
-                          {canOperate ? <Button size="sm" variant="danger" onClick={(event) => { event.stopPropagation(); setDeletingIslet(item); }}>Elimina</Button> : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Suspense fallback={<div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>}>
+              <LayoutSceneView
+                islets={sceneIslets}
+                positions={scenePositions}
+                selected={selection}
+                onSelect={setSelection}
+              />
+            </Suspense>
           )}
+          <LayoutQuickSelect
+            islets={sceneIslets}
+            positions={scenePositions}
+            selected={selection}
+            onSelect={setSelection}
+          />
         </div>
-        <div className={styles.panel}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.emptyTitle}>{selectedIslet ? `Posizioni ${selectedIslet.name}` : 'Posizioni'}</h2>
-            {selectedIslet ? <span className={styles.badgeMuted}>{positions.data?.length ?? 0} posizioni</span> : null}
-          </div>
-          {canOperate && selectedIslet ? (
-            <div className={styles.toolbar}>
-              <div className={styles.field}>
-                <label>Numero</label>
-                <input type="number" min="1" value={batchCount || ''} onChange={(event) => setBatchCount(Number(event.target.value))} />
-              </div>
-              <div className={styles.field}>
-                <label>Formato</label>
-                <select value={batchType} onChange={(event) => setBatchType(event.target.value)}>
-                  <option value="full">Full</option>
-                  <option value="half">Half</option>
-                </select>
-              </div>
-              <Button variant="secondary" onClick={createBatch} disabled={!batchCount || mutations.createPositions.isPending}>Crea posizioni</Button>
-            </div>
-          ) : null}
-          {positions.isLoading ? <Skeleton rows={5} /> : (positions.data?.length ?? 0) === 0 ? (
-            <p className={styles.emptyText}>Nessuna posizione configurata.</p>
-          ) : (
-            <div className={styles.positionGrid}>
-              {positions.data?.map((item) => (
-                <div key={item.id} className={`${styles.positionCell} ${item.status === 'occupied' ? styles.occupied : item.status === 'reserved' ? styles.reserved : styles.free}`}>
-                  <strong>{item.num}</strong>
-                  <span>{positionStatusLabel(item.status)}</span>
-                  <small>{item.rackName ?? item.type}</small>
-                  {canOperate ? (
-                    <div className={styles.cellActions}>
-                      <Button size="sm" variant="secondary" onClick={() => setEditingPosition(item)}>Modifica</Button>
-                      <Button size="sm" variant="danger" onClick={() => setDeletingPosition(item)}>Elimina</Button>
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+
+        <LayoutInspector
+          canOperate={canOperate}
+          datacenter={selectedDatacenter}
+          islets={sceneIslets}
+          positions={scenePositions}
+          selectedIslet={selectedIslet}
+          selectedPosition={selectedPosition}
+          occupancy={occupancy}
+          batchCount={batchCount}
+          batchType={batchType}
+          setBatchCount={setBatchCount}
+          setBatchType={setBatchType}
+          createBatch={createBatch}
+          createLoading={mutations.createPositions.isPending}
+          onNewIslet={() => setEditingIslet('new')}
+          onEditIslet={(item) => setEditingIslet(item)}
+          onDeleteIslet={(item) => setDeletingIslet(item)}
+          onEditPosition={(item) => setEditingPosition(item)}
+          onDeletePosition={(item) => setDeletingPosition(item)}
+          onOpenRack={(rackId) => navigate(`/rack/${rackId}`)}
+        />
       </div>
       <IsletModal
         open={editingIslet !== null}
@@ -489,6 +516,228 @@ export function LayoutPage() {
       />
     </section>
   );
+}
+
+function LayoutQuickSelect({
+  islets,
+  positions,
+  selected,
+  onSelect,
+}: {
+  islets: Islet[];
+  positions: Position[];
+  selected: LayoutSelection;
+  onSelect: (selection: LayoutSelection) => void;
+}) {
+  const selectedIsletId = selected?.type === 'islet'
+    ? selected.id
+    : selected?.type === 'position'
+      ? positions.find((item) => item.id === selected.id)?.isletId ?? null
+      : null;
+  const visiblePositions = selectedIsletId
+    ? positions.filter((item) => item.isletId === selectedIsletId).sort((a, b) => a.num - b.num)
+    : [];
+
+  return (
+    <div className={styles.layoutQuickPanel}>
+      <div className={styles.sectionHeader}>
+        <h2 className={styles.emptyTitle}>Selezione rapida</h2>
+        <span className={styles.badgeMuted}>{islets.length} isole</span>
+      </div>
+      <div className={styles.layoutRail} aria-label="Isole disponibili">
+        {islets.length === 0 ? (
+          <span className={styles.emptyText}>Nessuna isola configurata.</span>
+        ) : islets.map((item) => (
+          <button
+            type="button"
+            key={item.id}
+            className={`${styles.layoutRailButton} ${selectedIsletId === item.id ? styles.layoutRailButtonActive : ''}`}
+            onClick={() => onSelect({ type: 'islet', id: item.id })}
+          >
+            <strong>{item.name}</strong>
+            <span>{item.occupiedCount} / {item.positionCount || item.rackNum}</span>
+          </button>
+        ))}
+      </div>
+      {selectedIsletId ? (
+        <div className={styles.positionRail} aria-label="Posizioni isola selezionata">
+          {visiblePositions.length === 0 ? (
+            <span className={styles.emptyText}>Nessuna posizione per l'isola selezionata.</span>
+          ) : visiblePositions.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              className={`${styles.positionRailButton} ${styles[normalizePositionStatusClass(item.status)]} ${selected?.type === 'position' && selected.id === item.id ? styles.positionRailButtonActive : ''}`}
+              onClick={() => onSelect({ type: 'position', id: item.id })}
+            >
+              <strong>{item.num}</strong>
+              <span>{positionStatusLabel(item.status)}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function LayoutInspector({
+  canOperate,
+  datacenter,
+  islets,
+  positions,
+  selectedIslet,
+  selectedPosition,
+  occupancy,
+  batchCount,
+  batchType,
+  setBatchCount,
+  setBatchType,
+  createBatch,
+  createLoading,
+  onNewIslet,
+  onEditIslet,
+  onDeleteIslet,
+  onEditPosition,
+  onDeletePosition,
+  onOpenRack,
+}: {
+  canOperate: boolean;
+  datacenter: Datacenter | null;
+  islets: Islet[];
+  positions: Position[];
+  selectedIslet: Islet | null;
+  selectedPosition: Position | null;
+  occupancy: { free: number; occupied: number; reserved: number; total: number };
+  batchCount: number;
+  batchType: string;
+  setBatchCount: (value: number) => void;
+  setBatchType: (value: string) => void;
+  createBatch: () => void;
+  createLoading: boolean;
+  onNewIslet: () => void;
+  onEditIslet: (item: Islet) => void;
+  onDeleteIslet: (item: Islet) => void;
+  onEditPosition: (item: Position) => void;
+  onDeletePosition: (item: Position) => void;
+  onOpenRack: (rackId: number) => void;
+}) {
+  if (!datacenter) {
+    return (
+      <aside className={styles.layoutInspector} aria-label="Inspector layout">
+        <span className={styles.eyebrow}>Inspector</span>
+        <h2 className={styles.inspectorTitle}>Nessuna sala selezionata</h2>
+        <p className={styles.emptyText}>Seleziona una sala per visualizzare il layout fisico e le azioni disponibili.</p>
+      </aside>
+    );
+  }
+
+  if (selectedPosition) {
+    return (
+      <aside className={styles.layoutInspector} aria-label="Inspector layout">
+        <span className={styles.eyebrow}>Posizione</span>
+        <div className={styles.inspectorTitleRow}>
+          <h2 className={styles.inspectorTitle}>Posizione {selectedPosition.num}</h2>
+          <span className={`${styles.badgeMuted} ${styles[normalizePositionStatusClass(selectedPosition.status)]}`}>{positionStatusLabel(selectedPosition.status)}</span>
+        </div>
+        <div className={styles.detailGrid}>
+          <DetailItem label="Isola" value={selectedIslet?.name} />
+          <DetailItem label="Formato" value={selectedPosition.type} />
+          <DetailItem label="Rack" value={selectedPosition.rackName} />
+          <DetailItem label="Tipo rack" value={selectedPosition.rackType} />
+          <DetailItem label="Posizione rack" value={selectedPosition.rackPos === 'A' ? 'alta' : selectedPosition.rackPos === 'B' ? 'bassa' : selectedPosition.rackPos} />
+          <DetailItem label="ID posizione" value={selectedPosition.id} />
+        </div>
+        <div className={styles.inspectorActions}>
+          {selectedPosition.rackId ? <Button variant="secondary" onClick={() => selectedPosition.rackId && onOpenRack(selectedPosition.rackId)}>Apri rack</Button> : null}
+          {canOperate ? <Button variant="secondary" onClick={() => onEditPosition(selectedPosition)}>Modifica posizione</Button> : null}
+          {canOperate ? <Button variant="danger" onClick={() => onDeletePosition(selectedPosition)}>Elimina posizione</Button> : null}
+        </div>
+      </aside>
+    );
+  }
+
+  if (selectedIslet) {
+    const isletPositions = positions.filter((item) => item.isletId === selectedIslet.id);
+    const free = isletPositions.filter((item) => item.status === 'free').length;
+    const occupied = isletPositions.filter((item) => item.status === 'occupied').length;
+
+    return (
+      <aside className={styles.layoutInspector} aria-label="Inspector layout">
+        <span className={styles.eyebrow}>Isola</span>
+        <div className={styles.inspectorTitleRow}>
+          <h2 className={styles.inspectorTitle}>{selectedIslet.name}</h2>
+          <span className={styles.badgeMuted}>{occupied} / {isletPositions.length || selectedIslet.rackNum}</span>
+        </div>
+        <div className={styles.detailGrid}>
+          <DetailItem label="Tipo" value={selectedIslet.type} />
+          <DetailItem label="Piano" value={selectedIslet.floor} />
+          <DetailItem label="Libere" value={free} />
+          <DetailItem label="Occupate" value={occupied} />
+          <DetailItem label="Seriale" value={selectedIslet.serial} />
+          <DetailItem label="Ordine" value={selectedIslet.order} />
+        </div>
+        {canOperate ? (
+          <div className={styles.batchBox}>
+            <div className={styles.sectionHeader}>
+              <h3 className={styles.emptyTitle}>Crea posizioni</h3>
+              <span className={styles.badgeMuted}>{selectedIslet.name}</span>
+            </div>
+            <div className={styles.batchGrid}>
+              <div className={styles.field}>
+                <label>Numero</label>
+                <input type="number" min="1" value={batchCount || ''} onChange={(event) => setBatchCount(Number(event.target.value))} />
+              </div>
+              <div className={styles.field}>
+                <label>Formato</label>
+                <select value={batchType} onChange={(event) => setBatchType(event.target.value)}>
+                  <option value="full">Full</option>
+                  <option value="half">Half</option>
+                </select>
+              </div>
+            </div>
+            <Button variant="secondary" onClick={createBatch} disabled={!batchCount || createLoading}>Crea posizioni</Button>
+          </div>
+        ) : null}
+        <div className={styles.inspectorActions}>
+          {canOperate ? <Button variant="secondary" onClick={() => onEditIslet(selectedIslet)}>Modifica isola</Button> : null}
+          {canOperate ? <Button variant="danger" onClick={() => onDeleteIslet(selectedIslet)}>Elimina isola</Button> : null}
+        </div>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className={styles.layoutInspector} aria-label="Inspector layout">
+      <span className={styles.eyebrow}>Sala</span>
+      <h2 className={styles.inspectorTitle}>{datacenter.name}</h2>
+      <p className={styles.emptyText}>{datacenter.isMmr ? 'MMR' : 'Sala'} con {islets.length} isole configurate.</p>
+      <div className={styles.detailGrid}>
+        <DetailItem label="Posizioni" value={occupancy.total} />
+        <DetailItem label="Libere" value={occupancy.free} />
+        <DetailItem label="Occupate" value={occupancy.occupied} />
+        <DetailItem label="Riservate" value={occupancy.reserved} />
+      </div>
+      <div className={styles.inspectorActions}>
+        {canOperate ? <Button onClick={onNewIslet} leftIcon={<Icon name="plus" size={16} />}>Nuova isola</Button> : null}
+      </div>
+    </aside>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div className={styles.detailItem}>
+      <span className={styles.detailLabel}>{label}</span>
+      <span className={styles.detailValue}>{valueOrDash(value)}</span>
+    </div>
+  );
+}
+
+function normalizePositionStatusClass(status: string) {
+  if (status === 'occupied') return 'occupied';
+  if (status === 'reserved') return 'reserved';
+  if (status === 'free') return 'free';
+  return 'badgeMuted';
 }
 
 function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; loading: boolean; error: unknown }) {

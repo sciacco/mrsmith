@@ -278,10 +278,10 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		{
 			ID:            GrappaDCIMAppID,
 			Name:          "Grappa DCIM",
-			Description:   "Inventario e workspace operativo datacenter.",
+			Description:   "Inventario operativo datacenter.",
 			Icon:          "database",
 			Href:          GrappaDCIMAppHref,
-			Status:        "ready",
+			Status:        "dev",
 			CategoryID:    "tech",
 			CategoryTitle: "TECH",
 			AccessRoles:   GrappaDCIMAccessRoles(),
