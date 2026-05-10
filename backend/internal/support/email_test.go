@@ -40,7 +40,7 @@ func TestSupportRequestEmailIncludesTriageContextAndAttachment(t *testing.T) {
 		},
 	}, 42, []string{"support@example.com"})
 
-	if msg.Subject != "[MrSmith][URGENT] Proposte support request #42" {
+	if msg.Subject != "[MrSmith][URGENT] Mario Rossi needs help - Proposte #42" {
 		t.Fatalf("unexpected subject %q", msg.Subject)
 	}
 	if len(msg.ReplyTo) != 1 || msg.ReplyTo[0] != "mario.rossi@example.com" {
@@ -52,6 +52,7 @@ func TestSupportRequestEmailIncludesTriageContextAndAttachment(t *testing.T) {
 	for _, body := range []string{msg.Text, msg.HTML} {
 		for _, want := range []string{
 			"Proposte",
+			"Mario Rossi needs help",
 			"/apps/quotes",
 			"URGENT",
 			"Mario Rossi",
@@ -65,6 +66,9 @@ func TestSupportRequestEmailIncludesTriageContextAndAttachment(t *testing.T) {
 				t.Fatalf("email body missing %q:\n%s", want, body)
 			}
 		}
+	}
+	if strings.Contains(msg.Subject, "Proposte support request") || strings.Contains(msg.HTML, "Proposte needs help") {
+		t.Fatalf("app name used as requester in email:\nsubject=%s\nhtml=%s", msg.Subject, msg.HTML)
 	}
 
 	context := readSupportContextAttachment(t, msg.Attachments, "support-request-42-context.json")

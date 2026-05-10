@@ -63,16 +63,18 @@ func supportRequestEmail(input CreateRequestInput, id int64, to []string) email.
 
 func supportEmailSubject(input CreateRequestInput, id int64, summary supportEmailSummary) string {
 	priority := emailPriority(input)
+	requester := requesterDisplayName(input)
 	appName := compactLine(summary.AppName)
 	if appName == "" {
-		return fmt.Sprintf("[MrSmith][%s] Support request #%d", priority, id)
+		return fmt.Sprintf("[MrSmith][%s] %s needs help #%d", priority, requester, id)
 	}
-	return fmt.Sprintf("[MrSmith][%s] %s support request #%d", priority, appName, id)
+	return fmt.Sprintf("[MrSmith][%s] %s needs help - %s #%d", priority, requester, appName, id)
 }
 
 func supportEmailText(input CreateRequestInput, id int64, summary supportEmailSummary) string {
 	lines := []string{
 		fmt.Sprintf("Support request #%d", id),
+		requesterDisplayName(input) + " needs help",
 		"Priority: " + emailPriority(input),
 		"App: " + summary.AppName,
 		"Path: " + summary.PagePath,
@@ -176,7 +178,7 @@ func supportEmailHTML(input CreateRequestInput, id int64, summary supportEmailSu
 </body>
 </html>`,
 		id,
-		escapeHTML(emailTitle(input, summary)),
+		escapeHTML(emailTitle(input)),
 		infoRow("Priority", emailPriority(input)),
 		infoRow("App", summary.AppName),
 		infoRow("Path", summary.PagePath),
@@ -276,12 +278,17 @@ func apiEntryFailed(entry map[string]any) bool {
 	return exists && (status == 0 || status >= 400)
 }
 
-func emailTitle(input CreateRequestInput, summary supportEmailSummary) string {
-	appName := summary.AppName
-	if appName == "" {
-		appName = "Support"
-	}
-	return fmt.Sprintf("%s needs help", appName)
+func emailTitle(input CreateRequestInput) string {
+	return fmt.Sprintf("%s needs help", requesterDisplayName(input))
+}
+
+func requesterDisplayName(input CreateRequestInput) string {
+	return firstNonEmpty(
+		compactLine(input.Requester.Name),
+		compactLine(input.Requester.Email),
+		compactLine(input.Requester.Subject),
+		"User",
+	)
 }
 
 func technicalContextLine(input CreateRequestInput) string {
