@@ -16,7 +16,7 @@ export function App() {
 
   if (accessState !== 'allowed') {
     return (
-      <AppShell appName="Simulatori di Vendita" userName={user?.name} onLogout={logout}>
+      <AppShell appName="Simulatori di Vendita" userName={user?.name} onLogout={logout} support={auth}>
         <AppShell.Content>
           <AccessNotice state={accessState} />
         </AppShell.Content>
@@ -25,7 +25,7 @@ export function App() {
   }
 
   return (
-    <AppShell appName="Simulatori di Vendita" userName={user?.name ?? 'John Doe'} onLogout={logout}>
+    <AppShell appName="Simulatori di Vendita" userName={user?.name ?? 'John Doe'} onLogout={logout} support={auth}>
       <AppShell.Content><AppRoutes /></AppShell.Content>
     </AppShell>
   );

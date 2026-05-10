@@ -14,6 +14,17 @@ export interface LocalAuthPreflightUnauthorizedBody {
   reason: 'missing_token';
 }
 
+export interface ApiRequestHistoryEntry {
+  timestamp: string;
+  method: string;
+  path: string;
+  status: number;
+  ok: boolean;
+  durationMs: number;
+  requestId?: string;
+  error?: string;
+}
+
 export interface ApiClientOptions {
   baseUrl: string;
   getToken: () => Promise<string | undefined> | string | undefined;
@@ -42,6 +53,28 @@ export interface ApiClient {
 }
 
 type BodyMode = 'json' | 'blob' | 'form';
+const API_HISTORY_LIMIT = 20;
+
+declare global {
+  interface Window {
+    __MRSMITH_API_HISTORY__?: ApiRequestHistoryEntry[];
+  }
+}
+
+function nowMs(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+function recordApiRequest(entry: ApiRequestHistoryEntry) {
+  if (typeof window === 'undefined') return;
+  const current = window.__MRSMITH_API_HISTORY__ ?? [];
+  window.__MRSMITH_API_HISTORY__ = [entry, ...current].slice(0, API_HISTORY_LIMIT);
+}
+
+export function getApiRequestHistory(): ApiRequestHistoryEntry[] {
+  if (typeof window === 'undefined') return [];
+  return [...(window.__MRSMITH_API_HISTORY__ ?? [])];
+}
 
 function isLocalAuthPreflightBody(value: unknown): value is LocalAuthPreflightUnauthorizedBody {
   return (
@@ -124,16 +157,39 @@ export function createApiClient({
     body: unknown,
     mode: BodyMode,
   ): Promise<Response> {
-    const token = await getTokenForRequest(path);
-    let res = await doFetch(path, method, token, body, mode);
+    const started = nowMs();
+    try {
+      const token = await getTokenForRequest(path);
+      let res = await doFetch(path, method, token, body, mode);
 
-    if (res.status === 401 && forceRefreshToken) {
-      const fresh = await refreshOnce();
-      if (fresh) {
-        res = await doFetch(path, method, fresh, body, mode);
+      if (res.status === 401 && forceRefreshToken) {
+        const fresh = await refreshOnce();
+        if (fresh) {
+          res = await doFetch(path, method, fresh, body, mode);
+        }
       }
+      recordApiRequest({
+        timestamp: new Date().toISOString(),
+        method,
+        path,
+        status: res.status,
+        ok: res.ok,
+        durationMs: Math.round(nowMs() - started),
+        requestId: res.headers.get('X-Request-ID') ?? undefined,
+      });
+      return res;
+    } catch (error) {
+      recordApiRequest({
+        timestamp: new Date().toISOString(),
+        method,
+        path,
+        status: 0,
+        ok: false,
+        durationMs: Math.round(nowMs() - started),
+        error: error instanceof Error ? error.message : 'request_failed',
+      });
+      throw error;
     }
-    return res;
   }
 
   async function readErrorBody(res: Response): Promise<unknown> {

@@ -88,6 +88,13 @@
   height: 100%;
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+  flex-shrink: 0;
+}
+
 .main {
   flex: 1;
   padding: var(--space-10, 40px) var(--space-12, 48px);

@@ -340,6 +340,15 @@ Alyante ERP ID
 
 ## Deployment and Runtime Integration Rules
 
+### MrSmith-Owned Tables In Anisetta
+
+- Context: cross-app MrSmith platform features that need durable storage or runtime configuration.
+- Discovery: Anisetta is already wired through `ANISETTA_DSN` and contains several legacy/application domains in `public`; MrSmith-owned platform data should not be added to `public`.
+- Practical rule: create MrSmith platform tables in the dedicated `mrsmith` schema on Anisetta. Runtime-editable configuration should live in `mrsmith.runtime_config` as namespaced JSONB key/value rows so operational values, such as support notification recipients, can change without restarting the backend.
+- Evidence: support request migration `deploy/migrations/004_anisetta_mrsmith_support.sql`.
+- Used by: contextual support requests.
+- Open questions: none.
+
 ### New DSN-Backed Mini-Apps Must Update Both Dev and Preprod Env Templates
 
 - Context: introducing a new launcher-backed mini-app that needs backend DSNs and optional split-server frontend URL overrides.

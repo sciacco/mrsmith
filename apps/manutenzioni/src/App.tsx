@@ -38,7 +38,7 @@ export function App() {
 
   if (accessState !== 'allowed') {
     return (
-      <AppShell appName="Manutenzioni" userName={user?.name} onLogout={logout}>
+      <AppShell appName="Manutenzioni" userName={user?.name} onLogout={logout} support={auth}>
         <AppShell.Content>
           <AccessNotice state={accessState} />
         </AppShell.Content>
@@ -50,7 +50,7 @@ export function App() {
   const navGroups = buildNavGroups(canConfigure);
 
   return (
-    <AppShell appName="Manutenzioni" userName={user?.name ?? 'MrSmith'} onLogout={logout}>
+    <AppShell appName="Manutenzioni" userName={user?.name ?? 'MrSmith'} onLogout={logout} support={auth}>
       <AppShell.Nav>
         <div className={styles.navRow}>
           <TabNavGroup groups={navGroups} />

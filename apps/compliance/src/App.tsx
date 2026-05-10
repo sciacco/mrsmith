@@ -24,7 +24,7 @@ export function App() {
 
   if (accessState !== 'allowed') {
     return (
-      <AppShell appName="Compliance" userName={user?.name} onLogout={logout}>
+      <AppShell appName="Compliance" userName={user?.name} onLogout={logout} support={auth}>
         <AppShell.Content>
           <AccessNotice state={accessState} />
         </AppShell.Content>
@@ -33,7 +33,7 @@ export function App() {
   }
 
   return (
-    <AppShell appName="Compliance" userName={user?.name ?? 'John Doe'} onLogout={logout}>
+    <AppShell appName="Compliance" userName={user?.name ?? 'John Doe'} onLogout={logout} support={auth}>
       <AppShell.Nav>
         <TabNav items={navItems} />
       </AppShell.Nav>

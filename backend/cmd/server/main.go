@@ -44,6 +44,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/rdfbackend"
 	"github.com/sciacco/mrsmith/internal/reports"
 	"github.com/sciacco/mrsmith/internal/simulatorivendita"
+	"github.com/sciacco/mrsmith/internal/support"
 	"github.com/sciacco/mrsmith/pkg/middleware"
 )
 
@@ -463,6 +464,7 @@ func main() {
 	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)
 	simulatorivendita.RegisterRoutes(api, simulatoriVenditaCarboneSvc)
+	support.RegisterRoutes(api, support.Deps{DB: anisettaDB, Mailer: mailer, Logger: logger})
 	afctools.RegisterRoutes(api, afctools.Deps{
 		Vodka:   vodkaDB,
 		Whmcs:   whmcsDB,

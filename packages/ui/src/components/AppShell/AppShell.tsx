@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { SupportMenu, type AppShellSupportConfig } from '../SupportMenu/SupportMenu';
 import { UserMenu } from '../UserMenu/UserMenu';
 import styles from './AppShell.module.css';
 
@@ -6,6 +7,7 @@ interface AppShellProps {
   userName?: string;
   appName?: string;
   onLogout?: () => void;
+  support?: AppShellSupportConfig;
   children: ReactNode;
 }
 
@@ -17,7 +19,7 @@ function Content({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-export function AppShell({ userName, appName, onLogout, children }: AppShellProps) {
+export function AppShell({ userName, appName, onLogout, support, children }: AppShellProps) {
   let nav: ReactNode = null;
   let content: ReactNode = null;
 
@@ -43,7 +45,10 @@ export function AppShell({ userName, appName, onLogout, children }: AppShellProp
           </>
         )}
         <nav className={styles.nav}>{nav}</nav>
-        {userName && <UserMenu userName={userName} onLogout={onLogout} />}
+        <div className={styles.actions}>
+          {support && <SupportMenu appName={appName} support={support} />}
+          {userName && <UserMenu userName={userName} onLogout={onLogout} />}
+        </div>
       </header>
       <main className={styles.main}>{content}</main>
     </div>
