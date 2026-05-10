@@ -1,6 +1,7 @@
 package support
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -44,16 +45,25 @@ func supportRequestEmail(input CreateRequestInput, id int64, to []string) email.
 	summary := summarizeSupportContext(input, contextValue)
 	contextJSON := supportContextAttachment(contextValue)
 
+	attachments := []email.Attachment{{
+		Filename:    fmt.Sprintf("support-request-%d-context.json", id),
+		ContentType: "application/json",
+		Content:     strings.NewReader(contextJSON),
+	}}
+	for _, attachment := range input.Attachments {
+		attachments = append(attachments, email.Attachment{
+			Filename:    attachment.Filename,
+			ContentType: attachment.ContentType,
+			Content:     bytes.NewReader(attachment.Content),
+		})
+	}
+
 	msg := email.Message{
-		To:      to,
-		Subject: supportEmailSubject(input, id, summary),
-		Text:    supportEmailText(input, id, summary),
-		HTML:    supportEmailHTML(input, id, summary),
-		Attachments: []email.Attachment{{
-			Filename:    fmt.Sprintf("support-request-%d-context.json", id),
-			ContentType: "application/json",
-			Content:     strings.NewReader(contextJSON),
-		}},
+		To:          to,
+		Subject:     supportEmailSubject(input, id, summary),
+		Text:        supportEmailText(input, id, summary),
+		HTML:        supportEmailHTML(input, id, summary),
+		Attachments: attachments,
 	}
 	if replyTo := validReplyTo(input.Requester.Email); replyTo != "" {
 		msg.ReplyTo = []string{replyTo}
@@ -107,6 +117,14 @@ func supportEmailText(input CreateRequestInput, id int64, summary supportEmailSu
 			lines = append(lines, "- "+formatAPIFailure(failure))
 		}
 	}
+	lines = append(lines, "", "Attachments:")
+	if len(input.Attachments) == 0 {
+		lines = append(lines, "None provided")
+	} else {
+		for _, attachment := range input.Attachments {
+			lines = append(lines, "- "+formatSupportAttachment(attachment))
+		}
+	}
 	lines = append(lines, "", fmt.Sprintf("Full sanitized context is attached as support-request-%d-context.json.", id))
 	return strings.Join(lines, "\n")
 }
@@ -126,6 +144,19 @@ func supportEmailHTML(input CreateRequestInput, id int64, summary supportEmailSu
 			rows.WriteString("</tr>")
 		}
 		failureRows = rows.String()
+	}
+
+	attachmentRows := `<tr><td colspan="3" style="padding:10px 12px;color:#64748b;">None provided</td></tr>`
+	if len(input.Attachments) > 0 {
+		var rows strings.Builder
+		for _, attachment := range input.Attachments {
+			rows.WriteString("<tr>")
+			rows.WriteString(tableCell(attachment.Filename))
+			rows.WriteString(tableCell(attachment.ContentType))
+			rows.WriteString(tableCell(formatBytes(attachment.SizeBytes)))
+			rows.WriteString("</tr>")
+		}
+		attachmentRows = rows.String()
 	}
 
 	return fmt.Sprintf(`<!doctype html>
@@ -172,6 +203,17 @@ func supportEmailHTML(input CreateRequestInput, id int64, summary supportEmailSu
         </thead>
         <tbody>%s</tbody>
       </table>
+      <h2 style="margin:24px 0 8px;font-size:15px;color:#0f172a;">Attachments</h2>
+      <table style="width:100%%;border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e2e8f0;">Filename</th>
+            <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e2e8f0;">Content type</th>
+            <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e2e8f0;">Size</th>
+          </tr>
+        </thead>
+        <tbody>%s</tbody>
+      </table>
       <p style="margin:20px 0 0;color:#64748b;font-size:13px;">Full sanitized context is attached as <strong>support-request-%d-context.json</strong>.</p>
     </div>
   </div>
@@ -194,6 +236,7 @@ func supportEmailHTML(input CreateRequestInput, id int64, summary supportEmailSu
 		infoRow("Online", summary.BrowserOnline),
 		infoRow("User agent", summary.UserAgent),
 		failureRows,
+		attachmentRows,
 		id,
 	)
 }
@@ -324,6 +367,25 @@ func formatAPIFailure(failure supportEmailAPIFailure) string {
 		parts = append(parts, "error "+err)
 	}
 	return strings.Join(nonEmpty(parts), " | ")
+}
+
+func formatSupportAttachment(attachment CreateRequestAttachment) string {
+	parts := []string{
+		compactLine(attachment.Filename),
+		compactLine(attachment.ContentType),
+		formatBytes(attachment.SizeBytes),
+	}
+	return strings.Join(nonEmpty(parts), " | ")
+}
+
+func formatBytes(size int64) string {
+	if size < 1024 {
+		return fmt.Sprintf("%d B", size)
+	}
+	if size < 1024*1024 {
+		return fmt.Sprintf("%.1f KiB", float64(size)/1024)
+	}
+	return fmt.Sprintf("%.1f MiB", float64(size)/(1024*1024))
 }
 
 func validReplyTo(value string) string {

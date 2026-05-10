@@ -49,6 +49,15 @@ type CreateRequestInput struct {
 	Requester                auth.Claims
 	TechnicalContextIncluded bool
 	Context                  any
+	Attachments              []CreateRequestAttachment
+}
+
+type CreateRequestAttachment struct {
+	Filename      string
+	ContentType   string
+	SizeBytes     int64
+	ContentSHA256 string
+	Content       []byte
 }
 
 type createRequestPayload struct {

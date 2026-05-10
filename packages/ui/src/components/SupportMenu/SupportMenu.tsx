@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, Phone, Send } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { AlertCircle, CheckCircle2, FileText, Paperclip, Phone, Send, X } from 'lucide-react';
 import { Button } from '../Button/Button';
 import { Modal } from '../Modal/Modal';
 import { Tooltip } from '../Tooltip/Tooltip';
@@ -55,14 +55,57 @@ const priorityOptions: Array<{ value: SupportPriority; label: string }> = [
   { value: 'urgent', label: 'Urgente' },
 ];
 
+const maxAttachmentCount = 5;
+const maxAttachmentBytes = 10 * 1024 * 1024;
+const maxAttachmentTotalBytes = 25 * 1024 * 1024;
+
+const allowedAttachmentTypes = new Set([
+  'application/csv',
+  'application/msword',
+  'application/pdf',
+  'application/vnd.ms-excel',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'text/csv',
+  'text/plain',
+]);
+
+const allowedAttachmentExtensions = new Set([
+  '.csv',
+  '.doc',
+  '.docx',
+  '.jpeg',
+  '.jpg',
+  '.pdf',
+  '.png',
+  '.ppt',
+  '.pptx',
+  '.txt',
+  '.webp',
+  '.xls',
+  '.xlsx',
+]);
+
+const attachmentAccept = [
+  ...allowedAttachmentExtensions,
+  ...allowedAttachmentTypes,
+].join(',');
+
 export function SupportMenu({ appName, support }: SupportMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [priority, setPriority] = useState<SupportPriority>('normal');
   const [includeContext, setIncludeContext] = useState(true);
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [submitState, setSubmitState] = useState<SubmitState>({ status: 'idle' });
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const appId = support.appId ?? slugify(appName ?? 'mini-app');
 
   useEffect(() => {
@@ -86,6 +129,8 @@ export function SupportMenu({ appName, support }: SupportMenuProps) {
   }, [menuOpen]);
 
   const contextPreview = useMemo(() => buildContextPreview(appName, getApiHistory()), [appName, modalOpen]);
+  const attachmentsDisabled = submitState.status === 'submitting' || submitState.status === 'success';
+  const attachmentTotalBytes = useMemo(() => totalAttachmentBytes(attachments), [attachments]);
 
   function openModal() {
     setMenuOpen(false);
@@ -112,6 +157,7 @@ export function SupportMenu({ appName, support }: SupportMenuProps) {
         priority,
         technicalContextIncluded: includeContext,
         context: buildSupportContext({ appId, appName, user: support.user }),
+        attachments,
       });
       setSubmitState({
         status: 'success',
@@ -121,12 +167,45 @@ export function SupportMenu({ appName, support }: SupportMenuProps) {
       setMessage('');
       setPriority('normal');
       setIncludeContext(true);
+      setAttachments([]);
     } catch (error) {
       setSubmitState({
         status: 'error',
         message: error instanceof Error ? error.message : 'Richiesta non inviata.',
       });
     }
+  }
+
+  function addAttachments(files: File[]) {
+    if (files.length === 0) return;
+
+    const next = [...attachments, ...files];
+    const validationError = validateAttachments(next);
+    if (validationError) {
+      setSubmitState({ status: 'error', message: validationError });
+      return;
+    }
+    setAttachments(next);
+    setSubmitState({ status: 'idle' });
+  }
+
+  function handleAttachmentInput(event: ChangeEvent<HTMLInputElement>) {
+    addAttachments(Array.from(event.target.files ?? []));
+    event.target.value = '';
+  }
+
+  function handleAttachmentDragOver(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+  }
+
+  function handleAttachmentDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    if (attachmentsDisabled) return;
+    addAttachments(Array.from(event.dataTransfer.files ?? []));
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((current) => current.filter((_, currentIndex) => currentIndex !== index));
   }
 
   return (
@@ -183,6 +262,50 @@ export function SupportMenu({ appName, support }: SupportMenuProps) {
               ))}
             </div>
           </fieldset>
+
+          <div className={styles.attachmentSection}>
+            <div className={styles.attachmentHeader}>
+              <span>Allegati</span>
+              <small>{attachments.length}/{maxAttachmentCount} - {formatFileSize(attachmentTotalBytes)}</small>
+            </div>
+            <label
+              className={`${styles.attachmentDrop} ${attachmentsDisabled ? styles.attachmentDropDisabled : ''}`}
+              onDragOver={handleAttachmentDragOver}
+              onDrop={handleAttachmentDrop}
+            >
+              <Paperclip size={18} />
+              <span>Trascina screenshot o file</span>
+              <small>PNG, PDF, Office, testo - max 10 MiB ciascuno</small>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={attachmentAccept}
+                onChange={handleAttachmentInput}
+                disabled={attachmentsDisabled}
+              />
+            </label>
+            {attachments.length > 0 && (
+              <ul className={styles.attachmentList} aria-label="Allegati selezionati">
+                {attachments.map((file, index) => (
+                  <li key={`${file.name}-${file.size}-${file.lastModified}-${index}`} className={styles.attachmentItem}>
+                    <FileText size={16} />
+                    <span className={styles.attachmentName}>{file.name}</span>
+                    <span className={styles.attachmentSize}>{formatFileSize(file.size)}</span>
+                    <button
+                      type="button"
+                      className={styles.attachmentRemove}
+                      aria-label={`Rimuovi ${file.name}`}
+                      onClick={() => removeAttachment(index)}
+                      disabled={attachmentsDisabled}
+                    >
+                      <X size={15} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <label className={styles.contextToggle}>
             <input
@@ -302,6 +425,7 @@ async function postSupportRequest(
     priority: SupportPriority;
     technicalContextIncluded: boolean;
     context: unknown;
+    attachments: File[];
   },
 ): Promise<SupportResponse> {
   const token = await support.getAccessToken?.(30);
@@ -309,26 +433,12 @@ async function postSupportRequest(
     throw new Error('Sessione non disponibile.');
   }
 
-  let response = await fetch('/api/support/v1/requests', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  let response = await sendSupportFetch(token, body);
 
   if (response.status === 401 && support.forceRefreshToken) {
     const fresh = await support.forceRefreshToken();
     if (fresh) {
-      response = await fetch('/api/support/v1/requests', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${fresh}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
+      response = await sendSupportFetch(fresh, body);
     }
   }
 
@@ -338,6 +448,49 @@ async function postSupportRequest(
   return response.json() as Promise<SupportResponse>;
 }
 
+function sendSupportFetch(
+  token: string,
+  body: {
+    message: string;
+    priority: SupportPriority;
+    technicalContextIncluded: boolean;
+    context: unknown;
+    attachments: File[];
+  },
+) {
+  const payload = {
+    message: body.message,
+    priority: body.priority,
+    technicalContextIncluded: body.technicalContextIncluded,
+    context: body.context,
+  };
+
+  if (body.attachments.length === 0) {
+    return fetch('/api/support/v1/requests', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  const form = new FormData();
+  form.append('payload', JSON.stringify(payload));
+  for (const attachment of body.attachments) {
+    form.append('attachments', attachment, attachment.name);
+  }
+
+  return fetch('/api/support/v1/requests', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  });
+}
+
 async function supportErrorMessage(response: Response) {
   try {
     const payload = (await response.clone().json()) as { error?: string };
@@ -345,6 +498,14 @@ async function supportErrorMessage(response: Response) {
       case 'support_database_not_configured':
       case 'support_database_not_ready':
         return 'Supporto non configurato.';
+      case 'too_many_attachments':
+        return 'Puoi allegare al massimo 5 file.';
+      case 'attachment_too_large':
+        return 'Un allegato supera 10 MiB.';
+      case 'attachments_too_large':
+        return 'Gli allegati superano 25 MiB totali.';
+      case 'unsupported_attachment_type':
+        return 'Uno degli allegati ha un formato non supportato.';
       default:
         break;
     }
@@ -357,6 +518,53 @@ async function supportErrorMessage(response: Response) {
 function getApiHistory(): ApiHistoryEntry[] {
   const win = window as Window & { __MRSMITH_API_HISTORY__?: ApiHistoryEntry[] };
   return [...(win.__MRSMITH_API_HISTORY__ ?? [])].slice(0, 10);
+}
+
+function validateAttachments(files: File[]): string | null {
+  if (files.length > maxAttachmentCount) {
+    return 'Puoi allegare al massimo 5 file.';
+  }
+
+  let total = 0;
+  for (const file of files) {
+    if (file.size <= 0) {
+      return 'Uno degli allegati e vuoto.';
+    }
+    if (file.size > maxAttachmentBytes) {
+      return `${file.name} supera 10 MiB.`;
+    }
+    if (!isAllowedAttachment(file)) {
+      return `${file.name} ha un formato non supportato.`;
+    }
+    total += file.size;
+  }
+
+  if (total > maxAttachmentTotalBytes) {
+    return 'Gli allegati superano 25 MiB totali.';
+  }
+  return null;
+}
+
+function isAllowedAttachment(file: File): boolean {
+  const type = file.type.trim().toLowerCase();
+  if (type && allowedAttachmentTypes.has(type)) return true;
+  return allowedAttachmentExtensions.has(fileExtension(file.name));
+}
+
+function fileExtension(name: string): string {
+  const index = name.lastIndexOf('.');
+  if (index < 0) return '';
+  return name.slice(index).toLowerCase();
+}
+
+function totalAttachmentBytes(files: File[]): number {
+  return files.reduce((total, file) => total + file.size, 0);
+}
+
+function formatFileSize(size: number): string {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KiB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
 function slugify(value: string) {

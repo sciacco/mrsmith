@@ -107,6 +107,38 @@ func TestSupportRequestEmailSanitizesContextBeforeEmailing(t *testing.T) {
 	}
 }
 
+func TestSupportRequestEmailIncludesUserAttachments(t *testing.T) {
+	msg := supportRequestEmail(CreateRequestInput{
+		Priority:  "high",
+		AppID:     "reports",
+		AppName:   "Report",
+		PagePath:  "/reports",
+		Message:   "Il grafico non torna",
+		Requester: auth.Claims{Subject: "sub-1", Name: "Mario Rossi", Email: "mario@example.com"},
+		Context:   map[string]any{"app": map[string]any{"id": "reports", "name": "Report"}},
+		Attachments: []CreateRequestAttachment{{
+			Filename:      "screen.png",
+			ContentType:   "image/png",
+			SizeBytes:     int64(len("png-data")),
+			ContentSHA256: "unused",
+			Content:       []byte("png-data"),
+		}},
+	}, 12, []string{"support@example.com"})
+
+	if len(msg.Attachments) != 2 {
+		t.Fatalf("expected context and user attachment, got %d", len(msg.Attachments))
+	}
+	if !strings.Contains(msg.Text, "screen.png | image/png | 8 B") {
+		t.Fatalf("text body missing attachment summary:\n%s", msg.Text)
+	}
+	if !strings.Contains(msg.HTML, "screen.png") || !strings.Contains(msg.HTML, "image/png") {
+		t.Fatalf("html body missing attachment summary:\n%s", msg.HTML)
+	}
+	if got := readNamedAttachmentText(t, msg.Attachments, "screen.png", "image/png"); got != "png-data" {
+		t.Fatalf("unexpected user attachment content %q", got)
+	}
+}
+
 func TestSupportRequestEmailRendersMultilineMessageInHTML(t *testing.T) {
 	msg := supportRequestEmail(CreateRequestInput{
 		Priority:  "normal",
@@ -175,4 +207,23 @@ func readAttachmentText(t *testing.T, attachments []email.Attachment, expectedFi
 		t.Fatalf("read attachment: %v", err)
 	}
 	return string(raw)
+}
+
+func readNamedAttachmentText(t *testing.T, attachments []email.Attachment, expectedFilename string, expectedContentType string) string {
+	t.Helper()
+	for _, attachment := range attachments {
+		if attachment.Filename != expectedFilename {
+			continue
+		}
+		if attachment.ContentType != expectedContentType {
+			t.Fatalf("unexpected attachment content type %q", attachment.ContentType)
+		}
+		raw, err := io.ReadAll(attachment.Content)
+		if err != nil {
+			t.Fatalf("read attachment: %v", err)
+		}
+		return string(raw)
+	}
+	t.Fatalf("attachment %q not found", expectedFilename)
+	return ""
 }

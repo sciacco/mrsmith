@@ -1,10 +1,14 @@
 package support
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"strings"
 	"testing"
 
@@ -77,9 +81,83 @@ func TestHandleCreateRequestPersistsAndSendsNotification(t *testing.T) {
 	if len(mailer.messages) != 1 {
 		t.Fatalf("expected one email, got %d", len(mailer.messages))
 	}
+	if len(store.created.Attachments) != 0 {
+		t.Fatalf("expected no attachments, got %d", len(store.created.Attachments))
+	}
 	contextBytes, _ := json.Marshal(store.created.Context)
 	if strings.Contains(string(contextBytes), "do-not-store") {
 		t.Fatalf("sensitive token leaked into stored context: %s", string(contextBytes))
+	}
+}
+
+func TestHandleCreateRequestPersistsMultipartAttachmentsAndSendsNotification(t *testing.T) {
+	store := &fakeStore{recipients: []string{"support@example.com"}}
+	mailer := &fakeMailer{enabled: true}
+	h := &Handler{store: store, mailer: mailer}
+
+	payload := `{
+		"message": "La pagina mostra un errore",
+		"priority": "high",
+		"technicalContextIncluded": true,
+		"context": {
+			"app": {"id": "quotes", "name": "Proposte"},
+			"page": {"path": "/quotes"}
+		}
+	}`
+	req := authenticatedMultipartRequest(t, payload, []testUpload{
+		{name: "screen.png", contentType: "image/png", content: "\x89PNG\r\n\x1a\nimage"},
+		{name: "notes.txt", contentType: "text/plain", content: "steps to reproduce"},
+	})
+	rec := httptest.NewRecorder()
+
+	h.handleCreateRequest(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if store.created == nil {
+		t.Fatal("expected support request to be persisted")
+	}
+	if len(store.created.Attachments) != 2 {
+		t.Fatalf("expected two attachments, got %d", len(store.created.Attachments))
+	}
+	if got := store.created.Attachments[0]; got.Filename != "screen.png" || got.ContentType != "image/png" || got.SizeBytes == 0 || got.ContentSHA256 == "" {
+		t.Fatalf("unexpected first attachment: %#v", got)
+	}
+	if string(store.created.Attachments[1].Content) != "steps to reproduce" {
+		t.Fatalf("unexpected second attachment content: %q", string(store.created.Attachments[1].Content))
+	}
+	if len(mailer.messages) != 1 {
+		t.Fatalf("expected one email, got %d", len(mailer.messages))
+	}
+	if len(mailer.messages[0].Attachments) != 3 {
+		t.Fatalf("expected context plus two email attachments, got %d", len(mailer.messages[0].Attachments))
+	}
+}
+
+func TestHandleCreateRequestRejectsUnsupportedAttachmentType(t *testing.T) {
+	store := &fakeStore{recipients: []string{"support@example.com"}}
+	mailer := &fakeMailer{enabled: true}
+	h := &Handler{store: store, mailer: mailer}
+
+	req := authenticatedMultipartRequest(t, `{"message":"Serve aiuto","priority":"normal","context":{"app":{"id":"rda"}}}`, []testUpload{
+		{name: "script.exe", contentType: "application/x-msdownload", content: "\x00\x01\x02binary"},
+	})
+	rec := httptest.NewRecorder()
+
+	h.handleCreateRequest(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "unsupported_attachment_type") {
+		t.Fatalf("expected unsupported_attachment_type, got %s", rec.Body.String())
+	}
+	if store.created != nil {
+		t.Fatal("request should not be persisted when attachment validation fails")
+	}
+	if len(mailer.messages) != 0 {
+		t.Fatalf("expected no email, got %d", len(mailer.messages))
 	}
 }
 
@@ -152,6 +230,42 @@ func authenticatedRequest(body string) *http.Request {
 		Roles:   []string{"app_quotes_access"},
 	}
 	return req.WithContext(context.WithValue(req.Context(), auth.ClaimsKey, claims))
+}
+
+type testUpload struct {
+	name        string
+	contentType string
+	content     string
+}
+
+func authenticatedMultipartRequest(t *testing.T, payload string, uploads []testUpload) *http.Request {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("payload", payload); err != nil {
+		t.Fatalf("write payload field: %v", err)
+	}
+	for _, upload := range uploads {
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Disposition", `form-data; name="attachments"; filename="`+upload.name+`"`)
+		header.Set("Content-Type", upload.contentType)
+		part, err := writer.CreatePart(header)
+		if err != nil {
+			t.Fatalf("create attachment part: %v", err)
+		}
+		if _, err := part.Write([]byte(upload.content)); err != nil {
+			t.Fatalf("write attachment content: %v", err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	req := authenticatedRequest(body.String())
+	req.Body = io.NopCloser(bytes.NewReader(body.Bytes()))
+	req.ContentLength = int64(body.Len())
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req
 }
 
 type fakeStore struct {

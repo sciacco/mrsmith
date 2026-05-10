@@ -89,9 +89,36 @@ func (s *SQLStore) CreateRequest(ctx context.Context, input CreateRequestInput) 
 		return 0, fmt.Errorf("insert support request context: %w", err)
 	}
 
+	for index, attachment := range input.Attachments {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO mrsmith.support_request_attachment (
+				request_id,
+				ordinal,
+				filename,
+				content_type,
+				size_bytes,
+				content_sha256,
+				content
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`,
+			id,
+			index+1,
+			attachment.Filename,
+			attachment.ContentType,
+			attachment.SizeBytes,
+			attachment.ContentSHA256,
+			attachment.Content,
+		); err != nil {
+			return 0, fmt.Errorf("insert support request attachment: %w", err)
+		}
+	}
+
 	eventPayload, err := json.Marshal(map[string]any{
-		"priority": input.Priority,
-		"app_id":   input.AppID,
+		"priority":         input.Priority,
+		"app_id":           input.AppID,
+		"attachment_count": len(input.Attachments),
+		"attachment_bytes": supportAttachmentBytes(input.Attachments),
 	})
 	if err != nil {
 		return 0, fmt.Errorf("marshal support event payload: %w", err)
@@ -214,6 +241,14 @@ func normalizeEmailRecipients(values []string) []string {
 		result = append(result, address.Address)
 	}
 	return result
+}
+
+func supportAttachmentBytes(attachments []CreateRequestAttachment) int64 {
+	var total int64
+	for _, attachment := range attachments {
+		total += attachment.SizeBytes
+	}
+	return total
 }
 
 func rollbackTx(tx *sql.Tx) {

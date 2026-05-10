@@ -172,6 +172,153 @@
   box-shadow: 0 0 0 3px var(--color-accent-glow, rgba(99, 91, 255, 0.25));
 }
 
+.attachmentSection {
+  display: grid;
+  gap: var(--space-2, 8px);
+}
+
+.attachmentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+}
+
+.attachmentHeader span {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.attachmentHeader small {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.attachmentDrop {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1, 4px) var(--space-3, 12px);
+  align-items: center;
+  min-height: 76px;
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  border: 1.5px dashed var(--color-border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast, 150ms) var(--ease-out, ease-out),
+    border-color var(--duration-fast, 150ms) var(--ease-out, ease-out),
+    color var(--duration-fast, 150ms) var(--ease-out, ease-out);
+}
+
+.attachmentDrop:hover,
+.attachmentDrop:focus-within {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.attachmentDrop svg {
+  grid-row: span 2;
+}
+
+.attachmentDrop span {
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.attachmentDrop small {
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.attachmentDrop input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.attachmentDropDisabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.attachmentDropDisabled input {
+  cursor: default;
+}
+
+.attachmentList {
+  display: grid;
+  gap: var(--space-2, 8px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachmentItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-2, 8px);
+  align-items: center;
+  min-height: 36px;
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+}
+
+.attachmentName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentSize {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.attachmentRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast, 150ms) var(--ease-out, ease-out),
+    color var(--duration-fast, 150ms) var(--ease-out, ease-out);
+}
+
+.attachmentRemove:hover,
+.attachmentRemove:focus-visible {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  outline: none;
+}
+
 .contextToggle {
   display: inline-flex;
   align-items: center;
@@ -222,13 +369,13 @@
 }
 
 .success {
-  background: var(--color-success-bg, #ecfdf5);
-  color: var(--color-success, #10b981);
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .error {
-  background: var(--color-danger-subtle, rgba(239, 68, 68, 0.08));
-  color: var(--color-danger, #ef4444);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
 }
 
 .actions {
