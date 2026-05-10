@@ -89,6 +89,18 @@ type Config struct {
 	RDFTeamsWebhookURL           string
 	RDFTeamsNotificationsEnabled bool
 
+	// SMTP email delivery (optional, disabled by default)
+	SMTPEnabled       bool
+	SMTPHost          string
+	SMTPPort          string
+	SMTPUsername      string
+	SMTPPassword      string
+	SMTPFrom          string
+	SMTPTLSMode       string
+	SMTPTLSSkipVerify bool
+	SMTPTLSServerName string
+	SMTPAuthMode      string
+
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
 	KeycloakFrontendRealm    string
@@ -152,6 +164,16 @@ func Load() Config {
 		OpenRouterAPIKey:             envOr("OPENROUTER_API_KEY", ""),
 		RDFTeamsWebhookURL:           envOr("RDF_TEAMS_WEBHOOK_URL", ""),
 		RDFTeamsNotificationsEnabled: boolEnvOr("RDF_TEAMS_NOTIFICATIONS_ENABLED", false),
+		SMTPEnabled:                  boolEnvOr("SMTP_ENABLED", false),
+		SMTPHost:                     envOr("SMTP_HOST", ""),
+		SMTPPort:                     envOr("SMTP_PORT", "587"),
+		SMTPUsername:                 envOr("SMTP_USERNAME", ""),
+		SMTPPassword:                 envOr("SMTP_PASSWORD", ""),
+		SMTPFrom:                     envOr("SMTP_FROM", ""),
+		SMTPTLSMode:                  envOr("SMTP_TLS_MODE", "auto"),
+		SMTPTLSSkipVerify:            boolEnvOr("SMTP_TLS_SKIP_VERIFY", false),
+		SMTPTLSServerName:            envOr("SMTP_TLS_SERVER_NAME", ""),
+		SMTPAuthMode:                 envOr("SMTP_AUTH_MODE", "auto"),
 
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),

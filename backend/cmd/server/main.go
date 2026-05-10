@@ -30,6 +30,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/database"
+	"github.com/sciacco/mrsmith/internal/platform/email"
 	"github.com/sciacco/mrsmith/internal/platform/health"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
@@ -223,6 +224,35 @@ func main() {
 	if cfg.OpenRouterAPIKey != "" {
 		openrouterCli = openrouter.New(cfg.OpenRouterAPIKey)
 		logger.Info("shared openrouter client configured", "component", "openrouter")
+	}
+
+	mailer, err := email.NewSMTPClient(email.Config{
+		Enabled:       cfg.SMTPEnabled,
+		Host:          cfg.SMTPHost,
+		Port:          cfg.SMTPPort,
+		Username:      cfg.SMTPUsername,
+		Password:      cfg.SMTPPassword,
+		From:          cfg.SMTPFrom,
+		TLSMode:       cfg.SMTPTLSMode,
+		TLSSkipVerify: cfg.SMTPTLSSkipVerify,
+		TLSServerName: cfg.SMTPTLSServerName,
+		AuthMode:      cfg.SMTPAuthMode,
+	})
+	if err != nil {
+		logger.Error("failed to initialize smtp email client", "component", "email", "error", err)
+		os.Exit(1)
+	}
+	if mailer.Enabled() {
+		logger.Info(
+			"smtp email client configured",
+			"component", "email",
+			"host", cfg.SMTPHost,
+			"port", cfg.SMTPPort,
+			"tls_mode", cfg.SMTPTLSMode,
+			"auth_mode", cfg.SMTPAuthMode,
+		)
+	} else {
+		logger.Info("smtp email client disabled", "component", "email")
 	}
 
 	// Carbone service (optional — listini module)
