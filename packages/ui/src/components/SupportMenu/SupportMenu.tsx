@@ -131,7 +131,7 @@ export function SupportMenu({ appName, support }: SupportMenuProps) {
 
   return (
     <div className={styles.wrapper} ref={wrapperRef}>
-      <Tooltip content="Operator" placement="bottom">
+      <Tooltip content="Operator" placement="bottom" disabled={menuOpen}>
         <button
           type="button"
           className={styles.trigger}
