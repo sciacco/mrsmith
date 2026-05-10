@@ -143,7 +143,7 @@ func supportEmailHTML(input CreateRequestInput, id int64, summary supportEmailSu
         %s
       </table>
       <h2 style="margin:24px 0 8px;font-size:15px;color:#0f172a;">Message</h2>
-      <div style="white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;font-size:14px;line-height:1.5;">%s</div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;font-size:14px;line-height:1.5;">%s</div>
       <h2 style="margin:24px 0 8px;font-size:15px;color:#0f172a;">Requester</h2>
       <table style="width:100%%;border-collapse:collapse;font-size:14px;">
         %s
@@ -184,7 +184,7 @@ func supportEmailHTML(input CreateRequestInput, id int64, summary supportEmailSu
 		infoRow("Path", summary.PagePath),
 		infoRow("URL", summary.PageURL),
 		infoRow("Captured at", summary.CapturedAt),
-		escapeHTML(input.Message),
+		multilineHTML(input.Message),
 		infoRow("Name", input.Requester.Name),
 		infoRow("Email", input.Requester.Email),
 		infoRow("Subject", input.Requester.Subject),
@@ -348,6 +348,12 @@ func tableCell(value string) string {
 
 func escapeHTML(value string) string {
 	return html.EscapeString(value)
+}
+
+func multilineHTML(value string) string {
+	escaped := escapeHTML(strings.ReplaceAll(value, "\r\n", "\n"))
+	escaped = strings.ReplaceAll(escaped, "\r", "\n")
+	return strings.ReplaceAll(escaped, "\n", "<br>")
 }
 
 func emptyDash(value string) string {

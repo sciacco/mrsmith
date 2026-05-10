@@ -107,6 +107,33 @@ func TestSupportRequestEmailSanitizesContextBeforeEmailing(t *testing.T) {
 	}
 }
 
+func TestSupportRequestEmailRendersMultilineMessageInHTML(t *testing.T) {
+	msg := supportRequestEmail(CreateRequestInput{
+		Priority:  "normal",
+		AppID:     "listini",
+		AppName:   "Listini e Sconti",
+		PagePath:  "/listini",
+		Message:   "Prima riga\r\nSeconda riga\n\n<script>alert(1)</script>",
+		Requester: auth.Claims{Subject: "sub-1", Name: "Salvatore Sciacco", Email: "salvatore@example.com"},
+		Context:   map[string]any{"app": map[string]any{"id": "listini", "name": "Listini e Sconti"}},
+	}, 9, []string{"support@example.com"})
+
+	if !strings.Contains(msg.Text, "Prima riga\r\nSeconda riga\n\n<script>alert(1)</script>") {
+		t.Fatalf("plain text body should preserve original message newlines:\n%s", msg.Text)
+	}
+	for _, want := range []string{
+		"Prima riga<br>Seconda riga<br><br>&lt;script&gt;alert(1)&lt;/script&gt;",
+		"Salvatore Sciacco needs help",
+	} {
+		if !strings.Contains(msg.HTML, want) {
+			t.Fatalf("html body missing %q:\n%s", want, msg.HTML)
+		}
+	}
+	if strings.Contains(msg.HTML, "<script>alert(1)</script>") {
+		t.Fatalf("html body contains unescaped script:\n%s", msg.HTML)
+	}
+}
+
 func TestSupportRequestEmailSkipsInvalidReplyTo(t *testing.T) {
 	msg := supportRequestEmail(CreateRequestInput{
 		Priority:  "normal",
