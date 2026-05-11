@@ -1,7 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { ApiError } from '@mrsmith/api-client';
-import { Modal, MultiSelect, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
+import { Icon, Modal, MultiSelect, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import {
   useCategories,
   useCustomFieldKeys,
@@ -21,6 +37,7 @@ import {
   useUpdateKitCustomValue,
   useUpdateKitHelp,
   useUpdateKitProduct,
+  useUpdateKitProductPosition,
   useUpdateKitTranslations,
 } from './kitQueries';
 import type {
@@ -116,6 +133,7 @@ export function KitDetailPage() {
   const updateTranslations = useUpdateKitTranslations(isValidId ? kitId : null);
   const createKitProduct = useCreateKitProduct(isValidId ? kitId : null);
   const updateKitProduct = useUpdateKitProduct(isValidId ? kitId : null);
+  const updateKitProductPosition = useUpdateKitProductPosition(isValidId ? kitId : null);
   const deleteKitProduct = useDeleteKitProduct(isValidId ? kitId : null);
   const createCustomValue = useCreateKitCustomValue(isValidId ? kitId : null);
   const updateCustomValue = useUpdateKitCustomValue(isValidId ? kitId : null);
@@ -157,7 +175,29 @@ export function KitDetailPage() {
   }, [kit]);
 
   const productRows = kitProducts ?? [];
+  const productRowIds = useMemo(() => productRows.map((row) => row.id), [productRows]);
   const customValueRows = customValues ?? [];
+
+  const productSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleProductDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const targetRow = productRows.find((row) => row.id === Number(over.id));
+      if (!targetRow) return;
+      updateKitProductPosition.mutate(
+        { productId: Number(active.id), position: targetRow.position },
+        {
+          onError: (err) => toast(getErrorMessage(err, 'Impossibile riordinare i prodotti'), 'error'),
+        },
+      );
+    },
+    [productRows, toast, updateKitProductPosition],
+  );
 
   const selectedCategory = useMemo(
     () => categories?.find((category) => category.id === kitDraft.category_id) ?? null,
@@ -548,53 +588,47 @@ export function KitDetailPage() {
             </div>
           ) : (
             <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>Group</th>
-                    <th className={styles.numCell}>Min</th>
-                    <th className={styles.numCell}>Max</th>
-                    <th>Req</th>
-                    <th className={styles.numCell}>NRC</th>
-                    <th className={styles.numCell}>MRC</th>
-                    <th className={styles.numCell}>Pos</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productRows.map((row, index) => {
-                    const selected = productEditingId === row.id;
-                    return (
-                      <tr
-                        key={row.id}
-                        className={selected ? styles.rowSelected : ''}
-                        style={{ animationDelay: `${index * 0.03}s` }}
-                        onClick={() => setProductEditingId(row.id)}
-                        onDoubleClick={() => {
-                          setProductEditingId(row.id);
-                          setProductModalMode('edit');
-                          setProductModalDraft(toProductFormState(row, productDrafts[row.id]));
-                          setProductModalOpen(true);
-                        }}
-                      >
-                        <td>
-                          <span className={styles.codeCell}>
-                            <strong className={styles.codeCellName}>{resolveProductLabel(products, row)}</strong>
-                            <small className={styles.codeCellSku}>{row.product_code}</small>
-                          </span>
-                        </td>
-                        <td>{row.group_name ?? '—'}</td>
-                        <td className={styles.numCell}>{row.minimum}</td>
-                        <td className={styles.numCell}>{row.maximum}</td>
-                        <td>{row.required ? 'Si' : 'No'}</td>
-                        <td className={`${styles.numCell} ${styles.mono}`}>{formatCurrency(row.nrc)}</td>
-                        <td className={`${styles.numCell} ${styles.mono}`}>{formatCurrency(row.mrc)}</td>
-                        <td className={styles.numCell}>{row.position}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <DndContext
+                sensors={productSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleProductDragEnd}
+              >
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th className={styles.handleCell} aria-hidden />
+                      <th>Product</th>
+                      <th>Group</th>
+                      <th className={styles.numCell}>Min</th>
+                      <th className={styles.numCell}>Max</th>
+                      <th>Req</th>
+                      <th className={styles.numCell}>NRC</th>
+                      <th className={styles.numCell}>MRC</th>
+                      <th className={styles.numCell}>Pos</th>
+                    </tr>
+                  </thead>
+                  <SortableContext items={productRowIds} strategy={verticalListSortingStrategy}>
+                    <tbody>
+                      {productRows.map((row, index) => (
+                        <SortableProductRow
+                          key={row.id}
+                          row={row}
+                          index={index}
+                          selected={productEditingId === row.id}
+                          productLabel={resolveProductLabel(products, row)}
+                          onSelect={() => setProductEditingId(row.id)}
+                          onEdit={() => {
+                            setProductEditingId(row.id);
+                            setProductModalMode('edit');
+                            setProductModalDraft(toProductFormState(row, productDrafts[row.id]));
+                            setProductModalOpen(true);
+                          }}
+                        />
+                      ))}
+                    </tbody>
+                  </SortableContext>
+                </table>
+              </DndContext>
             </div>
           )}
       </section>
@@ -832,6 +866,67 @@ export function KitDetailPage() {
         </div>
       </Modal>
     </section>
+  );
+}
+
+
+interface SortableProductRowProps {
+  row: KitProductItem;
+  index: number;
+  selected: boolean;
+  productLabel: string;
+  onSelect: () => void;
+  onEdit: () => void;
+}
+
+function SortableProductRow({ row, index, selected, productLabel, onSelect, onEdit }: SortableProductRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    animationDelay: `${index * 0.03}s`,
+  };
+
+  const className = [selected ? styles.rowSelected : '', isDragging ? styles.draggingRow : '']
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={className}
+      onClick={onSelect}
+      onDoubleClick={onEdit}
+    >
+      <td className={styles.handleCell}>
+        <span
+          className={styles.dragHandle}
+          aria-label="Trascina per riordinare"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          {...attributes}
+          {...listeners}
+        >
+          <Icon name="grip-vertical" size={16} />
+        </span>
+      </td>
+      <td>
+        <span className={styles.codeCell}>
+          <strong className={styles.codeCellName}>{productLabel}</strong>
+          <small className={styles.codeCellSku}>{row.product_code}</small>
+        </span>
+      </td>
+      <td>{row.group_name ?? '—'}</td>
+      <td className={styles.numCell}>{row.minimum}</td>
+      <td className={styles.numCell}>{row.maximum}</td>
+      <td>{row.required ? 'Si' : 'No'}</td>
+      <td className={`${styles.numCell} ${styles.mono}`}>{formatCurrency(row.nrc)}</td>
+      <td className={`${styles.numCell} ${styles.mono}`}>{formatCurrency(row.mrc)}</td>
+      <td className={styles.numCell}>{row.position}</td>
+    </tr>
   );
 }
 

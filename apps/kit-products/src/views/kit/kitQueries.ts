@@ -167,6 +167,21 @@ export function useBatchUpdateKitProducts(id: number | null) {
   });
 }
 
+export function useUpdateKitProductPosition(id: number | null) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productId, position }: { productId: number; position: number }) =>
+      api.put<void>(`/kit-products/v1/kit/${id}/products/${productId}/position`, { position }),
+    onSuccess: () => {
+      if (id != null) {
+        queryClient.invalidateQueries({ queryKey: kitKeys.kitProducts(id) });
+        queryClient.invalidateQueries({ queryKey: kitKeys.kit(id) });
+      }
+    },
+  });
+}
+
 export function useDeleteKitProduct(id: number | null) {
   const api = useApiClient();
   const queryClient = useQueryClient();

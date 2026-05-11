@@ -534,6 +534,45 @@
   font-variant-numeric: tabular-nums;
 }
 
+.handleCell {
+  width: 32px;
+  padding-right: 0;
+  text-align: center;
+}
+
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--color-text-faint);
+  cursor: grab;
+  touch-action: none;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+}
+
+.dragHandle:hover {
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+  color: var(--color-text-muted);
+}
+
+.draggingRow {
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-md);
+}
+
 .notesCell {
   color: var(--color-text-muted);
   max-width: 16rem;

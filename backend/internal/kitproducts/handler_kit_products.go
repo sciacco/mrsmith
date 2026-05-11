@@ -348,6 +348,123 @@ SELECT products.upd_kit_product($1, $2::json)
 	httputil.JSON(w, http.StatusOK, map[string]int{"updated": len(req.Items)})
 }
 
+func (h *Handler) handleUpdateKitProductPosition(w http.ResponseWriter, r *http.Request) {
+	if !h.requireDB(w) {
+		return
+	}
+
+	kitID, err := pathID64(r, "id")
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid kit id")
+		return
+	}
+	productID, err := pathID64(r, "pid")
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid kit product id")
+		return
+	}
+
+	var body struct {
+		Position int `json:"position"`
+	}
+	if err := decodeBody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	var owningKitID int64
+	err = h.mistraDB.QueryRowContext(r.Context(), `
+SELECT kit_id
+FROM products.kit_product
+WHERE id = $1
+`, productID).Scan(&owningKitID)
+	if h.rowError(w, r, "update_kit_product_position_ownership", err, "kit_id", kitID, "kit_product_id", productID) {
+		return
+	}
+	if owningKitID != kitID {
+		httputil.Error(w, http.StatusNotFound, "not_found")
+		return
+	}
+
+	tx, err := h.mistraDB.BeginTx(r.Context(), nil)
+	if err != nil {
+		h.dbFailure(w, r, "update_kit_product_position_begin", err, "kit_id", kitID, "kit_product_id", productID)
+		return
+	}
+	defer h.rollbackTx(r, tx, "update_kit_product_position", "kit_id", kitID, "kit_product_id", productID)
+
+	rows, err := tx.QueryContext(r.Context(), `
+SELECT id
+FROM products.kit_product
+WHERE kit_id = $1
+ORDER BY position, id
+`, kitID)
+	if err != nil {
+		h.dbFailure(w, r, "update_kit_product_position_list", err, "kit_id", kitID)
+		return
+	}
+
+	order := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			h.dbFailure(w, r, "update_kit_product_position_scan", err, "kit_id", kitID)
+			return
+		}
+		order = append(order, id)
+	}
+	rows.Close()
+	if !h.rowsDone(w, r, rows, "update_kit_product_position", "kit_id", kitID) {
+		return
+	}
+
+	currentIndex := -1
+	for i, id := range order {
+		if id == productID {
+			currentIndex = i
+			break
+		}
+	}
+	if currentIndex == -1 {
+		httputil.Error(w, http.StatusNotFound, "not_found")
+		return
+	}
+
+	targetIndex := body.Position - 1
+	if targetIndex < 0 {
+		targetIndex = 0
+	}
+	if targetIndex >= len(order) {
+		targetIndex = len(order) - 1
+	}
+
+	if targetIndex != currentIndex {
+		moved := order[currentIndex]
+		order = append(order[:currentIndex], order[currentIndex+1:]...)
+		if targetIndex >= len(order) {
+			order = append(order, moved)
+		} else {
+			order = append(order[:targetIndex], append([]int64{moved}, order[targetIndex:]...)...)
+		}
+	}
+
+	for i, id := range order {
+		if _, err := tx.ExecContext(r.Context(),
+			`UPDATE products.kit_product SET position = $1 WHERE id = $2`, i+1, id); err != nil {
+			h.dbFailure(w, r, "update_kit_product_position_write", err, "kit_id", kitID, "kit_product_id", id)
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		h.dbFailure(w, r, "update_kit_product_position_commit", err, "kit_id", kitID, "kit_product_id", productID)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) handleDeleteKitProduct(w http.ResponseWriter, r *http.Request) {
 	if !h.requireDB(w) {
 		return

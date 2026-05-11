@@ -71,6 +71,7 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB *sql.DB, alyante *AlyanteAdapte
 	handle("POST /kit-products/v1/kit/{id}/products", h.handleCreateKitProduct)
 	handle("PATCH /kit-products/v1/kit/{id}/products", h.handleBatchUpdateKitProducts)
 	handle("PUT /kit-products/v1/kit/{id}/products/{pid}", h.handleUpdateKitProduct)
+	handle("PUT /kit-products/v1/kit/{id}/products/{pid}/position", h.handleUpdateKitProductPosition)
 	handle("DELETE /kit-products/v1/kit/{id}/products/{pid}", h.handleDeleteKitProduct)
 
 	handle("GET /kit-products/v1/kit/{id}/custom-values", h.handleListKitCustomValues)
