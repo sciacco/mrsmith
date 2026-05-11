@@ -105,6 +105,7 @@ export function SupportMenu({ appName, support }: SupportMenuProps) {
   const [includeContext, setIncludeContext] = useState(true);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [submitState, setSubmitState] = useState<SubmitState>({ status: 'idle' });
+  const [isFileInputFocused, setIsFileInputFocused] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const appId = support.appId ?? slugify(appName ?? 'mini-app');
@@ -232,7 +233,7 @@ export function SupportMenu({ appName, support }: SupportMenuProps) {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={closeModal} title="Operator" size="wide" dismissible={submitState.status !== 'submitting'}>
+      <Modal open={modalOpen} onClose={closeModal} title="Operator" size="wide" dismissible={submitState.status !== 'submitting'} closeOnEscape={!isFileInputFocused}>
         <div className={styles.form}>
           <label className={styles.field}>
             <span>Messaggio</span>
@@ -283,6 +284,8 @@ export function SupportMenu({ appName, support }: SupportMenuProps) {
                 multiple
                 accept={attachmentAccept}
                 onChange={handleAttachmentInput}
+                onFocus={() => setIsFileInputFocused(true)}
+                onBlur={() => setIsFileInputFocused(false)}
                 disabled={attachmentsDisabled}
               />
             </label>
