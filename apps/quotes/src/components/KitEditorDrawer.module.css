@@ -83,7 +83,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--color-warning, #f59e0b);
+  background: var(--color-warning);
   box-shadow: 0 0 0 2px var(--color-bg-elevated);
 }
 

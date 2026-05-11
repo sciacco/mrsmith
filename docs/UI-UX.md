@@ -83,6 +83,11 @@ This background gradient is the default mini-app page background. Override it on
 | `--color-danger-hover` | `#dc2626` | Danger hover |
 | `--color-danger-subtle` | `rgba(239,68,68,0.08)` | Danger backgrounds |
 | `--color-warning` | `#f59e0b` | Warnings |
+| `--color-warning-strong` | `#b45309` | Warning text |
+| `--color-warning-subtle` | `rgba(245,158,11,0.12)` | Warning backgrounds |
+| `--color-info` | `#0ea5e9` | Informational states |
+| `--color-info-strong` | `#075985` | Informational text |
+| `--color-info-subtle` | `rgba(14,116,144,0.10)` | Informational backgrounds |
 
 ### 3.2 Matrix Theme (Portal)
 

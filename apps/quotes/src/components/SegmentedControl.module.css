@@ -48,7 +48,7 @@
 
 .selected {
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-text-on-accent);
   box-shadow: var(--shadow-accent);
 }
 

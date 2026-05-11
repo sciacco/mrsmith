@@ -65,7 +65,7 @@
 .separator {
   display: inline-block;
   margin: 0 var(--space-3, 12px);
-  color: var(--color-border, #e2e8f0);
+  color: var(--color-border);
   font-size: 1.125rem;
   font-weight: 300;
   flex-shrink: 0;
@@ -75,7 +75,7 @@
 .appName {
   font-weight: 500;
   font-size: 1rem;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   letter-spacing: -0.02em;
   flex-shrink: 0;
   white-space: nowrap;
