@@ -553,12 +553,12 @@ export function KitDetailPage() {
                   <tr>
                     <th>Product</th>
                     <th>Group</th>
-                    <th>Min</th>
-                    <th>Max</th>
+                    <th className={styles.numCell}>Min</th>
+                    <th className={styles.numCell}>Max</th>
                     <th>Req</th>
-                    <th>NRC</th>
-                    <th>MRC</th>
-                    <th>Pos</th>
+                    <th className={styles.numCell}>NRC</th>
+                    <th className={styles.numCell}>MRC</th>
+                    <th className={styles.numCell}>Pos</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -579,17 +579,17 @@ export function KitDetailPage() {
                       >
                         <td>
                           <span className={styles.codeCell}>
-                            {row.product_code}
-                            <small>{resolveProductLabel(products, row)}</small>
+                            <strong className={styles.codeCellName}>{resolveProductLabel(products, row)}</strong>
+                            <small className={styles.codeCellSku}>{row.product_code}</small>
                           </span>
                         </td>
                         <td>{row.group_name ?? '—'}</td>
-                        <td>{row.minimum}</td>
-                        <td>{row.maximum}</td>
+                        <td className={styles.numCell}>{row.minimum}</td>
+                        <td className={styles.numCell}>{row.maximum}</td>
                         <td>{row.required ? 'Si' : 'No'}</td>
-                        <td className={styles.mono}>{formatMoney(row.nrc)}</td>
-                        <td className={styles.mono}>{formatMoney(row.mrc)}</td>
-                        <td>{row.position}</td>
+                        <td className={`${styles.numCell} ${styles.mono}`}>{formatCurrency(row.nrc)}</td>
+                        <td className={`${styles.numCell} ${styles.mono}`}>{formatCurrency(row.mrc)}</td>
+                        <td className={styles.numCell}>{row.position}</td>
                       </tr>
                     );
                   })}
@@ -695,19 +695,23 @@ export function KitDetailPage() {
         open={productModalOpen}
         onClose={() => setProductModalOpen(false)}
         title={productModalMode === 'create' ? 'Aggiungi prodotto al kit' : 'Modifica prodotto del kit'}
-        wide
+        size="xwide"
       >
         <div className={styles.modalBody}>
-          <div className={styles.formGrid}>
-            <div className={styles.field}>
-              <span>Product</span>
-              <SingleSelect<string>
-                options={(products ?? []).map((p) => ({ value: p.code, label: `${p.code} - ${p.internal_name}` }))}
-                selected={productModalDraft.product_code || null}
-                onChange={(v) => setProductModalDraft((c) => ({ ...c, product_code: v ?? '' }))}
-                placeholder="Cerca prodotto..."
-              />
-            </div>
+          <div className={styles.field}>
+            <span>Product</span>
+            <SingleSelect<string>
+              options={(products ?? []).map((p) => ({
+                value: p.code,
+                label: p.code,
+                secondaryLabel: p.internal_name,
+              }))}
+              selected={productModalDraft.product_code || null}
+              onChange={(v) => setProductModalDraft((c) => ({ ...c, product_code: v ?? '' }))}
+              placeholder="Cerca prodotto..."
+            />
+          </div>
+          <div className={styles.formGrid3}>
             <label className={styles.field}>
               <span>Group</span>
               <select value={productModalDraft.group_name ?? ''} onChange={(e) => setProductModalDraft((c) => ({ ...c, group_name: e.target.value || null }))}>
@@ -715,22 +719,19 @@ export function KitDetailPage() {
                 {productGroupOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </label>
-          </div>
-          <div className={styles.formGrid3}>
             <label className={styles.field}>
-              <span>Minimum</span>
-              <input type="number" value={productModalDraft.minimum} onChange={(e) => setProductModalDraft((c) => ({ ...c, minimum: Number(e.target.value) }))} />
-            </label>
-            <label className={styles.field}>
-              <span>Maximum</span>
-              <input type="number" value={productModalDraft.maximum} onChange={(e) => setProductModalDraft((c) => ({ ...c, maximum: Number(e.target.value) }))} />
+              <span>Required</span>
+              <label className={styles.checkboxInline}>
+                <input type="checkbox" checked={productModalDraft.required} onChange={(e) => setProductModalDraft((c) => ({ ...c, required: e.target.checked }))} />
+                <span>{productModalDraft.required ? 'Si' : 'No'}</span>
+              </label>
             </label>
             <label className={styles.field}>
               <span>Position</span>
               <input type="number" value={productModalDraft.position} onChange={(e) => setProductModalDraft((c) => ({ ...c, position: Number(e.target.value) }))} />
             </label>
           </div>
-          <div className={styles.formGrid3}>
+          <div className={styles.formGrid4}>
             <label className={styles.field}>
               <span>NRC</span>
               <input type="number" step="0.01" value={productModalDraft.nrc} onChange={(e) => setProductModalDraft((c) => ({ ...c, nrc: Number(e.target.value) }))} />
@@ -740,16 +741,17 @@ export function KitDetailPage() {
               <input type="number" step="0.01" value={productModalDraft.mrc} onChange={(e) => setProductModalDraft((c) => ({ ...c, mrc: Number(e.target.value) }))} />
             </label>
             <label className={styles.field}>
-              <span>Required</span>
-              <label className={styles.checkboxInline}>
-                <input type="checkbox" checked={productModalDraft.required} onChange={(e) => setProductModalDraft((c) => ({ ...c, required: e.target.checked }))} />
-                <span>{productModalDraft.required ? 'Si' : 'No'}</span>
-              </label>
+              <span>Minimum</span>
+              <input type="number" value={productModalDraft.minimum} onChange={(e) => setProductModalDraft((c) => ({ ...c, minimum: Number(e.target.value) }))} />
+            </label>
+            <label className={styles.field}>
+              <span>Maximum</span>
+              <input type="number" value={productModalDraft.maximum} onChange={(e) => setProductModalDraft((c) => ({ ...c, maximum: Number(e.target.value) }))} />
             </label>
           </div>
           <label className={styles.field}>
             <span>Notes</span>
-            <textarea rows={3} value={productModalDraft.notes} onChange={(e) => setProductModalDraft((c) => ({ ...c, notes: e.target.value }))} />
+            <textarea rows={4} value={productModalDraft.notes} onChange={(e) => setProductModalDraft((c) => ({ ...c, notes: e.target.value }))} />
           </label>
           <div className={styles.modalActions}>
             <button type="button" className={styles.secondaryButton} onClick={() => setProductModalOpen(false)}>
@@ -1040,8 +1042,8 @@ function stringifyJsonValue(value: unknown) {
   }
 }
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
 
 function resolveProductLabel(

@@ -5,6 +5,7 @@ import styles from './SingleSelect.module.css';
 interface Option<V extends string | number = string | number> {
   value: V;
   label: string;
+  secondaryLabel?: string;
 }
 
 interface SingleSelectProps<V extends string | number = string | number> {
@@ -165,7 +166,14 @@ export function SingleSelect<V extends string | number = string | number>({
               <span className={styles.radio}>
                 {o.value === selected && <span className={styles.radioDot} />}
               </span>
-              <span>{o.label}</span>
+              {o.secondaryLabel ? (
+                <span className={styles.optionLabels}>
+                  <span className={styles.optionPrimary}>{o.label}</span>
+                  <span className={styles.optionSecondary}>{o.secondaryLabel}</span>
+                </span>
+              ) : (
+                <span>{o.label}</span>
+              )}
             </div>
           ))
         )}
@@ -184,7 +192,14 @@ export function SingleSelect<V extends string | number = string | number>({
         }}
       >
         {selectedOption ? (
-          <span className={styles.selectedLabel}>{selectedOption.label}</span>
+          selectedOption.secondaryLabel ? (
+            <span className={styles.selectedStack}>
+              <span className={styles.selectedPrimary}>{selectedOption.label}</span>
+              <span className={styles.selectedSecondary}>{selectedOption.secondaryLabel}</span>
+            </span>
+          ) : (
+            <span className={styles.selectedLabel}>{selectedOption.label}</span>
+          )
         ) : (
           <span className={styles.placeholder}>{placeholder}</span>
         )}

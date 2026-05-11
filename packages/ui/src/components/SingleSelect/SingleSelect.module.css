@@ -1,6 +1,7 @@
 .container {
   position: relative;
   width: 100%;
+  min-width: 0;
 }
 
 .trigger {
@@ -48,6 +49,35 @@
   font-size: 0.875rem;
   color: var(--color-text);
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectedStack {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.selectedPrimary {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectedSecondary {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -131,6 +161,39 @@
 
 .option:hover {
   background: var(--color-surface);
+}
+
+.optionLabels {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.optionPrimary {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionSecondary {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionSelected .optionPrimary {
+  color: var(--color-accent);
 }
 
 .optionSelected {
