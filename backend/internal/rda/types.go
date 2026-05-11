@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/sciacco/mrsmith/internal/notifications"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 )
 
@@ -13,6 +14,9 @@ type Deps struct {
 	ArakDB         *sql.DB
 	Logger         *slog.Logger
 	QuoteThreshold float64
+	Notifier       notifications.Notifier
+	RDAAppURL      string
+	StaticDir      string
 }
 
 type Handler struct {
@@ -20,6 +24,9 @@ type Handler struct {
 	arakDB         *sql.DB
 	logger         *slog.Logger
 	quoteThreshold float64
+	notifier       notifications.Notifier
+	rdaAppURL      string
+	staticDir      string
 }
 
 type userRef struct {

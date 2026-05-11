@@ -1,4 +1,5 @@
 import type { Category } from '../../types';
+import type { NotificationItem } from '../../api/notifications';
 import { MatrixBackground } from '../MatrixBackground';
 import { ScanlineOverlay } from '../ScanlineOverlay';
 import { Header } from '../Header';
@@ -13,6 +14,15 @@ type PortalProps = {
   statusMessage?: string;
   statusTone?: 'default' | 'error';
   onLogout?: () => void;
+  notifications?: {
+    unreadCount: number;
+    items: NotificationItem[];
+    loading: boolean;
+    error: boolean;
+    onMarkAllRead: () => Promise<void>;
+    onOpen: (item: NotificationItem) => Promise<void>;
+    onArchive: (item: NotificationItem) => Promise<void>;
+  };
 };
 
 export function Portal({
@@ -23,13 +33,19 @@ export function Portal({
   statusMessage,
   statusTone = 'default',
   onLogout,
+  notifications,
 }: PortalProps) {
   return (
     <>
       <MatrixBackground />
       <ScanlineOverlay />
       <div className={styles.wrapper}>
-        <Header appName={appName} userName={userName} onLogout={onLogout} />
+        <Header
+          appName={appName}
+          userName={userName}
+          onLogout={onLogout}
+          notifications={notifications}
+        />
         <main className={styles.main}>
           {statusTitle ? (
             <section

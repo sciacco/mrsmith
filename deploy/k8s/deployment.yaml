@@ -71,6 +71,30 @@ spec:
                   name: mrsmith-secrets
                   key: CARBONE_API_KEY
                   optional: true
+            - name: SMTP_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: SMTP_HOST
+                  optional: true
+            - name: SMTP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: SMTP_USERNAME
+                  optional: true
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: SMTP_PASSWORD
+                  optional: true
+            - name: SMTP_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: SMTP_FROM
+                  optional: true
           livenessProbe:
             httpGet:
               path: /healthz

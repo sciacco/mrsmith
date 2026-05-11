@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/kitproducts"
 	"github.com/sciacco/mrsmith/internal/listini"
 	"github.com/sciacco/mrsmith/internal/manutenzioni"
+	"github.com/sciacco/mrsmith/internal/notifications"
 	"github.com/sciacco/mrsmith/internal/panoramica"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
@@ -256,6 +258,13 @@ func main() {
 		logger.Info("smtp email client disabled", "component", "email")
 	}
 
+	var notificationStore notifications.Store
+	var notificationNotifier notifications.Notifier
+	if anisettaDB != nil {
+		notificationStore = notifications.NewSQLStore(anisettaDB)
+		notificationNotifier = notifications.NewService(notificationStore, logger)
+	}
+
 	// Carbone service (optional — listini module)
 	var carboneSvc *listini.CarboneService
 	if cfg.CarboneAPIKey != "" {
@@ -435,7 +444,15 @@ func main() {
 	portal.RegisterRoutes(api, appCatalog)
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
-	rda.RegisterRoutes(api, rda.Deps{Arak: arakCli, ArakDB: arakDB, Logger: logger, QuoteThreshold: cfg.RDAQuoteThreshold})
+	rda.RegisterRoutes(api, rda.Deps{
+		Arak:           arakCli,
+		ArakDB:         arakDB,
+		Logger:         logger,
+		QuoteThreshold: cfg.RDAQuoteThreshold,
+		Notifier:       notificationNotifier,
+		RDAAppURL:      cfg.RDAAppURL,
+		StaticDir:      cfg.StaticDir,
+	})
 	compliance.RegisterRoutes(api, anisettaDB)
 	coperture.RegisterRoutes(api, dbCoperture)
 	cpbackoffice.RegisterRoutes(api, cpbackoffice.Deps{
@@ -464,6 +481,7 @@ func main() {
 	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)
 	simulatorivendita.RegisterRoutes(api, simulatoriVenditaCarboneSvc)
+	notifications.RegisterRoutes(api, notifications.Deps{Store: notificationStore, Logger: logger})
 	support.RegisterRoutes(api, support.Deps{DB: anisettaDB, Mailer: mailer, Logger: logger})
 	afctools.RegisterRoutes(api, afctools.Deps{
 		Vodka:   vodkaDB,
@@ -497,6 +515,26 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
+	appCtx, stopWorkers := context.WithCancel(context.Background())
+	var workerWG sync.WaitGroup
+	if cfg.NotificationsWorkerEnabled && notificationStore != nil {
+		worker := notifications.NewWorker(notificationStore, notifications.WorkerConfig{
+			Mailer:        mailer,
+			PublicBaseURL: cfg.MrSmithPublicBaseURL,
+			Interval:      cfg.NotificationsWorkerInterval,
+			Logger:        logger,
+		})
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			worker.Run(appCtx)
+		}()
+	} else if notificationStore == nil {
+		logger.Info("notifications worker not started without anisetta database", "component", "notifications")
+	} else {
+		logger.Info("notifications worker disabled", "component", "notifications")
+	}
+
 	// Graceful shutdown
 	go func() {
 		logger.Info("server listening", "component", "http", "addr", ":"+cfg.Port)
@@ -512,9 +550,20 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	stopWorkers()
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error("shutdown error", "component", "http", "error", err)
 		os.Exit(1)
+	}
+	workerDone := make(chan struct{})
+	go func() {
+		workerWG.Wait()
+		close(workerDone)
+	}()
+	select {
+	case <-workerDone:
+	case <-ctx.Done():
+		logger.Warn("worker shutdown timed out", "component", "notifications", "error", ctx.Err())
 	}
 	logger.Info("server stopped", "component", "http")
 }

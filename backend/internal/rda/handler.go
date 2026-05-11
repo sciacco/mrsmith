@@ -43,6 +43,9 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		arakDB:         deps.ArakDB,
 		logger:         logger.With("component", component),
 		quoteThreshold: normalizeQuoteThreshold(deps.QuoteThreshold),
+		notifier:       deps.Notifier,
+		rdaAppURL:      deps.RDAAppURL,
+		staticDir:      deps.StaticDir,
 	}
 
 	protect := acl.RequireRole(applaunch.RDAAccessRoles()...)
@@ -164,6 +167,10 @@ func queryWithDefaults(r *http.Request) string {
 }
 
 func (h *Handler) forwardArak(w http.ResponseWriter, r *http.Request, method, path, rawQuery string, body io.Reader, headers http.Header) {
+	h.forwardArakAfterSuccess(w, r, method, path, rawQuery, body, headers, nil)
+}
+
+func (h *Handler) forwardArakAfterSuccess(w http.ResponseWriter, r *http.Request, method, path, rawQuery string, body io.Reader, headers http.Header, after func()) {
 	resp, err := h.arak.DoWithHeaders(method, path, rawQuery, body, headers)
 	if err != nil {
 		h.requestLogger(r, "proxy_to_arak", "upstream_path", path).Error("upstream request failed", "error", err)
@@ -188,13 +195,26 @@ func (h *Handler) forwardArak(w http.ResponseWriter, r *http.Request, method, pa
 		return
 	}
 
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		h.requestLogger(r, "proxy_to_arak", "upstream_path", path).Warn("failed to read upstream response", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio RDA temporaneamente non disponibile",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	if after != nil {
+		after()
+	}
+
 	copyResponseHeaders(w.Header(), resp.Header)
 	if w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", "application/json")
 	}
 	w.WriteHeader(resp.StatusCode)
-	if _, err := io.Copy(w, resp.Body); err != nil {
-		h.requestLogger(r, "proxy_to_arak", "upstream_path", path).Warn("failed to stream upstream response", "error", err)
+	if _, err := w.Write(responseBody); err != nil {
+		h.requestLogger(r, "proxy_to_arak", "upstream_path", path).Warn("failed to write upstream response", "error", err)
 	}
 }
 

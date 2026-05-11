@@ -185,6 +185,15 @@ Alyante ERP ID
 - Used by: `apps/rda` row modal and row tables.
 - Open questions: none.
 
+### RDA Portal Deep Links Include App Mount And App Route
+
+- Context: portal notifications, emails, and any backend-generated links to RDA PO detail pages.
+- Discovery: the production/static RDA app is mounted at `/apps/rda/`, while the React router route for PO detail is `/rda/po/:poId`. A backend-generated production deep link therefore needs both parts: `/apps/rda/rda/po/{poID}`. In local split-server development, an explicit `RDA_APP_URL` should be used when configured; otherwise the RDA Vite dev URL is `http://localhost:5190/rda/po/{poID}`.
+- Practical rule: do not link backend notifications directly to `/rda/po/{poID}` in production. Build RDA PO links through the app-mount-aware helper and use `MRSMITH_PUBLIC_BASE_URL` only to make email links absolute.
+- Evidence: `apps/rda/vite.config.ts` base `/apps/rda/` for builds, `apps/rda/src/routes.tsx` route `/rda/po/:poId`, backend helper `backend/internal/rda/notifications.go`.
+- Used by: Notifications V1 RDA approval notifications.
+- Open questions: none.
+
 ### RDA Article Catalog Type Comes From The BFF
 
 - Context: `apps/rda` row creation in `/rda/new` and PO detail row modal.

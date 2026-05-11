@@ -600,7 +600,19 @@ func (h *Handler) handleSubmitPO(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "Per importi superiori alla soglia configurata sono necessari almeno 2 preventivi")
 		return
 	}
-	h.forwardArak(w, r, http.MethodPost, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/submit", "", nil, requesterHeaders(email))
+	poID := r.PathValue("id")
+	h.forwardArakAfterSuccess(
+		w,
+		r,
+		http.MethodPost,
+		arakRDARoot+"/po/"+url.PathEscape(poID)+"/submit",
+		"",
+		nil,
+		requesterHeaders(email),
+		func() {
+			h.afterRDAWorkflowTransition(r.Context(), h.requestLogger(r, "rda_submit_notifications"), email, poID, &po)
+		},
+	)
 }
 
 func (h *Handler) handleApprovePO(w http.ResponseWriter, r *http.Request) {
@@ -623,7 +635,19 @@ func (h *Handler) handleApprovePO(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusForbidden, "Operazione riservata agli approvatori assegnati")
 		return
 	}
-	h.forwardArak(w, r, http.MethodPost, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/approve", "", nil, requesterHeaders(email))
+	poID := r.PathValue("id")
+	h.forwardArakAfterSuccess(
+		w,
+		r,
+		http.MethodPost,
+		arakRDARoot+"/po/"+url.PathEscape(poID)+"/approve",
+		"",
+		nil,
+		requesterHeaders(email),
+		func() {
+			h.afterRDAWorkflowTransition(r.Context(), h.requestLogger(r, "rda_approve_notifications"), email, poID, &po)
+		},
+	)
 }
 
 func (h *Handler) handleRejectPO(w http.ResponseWriter, r *http.Request) {
@@ -658,7 +682,19 @@ func (h *Handler) handleRejectPO(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusForbidden, "Operazione riservata agli utenti abilitati")
 		return
 	}
-	h.forwardArak(w, r, http.MethodPost, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/reject", "", nil, requesterHeaders(email))
+	poID := r.PathValue("id")
+	h.forwardArakAfterSuccess(
+		w,
+		r,
+		http.MethodPost,
+		arakRDARoot+"/po/"+url.PathEscape(poID)+"/reject",
+		"",
+		nil,
+		requesterHeaders(email),
+		func() {
+			h.afterRDAWorkflowTransition(r.Context(), h.requestLogger(r, "rda_reject_notifications"), email, poID, &po)
+		},
+	)
 }
 
 func (h *Handler) handlePatchPaymentMethod(w http.ResponseWriter, r *http.Request) {
@@ -685,7 +721,19 @@ func (h *Handler) handlePatchPaymentMethod(w http.ResponseWriter, r *http.Reques
 		httputil.InternalError(w, r, err, "rda payment method body encode failed")
 		return
 	}
-	h.forwardArak(w, r, http.MethodPatch, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/payment-method", "", encoded, mergeHeaders(requesterHeaders(email), jsonHeaders()))
+	poID := r.PathValue("id")
+	h.forwardArakAfterSuccess(
+		w,
+		r,
+		http.MethodPatch,
+		arakRDARoot+"/po/"+url.PathEscape(poID)+"/payment-method",
+		"",
+		encoded,
+		mergeHeaders(requesterHeaders(email), jsonHeaders()),
+		func() {
+			h.afterRDAWorkflowTransition(r.Context(), h.requestLogger(r, "rda_payment_method_notifications"), email, poID, &po)
+		},
+	)
 }
 
 func (h *Handler) handlePermissionTransition(requiredPermission rdaPermissionFlag, suffix string, operation string) http.HandlerFunc {
@@ -706,8 +754,26 @@ func (h *Handler) handlePermissionTransition(requiredPermission rdaPermissionFla
 			httputil.Error(w, http.StatusForbidden, "Operazione riservata agli utenti abilitati")
 			return
 		}
-		h.requestLogger(r, operation)
-		h.forwardArak(w, r, http.MethodPost, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+suffix, "", nil, requesterHeaders(email))
+		logger := h.requestLogger(r, operation)
+		poID := r.PathValue("id")
+		var previous *poDetail
+		if po, err := h.fetchPODetailForNotifications(r.Context(), email, poID); err == nil {
+			previous = &po
+		} else {
+			logger.Warn("failed to fetch previous PO for notifications", "po_id", poID, "error", err)
+		}
+		h.forwardArakAfterSuccess(
+			w,
+			r,
+			http.MethodPost,
+			arakRDARoot+"/po/"+url.PathEscape(poID)+suffix,
+			"",
+			nil,
+			requesterHeaders(email),
+			func() {
+				h.afterRDAWorkflowTransition(r.Context(), logger, email, poID, previous)
+			},
+		)
 	}
 }
 
@@ -724,8 +790,20 @@ func (h *Handler) handleStateTransition(requiredState, suffix, operation string)
 			httputil.Error(w, http.StatusConflict, "Azione non disponibile nello stato attuale")
 			return
 		}
-		h.requestLogger(r, operation)
-		h.forwardArak(w, r, http.MethodPost, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+suffix, "", nil, requesterHeaders(email))
+		logger := h.requestLogger(r, operation)
+		poID := r.PathValue("id")
+		h.forwardArakAfterSuccess(
+			w,
+			r,
+			http.MethodPost,
+			arakRDARoot+"/po/"+url.PathEscape(poID)+suffix,
+			"",
+			nil,
+			requesterHeaders(email),
+			func() {
+				h.afterRDAWorkflowTransition(r.Context(), logger, email, poID, &po)
+			},
+		)
 	}
 }
 
@@ -751,7 +829,26 @@ func (h *Handler) handleBudgetIncrement(approve bool) http.HandlerFunc {
 		if approve {
 			suffix = "/approve-budget-increment"
 		}
-		h.forwardArak(w, r, http.MethodPost, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+suffix, "", r.Body, mergeHeaders(requesterHeaders(email), jsonHeaders()))
+		logger := h.requestLogger(r, "rda_budget_increment_notifications")
+		poID := r.PathValue("id")
+		var previous *poDetail
+		if po, err := h.fetchPODetailForNotifications(r.Context(), email, poID); err == nil {
+			previous = &po
+		} else {
+			logger.Warn("failed to fetch previous PO for notifications", "po_id", poID, "error", err)
+		}
+		h.forwardArakAfterSuccess(
+			w,
+			r,
+			http.MethodPost,
+			arakRDARoot+"/po/"+url.PathEscape(poID)+suffix,
+			"",
+			r.Body,
+			mergeHeaders(requesterHeaders(email), jsonHeaders()),
+			func() {
+				h.afterRDAWorkflowTransition(r.Context(), logger, email, poID, previous)
+			},
+		)
 	}
 }
 

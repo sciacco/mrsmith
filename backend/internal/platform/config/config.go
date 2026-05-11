@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/afctools"
 	"github.com/sciacco/mrsmith/internal/simulatorivendita"
@@ -101,6 +102,11 @@ type Config struct {
 	SMTPTLSServerName string
 	SMTPAuthMode      string
 
+	// Notifications runtime (portal works without SMTP; email links need public base URL)
+	MrSmithPublicBaseURL        string
+	NotificationsWorkerEnabled  bool
+	NotificationsWorkerInterval time.Duration
+
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
 	KeycloakFrontendRealm    string
@@ -174,6 +180,9 @@ func Load() Config {
 		SMTPTLSSkipVerify:            boolEnvOr("SMTP_TLS_SKIP_VERIFY", false),
 		SMTPTLSServerName:            envOr("SMTP_TLS_SERVER_NAME", ""),
 		SMTPAuthMode:                 envOr("SMTP_AUTH_MODE", "auto"),
+		MrSmithPublicBaseURL:         envOr("MRSMITH_PUBLIC_BASE_URL", ""),
+		NotificationsWorkerEnabled:   boolEnvOr("NOTIFICATIONS_WORKER_ENABLED", true),
+		NotificationsWorkerInterval:  durationEnvOr("NOTIFICATIONS_WORKER_INTERVAL", time.Minute),
 
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),
@@ -185,6 +194,18 @@ func Load() Config {
 		ArakServiceSecret:   envOr("ARAK_SERVICE_CLIENT_SECRET", ""),
 		ArakServiceTokenURL: envOr("ARAK_SERVICE_TOKEN_URL", ""),
 	}
+}
+
+func durationEnvOr(key string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
 
 func boolEnvOr(key string, fallback bool) bool {
