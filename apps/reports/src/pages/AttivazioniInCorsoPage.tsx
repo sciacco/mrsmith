@@ -131,8 +131,8 @@ export default function AttivazioniInCorsoPage() {
               placeholder="Cerca per cliente o numero ordine…"
               className={styles.searchInput}
             />
+            <div className={shared.info}>{displayData.length} ordini</div>
           </div>
-          <div className={shared.info}>{displayData.length} ordini</div>
           <div className={shared.tableWrap}>
             <table className={`${shared.table} ${styles.table}`}>
               <thead>
