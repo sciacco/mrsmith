@@ -103,6 +103,27 @@ test('assigned pending approval enters the to-do view', () => {
   assertEqual(todo[0]?.nextStepLabel, 'Valuta approvazione', 'assigned approval next step');
 });
 
+test('flat assigned approver enters the to-do view', () => {
+  const assigned = poFixture({
+    id: 151,
+    current_approval_level: 1,
+    requester: { email: 'me@example.com' },
+    approvers: [{ level: 1, email: 'me@example.com' }],
+  });
+  const model = buildRdaDashboardModel({
+    myRows: [assigned],
+    currentEmail: 'me@example.com',
+    permissions: permissionsFixture({ is_approver: true }),
+    inboxes: [{ kind: 'level1-2', rows: [assigned] }],
+  });
+
+  const todo = filterRdaDashboardRows(model.rows, { view: 'todo' });
+
+  assertEqual(todo.length, 1, 'to-do includes flat assigned approval');
+  assertEqual(todo[0]?.primaryQueue.key, 'level1-2', 'flat assigned approval queue');
+  assertEqual(todo[0]?.contexts.some((context) => context.key === 'requester'), true, 'flat assigned keeps requester context');
+});
+
 test('unassigned pending approval stays only in all', () => {
   const unassigned = poFixture({
     id: 16,

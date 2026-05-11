@@ -78,6 +78,7 @@ export interface RdaPermissions {
 }
 
 export interface PoApprover {
+  email?: string;
   level?: string | number;
   user?: RdaUser;
 }

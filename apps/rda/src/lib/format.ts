@@ -45,7 +45,7 @@ export function formatMoney(value?: string | number | null, currency?: string | 
 
 export function extractApproverList(approvers?: PoApprover[]): string {
   const emails = (approvers ?? [])
-    .map((approver) => approver.user?.email)
+    .map(approverEmail)
     .filter((email): email is string => Boolean(email));
   return emails.length ? emails.join(', ') : '-';
 }
@@ -58,12 +58,16 @@ function approvalLevel(value: unknown): string {
   return String(value ?? '').trim();
 }
 
+function approverEmail(approver: PoApprover): string | undefined {
+  return approver.email ?? approver.user?.email;
+}
+
 export function isApprover(po: Pick<PoPreview, 'approvers' | 'current_approval_level'> | undefined, userEmail?: string | null): boolean {
   const normalizedEmail = userEmail?.trim().toLowerCase();
   if (!po || !normalizedEmail) return false;
   const currentLevel = approvalLevel(po.current_approval_level);
   return (po.approvers ?? []).some((approver) => {
-    if (approver.user?.email?.trim().toLowerCase() !== normalizedEmail) return false;
+    if (approverEmail(approver)?.trim().toLowerCase() !== normalizedEmail) return false;
     const approverLevel = approvalLevel(approver.level);
     return currentLevel === '' || approverLevel === '' || approverLevel === currentLevel;
   });
