@@ -164,10 +164,46 @@ export function OrdiniDettaglioPage() {
   const selectedOrderKey = selectedRow ? orderGroupKey(selectedRow) : null;
   const orderRows = selectedOrderKey ? allRowsByOrder.get(selectedOrderKey) ?? [] : [];
 
-  // Parse storico string into timeline steps
-  const storicoSteps = selectedRow?.storico
-    ? selectedRow.storico.split('>').map((part: string) => part.trim()).filter(Boolean)
-    : null;
+  // Parse storico string into timeline steps, expanding multi-order nodes
+  // that are concatenated with ';', ',' or ' e ' (e.g. "41-2017; ON/85-2020" or "25/2017 e 573/2017")
+  const storicoSteps = useMemo(() => {
+    if (!selectedRow?.storico) return null;
+
+    // Split by '>' to get raw nodes, then split each node by any multi-order separator
+    const raw = selectedRow.storico.split('>').map((p: string) => p.trim()).filter(Boolean);
+
+    const expanded: string[] = [];
+
+    for (const node of raw) {
+      // Split by any of: semicolon, comma, or Italian " e "
+      const separators = /;\s*|,\s*|\s+e\s+/;
+      if (separators.test(node)) {
+        const parts = node.split(separators).map((p: string) => p.trim()).filter(Boolean);
+
+        // Sort parts by year extracted from the end of each string (ascending = older first)
+        parts.sort((a, b) => {
+          // Try to extract a 4-digit year or a 2-digit year at the end
+          const m4 = (s: string) => s.match(/\d{4}(?=\D*$)/)?.[0];
+          const m2 = (s: string) => s.match(/\d{2}(?=\D*$)/)?.[0];
+          const ya = m4(a) ?? m2(a) ?? '0';
+          const yb = m4(b) ?? m2(b) ?? '0';
+          // If years equal, fall back to full numeric suffix comparison
+          if (ya === yb) {
+            const na = parseInt(a.match(/\d+$/)?.[0] ?? '0', 10);
+            const nb = parseInt(b.match(/\d+$/)?.[0] ?? '0', 10);
+            return na - nb;
+          }
+          return parseInt(ya, 10) - parseInt(yb, 10);
+        });
+
+        expanded.push(...parts);
+      } else {
+        expanded.push(node);
+      }
+    }
+
+    return expanded.length > 0 ? expanded : null;
+  }, [selectedRow?.storico]);
 
   return (
     <div className={s.page}>
