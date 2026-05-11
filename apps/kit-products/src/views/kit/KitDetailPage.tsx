@@ -604,7 +604,7 @@ export function KitDetailPage() {
                       <th>Req</th>
                       <th className={styles.numCell}>NRC</th>
                       <th className={styles.numCell}>MRC</th>
-                      <th className={styles.numCell}>Pos</th>
+                      <th className={styles.actionCell} aria-label="Azioni" />
                     </tr>
                   </thead>
                   <SortableContext items={productRowIds} strategy={verticalListSortingStrategy}>
@@ -622,6 +622,10 @@ export function KitDetailPage() {
                             setProductModalMode('edit');
                             setProductModalDraft(toProductFormState(row, productDrafts[row.id]));
                             setProductModalOpen(true);
+                          }}
+                          onDelete={() => {
+                            setProductEditingId(row.id);
+                            setProductDeleteId(row.id);
                           }}
                         />
                       ))}
@@ -877,9 +881,10 @@ interface SortableProductRowProps {
   productLabel: string;
   onSelect: () => void;
   onEdit: () => void;
+  onDelete: () => void;
 }
 
-function SortableProductRow({ row, index, selected, productLabel, onSelect, onEdit }: SortableProductRowProps) {
+function SortableProductRow({ row, index, selected, productLabel, onSelect, onEdit, onDelete }: SortableProductRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id });
 
   const style: React.CSSProperties = {
@@ -902,15 +907,20 @@ function SortableProductRow({ row, index, selected, productLabel, onSelect, onEd
       onDoubleClick={onEdit}
     >
       <td className={styles.handleCell}>
-        <span
-          className={styles.dragHandle}
-          aria-label="Trascina per riordinare"
-          onClick={(e) => e.stopPropagation()}
-          onDoubleClick={(e) => e.stopPropagation()}
-          {...attributes}
-          {...listeners}
-        >
-          <Icon name="grip-vertical" size={16} />
+        <span className={styles.handleStack}>
+          <span
+            className={styles.dragHandle}
+            aria-label="Trascina per riordinare"
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+            {...attributes}
+            {...listeners}
+          >
+            <Icon name="grip-vertical" size={16} />
+          </span>
+          <span className={styles.positionLabel} aria-label={`Posizione ${row.position}`}>
+            {row.position}
+          </span>
         </span>
       </td>
       <td>
@@ -925,7 +935,20 @@ function SortableProductRow({ row, index, selected, productLabel, onSelect, onEd
       <td>{row.required ? 'Si' : 'No'}</td>
       <td className={`${styles.numCell} ${styles.mono}`}>{formatCurrency(row.nrc)}</td>
       <td className={`${styles.numCell} ${styles.mono}`}>{formatCurrency(row.mrc)}</td>
-      <td className={styles.numCell}>{row.position}</td>
+      <td className={styles.actionCell}>
+        <button
+          type="button"
+          className={styles.rowDeleteBtn}
+          aria-label="Rimuovi prodotto"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <Icon name="trash" size={16} />
+        </button>
+      </td>
     </tr>
   );
 }

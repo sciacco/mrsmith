@@ -480,6 +480,10 @@
   text-transform: uppercase;
 }
 
+.table th.numCell {
+  text-align: right;
+}
+
 .table td {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
@@ -535,9 +539,17 @@
 }
 
 .handleCell {
-  width: 32px;
+  width: 44px;
   padding-right: 0;
   text-align: center;
+}
+
+.handleStack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
 }
 
 .dragHandle {
@@ -568,9 +580,50 @@
   color: var(--color-text-muted);
 }
 
+.positionLabel {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
 .draggingRow {
   background: var(--color-bg-elevated);
   box-shadow: var(--shadow-md);
+}
+
+.actionCell {
+  width: 48px;
+  padding-left: 0;
+  text-align: right;
+}
+
+.rowDeleteBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-faint);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+}
+
+.rowDeleteBtn:hover {
+  color: var(--color-danger);
+  background: var(--color-danger-subtle, rgba(239, 68, 68, 0.1));
+}
+
+.rowDeleteBtn:focus-visible {
+  outline: none;
+  color: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--color-danger-glow, rgba(239, 68, 68, 0.25));
 }
 
 .notesCell {
