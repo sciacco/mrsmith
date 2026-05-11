@@ -17,9 +17,11 @@ type BlockDomain struct {
 
 // ReleaseRequest represents a DNS release request header.
 type ReleaseRequest struct {
-	ID          int    `json:"id"`
-	RequestDate string `json:"request_date"`
-	Reference   string `json:"reference"`
+	ID                int     `json:"id"`
+	RequestDate       string  `json:"request_date"`
+	Reference         string  `json:"reference"`
+	MethodID          *string `json:"method_id"`
+	MethodDescription *string `json:"method_description"`
 }
 
 // ReleaseDomain represents a domain in a release request.
@@ -69,6 +71,7 @@ type UpdateBlockRequest struct {
 type CreateReleaseRequest struct {
 	RequestDate string   `json:"request_date"`
 	Reference   string   `json:"reference"`
+	MethodID    string   `json:"method_id"`
 	Domains     []string `json:"domains"`
 }
 
@@ -76,6 +79,7 @@ type CreateReleaseRequest struct {
 type UpdateReleaseRequest struct {
 	RequestDate string `json:"request_date"`
 	Reference   string `json:"reference"`
+	MethodID    string `json:"method_id"`
 }
 
 // AddDomainsRequest is the body for POST /blocks/:id/domains and /releases/:id/domains.

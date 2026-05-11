@@ -12,11 +12,16 @@ function formatDate(dateStr: string): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+function formatOrigin(release: ReleaseRequest): string {
+  return release.method_description ?? release.method_id ?? 'Non indicata';
+}
+
 export function ReleasesTable({ releases, selectedId, onSelect }: ReleasesTableProps) {
   return (
     <>
       <div className={styles.tableHeader}>
         <span>Data</span>
+        <span>Provenienza</span>
         <span>Riferimento</span>
         <span />
       </div>
@@ -36,6 +41,7 @@ export function ReleasesTable({ releases, selectedId, onSelect }: ReleasesTableP
               </svg>
             </div>
             <span className={styles.rowText}>{formatDate(rel.request_date)}</span>
+            <span className={styles.rowText}>{formatOrigin(rel)}</span>
             <span className={styles.rowText}>{rel.reference}</span>
             <svg className={styles.rowChevron} width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />

@@ -137,7 +137,7 @@ export function useCreateRelease() {
   const api = useApiClient();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { request_date: string; reference: string; domains: string[] }) =>
+    mutationFn: (body: { request_date: string; reference: string; method_id: string; domains: string[] }) =>
       api.post<{ id: number; domains_count: number }>('/compliance/releases', body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: complianceKeys.releases });
@@ -151,7 +151,7 @@ export function useUpdateRelease() {
   const api = useApiClient();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...body }: { id: number; request_date: string; reference: string }) =>
+    mutationFn: ({ id, ...body }: { id: number; request_date: string; reference: string; method_id: string }) =>
       api.put<{ id: number }>(`/compliance/releases/${id}`, body),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: complianceKeys.releases });

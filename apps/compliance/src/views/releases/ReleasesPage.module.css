@@ -33,7 +33,7 @@
 }
 
 .tableHeader {
-  display: grid; grid-template-columns: 1fr 1fr 24px;
+  display: grid; grid-template-columns: 1fr 1fr 1fr 24px;
   padding: var(--space-3, 12px) var(--space-5, 20px); padding-left: 60px;
   border-bottom: 1px solid var(--color-border, #e2e8f0); background: var(--color-surface, #f1f5f9);
 }
@@ -47,7 +47,7 @@
 
 /* ═══ Row ═══ */
 .row {
-  display: grid; grid-template-columns: 4px 36px 1fr 1fr 24px;
+  display: grid; grid-template-columns: 4px 36px 1fr 1fr 1fr 24px;
   align-items: center; gap: var(--space-3, 12px);
   padding: var(--space-3, 12px) var(--space-4, 16px);
   cursor: pointer; border-radius: var(--radius-md, 10px);

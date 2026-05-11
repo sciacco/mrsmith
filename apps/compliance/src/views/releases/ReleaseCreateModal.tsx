@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Modal, useToast } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
-import { useCreateRelease } from '../../api/queries';
+import { useCreateRelease, useOrigins } from '../../api/queries';
 import { parseDomains } from '../../utils/fqdn';
 import { DomainPreview } from '../../components/DomainPreview';
 import styles from '../../components/Compliance.module.css';
@@ -14,24 +14,34 @@ interface ReleaseCreateModalProps {
 export function ReleaseCreateModal({ open, onClose }: ReleaseCreateModalProps) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]!);
   const [reference, setReference] = useState('');
+  const [methodId, setMethodId] = useState('');
   const [domainsText, setDomainsText] = useState('');
   const { toast } = useToast();
   const createRelease = useCreateRelease();
+  const { data: origins, isLoading: originsLoading } = useOrigins();
+
+  useEffect(() => {
+    if (origins && origins.length > 0 && !methodId) {
+      setMethodId(origins[0]!.method_id);
+    }
+  }, [origins, methodId]);
 
   useEffect(() => {
     if (!open) {
       setDate(new Date().toISOString().split('T')[0]!);
       setReference('');
+      setMethodId('');
       setDomainsText('');
     }
   }, [open]);
 
   const parsed = parseDomains(domainsText);
+  const noOrigins = !originsLoading && (!origins || origins.length === 0);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     createRelease.mutate(
-      { request_date: date, reference: reference.trim(), domains: parsed.valid },
+      { request_date: date, reference: reference.trim(), method_id: methodId, domains: parsed.valid },
       {
         onSuccess: () => {
           toast('Richiesta di rilascio creata');
@@ -65,6 +75,19 @@ export function ReleaseCreateModal({ open, onClose }: ReleaseCreateModalProps) {
           <input className={styles.input} type="text" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Numero protocollo" required />
         </div>
         <div className={styles.formGroup}>
+          <label className={styles.label}>Provenienza</label>
+          <select className={styles.input} value={methodId} onChange={(e) => setMethodId(e.target.value)} disabled={originsLoading || noOrigins}>
+            {originsLoading && <option disabled>Caricamento...</option>}
+            {noOrigins && <option disabled>Nessuna provenienza disponibile</option>}
+            {origins?.map((o) => (
+              <option key={o.method_id} value={o.method_id}>{o.description}</option>
+            ))}
+          </select>
+          {noOrigins && (
+            <p className={styles.errorText}>Vai alla sezione Provenienze per crearne una</p>
+          )}
+        </div>
+        <div className={styles.formGroup}>
           <label className={styles.label}>Domini</label>
           <textarea
             className={styles.textarea}
@@ -79,7 +102,15 @@ export function ReleaseCreateModal({ open, onClose }: ReleaseCreateModalProps) {
           <button
             type="submit"
             className={styles.btnPrimary}
-            disabled={createRelease.isPending || !reference.trim() || parsed.valid.length === 0 || parsed.invalid.length > 0}
+            disabled={
+              createRelease.isPending ||
+              !reference.trim() ||
+              !methodId ||
+              originsLoading ||
+              noOrigins ||
+              parsed.valid.length === 0 ||
+              parsed.invalid.length > 0
+            }
           >
             {createRelease.isPending ? 'Creazione...' : 'Crea richiesta'}
           </button>

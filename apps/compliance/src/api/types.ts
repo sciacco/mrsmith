@@ -15,6 +15,8 @@ export interface ReleaseRequest {
   id: number;
   request_date: string;
   reference: string;
+  method_id: string | null;
+  method_description: string | null;
 }
 
 export interface ReleaseDomain {

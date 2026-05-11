@@ -1,6 +1,7 @@
 package compliance
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
@@ -14,9 +15,10 @@ func (h *Handler) handleListReleases(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.QueryContext(r.Context(), `
-		SELECT id, request_date, reference
-		FROM dns_bl_release
-		ORDER BY request_date DESC, id DESC`)
+		SELECT r.id, r.request_date, r.reference, r.method_id, m.description
+		FROM dns_bl_release r
+		LEFT JOIN dns_bl_method m ON m.method_id = r.method_id
+		ORDER BY r.request_date DESC, r.id DESC`)
 	if err != nil {
 		h.dbFailure(w, r, "list_releases", err)
 		return
@@ -26,9 +28,19 @@ func (h *Handler) handleListReleases(w http.ResponseWriter, r *http.Request) {
 	releases := make([]ReleaseRequest, 0)
 	for rows.Next() {
 		var rel ReleaseRequest
-		if err := rows.Scan(&rel.ID, &rel.RequestDate, &rel.Reference); err != nil {
+		var methodID sql.NullString
+		var methodDescription sql.NullString
+		if err := rows.Scan(&rel.ID, &rel.RequestDate, &rel.Reference, &methodID, &methodDescription); err != nil {
 			h.dbFailure(w, r, "list_releases", err)
 			return
+		}
+		if methodID.Valid {
+			value := methodID.String
+			rel.MethodID = &value
+		}
+		if methodDescription.Valid {
+			value := methodDescription.String
+			rel.MethodDescription = &value
 		}
 		releases = append(releases, rel)
 	}
@@ -50,11 +62,24 @@ func (h *Handler) handleGetRelease(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var rel ReleaseRequest
-	err = h.db.QueryRowContext(r.Context(),
-		`SELECT id, request_date, reference FROM dns_bl_release WHERE id = $1`, id).
-		Scan(&rel.ID, &rel.RequestDate, &rel.Reference)
+	var methodID sql.NullString
+	var methodDescription sql.NullString
+	err = h.db.QueryRowContext(r.Context(), `
+		SELECT r.id, r.request_date, r.reference, r.method_id, m.description
+		FROM dns_bl_release r
+		LEFT JOIN dns_bl_method m ON m.method_id = r.method_id
+		WHERE r.id = $1`, id).
+		Scan(&rel.ID, &rel.RequestDate, &rel.Reference, &methodID, &methodDescription)
 	if h.rowError(w, r, "get_release", err, "release_id", id) {
 		return
+	}
+	if methodID.Valid {
+		value := methodID.String
+		rel.MethodID = &value
+	}
+	if methodDescription.Valid {
+		value := methodDescription.String
+		rel.MethodDescription = &value
 	}
 
 	httputil.JSON(w, http.StatusOK, rel)
@@ -70,9 +95,11 @@ func (h *Handler) handleCreateRelease(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	body.Reference = strings.TrimSpace(body.Reference)
+	body.MethodID = strings.TrimSpace(body.MethodID)
 
-	if body.RequestDate == "" || body.Reference == "" {
-		httputil.Error(w, http.StatusBadRequest, "request_date and reference are required")
+	if body.RequestDate == "" || body.Reference == "" || body.MethodID == "" {
+		httputil.Error(w, http.StatusBadRequest, "request_date, reference, and method_id are required")
 		return
 	}
 
@@ -101,9 +128,9 @@ func (h *Handler) handleCreateRelease(w http.ResponseWriter, r *http.Request) {
 
 	var releaseID int
 	err = tx.QueryRowContext(r.Context(),
-		`INSERT INTO dns_bl_release (request_date, reference)
-		 VALUES ($1, $2) RETURNING id`,
-		body.RequestDate, body.Reference).Scan(&releaseID)
+		`INSERT INTO dns_bl_release (request_date, reference, method_id)
+		 VALUES ($1, $2, $3) RETURNING id`,
+		body.RequestDate, body.Reference, body.MethodID).Scan(&releaseID)
 	if err != nil {
 		h.dbFailure(w, r, "create_release", err)
 		return
@@ -140,10 +167,17 @@ func (h *Handler) handleUpdateRelease(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	body.Reference = strings.TrimSpace(body.Reference)
+	body.MethodID = strings.TrimSpace(body.MethodID)
+
+	if body.RequestDate == "" || body.Reference == "" || body.MethodID == "" {
+		httputil.Error(w, http.StatusBadRequest, "request_date, reference, and method_id are required")
+		return
+	}
 
 	res, err := h.db.ExecContext(r.Context(),
-		`UPDATE dns_bl_release SET request_date = $1, reference = $2 WHERE id = $3`,
-		body.RequestDate, body.Reference, id)
+		`UPDATE dns_bl_release SET request_date = $1, reference = $2, method_id = $3 WHERE id = $4`,
+		body.RequestDate, body.Reference, body.MethodID, id)
 	if err != nil {
 		h.dbFailure(w, r, "update_release", err, "release_id", id)
 		return

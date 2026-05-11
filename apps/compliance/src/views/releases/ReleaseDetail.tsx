@@ -17,6 +17,10 @@ function formatDate(dateStr: string): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+function formatOrigin(release: ReleaseRequest): string {
+  return release.method_description ?? release.method_id ?? 'Non indicata';
+}
+
 export function ReleaseDetail({ release, domains, domainsLoading, onEdit, onAddDomains, onEditDomain }: ReleaseDetailProps) {
   return (
     <div className={styles.detailContent}>
@@ -36,6 +40,17 @@ export function ReleaseDetail({ release, domains, domainsLoading, onEdit, onAddD
       <div className={styles.divider} />
 
       <div className={styles.infoSection}>
+        <div className={styles.infoRow}>
+          <div className={styles.infoIcon}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 1l6 3v4c0 3.3-2.7 5-6 7-3.3-2-6-3.7-6-7V4l6-3z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div>
+            <p className={styles.infoLabel}>Provenienza</p>
+            <p className={styles.infoValue}>{formatOrigin(release)}</p>
+          </div>
+        </div>
         <div className={styles.infoRow}>
           <div className={styles.infoIcon}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
