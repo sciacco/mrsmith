@@ -40,10 +40,9 @@ function SortableTh({
   onSort: (key: SortKey) => void;
 }) {
   const active = sort.key === sortKey;
-  const nextDir = active && sort.dir === 'asc' ? 'desc' : 'asc';
   return (
     <th
-      onClick={() => onSort(nextDir)}
+      onClick={() => onSort(sortKey)}
       className={styles.sortableHeader}
       aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
