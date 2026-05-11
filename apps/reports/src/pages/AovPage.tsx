@@ -176,7 +176,7 @@ function TableSectionHeader({
 export default function AovPage() {
   const [dateFrom, setDateFrom] = useState(defaultDateFrom);
   const [dateTo, setDateTo] = useState(defaultDateTo);
-  const [statuses, setStatuses] = useState<string[]>([]);
+  const [statuses, setStatuses] = useState<string[]>(['Confermato', 'Evaso']);
   const [aovData, setAovData] = useState<AovPreviewResponse | null>(null);
   const [activeTab, setActiveTab] = useState<AovTab>('byType');
   const [loading, setLoading] = useState(false);

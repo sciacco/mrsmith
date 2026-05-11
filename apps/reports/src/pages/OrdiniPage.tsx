@@ -22,7 +22,7 @@ function defaultDateTo(): string {
 export default function OrdiniPage() {
   const [dateFrom, setDateFrom] = useState(defaultDateFrom);
   const [dateTo, setDateTo] = useState(defaultDateTo);
-  const [statuses, setStatuses] = useState<string[]>([]);
+  const [statuses, setStatuses] = useState<string[]>(['Confermato', 'Evaso']);
   const [previewData, setPreviewData] = useState<OrderRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
