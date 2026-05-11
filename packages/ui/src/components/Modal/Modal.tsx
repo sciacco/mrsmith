@@ -12,6 +12,8 @@ interface ModalProps {
   /** @deprecated Use `size="wide"` instead. Kept for backward compatibility. */
   wide?: boolean;
   dismissible?: boolean;
+  /** When false, pressing Escape will not close the modal. Useful when the modal contains a file input. */
+  closeOnEscape?: boolean;
 }
 
 export function Modal({
@@ -22,6 +24,7 @@ export function Modal({
   size,
   wide,
   dismissible = true,
+  closeOnEscape = true,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -39,7 +42,7 @@ export function Modal({
   }, [open]);
 
   const handleCancel = (e: SyntheticEvent<HTMLDialogElement>) => {
-    if (!dismissible) {
+    if (!dismissible || !closeOnEscape) {
       e.preventDefault();
       return;
     }

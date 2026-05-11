@@ -2538,7 +2538,7 @@ function DocumentModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={title} size="md">
+    <Modal open={open} onClose={onClose} title={title} size="md" closeOnEscape={false}>
       <form className="modalForm" onSubmit={(event) => void submit(event)}>
         {isReplace ? (
           <section className="currentDocumentSummary" aria-label="Documento attuale">
