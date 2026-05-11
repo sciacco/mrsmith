@@ -258,13 +258,15 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+  min-width: 0;
 }
 
 .formRowWide {
   display: grid;
-  grid-template-columns: 4fr 1fr;
+  grid-template-columns: minmax(0, 4fr) minmax(7.5rem, 1fr);
   gap: var(--space-4);
   align-items: end;
+  min-width: 0;
 }
 
 .toggleWrap {
@@ -277,6 +279,14 @@
 .modalForm {
   display: grid;
   gap: var(--space-4);
+  max-height: calc(100vh - 11rem);
+  max-height: calc(100dvh - 11rem);
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .modalLead {
@@ -286,6 +296,7 @@
 .field {
   display: grid;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .field span,
@@ -300,7 +311,9 @@
 .modalForm input,
 .modalForm select,
 .modalForm textarea {
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
   min-height: 2.75rem;
   padding: 0.65rem 0.85rem;
   border: 1.5px solid var(--color-border);
@@ -323,11 +336,13 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+  min-width: 0;
 }
 
 .translationBlock {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .translationBlock h3 {
@@ -338,27 +353,39 @@
 .translationGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
+  gap: var(--space-3);
+  min-width: 0;
 }
 
 .translationCard {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
 }
 
 .translationCard textarea {
-  min-height: 7rem;
+  height: 5.5rem;
+  min-height: 5rem;
+  max-height: 7rem;
   resize: vertical;
 }
 
 .modalActions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-3);
+  margin-right: calc(-1 * var(--space-1));
+  padding-top: var(--space-3);
+  padding-right: var(--space-1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--color-bg-elevated) var(--space-3));
 }
 
 .modalActions .primaryButton,
@@ -385,5 +412,20 @@
   .cardToolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .formRow,
+  .formRowWide,
+  .translationGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .modalActions {
+    justify-content: stretch;
+  }
+
+  .modalActions .primaryButton,
+  .modalActions .secondaryButton {
+    flex: 1 1 10rem;
   }
 }
