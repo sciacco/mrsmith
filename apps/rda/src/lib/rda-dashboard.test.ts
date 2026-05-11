@@ -79,7 +79,7 @@ test('can_see_all_po keeps visible POs out of the to-do view', () => {
   assertEqual(filterRdaDashboardRows(model.rows, { view: 'todo' }).length, 0, 'to-do excludes visibility-only rows');
   assertEqual(filterRdaDashboardRows(model.rows, { view: 'all' }).length, 1, 'all view includes visible rows');
   assertEqual(model.rows[0]?.primaryQueue.key, 'supervision', 'visibility queue');
-  assertEqual(model.rows[0]?.nextStepLabel, 'In approvazione', 'visibility next step');
+  assertEqual(model.rows[0]?.actionLabel, '', 'visibility-only row has no requested action');
   assertEqual(model.counts.toManage, 0, 'visibility is not counted as work');
 });
 
@@ -100,7 +100,7 @@ test('assigned pending approval enters the to-do view', () => {
 
   assertEqual(todo.length, 1, 'to-do includes assigned approval');
   assertEqual(todo[0]?.primaryQueue.key, 'level1-2', 'assigned approval queue');
-  assertEqual(todo[0]?.nextStepLabel, 'Valuta approvazione', 'assigned approval next step');
+  assertEqual(todo[0]?.actionLabel, 'Valuta approvazione', 'assigned approval action');
 });
 
 test('flat assigned approver enters the to-do view', () => {

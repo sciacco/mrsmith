@@ -79,17 +79,6 @@ export function RdaListPage() {
     });
   }, [authorizedKinds, inboxQueries, myPOs.data, permissions.data, user?.email]);
 
-  const visibleRows = useMemo(
-    () =>
-      filterRdaDashboardRows(dashboard.rows, {
-        view,
-        q: deferredQ,
-        state: stateFilter,
-        queue: queueFilter,
-      }),
-    [dashboard.rows, deferredQ, queueFilter, stateFilter, view],
-  );
-
   const viewCounts = useMemo(
     () => ({
       todo: filterRdaDashboardRows(dashboard.rows, { view: 'todo' }).length,
@@ -113,8 +102,20 @@ export function RdaListPage() {
     })),
     [dashboard.rows, view],
   );
+  const activeQueueFilter = queueOptions.some((option) => option.value === queueFilter) ? queueFilter : '';
 
-  const hasFilters = qFilter !== '' || stateFilter !== '' || queueFilter !== '';
+  const visibleRows = useMemo(
+    () =>
+      filterRdaDashboardRows(dashboard.rows, {
+        view,
+        q: deferredQ,
+        state: stateFilter,
+        queue: activeQueueFilter,
+      }),
+    [activeQueueFilter, dashboard.rows, deferredQ, stateFilter, view],
+  );
+
+  const hasFilters = qFilter !== '' || stateFilter !== '' || activeQueueFilter !== '';
   const hasWorkToManage = dashboard.counts.toManage > 0;
   let toManageMessage = 'Nessuna richiesta richiede azione.';
   if (dashboard.counts.toManage === 1) toManageMessage = '1 richiesta richiede azione.';
@@ -269,11 +270,11 @@ export function RdaListPage() {
           <div className="rdaFilterSelect">
             <SingleSelect
               options={queueOptions}
-              selected={queueFilter || null}
+              selected={activeQueueFilter || null}
               onChange={(value) => updateParam('queue', value ?? '')}
-              placeholder="Tutte le code"
+              placeholder="Tutte le aree"
               allowClear
-              clearLabel="Tutte le code"
+              clearLabel="Tutte le aree"
             />
           </div>
           {hasFilters ? (

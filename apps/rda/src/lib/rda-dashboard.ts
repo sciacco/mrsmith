@@ -21,7 +21,7 @@ export interface RdaInboxSource {
 export interface RdaDashboardRow extends PoPreview {
   contexts: RdaDashboardContext[];
   primaryQueue: RdaDashboardContext;
-  nextStepLabel: string;
+  actionLabel: string;
   isRequesterOwned: boolean;
   isOwnDraft: boolean;
   isActionable: boolean;
@@ -58,7 +58,7 @@ interface MutableRow {
   isRequesterOwned: boolean;
 }
 
-const terminalStates = new Set(['APPROVED', 'CLOSED', 'REJECTED', 'SENT']);
+const terminalStates = new Set(['APPROVED', 'CLOSED', 'REJECTED', 'SENT', 'DELIVERED_AND_COMPLIANT']);
 
 export function parseRdaDashboardView(value: string | null): RdaDashboardView {
   if (value === 'mine' || value === 'all' || value === 'todo') return value;
@@ -124,42 +124,24 @@ function sortContexts(contexts: Iterable<RdaDashboardContext>): RdaDashboardCont
   return Array.from(contexts).sort((a, b) => queuePriority(a) - queuePriority(b));
 }
 
-function stateNextStep(state?: string): string {
+function isVisibilityQueueKey(value: string): boolean {
+  return value === 'supervision' || value === 'visible';
+}
+
+function stateActionLabel(state?: string): string {
   switch (state) {
-    case 'DRAFT':
-      return 'Completa bozza';
-    case 'PENDING_APPROVAL':
-      return 'Attendi approvazione';
-    case 'PENDING_APPROVAL_PAYMENT_METHOD':
-      return 'Attendi metodo';
-    case 'PENDING_LEASING':
-      return 'Attendi leasing';
-    case 'PENDING_LEASING_ORDER_CREATION':
-      return 'Attendi ordine leasing';
-    case 'PENDING_APPROVAL_NO_LEASING':
-      return 'Attendi no leasing';
-    case 'PENDING_BUDGET_INCREMENT':
-      return 'Attendi budget';
     case 'PENDING_SEND':
-      return 'Attendi invio';
+      return 'Invia al fornitore';
     case 'PENDING_VERIFICATION':
-      return 'Attendi conformità';
-    case 'APPROVED':
-      return 'Approvata';
-    case 'REJECTED':
-      return 'Richiesta rifiutata';
-    case 'SENT':
-      return 'Inviata al fornitore';
-    case 'CLOSED':
-      return 'Chiusa';
+      return 'Verifica fornitura';
     default:
-      return 'Apri richiesta';
+      return '';
   }
 }
 
-function nextStepLabel(row: PoPreview, primaryQueue: RdaDashboardContext): string {
-  if (primaryQueue.type === 'visibility' && row.state === 'PENDING_APPROVAL') {
-    return 'In approvazione';
+function actionLabel(row: PoPreview, primaryQueue: RdaDashboardContext): string {
+  if (isTerminalPOState(row.state)) {
+    return '';
   }
 
   switch (primaryQueue.key) {
@@ -175,11 +157,13 @@ function nextStepLabel(row: PoPreview, primaryQueue: RdaDashboardContext): strin
       return 'Conferma metodo';
     case 'budget-increment':
       return 'Valuta budget';
-    case 'requester':
-      return stateNextStep(row.state);
     default:
-      return stateNextStep(row.state);
+      return stateActionLabel(row.state);
   }
+}
+
+function hasStateAction(state?: string | null): boolean {
+  return stateActionLabel(state ?? undefined) !== '';
 }
 
 function mergePreview(current: PoPreview, next: PoPreview): PoPreview {
@@ -211,13 +195,13 @@ function toDashboardRow(row: MutableRow): RdaDashboardRow {
   const contexts = sortContexts(row.contexts.values());
   const primaryQueue = contexts.find((context) => context.type === 'inbox') ?? contexts[0] ?? requesterContext();
   const isOwnDraft = row.isRequesterOwned && row.po.state === 'DRAFT';
-  const isActionable = isOwnDraft || contexts.some((context) => context.type === 'inbox');
+  const isActionable = isOwnDraft || contexts.some((context) => context.type === 'inbox') || hasStateAction(row.po.state);
 
   return {
     ...row.po,
     contexts,
     primaryQueue,
-    nextStepLabel: nextStepLabel(row.po, primaryQueue),
+    actionLabel: actionLabel(row.po, primaryQueue),
     isRequesterOwned: row.isRequesterOwned,
     isOwnDraft,
     isActionable,
@@ -326,8 +310,11 @@ function matchesQuery(row: RdaDashboardRow, query: string): boolean {
     row.project,
     row.provider?.company_name,
     requesterName(row),
-    row.nextStepLabel,
-    row.primaryQueue.label,
+    row.actionLabel,
+    row.contexts
+      .filter((context) => context.type !== 'visibility')
+      .map((context) => context.label)
+      .join(' '),
     stateLabel(row.state),
   ].join(' '));
 
@@ -338,7 +325,11 @@ export function filterRdaDashboardRows(rows: RdaDashboardRow[], filters: RdaDash
   return rows.filter((row) => {
     if (!rowInView(row, filters.view)) return false;
     if (filters.state && row.state !== filters.state) return false;
-    if (filters.queue && !row.contexts.some((context) => context.key === filters.queue)) return false;
+    if (
+      filters.queue &&
+      !isVisibilityQueueKey(filters.queue) &&
+      !row.contexts.some((context) => context.type !== 'visibility' && context.key === filters.queue)
+    ) return false;
     if (filters.q && !matchesQuery(row, filters.q)) return false;
     return true;
   });
@@ -361,6 +352,7 @@ export function rdaQueueFilterOptions(rows: RdaDashboardRow[], view: RdaDashboar
   for (const row of rows) {
     if (!rowInView(row, view)) continue;
     for (const context of row.contexts) {
+      if (context.type === 'visibility') continue;
       const current = counts.get(context.key);
       counts.set(context.key, {
         label: context.label,

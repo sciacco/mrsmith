@@ -1,4 +1,4 @@
-import { Icon, Tooltip } from '@mrsmith/ui';
+import { Icon, Tooltip, type IconName } from '@mrsmith/ui';
 import { useNavigate } from 'react-router-dom';
 import type { RdaDashboardRow } from '../lib/rda-dashboard';
 import { formatDateIT, formatMoney } from '../lib/format';
@@ -31,6 +31,51 @@ function openLabel(po: RdaDashboardRow): string {
   return 'Visualizza richiesta';
 }
 
+interface RowAction {
+  iconName: IconName;
+  label: string;
+}
+
+function actionLabel(po: RdaDashboardRow, fallback: string): string {
+  return po.actionLabel || fallback;
+}
+
+function rowAction(po: RdaDashboardRow): RowAction {
+  if (po.isOwnDraft) {
+    return { iconName: 'pencil', label: actionLabel(po, 'Modifica bozza') };
+  }
+
+  switch (po.primaryQueue.key) {
+    case 'level1-2':
+      return { iconName: 'file-check', label: actionLabel(po, 'Valuta approvazione') };
+    case 'leasing':
+      return { iconName: 'landmark', label: actionLabel(po, 'Valuta leasing') };
+    case 'no-leasing':
+      return { iconName: 'git-branch', label: actionLabel(po, 'Valuta no leasing') };
+    case 'payment-method':
+      return { iconName: 'credit-card', label: actionLabel(po, 'Conferma metodo pagamento') };
+    case 'budget-increment':
+      return { iconName: 'circle-dollar-sign', label: actionLabel(po, 'Valuta incremento budget') };
+    default:
+      break;
+  }
+
+  switch (po.state) {
+    case 'PENDING_SEND':
+      return { iconName: 'mail', label: actionLabel(po, 'Invia al fornitore') };
+    case 'PENDING_VERIFICATION':
+      return { iconName: 'clipboard-check', label: actionLabel(po, 'Verifica fornitura') };
+    default:
+      break;
+  }
+
+  if (po.isActionable) {
+    return { iconName: 'clipboard-check', label: openLabel(po) };
+  }
+
+  return { iconName: 'eye', label: openLabel(po) };
+}
+
 export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
   const navigate = useNavigate();
 
@@ -51,7 +96,6 @@ export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
         <thead>
           <tr>
             <th>Richiesta</th>
-            <th>Prossimo passo</th>
             <th>Stato</th>
             <th>Fornitore</th>
             <th>Richiedente</th>
@@ -62,12 +106,13 @@ export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
         </thead>
         <tbody>
           {rows.map((po) => {
-            const label = openLabel(po);
-            const iconName = po.isOwnDraft ? 'pencil' : po.isActionable ? 'chevron-right' : 'eye';
+            const action = rowAction(po);
             const code = po.code ?? `PO ${po.id}`;
-            const contexts = po.contexts.slice(0, 2);
-            const extraContexts = po.contexts.length - contexts.length;
-            const contextTooltip = po.contexts.map((context) => context.label).join(', ');
+            const visibleContexts = po.contexts.filter((context) => context.type !== 'visibility');
+            const contexts = visibleContexts.slice(0, 2);
+            const extraContexts = visibleContexts.length - contexts.length;
+            const contextTooltip = visibleContexts.map((context) => context.label).join(', ');
+            const hasContexts = contexts.length > 0;
 
             return (
               <tr key={po.id} onDoubleClick={() => navigate(`/rda/po/${po.id}`)}>
@@ -79,19 +124,20 @@ export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
                   </div>
                 </td>
                 <td>
-                  <div className="nextStepCell">
-                    <strong>{po.nextStepLabel}</strong>
-                    <Tooltip content={contextTooltip}>
-                      <span className="queuePills" aria-label={`Code: ${contextTooltip}`}>
-                        {contexts.map((context) => (
-                          <span className="queuePill" key={context.key}>{context.label}</span>
-                        ))}
-                        {extraContexts > 0 ? <span className="queuePill mutedPill">+{extraContexts}</span> : null}
-                      </span>
-                    </Tooltip>
+                  <div className="statusCell">
+                    <StateBadge state={po.state} />
+                    {hasContexts ? (
+                      <Tooltip content={contextTooltip}>
+                        <span className="queuePills" aria-label={`Aree: ${contextTooltip}`}>
+                          {contexts.map((context) => (
+                            <span className="queuePill" key={context.key}>{context.label}</span>
+                          ))}
+                          {extraContexts > 0 ? <span className="queuePill mutedPill">+{extraContexts}</span> : null}
+                        </span>
+                      </Tooltip>
+                    ) : null}
                   </div>
                 </td>
-                <td><StateBadge state={po.state} /></td>
                 <td>
                   <span className="textCell">{po.provider?.company_name ?? '-'}</span>
                 </td>
@@ -102,15 +148,15 @@ export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
                 <td className="moneyCell">{formatMoney(po.total_price, po.currency)}</td>
                 <td className="actionsCell" onDoubleClick={(event) => event.stopPropagation()}>
                   <span className="iconActions">
-                    <Tooltip content={label}>
+                    <Tooltip content={action.label}>
                       <button
                         className="iconButton"
                         type="button"
-                        aria-label={label}
-                        title={label}
+                        aria-label={action.label}
+                        title={action.label}
                         onClick={() => navigate(`/rda/po/${po.id}`)}
                       >
-                        <Icon name={iconName} size={16} />
+                        <Icon name={action.iconName} size={16} />
                       </button>
                     </Tooltip>
                     {po.isOwnDraft ? (

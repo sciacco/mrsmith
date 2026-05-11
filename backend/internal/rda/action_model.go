@@ -381,7 +381,7 @@ func poWorkflowStage(state string) string {
 		return "send"
 	case "PENDING_VERIFICATION", "SENT":
 		return "verification"
-	case "CLOSED", "REJECTED":
+	case "CLOSED", "REJECTED", "DELIVERED_AND_COMPLIANT":
 		return "closure"
 	default:
 		return "draft"
