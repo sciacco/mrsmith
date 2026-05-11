@@ -72,33 +72,23 @@ const emptySummary: NotificationSummary = {
   unreadByApp: {},
 };
 
+const italianLabels = {
+  actionLabel: 'Notifiche',
+  panelLabel: 'Notifiche',
+  panelTitle: 'Notifiche',
+  unreadGroup: 'Nuove',
+  readGroup: 'Gia lette',
+  unreadChip: 'Nuova',
+  readAll: 'Segna lette',
+  loading: 'Sincronizzazione',
+  empty: 'Nessuna notifica',
+  error: 'Notifiche non disponibili',
+  archive: 'Archivia notifica',
+} as const;
+
 const labels = {
-  clean: {
-    actionLabel: 'Notifiche',
-    panelLabel: 'Notifiche',
-    panelTitle: 'Notifiche',
-    unreadGroup: 'Nuove',
-    readGroup: 'Gia lette',
-    unreadChip: 'Nuova',
-    readAll: 'Segna lette',
-    loading: 'Sincronizzazione',
-    empty: 'Nessuna notifica',
-    error: 'Notifiche non disponibili',
-    archive: 'Archivia notifica',
-  },
-  matrix: {
-    actionLabel: 'Notifications',
-    panelLabel: 'Notifications',
-    panelTitle: 'SIGNALS',
-    unreadGroup: 'NEW SIGNALS',
-    readGroup: 'LOG',
-    unreadChip: 'NEW',
-    readAll: 'READ ALL',
-    loading: 'SYNCING',
-    empty: 'NO SIGNALS',
-    error: 'SIGNAL ERROR',
-    archive: 'Archive notification',
-  },
+  clean: italianLabels,
+  matrix: italianLabels,
 } as const;
 
 export function NotificationBell({
