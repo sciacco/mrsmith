@@ -61,6 +61,12 @@ type NotificationsState = {
   archive: (item: NotificationItem) => Promise<void>;
 };
 
+type NotificationGroup = {
+  key: 'unread' | 'read';
+  label: string;
+  items: NotificationItem[];
+};
+
 const emptySummary: NotificationSummary = {
   totalUnread: 0,
   unreadByApp: {},
@@ -71,6 +77,9 @@ const labels = {
     actionLabel: 'Notifiche',
     panelLabel: 'Notifiche',
     panelTitle: 'Notifiche',
+    unreadGroup: 'Nuove',
+    readGroup: 'Gia lette',
+    unreadChip: 'Nuova',
     readAll: 'Segna lette',
     loading: 'Sincronizzazione',
     empty: 'Nessuna notifica',
@@ -81,6 +90,9 @@ const labels = {
     actionLabel: 'Notifications',
     panelLabel: 'Notifications',
     panelTitle: 'SIGNALS',
+    unreadGroup: 'NEW SIGNALS',
+    readGroup: 'LOG',
+    unreadChip: 'NEW',
     readAll: 'READ ALL',
     loading: 'SYNCING',
     empty: 'NO SIGNALS',
@@ -103,6 +115,11 @@ export function NotificationBell({
   const unreadCount = Math.min(notifications.summary.totalUnread, 99);
   const copy = labels[variant];
   const showBell = enabled && (visibility === 'always' || notifications.summary.totalUnread > 0);
+  const unreadItems = notifications.items.filter((item) => !item.readAt);
+  const readItems = notifications.items.filter((item) => item.readAt);
+  const groups: NotificationGroup[] = [];
+  if (unreadItems.length > 0) groups.push({ key: 'unread', label: copy.unreadGroup, items: unreadItems });
+  if (readItems.length > 0) groups.push({ key: 'read', label: copy.readGroup, items: readItems });
 
   useEffect(() => {
     if (!open) return undefined;
@@ -163,31 +180,46 @@ export function NotificationBell({
             ) : notifications.items.length === 0 ? (
               <div className={styles.state}>{copy.empty}</div>
             ) : (
-              notifications.items.map((item) => (
-                <div className={item.readAt ? styles.item : styles.itemUnread} key={item.id}>
-                  <button
-                    type="button"
-                    className={styles.openButton}
-                    onClick={() => void notifications.openNotification(item)}
-                  >
-                    <span className={styles.meta}>
-                      {item.appId.toUpperCase()} / {formatNotificationTime(item.createdAt)}
-                    </span>
-                    <span className={styles.title}>{item.title}</span>
-                    {item.body ? <span className={styles.body}>{item.body}</span> : null}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.archiveButton}
-                    aria-label={copy.archive}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void notifications.archive(item);
-                    }}
-                  >
-                    <Icon className={styles.archiveIcon} name="archive" size={16} strokeWidth={1.8} />
-                  </button>
-                </div>
+              groups.map((group) => (
+                <section className={styles.group} key={group.key} aria-label={group.label}>
+                  <div className={styles.groupHeader}>
+                    <span>{group.label}</span>
+                    <span className={styles.groupCount}>{group.items.length}</span>
+                  </div>
+                  {group.items.map((item) => {
+                    const unread = !item.readAt;
+
+                    return (
+                      <div className={unread ? styles.itemUnread : styles.item} key={item.id}>
+                        <button
+                          type="button"
+                          className={styles.openButton}
+                          onClick={() => void notifications.openNotification(item)}
+                        >
+                          <span className={styles.meta}>
+                            {unread ? <span className={styles.unreadChip}>{copy.unreadChip}</span> : null}
+                            <span className={styles.metaText}>
+                              {item.appId.toUpperCase()} / {formatNotificationTime(item.createdAt)}
+                            </span>
+                          </span>
+                          <span className={styles.title}>{item.title}</span>
+                          {item.body ? <span className={styles.body}>{item.body}</span> : null}
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.archiveButton}
+                          aria-label={copy.archive}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void notifications.archive(item);
+                          }}
+                        >
+                          <Icon className={styles.archiveIcon} name="archive" size={16} strokeWidth={1.8} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </section>
               ))
             )}
           </div>
