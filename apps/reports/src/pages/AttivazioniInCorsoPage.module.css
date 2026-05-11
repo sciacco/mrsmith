@@ -4,6 +4,35 @@
   margin-bottom: var(--space-4);
 }
 
+.toolbar {
+  margin-bottom: var(--space-3);
+}
+
+.searchInput {
+  max-width: 360px;
+}
+
+.sortableHeader {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.sortableHeader:hover {
+  color: var(--color-text-primary);
+}
+
+.sortIcon {
+  display: inline-flex;
+  margin-left: var(--space-1);
+  vertical-align: middle;
+  color: var(--color-text-muted);
+}
+
+.sortIconActive {
+  color: var(--color-accent);
+}
+
 .table tbody tr {
   cursor: pointer;
 }

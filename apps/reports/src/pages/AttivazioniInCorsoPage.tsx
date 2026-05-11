@@ -1,9 +1,57 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Skeleton, Drawer, Icon } from '@mrsmith/ui';
+import { Skeleton, Drawer, Icon, SearchInput } from '@mrsmith/ui';
 import { usePendingActivations, usePendingActivationRows } from '../api/queries';
 import { formatMoneyEUR } from '../utils/format';
 import shared from './shared.module.css';
 import styles from './AttivazioniInCorsoPage.module.css';
+import type { PendingActivation } from '../types';
+
+type SortKey = keyof PendingActivation;
+type SortDir = 'asc' | 'desc';
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  return (
+    <svg
+      className={`${styles.sortIcon} ${active ? styles.sortIconActive : ''}`}
+      width="10"
+      height="10"
+      viewBox="0 0 10 10"
+      fill="none"
+      aria-hidden="true"
+    >
+      {dir === 'asc' ? (
+        <path d="M5 2l4 5H1l4-5Z" fill="currentColor" />
+      ) : (
+        <path d="M5 8L1 3h8L5 8Z" fill="currentColor" />
+      )}
+    </svg>
+  );
+}
+
+function SortableTh({
+  label,
+  sortKey,
+  sort,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: { key: SortKey; dir: SortDir };
+  onSort: (key: SortKey) => void;
+}) {
+  const active = sort.key === sortKey;
+  const nextDir = active && sort.dir === 'asc' ? 'desc' : 'asc';
+  return (
+    <th
+      onClick={() => onSort(nextDir)}
+      className={styles.sortableHeader}
+      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      {label}
+      <SortIcon active={active} dir={sort.dir} />
+    </th>
+  );
+}
 
 function formatDurationMonths(value: string | null | undefined): string {
   const normalized = value?.trim();
@@ -17,8 +65,34 @@ function formatDurationMonths(value: string | null | undefined): string {
 export default function AttivazioniInCorsoPage() {
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
+    key: 'ragione_sociale',
+    dir: 'asc',
+  });
+
   const activationsQ = usePendingActivations();
   const rowsQ = usePendingActivationRows(selectedOrder);
+
+  const displayData = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let rows = activationsQ.data ?? [];
+
+    if (q) {
+      rows = rows.filter(
+        (r) =>
+          r.ragione_sociale.toLowerCase().includes(q) ||
+          r.numero_ordine.toLowerCase().includes(q),
+      );
+    }
+
+    return [...rows].sort((a, b) => {
+      const av = a[sort.key] ?? '';
+      const bv = b[sort.key] ?? '';
+      const cmp = String(av).localeCompare(String(bv), 'it', { numeric: true });
+      return sort.dir === 'asc' ? cmp : -cmp;
+    });
+  }, [activationsQ.data, search, sort]);
 
   const selectedSummary = useMemo(
     () => activationsQ.data?.find((r) => r.numero_ordine === selectedOrder),
@@ -39,7 +113,7 @@ export default function AttivazioniInCorsoPage() {
     <div className={shared.page}>
       <h1 className={shared.title}>Attivazioni in corso</h1>
       <p className={styles.subtitle}>
-        Elenco ordini in stato confermato con righe da attivare
+        Elenco ordini in stato confermato con righe da attivare. Seleziona una riga per i dettagli
       </p>
 
       {activationsQ.isLoading && <Skeleton rows={8} />}
@@ -50,24 +124,32 @@ export default function AttivazioniInCorsoPage() {
 
       {activationsQ.data && (
         <>
-          <div className={shared.info}>{activationsQ.data.length} ordini</div>
+          <div className={styles.toolbar}>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Cerca per cliente o numero ordine…"
+              className={styles.searchInput}
+            />
+          </div>
+          <div className={shared.info}>{displayData.length} ordini</div>
           <div className={shared.tableWrap}>
             <table className={`${shared.table} ${styles.table}`}>
               <thead>
                 <tr>
                   <th></th>
-                  <th>Cliente</th>
-                  <th>N. Ordine</th>
-                  <th>Data documento</th>
-                  <th>Durata servizio</th>
-                  <th>Durata rinnovo</th>
-                  <th>Sost. ord.</th>
-                  <th>Sostituito da</th>
-                  <th>Storico</th>
+                  <SortableTh label="Cliente" sortKey="ragione_sociale" sort={sort} onSort={(k) => setSort((p) => (p.key === k && p.dir === 'asc' ? { key: k, dir: 'desc' } : { key: k, dir: 'asc' }))} />
+                  <SortableTh label="N. Ordine" sortKey="numero_ordine" sort={sort} onSort={(k) => setSort((p) => (p.key === k && p.dir === 'asc' ? { key: k, dir: 'desc' } : { key: k, dir: 'asc' }))} />
+                  <SortableTh label="Data documento" sortKey="data_documento" sort={sort} onSort={(k) => setSort((p) => (p.key === k && p.dir === 'asc' ? { key: k, dir: 'desc' } : { key: k, dir: 'asc' }))} />
+                  <SortableTh label="Durata servizio" sortKey="durata_servizio" sort={sort} onSort={(k) => setSort((p) => (p.key === k && p.dir === 'asc' ? { key: k, dir: 'desc' } : { key: k, dir: 'asc' }))} />
+                  <SortableTh label="Durata rinnovo" sortKey="durata_rinnovo" sort={sort} onSort={(k) => setSort((p) => (p.key === k && p.dir === 'asc' ? { key: k, dir: 'desc' } : { key: k, dir: 'asc' }))} />
+                  <SortableTh label="Sost. ord." sortKey="sost_ord" sort={sort} onSort={(k) => setSort((p) => (p.key === k && p.dir === 'asc' ? { key: k, dir: 'desc' } : { key: k, dir: 'asc' }))} />
+                  <SortableTh label="Sostituito da" sortKey="sostituito_da" sort={sort} onSort={(k) => setSort((p) => (p.key === k && p.dir === 'asc' ? { key: k, dir: 'desc' } : { key: k, dir: 'asc' }))} />
+                  <SortableTh label="Storico" sortKey="storico" sort={sort} onSort={(k) => setSort((p) => (p.key === k && p.dir === 'asc' ? { key: k, dir: 'desc' } : { key: k, dir: 'asc' }))} />
                 </tr>
               </thead>
               <tbody>
-                {activationsQ.data.map((row, i) => (
+                {displayData.map((row, i) => (
                   <tr
                     key={row.numero_ordine}
                     className={selectedOrder === row.numero_ordine ? styles.selectedRow : undefined}
