@@ -1,6 +1,6 @@
 import { useToast } from '@mrsmith/ui';
 import { usePostComment } from '../api/queries';
-import type { PoComment } from '../api/types';
+import type { CommentMentionUser, PoComment } from '../api/types';
 import { formatDateTimeIT } from '../lib/format';
 import { MentionInput } from './MentionInput';
 
@@ -45,9 +45,9 @@ export function CommentsPanel({ poId, comments }: { poId: number; comments: PoCo
   const post = usePostComment();
   const { toast } = useToast();
 
-  async function submit(comment: string) {
+  async function submit(comment: string, mentionedUsers: CommentMentionUser[]) {
     try {
-      await post.mutateAsync({ id: poId, comment });
+      await post.mutateAsync({ id: poId, comment, mentioned_users: mentionedUsers });
       toast('Commento aggiunto');
     } catch {
       toast('Commento non salvato', 'error');
@@ -67,7 +67,7 @@ export function CommentsPanel({ poId, comments }: { poId: number; comments: PoCo
           {comments.map((comment) => <CommentItem key={comment.id} comment={comment} />)}
           {comments.length === 0 ? <p className="muted">Nessun commento presente.</p> : null}
         </div>
-        <MentionInput submitting={post.isPending} onSubmit={(comment) => void submit(comment)} />
+        <MentionInput submitting={post.isPending} onSubmit={(comment, mentionedUsers) => void submit(comment, mentionedUsers)} />
       </details>
     </aside>
   );

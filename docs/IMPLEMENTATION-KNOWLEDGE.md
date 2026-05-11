@@ -194,6 +194,15 @@ Alyante ERP ID
 - Used by: Notifications V1 RDA approval notifications.
 - Open questions: none.
 
+### RDA Comment Mentions Notify Through MrSmith, Not Mistra
+
+- Context: `apps/rda` PO detail comment mentions and backend `POST /api/rda/v1/pos/{id}/comments`.
+- Discovery: Mistra `po-comment-new` accepts only `comment`; it does not persist or process mention recipients. MrSmith owns the notification side effect after Mistra successfully creates the comment.
+- Practical rule: the frontend should submit only users selected from the RDA mention dropdown. The RDA BFF must forward only the comment text to Mistra, validate selected mention recipients against enabled `users_int` users, and create `rda_comment_mention` notifications with the standard RDA PO deep link. Manually typed `@email` text is display-only and must not notify. Self-mentions are skipped unless `NOTIFY_SELF_MENTIONS=true`, which is intended only for local/development testing.
+- Evidence: `docs/mistra-dist.yaml` schema `po-comment-new`; RDA frontend `MentionInput`; backend `backend/internal/rda/validation.go` and `backend/internal/rda/notifications.go`.
+- Used by: `apps/rda` PO detail comments.
+- Open questions: none.
+
 ### RDA Article Catalog Type Comes From The BFF
 
 - Context: `apps/rda` row creation in `/rda/new` and PO detail row modal.

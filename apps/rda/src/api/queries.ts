@@ -3,6 +3,7 @@ import type {
   AttachmentType,
   Article,
   BudgetForUser,
+  CommentMentionUser,
   Country,
   CreatePOPayload,
   DefaultPaymentMethod,
@@ -288,7 +289,8 @@ export function usePostComment() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, comment }: { id: number; comment: string }) => api.post<PoComment>(`${rdaRoot}/pos/${id}/comments`, { comment }),
+    mutationFn: ({ id, comment, mentioned_users }: { id: number; comment: string; mentioned_users?: CommentMentionUser[] }) =>
+      api.post<PoComment>(`${rdaRoot}/pos/${id}/comments`, { comment, mentioned_users }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['rda', 'comments', variables.id] });
     },

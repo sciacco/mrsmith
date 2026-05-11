@@ -106,6 +106,7 @@ type Config struct {
 	MrSmithPublicBaseURL        string
 	NotificationsWorkerEnabled  bool
 	NotificationsWorkerInterval time.Duration
+	NotifySelfMentions          bool
 
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
@@ -183,6 +184,7 @@ func Load() Config {
 		MrSmithPublicBaseURL:         envOr("MRSMITH_PUBLIC_BASE_URL", ""),
 		NotificationsWorkerEnabled:   boolEnvOr("NOTIFICATIONS_WORKER_ENABLED", true),
 		NotificationsWorkerInterval:  durationEnvOr("NOTIFICATIONS_WORKER_INTERVAL", time.Minute),
+		NotifySelfMentions:           boolEnvOr("NOTIFY_SELF_MENTIONS", false),
 
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),

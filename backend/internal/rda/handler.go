@@ -39,13 +39,14 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		logger = slog.Default()
 	}
 	h := &Handler{
-		arak:           deps.Arak,
-		arakDB:         deps.ArakDB,
-		logger:         logger.With("component", component),
-		quoteThreshold: normalizeQuoteThreshold(deps.QuoteThreshold),
-		notifier:       deps.Notifier,
-		rdaAppURL:      deps.RDAAppURL,
-		staticDir:      deps.StaticDir,
+		arak:               deps.Arak,
+		arakDB:             deps.ArakDB,
+		logger:             logger.With("component", component),
+		quoteThreshold:     normalizeQuoteThreshold(deps.QuoteThreshold),
+		notifier:           deps.Notifier,
+		notifySelfMentions: deps.NotifySelfMentions,
+		rdaAppURL:          deps.RDAAppURL,
+		staticDir:          deps.StaticDir,
 	}
 
 	protect := acl.RequireRole(applaunch.RDAAccessRoles()...)
@@ -656,7 +657,19 @@ func (h *Handler) handleDeletePO(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusForbidden, "La bozza puo essere eliminata solo dal richiedente")
 		return
 	}
-	h.forwardArak(w, r, http.MethodDelete, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id")), "", nil, requesterHeaders(email))
+	poID := r.PathValue("id")
+	h.forwardArakAfterSuccess(
+		w,
+		r,
+		http.MethodDelete,
+		arakRDARoot+"/po/"+url.PathEscape(poID),
+		"",
+		nil,
+		requesterHeaders(email),
+		func() {
+			h.resolveRDACommentMentions(r.Context(), h.requestLogger(r, "rda_delete_comment_notifications"), poID)
+		},
+	)
 }
 
 func (h *Handler) handlePDF(w http.ResponseWriter, r *http.Request) {

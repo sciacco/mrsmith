@@ -14,6 +14,14 @@ export interface RdaUser {
   email?: string;
 }
 
+export interface CommentMentionUser {
+  id?: number;
+  first_name?: string;
+  last_name?: string;
+  name?: string;
+  email?: string;
+}
+
 export interface ProviderReference {
   id?: number;
   first_name?: string;

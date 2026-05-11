@@ -13,6 +13,7 @@ data:
   MRSMITH_PUBLIC_BASE_URL: "https://mrsmith.example.com"
   NOTIFICATIONS_WORKER_ENABLED: "true"
   NOTIFICATIONS_WORKER_INTERVAL: "60s"
+  NOTIFY_SELF_MENTIONS: "false"
   SMTP_ENABLED: "false"
   SMTP_PORT: "587"
   SMTP_TLS_MODE: "auto"

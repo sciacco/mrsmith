@@ -445,13 +445,14 @@ func main() {
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	rda.RegisterRoutes(api, rda.Deps{
-		Arak:           arakCli,
-		ArakDB:         arakDB,
-		Logger:         logger,
-		QuoteThreshold: cfg.RDAQuoteThreshold,
-		Notifier:       notificationNotifier,
-		RDAAppURL:      cfg.RDAAppURL,
-		StaticDir:      cfg.StaticDir,
+		Arak:               arakCli,
+		ArakDB:             arakDB,
+		Logger:             logger,
+		QuoteThreshold:     cfg.RDAQuoteThreshold,
+		Notifier:           notificationNotifier,
+		NotifySelfMentions: cfg.NotifySelfMentions,
+		RDAAppURL:          cfg.RDAAppURL,
+		StaticDir:          cfg.StaticDir,
 	})
 	compliance.RegisterRoutes(api, anisettaDB)
 	coperture.RegisterRoutes(api, dbCoperture)

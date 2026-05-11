@@ -33,6 +33,11 @@ var allowedAttachmentTypes = map[string]struct{}{
 	"other":              {},
 }
 
+type postCommentRequest struct {
+	Comment        string               `json:"comment"`
+	MentionedUsers []commentMentionUser `json:"mentioned_users"`
+}
+
 type upstreamBodyResponse struct {
 	status int
 	header http.Header
@@ -565,19 +570,96 @@ func (h *Handler) handlePostComment(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusUnauthorized, "Accesso richiesto")
 		return
 	}
-	var body struct {
-		Comment string `json:"comment"`
+	var body postCommentRequest
+	comment := ""
+	if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+		comment = strings.TrimSpace(body.Comment)
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Comment) == "" {
+	if comment == "" {
 		httputil.Error(w, http.StatusBadRequest, "Inserisci un commento")
 		return
 	}
-	encoded, err := encodeJSONBody(map[string]string{"comment": strings.TrimSpace(body.Comment)})
+	encoded, err := encodeJSONBody(map[string]string{"comment": comment})
 	if err != nil {
 		httputil.InternalError(w, r, err, "rda comment body encode failed")
 		return
 	}
-	h.forwardArak(w, r, http.MethodPost, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/comment", "", encoded, mergeHeaders(requesterHeaders(email), jsonHeaders()))
+	poID := r.PathValue("id")
+	response, err := h.postCommentUpstream(email, poID, encoded)
+	if err != nil {
+		h.requestLogger(r, "rda_post_comment", "upstream_path", arakRDARoot+"/po/"+url.PathEscape(poID)+"/comment").Error("upstream request failed", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio RDA temporaneamente non disponibile",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	h.writePostCommentResponse(w, r, response, func(commentID string) {
+		h.notifyRDACommentMentions(
+			r.Context(),
+			h.requestLogger(r, "rda_comment_mention_notifications"),
+			poID,
+			commentID,
+			email,
+			comment,
+			body.MentionedUsers,
+		)
+	})
+}
+
+func (h *Handler) postCommentUpstream(email string, poID string, body io.Reader) (upstreamBodyResponse, error) {
+	path := arakRDARoot + "/po/" + url.PathEscape(poID) + "/comment"
+	resp, err := h.arak.DoWithHeaders(http.MethodPost, path, "", body, mergeHeaders(requesterHeaders(email), jsonHeaders()))
+	if err != nil {
+		return upstreamBodyResponse{}, err
+	}
+	defer resp.Body.Close()
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return upstreamBodyResponse{}, err
+	}
+	return upstreamBodyResponse{status: resp.StatusCode, header: resp.Header.Clone(), body: responseBody}, nil
+}
+
+func (h *Handler) writePostCommentResponse(w http.ResponseWriter, r *http.Request, response upstreamBodyResponse, after func(commentID string)) {
+	path := arakRDARoot + "/po/" + url.PathEscape(r.PathValue("id")) + "/comment"
+	if response.status == http.StatusUnauthorized || response.status == http.StatusForbidden {
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Autorizzazione verso il servizio RDA non riuscita",
+			"code":  codeUpstreamAuthFailed,
+		})
+		return
+	}
+	if response.status >= http.StatusBadRequest && response.status <= 599 {
+		resp := &http.Response{
+			StatusCode: response.status,
+			Header:     response.header,
+			Body:       io.NopCloser(bytes.NewReader(response.body)),
+		}
+		h.writeUpstreamRejected(w, r, resp, path, "")
+		return
+	}
+	if after != nil {
+		after(commentIDFromResponse(response.body))
+	}
+	copyResponseHeaders(w.Header(), response.header)
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
+	w.WriteHeader(response.status)
+	_, _ = w.Write(response.body)
+}
+
+func commentIDFromResponse(body []byte) string {
+	var result struct {
+		ID any `json:"id"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := decoder.Decode(&result); err != nil {
+		return ""
+	}
+	return poIDString(result.ID)
 }
 
 func (h *Handler) handleSubmitPO(w http.ResponseWriter, r *http.Request) {

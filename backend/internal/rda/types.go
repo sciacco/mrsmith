@@ -10,29 +10,39 @@ import (
 )
 
 type Deps struct {
-	Arak           *arak.Client
-	ArakDB         *sql.DB
-	Logger         *slog.Logger
-	QuoteThreshold float64
-	Notifier       notifications.Notifier
-	RDAAppURL      string
-	StaticDir      string
+	Arak               *arak.Client
+	ArakDB             *sql.DB
+	Logger             *slog.Logger
+	QuoteThreshold     float64
+	Notifier           notifications.Notifier
+	NotifySelfMentions bool
+	RDAAppURL          string
+	StaticDir          string
 }
 
 type Handler struct {
-	arak           *arak.Client
-	arakDB         *sql.DB
-	logger         *slog.Logger
-	quoteThreshold float64
-	notifier       notifications.Notifier
-	rdaAppURL      string
-	staticDir      string
+	arak               *arak.Client
+	arakDB             *sql.DB
+	logger             *slog.Logger
+	quoteThreshold     float64
+	notifier           notifications.Notifier
+	notifySelfMentions bool
+	rdaAppURL          string
+	staticDir          string
 }
 
 type userRef struct {
 	ID        int64  `json:"id,omitempty"`
 	FirstName string `json:"first_name,omitempty"`
 	LastName  string `json:"last_name,omitempty"`
+	Email     string `json:"email,omitempty"`
+}
+
+type commentMentionUser struct {
+	ID        int64  `json:"id,omitempty"`
+	FirstName string `json:"first_name,omitempty"`
+	LastName  string `json:"last_name,omitempty"`
+	Name      string `json:"name,omitempty"`
 	Email     string `json:"email,omitempty"`
 }
 
