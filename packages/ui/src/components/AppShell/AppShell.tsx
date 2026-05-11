@@ -1,13 +1,23 @@
 import { type ReactNode } from 'react';
+import {
+  NotificationBell,
+  type NotificationBellVisibility,
+} from '../NotificationBell/NotificationBell';
 import { SupportMenu, type AppShellSupportConfig } from '../SupportMenu/SupportMenu';
 import { UserMenu } from '../UserMenu/UserMenu';
 import styles from './AppShell.module.css';
+
+type AppShellNotificationsConfig = {
+  enabled?: boolean;
+  visibility?: NotificationBellVisibility;
+};
 
 interface AppShellProps {
   userName?: string;
   appName?: string;
   onLogout?: () => void;
   support?: AppShellSupportConfig;
+  notifications?: boolean | AppShellNotificationsConfig;
   children: ReactNode;
 }
 
@@ -19,9 +29,24 @@ function Content({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-export function AppShell({ userName, appName, onLogout, support, children }: AppShellProps) {
+export function AppShell({
+  userName,
+  appName,
+  onLogout,
+  support,
+  notifications,
+  children,
+}: AppShellProps) {
   let nav: ReactNode = null;
   let content: ReactNode = null;
+  const notificationSettings =
+    typeof notifications === 'object' ? notifications : undefined;
+  const notificationsEnabled =
+    notifications !== false &&
+    notificationSettings?.enabled !== false &&
+    Boolean(support?.getAccessToken) &&
+    support?.authenticated !== false;
+  const notificationVisibility = notificationSettings?.visibility ?? 'unread';
 
   const childArray = Array.isArray(children) ? children : [children];
   for (const child of childArray) {
@@ -46,6 +71,14 @@ export function AppShell({ userName, appName, onLogout, support, children }: App
         )}
         <nav className={styles.nav}>{nav}</nav>
         <div className={styles.actions}>
+          {notificationsEnabled ? (
+            <NotificationBell
+              auth={support}
+              status="unread"
+              variant="clean"
+              visibility={notificationVisibility}
+            />
+          ) : null}
           {support && <SupportMenu appName={appName} support={support} />}
           {userName && <UserMenu userName={userName} onLogout={onLogout} />}
         </div>

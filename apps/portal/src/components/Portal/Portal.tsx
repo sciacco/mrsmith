@@ -1,5 +1,5 @@
+import type { NotificationBellAuth } from '@mrsmith/ui';
 import type { Category } from '../../types';
-import type { NotificationItem } from '../../api/notifications';
 import { MatrixBackground } from '../MatrixBackground';
 import { ScanlineOverlay } from '../ScanlineOverlay';
 import { Header } from '../Header';
@@ -14,15 +14,7 @@ type PortalProps = {
   statusMessage?: string;
   statusTone?: 'default' | 'error';
   onLogout?: () => void;
-  notifications?: {
-    unreadCount: number;
-    items: NotificationItem[];
-    loading: boolean;
-    error: boolean;
-    onMarkAllRead: () => Promise<void>;
-    onOpen: (item: NotificationItem) => Promise<void>;
-    onArchive: (item: NotificationItem) => Promise<void>;
-  };
+  notifications?: NotificationBellAuth;
 };
 
 export function Portal({

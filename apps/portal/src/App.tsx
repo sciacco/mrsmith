@@ -2,7 +2,6 @@ import { createApiClient, ApiError } from '@mrsmith/api-client';
 import { useAuth } from '@mrsmith/auth-client';
 import { useEffect, useMemo, useState } from 'react';
 import { Portal } from './components/Portal';
-import { useNotifications } from './hooks/useNotifications';
 import type { Category, PortalUser } from './types';
 
 const BOOTSTRAP_STATUS_DELAY_MS = 500;
@@ -47,21 +46,13 @@ export function App() {
   const [bootstrapping, setBootstrapping] = useState(true);
   const isTransientBootstrap = loading || bootstrapping || status === 'reauthenticating';
   const showBootstrapStatus = useDelayedFlag(isTransientBootstrap, BOOTSTRAP_STATUS_DELAY_MS);
-  const notifications = useNotifications(
-    api,
-    authenticated && !loading && status !== 'reauthenticating',
+  const notificationAuth = useMemo(
+    () =>
+      authenticated && !loading && status !== 'reauthenticating'
+        ? { getAccessToken, forceRefreshToken }
+        : undefined,
+    [authenticated, forceRefreshToken, getAccessToken, loading, status],
   );
-  const headerNotifications = authenticated
-    ? {
-        unreadCount: notifications.summary.totalUnread,
-        items: notifications.items,
-        loading: notifications.loading,
-        error: notifications.error,
-        onMarkAllRead: notifications.markAllRead,
-        onOpen: notifications.openNotification,
-        onArchive: notifications.archive,
-      }
-    : undefined;
 
   useEffect(() => {
     if (loading) return;
@@ -144,7 +135,7 @@ export function App() {
         statusTone="error"
         statusMessage={error}
         onLogout={logout}
-        notifications={headerNotifications}
+        notifications={notificationAuth}
       />
     );
   }
@@ -157,7 +148,7 @@ export function App() {
         statusTitle="NO APPLICATIONS ASSIGNED"
         statusMessage="Your account is authenticated, but no launcher roles are currently mapped to this profile."
         onLogout={logout}
-        notifications={headerNotifications}
+        notifications={notificationAuth}
       />
     );
   }
@@ -167,7 +158,7 @@ export function App() {
       categories={categories}
       userName={user?.name ?? 'Authenticated User'}
       onLogout={logout}
-      notifications={headerNotifications}
+      notifications={notificationAuth}
     />
   );
 }

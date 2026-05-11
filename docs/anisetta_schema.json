@@ -6,6 +6,1327 @@
   ],
   "schemas": [
     {
+      "name": "mrsmith",
+      "tables": [
+        {
+          "name": "notification",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('mrsmith.notification_id_seq'::regclass)"
+            },
+            {
+              "name": "type_key",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "app_id",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "severity",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "title",
+              "position": 5,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "body",
+              "position": 6,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "entity_type",
+              "position": 7,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "entity_id",
+              "position": 8,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "dedupe_key",
+              "position": 9,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "deep_link",
+              "position": 10,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "metadata",
+              "position": 11,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "policy_override",
+              "position": 12,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "created_by_subject",
+              "position": 13,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "created_by_email",
+              "position": 14,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "created_at",
+              "position": 15,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "notification_app_created_idx",
+              "type": "BTREE",
+              "expressions": [
+                "app_id",
+                "created_at DESC"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notification_dedupe_key_idx",
+              "type": "BTREE",
+              "expressions": [
+                "dedupe_key"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "notification_entity_idx",
+              "type": "BTREE",
+              "expressions": [
+                "entity_type",
+                "entity_id",
+                "created_at DESC"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notification_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "notification_type_created_idx",
+              "type": "BTREE",
+              "expressions": [
+                "type_key",
+                "created_at DESC"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "notification_type_key_fkey",
+              "columns": [
+                "type_key"
+              ],
+              "referencedTable": "mrsmith.notification_type",
+              "referencedColumns": [
+                "type_key"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "notification_metadata_object_check",
+              "expression": "(jsonb_typeof(metadata) = 'object'::text)"
+            },
+            {
+              "name": "notification_policy_override_object_check",
+              "expression": "(jsonb_typeof(policy_override) = 'object'::text)"
+            },
+            {
+              "name": "notification_severity_check",
+              "expression": "(severity = ANY (ARRAY['info'::text, 'success'::text, 'warning'::text, 'critical'::text]))"
+            }
+          ],
+          "rowCount": 2,
+          "dataSize": 24576,
+          "indexSize": 122880
+        },
+        {
+          "name": "notification_delivery",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('mrsmith.notification_delivery_id_seq'::regclass)"
+            },
+            {
+              "name": "recipient_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "channel",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "policy_step",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "status",
+              "position": 5,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "due_at",
+              "position": 6,
+              "type": "timestamp with time zone",
+              "nullable": false
+            },
+            {
+              "name": "locked_at",
+              "position": 7,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "locked_by",
+              "position": 8,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "attempt_count",
+              "position": 9,
+              "type": "integer",
+              "nullable": false,
+              "default": "0"
+            },
+            {
+              "name": "sent_at",
+              "position": 10,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "skipped_at",
+              "position": 11,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "failed_at",
+              "position": 12,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "last_error",
+              "position": 13,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "created_at",
+              "position": 14,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "notification_delivery_due_idx",
+              "type": "BTREE",
+              "expressions": [
+                "status",
+                "due_at",
+                "id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notification_delivery_pending_due_idx",
+              "type": "BTREE",
+              "expressions": [
+                "due_at",
+                "id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notification_delivery_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "notification_delivery_recipient_idx",
+              "type": "BTREE",
+              "expressions": [
+                "recipient_id",
+                "created_at DESC"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notification_delivery_unique_step_idx",
+              "type": "BTREE",
+              "expressions": [
+                "recipient_id",
+                "channel",
+                "policy_step"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "notification_delivery_recipient_id_fkey",
+              "columns": [
+                "recipient_id"
+              ],
+              "referencedTable": "mrsmith.notification_recipient",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "notification_delivery_attempt_count_check",
+              "expression": "(attempt_count \u003e= 0)"
+            },
+            {
+              "name": "notification_delivery_channel_check",
+              "expression": "(channel = ANY (ARRAY['portal'::text, 'email'::text]))"
+            },
+            {
+              "name": "notification_delivery_policy_step_not_blank_check",
+              "expression": "(btrim(policy_step) \u003c\u003e ''::text)"
+            },
+            {
+              "name": "notification_delivery_status_check",
+              "expression": "(status = ANY (ARRAY['pending'::text, 'locked'::text, 'sent'::text, 'skipped'::text, 'failed'::text, 'cancelled'::text]))"
+            }
+          ],
+          "indexSize": 106496
+        },
+        {
+          "name": "notification_delivery_attempt",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('mrsmith.notification_delivery_attempt_id_seq'::regclass)"
+            },
+            {
+              "name": "delivery_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "status",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "error",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "attempted_at",
+              "position": 5,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "notification_delivery_attempt_delivery_idx",
+              "type": "BTREE",
+              "expressions": [
+                "delivery_id",
+                "attempted_at DESC"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notification_delivery_attempt_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "notification_delivery_attempt_delivery_id_fkey",
+              "columns": [
+                "delivery_id"
+              ],
+              "referencedTable": "mrsmith.notification_delivery",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "notification_delivery_attempt_status_check",
+              "expression": "(status = ANY (ARRAY['sent'::text, 'skipped'::text, 'failed'::text, 'cancelled'::text]))"
+            }
+          ],
+          "dataSize": 8192,
+          "indexSize": 73728
+        },
+        {
+          "name": "notification_recipient",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('mrsmith.notification_recipient_id_seq'::regclass)"
+            },
+            {
+              "name": "notification_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "recipient_subject",
+              "position": 3,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "recipient_email",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "recipient_name",
+              "position": 5,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "read_at",
+              "position": 6,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "archived_at",
+              "position": 7,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "resolved_at",
+              "position": 8,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "created_at",
+              "position": 9,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "notification_recipient_email_created_idx",
+              "type": "BTREE",
+              "expressions": [
+                "lower(recipient_email"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notification_recipient_notification_idx",
+              "type": "BTREE",
+              "expressions": [
+                "notification_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notification_recipient_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "notification_recipient_unique_idx",
+              "type": "BTREE",
+              "expressions": [
+                "notification_id",
+                "lower(recipient_email"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "notification_recipient_unread_idx",
+              "type": "BTREE",
+              "expressions": [
+                "lower(recipient_email"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "notification_recipient_notification_id_fkey",
+              "columns": [
+                "notification_id"
+              ],
+              "referencedTable": "mrsmith.notification",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "notification_recipient_email_not_blank_check",
+              "expression": "(btrim(recipient_email) \u003c\u003e ''::text)"
+            }
+          ],
+          "dataSize": 8192,
+          "indexSize": 122880
+        },
+        {
+          "name": "notification_type",
+          "columns": [
+            {
+              "name": "type_key",
+              "position": 1,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "app_id",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "title_template",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "body_template",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "severity",
+              "position": 5,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "default_policy",
+              "position": 6,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "enabled",
+              "position": 7,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "created_at",
+              "position": 8,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "updated_at",
+              "position": 9,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "notification_type_app_idx",
+              "type": "BTREE",
+              "expressions": [
+                "app_id",
+                "enabled",
+                "type_key"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notification_type_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "type_key"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "notification_type_default_policy_object_check",
+              "expression": "(jsonb_typeof(default_policy) = 'object'::text)"
+            },
+            {
+              "name": "notification_type_severity_check",
+              "expression": "(severity = ANY (ARRAY['info'::text, 'success'::text, 'warning'::text, 'critical'::text]))"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "notification_type_set_updated_at",
+              "event": "UPDATE",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER notification_type_set_updated_at BEFORE UPDATE ON mrsmith.notification_type FOR EACH ROW EXECUTE FUNCTION mrsmith.set_runtime_config_updated_at()"
+            }
+          ],
+          "rowCount": 1,
+          "dataSize": 8192,
+          "indexSize": 73728
+        },
+        {
+          "name": "runtime_config",
+          "columns": [
+            {
+              "name": "namespace",
+              "position": 1,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "key",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "value",
+              "position": 3,
+              "type": "jsonb",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "is_sensitive",
+              "position": 5,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "updated_by",
+              "position": 6,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "updated_at",
+              "position": 7,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "runtime_config_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "namespace",
+                "key"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "triggers": [
+            {
+              "name": "runtime_config_set_updated_at",
+              "event": "UPDATE",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER runtime_config_set_updated_at BEFORE UPDATE ON mrsmith.runtime_config FOR EACH ROW EXECUTE FUNCTION mrsmith.set_runtime_config_updated_at()"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "support_request",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('mrsmith.support_request_id_seq'::regclass)"
+            },
+            {
+              "name": "status",
+              "position": 2,
+              "type": "text",
+              "nullable": false,
+              "default": "'open'::text"
+            },
+            {
+              "name": "priority",
+              "position": 3,
+              "type": "text",
+              "nullable": false,
+              "default": "'normal'::text"
+            },
+            {
+              "name": "app_id",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "app_name",
+              "position": 5,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "page_url",
+              "position": 6,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "page_path",
+              "position": 7,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "message",
+              "position": 8,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "requester_subject",
+              "position": 9,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "requester_name",
+              "position": 10,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "requester_email",
+              "position": 11,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "requester_roles",
+              "position": 12,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'[]'::jsonb"
+            },
+            {
+              "name": "technical_context_included",
+              "position": 13,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "email_notification_status",
+              "position": 14,
+              "type": "text",
+              "nullable": false,
+              "default": "'pending'::text"
+            },
+            {
+              "name": "created_at",
+              "position": 15,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "updated_at",
+              "position": 16,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "support_request_app_idx",
+              "type": "BTREE",
+              "expressions": [
+                "app_id",
+                "created_at DESC"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "support_request_created_idx",
+              "type": "BTREE",
+              "expressions": [
+                "created_at DESC"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "support_request_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "support_request_status_priority_idx",
+              "type": "BTREE",
+              "expressions": [
+                "status",
+                "priority",
+                "created_at DESC"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "support_request_email_status_check",
+              "expression": "(email_notification_status = ANY (ARRAY['pending'::text, 'sent'::text, 'skipped'::text, 'failed'::text]))"
+            },
+            {
+              "name": "support_request_priority_check",
+              "expression": "(priority = ANY (ARRAY['low'::text, 'normal'::text, 'high'::text, 'urgent'::text]))"
+            },
+            {
+              "name": "support_request_status_check",
+              "expression": "(status = ANY (ARRAY['open'::text, 'in_progress'::text, 'closed'::text, 'cancelled'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 73728
+        },
+        {
+          "name": "support_request_attachment",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('mrsmith.support_request_attachment_id_seq'::regclass)"
+            },
+            {
+              "name": "request_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "ordinal",
+              "position": 3,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "filename",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "content_type",
+              "position": 5,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "size_bytes",
+              "position": 6,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "content_sha256",
+              "position": 7,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "content",
+              "position": 8,
+              "type": "bytea",
+              "nullable": false
+            },
+            {
+              "name": "created_at",
+              "position": 9,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "support_request_attachment_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "support_request_attachment_request_idx",
+              "type": "BTREE",
+              "expressions": [
+                "request_id",
+                "created_at"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "support_request_attachment_request_ordinal_idx",
+              "type": "BTREE",
+              "expressions": [
+                "request_id",
+                "ordinal"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "support_request_attachment_request_id_fkey",
+              "columns": [
+                "request_id"
+              ],
+              "referencedTable": "mrsmith.support_request",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "support_request_attachment_hash_check",
+              "expression": "(length(content_sha256) = 64)"
+            },
+            {
+              "name": "support_request_attachment_ordinal_check",
+              "expression": "(ordinal \u003e 0)"
+            },
+            {
+              "name": "support_request_attachment_size_check",
+              "expression": "(size_bytes \u003e 0)"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 753664
+        },
+        {
+          "name": "support_request_context",
+          "columns": [
+            {
+              "name": "request_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "context",
+              "position": 2,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "created_at",
+              "position": 3,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "support_request_context_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "request_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "support_request_context_request_id_fkey",
+              "columns": [
+                "request_id"
+              ],
+              "referencedTable": "mrsmith.support_request",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 16384,
+          "indexSize": 49152
+        },
+        {
+          "name": "support_request_event",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('mrsmith.support_request_event_id_seq'::regclass)"
+            },
+            {
+              "name": "request_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "event_type",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "actor_subject",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "actor_name",
+              "position": 5,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "actor_email",
+              "position": 6,
+              "type": "text",
+              "nullable": false,
+              "default": "''::text"
+            },
+            {
+              "name": "payload",
+              "position": 7,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "created_at",
+              "position": 8,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "support_request_event_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "support_request_event_request_idx",
+              "type": "BTREE",
+              "expressions": [
+                "request_id",
+                "created_at"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "support_request_event_request_id_fkey",
+              "columns": [
+                "request_id"
+              ],
+              "referencedTable": "mrsmith.support_request",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 40960
+        }
+      ],
+      "functions": [
+        {
+          "name": "set_runtime_config_updated_at",
+          "definition": "CREATE OR REPLACE FUNCTION mrsmith.set_runtime_config_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  NEW.updated_at = now();\n  RETURN NEW;\nEND;\n$function$\n"
+        }
+      ],
+      "sequences": [
+        {
+          "name": "notification_delivery_attempt_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "notification_delivery_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "notification_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "notification_recipient_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "support_request_attachment_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "support_request_event_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "support_request_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    },
+    {
       "name": "common"
     },
     {
@@ -176,9 +1497,9 @@
               "onUpdate": "NO ACTION"
             }
           ],
-          "rowCount": 161986,
-          "dataSize": 14057472,
-          "indexSize": 3719168
+          "rowCount": 197007,
+          "dataSize": 17055744,
+          "indexSize": 4497408
         },
         {
           "name": "as7_tenants",
@@ -200,6 +1521,12 @@
               "position": 3,
               "type": "integer",
               "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 4,
+              "type": "character varying(255)",
+              "nullable": true
             }
           ],
           "indexes": [
@@ -485,6 +1812,13 @@
               "position": 2,
               "type": "character varying(100)",
               "nullable": false
+            },
+            {
+              "name": "is_active",
+              "position": 3,
+              "type": "boolean",
+              "nullable": true,
+              "default": "true"
             }
           ],
           "indexes": [
@@ -814,7 +2148,7 @@
               "body": "CREATE TRIGGER trigger_aggiorna_stato_richiesta AFTER INSERT ON public.rdf_fattibilita_fornitori FOR EACH ROW EXECUTE FUNCTION public.aggiorna_stato_richiesta_dopo_fattibilita()"
             }
           ],
-          "rowCount": 137,
+          "rowCount": 165,
           "dataSize": 81920,
           "indexSize": 57344
         },
@@ -1148,6 +2482,3475 @@
           "increment": 1,
           "min": 1,
           "max": 2147483647,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    },
+    {
+      "name": "maintenance",
+      "tables": [
+        {
+          "name": "customer_scope",
+          "columns": [
+            {
+              "name": "customer_scope_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_it",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_en",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "synonyms",
+              "position": 6,
+              "type": "text[]",
+              "nullable": false,
+              "default": "'{}'::text[]"
+            },
+            {
+              "name": "sort_order",
+              "position": 7,
+              "type": "integer",
+              "nullable": false,
+              "default": "100"
+            },
+            {
+              "name": "is_active",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "customer_scope_code_key",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "customer_scope_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "customer_scope_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "customer_scope_code_check",
+              "expression": "(code ~ '^[a-z][a-z0-9_]*$'::text)"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 40960
+        },
+        {
+          "name": "impact_effect",
+          "columns": [
+            {
+              "name": "impact_effect_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_it",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_en",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "synonyms",
+              "position": 6,
+              "type": "text[]",
+              "nullable": false,
+              "default": "'{}'::text[]"
+            },
+            {
+              "name": "sort_order",
+              "position": 7,
+              "type": "integer",
+              "nullable": false,
+              "default": "100"
+            },
+            {
+              "name": "is_active",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "impact_effect_code_key",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "impact_effect_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "impact_effect_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "impact_effect_code_check",
+              "expression": "(code ~ '^[a-z][a-z0-9_]*$'::text)"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 40960
+        },
+        {
+          "name": "llm_model",
+          "columns": [
+            {
+              "name": "scope",
+              "position": 1,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "model",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "llm_model_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "scope"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "llm_model_model_check",
+              "expression": "(btrim(model) \u003c\u003e ''::text)"
+            },
+            {
+              "name": "llm_model_scope_check",
+              "expression": "(scope ~ '^[a-z][a-z0-9_]*$'::text)"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "maintenance",
+          "columns": [
+            {
+              "name": "maintenance_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "title_it",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "title_en",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description_it",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description_en",
+              "position": 6,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "maintenance_kind_id",
+              "position": 7,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "technical_domain_id",
+              "position": 8,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "customer_scope_id",
+              "position": 9,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "status",
+              "position": 10,
+              "type": "text",
+              "nullable": false,
+              "default": "'draft'::text"
+            },
+            {
+              "name": "site_id",
+              "position": 11,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "reason_it",
+              "position": 12,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "reason_en",
+              "position": 13,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "residual_service_it",
+              "position": 14,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "residual_service_en",
+              "position": 15,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "owner_admin_id",
+              "position": 16,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "created_by_admin_id",
+              "position": 17,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "updated_by_admin_id",
+              "position": 18,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "created_at",
+              "position": 19,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "updated_at",
+              "position": 20,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "metadata",
+              "position": 21,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_maintenance_customer_scope",
+              "type": "BTREE",
+              "expressions": [
+                "customer_scope_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_kind",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_kind_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_site",
+              "type": "BTREE",
+              "expressions": [
+                "site_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_status",
+              "type": "BTREE",
+              "expressions": [
+                "status"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_technical_domain",
+              "type": "BTREE",
+              "expressions": [
+                "technical_domain_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "maintenance_code_key",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "maintenance_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "maintenance_customer_scope_id_fkey",
+              "columns": [
+                "customer_scope_id"
+              ],
+              "referencedTable": "maintenance.customer_scope",
+              "referencedColumns": [
+                "customer_scope_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "maintenance_maintenance_kind_id_fkey",
+              "columns": [
+                "maintenance_kind_id"
+              ],
+              "referencedTable": "maintenance.maintenance_kind",
+              "referencedColumns": [
+                "maintenance_kind_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "maintenance_site_id_fkey",
+              "columns": [
+                "site_id"
+              ],
+              "referencedTable": "maintenance.site",
+              "referencedColumns": [
+                "site_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "maintenance_technical_domain_id_fkey",
+              "columns": [
+                "technical_domain_id"
+              ],
+              "referencedTable": "maintenance.technical_domain",
+              "referencedColumns": [
+                "technical_domain_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "maintenance_customer_scope_required_for_active_status",
+              "expression": "((customer_scope_id IS NOT NULL) OR (status = ANY (ARRAY['draft'::text, 'cancelled'::text])))"
+            },
+            {
+              "name": "maintenance_status_check",
+              "expression": "(status = ANY (ARRAY['draft'::text, 'announced'::text, 'approved'::text, 'scheduled'::text, 'in_progress'::text, 'completed'::text, 'cancelled'::text, 'superseded'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 16384,
+          "indexSize": 147456
+        },
+        {
+          "name": "maintenance_event",
+          "columns": [
+            {
+              "name": "maintenance_event_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_window_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "event_type",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "actor_type",
+              "position": 5,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "actor_admin_id",
+              "position": 6,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "event_at",
+              "position": 7,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "summary",
+              "position": 8,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "payload",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_maintenance_event_at",
+              "type": "BTREE",
+              "expressions": [
+                "event_at"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_event_maintenance",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_event_type",
+              "type": "BTREE",
+              "expressions": [
+                "event_type"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_event_window",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_window_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "maintenance_event_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_event_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "maintenance_event_maintenance_id_fkey",
+              "columns": [
+                "maintenance_id"
+              ],
+              "referencedTable": "maintenance.maintenance",
+              "referencedColumns": [
+                "maintenance_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "maintenance_event_maintenance_window_id_fkey",
+              "columns": [
+                "maintenance_window_id"
+              ],
+              "referencedTable": "maintenance.maintenance_window",
+              "referencedColumns": [
+                "maintenance_window_id"
+              ],
+              "onDelete": "SET NULL",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "maintenance_event_actor_type_check",
+              "expression": "(actor_type = ANY (ARRAY['user'::text, 'system'::text, 'ai'::text, 'import'::text]))"
+            },
+            {
+              "name": "maintenance_event_event_type_check",
+              "expression": "(event_type = ANY (ARRAY['created'::text, 'classified'::text, 'announced'::text, 'reminder_sent'::text, 'rescheduled'::text, 'cancelled'::text, 'started'::text, 'updated'::text, 'completed'::text, 'analysis_enriched'::text, 'impact_recomputed'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 16384,
+          "indexSize": 114688
+        },
+        {
+          "name": "maintenance_impact_effect",
+          "columns": [
+            {
+              "name": "maintenance_impact_effect_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "impact_effect_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "source",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "'manual'::text"
+            },
+            {
+              "name": "confidence",
+              "position": 5,
+              "type": "numeric(5,4)",
+              "nullable": true
+            },
+            {
+              "name": "is_primary",
+              "position": 6,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "metadata",
+              "position": 7,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_maintenance_impact_effect_effect",
+              "type": "BTREE",
+              "expressions": [
+                "impact_effect_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_impact_effect_maintenance",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "maintenance_impact_effect_maintenance_id_impact_effect_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id",
+                "impact_effect_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "maintenance_impact_effect_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_impact_effect_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "maintenance_impact_effect_impact_effect_id_fkey",
+              "columns": [
+                "impact_effect_id"
+              ],
+              "referencedTable": "maintenance.impact_effect",
+              "referencedColumns": [
+                "impact_effect_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "maintenance_impact_effect_maintenance_id_fkey",
+              "columns": [
+                "maintenance_id"
+              ],
+              "referencedTable": "maintenance.maintenance",
+              "referencedColumns": [
+                "maintenance_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "maintenance_impact_effect_confidence_check",
+              "expression": "((confidence IS NULL) OR ((confidence \u003e= (0)::numeric) AND (confidence \u003c= (1)::numeric)))"
+            },
+            {
+              "name": "maintenance_impact_effect_source_check",
+              "expression": "(source = ANY (ARRAY['manual'::text, 'import'::text, 'rule'::text, 'ai_extracted'::text, 'catalog_mapping'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 73728
+        },
+        {
+          "name": "maintenance_impacted_customer",
+          "columns": [
+            {
+              "name": "maintenance_impacted_customer_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "customer_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "order_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "service_id",
+              "position": 5,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "impact_scope",
+              "position": 6,
+              "type": "text",
+              "nullable": false,
+              "default": "'possible'::text"
+            },
+            {
+              "name": "derivation_source",
+              "position": 7,
+              "type": "text",
+              "nullable": false,
+              "default": "'rule'::text"
+            },
+            {
+              "name": "confidence",
+              "position": 8,
+              "type": "numeric(5,4)",
+              "nullable": true
+            },
+            {
+              "name": "reason",
+              "position": 9,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "metadata",
+              "position": 10,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "created_at",
+              "position": 11,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_impacted_customer_customer",
+              "type": "BTREE",
+              "expressions": [
+                "customer_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_impacted_customer_maintenance",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_impacted_customer_order",
+              "type": "BTREE",
+              "expressions": [
+                "order_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "maintenance_impacted_customer_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_impacted_customer_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "maintenance_impacted_customer_maintenance_id_fkey",
+              "columns": [
+                "maintenance_id"
+              ],
+              "referencedTable": "maintenance.maintenance",
+              "referencedColumns": [
+                "maintenance_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "maintenance_impacted_customer_confidence_check",
+              "expression": "((confidence IS NULL) OR ((confidence \u003e= (0)::numeric) AND (confidence \u003c= (1)::numeric)))"
+            },
+            {
+              "name": "maintenance_impacted_customer_derivation_source_check",
+              "expression": "(derivation_source = ANY (ARRAY['manual'::text, 'rule'::text, 'ai'::text, 'hybrid'::text]))"
+            },
+            {
+              "name": "maintenance_impacted_customer_impact_scope_check",
+              "expression": "(impact_scope = ANY (ARRAY['direct'::text, 'indirect'::text, 'possible'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "indexSize": 40960
+        },
+        {
+          "name": "maintenance_kind",
+          "columns": [
+            {
+              "name": "maintenance_kind_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_it",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_en",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "synonyms",
+              "position": 6,
+              "type": "text[]",
+              "nullable": false,
+              "default": "'{}'::text[]"
+            },
+            {
+              "name": "sort_order",
+              "position": 7,
+              "type": "integer",
+              "nullable": false,
+              "default": "100"
+            },
+            {
+              "name": "is_active",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "maintenance_kind_code_key",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "maintenance_kind_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_kind_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "maintenance_kind_code_check",
+              "expression": "(code ~ '^[a-z][a-z0-9_]*$'::text)"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 40960
+        },
+        {
+          "name": "maintenance_quality_flag",
+          "columns": [
+            {
+              "name": "maintenance_quality_flag_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "quality_flag_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "source",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "'manual'::text"
+            },
+            {
+              "name": "confidence",
+              "position": 5,
+              "type": "numeric(5,4)",
+              "nullable": true
+            },
+            {
+              "name": "metadata",
+              "position": 6,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_maintenance_quality_flag_flag",
+              "type": "BTREE",
+              "expressions": [
+                "quality_flag_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_quality_flag_maintenance",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "maintenance_quality_flag_maintenance_id_quality_flag_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id",
+                "quality_flag_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "maintenance_quality_flag_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_quality_flag_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "maintenance_quality_flag_maintenance_id_fkey",
+              "columns": [
+                "maintenance_id"
+              ],
+              "referencedTable": "maintenance.maintenance",
+              "referencedColumns": [
+                "maintenance_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "maintenance_quality_flag_quality_flag_id_fkey",
+              "columns": [
+                "quality_flag_id"
+              ],
+              "referencedTable": "maintenance.quality_flag",
+              "referencedColumns": [
+                "quality_flag_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "maintenance_quality_flag_confidence_check",
+              "expression": "((confidence IS NULL) OR ((confidence \u003e= (0)::numeric) AND (confidence \u003c= (1)::numeric)))"
+            },
+            {
+              "name": "maintenance_quality_flag_source_check",
+              "expression": "(source = ANY (ARRAY['manual'::text, 'import'::text, 'rule'::text, 'ai_extracted'::text, 'catalog_mapping'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 73728
+        },
+        {
+          "name": "maintenance_reason_class",
+          "columns": [
+            {
+              "name": "maintenance_reason_class_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "reason_class_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "source",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "'manual'::text"
+            },
+            {
+              "name": "confidence",
+              "position": 5,
+              "type": "numeric(5,4)",
+              "nullable": true
+            },
+            {
+              "name": "is_primary",
+              "position": 6,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "metadata",
+              "position": 7,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_maintenance_reason_class_maintenance",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_reason_class_reason",
+              "type": "BTREE",
+              "expressions": [
+                "reason_class_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "maintenance_reason_class_maintenance_id_reason_class_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id",
+                "reason_class_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "maintenance_reason_class_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_reason_class_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "maintenance_reason_class_maintenance_id_fkey",
+              "columns": [
+                "maintenance_id"
+              ],
+              "referencedTable": "maintenance.maintenance",
+              "referencedColumns": [
+                "maintenance_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "maintenance_reason_class_reason_class_id_fkey",
+              "columns": [
+                "reason_class_id"
+              ],
+              "referencedTable": "maintenance.reason_class",
+              "referencedColumns": [
+                "reason_class_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "maintenance_reason_class_confidence_check",
+              "expression": "((confidence IS NULL) OR ((confidence \u003e= (0)::numeric) AND (confidence \u003c= (1)::numeric)))"
+            },
+            {
+              "name": "maintenance_reason_class_source_check",
+              "expression": "(source = ANY (ARRAY['manual'::text, 'import'::text, 'rule'::text, 'ai_extracted'::text, 'catalog_mapping'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 73728
+        },
+        {
+          "name": "maintenance_service_taxonomy",
+          "columns": [
+            {
+              "name": "maintenance_service_taxonomy_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "service_taxonomy_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "source",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "'manual'::text"
+            },
+            {
+              "name": "confidence",
+              "position": 5,
+              "type": "numeric(5,4)",
+              "nullable": true
+            },
+            {
+              "name": "is_primary",
+              "position": 6,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "metadata",
+              "position": 7,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "role",
+              "position": 8,
+              "type": "text",
+              "nullable": false,
+              "default": "'operated'::text"
+            },
+            {
+              "name": "expected_severity",
+              "position": 9,
+              "type": "text",
+              "nullable": false,
+              "default": "'unavailable'::text"
+            },
+            {
+              "name": "expected_audience",
+              "position": 10,
+              "type": "text",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_maintenance_service_taxonomy_maintenance",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_service_taxonomy_service",
+              "type": "BTREE",
+              "expressions": [
+                "service_taxonomy_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "maintenance_service_taxonomy_maintenance_id_service_taxonom_key",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id",
+                "service_taxonomy_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "maintenance_service_taxonomy_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_service_taxonomy_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "maintenance_service_taxonomy_maintenance_id_fkey",
+              "columns": [
+                "maintenance_id"
+              ],
+              "referencedTable": "maintenance.maintenance",
+              "referencedColumns": [
+                "maintenance_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "maintenance_service_taxonomy_service_taxonomy_id_fkey",
+              "columns": [
+                "service_taxonomy_id"
+              ],
+              "referencedTable": "maintenance.service_taxonomy",
+              "referencedColumns": [
+                "service_taxonomy_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "maintenance_service_taxonomy_confidence_check",
+              "expression": "((confidence IS NULL) OR ((confidence \u003e= (0)::numeric) AND (confidence \u003c= (1)::numeric)))"
+            },
+            {
+              "name": "maintenance_service_taxonomy_expected_audience_check",
+              "expression": "((expected_audience IS NULL) OR (expected_audience = ANY (ARRAY['internal'::text, 'external'::text, 'both'::text])))"
+            },
+            {
+              "name": "maintenance_service_taxonomy_expected_severity_check",
+              "expression": "(expected_severity = ANY (ARRAY['none'::text, 'degraded'::text, 'unavailable'::text]))"
+            },
+            {
+              "name": "maintenance_service_taxonomy_role_check",
+              "expression": "(role = ANY (ARRAY['operated'::text, 'dependent'::text]))"
+            },
+            {
+              "name": "maintenance_service_taxonomy_source_check",
+              "expression": "(source = ANY (ARRAY['manual'::text, 'import'::text, 'rule'::text, 'ai_extracted'::text, 'catalog_mapping'::text, 'dependency_graph'::text]))"
+            }
+          ],
+          "rowCount": 15,
+          "dataSize": 8192,
+          "indexSize": 106496
+        },
+        {
+          "name": "maintenance_target",
+          "columns": [
+            {
+              "name": "maintenance_target_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "target_type_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "ref_table",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "ref_id",
+              "position": 5,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "external_key",
+              "position": 6,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "display_name",
+              "position": 7,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "source",
+              "position": 8,
+              "type": "text",
+              "nullable": false,
+              "default": "'manual'::text"
+            },
+            {
+              "name": "confidence",
+              "position": 9,
+              "type": "numeric(5,4)",
+              "nullable": true
+            },
+            {
+              "name": "is_primary",
+              "position": 10,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "metadata",
+              "position": 11,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "service_taxonomy_id",
+              "position": 12,
+              "type": "bigint",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_maintenance_target_maintenance",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_target_ref",
+              "type": "BTREE",
+              "expressions": [
+                "ref_table",
+                "ref_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_target_service_taxonomy",
+              "type": "BTREE",
+              "expressions": [
+                "service_taxonomy_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_target_type",
+              "type": "BTREE",
+              "expressions": [
+                "target_type_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "maintenance_target_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_target_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "maintenance_target_maintenance_id_fkey",
+              "columns": [
+                "maintenance_id"
+              ],
+              "referencedTable": "maintenance.maintenance",
+              "referencedColumns": [
+                "maintenance_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "maintenance_target_service_taxonomy_id_fkey",
+              "columns": [
+                "service_taxonomy_id"
+              ],
+              "referencedTable": "maintenance.service_taxonomy",
+              "referencedColumns": [
+                "service_taxonomy_id"
+              ],
+              "onDelete": "SET NULL",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "maintenance_target_target_type_id_fkey",
+              "columns": [
+                "target_type_id"
+              ],
+              "referencedTable": "maintenance.target_type",
+              "referencedColumns": [
+                "target_type_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "maintenance_target_confidence_check",
+              "expression": "((confidence IS NULL) OR ((confidence \u003e= (0)::numeric) AND (confidence \u003c= (1)::numeric)))"
+            },
+            {
+              "name": "maintenance_target_source_check",
+              "expression": "(source = ANY (ARRAY['manual'::text, 'import'::text, 'rule'::text, 'ai_extracted'::text, 'catalog_mapping'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 90112
+        },
+        {
+          "name": "maintenance_window",
+          "columns": [
+            {
+              "name": "maintenance_window_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "seq_no",
+              "position": 3,
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "window_status",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "'planned'::text"
+            },
+            {
+              "name": "scheduled_start_at",
+              "position": 5,
+              "type": "timestamp with time zone",
+              "nullable": false
+            },
+            {
+              "name": "scheduled_end_at",
+              "position": 6,
+              "type": "timestamp with time zone",
+              "nullable": false
+            },
+            {
+              "name": "expected_downtime_minutes",
+              "position": 7,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "actual_start_at",
+              "position": 8,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "actual_end_at",
+              "position": 9,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "actual_downtime_minutes",
+              "position": 10,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "cancellation_reason_it",
+              "position": 11,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "cancellation_reason_en",
+              "position": 12,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "announced_at",
+              "position": 13,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "last_notice_at",
+              "position": 14,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "created_at",
+              "position": 15,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_maintenance_window_maintenance",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_window_start",
+              "type": "BTREE",
+              "expressions": [
+                "scheduled_start_at"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_maintenance_window_status",
+              "type": "BTREE",
+              "expressions": [
+                "window_status"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "maintenance_window_maintenance_id_seq_no_key",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id",
+                "seq_no"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "maintenance_window_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_window_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "maintenance_window_maintenance_id_fkey",
+              "columns": [
+                "maintenance_id"
+              ],
+              "referencedTable": "maintenance.maintenance",
+              "referencedColumns": [
+                "maintenance_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "maintenance_window_actual_downtime_minutes_check",
+              "expression": "((actual_downtime_minutes IS NULL) OR (actual_downtime_minutes \u003e= 0))"
+            },
+            {
+              "name": "maintenance_window_check",
+              "expression": "(scheduled_end_at \u003e scheduled_start_at)"
+            },
+            {
+              "name": "maintenance_window_check1",
+              "expression": "((actual_start_at IS NULL) OR (actual_end_at IS NULL) OR (actual_end_at \u003e actual_start_at))"
+            },
+            {
+              "name": "maintenance_window_expected_downtime_minutes_check",
+              "expression": "((expected_downtime_minutes IS NULL) OR (expected_downtime_minutes \u003e= 0))"
+            },
+            {
+              "name": "maintenance_window_window_status_check",
+              "expression": "(window_status = ANY (ARRAY['planned'::text, 'cancelled'::text, 'superseded'::text, 'executed'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 90112
+        },
+        {
+          "name": "notice",
+          "columns": [
+            {
+              "name": "notice_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "maintenance_window_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "notice_type",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "audience",
+              "position": 5,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "notice_channel_id",
+              "position": 6,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "template_code",
+              "position": 7,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "template_version",
+              "position": 8,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "generation_source",
+              "position": 9,
+              "type": "text",
+              "nullable": false,
+              "default": "'manual'::text"
+            },
+            {
+              "name": "send_status",
+              "position": 10,
+              "type": "text",
+              "nullable": false,
+              "default": "'draft'::text"
+            },
+            {
+              "name": "scheduled_send_at",
+              "position": 11,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "sent_at",
+              "position": 12,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "created_by_admin_id",
+              "position": 13,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "created_at",
+              "position": 14,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "metadata",
+              "position": 15,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_notice_channel",
+              "type": "BTREE",
+              "expressions": [
+                "notice_channel_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_notice_maintenance",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_notice_send_status",
+              "type": "BTREE",
+              "expressions": [
+                "send_status"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_notice_type",
+              "type": "BTREE",
+              "expressions": [
+                "notice_type"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_notice_window",
+              "type": "BTREE",
+              "expressions": [
+                "maintenance_window_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notice_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "notice_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "notice_maintenance_id_fkey",
+              "columns": [
+                "maintenance_id"
+              ],
+              "referencedTable": "maintenance.maintenance",
+              "referencedColumns": [
+                "maintenance_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "notice_maintenance_window_id_fkey",
+              "columns": [
+                "maintenance_window_id"
+              ],
+              "referencedTable": "maintenance.maintenance_window",
+              "referencedColumns": [
+                "maintenance_window_id"
+              ],
+              "onDelete": "SET NULL",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "notice_notice_channel_id_fkey",
+              "columns": [
+                "notice_channel_id"
+              ],
+              "referencedTable": "maintenance.notice_channel",
+              "referencedColumns": [
+                "notice_channel_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "notice_audience_check",
+              "expression": "(audience = ANY (ARRAY['internal'::text, 'external'::text]))"
+            },
+            {
+              "name": "notice_generation_source_check",
+              "expression": "(generation_source = ANY (ARRAY['manual'::text, 'ai'::text, 'system'::text, 'import'::text]))"
+            },
+            {
+              "name": "notice_notice_type_check",
+              "expression": "(notice_type = ANY (ARRAY['announcement'::text, 'reminder'::text, 'reschedule'::text, 'cancellation'::text, 'start'::text, 'completion'::text, 'internal_update'::text]))"
+            },
+            {
+              "name": "notice_send_status_check",
+              "expression": "(send_status = ANY (ARRAY['draft'::text, 'ready'::text, 'sent'::text, 'failed'::text, 'suppressed'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "indexSize": 57344
+        },
+        {
+          "name": "notice_channel",
+          "columns": [
+            {
+              "name": "notice_channel_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_it",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_en",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "synonyms",
+              "position": 6,
+              "type": "text[]",
+              "nullable": false,
+              "default": "'{}'::text[]"
+            },
+            {
+              "name": "sort_order",
+              "position": 7,
+              "type": "integer",
+              "nullable": false,
+              "default": "100"
+            },
+            {
+              "name": "is_active",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "notice_channel_code_key",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "notice_channel_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "notice_channel_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "notice_channel_code_check",
+              "expression": "(code ~ '^[a-z][a-z0-9_]*$'::text)"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 40960
+        },
+        {
+          "name": "notice_locale",
+          "columns": [
+            {
+              "name": "notice_locale_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "notice_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "locale",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "subject",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "body_html",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "body_text",
+              "position": 6,
+              "type": "text",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "notice_locale_notice_id_locale_key",
+              "type": "BTREE",
+              "expressions": [
+                "notice_id",
+                "locale"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "notice_locale_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "notice_locale_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "notice_locale_notice_id_fkey",
+              "columns": [
+                "notice_id"
+              ],
+              "referencedTable": "maintenance.notice",
+              "referencedColumns": [
+                "notice_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "notice_locale_locale_check",
+              "expression": "(locale = ANY (ARRAY['it'::text, 'en'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "indexSize": 24576
+        },
+        {
+          "name": "notice_quality_flag",
+          "columns": [
+            {
+              "name": "notice_quality_flag_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "notice_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "quality_flag_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "source",
+              "position": 4,
+              "type": "text",
+              "nullable": false,
+              "default": "'manual'::text"
+            },
+            {
+              "name": "confidence",
+              "position": 5,
+              "type": "numeric(5,4)",
+              "nullable": true
+            },
+            {
+              "name": "metadata",
+              "position": 6,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_notice_quality_flag_flag",
+              "type": "BTREE",
+              "expressions": [
+                "quality_flag_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_notice_quality_flag_notice",
+              "type": "BTREE",
+              "expressions": [
+                "notice_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "notice_quality_flag_notice_id_quality_flag_id_key",
+              "type": "BTREE",
+              "expressions": [
+                "notice_id",
+                "quality_flag_id"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "notice_quality_flag_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "notice_quality_flag_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "notice_quality_flag_notice_id_fkey",
+              "columns": [
+                "notice_id"
+              ],
+              "referencedTable": "maintenance.notice",
+              "referencedColumns": [
+                "notice_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "notice_quality_flag_quality_flag_id_fkey",
+              "columns": [
+                "quality_flag_id"
+              ],
+              "referencedTable": "maintenance.quality_flag",
+              "referencedColumns": [
+                "quality_flag_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "notice_quality_flag_confidence_check",
+              "expression": "((confidence IS NULL) OR ((confidence \u003e= (0)::numeric) AND (confidence \u003c= (1)::numeric)))"
+            },
+            {
+              "name": "notice_quality_flag_source_check",
+              "expression": "(source = ANY (ARRAY['manual'::text, 'import'::text, 'rule'::text, 'ai_extracted'::text, 'catalog_mapping'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "indexSize": 40960
+        },
+        {
+          "name": "quality_flag",
+          "columns": [
+            {
+              "name": "quality_flag_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_it",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_en",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "synonyms",
+              "position": 6,
+              "type": "text[]",
+              "nullable": false,
+              "default": "'{}'::text[]"
+            },
+            {
+              "name": "sort_order",
+              "position": 7,
+              "type": "integer",
+              "nullable": false,
+              "default": "100"
+            },
+            {
+              "name": "is_active",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "quality_flag_code_key",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "quality_flag_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "quality_flag_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "quality_flag_code_check",
+              "expression": "(code ~ '^[a-z][a-z0-9_]*$'::text)"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 40960
+        },
+        {
+          "name": "reason_class",
+          "columns": [
+            {
+              "name": "reason_class_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_it",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_en",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "synonyms",
+              "position": 6,
+              "type": "text[]",
+              "nullable": false,
+              "default": "'{}'::text[]"
+            },
+            {
+              "name": "sort_order",
+              "position": 7,
+              "type": "integer",
+              "nullable": false,
+              "default": "100"
+            },
+            {
+              "name": "is_active",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "reason_class_code_key",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "reason_class_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "reason_class_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "reason_class_code_check",
+              "expression": "(code ~ '^[a-z][a-z0-9_]*$'::text)"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 40960
+        },
+        {
+          "name": "service_dependency",
+          "columns": [
+            {
+              "name": "service_dependency_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "upstream_service_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "downstream_service_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "dependency_type",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "is_redundant",
+              "position": 5,
+              "type": "boolean",
+              "nullable": false,
+              "default": "false"
+            },
+            {
+              "name": "default_severity",
+              "position": 6,
+              "type": "text",
+              "nullable": false,
+              "default": "'unavailable'::text"
+            },
+            {
+              "name": "source",
+              "position": 7,
+              "type": "text",
+              "nullable": false,
+              "default": "'manual'::text"
+            },
+            {
+              "name": "is_active",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "created_at",
+              "position": 10,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "name": "updated_at",
+              "position": 11,
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_service_dependency_downstream_active",
+              "type": "BTREE",
+              "expressions": [
+                "downstream_service_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_service_dependency_upstream_active",
+              "type": "BTREE",
+              "expressions": [
+                "upstream_service_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "service_dependency_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "service_dependency_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "service_dependency_upstream_service_id_downstream_service_i_key",
+              "type": "BTREE",
+              "expressions": [
+                "upstream_service_id",
+                "downstream_service_id",
+                "dependency_type"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "service_dependency_downstream_service_id_fkey",
+              "columns": [
+                "downstream_service_id"
+              ],
+              "referencedTable": "maintenance.service_taxonomy",
+              "referencedColumns": [
+                "service_taxonomy_id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "service_dependency_upstream_service_id_fkey",
+              "columns": [
+                "upstream_service_id"
+              ],
+              "referencedTable": "maintenance.service_taxonomy",
+              "referencedColumns": [
+                "service_taxonomy_id"
+              ],
+              "onDelete": "RESTRICT",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "service_dependency_check",
+              "expression": "(upstream_service_id \u003c\u003e downstream_service_id)"
+            },
+            {
+              "name": "service_dependency_default_severity_check",
+              "expression": "(default_severity = ANY (ARRAY['none'::text, 'degraded'::text, 'unavailable'::text]))"
+            },
+            {
+              "name": "service_dependency_dependency_type_check",
+              "expression": "(dependency_type = ANY (ARRAY['runs_on'::text, 'connects_through'::text, 'consumes'::text, 'depends_on'::text]))"
+            },
+            {
+              "name": "service_dependency_source_check",
+              "expression": "(source = ANY (ARRAY['manual'::text, 'ai_suggested'::text, 'usage_suggested'::text, 'import_suggested'::text]))"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 73728
+        },
+        {
+          "name": "service_taxonomy",
+          "columns": [
+            {
+              "name": "service_taxonomy_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "technical_domain_id",
+              "position": 3,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "name_it",
+              "position": 4,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_en",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description",
+              "position": 6,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "synonyms",
+              "position": 7,
+              "type": "text[]",
+              "nullable": false,
+              "default": "'{}'::text[]"
+            },
+            {
+              "name": "sort_order",
+              "position": 8,
+              "type": "integer",
+              "nullable": false,
+              "default": "100"
+            },
+            {
+              "name": "is_active",
+              "position": 9,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 10,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "target_type_id",
+              "position": 11,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "audience",
+              "position": 12,
+              "type": "text",
+              "nullable": false,
+              "default": "'maintenance'::text"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_service_taxonomy_domain",
+              "type": "BTREE",
+              "expressions": [
+                "technical_domain_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "idx_service_taxonomy_target_type",
+              "type": "BTREE",
+              "expressions": [
+                "target_type_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "service_taxonomy_code_key",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "service_taxonomy_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "service_taxonomy_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "service_taxonomy_target_type_id_fkey",
+              "columns": [
+                "target_type_id"
+              ],
+              "referencedTable": "maintenance.target_type",
+              "referencedColumns": [
+                "target_type_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "service_taxonomy_technical_domain_id_fkey",
+              "columns": [
+                "technical_domain_id"
+              ],
+              "referencedTable": "maintenance.technical_domain",
+              "referencedColumns": [
+                "technical_domain_id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "service_taxonomy_audience_check",
+              "expression": "(audience = ANY (ARRAY['internal'::text, 'external'::text, 'both'::text, 'maintenance'::text]))"
+            },
+            {
+              "name": "service_taxonomy_code_check",
+              "expression": "(code ~ '^[a-z][a-z0-9_]*$'::text)"
+            }
+          ],
+          "rowCount": 66,
+          "dataSize": 24576,
+          "indexSize": 106496
+        },
+        {
+          "name": "site",
+          "columns": [
+            {
+              "name": "site_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "city",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "country_code",
+              "position": 5,
+              "type": "character(2)",
+              "nullable": true
+            },
+            {
+              "name": "is_active",
+              "position": 6,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 7,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            },
+            {
+              "name": "scope",
+              "position": 8,
+              "type": "text",
+              "nullable": false,
+              "default": "'global'::text"
+            },
+            {
+              "name": "owner_maintenance_id",
+              "position": 9,
+              "type": "bigint",
+              "nullable": true
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_site_owner_maintenance",
+              "type": "BTREE",
+              "expressions": [
+                "owner_maintenance_id"
+              ],
+              "primary": false,
+              "unique": false,
+              "visible": true
+            },
+            {
+              "name": "site_code_global_unique",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "site_code_scoped_unique",
+              "type": "BTREE",
+              "expressions": [
+                "owner_maintenance_id",
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "site_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "site_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "site_owner_maintenance_id_fkey",
+              "columns": [
+                "owner_maintenance_id"
+              ],
+              "referencedTable": "maintenance.maintenance",
+              "referencedColumns": [
+                "maintenance_id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "site_scope_check",
+              "expression": "(scope = ANY (ARRAY['global'::text, 'scoped'::text]))"
+            },
+            {
+              "name": "site_scope_consistency",
+              "expression": "(((scope = 'global'::text) AND (owner_maintenance_id IS NULL)) OR ((scope = 'scoped'::text) AND (owner_maintenance_id IS NOT NULL)))"
+            }
+          ],
+          "rowCount": 2,
+          "dataSize": 8192,
+          "indexSize": 57344
+        },
+        {
+          "name": "target_type",
+          "columns": [
+            {
+              "name": "target_type_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_it",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_en",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "synonyms",
+              "position": 6,
+              "type": "text[]",
+              "nullable": false,
+              "default": "'{}'::text[]"
+            },
+            {
+              "name": "sort_order",
+              "position": 7,
+              "type": "integer",
+              "nullable": false,
+              "default": "100"
+            },
+            {
+              "name": "is_active",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "target_type_code_key",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "target_type_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "target_type_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "target_type_code_check",
+              "expression": "(code ~ '^[a-z][a-z0-9_]*$'::text)"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 40960
+        },
+        {
+          "name": "technical_domain",
+          "columns": [
+            {
+              "name": "technical_domain_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false
+            },
+            {
+              "name": "code",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_it",
+              "position": 3,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "name_en",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "description",
+              "position": 5,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "synonyms",
+              "position": 6,
+              "type": "text[]",
+              "nullable": false,
+              "default": "'{}'::text[]"
+            },
+            {
+              "name": "sort_order",
+              "position": 7,
+              "type": "integer",
+              "nullable": false,
+              "default": "100"
+            },
+            {
+              "name": "is_active",
+              "position": 8,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "metadata",
+              "position": 9,
+              "type": "jsonb",
+              "nullable": false,
+              "default": "'{}'::jsonb"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "technical_domain_code_key",
+              "type": "BTREE",
+              "expressions": [
+                "code"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "technical_domain_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "technical_domain_id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "checkConstraints": [
+            {
+              "name": "technical_domain_code_check",
+              "expression": "(code ~ '^[a-z][a-z0-9_]*$'::text)"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 40960
+        }
+      ],
+      "views": [
+        {
+          "name": "v_current_window",
+          "definition": " SELECT DISTINCT ON (maintenance_id) maintenance_id,\n    maintenance_window_id,\n    seq_no,\n    window_status,\n    scheduled_start_at,\n    scheduled_end_at,\n    expected_downtime_minutes\n   FROM maintenance.maintenance_window mw\n  ORDER BY maintenance_id, seq_no DESC;",
+          "columns": [
+            {
+              "name": "maintenance_id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "maintenance_window_id",
+              "position": 2,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "seq_no",
+              "position": 3,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "window_status",
+              "position": 4,
+              "type": "text",
+              "nullable": true
+            },
+            {
+              "name": "scheduled_start_at",
+              "position": 5,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "scheduled_end_at",
+              "position": 6,
+              "type": "timestamp with time zone",
+              "nullable": true
+            },
+            {
+              "name": "expected_downtime_minutes",
+              "position": 7,
+              "type": "integer",
+              "nullable": true
+            }
+          ]
+        }
+      ],
+      "sequences": [
+        {
+          "name": "customer_scope_customer_scope_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "impact_effect_impact_effect_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "maintenance_event_maintenance_event_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "maintenance_impact_effect_maintenance_impact_effect_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "maintenance_impacted_customer_maintenance_impacted_customer_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "maintenance_kind_maintenance_kind_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "maintenance_maintenance_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "maintenance_quality_flag_maintenance_quality_flag_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "maintenance_reason_class_maintenance_reason_class_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "maintenance_service_taxonomy_maintenance_service_taxonomy_i_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "maintenance_target_maintenance_target_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "maintenance_window_maintenance_window_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "notice_channel_notice_channel_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "notice_locale_notice_locale_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "notice_notice_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "notice_quality_flag_notice_quality_flag_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "quality_flag_quality_flag_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "reason_class_reason_class_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "service_dependency_service_dependency_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "service_taxonomy_service_taxonomy_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "site_site_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "target_type_target_type_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
+          "cache": 1,
+          "cycle": false
+        },
+        {
+          "name": "technical_domain_technical_domain_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854775807,
           "cache": 1,
           "cycle": false
         }

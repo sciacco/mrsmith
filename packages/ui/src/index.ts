@@ -1,6 +1,16 @@
 export { AppShell } from './components/AppShell/AppShell';
 export { SupportMenu } from './components/SupportMenu';
 export type { AppShellSupportConfig, SupportPriority, SupportUser } from './components/SupportMenu';
+export { NotificationBell } from './components/NotificationBell';
+export type {
+  NotificationBellAuth,
+  NotificationBellProps,
+  NotificationBellVariant,
+  NotificationBellVisibility,
+  NotificationItem,
+  NotificationListStatus,
+  NotificationSummary,
+} from './components/NotificationBell';
 export { AccessNotice } from './components/AccessNotice/AccessNotice';
 export type { AccessNoticeState } from './components/AccessNotice/AccessNotice';
 export { UserMenu } from './components/UserMenu/UserMenu';

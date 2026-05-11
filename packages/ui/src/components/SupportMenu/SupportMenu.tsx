@@ -15,6 +15,7 @@ export interface SupportUser {
 
 export interface AppShellSupportConfig {
   appId?: string;
+  authenticated?: boolean;
   user?: SupportUser | null;
   getAccessToken?: (minValidity?: number) => Promise<string | undefined> | string | undefined;
   forceRefreshToken?: () => Promise<string | undefined> | string | undefined;
