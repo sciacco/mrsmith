@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
-import { Icon, Skeleton, StatusBadge, useToast } from '@mrsmith/ui';
+import { Icon, SearchInput, Skeleton, StatusBadge, TableToolbar, useTableFilter, useToast } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { useApiClient } from '../api/client';
 import { useXConnectOrders } from '../api/queries';
+import type { XConnectOrder } from '../types';
 import { formatDate } from '../utils/format';
 import { getOrderPdfNotReadyMessage } from './orderPdfState';
 import shared from './shared.module.css';
@@ -24,10 +25,18 @@ function getOrderPdfErrorMessage(error: unknown): string {
 
 export default function ReportXConnectRhPage() {
   const [orderPdfStates, setOrderPdfStates] = useState<Record<number, OrderPdfState>>({});
+  const [search, setSearch] = useState('');
 
   const { toast } = useToast();
   const api = useApiClient();
   const ordersQ = useXConnectOrders();
+
+  const orders = ordersQ.data ?? [];
+  const { filtered: filteredOrders } = useTableFilter<XConnectOrder>({
+    data: orders,
+    searchQuery: search,
+    searchFields: ['id_ordine', 'codice_ordine', 'cliente', 'data_creazione'],
+  });
 
   const triggerDownload = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
@@ -112,9 +121,20 @@ export default function ReportXConnectRhPage() {
     <div className={shared.page}>
       <h1 className={shared.title}>Ordini XConnect</h1>
 
+      <TableToolbar>
+        <div className={styles.search}>
+          <SearchInput
+            value={search}
+            onChange={(v) => setSearch(v)}
+            placeholder="Cerca per ID, codice, cliente o data…"
+          />
+        </div>
+      </TableToolbar>
+
       {ordersQ.isLoading && <Skeleton rows={8} />}
       {ordersQ.isError && <div className={shared.error}>Errore nel caricamento degli ordini.</div>}
-      {ordersQ.data && (
+
+      {ordersQ.data && filteredOrders.length > 0 && (
         <div className={shared.tableWrap}>
           <table className={shared.table}>
             <thead>
@@ -127,7 +147,7 @@ export default function ReportXConnectRhPage() {
               </tr>
             </thead>
             <tbody>
-              {ordersQ.data.map((o, i) => (
+              {filteredOrders.map((o, i) => (
                 <tr key={o.id_ordine} style={{ animationDelay: `${Math.min(i * 10, 300)}ms` }}>
                   <td className={shared.numCol}>{o.id_ordine}</td>
                   <td className={shared.mono}>{o.codice_ordine ?? ''}</td>
@@ -138,8 +158,15 @@ export default function ReportXConnectRhPage() {
               ))}
             </tbody>
           </table>
-          {ordersQ.data.length === 0 && <div className={shared.empty}>Nessun ordine XConnect evaso.</div>}
         </div>
+      )}
+
+      {ordersQ.data && orders.length === 0 && (
+        <div className={shared.empty}>Nessun ordine XConnect evaso.</div>
+      )}
+
+      {ordersQ.data && orders.length > 0 && filteredOrders.length === 0 && (
+        <div className={shared.empty}>Nessun ordine corrisponde alla ricerca.</div>
       )}
     </div>
   );
