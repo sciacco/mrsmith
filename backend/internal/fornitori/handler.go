@@ -32,7 +32,8 @@ const (
 	codeDependencyUnavailable = "DEPENDENCY_UNAVAILABLE"
 	codeSkipRoleRequired      = "SKIP_QUALIFICATION_ROLE_REQUIRED"
 
-	maxUploadBytes = 25 << 20
+	maxUploadBytes           = 25 << 20
+	maxUpstreamErrorLogBytes = 2048
 
 	qualificationReferenceType = "QUALIFICATION_REF"
 )
@@ -331,6 +332,29 @@ func (h *Handler) forwardArak(w http.ResponseWriter, r *http.Request, path, rawQ
 		return
 	}
 
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			h.requestLogger(r, "proxy_to_arak", "upstream_path", path, "upstream_status", resp.StatusCode).Warn("failed to read upstream error response", "error", readErr)
+			httputil.JSON(w, http.StatusBadGateway, map[string]string{
+				"error": "Servizio fornitori temporaneamente non disponibile",
+				"code":  "UPSTREAM_READ_FAILED",
+			})
+			return
+		}
+		h.requestLogger(r, "proxy_to_arak", "upstream_path", path, "upstream_status", resp.StatusCode).Warn(
+			"upstream request returned error",
+			"upstream_body", truncateForLog(string(bodyBytes), maxUpstreamErrorLogBytes),
+		)
+		copyResponseHeaders(w.Header(), resp.Header)
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", "application/json")
+		}
+		w.WriteHeader(resp.StatusCode)
+		_, _ = w.Write(bodyBytes)
+		return
+	}
+
 	copyResponseHeaders(w.Header(), resp.Header)
 	if w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", "application/json")
@@ -358,25 +382,74 @@ func (h *Handler) handlePutProvider(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
 		return
 	}
-	var raw map[string]any
-	if len(bytes.TrimSpace(body)) > 0 {
-		if err := json.Unmarshal(body, &raw); err != nil {
-			httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+	normalizedBody, raw, ok := normalizeProviderEditBody(w, r, body)
+	if !ok {
+		return
+	}
+	if value, ok := raw["skip_qualification_validation"].(bool); ok && value {
+		claims, ok := auth.GetClaims(r.Context())
+		if !ok || !authz.HasAnyRole(claims.Roles, applaunch.FornitoriSkipQualificationRoles()...) {
+			httputil.JSON(w, http.StatusForbidden, map[string]string{
+				"error": "Operazione riservata agli utenti abilitati",
+				"code":  codeSkipRoleRequired,
+			})
 			return
-		}
-		if value, ok := raw["skip_qualification_validation"].(bool); ok && value {
-			claims, ok := auth.GetClaims(r.Context())
-			if !ok || !authz.HasAnyRole(claims.Roles, applaunch.FornitoriSkipQualificationRoles()...) {
-				httputil.JSON(w, http.StatusForbidden, map[string]string{
-					"error": "Operazione riservata agli utenti abilitati",
-					"code":  codeSkipRoleRequired,
-				})
-				return
-			}
 		}
 	}
 	path := arakRoot + "/provider/" + url.PathEscape(r.PathValue("id"))
-	h.forwardArak(w, r, path, r.URL.RawQuery, bytes.NewReader(body), nil)
+	h.forwardArak(w, r, path, r.URL.RawQuery, bytes.NewReader(normalizedBody), nil)
+}
+
+func normalizeProviderEditBody(w http.ResponseWriter, r *http.Request, body []byte) ([]byte, map[string]any, bool) {
+	providerID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || providerID <= 0 {
+		httputil.Error(w, http.StatusBadRequest, "Fornitore non valido")
+		return nil, nil, false
+	}
+
+	raw := map[string]any{}
+	if len(bytes.TrimSpace(body)) > 0 {
+		if err := json.Unmarshal(body, &raw); err != nil || raw == nil {
+			httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+			return nil, nil, false
+		}
+	}
+
+	if value, exists := raw["id"]; exists && !jsonIDMatches(value, providerID) {
+		httputil.Error(w, http.StatusBadRequest, "Fornitore non valido")
+		return nil, nil, false
+	}
+	raw["id"] = providerID
+
+	normalized, err := json.Marshal(raw)
+	if err != nil {
+		httputil.InternalError(w, r, err, "provider edit body encode failed")
+		return nil, nil, false
+	}
+	return normalized, raw, true
+}
+
+func jsonIDMatches(value any, expected int64) bool {
+	switch typed := value.(type) {
+	case float64:
+		return typed == float64(expected)
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
+		return err == nil && parsed == expected
+	default:
+		return false
+	}
+}
+
+func truncateForLog(value string, maxBytes int) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= maxBytes {
+		return value
+	}
+	if maxBytes <= 3 {
+		return value[:maxBytes]
+	}
+	return value[:maxBytes-3] + "..."
 }
 
 type providerReferencePayload struct {

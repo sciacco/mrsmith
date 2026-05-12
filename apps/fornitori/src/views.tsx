@@ -64,6 +64,7 @@ function apiErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
     const body = error.body;
     if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') return body.error;
+    if (body && typeof body === 'object' && 'message' in body && typeof body.message === 'string') return body.message;
     return error.message;
   }
   return fallback;

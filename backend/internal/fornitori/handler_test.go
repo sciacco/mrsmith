@@ -111,7 +111,7 @@ func TestDevAdminCanSetSkipQualification(t *testing.T) {
 	if gotPath != "/arak/provider-qualification/v1/provider/12" {
 		t.Fatalf("unexpected upstream path %q", gotPath)
 	}
-	if gotBody != `{"skip_qualification_validation":true}` {
+	if gotBody != `{"id":12,"skip_qualification_validation":true}` {
 		t.Fatalf("unexpected upstream body %q", gotBody)
 	}
 }

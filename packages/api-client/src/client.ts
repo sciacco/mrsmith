@@ -176,6 +176,7 @@ export function createApiClient({
         ok: res.ok,
         durationMs: Math.round(nowMs() - started),
         requestId: res.headers.get('X-Request-ID') ?? undefined,
+        error: res.ok ? undefined : await readResponseErrorMessage(res),
       });
       return res;
     } catch (error) {
@@ -195,6 +196,31 @@ export function createApiClient({
   async function readErrorBody(res: Response): Promise<unknown> {
     try {
       return await res.clone().json();
+    } catch {
+      return undefined;
+    }
+  }
+
+  function errorMessageFromBody(body: unknown): string | undefined {
+    if (body && typeof body === 'object') {
+      if ('error' in body && typeof body.error === 'string') return body.error;
+      if ('message' in body && typeof body.message === 'string') return body.message;
+    }
+    if (typeof body === 'string') {
+      const trimmed = body.trim();
+      return trimmed || undefined;
+    }
+    return undefined;
+  }
+
+  async function readResponseErrorMessage(res: Response): Promise<string | undefined> {
+    const jsonBody = await readErrorBody(res);
+    const jsonMessage = errorMessageFromBody(jsonBody);
+    if (jsonMessage) return jsonMessage;
+
+    try {
+      const text = (await res.clone().text()).trim();
+      return text || undefined;
     } catch {
       return undefined;
     }
