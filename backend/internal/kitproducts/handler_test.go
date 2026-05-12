@@ -717,8 +717,9 @@ func (c *kitProductsTestConn) QueryContext(_ context.Context, query string, args
 	}
 	if strings.Contains(query, "FROM products.product p") {
 		translations := []byte(`[{"language":"it","short":"Router","long":"Router IT"},{"language":"en","short":"Router","long":"Router EN"}]`)
+		kitUsages := []byte(`[{"kit_id":7,"kit_name":"Kit Router"},{"kit_id":8,"kit_name":"Kit Firewall"}]`)
 		return &kitProductsTestRows{
-			columns: []string{"code", "internal_name", "category_id", "name", "color", "translation_uuid", "nrc", "mrc", "img_url", "erp_sync", "asset_flow", "translations"},
+			columns: []string{"code", "internal_name", "category_id", "name", "color", "translation_uuid", "nrc", "mrc", "img_url", "erp_sync", "asset_flow", "translations", "kit_usage_count", "kit_usages"},
 			values: [][]driver.Value{{
 				"PRD001",
 				"Router",
@@ -732,6 +733,8 @@ func (c *kitProductsTestConn) QueryContext(_ context.Context, query string, args
 				true,
 				nil,
 				translations,
+				int64(2),
+				kitUsages,
 			}},
 		}, nil
 	}

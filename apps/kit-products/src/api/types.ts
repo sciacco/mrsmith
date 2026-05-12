@@ -57,6 +57,11 @@ export interface Translation {
   long: string;
 }
 
+export interface ProductKitUsage {
+  kit_id: number;
+  kit_name: string;
+}
+
 export interface ProductGroupTranslation {
   language: string;
   short: string;
@@ -95,6 +100,8 @@ export interface Product {
   erp_sync: boolean;
   asset_flow: string | null;
   translations: Translation[];
+  kit_usage_count: number;
+  kit_usages: ProductKitUsage[];
 }
 
 export interface ProductCreateRequest {

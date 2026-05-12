@@ -20,18 +20,25 @@ type Translation struct {
 }
 
 type Product struct {
-	Code            string        `json:"code"`
-	InternalName    string        `json:"internal_name"`
-	CategoryID      int           `json:"category_id"`
-	CategoryName    string        `json:"category_name"`
-	CategoryColor   string        `json:"category_color"`
-	TranslationUUID string        `json:"translation_uuid"`
-	NRC             float64       `json:"nrc"`
-	MRC             float64       `json:"mrc"`
-	ImgURL          *string       `json:"img_url"`
-	ERPSync         bool          `json:"erp_sync"`
-	AssetFlow       *string       `json:"asset_flow"`
-	Translations    []Translation `json:"translations"`
+	Code            string            `json:"code"`
+	InternalName    string            `json:"internal_name"`
+	CategoryID      int               `json:"category_id"`
+	CategoryName    string            `json:"category_name"`
+	CategoryColor   string            `json:"category_color"`
+	TranslationUUID string            `json:"translation_uuid"`
+	NRC             float64           `json:"nrc"`
+	MRC             float64           `json:"mrc"`
+	ImgURL          *string           `json:"img_url"`
+	ERPSync         bool              `json:"erp_sync"`
+	AssetFlow       *string           `json:"asset_flow"`
+	Translations    []Translation     `json:"translations"`
+	KitUsageCount   int               `json:"kit_usage_count"`
+	KitUsages       []ProductKitUsage `json:"kit_usages"`
+}
+
+type ProductKitUsage struct {
+	KitID   int64  `json:"kit_id"`
+	KitName string `json:"kit_name"`
 }
 
 type ProductCreateRequest struct {
@@ -65,7 +72,31 @@ func (h *Handler) handleListProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	usedInKits := strings.EqualFold(r.URL.Query().Get("used_in_kits"), "true")
+
 	rows, err := h.mistraDB.QueryContext(r.Context(), `
+WITH usage_rows AS (
+  SELECT DISTINCT
+    kp.product_code,
+    k.id AS kit_id,
+    k.internal_name AS kit_name
+  FROM products.kit_product kp
+  JOIN products.kit k ON k.id = kp.kit_id
+),
+usage AS (
+  SELECT
+    product_code,
+    COUNT(*)::int AS kit_usage_count,
+    json_agg(
+      json_build_object(
+        'kit_id', kit_id,
+        'kit_name', kit_name
+      )
+      ORDER BY kit_name, kit_id
+    ) AS kit_usages
+  FROM usage_rows
+  GROUP BY product_code
+)
 SELECT
   p.code,
   p.internal_name,
@@ -78,11 +109,15 @@ SELECT
   p.img_url,
   COALESCE(p.erp_sync, true),
   p.asset_flow,
-  COALESCE(common.get_translations(p.translation_uuid), '[]'::json)
+  COALESCE(common.get_translations(p.translation_uuid), '[]'::json),
+  COALESCE(usage.kit_usage_count, 0),
+  COALESCE(usage.kit_usages, '[]'::json)
 FROM products.product p
 JOIN products.product_category pc ON pc.id = p.category_id
+LEFT JOIN usage ON usage.product_code = p.code
+WHERE (NOT $1::boolean OR COALESCE(usage.kit_usage_count, 0) > 0)
 ORDER BY p.internal_name
-`)
+`, usedInKits)
 	if err != nil {
 		h.dbFailure(w, r, "list_products", err)
 		return
@@ -372,6 +407,28 @@ DO UPDATE SET
 
 func (h *Handler) getProductByCode(r *http.Request, code string) (Product, error) {
 	row := h.mistraDB.QueryRowContext(r.Context(), `
+WITH usage_rows AS (
+  SELECT DISTINCT
+    kp.product_code,
+    k.id AS kit_id,
+    k.internal_name AS kit_name
+  FROM products.kit_product kp
+  JOIN products.kit k ON k.id = kp.kit_id
+),
+usage AS (
+  SELECT
+    product_code,
+    COUNT(*)::int AS kit_usage_count,
+    json_agg(
+      json_build_object(
+        'kit_id', kit_id,
+        'kit_name', kit_name
+      )
+      ORDER BY kit_name, kit_id
+    ) AS kit_usages
+  FROM usage_rows
+  GROUP BY product_code
+)
 SELECT
   p.code,
   p.internal_name,
@@ -384,9 +441,12 @@ SELECT
   p.img_url,
   COALESCE(p.erp_sync, true),
   p.asset_flow,
-  COALESCE(common.get_translations(p.translation_uuid), '[]'::json)
+  COALESCE(common.get_translations(p.translation_uuid), '[]'::json),
+  COALESCE(usage.kit_usage_count, 0),
+  COALESCE(usage.kit_usages, '[]'::json)
 FROM products.product p
 JOIN products.product_category pc ON pc.id = p.category_id
+LEFT JOIN usage ON usage.product_code = p.code
 WHERE p.code = $1
 `, code)
 	return scanProduct(row)
@@ -399,6 +459,7 @@ func scanProduct(scanner interface{ Scan(dest ...any) error }) (Product, error) 
 		imgURL          sql.NullString
 		assetFlow       sql.NullString
 		rawTranslations []byte
+		rawKitUsages    []byte
 	)
 	if err := scanner.Scan(
 		&product.Code,
@@ -413,6 +474,8 @@ func scanProduct(scanner interface{ Scan(dest ...any) error }) (Product, error) 
 		&product.ERPSync,
 		&assetFlow,
 		&rawTranslations,
+		&product.KitUsageCount,
+		&rawKitUsages,
 	); err != nil {
 		return Product{}, err
 	}
@@ -421,6 +484,11 @@ func scanProduct(scanner interface{ Scan(dest ...any) error }) (Product, error) 
 	product.AssetFlow = nullString(assetFlow)
 	if len(rawTranslations) > 0 {
 		if err := json.Unmarshal(rawTranslations, &product.Translations); err != nil {
+			return Product{}, err
+		}
+	}
+	if len(rawKitUsages) > 0 {
+		if err := json.Unmarshal(rawKitUsages, &product.KitUsages); err != nil {
 			return Product{}, err
 		}
 	}

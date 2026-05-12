@@ -27,7 +27,9 @@ export const kitProductsKeys = {
   categories: ['kit-products', 'categories'] as const,
   customerGroups: ['kit-products', 'customer-groups'] as const,
   productGroups: ['kit-products', 'product-groups'] as const,
-  products: ['kit-products', 'products'] as const,
+  productsRoot: ['kit-products', 'products'] as const,
+  products: (usedInKits = false) =>
+    ['kit-products', 'products', usedInKits ? 'used-in-kits' : 'all'] as const,
 };
 
 export function useAssetFlows() {
@@ -170,11 +172,11 @@ export function useUpdateProductGroup() {
   });
 }
 
-export function useProducts() {
+export function useProducts({ usedInKits = false }: { usedInKits?: boolean } = {}) {
   const api = useApiClient();
   return useQuery({
-    queryKey: kitProductsKeys.products,
-    queryFn: () => api.get<Product[]>('/kit-products/v1/product'),
+    queryKey: kitProductsKeys.products(usedInKits),
+    queryFn: () => api.get<Product[]>(`/kit-products/v1/product${usedInKits ? '?used_in_kits=true' : ''}`),
   });
 }
 
@@ -185,7 +187,7 @@ export function useCreateProduct() {
     mutationFn: (body: ProductCreateRequest) =>
       api.post<Product>('/kit-products/v1/product', body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: kitProductsKeys.products });
+      queryClient.invalidateQueries({ queryKey: kitProductsKeys.productsRoot });
     },
   });
 }
@@ -197,7 +199,7 @@ export function useUpdateProduct() {
     mutationFn: ({ code, ...body }: { code: string } & ProductUpdateRequest) =>
       api.put<Product>(`/kit-products/v1/product/${encodeURIComponent(code)}`, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: kitProductsKeys.products });
+      queryClient.invalidateQueries({ queryKey: kitProductsKeys.productsRoot });
     },
   });
 }
@@ -212,7 +214,7 @@ export function useUpdateProductTranslations() {
         { translations },
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: kitProductsKeys.products });
+      queryClient.invalidateQueries({ queryKey: kitProductsKeys.productsRoot });
     },
   });
 }

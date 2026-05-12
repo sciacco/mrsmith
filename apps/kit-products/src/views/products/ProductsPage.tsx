@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
-import { Modal, SearchInput, Skeleton, ToggleSwitch, useToast } from '@mrsmith/ui';
+import { Icon, Modal, SearchInput, Skeleton, ToggleSwitch, Tooltip, useToast } from '@mrsmith/ui';
 import {
   useAssetFlows,
   useCategories,
@@ -24,8 +25,11 @@ const emptyTranslations: Translation[] = [
 
 export function ProductsPage() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [showUsedInKits, setShowUsedInKits] = useState(false);
+  const [usageProduct, setUsageProduct] = useState<Product | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [newProduct, setNewProduct] = useState<ProductCreateRequest>({
@@ -51,7 +55,7 @@ export function ProductsPage() {
   });
   const [originalTranslations, setOriginalTranslations] = useState<Translation[]>(emptyTranslations);
 
-  const { data: products, isLoading, error } = useProducts();
+  const { data: products, isLoading, error } = useProducts({ usedInKits: showUsedInKits });
   const { data: categories } = useCategories();
   const { data: assetFlows } = useAssetFlows();
   const createProduct = useCreateProduct();
@@ -120,7 +124,7 @@ export function ProductsPage() {
       });
       toast('Prodotto creato', 'success');
     } catch (err) {
-      toast(getErrorMessage(err, 'Impossibile creare il prodotto'), 'error');
+      toast(getProductErrorMessage(err, 'Impossibile creare il prodotto'), 'error');
     }
   }
 
@@ -157,7 +161,7 @@ export function ProductsPage() {
       setEditOpen(false);
       toast(`Prodotto ${selectedProduct.code} aggiornato`, 'success');
     } catch (err) {
-      toast(getErrorMessage(err, 'Impossibile aggiornare il prodotto'), 'error');
+      toast(getProductErrorMessage(err, 'Impossibile aggiornare il prodotto'), 'error');
     }
   }
 
@@ -174,7 +178,11 @@ export function ProductsPage() {
       <header className={styles.pageHeader}>
         <div>
           <h1>Catalogo prodotti</h1>
-          <p className={styles.subtitle}>{products?.length ?? 0} prodotti</p>
+          <p className={styles.subtitle}>
+            {showUsedInKits
+              ? `${products?.length ?? 0} prodotti usati in kit`
+              : `${products?.length ?? 0} prodotti`}
+          </p>
         </div>
         <button type="button" className={styles.primaryButton} onClick={() => setCreateOpen(true)}>
           Nuovo prodotto
@@ -196,6 +204,22 @@ export function ProductsPage() {
             </button>
           </div>
           <SearchInput value={search} onChange={setSearch} placeholder="Cerca prodotti..." className={styles.searchWrap} />
+          <div className={styles.toolbarGroup}>
+            <Tooltip content={showUsedInKits ? 'Mostra tutti i prodotti' : 'Mostra prodotti usati nei kit'} placement="bottom">
+              <button
+                type="button"
+                className={`${styles.iconButton} ${showUsedInKits ? styles.iconButtonActive : ''}`}
+                onClick={() => {
+                  setShowUsedInKits((current) => !current);
+                  setSelectedCode(null);
+                }}
+                aria-label={showUsedInKits ? 'Mostra tutti i prodotti' : 'Mostra prodotti usati nei kit'}
+                aria-pressed={showUsedInKits}
+              >
+                <Icon name="package" size={16} />
+              </button>
+            </Tooltip>
+          </div>
         </div>
 
         {error ? (
@@ -206,7 +230,7 @@ export function ProductsPage() {
               </svg>
             </div>
             <p className={styles.emptyTitle}>Impossibile caricare i prodotti</p>
-            <p className={styles.emptyText}>{getErrorMessage(error, 'Riprova tra poco.')}</p>
+            <p className={styles.emptyText}>L&apos;elenco prodotti non e disponibile in questo momento. Riprova tra poco.</p>
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className={styles.emptyState}>
@@ -215,8 +239,16 @@ export function ProductsPage() {
                 <path d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
               </svg>
             </div>
-            <p className={styles.emptyTitle}>{search ? 'Nessun risultato' : 'Nessun prodotto disponibile'}</p>
-            <p className={styles.emptyText}>{search ? `Nessun prodotto corrisponde a "${search}".` : 'Crea il primo prodotto per iniziare il catalogo.'}</p>
+            <p className={styles.emptyTitle}>
+              {search ? 'Nessun risultato' : showUsedInKits ? 'Nessun prodotto usato nei kit' : 'Nessun prodotto disponibile'}
+            </p>
+            <p className={styles.emptyText}>
+              {search
+                ? `Nessun prodotto corrisponde a "${search}".`
+                : showUsedInKits
+                  ? 'Tutti i prodotti disponibili risultano fuori dai kit.'
+                  : 'Crea il primo prodotto per iniziare il catalogo.'}
+            </p>
           </div>
         ) : (
           <div className={styles.tableWrap}>
@@ -229,6 +261,7 @@ export function ProductsPage() {
                   <th>Asset flow</th>
                   <th>NRC</th>
                   <th>MRC</th>
+                  <th>Kit</th>
                   <th>ERP</th>
                 </tr>
               </thead>
@@ -256,6 +289,24 @@ export function ProductsPage() {
                       <td>{product.asset_flow ?? '—'}</td>
                       <td className={styles.mono}>{formatMoney(product.nrc)}</td>
                       <td className={styles.mono}>{formatMoney(product.mrc)}</td>
+                      <td>
+                        {product.kit_usage_count > 0 ? (
+                          <button
+                            type="button"
+                            className={styles.usageButton}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedCode(product.code);
+                              setUsageProduct(product);
+                            }}
+                          >
+                            <Icon name="package" size={13} />
+                            <span>{formatKitCount(product.kit_usage_count)}</span>
+                          </button>
+                        ) : (
+                          <span className={styles.mutedDash}>—</span>
+                        )}
+                      </td>
                       <td>{product.erp_sync ? 'On' : 'Off'}</td>
                     </tr>
                   );
@@ -415,6 +466,38 @@ export function ProductsPage() {
           </div>
         </div>
       </Modal>
+
+      <Modal
+        open={usageProduct != null}
+        onClose={() => setUsageProduct(null)}
+        title={`Kit per ${usageProduct?.code ?? ''}`}
+      >
+        <div className={styles.usageModalBody}>
+          <p className={styles.modalLead}>
+            {usageProduct ? `${formatKitCount(usageProduct.kit_usage_count)} collegati a ${usageProduct.internal_name}.` : ''}
+          </p>
+          {usageProduct && usageProduct.kit_usages.length > 0 ? (
+            <div className={styles.kitUsageList}>
+              {usageProduct.kit_usages.map((kit) => (
+                <button
+                  key={kit.kit_id}
+                  type="button"
+                  className={styles.kitUsageItem}
+                  onClick={() => {
+                    setUsageProduct(null);
+                    navigate(`/kit/${kit.kit_id}`);
+                  }}
+                >
+                  <span>{kit.kit_name}</span>
+                  <span className={styles.kitUsageMeta}>Kit #{kit.kit_id}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.emptyText}>Nessun kit collegato a questo prodotto.</p>
+          )}
+        </div>
+      </Modal>
     </section>
   );
 }
@@ -498,17 +581,33 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
+function formatKitCount(count: number) {
+  return `${count} ${count === 1 ? 'kit' : 'kit'}`;
+}
+
 function emptyToNull(value: string | null) {
   if (value == null) return null;
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
+function getProductErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError && typeof error.body === 'object' && error.body && 'error' in error.body) {
     const message = error.body.error;
-    if (typeof message === 'string') return message;
+    if (typeof message === 'string') {
+      switch (message) {
+        case 'code_too_long':
+          return 'Il codice prodotto deve restare entro 25 caratteri.';
+        case 'invalid category_id':
+          return 'Seleziona una categoria valida.';
+        case 'not_found':
+          return 'Il prodotto selezionato non e piu disponibile.';
+        case 'short translation is required for it and en':
+          return 'Inserisci le descrizioni brevi in italiano e inglese.';
+        default:
+          return fallback;
+      }
+    }
   }
-  if (error instanceof Error) return error.message;
   return fallback;
 }
