@@ -420,6 +420,9 @@ func normalizeProviderEditBody(w http.ResponseWriter, r *http.Request, body []by
 		return nil, nil, false
 	}
 	raw["id"] = providerID
+	if value, ok := raw["default_payment_method"].(string); ok {
+		raw["default_payment_method"] = strings.TrimSpace(value)
+	}
 
 	normalized, err := json.Marshal(raw)
 	if err != nil {
@@ -944,7 +947,7 @@ func (h *Handler) handlePaymentMethods(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := h.db.QueryContext(r.Context(), `
-		SELECT code, description, COALESCE(rda_available, false)
+		SELECT RTRIM(code) AS code, description, COALESCE(rda_available, false)
 		FROM provider_qualifications.payment_method
 		ORDER BY description ASC`)
 	if err != nil {

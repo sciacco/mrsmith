@@ -823,8 +823,8 @@ function refPayload(form: HTMLFormElement, type?: string): ProviderReference {
 }
 
 function paymentCodeOf(value: Provider['default_payment_method']): string {
-  if (value && typeof value === 'object') return value.code ?? '';
-  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') return (value.code ?? '').trim();
+  if (typeof value === 'string') return value.trim();
   if (typeof value === 'number') return String(value);
   return '';
 }
@@ -895,7 +895,7 @@ function providerPayloadFromState(state: ProviderFormState): ProviderPayload {
     erp_id: parseErpId(erp),
     language: state.language || 'it',
     country: state.country || 'IT',
-    default_payment_method: state.default_payment_method || null,
+    default_payment_method: state.default_payment_method.trim() || null,
   };
   if (state.skip_qualification_validation) payload.skip_qualification_validation = true;
   return payload;
