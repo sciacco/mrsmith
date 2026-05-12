@@ -140,17 +140,17 @@ export interface ArticleCategory {
 
 export interface ProviderPayload {
   company_name: string;
-  state: string;
+  state?: string;
   vat_number?: string;
   cf?: string;
   address?: string;
   city?: string;
   postal_code?: string;
   province?: string;
-  erp_id?: number | null;
+  erp_id?: number;
   language?: string;
   country?: string;
-  default_payment_method?: string | number | null;
+  default_payment_method?: string | number;
   skip_qualification_validation?: boolean;
   ref?: ProviderReference;
 }

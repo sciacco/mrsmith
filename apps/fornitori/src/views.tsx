@@ -117,6 +117,9 @@ const languageOptions = [
   { value: 'en', label: 'Inglese' },
 ];
 
+const DEFAULT_PROVIDER_PAYMENT_METHOD = '320';
+const PROVIDER_REFERENCE_EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
 function countrySelectOptions(countries: Country[] | undefined, current?: string | null) {
   const options = countries?.map((item) => ({ value: item.code, label: item.name })) ?? [];
   if (current && !options.some((item) => item.value === current)) {
@@ -145,40 +148,53 @@ function hasInvalidErpId(raw?: string | null) {
 function providerPayload(form: HTMLFormElement): ProviderPayload {
   const data = new FormData(form);
   const erp = String(data.get('erp_id') ?? '').trim();
+  const erpId = parseErpId(erp);
   const country = String(data.get('country') || 'IT');
+  const paymentMethod = String(data.get('default_payment_method') || DEFAULT_PROVIDER_PAYMENT_METHOD).trim();
+  const ref: ProviderReference = {
+    email: String(data.get('ref_email') ?? '').trim(),
+  };
+  const refFirstName = String(data.get('ref_first_name') ?? '').trim();
+  const refLastName = String(data.get('ref_last_name') ?? '').trim();
+  const refPhone = String(data.get('ref_phone') ?? '').trim();
+  if (refFirstName) ref.first_name = refFirstName;
+  if (refLastName) ref.last_name = refLastName;
+  if (refPhone) ref.phone = refPhone;
+  ref.reference_type = QUALIFICATION_REFERENCE_TYPE;
+
   const payload: ProviderPayload = {
     company_name: String(data.get('company_name') ?? '').trim(),
-    state: String(data.get('state') || 'DRAFT'),
     vat_number: String(data.get('vat_number') ?? '').trim() || undefined,
     cf: String(data.get('cf') ?? '').trim() || undefined,
     address: String(data.get('address') ?? '').trim() || undefined,
     city: String(data.get('city') ?? '').trim() || undefined,
     postal_code: String(data.get('postal_code') ?? '').trim() || undefined,
     province: String(data.get('province') ?? '').trim() || undefined,
-    erp_id: parseErpId(erp),
     language: String(data.get('language') || 'it'),
     country,
-    default_payment_method: String(data.get('default_payment_method') ?? '') || null,
-    ref: {
-      first_name: String(data.get('ref_first_name') ?? '').trim(),
-      last_name: String(data.get('ref_last_name') ?? '').trim(),
-      email: String(data.get('ref_email') ?? '').trim(),
-      phone: String(data.get('ref_phone') ?? '').trim(),
-      reference_type: QUALIFICATION_REFERENCE_TYPE,
-    },
+    default_payment_method: paymentMethod,
+    ref,
   };
+  if (erpId !== null) payload.erp_id = erpId;
   if (data.get('skip_qualification_validation') === 'on') {
     payload.skip_qualification_validation = true;
   }
   return payload;
 }
 
-function validateProvider(payload: ProviderPayload): string | null {
-  if (!payload.company_name) return 'Inserisci la ragione sociale';
-  if (payload.country === 'IT' && !payload.cf && !payload.vat_number) return 'Per i fornitori italiani inserisci CF o P.IVA';
-  if (payload.country === 'IT' && (payload.postal_code?.length ?? 0) < 5) return 'Per i fornitori italiani inserisci un CAP valido';
-  if (payload.country === 'IT' && !payload.province) return 'Per i fornitori italiani seleziona la provincia';
-  if ((payload.state === 'ACTIVE' || payload.state === 'INACTIVE') && !payload.erp_id) return 'Inserisci il codice Alyante prima di cambiare stato';
+function validateProviderFormState(state: ProviderFormState): string | null {
+  if (!state.company_name.trim()) return 'Inserisci la ragione sociale';
+  if (state.country === 'IT' && !state.cf.trim() && !state.vat_number.trim()) return 'Per i fornitori italiani inserisci CF o P.IVA';
+  if (state.country === 'IT' && state.postal_code.trim().length < 5) return 'Per i fornitori italiani inserisci un CAP valido';
+  if (state.country === 'IT' && !state.province.trim()) return 'Per i fornitori italiani seleziona la provincia';
+  if ((state.state === 'ACTIVE' || state.state === 'INACTIVE') && !hasProviderErp(state.erp_id)) return 'Inserisci il codice Alyante prima di cambiare stato';
+  if ((state.state === 'ACTIVE' || state.state === 'INACTIVE') && !state.default_payment_method.trim()) return 'Seleziona il metodo di pagamento';
+  return null;
+}
+
+function validateProviderActiveEdit(state: ProviderFormState): string | null {
+  if ((state.state === 'ACTIVE' || state.state === 'INACTIVE') && !hasProviderErp(state.erp_id)) return 'Inserisci il codice Alyante prima di cambiare stato';
+  if ((state.state === 'ACTIVE' || state.state === 'INACTIVE') && !state.default_payment_method.trim()) return 'Seleziona il metodo di pagamento';
   return null;
 }
 
@@ -881,23 +897,59 @@ function providerFormStatesEqual(a: ProviderFormState, b: ProviderFormState) {
   );
 }
 
-function providerPayloadFromState(state: ProviderFormState): ProviderPayload {
-  const erp = state.erp_id.trim();
-  const payload: ProviderPayload = {
-    company_name: state.company_name.trim(),
-    state: state.state || 'DRAFT',
-    vat_number: state.vat_number.trim() || undefined,
-    cf: state.cf.trim() || undefined,
-    address: state.address.trim() || undefined,
-    city: state.city.trim() || undefined,
-    postal_code: state.postal_code.trim() || undefined,
-    province: state.province.trim() || undefined,
-    erp_id: parseErpId(erp),
-    language: state.language || 'it',
-    country: state.country || 'IT',
-    default_payment_method: state.default_payment_method.trim() || null,
+function providerEditRefPayload(provider: Provider): ProviderReference | undefined {
+  const source = getProviderRefs(provider).find((ref) => ref.reference_type === QUALIFICATION_REFERENCE_TYPE);
+  if (!source) return undefined;
+
+  const payload: ProviderReference = {};
+  const firstName = source.first_name?.trim() ?? '';
+  const lastName = source.last_name?.trim() ?? '';
+  const email = source.email?.trim() ?? '';
+  const phone = source.phone?.trim() ?? '';
+  if (firstName) payload.first_name = firstName;
+  if (lastName) payload.last_name = lastName;
+  if (email && PROVIDER_REFERENCE_EMAIL_RE.test(email)) payload.email = email;
+  if (phone && isValidOptionalProviderRefPhone(phone)) payload.phone = phone;
+  return Object.keys(payload).length > 0 ? payload : undefined;
+}
+
+function providerPayloadFromState(
+  state: ProviderFormState,
+  provider: Provider,
+  includeSkipQualificationValidation: boolean,
+): Partial<ProviderPayload> {
+  const currentState = (provider.state ?? '').toUpperCase();
+  const selectedState = state.state || 'DRAFT';
+  const paymentMethod = state.default_payment_method.trim();
+  const ref = providerEditRefPayload(provider);
+  const payload: Partial<ProviderPayload> = {
+    state: selectedState,
   };
-  if (state.skip_qualification_validation) payload.skip_qualification_validation = true;
+
+  if (ref) payload.ref = ref;
+  if (paymentMethod) payload.default_payment_method = paymentMethod;
+  if (includeSkipQualificationValidation) payload.skip_qualification_validation = state.skip_qualification_validation;
+
+  if (currentState === 'ACTIVE') return payload;
+
+  const erpId = parseErpId(state.erp_id);
+  const vatNumber = state.vat_number.trim();
+  const cf = state.cf.trim();
+  const address = state.address.trim();
+  const city = state.city.trim();
+  const postalCode = state.postal_code.trim();
+  const province = state.province.trim();
+
+  payload.company_name = state.company_name.trim();
+  if (vatNumber) payload.vat_number = vatNumber;
+  if (cf) payload.cf = cf;
+  if (address) payload.address = address;
+  if (city) payload.city = city;
+  if (postalCode) payload.postal_code = postalCode;
+  if (province) payload.province = province;
+  if (erpId !== null) payload.erp_id = erpId;
+  payload.language = state.language || 'it';
+  payload.country = state.country || 'IT';
   return payload;
 }
 
@@ -915,13 +967,13 @@ function ProviderCreateModal({
   const paymentMethods = usePaymentMethods();
   const countriesQuery = useCountries();
   const [country, setCountry] = useState('IT');
-  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState(DEFAULT_PROVIDER_PAYMENT_METHOD);
   const [erpId, setErpId] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   function close() {
     setCountry('IT');
-    setPaymentMethod('');
+    setPaymentMethod(DEFAULT_PROVIDER_PAYMENT_METHOD);
     setErpId('');
     setShowAdvanced(false);
     onClose();
@@ -1019,7 +1071,13 @@ function ProviderCreateModal({
 
 function validateCreatePayload(payload: ProviderPayload): string | null {
   if (!payload.company_name) return 'Inserisci la ragione sociale';
+  if (!payload.address) return 'Inserisci l\'indirizzo';
+  if (!payload.city) return 'Inserisci la citta';
+  if (!payload.postal_code) return 'Inserisci il CAP';
+  if (!payload.default_payment_method) return 'Seleziona il metodo di pagamento';
   if (!payload.ref?.email) return 'Inserisci l\'email del contatto qualifica';
+  if (!PROVIDER_REFERENCE_EMAIL_RE.test(payload.ref.email)) return 'Inserisci un indirizzo email valido per il contatto qualifica';
+  if (!isValidOptionalProviderRefPhone(payload.ref.phone)) return PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE;
   if (payload.country === 'IT') {
     if (!payload.cf && !payload.vat_number) return 'Per i fornitori italiani inserisci CF o P.IVA';
     if ((payload.postal_code?.length ?? 0) < 5) return 'Inserisci un CAP italiano valido';
@@ -1925,8 +1983,7 @@ function contactDrawerTitle(state: ContactDrawerState) {
   return `${contact ? 'Modifica' : 'Nuovo'} contatto ${role.labelLower}`;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const isLikelyEmail = (v: string) => EMAIL_RE.test(v.trim());
+const isLikelyEmail = (v: string) => PROVIDER_REFERENCE_EMAIL_RE.test(v.trim());
 
 function ContactField({
   name,
@@ -2189,12 +2246,12 @@ function AnagraficaSection({
       toast('Inserisci un codice Alyante numerico', 'warning');
       return;
     }
-    const body = providerPayloadFromState(formState);
-    const validation = validateProvider(body);
+    const validation = anagraficaLocked ? validateProviderActiveEdit(formState) : validateProviderFormState(formState);
     if (validation) {
       toast(validation, 'warning');
       return;
     }
+    const body = providerPayloadFromState(formState, provider, skipRole);
     await mutations.updateProvider.mutateAsync({ id: provider.id, body });
     toast('Aggiornamento completato');
   }
