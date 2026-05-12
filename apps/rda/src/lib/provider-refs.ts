@@ -7,7 +7,6 @@ const PROVIDER_REFERENCE_PHONE_RE = /^\+?[0-9 ]{6,20}$/;
 export const providerReferenceTypes = [
   { value: 'ADMINISTRATIVE_REF', label: 'Amministrativo' },
   { value: 'TECHNICAL_REF', label: 'Tecnico' },
-  { value: 'COMMERCIAL_REF', label: 'Commerciale' },
   { value: 'OTHER_REF', label: 'Altro' },
 ] as const;
 

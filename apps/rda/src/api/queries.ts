@@ -23,7 +23,6 @@ import type {
 import { useApiClient } from './client';
 
 const rdaRoot = '/rda/v1';
-const fornitoriRoot = '/fornitori/v1';
 
 type DraftProviderResponse = Partial<ProviderSummary> & Pick<ProviderSummary, 'id'>;
 
@@ -145,10 +144,9 @@ export function usePOComments(id: number | null) {
 export function useProviders() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['fornitori', 'providers', 'rda'],
+    queryKey: ['rda', 'providers'],
     queryFn: async () => {
-      const params = new URLSearchParams({ disable_pagination: 'true', page_number: '1', usable: 'true' });
-      return unwrap(await api.get<ProviderSummary[] | PagedEnvelope<ProviderSummary>>(`${fornitoriRoot}/provider?${params}`));
+      return unwrap(await api.get<ProviderSummary[] | PagedEnvelope<ProviderSummary>>(`${rdaRoot}/providers`));
     },
   });
 }
@@ -156,17 +154,17 @@ export function useProviders() {
 export function useCountries() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['fornitori', 'countries'],
-    queryFn: () => api.get<Country[]>(`${fornitoriRoot}/country`),
+    queryKey: ['rda', 'provider-countries'],
+    queryFn: () => api.get<Country[]>(`${rdaRoot}/provider-countries`),
   });
 }
 
 export function useProvider(id: number | null) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['fornitori', 'provider', id],
+    queryKey: ['rda', 'provider', id],
     enabled: id != null,
-    queryFn: () => api.get<ProviderSummary>(`${fornitoriRoot}/provider/${id}`),
+    queryFn: () => api.get<ProviderSummary>(`${rdaRoot}/providers/${id}`),
   });
 }
 
@@ -308,23 +306,26 @@ export function useRdaDownloads() {
 export function useProviderMutations() {
   const api = useApiClient();
   const queryClient = useQueryClient();
-  const invalidateProviders = () => queryClient.invalidateQueries({ queryKey: ['fornitori'] });
+  const invalidateProviders = () => {
+    queryClient.invalidateQueries({ queryKey: ['rda', 'providers'] });
+    queryClient.invalidateQueries({ queryKey: ['rda', 'provider'] });
+  };
   return {
     createProvider: useMutation({
       mutationFn: async (body: ProviderPayload) => {
-        const response = await api.post<DraftProviderResponse>(`${fornitoriRoot}/provider/draft`, body);
+        const response = await api.post<DraftProviderResponse>(`${rdaRoot}/providers/draft`, body);
         return providerSummaryFromDraft(response, body);
       },
       onSuccess: invalidateProviders,
     }),
     createReference: useMutation({
       mutationFn: ({ providerId, body }: { providerId: number; body: ProviderReference }) =>
-        api.post<ProviderReference>(`${fornitoriRoot}/provider/${providerId}/reference`, body),
+        api.post<ProviderReference>(`${rdaRoot}/providers/${providerId}/references`, body),
       onSuccess: invalidateProviders,
     }),
     updateReference: useMutation({
       mutationFn: ({ providerId, refId, body }: { providerId: number; refId: number; body: ProviderReference }) =>
-        api.put<ProviderReference>(`${fornitoriRoot}/provider/${providerId}/reference/${refId}`, body),
+        api.put<ProviderReference>(`${rdaRoot}/providers/${providerId}/references/${refId}`, body),
       onSuccess: invalidateProviders,
     }),
   };

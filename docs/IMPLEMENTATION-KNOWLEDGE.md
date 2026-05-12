@@ -106,18 +106,18 @@ Alyante ERP ID
 
 ### Fornitori Provider Contacts Follow Appsmith Payload Semantics
 
-- Context: `apps/fornitori` provider detail contacts and backend `POST/PUT /fornitori/v1/provider/{id}/reference`.
+- Context: `apps/fornitori` provider detail contacts, `apps/rda` PO recipient contacts, and backend `POST/PUT /fornitori/v1/provider/{id}/reference` plus `POST/PUT /rda/v1/providers/{id}/references`.
 - Discovery: Appsmith does not send empty `first_name`, `last_name`, or `email` fields for provider contacts. On reference create, empty `phone` must be omitted because Mistra `provider_ref_new` inserts it directly and the `provider_ref` phone check accepts `NULL` but not `''`; on reference edit, empty `phone` must be sent as `''` because `provider_ref_edit` converts it with `NULLIF` and uses key presence to clear the value. `QUALIFICATION_REF` is also a special reference type: Mistra's standard provider-reference functions reject creating, editing, or deleting it.
-- Practical rule: Fornitori contact forms should omit empty name/email fields. The backend `/provider/{id}/reference` proxy must omit empty `phone` on `POST`, include `phone` on `PUT` even when empty, be used **only** for non-qualification reference types (`ADMINISTRATIVE_REF`, `TECHNICAL_REF`, `OTHER_REF`), and reject `QUALIFICATION_REF` with a clear error. The QUALIFICATION_REF contact is owned by Mistra and is created/edited via `PUT /provider/{id}` (the `ref` field of `provider-edit`); never write to `provider_qualifications.provider_ref` directly from the portal backend.
+- Practical rule: Fornitori and RDA contact forms should omit empty name/email fields. The backend provider-reference proxies must omit empty `phone` on `POST`, include `phone` on `PUT` even when empty, be used **only** for non-qualification reference types (`ADMINISTRATIVE_REF`, `TECHNICAL_REF`, `OTHER_REF`), and reject `QUALIFICATION_REF` with a clear error. The QUALIFICATION_REF contact is owned by Mistra and is created/edited via `PUT /provider/{id}` (the `ref` field of `provider-edit`); never write to `provider_qualifications.provider_ref` directly from the portal backend.
 - Evidence: Appsmith contact-save snippet provided during the Fornitori migration; `docs/mistra-dist.yaml` provider-ref schemas; `docs/arak_schema.json` functions `provider_ref_new` and `provider_ref_edit`.
-- Used by: `apps/fornitori` detail page contacts.
+- Used by: `apps/fornitori` detail page contacts and `apps/rda` PO recipient contacts.
 - Open questions: none.
 
 ### RDA New Supplier Requests Must Use Provider Draft Create
 
 - Context: `apps/rda` supplier creation from `/rda/new` and any RDA inline new-provider form.
 - Discovery: Mistra `POST /arak/provider-qualification/v1/provider` follows the full provider-create schema and requires `default_payment_method`, while the RDA flow only requests a supplier census draft. The legacy RDA datasource used `POST /arak/provider-qualification/v1/provider/draft`.
-- Practical rule: RDA must create new suppliers through `POST /api/fornitori/v1/provider/draft`, not the full `POST /api/fornitori/v1/provider`. Keep full provider create for the Fornitori app where users can manage complete provider records.
+- Practical rule: RDA must create new suppliers through the RDA-owned `POST /api/rda/v1/providers/draft`, which proxies Mistra draft create, not the full provider create. Keep full provider create for the Fornitori app where users can manage complete provider records. RDA users should not need `app_fornitori_access` for supplier lookup, supplier draft creation, or PO recipient contact management.
 - Evidence: `docs/mistra-dist.yaml` schemas `provider-new` and `provider-draft-new`; `docs/arak_schema.json` functions `provider_new` and `provider_draft_new`; RDA audit datasource `nuovoFornitore`.
 - Used by: `apps/rda` `/rda/new` supplier request modal and legacy inline new-provider form.
 - Open questions: none.

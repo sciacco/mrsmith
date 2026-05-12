@@ -60,6 +60,12 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handle("GET /rda/v1/payment-methods/default", h.handleDefaultPaymentMethod)
 	handle("GET /rda/v1/articles", h.handleArticles)
 	handle("GET /rda/v1/users", h.handleUsers)
+	handle("GET /rda/v1/providers", h.handleProviders)
+	handle("GET /rda/v1/providers/{id}", h.handleProviderDetail)
+	handle("GET /rda/v1/provider-countries", h.handleProviderCountries)
+	handle("POST /rda/v1/providers/draft", h.handleProviderDraft)
+	handle("POST /rda/v1/providers/{id}/references", h.handleCreateProviderReference)
+	handle("PUT /rda/v1/providers/{id}/references/{refId}", h.handleUpdateProviderReference)
 
 	handle("GET /rda/v1/pos", h.handlePOList)
 	handle("GET /rda/v1/pos/inbox/level1-2", h.handlePOInbox)
