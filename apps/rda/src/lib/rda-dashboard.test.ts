@@ -187,6 +187,85 @@ test('own draft enters the to-do view', () => {
   assertEqual(todo[0]?.primaryQueue.key, 'own-draft', 'draft queue context');
 });
 
+test('requester pending send enters the to-do view', () => {
+  const model = buildRdaDashboardModel({
+    myRows: [poFixture({ id: 41, state: 'PENDING_SEND', requester: { email: 'me@example.com' } })],
+    currentEmail: 'me@example.com',
+    inboxes: [],
+  });
+
+  const todo = filterRdaDashboardRows(model.rows, { view: 'todo' });
+
+  assertEqual(todo.length, 1, 'to-do includes requester send action');
+  assertEqual(todo[0]?.actionLabel, 'Invia al fornitore', 'send action label');
+  assertEqual(model.counts.toManage, 1, 'send action count');
+});
+
+test('requester pending verification enters the to-do view', () => {
+  const model = buildRdaDashboardModel({
+    myRows: [poFixture({ id: 42, state: 'PENDING_VERIFICATION', requester: { email: 'me@example.com' } })],
+    currentEmail: 'me@example.com',
+    inboxes: [],
+  });
+
+  const todo = filterRdaDashboardRows(model.rows, { view: 'todo' });
+
+  assertEqual(todo.length, 1, 'to-do includes requester verification action');
+  assertEqual(todo[0]?.actionLabel, 'Verifica fornitura', 'verification action label');
+  assertEqual(model.counts.toManage, 1, 'verification action count');
+});
+
+test('visible pending send and verification stay out of the to-do view', () => {
+  const model = buildRdaDashboardModel({
+    myRows: [
+      poFixture({ id: 43, state: 'PENDING_SEND', requester: { email: 'other@example.com' } }),
+      poFixture({ id: 44, state: 'PENDING_VERIFICATION', requester: { email: 'other@example.com' } }),
+    ],
+    currentEmail: 'supervisor@example.com',
+    permissions: permissionsFixture({ can_see_all_po: true, is_afc: true }),
+    inboxes: [],
+  });
+
+  assertEqual(filterRdaDashboardRows(model.rows, { view: 'todo' }).length, 0, 'to-do excludes state actions owned by others');
+  assertEqual(filterRdaDashboardRows(model.rows, { view: 'all' }).length, 2, 'all includes visible state actions');
+  assertEqual(model.rows.every((row) => !row.isActionable), true, 'visible state actions are read-only in dashboard');
+  assertEqual(model.rows.every((row) => row.actionLabel === ''), true, 'visible state actions have no dashboard action label');
+  assertEqual(model.counts.toManage, 0, 'visible state actions are not counted');
+});
+
+test('requester payment method correction stays out of the to-do view', () => {
+  const model = buildRdaDashboardModel({
+    myRows: [poFixture({ id: 45, state: 'PENDING_APPROVAL_PAYMENT_METHOD', requester: { email: 'me@example.com' } })],
+    currentEmail: 'me@example.com',
+    permissions: permissionsFixture(),
+    inboxes: [],
+  });
+
+  assertEqual(filterRdaDashboardRows(model.rows, { view: 'todo' }).length, 0, 'to-do excludes requester payment correction');
+  assertEqual(filterRdaDashboardRows(model.rows, { view: 'mine' }).length, 1, 'mine includes requester payment correction');
+  assertEqual(model.rows[0]?.isActionable, false, 'requester payment correction is not dashboard work');
+});
+
+test('AFC payment method inbox enters the to-do view', () => {
+  const payment = poFixture({
+    id: 46,
+    state: 'PENDING_APPROVAL_PAYMENT_METHOD',
+    requester: { email: 'other@example.com' },
+  });
+  const model = buildRdaDashboardModel({
+    myRows: [],
+    currentEmail: 'afc@example.com',
+    permissions: permissionsFixture({ is_afc: true }),
+    inboxes: [{ kind: 'payment-method', rows: [payment] }],
+  });
+
+  const todo = filterRdaDashboardRows(model.rows, { view: 'todo' });
+
+  assertEqual(todo.length, 1, 'to-do includes AFC payment inbox');
+  assertEqual(todo[0]?.primaryQueue.key, 'payment-method', 'payment queue');
+  assertEqual(todo[0]?.actionLabel, 'Conferma metodo', 'payment action label');
+});
+
 test('own and accessible requests land in the correct views', () => {
   const draft = poFixture({ id: 11, code: 'PO-11', state: 'DRAFT', requester: { email: 'me@example.com' } });
   const mine = poFixture({ id: 12, code: 'PO-12', state: 'PENDING_SEND', requester: { email: 'me@example.com' } });
@@ -201,7 +280,7 @@ test('own and accessible requests land in the correct views', () => {
     inboxes: [{ kind: 'level1-2', rows: [inbox] }],
   });
 
-  assertEqual(filterRdaDashboardRows(model.rows, { view: 'todo' }).length, 1, 'to-do view');
+  assertEqual(filterRdaDashboardRows(model.rows, { view: 'todo' }).length, 2, 'to-do view');
   assertEqual(filterRdaDashboardRows(model.rows, { view: 'mine' }).length, 2, 'my view');
   assertEqual(filterRdaDashboardRows(model.rows, { view: 'all' }).length, 3, 'all view');
   assertEqual(model.counts.ownOpen, 1, 'own open count excludes drafts');

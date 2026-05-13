@@ -137,7 +137,7 @@ func buildPOActionModel(po poDetail, permissions poActionPermissions, email stri
 					ID:             "reject",
 					ModeID:         "afc_payment",
 					Label:          "Rifiuta metodo",
-					Description:    "La richiesta torna al richiedente per una correzione.",
+					Description:    "La richiesta viene rifiutata.",
 					Tone:           "danger",
 					Disabled:       !enabled,
 					DisabledReason: disabledReason,

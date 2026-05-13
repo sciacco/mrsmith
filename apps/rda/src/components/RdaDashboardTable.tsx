@@ -60,16 +60,16 @@ function rowAction(po: RdaDashboardRow): RowAction {
       break;
   }
 
-  switch (po.state) {
-    case 'PENDING_SEND':
-      return { iconName: 'mail', label: actionLabel(po, 'Invia al fornitore') };
-    case 'PENDING_VERIFICATION':
-      return { iconName: 'clipboard-check', label: actionLabel(po, 'Verifica fornitura') };
-    default:
-      break;
-  }
-
   if (po.isActionable) {
+    switch (po.state) {
+      case 'PENDING_SEND':
+        return { iconName: 'mail', label: actionLabel(po, 'Invia al fornitore') };
+      case 'PENDING_VERIFICATION':
+        return { iconName: 'clipboard-check', label: actionLabel(po, 'Verifica fornitura') };
+      default:
+        break;
+    }
+
     return { iconName: 'clipboard-check', label: openLabel(po) };
   }
 

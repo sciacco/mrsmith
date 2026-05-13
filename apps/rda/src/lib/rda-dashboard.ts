@@ -139,7 +139,29 @@ function stateActionLabel(state?: string): string {
   }
 }
 
-function actionLabel(row: PoPreview, primaryQueue: RdaDashboardContext): string {
+function isRequesterActionState(state?: string | null): boolean {
+  return stateActionLabel(state ?? undefined) !== '';
+}
+
+function hasInboxContext(contexts: RdaDashboardContext[]): boolean {
+  return contexts.some((context) => context.type === 'inbox');
+}
+
+function isAssignedDashboardWork({
+  isOwnDraft,
+  isRequesterOwned,
+  state,
+  contexts,
+}: {
+  isOwnDraft: boolean;
+  isRequesterOwned: boolean;
+  state?: string | null;
+  contexts: RdaDashboardContext[];
+}): boolean {
+  return isOwnDraft || hasInboxContext(contexts) || (isRequesterOwned && isRequesterActionState(state));
+}
+
+function actionLabel(row: PoPreview, primaryQueue: RdaDashboardContext, isAssignedWork: boolean): string {
   if (isTerminalPOState(row.state)) {
     return '';
   }
@@ -158,12 +180,8 @@ function actionLabel(row: PoPreview, primaryQueue: RdaDashboardContext): string 
     case 'budget-increment':
       return 'Valuta budget';
     default:
-      return stateActionLabel(row.state);
+      return isAssignedWork ? stateActionLabel(row.state) : '';
   }
-}
-
-function hasStateAction(state?: string | null): boolean {
-  return stateActionLabel(state ?? undefined) !== '';
 }
 
 function mergePreview(current: PoPreview, next: PoPreview): PoPreview {
@@ -195,13 +213,18 @@ function toDashboardRow(row: MutableRow): RdaDashboardRow {
   const contexts = sortContexts(row.contexts.values());
   const primaryQueue = contexts.find((context) => context.type === 'inbox') ?? contexts[0] ?? requesterContext();
   const isOwnDraft = row.isRequesterOwned && row.po.state === 'DRAFT';
-  const isActionable = isOwnDraft || contexts.some((context) => context.type === 'inbox') || hasStateAction(row.po.state);
+  const isActionable = isAssignedDashboardWork({
+    isOwnDraft,
+    isRequesterOwned: row.isRequesterOwned,
+    state: row.po.state,
+    contexts,
+  });
 
   return {
     ...row.po,
     contexts,
     primaryQueue,
-    actionLabel: actionLabel(row.po, primaryQueue),
+    actionLabel: actionLabel(row.po, primaryQueue, isActionable),
     isRequesterOwned: row.isRequesterOwned,
     isOwnDraft,
     isActionable,
@@ -284,7 +307,7 @@ export function buildRdaDashboardModel({
     .sort((a, b) => rowPriority(a) - rowPriority(b) || rowDateValue(b) - rowDateValue(a) || b.id - a.id);
 
   const counts: RdaDashboardCounts = {
-    toManage: rows.filter((row) => row.contexts.some((context) => context.type === 'inbox')).length,
+    toManage: rows.filter((row) => row.isActionable).length,
     ownDrafts: rows.filter((row) => row.isOwnDraft).length,
     ownOpen: rows.filter((row) => row.isRequesterOwned && !row.isOwnDraft && !isTerminalPOState(row.state)).length,
     totalAccessible: rows.length,
@@ -296,7 +319,7 @@ export function buildRdaDashboardModel({
 function rowInView(row: RdaDashboardRow, view: RdaDashboardView): boolean {
   if (view === 'all') return true;
   if (view === 'mine') return row.isRequesterOwned;
-  return row.isOwnDraft || row.contexts.some((context) => context.type === 'inbox');
+  return row.isActionable;
 }
 
 function matchesQuery(row: RdaDashboardRow, query: string): boolean {

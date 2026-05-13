@@ -34,6 +34,7 @@ import { PO_STATES } from '../lib/state-labels';
 
 function afterTransitionRoute(po: PoDetail, action: TransitionAction): string | null {
   if (action === 'send-to-provider') return '/rda';
+  if (action === 'payment-method/approve') return '/rda/inbox/payment-method';
   if (action === 'approve' || action === 'reject') {
     if (po.state === PO_STATES.PENDING_APPROVAL) return '/rda/inbox/level1-2';
     if (po.state === PO_STATES.PENDING_APPROVAL_PAYMENT_METHOD) return '/rda/inbox/payment-method';
