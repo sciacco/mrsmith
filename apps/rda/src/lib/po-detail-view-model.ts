@@ -41,7 +41,7 @@ export const workflowStages = [
   { id: 'approval', label: 'Approvazione' },
   { id: 'method_budget', label: 'Metodo/Leasing/Budget' },
   { id: 'send', label: 'Invio' },
-  { id: 'verification', label: 'Verifica' },
+  { id: 'verification', label: 'Verifica/Contestazione' },
   { id: 'closure', label: 'Chiusura' },
 ] as const;
 

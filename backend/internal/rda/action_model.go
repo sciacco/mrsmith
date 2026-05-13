@@ -379,7 +379,7 @@ func poWorkflowStage(state string) string {
 		return "method_budget"
 	case "PENDING_SEND":
 		return "send"
-	case "PENDING_VERIFICATION", "SENT":
+	case "PENDING_VERIFICATION", "PENDING_DISPUTE", "SENT":
 		return "verification"
 	case "CLOSED", "REJECTED", "DELIVERED_AND_COMPLIANT":
 		return "closure"

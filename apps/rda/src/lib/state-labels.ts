@@ -8,6 +8,7 @@ export const PO_STATES = {
   PENDING_BUDGET_INCREMENT: 'PENDING_BUDGET_INCREMENT',
   PENDING_SEND: 'PENDING_SEND',
   PENDING_VERIFICATION: 'PENDING_VERIFICATION',
+  PENDING_DISPUTE: 'PENDING_DISPUTE',
 } as const;
 
 const labels: Record<string, string> = {
@@ -22,6 +23,7 @@ const labels: Record<string, string> = {
   PENDING_BUDGET_INCREMENT: 'Attesa budget',
   PENDING_SEND: 'Da inviare',
   PENDING_VERIFICATION: 'Attesa conformità',
+  PENDING_DISPUTE: 'In contestazione',
   DELIVERED_AND_COMPLIANT: 'Erogata conforme',
   SENT: 'Inviata',
   CLOSED: 'Chiusa',
@@ -39,6 +41,7 @@ const fullLabels: Record<string, string> = {
   PENDING_BUDGET_INCREMENT: 'In attesa incremento budget',
   PENDING_SEND: 'In attesa invio al fornitore',
   PENDING_VERIFICATION: 'In attesa verifica conformità',
+  PENDING_DISPUTE: 'In contestazione',
   DELIVERED_AND_COMPLIANT: 'Erogata e conforme',
   SENT: 'Inviata al fornitore',
   CLOSED: 'Chiusa',
@@ -83,6 +86,7 @@ export function stateTone(state?: string | null): StateTone {
   if (state === 'PENDING_LEASING' || state === 'PENDING_LEASING_ORDER_CREATION') return 'leasing';
   if (state === 'PENDING_SEND') return 'send';
   if (state === 'PENDING_VERIFICATION') return 'verification';
+  if (state === 'PENDING_DISPUTE') return 'danger';
   if (state === 'PENDING_APPROVAL_NO_LEASING') return 'approval';
   return 'neutral';
 }
