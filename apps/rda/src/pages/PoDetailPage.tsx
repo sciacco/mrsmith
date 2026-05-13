@@ -16,8 +16,9 @@ import {
   useTransitionMutation,
   type TransitionAction,
 } from '../api/queries';
-import type { PoDetail, ProviderReference, ProviderSummary } from '../api/types';
+import type { ClonePOResponse, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ClonePoModal } from '../components/ClonePoModal';
 import { CommentsPanel } from '../components/CommentsPanel';
 import { headerStateFromPO, PoHeaderEditModal, PoHeaderSummary, type HeaderFormState } from '../components/PoHeaderForm';
 import { POCommandBar } from '../components/POCommandBar';
@@ -70,6 +71,7 @@ export function PoDetailPage() {
   const [providerRequestSearch, setProviderRequestSearch] = useState('');
   const [selectedActionMode, setSelectedActionMode] = useState<string>('read_only');
   const [headerModalOpen, setHeaderModalOpen] = useState(false);
+  const [cloneModalOpen, setCloneModalOpen] = useState(false);
   const [editHeader, setEditHeader] = useState<HeaderFormState | null>(null);
 
   const po = usePODetail(poId);
@@ -324,6 +326,15 @@ export function PoDetailPage() {
     }
   }
 
+  function handleCloned(response: ClonePOResponse) {
+    const newID = coerceID(response.id);
+    toast('Bozza duplicata creata');
+    for (const warning of response.warnings.slice(0, 2)) {
+      toast(warning, 'warning');
+    }
+    if (newID) navigate(`/rda/new/${newID}`);
+  }
+
   return (
     <main className="rdaPage">
       <POCommandBar
@@ -335,6 +346,7 @@ export function PoDetailPage() {
         transitioning={transition.isPending}
         onModeChange={setSelectedActionMode}
         onClose={() => navigate('/rda')}
+        onClone={() => setCloneModalOpen(true)}
         onSubmit={() => setSubmitConfirm(true)}
         onTransition={(action) => void runTransition(action)}
         onPDF={() => void downloadPDF()}
@@ -405,6 +417,13 @@ export function PoDetailPage() {
           onCreated={handleProviderRequestCreated}
         />
       ) : null}
+      <ClonePoModal
+        open={cloneModalOpen}
+        po={detail}
+        budgets={budgets.data ?? []}
+        onClose={() => setCloneModalOpen(false)}
+        onCloned={handleCloned}
+      />
     </main>
   );
 }

@@ -32,8 +32,10 @@ interface POCommandBarProps {
   quoteRuleBlocked: boolean;
   saving: boolean;
   transitioning: boolean;
+  cloning?: boolean;
   onModeChange: (modeID: string) => void;
   onClose: () => void;
+  onClone: () => void;
   onSubmit: () => void;
   onTransition: (action: TransitionAction) => void;
   onPDF: () => void;
@@ -154,8 +156,10 @@ export function POCommandBar({
   quoteRuleBlocked,
   saving,
   transitioning,
+  cloning = false,
   onModeChange,
   onClose,
+  onClone,
   onSubmit,
   onTransition,
   onPDF,
@@ -202,6 +206,19 @@ export function POCommandBar({
       <div className="commandTop">
         <Button variant="secondary" leftIcon={<Icon name="arrow-left" />} onClick={onClose}>Chiudi</Button>
         <CommandContext po={po} />
+        <span className="commandUtilityActions">
+          <Tooltip content="Duplica RDA" placement="bottom">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="commandUtilityButton"
+              leftIcon={<Icon name="copy" />}
+              loading={cloning}
+              aria-label="Duplica RDA"
+              onClick={onClone}
+            />
+          </Tooltip>
+        </span>
         <ModePicker modes={modes} selected={modeID} onChange={onModeChange} />
       </div>
 

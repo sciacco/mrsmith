@@ -231,6 +231,23 @@ export interface CreatePOPayload {
   provider_offer_date?: string;
 }
 
+export interface ClonePOPayload {
+  budget_id: number;
+  cost_center?: string;
+  budget_user_id?: number;
+  include_rows?: boolean;
+  include_recipients?: boolean;
+  include_offer_fields?: boolean;
+}
+
+export interface ClonePOResponse {
+  id: number;
+  copied_rows: number;
+  skipped_rows: number;
+  copied_recipients: number;
+  warnings: string[];
+}
+
 export interface PatchPOPayload {
   type?: string;
   budget_id?: number;

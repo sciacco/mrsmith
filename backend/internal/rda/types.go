@@ -57,6 +57,13 @@ type poDetail struct {
 	ID                   any               `json:"id,omitempty"`
 	Code                 string            `json:"code,omitempty"`
 	State                string            `json:"state,omitempty"`
+	Type                 string            `json:"type,omitempty"`
+	Project              string            `json:"project,omitempty"`
+	Object               string            `json:"object,omitempty"`
+	Description          string            `json:"description,omitempty"`
+	Note                 string            `json:"note,omitempty"`
+	ProviderOfferCode    string            `json:"provider_offer_code,omitempty"`
+	ProviderOfferDate    string            `json:"provider_offer_date,omitempty"`
 	CurrentApprovalLevel any               `json:"current_approval_level,omitempty"`
 	TotalPrice           string            `json:"total_price,omitempty"`
 	Currency             string            `json:"currency,omitempty"`
@@ -156,4 +163,29 @@ type createPORequest struct {
 	Note              string `json:"note,omitempty"`
 	ProviderOfferCode string `json:"provider_offer_code,omitempty"`
 	ProviderOfferDate string `json:"provider_offer_date,omitempty"`
+}
+
+type clonePORequest struct {
+	BudgetID           int64  `json:"budget_id"`
+	CostCenter         string `json:"cost_center,omitempty"`
+	BudgetUserID       int64  `json:"budget_user_id,omitempty"`
+	IncludeRows        *bool  `json:"include_rows,omitempty"`
+	IncludeRecipients  *bool  `json:"include_recipients,omitempty"`
+	IncludeOfferFields bool   `json:"include_offer_fields,omitempty"`
+}
+
+func (req clonePORequest) includeRows() bool {
+	return req.IncludeRows == nil || *req.IncludeRows
+}
+
+func (req clonePORequest) includeRecipients() bool {
+	return req.IncludeRecipients == nil || *req.IncludeRecipients
+}
+
+type clonePOResponse struct {
+	ID               int64    `json:"id"`
+	CopiedRows       int      `json:"copied_rows"`
+	SkippedRows      int      `json:"skipped_rows"`
+	CopiedRecipients int      `json:"copied_recipients"`
+	Warnings         []string `json:"warnings"`
 }

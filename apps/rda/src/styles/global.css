@@ -882,6 +882,52 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.clonePoSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, var(--color-accent-subtle) 12%);
+}
+
+.clonePoSummary span {
+  display: grid;
+  gap: 0.14rem;
+  min-width: 0;
+}
+
+.clonePoSummary small {
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.clonePoSummary strong {
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.clonePoNotice {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid var(--color-info-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.68rem 0.75rem;
+  color: var(--color-info-strong);
+  background: var(--color-info-subtle);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
 .field.twoThirds {
   grid-column: span 2;
 }
@@ -1043,6 +1089,33 @@ textarea {
   font-size: 0.82rem;
   line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+.commandUtilityActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.commandTop .commandUtilityButton {
+  width: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border-color: transparent;
+  border-radius: var(--radius-md);
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  box-shadow: none;
+}
+
+.commandTop .commandUtilityButton:hover:not(:disabled),
+.commandTop .commandUtilityButton:focus-visible {
+  border-color: var(--color-border);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-xs);
 }
 
 .commandTitle {
@@ -2578,6 +2651,7 @@ textarea {
   .providerPaymentGrid,
   .poMetaGrid,
   .poOfferGrid,
+  .clonePoSummary,
   .poInspectorFacts,
   .detailLayout,
   .commandSummary,
@@ -2625,6 +2699,10 @@ textarea {
 
   .commandContext {
     width: 100%;
+  }
+
+  .commandUtilityActions {
+    align-self: flex-end;
   }
 
   .commandSummary {

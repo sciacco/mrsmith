@@ -3,6 +3,8 @@ import type {
   AttachmentType,
   Article,
   BudgetForUser,
+  ClonePOPayload,
+  ClonePOResponse,
   CommentMentionUser,
   Country,
   CreatePOPayload,
@@ -173,6 +175,15 @@ export function useCreatePO() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreatePOPayload) => api.post<PoDetail | PoPreview>(`${rdaRoot}/pos`, body),
+    onSuccess: () => invalidatePO(queryClient),
+  });
+}
+
+export function useClonePO() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: ClonePOPayload }) => api.post<ClonePOResponse>(`${rdaRoot}/pos/${id}/clone`, body),
     onSuccess: () => invalidatePO(queryClient),
   });
 }
