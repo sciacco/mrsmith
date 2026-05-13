@@ -108,6 +108,11 @@ type Config struct {
 	NotificationsWorkerInterval time.Duration
 	NotifySelfMentions          bool
 
+	// Diagnostic event sink (optional, backed by ANISETTA_DSN)
+	DiagnosticEventsEnabled       bool
+	DiagnosticEventsRetentionDays int
+	DiagnosticEventsQueueSize     int
+
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
 	KeycloakFrontendRealm    string
@@ -185,6 +190,12 @@ func Load() Config {
 		NotificationsWorkerEnabled:   boolEnvOr("NOTIFICATIONS_WORKER_ENABLED", true),
 		NotificationsWorkerInterval:  durationEnvOr("NOTIFICATIONS_WORKER_INTERVAL", time.Minute),
 		NotifySelfMentions:           boolEnvOr("NOTIFY_SELF_MENTIONS", false),
+		DiagnosticEventsEnabled:      boolEnvOr("DIAGNOSTIC_EVENTS_ENABLED", envOr("ANISETTA_DSN", "") != ""),
+		DiagnosticEventsRetentionDays: positiveIntEnvOr(
+			"DIAGNOSTIC_EVENTS_RETENTION_DAYS",
+			90,
+		),
+		DiagnosticEventsQueueSize: positiveIntEnvOr("DIAGNOSTIC_EVENTS_QUEUE_SIZE", 1000),
 
 		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
 		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),
@@ -235,6 +246,18 @@ func positiveFloatEnvOr(key string, fallback float64) float64 {
 		return fallback
 	}
 	parsed, err := strconv.ParseFloat(strings.ReplaceAll(value, ",", "."), 64)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func positiveIntEnvOr(key string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
 		return fallback
 	}

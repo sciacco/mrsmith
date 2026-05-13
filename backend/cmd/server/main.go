@@ -21,6 +21,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/compliance"
 	"github.com/sciacco/mrsmith/internal/coperture"
 	"github.com/sciacco/mrsmith/internal/cpbackoffice"
+	"github.com/sciacco/mrsmith/internal/diagnostics"
 	"github.com/sciacco/mrsmith/internal/energiadc"
 	"github.com/sciacco/mrsmith/internal/fornitori"
 	"github.com/sciacco/mrsmith/internal/kitproducts"
@@ -99,6 +100,8 @@ func main() {
 
 	// Anisetta DB (compliance module)
 	var anisettaDB *sql.DB
+	var diagnosticStore diagnostics.Store
+	var diagnosticSink *diagnostics.Sink
 	if cfg.AnisettaDSN != "" {
 		var err error
 		anisettaDB, err = database.New(database.Config{Driver: "postgres", DSN: cfg.AnisettaDSN})
@@ -107,6 +110,21 @@ func main() {
 			os.Exit(1)
 		}
 		logger.Info("anisetta database connected", "component", "compliance")
+	}
+	if cfg.DiagnosticEventsEnabled && anisettaDB != nil {
+		diagnosticStore = diagnostics.NewSQLStore(anisettaDB)
+		diagnosticSink = diagnostics.NewSink(diagnosticStore, diagnostics.SinkConfig{
+			Enabled:       true,
+			QueueSize:     cfg.DiagnosticEventsQueueSize,
+			RetentionDays: cfg.DiagnosticEventsRetentionDays,
+		})
+		logger = slog.New(diagnostics.NewSlogHandler(logger.Handler(), diagnosticSink))
+		slog.SetDefault(logger)
+		logger.Info("diagnostic event sink configured", "component", "diagnostics")
+	} else if cfg.DiagnosticEventsEnabled {
+		logger.Info("diagnostic event sink not started without anisetta database", "component", "diagnostics")
+	} else {
+		logger.Info("diagnostic event sink disabled", "component", "diagnostics")
 	}
 
 	// Mistra DB (kit products)
@@ -484,6 +502,7 @@ func main() {
 	simulatorivendita.RegisterRoutes(api, simulatoriVenditaCarboneSvc)
 	notifications.RegisterRoutes(api, notifications.Deps{Store: notificationStore, Logger: logger})
 	support.RegisterRoutes(api, support.Deps{DB: anisettaDB, Mailer: mailer, Logger: logger})
+	diagnostics.RegisterRoutes(api, diagnostics.Deps{Store: diagnosticStore, Sink: diagnosticSink, Logger: logger})
 	afctools.RegisterRoutes(api, afctools.Deps{
 		Vodka:   vodkaDB,
 		Whmcs:   whmcsDB,
@@ -534,6 +553,13 @@ func main() {
 		logger.Info("notifications worker not started without anisetta database", "component", "notifications")
 	} else {
 		logger.Info("notifications worker disabled", "component", "notifications")
+	}
+	if diagnosticSink != nil && diagnosticSink.Enabled() {
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			diagnosticSink.Run(appCtx)
+		}()
 	}
 
 	// Graceful shutdown

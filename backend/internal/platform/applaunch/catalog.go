@@ -499,9 +499,9 @@ func DefaultAccessRoles() []string {
 }
 
 // AllRoles returns the concatenation of every known app_* role declared
-// in the catalog, deduplicated. Intended for dev-only scenarios (noop auth
-// middleware, dev auth bypass on the frontend) where the caller needs to
-// simulate an omnipotent user.
+// in the catalog plus the dev-admin override, deduplicated. Intended for
+// dev-only scenarios (noop auth middleware, dev auth bypass on the frontend)
+// where the caller needs to simulate an omnipotent user.
 func AllRoles() []string {
 	groups := [][]string{
 		budgetAccessRoles,
@@ -538,6 +538,9 @@ func AllRoles() []string {
 			seen[role] = struct{}{}
 			result = append(result, role)
 		}
+	}
+	if _, ok := seen[authz.DevAdminRole]; !ok {
+		result = append(result, authz.DevAdminRole)
 	}
 	return result
 }

@@ -347,6 +347,15 @@ Alyante ERP ID
 - Used by: `apps/panoramica-cliente` IaaS PPU monthly charges view; shared backend middleware in `backend/pkg/middleware`.
 - Open questions: whether future report endpoints should adopt per-handler query deadlines or asynchronous export flows instead of relying on a larger shared write timeout.
 
+### Database Diagnostics Are A Low-Volume Error Inbox, Not Access Logging
+
+- Context: support/debugging when stdout/container logs are not easy to inspect.
+- Discovery: MrSmith can persist warning/error diagnostics to Anisetta through the async `internal/diagnostics` sink while keeping normal access logs on stdout.
+- Practical rule: do not store routine 2xx/3xx request logs in SQL. Use `mrsmith.diagnostic_event` for low-volume `WARN`/`ERROR` events, 4xx/5xx API access summaries, panic recovery details, and support correlation by `request_id`. The sink must stay bounded, async, sanitized, and fail-open.
+- Evidence: diagnostics migration `deploy/migrations/008_anisetta_mrsmith_diagnostics.sql` and `backend/internal/diagnostics`.
+- Used by: backend-wide warning/error visibility and support request correlation.
+- Open questions: whether frontend browser exceptions should feed the same table in a later phase.
+
 ### AFC Tools Order PDF Missing in Arxivar Surfaces as `ARX_DOC_NUMBER_NOT_FOUND`
 
 - Context: `GET /api/afc-tools/v1/orders/{orderId}/pdf`, which proxies the Mistra/gw-int order PDF endpoint used by the AFC Tools XConnect orders view.

@@ -117,6 +117,10 @@ func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 				reqLogger.Warn("request completed with downstream write failure", args...)
 			case errors.Is(r.Context().Err(), context.Canceled):
 				reqLogger.Warn("request aborted by client", args...)
+			case rec.status >= http.StatusInternalServerError:
+				reqLogger.Error("request completed with server error", args...)
+			case rec.status >= http.StatusBadRequest:
+				reqLogger.Warn("request completed with client error", args...)
 			default:
 				reqLogger.Info("request completed", args...)
 			}

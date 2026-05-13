@@ -146,6 +146,60 @@ func TestAccessLogCapturesClientAbort(t *testing.T) {
 	}
 }
 
+func TestAccessLogEmitsErrorForServerErrors(t *testing.T) {
+	var buf bytes.Buffer
+	logger := logging.NewWithWriter(&buf, "debug")
+
+	handler := RequestID(AccessLog(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("error"))
+	})))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/error", nil)
+	req.Header.Set("X-Request-ID", "req-error")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	entry := decodeMiddlewareLog(t, buf.String())
+	if entry["level"] != "ERROR" {
+		t.Fatalf("expected ERROR level, got %#v", entry["level"])
+	}
+	if entry["msg"] != "request completed with server error" {
+		t.Fatalf("expected server error access log, got %#v", entry["msg"])
+	}
+	if entry["status"] != float64(http.StatusInternalServerError) {
+		t.Fatalf("expected 500 status, got %#v", entry["status"])
+	}
+}
+
+func TestAccessLogEmitsWarnForClientErrors(t *testing.T) {
+	var buf bytes.Buffer
+	logger := logging.NewWithWriter(&buf, "debug")
+
+	handler := RequestID(AccessLog(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("bad request"))
+	})))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/error", nil)
+	req.Header.Set("X-Request-ID", "req-client-error")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	entry := decodeMiddlewareLog(t, buf.String())
+	if entry["level"] != "WARN" {
+		t.Fatalf("expected WARN level, got %#v", entry["level"])
+	}
+	if entry["msg"] != "request completed with client error" {
+		t.Fatalf("expected client error access log, got %#v", entry["msg"])
+	}
+	if entry["status"] != float64(http.StatusBadRequest) {
+		t.Fatalf("expected 400 status, got %#v", entry["status"])
+	}
+}
+
 func decodeMiddlewareLog(t *testing.T, raw string) map[string]any {
 	t.Helper()
 
