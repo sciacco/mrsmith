@@ -187,14 +187,20 @@ export function PoDetailPage() {
     cdlanDefaultCode: cdlanDefault,
     currentCode: (editHeader ?? currentHeader).payment_method,
   });
-  const paymentRequiresVerification = requiresPaymentMethodVerification(currentHeader.payment_method, providerDefault, cdlanDefault);
-  const editPaymentRequiresVerification = requiresPaymentMethodVerification((editHeader ?? currentHeader).payment_method, editProviderDefault, cdlanDefault);
+  const paymentVerificationIsCurrent =
+    detail.state === PO_STATES.DRAFT || detail.state === PO_STATES.PENDING_APPROVAL_PAYMENT_METHOD;
+  const paymentRequiresVerification =
+    paymentVerificationIsCurrent && requiresPaymentMethodVerification(currentHeader.payment_method, providerDefault, cdlanDefault);
+  const editPaymentRequiresVerification =
+    paymentVerificationIsCurrent &&
+    requiresPaymentMethodVerification((editHeader ?? currentHeader).payment_method, editProviderDefault, cdlanDefault);
   const readinessItems = buildPOReadinessItems(detailWithDisplayedRecipients ?? detail, currentHeader, {
     provider: fullProvider,
     recipients: displayedRecipients,
     paymentRequiresVerification,
     quoteThreshold: getRdaQuoteThreshold(),
   });
+  const showReadinessPanel = detail.state === PO_STATES.DRAFT;
   const tabBadges = buildTabBadges(detailWithDisplayedRecipients ?? detail, fullProvider, getRdaQuoteThreshold());
 
   function handleProviderChange(value: number | '') {
@@ -357,7 +363,7 @@ export function PoDetailPage() {
         </div>
         <div className="detailSide">
           <POWorkflowRail stage={detail.action_model?.workflow_stage} />
-          <POReadinessPanel items={readinessItems} />
+          {showReadinessPanel ? <POReadinessPanel items={readinessItems} /> : null}
           <CommentsPanel poId={detail.id} comments={comments.data ?? []} />
         </div>
       </div>

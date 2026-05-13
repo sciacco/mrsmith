@@ -77,9 +77,6 @@ function readinessSummary(blockedItems: ReadinessItem[]): string | null {
   if (blockedItems.length === 1) {
     const [item] = blockedItems;
     if (!item) return null;
-    if (item.id === 'payment' && item.detail.toLowerCase().includes('approvazione')) {
-      return 'Pagamento in attesa di approvazione.';
-    }
     return `Da risolvere: ${item.label}.`;
   }
 

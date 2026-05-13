@@ -110,10 +110,10 @@ export function buildPOReadinessItems(po: PoDetail, header: POHeaderState, optio
     {
       id: 'payment',
       label: 'Pagamento',
-      ready: header.payment_method.trim() !== '' && !options.paymentRequiresVerification,
+      ready: header.payment_method.trim() !== '',
       detail: header.payment_method.trim()
         ? options.paymentRequiresVerification
-          ? 'Richiede approvazione metodo pagamento.'
+          ? 'Metodo selezionato; seguira la verifica AFC.'
           : 'Metodo di pagamento selezionato.'
         : 'Seleziona un metodo di pagamento.',
     },
