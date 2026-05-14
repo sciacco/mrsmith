@@ -37,6 +37,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/health"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
+	"github.com/sciacco/mrsmith/internal/platform/keycloak"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 	"github.com/sciacco/mrsmith/internal/platform/staticspa"
@@ -283,6 +284,22 @@ func main() {
 		notificationNotifier = notifications.NewService(notificationStore, logger)
 	}
 
+	var keycloakRoleResolver *keycloak.Client
+	if cfg.KeycloakAdminBaseURL != "" &&
+		cfg.KeycloakAdminRealm != "" &&
+		cfg.KeycloakAdminTokenURL != "" &&
+		cfg.KeycloakAdminClientID != "" &&
+		cfg.KeycloakAdminClientSecret != "" {
+		keycloakRoleResolver = keycloak.New(keycloak.Config{
+			BaseURL:      cfg.KeycloakAdminBaseURL,
+			Realm:        cfg.KeycloakAdminRealm,
+			TokenURL:     cfg.KeycloakAdminTokenURL,
+			ClientID:     cfg.KeycloakAdminClientID,
+			ClientSecret: cfg.KeycloakAdminClientSecret,
+		})
+		logger.Info("keycloak admin client configured", "component", "keycloak")
+	}
+
 	// Carbone service (optional — listini module)
 	var carboneSvc *listini.CarboneService
 	if cfg.CarboneAPIKey != "" {
@@ -496,7 +513,18 @@ func main() {
 	})
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 	quotes.RegisterRoutes(api, mistraDB, alyanteDB, hubspotCli)
-	rdf.RegisterRoutes(api, anisettaDB, mistraDB, openrouterCli, cfg.RDFTeamsWebhookURL, cfg.RDFTeamsNotificationsEnabled)
+	rdf.RegisterRoutes(api, rdf.Deps{
+		AnisettaDB:                 anisettaDB,
+		MistraDB:                   mistraDB,
+		AI:                         openrouterCli,
+		Logger:                     logger,
+		Notifier:                   notificationNotifier,
+		RoleResolver:               keycloakRoleResolver,
+		RichiesteFattibilitaAppURL: cfg.RichiesteFattibilitaAppURL,
+		StaticDir:                  cfg.StaticDir,
+		TeamsWebhookURL:            cfg.RDFTeamsWebhookURL,
+		TeamsNotificationsEnabled:  cfg.RDFTeamsNotificationsEnabled,
+	})
 	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)
 	simulatorivendita.RegisterRoutes(api, simulatoriVenditaCarboneSvc)

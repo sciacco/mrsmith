@@ -98,9 +98,38 @@ func openRDFTestDB(t *testing.T, mode string) *sql.DB {
 	return db
 }
 
+func openRDFStateTestDB(t *testing.T, mode string, state *rdfTestState) *sql.DB {
+	t.Helper()
+
+	registerRDFTestDriver()
+	state.mode = mode
+	name := fmt.Sprintf("%s-%d", mode, time.Now().UnixNano())
+	rdfTestStateMu.Lock()
+	rdfTestStates[name] = state
+	rdfTestStateMu.Unlock()
+	t.Cleanup(func() {
+		rdfTestStateMu.Lock()
+		delete(rdfTestStates, name)
+		rdfTestStateMu.Unlock()
+	})
+
+	db, err := sql.Open(rdfTestDriverName, name)
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+	return db
+}
+
 const rdfTestDriverName = "rdf_test_driver"
 
-var registerRDFTestDriverOnce sync.Once
+var (
+	registerRDFTestDriverOnce sync.Once
+	rdfTestStateMu            sync.Mutex
+	rdfTestStates             = map[string]*rdfTestState{}
+)
 
 func registerRDFTestDriver() {
 	registerRDFTestDriverOnce.Do(func() {
@@ -111,11 +140,19 @@ func registerRDFTestDriver() {
 type rdfTestDriver struct{}
 
 func (rdfTestDriver) Open(name string) (driver.Conn, error) {
-	return &rdfTestConn{mode: name}, nil
+	rdfTestStateMu.Lock()
+	state := rdfTestStates[name]
+	rdfTestStateMu.Unlock()
+	mode := name
+	if state != nil {
+		mode = state.mode
+	}
+	return &rdfTestConn{mode: mode, state: state}, nil
 }
 
 type rdfTestConn struct {
-	mode string
+	mode  string
+	state *rdfTestState
 }
 
 func (c *rdfTestConn) Prepare(string) (driver.Stmt, error) {
@@ -125,10 +162,14 @@ func (c *rdfTestConn) Prepare(string) (driver.Stmt, error) {
 func (c *rdfTestConn) Close() error { return nil }
 
 func (c *rdfTestConn) Begin() (driver.Tx, error) {
-	return nil, errors.New("not implemented")
+	return c.BeginTx(context.Background(), driver.TxOptions{})
 }
 
-func (c *rdfTestConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+func (c *rdfTestConn) BeginTx(context.Context, driver.TxOptions) (driver.Tx, error) {
+	return &rdfTestTx{state: c.state}, nil
+}
+
+func (c *rdfTestConn) QueryContext(_ context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	switch c.mode {
 	case "summary-null-preferred-suppliers":
 		if strings.Contains(query, "FROM public.rdf_richieste r") && strings.Contains(query, "LEFT JOIN counts c") {
@@ -196,6 +237,46 @@ func (c *rdfTestConn) QueryContext(_ context.Context, query string, _ []driver.N
 				},
 			}, nil
 		}
+	case "comment-create":
+		if strings.Contains(query, "FROM public.rdf_richieste") && strings.Contains(query, "WHERE id = $1") {
+			return &rdfTestRows{
+				columns: []string{
+					"id", "deal_id", "data_richiesta", "descrizione", "indirizzo", "stato",
+					"annotazioni_richiedente", "annotazioni_carrier", "created_by", "created_at", "updated_at",
+					"fornitori_preferiti", "codice_deal",
+				},
+				values: [][]driver.Value{{
+					int64(42),
+					nil,
+					time.Date(2026, time.April, 16, 0, 0, 0, 0, time.UTC),
+					"Nuova richiesta",
+					"Via Roma 1",
+					"nuova",
+					nil,
+					nil,
+					"tester@example.com",
+					time.Date(2026, time.April, 16, 10, 21, 0, 0, time.UTC),
+					nil,
+					nil,
+					"DL-42",
+				}},
+			}, nil
+		}
+		if strings.Contains(query, "INSERT INTO public.rdf_commenti") {
+			if c.state != nil {
+				c.state.insertedComment = namedValueString(args, 1)
+				c.state.insertedAuthorSubject = namedValueString(args, 2)
+				c.state.insertedAuthorEmail = namedValueString(args, 3)
+				c.state.insertedAuthorName = namedValueString(args, 4)
+			}
+			return &rdfTestRows{
+				columns: []string{"id", "created_at"},
+				values: [][]driver.Value{{
+					int64(101),
+					time.Date(2026, time.May, 14, 8, 30, 0, 0, time.UTC),
+				}},
+			}, nil
+		}
 	case "unexpected-query":
 		return nil, fmt.Errorf("unexpected query: %s", query)
 	}
@@ -203,7 +284,58 @@ func (c *rdfTestConn) QueryContext(_ context.Context, query string, _ []driver.N
 	return nil, fmt.Errorf("unexpected query in mode %q: %s", c.mode, query)
 }
 
+func (c *rdfTestConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	switch c.mode {
+	case "comment-create":
+		if strings.Contains(query, "INSERT INTO public.rdf_commenti_menzioni") {
+			if c.state != nil {
+				c.state.mentionEmails = append(c.state.mentionEmails, namedValueString(args, 3))
+			}
+			return driver.RowsAffected(1), nil
+		}
+		if strings.Contains(query, "INSERT INTO public.rdf_richieste_notificati") {
+			if c.state != nil {
+				c.state.notifiedEmails = append(c.state.notifiedEmails, namedValueString(args, 2))
+			}
+			return driver.RowsAffected(1), nil
+		}
+	}
+	return nil, fmt.Errorf("unexpected exec in mode %q: %s", c.mode, query)
+}
+
 var _ driver.QueryerContext = (*rdfTestConn)(nil)
+var _ driver.ExecerContext = (*rdfTestConn)(nil)
+var _ driver.ConnBeginTx = (*rdfTestConn)(nil)
+
+type rdfTestTx struct {
+	state *rdfTestState
+}
+
+func (tx *rdfTestTx) Commit() error {
+	if tx.state != nil {
+		tx.state.committed = true
+	}
+	return nil
+}
+
+func (tx *rdfTestTx) Rollback() error {
+	if tx.state != nil {
+		tx.state.rolledBack = true
+	}
+	return nil
+}
+
+type rdfTestState struct {
+	mode                  string
+	insertedComment       string
+	insertedAuthorSubject string
+	insertedAuthorEmail   string
+	insertedAuthorName    string
+	mentionEmails         []string
+	notifiedEmails        []string
+	committed             bool
+	rolledBack            bool
+}
 
 type rdfTestRows struct {
 	columns []string
@@ -224,4 +356,14 @@ func (r *rdfTestRows) Next(dest []driver.Value) error {
 	copy(dest, r.values[r.index])
 	r.index++
 	return nil
+}
+
+func namedValueString(args []driver.NamedValue, index int) string {
+	if index < 0 || index >= len(args) {
+		return ""
+	}
+	if args[index].Value == nil {
+		return ""
+	}
+	return fmt.Sprint(args[index].Value)
 }

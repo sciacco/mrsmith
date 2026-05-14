@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"net/http"
 	"strconv"
@@ -16,8 +17,10 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/auth"
+	"github.com/sciacco/mrsmith/internal/notifications"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/keycloak"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 )
@@ -46,12 +49,34 @@ var (
 )
 
 type Handler struct {
-	anisettaDB                *sql.DB
-	mistraDB                  *sql.DB
-	ai                        *openrouter.Client
-	teamsWebhookURL           string
-	teamsNotificationsEnabled bool
-	httpCli                   *http.Client
+	anisettaDB                 *sql.DB
+	mistraDB                   *sql.DB
+	ai                         *openrouter.Client
+	logger                     *slog.Logger
+	notifier                   notifications.Notifier
+	roleResolver               RoleUserResolver
+	richiesteFattibilitaAppURL string
+	staticDir                  string
+	teamsWebhookURL            string
+	teamsNotificationsEnabled  bool
+	httpCli                    *http.Client
+}
+
+type RoleUserResolver interface {
+	UsersByRealmRole(ctx context.Context, roleName string, opts keycloak.UsersByRealmRoleOptions) ([]keycloak.User, error)
+}
+
+type Deps struct {
+	AnisettaDB                 *sql.DB
+	MistraDB                   *sql.DB
+	AI                         *openrouter.Client
+	Logger                     *slog.Logger
+	Notifier                   notifications.Notifier
+	RoleResolver               RoleUserResolver
+	RichiesteFattibilitaAppURL string
+	StaticDir                  string
+	TeamsWebhookURL            string
+	TeamsNotificationsEnabled  bool
 }
 
 type createRichiestaRequest struct {
@@ -91,20 +116,23 @@ type updateFattibilitaRequest struct {
 	GiorniRilascio       *int     `json:"giorni_rilascio"`
 }
 
-func RegisterRoutes(
-	mux *http.ServeMux,
-	anisettaDB, mistraDB *sql.DB,
-	ai *openrouter.Client,
-	teamsWebhookURL string,
-	teamsNotificationsEnabled bool,
-) {
+func RegisterRoutes(mux *http.ServeMux, deps Deps) {
+	logger := deps.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
 	h := &Handler{
-		anisettaDB:                anisettaDB,
-		mistraDB:                  mistraDB,
-		ai:                        ai,
-		teamsWebhookURL:           strings.TrimSpace(teamsWebhookURL),
-		teamsNotificationsEnabled: teamsNotificationsEnabled,
-		httpCli:                   &http.Client{Timeout: 20 * time.Second},
+		anisettaDB:                 deps.AnisettaDB,
+		mistraDB:                   deps.MistraDB,
+		ai:                         deps.AI,
+		logger:                     logger.With("component", "rdf"),
+		notifier:                   deps.Notifier,
+		roleResolver:               deps.RoleResolver,
+		richiesteFattibilitaAppURL: strings.TrimSpace(deps.RichiesteFattibilitaAppURL),
+		staticDir:                  strings.TrimSpace(deps.StaticDir),
+		teamsWebhookURL:            strings.TrimSpace(deps.TeamsWebhookURL),
+		teamsNotificationsEnabled:  deps.TeamsNotificationsEnabled,
+		httpCli:                    &http.Client{Timeout: 20 * time.Second},
 	}
 
 	accessProtect := acl.RequireRole(applaunch.RichiesteFattibilitaAccessRoles()...)
@@ -121,10 +149,13 @@ func RegisterRoutes(
 	access("GET /rdf/v1/deals/{id}", h.handleGetDeal)
 	access("GET /rdf/v1/fornitori", h.handleListFornitori)
 	access("GET /rdf/v1/tecnologie", h.handleListTecnologie)
+	access("GET /rdf/v1/users", h.handleListRDFUsers)
 	access("GET /rdf/v1/richieste/summary", h.handleListRichiesteSummary)
 	access("GET /rdf/v1/richieste/{id}/full", h.handleGetRichiestaFull)
+	access("GET /rdf/v1/richieste/{id}/comments", h.handleListComments)
 	access("GET /rdf/v1/fattibilita/{id}", h.handleGetFattibilita)
 	access("POST /rdf/v1/richieste", h.handleCreateRichiesta)
+	access("POST /rdf/v1/richieste/{id}/comments", h.handlePostComment)
 	access("POST /rdf/v1/richieste/{id}/analisi", h.handleAnalyzeRichiesta)
 	access("POST /rdf/v1/richieste/{id}/analisi-json", h.handleAnalyzeRichiestaJSON)
 	access("GET /rdf/v1/richieste/{id}/pdf", h.handleRenderRichiestaPDF)
