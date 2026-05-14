@@ -3,6 +3,7 @@ import { Icon } from '../Icon/Icon';
 import styles from './NotificationBell.module.css';
 
 const POLL_INTERVAL_MS = 60_000;
+const OLD_NOTIFICATION_THRESHOLD_MS = 22 * 60 * 60 * 1000;
 
 export type NotificationBellVariant = 'clean' | 'matrix';
 export type NotificationBellVisibility = 'always' | 'unread';
@@ -343,11 +344,24 @@ function sendNotificationFetch(path: string, token: string, init: RequestInit = 
   });
 }
 
-function formatNotificationTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '--:--';
-  return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+function formatNotificationTime(value?: string | null): string {
+  const date = new Date(value ?? '');
+  const timestamp = date.getTime();
+  if (Number.isNaN(timestamp)) return '--:--';
+
+  const dateTimeOptions: Intl.DateTimeFormatOptions =
+    Date.now() - timestamp > OLD_NOTIFICATION_THRESHOLD_MS
+      ? {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }
+      : {
+          hour: '2-digit',
+          minute: '2-digit',
+        };
+
+  return new Intl.DateTimeFormat(undefined, dateTimeOptions).format(date);
 }
