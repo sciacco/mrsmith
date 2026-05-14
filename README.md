@@ -167,7 +167,9 @@ starting point. Important groups:
 
 - Auth: `KEYCLOAK_ISSUER_URL`, `KEYCLOAK_FRONTEND_URL`,
   `KEYCLOAK_FRONTEND_REALM`, `KEYCLOAK_FRONTEND_CLIENT_ID`,
-  `SKIP_KEYCLOAK`
+  `KEYCLOAK_ADMIN_CLIENT_ID`, `KEYCLOAK_ADMIN_CLIENT_SECRET`,
+  optional `KEYCLOAK_ADMIN_BASE_URL`, `KEYCLOAK_ADMIN_REALM`,
+  `KEYCLOAK_ADMIN_TOKEN_URL`, and `SKIP_KEYCLOAK`
 - Server/runtime: `PORT`, `CORS_ORIGINS`, `STATIC_DIR`, `INCLUDE_DEV_APPS`
 - App databases: `MISTRA_DSN`, `ARAK_DSN`, `ANISETTA_DSN`, `GRAPPA_DSN`,
   `DBCOPERTURE_DSN`, `MANUTENZIONI_DSN`, `ALYANTE_DSN`, `VODKA_DSN`,
@@ -179,6 +181,12 @@ starting point. Important groups:
 
 Do not commit `.env`, `.env.local`, deployment secrets, or copied production
 configuration.
+
+`KEYCLOAK_ADMIN_*` is backend-only and is not returned by `GET /config`.
+Configure it only when backend code needs to resolve users by realm role. The
+Keycloak service account must have read-only Admin API access to users, groups,
+and realm roles; direct role-user lookup alone does not include users who
+inherit a role through group membership.
 
 ## Key References
 

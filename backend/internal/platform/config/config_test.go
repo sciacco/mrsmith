@@ -102,6 +102,74 @@ func TestSMTPConfigFromEnv(t *testing.T) {
 	}
 }
 
+func TestKeycloakAdminConfigDerivesFromFrontendConfig(t *testing.T) {
+	clearKeycloakAdminEnv(t)
+	t.Setenv("KEYCLOAK_ISSUER_URL", "")
+	t.Setenv("KEYCLOAK_FRONTEND_URL", "https://keycloak.example.com/")
+	t.Setenv("KEYCLOAK_FRONTEND_REALM", "mrsmith-dev")
+
+	cfg := Load()
+
+	if cfg.KeycloakAdminBaseURL != "https://keycloak.example.com" {
+		t.Fatalf("expected admin base URL from frontend URL, got %q", cfg.KeycloakAdminBaseURL)
+	}
+	if cfg.KeycloakAdminRealm != "mrsmith-dev" {
+		t.Fatalf("expected admin realm from frontend realm, got %q", cfg.KeycloakAdminRealm)
+	}
+	if cfg.KeycloakAdminTokenURL != "https://keycloak.example.com/realms/mrsmith-dev/protocol/openid-connect/token" {
+		t.Fatalf("unexpected admin token URL %q", cfg.KeycloakAdminTokenURL)
+	}
+}
+
+func TestKeycloakAdminConfigDerivesFromIssuerConfig(t *testing.T) {
+	clearKeycloakAdminEnv(t)
+	t.Setenv("KEYCLOAK_ISSUER_URL", "https://keycloak.example.com/auth/realms/mrsmith-dev")
+	t.Setenv("KEYCLOAK_FRONTEND_URL", "")
+	t.Setenv("KEYCLOAK_FRONTEND_REALM", "")
+
+	cfg := Load()
+
+	if cfg.KeycloakAdminBaseURL != "https://keycloak.example.com/auth" {
+		t.Fatalf("expected admin base URL from issuer URL, got %q", cfg.KeycloakAdminBaseURL)
+	}
+	if cfg.KeycloakAdminRealm != "mrsmith-dev" {
+		t.Fatalf("expected admin realm from issuer URL, got %q", cfg.KeycloakAdminRealm)
+	}
+	if cfg.KeycloakAdminTokenURL != "https://keycloak.example.com/auth/realms/mrsmith-dev/protocol/openid-connect/token" {
+		t.Fatalf("unexpected admin token URL %q", cfg.KeycloakAdminTokenURL)
+	}
+}
+
+func TestKeycloakAdminConfigUsesExplicitOverrides(t *testing.T) {
+	clearKeycloakAdminEnv(t)
+	t.Setenv("KEYCLOAK_ISSUER_URL", "https://issuer.example.com/realms/issuer")
+	t.Setenv("KEYCLOAK_FRONTEND_URL", "https://frontend.example.com")
+	t.Setenv("KEYCLOAK_FRONTEND_REALM", "frontend")
+	t.Setenv("KEYCLOAK_ADMIN_BASE_URL", "https://admin.example.com/keycloak")
+	t.Setenv("KEYCLOAK_ADMIN_REALM", "admin")
+	t.Setenv("KEYCLOAK_ADMIN_TOKEN_URL", "https://tokens.example.com/custom/token")
+	t.Setenv("KEYCLOAK_ADMIN_CLIENT_ID", "resolver")
+	t.Setenv("KEYCLOAK_ADMIN_CLIENT_SECRET", "resolver-secret")
+
+	cfg := Load()
+
+	if cfg.KeycloakAdminBaseURL != "https://admin.example.com/keycloak" {
+		t.Fatalf("expected explicit admin base URL, got %q", cfg.KeycloakAdminBaseURL)
+	}
+	if cfg.KeycloakAdminRealm != "admin" {
+		t.Fatalf("expected explicit admin realm, got %q", cfg.KeycloakAdminRealm)
+	}
+	if cfg.KeycloakAdminTokenURL != "https://tokens.example.com/custom/token" {
+		t.Fatalf("expected explicit admin token URL, got %q", cfg.KeycloakAdminTokenURL)
+	}
+	if cfg.KeycloakAdminClientID != "resolver" {
+		t.Fatalf("expected admin client id, got %q", cfg.KeycloakAdminClientID)
+	}
+	if cfg.KeycloakAdminClientSecret != "resolver-secret" {
+		t.Fatalf("expected admin client secret, got %q", cfg.KeycloakAdminClientSecret)
+	}
+}
+
 func clearSMTPEnv(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{
@@ -115,6 +183,22 @@ func clearSMTPEnv(t *testing.T) {
 		"SMTP_TLS_SKIP_VERIFY",
 		"SMTP_TLS_SERVER_NAME",
 		"SMTP_AUTH_MODE",
+	} {
+		t.Setenv(key, "")
+	}
+}
+
+func clearKeycloakAdminEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"KEYCLOAK_ISSUER_URL",
+		"KEYCLOAK_FRONTEND_URL",
+		"KEYCLOAK_FRONTEND_REALM",
+		"KEYCLOAK_ADMIN_BASE_URL",
+		"KEYCLOAK_ADMIN_REALM",
+		"KEYCLOAK_ADMIN_TOKEN_URL",
+		"KEYCLOAK_ADMIN_CLIENT_ID",
+		"KEYCLOAK_ADMIN_CLIENT_SECRET",
 	} {
 		t.Setenv(key, "")
 	}

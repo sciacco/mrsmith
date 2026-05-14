@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -118,6 +119,14 @@ type Config struct {
 	KeycloakFrontendRealm    string
 	KeycloakFrontendClientId string
 
+	// Backend-only Keycloak Admin API client credentials and endpoints. These
+	// values are not exposed through GET /config.
+	KeycloakAdminBaseURL      string
+	KeycloakAdminRealm        string
+	KeycloakAdminClientID     string
+	KeycloakAdminClientSecret string
+	KeycloakAdminTokenURL     string
+
 	// Public RDA runtime settings served to browser via GET /config.
 	RDAQuoteThreshold float64
 
@@ -129,10 +138,27 @@ type Config struct {
 }
 
 func Load() Config {
+	keycloakIssuerURL := envOr("KEYCLOAK_ISSUER_URL", "")
+	keycloakFrontendURL := envOr("KEYCLOAK_FRONTEND_URL", "")
+	keycloakFrontendRealm := envOr("KEYCLOAK_FRONTEND_REALM", "")
+
+	keycloakAdminBaseURL := envOr(
+		"KEYCLOAK_ADMIN_BASE_URL",
+		deriveKeycloakAdminBaseURL(keycloakIssuerURL, keycloakFrontendURL),
+	)
+	keycloakAdminRealm := envOr(
+		"KEYCLOAK_ADMIN_REALM",
+		deriveKeycloakAdminRealm(keycloakIssuerURL, keycloakFrontendRealm),
+	)
+	keycloakAdminTokenURL := envOr(
+		"KEYCLOAK_ADMIN_TOKEN_URL",
+		deriveKeycloakAdminTokenURL(keycloakAdminBaseURL, keycloakAdminRealm, keycloakIssuerURL),
+	)
+
 	return Config{
 		Port:                         envOr("PORT", "8080"),
 		LogLevel:                     envOr("LOG_LEVEL", "info"),
-		KeycloakIssuerURL:            envOr("KEYCLOAK_ISSUER_URL", ""),
+		KeycloakIssuerURL:            keycloakIssuerURL,
 		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185,http://localhost:5186,http://localhost:5187,http://localhost:5188,http://localhost:5189,http://localhost:5190"),
 		StaticDir:                    envOr("STATIC_DIR", ""),
 		IncludeDevApps:               boolEnvOr("INCLUDE_DEV_APPS", false),
@@ -197,10 +223,21 @@ func Load() Config {
 		),
 		DiagnosticEventsQueueSize: positiveIntEnvOr("DIAGNOSTIC_EVENTS_QUEUE_SIZE", 1000),
 
-		KeycloakFrontendURL:      envOr("KEYCLOAK_FRONTEND_URL", ""),
-		KeycloakFrontendRealm:    envOr("KEYCLOAK_FRONTEND_REALM", ""),
+		KeycloakFrontendURL:      keycloakFrontendURL,
+		KeycloakFrontendRealm:    keycloakFrontendRealm,
 		KeycloakFrontendClientId: envOr("KEYCLOAK_FRONTEND_CLIENT_ID", ""),
-		RDAQuoteThreshold:        positiveFloatEnvOr("RDA_QUOTE_THRESHOLD", DefaultRDAQuoteThreshold),
+		KeycloakAdminBaseURL:     keycloakAdminBaseURL,
+		KeycloakAdminRealm:       keycloakAdminRealm,
+		KeycloakAdminClientID: envOr(
+			"KEYCLOAK_ADMIN_CLIENT_ID",
+			"",
+		),
+		KeycloakAdminClientSecret: envOr(
+			"KEYCLOAK_ADMIN_CLIENT_SECRET",
+			"",
+		),
+		KeycloakAdminTokenURL: keycloakAdminTokenURL,
+		RDAQuoteThreshold:     positiveFloatEnvOr("RDA_QUOTE_THRESHOLD", DefaultRDAQuoteThreshold),
 
 		ArakBaseURL:         envOr("ARAK_BASE_URL", ""),
 		ArakServiceClientID: envOr("ARAK_SERVICE_CLIENT_ID", ""),
@@ -238,6 +275,67 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func deriveKeycloakAdminBaseURL(issuerURL, frontendURL string) string {
+	if strings.TrimSpace(frontendURL) != "" {
+		return strings.TrimRight(strings.TrimSpace(frontendURL), "/")
+	}
+	baseURL, _ := keycloakIssuerParts(issuerURL)
+	return baseURL
+}
+
+func deriveKeycloakAdminRealm(issuerURL, frontendRealm string) string {
+	if strings.TrimSpace(frontendRealm) != "" {
+		return strings.TrimSpace(frontendRealm)
+	}
+	_, realm := keycloakIssuerParts(issuerURL)
+	return realm
+}
+
+func deriveKeycloakAdminTokenURL(adminBaseURL, adminRealm, issuerURL string) string {
+	if strings.TrimSpace(adminBaseURL) != "" && strings.TrimSpace(adminRealm) != "" {
+		return joinURLPath(adminBaseURL, "realms", adminRealm, "protocol", "openid-connect", "token")
+	}
+	if strings.TrimSpace(issuerURL) == "" {
+		return ""
+	}
+	return strings.TrimRight(strings.TrimSpace(issuerURL), "/") + "/protocol/openid-connect/token"
+}
+
+func keycloakIssuerParts(issuerURL string) (string, string) {
+	parsed, err := url.Parse(strings.TrimSpace(issuerURL))
+	if err != nil {
+		return "", ""
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	for i := len(parts) - 2; i >= 0; i-- {
+		if parts[i] != "realms" {
+			continue
+		}
+
+		realm, err := url.PathUnescape(parts[i+1])
+		if err != nil {
+			realm = parts[i+1]
+		}
+		parsed.Path = ""
+		if i > 0 {
+			parsed.Path = "/" + strings.Join(parts[:i], "/")
+		}
+		parsed.RawQuery = ""
+		parsed.Fragment = ""
+		return strings.TrimRight(parsed.String(), "/"), realm
+	}
+	return "", ""
+}
+
+func joinURLPath(baseURL string, parts ...string) string {
+	escaped := make([]string, 0, len(parts))
+	for _, part := range parts {
+		escaped = append(escaped, url.PathEscape(strings.Trim(part, "/")))
+	}
+	return strings.TrimRight(strings.TrimSpace(baseURL), "/") + "/" + strings.Join(escaped, "/")
 }
 
 func positiveFloatEnvOr(key string, fallback float64) float64 {

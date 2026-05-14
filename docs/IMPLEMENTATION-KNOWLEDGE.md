@@ -432,6 +432,15 @@ Alyante ERP ID
 
 ## Auth and Transport Behavior
 
+### Keycloak Role User Lookups Must Include Group-Derived Membership
+
+- Context: backend services that need the current enabled users for a Keycloak realm role.
+- Discovery: `GET /admin/realms/{realm}/roles/{role-name}/users` returns users assigned directly to the role, but does not cover users who inherit the role through Keycloak groups.
+- Practical rule: use `backend/internal/platform/keycloak.Client.UsersByRealmRole` for backend role-user resolution. It combines direct role users with groups that carry the role, recursively visits subgroup children, pages group members, excludes disabled users and blank emails, and deduplicates by Keycloak user ID. V1 intentionally does not expand composite roles.
+- Evidence: Keycloak Admin REST role users/groups and group members endpoints; Keycloak issue `keycloak/keycloak#19391` documents the direct lookup limitation for group-inherited users.
+- Used by: future backend-only role recipient or operator resolution flows.
+- Open questions: none for realm roles; client-role and composite-role expansion would need separate explicit design.
+
 ### RDA Approval Permissions Come From users_int.role
 
 - Context: `apps/rda` approver inboxes, PO action bar, and privileged RDA transitions.
