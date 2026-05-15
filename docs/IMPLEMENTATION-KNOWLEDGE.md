@@ -522,6 +522,15 @@ Alyante ERP ID
 - Used by: all Vite mini-apps mounted under `/apps/<app>/`.
 - Open questions: none.
 
+### Route-Scoped Roles Share the App Launcher Role Set
+
+- Context: a user should open an existing mini-app but only operate one route/tab inside it.
+- Discovery: a single `APP_ACCESS_ROLES[app]` value is both the mini-app shell gate and the frontend mirror of launcher visibility, while backend ACL is the real authorization boundary for each API route.
+- Practical rule: put every role that may enter the app in the launcher/app access union, then enforce narrower route/API permissions separately. The frontend should hide or redirect unavailable tabs for UX, but backend handlers must use the precise role helper for each operation.
+- Evidence: CP Backoffice full role `app_cpbackoffice_access`, biometric-only role `app_cpbackoffice_biometric_access`, `backend/internal/cpbackoffice/handler.go`, `backend/internal/platform/applaunch/catalog.go`, `packages/auth-client/src/roles.ts`, and `apps/cp-backoffice/src/App.tsx`.
+- Used by: CP Backoffice biometric-only access.
+- Open questions: none.
+
 ## Legacy Data Model Constraints
 
 ### Alyante Product Translation Write Contract

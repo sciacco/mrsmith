@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getAppAccessState } from '../src/roles.ts';
+import {
+  APP_ACCESS_ROLES,
+  CP_BACKOFFICE_FULL_ACCESS_ROLES,
+  getAppAccessState,
+  hasAnyRole,
+} from '../src/roles.ts';
 
 function auth(overrides: Partial<Parameters<typeof getAppAccessState>[0]> = {}) {
   return {
@@ -24,6 +29,16 @@ test('matching required app role is allowed', () => {
     getAppAccessState(auth({ user: { roles: ['app_budget_access'] } }), ['app_budget_access']),
     'allowed',
   );
+});
+
+test('cp backoffice biometric role grants app access but not full access', () => {
+  const roles = ['app_cpbackoffice_biometric_access'];
+
+  assert.equal(
+    getAppAccessState(auth({ user: { roles } }), APP_ACCESS_ROLES['cp-backoffice']),
+    'allowed',
+  );
+  assert.equal(hasAnyRole(roles, CP_BACKOFFICE_FULL_ACCESS_ROLES), false);
 });
 
 test('app_devadmin bypass is allowed', () => {

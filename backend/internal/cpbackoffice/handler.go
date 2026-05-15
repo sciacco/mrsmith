@@ -22,23 +22,28 @@ type Deps struct {
 }
 
 // RegisterRoutes mounts every cp-backoffice endpoint on the given mux.
-// All routes are gated by the app_cpbackoffice_access role.
+// Customer/user/admin routes require the full app_cpbackoffice_access role;
+// biometric routes also allow the biometric-only role.
 //
 // The mux is expected to be the shared /api mux from backend/cmd/server/main.go,
 // so Recover, RequestID, CORS, AccessLog, and auth middleware apply automatically.
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
-	protect := acl.RequireRole(applaunch.CPBackofficeAccessRoles()...)
-	handle := func(pattern string, handler http.HandlerFunc) {
-		mux.Handle(pattern, protect(handler))
+	fullProtect := acl.RequireRole(applaunch.CPBackofficeAccessRoles()...)
+	appProtect := acl.RequireRole(applaunch.CPBackofficeAppAccessRoles()...)
+	handleFull := func(pattern string, handler http.HandlerFunc) {
+		mux.Handle(pattern, fullProtect(handler))
+	}
+	handleApp := func(pattern string, handler http.HandlerFunc) {
+		mux.Handle(pattern, appProtect(handler))
 	}
 
-	handle("GET /cp-backoffice/v1/customers", handleListCustomers(deps))
-	handle("GET /cp-backoffice/v1/customer-states", handleListCustomerStates(deps))
-	handle("PUT /cp-backoffice/v1/customers/{id}/state", handleUpdateCustomerState(deps))
-	handle("GET /cp-backoffice/v1/users", handleListUsers(deps))
-	handle("POST /cp-backoffice/v1/admins", handleCreateAdmin(deps))
-	handle("GET /cp-backoffice/v1/biometric-requests", handleListBiometricRequests(deps))
-	handle("POST /cp-backoffice/v1/biometric-requests/{id}/completion", handleSetBiometricCompleted(deps))
+	handleFull("GET /cp-backoffice/v1/customers", handleListCustomers(deps))
+	handleFull("GET /cp-backoffice/v1/customer-states", handleListCustomerStates(deps))
+	handleFull("PUT /cp-backoffice/v1/customers/{id}/state", handleUpdateCustomerState(deps))
+	handleFull("GET /cp-backoffice/v1/users", handleListUsers(deps))
+	handleFull("POST /cp-backoffice/v1/admins", handleCreateAdmin(deps))
+	handleApp("GET /cp-backoffice/v1/biometric-requests", handleListBiometricRequests(deps))
+	handleApp("POST /cp-backoffice/v1/biometric-requests/{id}/completion", handleSetBiometricCompleted(deps))
 }
 
 // --- Shared helpers (names locked by S2 contract) ---

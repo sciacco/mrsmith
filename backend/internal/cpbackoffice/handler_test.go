@@ -25,6 +25,7 @@ type routeCase struct {
 	body        string
 	needsArak   bool
 	needsMistra bool
+	biometric   bool
 }
 
 var registeredRoutes = []routeCase{
@@ -33,8 +34,8 @@ var registeredRoutes = []routeCase{
 	{name: "update_customer_state", method: http.MethodPut, path: "/cp-backoffice/v1/customers/42/state", body: `{"state_id":7}`, needsArak: true},
 	{name: "list_users", method: http.MethodGet, path: "/cp-backoffice/v1/users?customer_id=7", needsArak: true},
 	{name: "create_admin", method: http.MethodPost, path: "/cp-backoffice/v1/admins", body: `{"customer_id":1,"nome":"Jane","cognome":"Doe","email":"jane@example.com","telefono":"0000","maintenance_on_primary_email":false,"marketing_on_primary_email":false}`, needsArak: true},
-	{name: "list_biometric_requests", method: http.MethodGet, path: "/cp-backoffice/v1/biometric-requests", needsMistra: true},
-	{name: "set_biometric_completed", method: http.MethodPost, path: "/cp-backoffice/v1/biometric-requests/42/completion", body: `{"completed":true}`, needsMistra: true},
+	{name: "list_biometric_requests", method: http.MethodGet, path: "/cp-backoffice/v1/biometric-requests", needsMistra: true, biometric: true},
+	{name: "set_biometric_completed", method: http.MethodPost, path: "/cp-backoffice/v1/biometric-requests/42/completion", body: `{"completed":true}`, needsMistra: true, biometric: true},
 }
 
 func newRouteRequest(rc routeCase) *http.Request {
@@ -123,6 +124,27 @@ func TestRoutesReachHandlerWithRole(t *testing.T) {
 
 			want := http.StatusNotImplemented
 			if rc.needsMistra {
+				want = http.StatusInternalServerError
+			}
+			if rec.Code != want {
+				t.Fatalf("expected %d, got %d: %s", want, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestBiometricRoleOnlyReachesBiometricHandlers(t *testing.T) {
+	mux := newMux(newTestDeps(t, true, true))
+
+	for _, rc := range registeredRoutes {
+		t.Run(rc.name, func(t *testing.T) {
+			req := newRouteRequest(rc)
+			req = withRoleClaims(req, "app_cpbackoffice_biometric_access")
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+
+			want := http.StatusForbidden
+			if rc.biometric {
 				want = http.StatusInternalServerError
 			}
 			if rec.Code != want {

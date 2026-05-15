@@ -68,6 +68,7 @@ var (
 	complianceAccessRoles            = []string{"app_compliance_access"}
 	copertureAccessRoles             = []string{"app_coperture_access"}
 	cpBackofficeAccessRoles          = []string{"app_cpbackoffice_access"}
+	cpBackofficeBiometricAccessRoles = []string{"app_cpbackoffice_biometric_access"}
 	energiaDCAccessRoles             = []string{"app_energiadc_access"}
 	kitProductsAccessRoles           = []string{"app_kitproducts_access"}
 	listiniAccessRoles               = []string{"app_listini_access"}
@@ -310,7 +311,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			Status:        "ready",
 			CategoryID:    "backoffice",
 			CategoryTitle: "Backoffice",
-			AccessRoles:   CPBackofficeAccessRoles(),
+			AccessRoles:   CPBackofficeAppAccessRoles(),
 		},
 		{
 			ID:            RDFBackendAppID,
@@ -430,6 +431,15 @@ func CPBackofficeAccessRoles() []string {
 	return slices.Clone(cpBackofficeAccessRoles)
 }
 
+func CPBackofficeBiometricAccessRoles() []string {
+	return slices.Clone(cpBackofficeBiometricAccessRoles)
+}
+
+func CPBackofficeAppAccessRoles() []string {
+	roles := slices.Clone(cpBackofficeAccessRoles)
+	return append(roles, cpBackofficeBiometricAccessRoles...)
+}
+
 func EnergiaDCAccessRoles() []string {
 	return slices.Clone(energiaDCAccessRoles)
 }
@@ -511,6 +521,7 @@ func AllRoles() []string {
 		complianceAccessRoles,
 		copertureAccessRoles,
 		cpBackofficeAccessRoles,
+		cpBackofficeBiometricAccessRoles,
 		energiaDCAccessRoles,
 		kitProductsAccessRoles,
 		listiniAccessRoles,

@@ -1,12 +1,21 @@
 export const DEVADMIN_ROLE = 'app_devadmin';
 
+export const CP_BACKOFFICE_FULL_ACCESS_ROLES = ['app_cpbackoffice_access'] as const;
+export const CP_BACKOFFICE_BIOMETRIC_ACCESS_ROLES = [
+  'app_cpbackoffice_biometric_access',
+] as const;
+export const CP_BACKOFFICE_APP_ACCESS_ROLES = [
+  ...CP_BACKOFFICE_FULL_ACCESS_ROLES,
+  ...CP_BACKOFFICE_BIOMETRIC_ACCESS_ROLES,
+] as const;
+
 export const APP_ACCESS_ROLES = {
   budget: ['app_budget_access'],
   fornitori: ['app_fornitori_access'],
   rda: ['app_rda_access'],
   compliance: ['app_compliance_access'],
   coperture: ['app_coperture_access'],
-  'cp-backoffice': ['app_cpbackoffice_access'],
+  'cp-backoffice': CP_BACKOFFICE_APP_ACCESS_ROLES,
   'energia-dc': ['app_energiadc_access'],
   'kit-products': ['app_kitproducts_access'],
   'listini-e-sconti': ['app_listini_access'],

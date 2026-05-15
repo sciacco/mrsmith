@@ -5,13 +5,14 @@ Platform-neutral spec ready to hand to `portal-miniapp-generator` (or any implem
 ## Summary
 - **Application name / display**: Customer Portal Back-office (back-office admin companion to the end-user Customer Portal). Retains Italian copy.
 - **Slug**: `cp-backoffice` (used uniformly for the Vite app folder, package.json script `dev:cp-backoffice`, Makefile target `dev-cp-backoffice`, catalog `ID: "cp-backoffice"`, `Href: "/apps/cp-backoffice/"`, Go config field `CPBackofficeAppURL`, env var `CP_BACKOFFICE_APP_URL`).
-- **Keycloak access role**: `app_cpbackoffice_access` (CLAUDE.md convention, collapsed form matching `app_kitproducts_access`, `app_afctools_access`, etc.).
+- **Keycloak access roles**: `app_cpbackoffice_access` for full back-office access; `app_cpbackoffice_biometric_access` for biometric-only operators.
 - **Audit source**: `apps/customer-portal/audit/` (APPLICATION_INVENTORY.md, DATASOURCE_CATALOG.md, PAGE_AUDITS.md, FINDINGS.md), cross-checked against `docs/mistra-dist.yaml` and `docs/mistradb/mistra_customers.json`.
 - **Spec status**: ready for implementation planning.
 - **Last updated decisions** (expert):
   - Gestione Utenti: **defer** the user fetch until a customer is selected (fix the unguarded on-load fetch).
   - Accessi Biometrico: **drop** the `howAlert('success')` dead toast and the `onCheckChange` defensive no-op.
   - Home page: **drop**; default route is Stato Aziende.
+  - Biometric-only access: users with only `app_cpbackoffice_biometric_access` use the same CP Backoffice launcher tile, land on Accessi Biometrico, and do not see the other tabs.
   - Mistra NG auth: **use the existing `backend/internal/platform/arak` client** (already consumed by `afctools`). Nothing new to build on the auth front.
   - `Nuovo Admin` button is **disabled until a customer is selected** in `select_customer`.
   - Hidden `skip_keycloak` Appsmith switch stays omitted in the v1 port; `createAdmin` request assembly pins `skip_keycloak=false`.
@@ -210,7 +211,7 @@ Following `docs/API-CONVENTIONS.md` §"Namespacing": `/api/<app-prefix>/v1/...`.
 | GET | `/api/cp-backoffice/v1/biometric-requests` | Mistra PostgreSQL (same SELECT as source) | — → `{ items: BiometricRequestRow[] }` |
 | POST | `/api/cp-backoffice/v1/biometric-requests/{id}/completion` | Mistra PostgreSQL `SELECT customers.biometric_request_set_completed($1::bigint, $2::boolean)` | `{ completed: bool }` → `{ ok: true }` |
 
-All routes are gated by `app_cpbackoffice_access` via `acl.RequireRole(applaunch.CPBackofficeAccessRoles()...)`, matching the `afctools` pattern in `backend/internal/afctools/handler.go:37`. Frontend calls go through `@mrsmith/api-client` with `baseUrl: '/api'` (same-origin); auth bootstrap from `GET /config`; Vite proxies both `/api` and `/config` during dev.
+Customer/user/admin routes are gated by `app_cpbackoffice_access`; biometric routes accept either `app_cpbackoffice_access` or `app_cpbackoffice_biometric_access`. Frontend calls go through `@mrsmith/api-client` with `baseUrl: '/api'` (same-origin); auth bootstrap from `GET /config`; Vite proxies both `/api` and `/config` during dev.
 
 Non-negotiable shapes under 1:1:
 - `BiometricRequestRow` keys and types exactly as in Phase A.

@@ -102,6 +102,16 @@ func TestVisibleCategoriesHidesAppsWithoutRole(t *testing.T) {
 	}
 }
 
+func TestCPBackofficeVisibleWithBiometricRole(t *testing.T) {
+	categories := VisibleCategories(Catalog(nil), []string{"app_cpbackoffice_biometric_access"})
+	got := visibleAppIDs(categories)
+	want := []string{CPBackofficeAppID}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected app IDs %v, got %v", want, got)
+	}
+}
+
 func TestCatalogAppliesHrefOverrides(t *testing.T) {
 	catalog := Catalog(map[string]string{BudgetAppID: "http://localhost:5174"})
 
