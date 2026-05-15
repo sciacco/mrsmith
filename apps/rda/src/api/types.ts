@@ -50,6 +50,7 @@ export interface BudgetForUser {
   cost_center?: string | null;
   budget_user_id?: number | null;
   user_id?: number | null;
+  user_email?: string | null;
 }
 
 export interface PaymentMethod {

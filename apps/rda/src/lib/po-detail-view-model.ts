@@ -1,5 +1,6 @@
 import type { PoActionModel, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
 import { countQuoteAttachments } from './attachments.js';
+import type { BudgetSelection } from './budgets.js';
 import { formatMoney, normalizeCurrency, parseMistraMoney } from './format.js';
 import { QUALIFICATION_REF } from './provider-refs.js';
 
@@ -18,7 +19,7 @@ export interface POReadinessItem {
 }
 
 export interface POHeaderState {
-  budget_id: number | '';
+  budget_id: BudgetSelection;
   object: string;
   project: string;
   provider_id: number | '';

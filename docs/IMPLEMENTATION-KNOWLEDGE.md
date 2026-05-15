@@ -158,6 +158,15 @@ Alyante ERP ID
 - Used by: `apps/rda` PO detail and new-RDA wizard header save flows.
 - Open questions: whether Mistra exposes a supported way to clear an existing `provider_offer_date`; the current safe behavior omits empty dates on PATCH.
 
+### RDA Budget Selection Keys
+
+- Context: `apps/rda` budget selection in new/clone/edit RDA flows.
+- Discovery: Mistra `budget-for-user` can return multiple spendable entries with the same `budget_id` and different `cost_center` values, for example `Trasferte` for two cost centers. A select value based only on `budget_id` makes those options indistinguishable and always resolves to the first matching budget.
+- Practical rule: frontend form state must store a composite budget selection key built from `budget_id` plus the active binding (`cost_center` or `user_id`/`budget_user_id`). Payload builders must then translate that key back to numeric `budget_id` plus exactly one of `cost_center` or `budget_user_id`.
+- Evidence: `docs/mistra-dist.yaml` schema `budget-for-user`; implementation in `apps/rda/src/lib/budgets.ts`, `apps/rda/src/components/BudgetSelect.tsx`, and `apps/rda/src/lib/po-payload.ts`.
+- Used by: `apps/rda` `/rda/new`, PO header edit, new PO modal, and clone PO modal.
+- Open questions: none.
+
 ### RDA Row Totals Are Normalized By The BFF
 
 - Context: `apps/rda` PO row tables in the new wizard and PO detail page.

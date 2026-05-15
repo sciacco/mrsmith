@@ -1,6 +1,7 @@
 import { Button, Icon, Modal, Tooltip } from '@mrsmith/ui';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { BudgetForUser, PoDetail, ProviderSummary } from '../api/types';
+import { budgetOptionLabel, budgetSelectionKey, findBudget, type BudgetSelection } from '../lib/budgets';
 import { formatDateIT, normalizeCurrency, RDA_CURRENCIES } from '../lib/format';
 import type { PaymentMethodOption } from '../lib/payment-options';
 import { BudgetSelect } from './BudgetSelect';
@@ -9,7 +10,7 @@ import { PoNotesDisclosures } from './PoNotesDisclosures';
 import { ProviderCombobox } from './ProviderCombobox';
 
 export interface HeaderFormState {
-  budget_id: number | '';
+  budget_id: BudgetSelection;
   object: string;
   project: string;
   provider_id: number | '';
@@ -29,7 +30,7 @@ function paymentCode(po: PoDetail): string {
 
 export function headerStateFromPO(po: PoDetail): HeaderFormState {
   return {
-    budget_id: po.budget?.budget_id ?? po.budget?.id ?? '',
+    budget_id: po.budget ? budgetSelectionKey(po.budget) : '',
     object: po.object ?? '',
     project: po.project ?? '',
     provider_id: po.provider?.id ?? '',
@@ -46,10 +47,10 @@ function providerLabel(provider?: ProviderSummary): string {
   return provider?.company_name?.trim() || (provider?.id ? `Fornitore ${provider.id}` : '-');
 }
 
-function budgetLabel(budgets: BudgetForUser[], value: number | '', fallback?: BudgetForUser): string {
-  const selected = budgets.find((budget) => (budget.budget_id ?? budget.id ?? 0) === value) ?? fallback;
+function budgetLabel(budgets: BudgetForUser[], value: BudgetSelection, fallback?: BudgetForUser): string {
+  const selected = findBudget(budgets, value) ?? fallback;
   if (!selected) return '-';
-  return selected.name ?? `Budget ${selected.budget_id ?? selected.id ?? value}`;
+  return budgetOptionLabel(selected);
 }
 
 function paymentLabel(value: string, methods: PaymentMethodOption[], po: PoDetail): string {

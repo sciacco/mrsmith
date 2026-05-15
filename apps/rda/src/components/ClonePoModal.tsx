@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useClonePO } from '../api/queries';
 import type { BudgetForUser, ClonePOPayload, ClonePOResponse, PoDetail } from '../api/types';
 import { apiErrorMessage } from '../lib/api-error';
+import { budgetID, budgetSelectionKey, selectedBudgetID, type BudgetSelection } from '../lib/budgets';
 import { formatMoney } from '../lib/format';
 import { selectedBudgetBinding } from '../lib/po-payload';
 import { stateLabel } from '../lib/state-labels';
@@ -16,10 +17,15 @@ interface ClonePoModalProps {
   onCloned: (response: ClonePOResponse) => void;
 }
 
-function availableSourceBudget(po: PoDetail, budgets: BudgetForUser[]): number | '' {
-  const sourceID = po.budget?.budget_id ?? po.budget?.id;
+function availableSourceBudget(po: PoDetail, budgets: BudgetForUser[]): BudgetSelection {
+  if (!po.budget) return '';
+  const sourceKey = budgetSelectionKey(po.budget);
+  if (budgets.some((budget) => budgetSelectionKey(budget) === sourceKey)) return sourceKey;
+  const sourceID = budgetID(po.budget);
   if (!sourceID) return '';
-  return budgets.some((budget) => (budget.budget_id ?? budget.id ?? 0) === sourceID) ? sourceID : '';
+  const matches = budgets.filter((budget) => budgetID(budget) === sourceID);
+  const [match] = matches;
+  return matches.length === 1 && match ? budgetSelectionKey(match) : '';
 }
 
 function providerLabel(po: PoDetail): string {
@@ -28,7 +34,7 @@ function providerLabel(po: PoDetail): string {
 
 export function ClonePoModal({ open, po, budgets, onClose, onCloned }: ClonePoModalProps) {
   const defaultBudgetID = useMemo(() => availableSourceBudget(po, budgets), [budgets, po]);
-  const [budgetId, setBudgetId] = useState<number | ''>(defaultBudgetID);
+  const [budgetId, setBudgetId] = useState<BudgetSelection>(defaultBudgetID);
   const [includeRows, setIncludeRows] = useState(true);
   const [includeRecipients, setIncludeRecipients] = useState(true);
   const clonePO = useClonePO();
@@ -54,7 +60,7 @@ export function ClonePoModal({ open, po, budgets, onClose, onCloned }: ClonePoMo
       return;
     }
     const body: ClonePOPayload = {
-      budget_id: Number(budgetId),
+      budget_id: selectedBudgetID(budgetId, budgets),
       include_rows: includeRows,
       include_recipients: includeRecipients,
       include_offer_fields: false,

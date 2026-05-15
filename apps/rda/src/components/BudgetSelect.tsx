@@ -1,8 +1,7 @@
 import type { BudgetForUser } from '../api/types';
+import { budgetOptionLabel, budgetSelectionKey, type BudgetSelection } from '../lib/budgets';
 
-function budgetID(budget: BudgetForUser): number {
-  return budget.budget_id ?? budget.id ?? 0;
-}
+export { findBudget, selectedBudgetID } from '../lib/budgets';
 
 export function BudgetSelect({
   budgets,
@@ -11,30 +10,21 @@ export function BudgetSelect({
   onChange,
 }: {
   budgets: BudgetForUser[];
-  value: number | '';
+  value: BudgetSelection;
   disabled?: boolean;
-  onChange: (value: number | '') => void;
+  onChange: (value: BudgetSelection) => void;
 }) {
   return (
-    <select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value ? Number(event.target.value) : '')}>
+    <select value={value === '' ? '' : String(value)} disabled={disabled} onChange={(event) => onChange(event.target.value || '')}>
       <option value="">Seleziona budget</option>
-      {budgets.map((budget) => {
-        const id = budgetID(budget);
+      {budgets.map((budget, index) => {
+        const key = budgetSelectionKey(budget);
         return (
-          <option key={id} value={id}>
-            {budget.name ?? `Budget ${id}`}
+          <option key={`${key}-${index}`} value={key}>
+            {budgetOptionLabel(budget)}
           </option>
         );
       })}
     </select>
   );
-}
-
-export function findBudget(budgets: BudgetForUser[], selected: number | ''): BudgetForUser | undefined {
-  if (!selected) return undefined;
-  return budgets.find((budget) => budgetID(budget) === selected);
-}
-
-export function selectedBudgetID(budget: BudgetForUser | undefined): number {
-  return budget ? budgetID(budget) : 0;
 }

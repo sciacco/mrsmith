@@ -1,11 +1,12 @@
 import type { BudgetForUser, CreatePOPayload, PatchPOPayload, PaymentMethod, ProviderSummary } from '../api/types';
+import { budgetBinding, findBudget, selectedBudgetID, type BudgetSelection } from './budgets';
 import { DEFAULT_RDA_CURRENCY, normalizeCurrency } from './format';
 
 export type POType = 'STANDARD' | 'ECOMMERCE';
 
 export interface POHeaderDraft {
   type?: POType | string;
-  budget_id: number | '';
+  budget_id: BudgetSelection;
   object: string;
   project: string;
   provider_id: number | '';
@@ -33,27 +34,21 @@ export function methodUnion(methods: PaymentMethod[], ...extraCodes: string[]): 
   return Array.from(byCode.values()).sort((a, b) => a.description.localeCompare(b.description));
 }
 
-export function selectedBudgetBinding(budgets: BudgetForUser[], budgetId: number | '') {
-  const budget = budgets.find((item) => (item.budget_id ?? item.id ?? 0) === budgetId);
-  if (!budget) return {};
-  if (budget.cost_center) return { cost_center: budget.cost_center };
-  const budgetUserId = budget.budget_user_id ?? budget.user_id;
-  return budgetUserId ? { budget_user_id: budgetUserId } : {};
+export function selectedBudgetBinding(budgets: BudgetForUser[], budgetId: BudgetSelection) {
+  return budgetBinding(findBudget(budgets, budgetId));
 }
 
-function selectedBudgetPatchBinding(budgets: BudgetForUser[], budgetId: number | ''): Pick<PatchPOPayload, 'budget_user_id' | 'cost_center'> {
-  const budget = budgets.find((item) => (item.budget_id ?? item.id ?? 0) === budgetId);
-  if (!budget) return {};
-  if (budget.cost_center) return { cost_center: budget.cost_center };
-  const budgetUserId = budget.budget_user_id ?? budget.user_id;
-  return budgetUserId ? { budget_user_id: budgetUserId, cost_center: null } : {};
+function selectedBudgetPatchBinding(budgets: BudgetForUser[], budgetId: BudgetSelection): Pick<PatchPOPayload, 'budget_user_id' | 'cost_center'> {
+  const binding = selectedBudgetBinding(budgets, budgetId);
+  if (binding.cost_center) return { cost_center: binding.cost_center };
+  return binding.budget_user_id ? { budget_user_id: binding.budget_user_id, cost_center: null } : {};
 }
 
 export function buildCreatePOPayload(header: POHeaderDraft, budgets: BudgetForUser[]): CreatePOPayload {
   const binding = selectedBudgetBinding(budgets, header.budget_id);
   return {
     type: header.type === 'ECOMMERCE' ? 'ECOMMERCE' : 'STANDARD',
-    budget_id: Number(header.budget_id),
+    budget_id: selectedBudgetID(header.budget_id, budgets),
     provider_id: Number(header.provider_id),
     payment_method: header.payment_method,
     currency: normalizeCurrency(header.currency || DEFAULT_RDA_CURRENCY),
@@ -76,7 +71,7 @@ export function buildPatchPOPayload(
 ): PatchPOPayload {
   return {
     ...(header.type ? { type: header.type } : {}),
-    budget_id: Number(header.budget_id),
+    budget_id: selectedBudgetID(header.budget_id, budgets),
     ...selectedBudgetPatchBinding(budgets, header.budget_id),
     object: header.object.trim(),
     project: header.project.trim(),

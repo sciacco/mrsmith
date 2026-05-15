@@ -2,15 +2,17 @@ import { Button, Icon, Modal, useToast } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreatePO } from '../api/queries';
-import type { BudgetForUser, CreatePOPayload, PaymentMethod, ProviderSummary } from '../api/types';
+import type { BudgetForUser, PaymentMethod, ProviderSummary } from '../api/types';
+import type { BudgetSelection } from '../lib/budgets';
 import { coerceID, DEFAULT_RDA_CURRENCY, normalizeCurrency, RDA_CURRENCIES } from '../lib/format';
 import {
   buildPaymentMethodOptions,
   paymentCodeFromProvider,
   requiresPaymentMethodVerification,
 } from '../lib/payment-options';
+import { buildCreatePOPayload } from '../lib/po-payload';
 import { firstError, validateNewPO } from '../lib/validation';
-import { BudgetSelect, findBudget } from './BudgetSelect';
+import { BudgetSelect } from './BudgetSelect';
 import { NewProviderInlineForm } from './NewProviderInlineForm';
 import { PaymentMethodSelect } from './PaymentMethodSelect';
 import { ProviderSelect } from './ProviderSelect';
@@ -31,7 +33,7 @@ export function NewPoModal({
   onClose: () => void;
 }) {
   const [type, setType] = useState<'STANDARD' | 'ECOMMERCE'>('STANDARD');
-  const [budgetId, setBudgetId] = useState<number | ''>('');
+  const [budgetId, setBudgetId] = useState<BudgetSelection>('');
   const [providerId, setProviderId] = useState<number | ''>('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [currency, setCurrency] = useState(DEFAULT_RDA_CURRENCY);
@@ -81,22 +83,19 @@ export function NewPoModal({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const budget = findBudget(budgets, budgetId);
-    const body: CreatePOPayload = {
+    const body = buildCreatePOPayload({
       type,
-      budget_id: Number(budgetId),
-      provider_id: Number(providerId),
+      budget_id: budgetId,
+      provider_id: providerId,
       payment_method: paymentMethod,
       currency,
-      project: project.trim(),
-      object: object.trim(),
-      description: description.trim() || undefined,
-      note: note.trim() || undefined,
-      provider_offer_code: offerCode.trim() || undefined,
-      provider_offer_date: offerDate || undefined,
-      ...(budget?.cost_center ? { cost_center: budget.cost_center } : {}),
-      ...(budget?.budget_user_id ? { budget_user_id: budget.budget_user_id } : {}),
-    };
+      project,
+      object,
+      description,
+      note,
+      provider_offer_code: offerCode,
+      provider_offer_date: offerDate,
+    }, budgets);
     const validation = validateNewPO(body);
     const message = firstError(validation);
     if (message) {
