@@ -1,11 +1,18 @@
 import type { PoPreview, RdaPermissions } from '../api/types';
 import { inboxConfig, inboxOrder, type InboxKind } from './inbox.js';
-import { isApprover } from './format.js';
+import { isApprover, parseMistraMoney } from './format.js';
 import { stateLabel } from './state-labels.js';
 
 export type RdaDashboardView = 'todo' | 'mine' | 'all';
 export type RdaQueueKey = InboxKind | 'own-draft' | 'requester' | 'supervision' | 'visible';
 export type RdaContextType = 'inbox' | 'draft' | 'requester' | 'visibility';
+export type RdaDashboardSortKey = 'request' | 'state' | 'provider' | 'requester' | 'created' | 'total';
+export type RdaDashboardSortDirection = 'asc' | 'desc';
+
+export interface RdaDashboardSort {
+  key: RdaDashboardSortKey;
+  direction: RdaDashboardSortDirection;
+}
 
 export interface RdaDashboardContext {
   key: RdaQueueKey;
@@ -59,10 +66,33 @@ interface MutableRow {
 }
 
 const terminalStates = new Set(['APPROVED', 'CLOSED', 'REJECTED', 'SENT', 'DELIVERED_AND_COMPLIANT']);
+const sortKeys = new Set<RdaDashboardSortKey>(['request', 'state', 'provider', 'requester', 'created', 'total']);
+const textCollator = new Intl.Collator('it', { numeric: true, sensitivity: 'base' });
+const defaultSortDirections: Record<RdaDashboardSortKey, RdaDashboardSortDirection> = {
+  request: 'asc',
+  state: 'asc',
+  provider: 'asc',
+  requester: 'asc',
+  created: 'desc',
+  total: 'desc',
+};
 
 export function parseRdaDashboardView(value: string | null): RdaDashboardView {
   if (value === 'mine' || value === 'all' || value === 'todo') return value;
   return 'todo';
+}
+
+export function parseRdaDashboardSortKey(value: string | null): RdaDashboardSortKey | null {
+  return sortKeys.has(value as RdaDashboardSortKey) ? (value as RdaDashboardSortKey) : null;
+}
+
+export function parseRdaDashboardSortDirection(value: string | null): RdaDashboardSortDirection | null {
+  if (value === 'asc' || value === 'desc') return value;
+  return null;
+}
+
+export function defaultRdaDashboardSortDirection(key: RdaDashboardSortKey): RdaDashboardSortDirection {
+  return defaultSortDirections[key];
 }
 
 export function isTerminalPOState(state?: string | null): boolean {
@@ -79,6 +109,18 @@ function normalize(value: string | number | null | undefined): string {
 function requesterName(po: PoPreview): string {
   const user = po.requester;
   return [user?.name, user?.first_name, user?.last_name, user?.email].filter(Boolean).join(' ');
+}
+
+export function rdaDashboardRequesterLabel(po: Pick<PoPreview, 'requester'>): string {
+  const requester = po.requester;
+  const name = [requester?.first_name, requester?.last_name].filter(Boolean).join(' ');
+  if (requester?.name) return requester.name;
+  if (name) return name;
+  return requester?.email ?? '-';
+}
+
+export function rdaDashboardRequestTitle(po: Pick<PoPreview, 'object' | 'project'>): string {
+  return po.object || po.project || 'Richiesta senza oggetto';
 }
 
 function requesterMatches(po: PoPreview, currentEmail?: string | null): boolean {
@@ -200,6 +242,72 @@ function rowDateValue(row: PoPreview): number {
   if (!raw) return 0;
   const parsed = new Date(raw).getTime();
   return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function sortableRowDateValue(row: PoPreview): number | null {
+  const raw = row.created ?? row.creation_date ?? row.updated;
+  if (!raw) return null;
+  const parsed = new Date(raw).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function textValue(value: string | number | null | undefined): string | null {
+  const normalized = String(value ?? '').trim();
+  return normalized && normalized !== '-' ? normalized : null;
+}
+
+function moneyValue(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  return parseMistraMoney(value);
+}
+
+function compareTextValues(a: string | number | null | undefined, b: string | number | null | undefined, direction: RdaDashboardSortDirection): number {
+  const av = textValue(a);
+  const bv = textValue(b);
+  if (av === null && bv === null) return 0;
+  if (av === null) return 1;
+  if (bv === null) return -1;
+  const result = textCollator.compare(av, bv);
+  return direction === 'asc' ? result : -result;
+}
+
+function compareNumberValues(a: number | null, b: number | null, direction: RdaDashboardSortDirection): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  const result = a - b;
+  return direction === 'asc' ? result : -result;
+}
+
+function rowRequestSortValue(row: RdaDashboardRow): string {
+  return [row.code ?? `PO ${row.id}`, rdaDashboardRequestTitle(row), row.project].filter(Boolean).join(' ');
+}
+
+function compareDashboardRows(a: RdaDashboardRow, b: RdaDashboardRow, sort: RdaDashboardSort): number {
+  switch (sort.key) {
+    case 'request':
+      return compareTextValues(rowRequestSortValue(a), rowRequestSortValue(b), sort.direction);
+    case 'state':
+      return compareTextValues(stateLabel(a.state), stateLabel(b.state), sort.direction);
+    case 'provider':
+      return compareTextValues(a.provider?.company_name, b.provider?.company_name, sort.direction);
+    case 'requester':
+      return compareTextValues(rdaDashboardRequesterLabel(a), rdaDashboardRequesterLabel(b), sort.direction);
+    case 'created':
+      return compareNumberValues(sortableRowDateValue(a), sortableRowDateValue(b), sort.direction);
+    case 'total':
+      return compareNumberValues(moneyValue(a.total_price), moneyValue(b.total_price), sort.direction);
+    default:
+      return 0;
+  }
+}
+
+export function sortRdaDashboardRows(rows: RdaDashboardRow[], sort: RdaDashboardSort | null): RdaDashboardRow[] {
+  if (!sort) return rows;
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => compareDashboardRows(a.row, b.row, sort) || a.index - b.index)
+    .map((item) => item.row);
 }
 
 function rowPriority(row: RdaDashboardRow): number {

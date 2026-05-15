@@ -522,6 +522,62 @@ textarea {
   white-space: nowrap;
 }
 
+.rdaSortHeaderButton {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.22rem;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.rdaSortHeaderButton:hover,
+.rdaSortHeaderButton:focus-visible {
+  color: var(--color-text);
+}
+
+.rdaSortHeaderButton:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--color-accent-glow);
+  outline-offset: 2px;
+}
+
+.rdaSortIndicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.9rem;
+  color: var(--color-text-muted);
+  opacity: 0.34;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out);
+}
+
+.rdaSortHeaderButton:hover .rdaSortIndicator,
+.rdaSortHeaderButton:focus-visible .rdaSortIndicator,
+.rdaSortHeaderButton.active .rdaSortIndicator {
+  opacity: 1;
+}
+
+.rdaSortHeaderButton.active .rdaSortIndicator {
+  color: var(--color-accent);
+}
+
+.dataTable th.moneyCell .rdaSortHeaderButton {
+  justify-content: flex-end;
+  text-align: right;
+}
+
 .dataTable td {
   padding: 0.68rem 0.75rem;
   border-bottom: 1px solid var(--color-border-subtle);

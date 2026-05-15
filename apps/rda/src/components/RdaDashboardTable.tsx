@@ -1,28 +1,25 @@
 import { Icon, Tooltip, type IconName } from '@mrsmith/ui';
 import { useNavigate } from 'react-router-dom';
-import type { RdaDashboardRow } from '../lib/rda-dashboard';
+import {
+  defaultRdaDashboardSortDirection,
+  rdaDashboardRequesterLabel,
+  rdaDashboardRequestTitle,
+  type RdaDashboardRow,
+  type RdaDashboardSort,
+  type RdaDashboardSortKey,
+} from '../lib/rda-dashboard';
 import { formatDateIT, formatMoney } from '../lib/format';
 import { StateBadge } from './StateBadge';
 
 interface RdaDashboardTableProps {
   rows: RdaDashboardRow[];
+  sort?: RdaDashboardSort | null;
+  onSortChange?: (key: RdaDashboardSortKey) => void;
   onDelete?: (po: RdaDashboardRow) => void;
 }
 
 function rowDate(po: RdaDashboardRow): string {
   return formatDateIT(po.created ?? po.creation_date ?? po.updated);
-}
-
-function requesterLabel(po: RdaDashboardRow): string {
-  const requester = po.requester;
-  const name = [requester?.first_name, requester?.last_name].filter(Boolean).join(' ');
-  if (requester?.name) return requester.name;
-  if (name) return name;
-  return requester?.email ?? '-';
-}
-
-function requestTitle(po: RdaDashboardRow): string {
-  return po.object || po.project || 'Richiesta senza oggetto';
 }
 
 function openLabel(po: RdaDashboardRow): string {
@@ -76,7 +73,54 @@ function rowAction(po: RdaDashboardRow): RowAction {
   return { iconName: 'eye', label: openLabel(po) };
 }
 
-export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
+function ariaSort(sort: RdaDashboardSort | null | undefined, key: RdaDashboardSortKey): 'ascending' | 'descending' | 'none' {
+  if (sort?.key !== key) return 'none';
+  return sort.direction === 'asc' ? 'ascending' : 'descending';
+}
+
+function nextSortLabel(sort: RdaDashboardSort | null | undefined, key: RdaDashboardSortKey): string {
+  const nextDirection = sort?.key === key
+    ? (sort.direction === 'asc' ? 'desc' : 'asc')
+    : defaultRdaDashboardSortDirection(key);
+  return nextDirection === 'asc' ? 'Ordina crescente' : 'Ordina decrescente';
+}
+
+function SortableHeader({
+  label,
+  sortKey,
+  sort,
+  onSortChange,
+  className,
+}: {
+  label: string;
+  sortKey: RdaDashboardSortKey;
+  sort?: RdaDashboardSort | null;
+  onSortChange?: (key: RdaDashboardSortKey) => void;
+  className?: string;
+}) {
+  const active = sort?.key === sortKey;
+  const direction = active ? sort.direction : defaultRdaDashboardSortDirection(sortKey);
+  const labelText = `${label}: ${nextSortLabel(sort, sortKey)}`;
+
+  return (
+    <th className={className} aria-sort={ariaSort(sort, sortKey)}>
+      <button
+        className={`rdaSortHeaderButton ${active ? 'active' : ''}`}
+        type="button"
+        aria-label={labelText}
+        title={labelText}
+        onClick={() => onSortChange?.(sortKey)}
+      >
+        <span>{label}</span>
+        <span className="rdaSortIndicator" aria-hidden="true">
+          <Icon name={direction === 'asc' ? 'chevron-up' : 'chevron-down'} size={13} strokeWidth={2.2} />
+        </span>
+      </button>
+    </th>
+  );
+}
+
+export function RdaDashboardTable({ rows, sort, onSortChange, onDelete }: RdaDashboardTableProps) {
   const navigate = useNavigate();
 
   if (rows.length === 0) {
@@ -95,12 +139,12 @@ export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
       <table className="dataTable rdaDashboardTable">
         <thead>
           <tr>
-            <th>Richiesta</th>
-            <th>Stato</th>
-            <th>Fornitore</th>
-            <th>Richiedente</th>
-            <th>Creata</th>
-            <th className="moneyCell">Totale</th>
+            <SortableHeader label="Richiesta" sortKey="request" sort={sort} onSortChange={onSortChange} />
+            <SortableHeader label="Stato" sortKey="state" sort={sort} onSortChange={onSortChange} />
+            <SortableHeader label="Fornitore" sortKey="provider" sort={sort} onSortChange={onSortChange} />
+            <SortableHeader label="Richiedente" sortKey="requester" sort={sort} onSortChange={onSortChange} />
+            <SortableHeader label="Creata" sortKey="created" sort={sort} onSortChange={onSortChange} />
+            <SortableHeader label="Totale" sortKey="total" sort={sort} onSortChange={onSortChange} className="moneyCell" />
             <th className="actionsCell">Azione</th>
           </tr>
         </thead>
@@ -119,7 +163,7 @@ export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
                 <td>
                   <div className="requestCell">
                     <span className="requestCode">{code}</span>
-                    <strong>{requestTitle(po)}</strong>
+                    <strong>{rdaDashboardRequestTitle(po)}</strong>
                     {po.project && po.project !== po.object ? <small>{po.project}</small> : null}
                   </div>
                 </td>
@@ -142,7 +186,7 @@ export function RdaDashboardTable({ rows, onDelete }: RdaDashboardTableProps) {
                   <span className="textCell">{po.provider?.company_name ?? '-'}</span>
                 </td>
                 <td>
-                  <span className="textCell">{requesterLabel(po)}</span>
+                  <span className="textCell">{rdaDashboardRequesterLabel(po)}</span>
                 </td>
                 <td className="dateCell">{rowDate(po)}</td>
                 <td className="moneyCell">{formatMoney(po.total_price, po.currency)}</td>

@@ -9,11 +9,17 @@ import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { authorizedInboxKinds, type InboxKind } from '../lib/inbox';
 import {
   buildRdaDashboardModel,
+  defaultRdaDashboardSortDirection,
   filterRdaDashboardRows,
+  parseRdaDashboardSortDirection,
+  parseRdaDashboardSortKey,
   parseRdaDashboardView,
   rdaQueueFilterOptions,
   rdaStateFilterOptions,
+  sortRdaDashboardRows,
   type RdaDashboardRow,
+  type RdaDashboardSort,
+  type RdaDashboardSortKey,
   type RdaDashboardView,
 } from '../lib/rda-dashboard';
 
@@ -49,7 +55,15 @@ export function RdaListPage() {
   const qFilter = params.get('q') ?? '';
   const stateFilter = params.get('state') ?? '';
   const queueFilter = params.get('queue') ?? '';
+  const sortKey = parseRdaDashboardSortKey(params.get('sort'));
+  const sortDirection = sortKey
+    ? parseRdaDashboardSortDirection(params.get('dir')) ?? defaultRdaDashboardSortDirection(sortKey)
+    : null;
   const deferredQ = useDeferredValue(qFilter);
+  const sortState = useMemo<RdaDashboardSort | null>(
+    () => (sortKey && sortDirection ? { key: sortKey, direction: sortDirection } : null),
+    [sortDirection, sortKey],
+  );
 
   const inboxQueries = useMemo(
     () => [
@@ -104,7 +118,7 @@ export function RdaListPage() {
   );
   const activeQueueFilter = queueOptions.some((option) => option.value === queueFilter) ? queueFilter : '';
 
-  const visibleRows = useMemo(
+  const filteredRows = useMemo(
     () =>
       filterRdaDashboardRows(dashboard.rows, {
         view,
@@ -113,6 +127,10 @@ export function RdaListPage() {
         queue: activeQueueFilter,
       }),
     [activeQueueFilter, dashboard.rows, deferredQ, stateFilter, view],
+  );
+  const visibleRows = useMemo(
+    () => sortRdaDashboardRows(filteredRows, sortState),
+    [filteredRows, sortState],
   );
 
   const hasFilters = qFilter !== '' || stateFilter !== '' || activeQueueFilter !== '';
@@ -126,6 +144,24 @@ export function RdaListPage() {
       const next = new URLSearchParams(previous);
       if (value) next.set(key, value);
       else next.delete(key);
+      return next;
+    });
+  }
+
+  function updateSort(key: RdaDashboardSortKey) {
+    setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      const currentKey = parseRdaDashboardSortKey(previous.get('sort'));
+      const currentDirection = currentKey
+        ? parseRdaDashboardSortDirection(previous.get('dir')) ?? defaultRdaDashboardSortDirection(currentKey)
+        : null;
+
+      next.set('sort', key);
+      if (currentKey === key) {
+        next.set('dir', currentDirection === 'asc' ? 'desc' : 'asc');
+      } else {
+        next.set('dir', defaultRdaDashboardSortDirection(key));
+      }
       return next;
     });
   }
@@ -294,7 +330,7 @@ export function RdaListPage() {
             </div>
           </div>
         ) : (
-          <RdaDashboardTable rows={visibleRows} onDelete={setDeleteTarget} />
+          <RdaDashboardTable rows={visibleRows} sort={sortState} onSortChange={updateSort} onDelete={setDeleteTarget} />
         )}
       </section>
 
