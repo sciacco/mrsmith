@@ -329,6 +329,15 @@ Alyante ERP ID
 - Used by: `apps/reports` (`orders`, `active-lines`, `pending-activations`, `upcoming-renewals`) and `apps/panoramica-cliente` (`orders/summary`, `orders/detail`).
 - Open questions: none.
 
+### Reports AOV Replacement MRC Matching
+
+- Context: AOV calculations in `apps/reports` that subtract replaced-order MRC for substitution orders (`tipo_ordine = 'A'`) from `loader.v_ordini_ric_spot`.
+- Discovery: Appsmith's AOV replacement lookup treats `sost_ord` as a semicolon-separated list of replaced order names, normalizes order names by replacing `/` with `-`, and counts only replaced rows whose `data_disdetta` equals the replacing order's `data_conferma`.
+- Practical rule: AOV old-MRC subqueries should match `REPLACE(odv.nome_testata_ordine, '/', '-')` against `string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')`, keep `odv.annullato = 0`, and require `odv.data_disdetta = o.data_conferma`. Include `o.data_disdetta` in the inner grouping when mirroring the current Appsmith AOV queries.
+- Evidence: Appsmith AOV diff `artifacts/ad4f4244a1c1b59d16b4fe0982d37faa1c639ef0.diff`; backend implementation in `backend/internal/reports/handler_aov.go`.
+- Used by: `apps/reports` AOV detail, by-type, and by-sales datasets.
+- Open questions: whether the legacy by-category AOV inconsistency should also adopt replacement-delta logic; currently tracked separately in `docs/TODO.md`.
+
 ### Reports Carbone Export Payloads May Need Template-Specific Key Aliases
 
 - Context: XLSX exports in `backend/internal/reports` rendered through Carbone templates.

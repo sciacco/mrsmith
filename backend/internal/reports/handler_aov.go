@@ -138,23 +138,29 @@ END
 as totale_nrc,
 CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
-	ELSE
-		(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
-		FROM loader.v_ordini_ric_spot  AS odv WHERE
-		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0)
-END
-AS totale_mrc_odv_sost,
+		ELSE
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+			AND odv.annullato = 0
+			AND odv.data_disdetta = o.data_conferma)
+	END
+	AS totale_mrc_odv_sost,
 
 CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
-		-
-		COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
-		FROM loader.v_ordini_ric_spot  AS odv WHERE
-		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0), 0)
-		)
+			-
+			COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+			AND odv.annullato = 0
+			AND odv.data_disdetta = o.data_conferma), 0)
+			)
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
 	ELSE sum(round(o.quantita::decimal * o.canone::decimal,2))
 END
@@ -163,12 +169,15 @@ AS  totale_mrc_new,
 CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
-		-
-		COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
-		FROM loader.v_ordini_ric_spot  AS odv WHERE
-		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0), 0)
-		)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
+			-
+			COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+			AND odv.annullato = 0
+			AND odv.data_disdetta = o.data_conferma), 0)
+			)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
 	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12)
 END
@@ -178,9 +187,9 @@ from loader.v_ordini_ric_spot as o join loader.erp_anagrafiche_clienti eac on o.
 
 %s
 
-GROUP BY
-o.data_conferma,o.data_documento, o.tipo_ordine, o.nome_testata_ordine, o.sostituito_da, o.sost_ord, o.tipo_documento
-ORDER BY o.tipo_ordine ASC
+	GROUP BY
+	o.data_conferma,o.data_documento, o.tipo_ordine, o.nome_testata_ordine, o.sostituito_da, o.sost_ord, o.tipo_documento, o.data_disdetta
+	ORDER BY o.tipo_ordine ASC
 ) AS x
 GROUP BY anno, mese, tipo_ordine
 ORDER BY
@@ -362,22 +371,28 @@ END
 as totale_nrc,
 CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
-	ELSE
-		(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
-		FROM loader.v_ordini_ric_spot  AS odv WHERE
-		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0)
-END
-AS totale_mrc_odv_sost,
+		ELSE
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+			AND odv.annullato = 0
+			AND odv.data_disdetta = o.data_conferma)
+	END
+	AS totale_mrc_odv_sost,
 CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
-		-
-		COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
-		FROM loader.v_ordini_ric_spot  AS odv WHERE
-		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0), 0)
-		)
+			-
+			COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+			AND odv.annullato = 0
+			AND odv.data_disdetta = o.data_conferma), 0)
+			)
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
 	ELSE sum(round(o.quantita::decimal * o.canone::decimal,2))
 END
@@ -385,12 +400,15 @@ AS  totale_mrc_new,
 CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
-		-
-		COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
-		FROM loader.v_ordini_ric_spot  AS odv WHERE
-		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0), 0)
-		)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
+			-
+			COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+			AND odv.annullato = 0
+			AND odv.data_disdetta = o.data_conferma), 0)
+			)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
 	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12)
 END
@@ -401,9 +419,9 @@ from loader.v_ordini_ric_spot as o join loader.erp_anagrafiche_clienti eac on o.
 
 %s
 
-GROUP BY
-o.data_conferma,o.data_documento, o.tipo_ordine, o.nome_testata_ordine, o.sostituito_da, o.sost_ord, o.tipo_documento
-ORDER BY o.tipo_ordine ASC
+	GROUP BY
+	o.data_conferma,o.data_documento, o.tipo_ordine, o.nome_testata_ordine, o.sostituito_da, o.sost_ord, o.tipo_documento, o.data_disdetta
+	ORDER BY o.tipo_ordine ASC
 ) AS x
 GROUP BY anno, commerciale, tipo_ordine
 ORDER BY
@@ -491,23 +509,29 @@ as totale_nrc,
 
 CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
-	ELSE
-		(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
-		FROM loader.v_ordini_ric_spot  AS odv WHERE
-		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0)
-END
-AS totale_mrc_odv_sost,
+		ELSE
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+			AND odv.annullato = 0
+			AND odv.data_disdetta = o.data_conferma)
+	END
+	AS totale_mrc_odv_sost,
 
 CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
-		-
-		(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
-		FROM loader.v_ordini_ric_spot  AS odv WHERE
-		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0)
-		)
+			-
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+			AND odv.annullato = 0
+			AND odv.data_disdetta = o.data_conferma)
+			)
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
 	ELSE sum(round(o.quantita::decimal * o.canone::decimal,2))
 END
@@ -516,12 +540,15 @@ AS  totale_mrc_new,
 CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
-		-
-		(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
-		FROM loader.v_ordini_ric_spot  AS odv WHERE
-		( REPLACE(odv.nome_testata_ordine,'/','-') IN(REPLACE(o.sost_ord,'/','-')))
-		AND odv.annullato = 0)
-		)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
+			-
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+			AND odv.annullato = 0
+			AND odv.data_disdetta = o.data_conferma)
+			)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
 	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12)
 END
@@ -533,9 +560,9 @@ from loader.v_ordini_ric_spot as o join loader.erp_anagrafiche_clienti eac on o.
 
 %s
 
-GROUP BY
-o.data_conferma,o.data_documento, o.tipo_ordine, o.nome_testata_ordine, o.sostituito_da, o.sost_ord, o.tipo_documento
-ORDER BY
+	GROUP BY
+	o.data_conferma,o.data_documento, o.tipo_ordine, o.nome_testata_ordine, o.sostituito_da, o.sost_ord, o.tipo_documento, o.data_disdetta
+	ORDER BY
 anno ASC,
 mese ASC,
 commerciale ASC,
