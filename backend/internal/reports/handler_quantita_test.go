@@ -416,13 +416,13 @@ func (c *reportsTestConn) QueryContext(_ context.Context, query string, _ []driv
 				columns: []string{
 					"tipo_documento", "anno", "mese", "nome_testata_ordine", "tipo_ordine",
 					"sost_ord", "commerciale", "totale_mrc", "totale_nrc", "totale_mrc_odv_sost",
-					"totale_mrc_new", "valore_aov",
+					"totale_mrc_new", "valore_aov", "has_cdl_cloud",
 				},
 				values: [][]driver.Value{
 					{
 						"TSC-ORDINE-RIC", "2026", "04", "ORD-001", "NUOVO",
 						"SOST-000", "Mario Rossi", float64(120), float64(5), float64(0),
-						float64(120), float64(1445),
+						float64(120), float64(1445), false,
 					},
 				},
 			}, nil

@@ -121,6 +121,7 @@ export interface AovDetailRow {
   totale_mrc_odv_sost: number | null;
   totale_mrc_new: number | null;
   valore_aov: number | null;
+  has_cdl_cloud: boolean;
 }
 
 export interface AovPreviewResponse {

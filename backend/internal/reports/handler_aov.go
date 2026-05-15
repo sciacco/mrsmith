@@ -60,6 +60,7 @@ type aovDetail struct {
 	TotaleMRCOdvSost  *float64 `json:"totale_mrc_odv_sost"`
 	TotaleMRCNew      *float64 `json:"totale_mrc_new"`
 	ValoreAOV         *float64 `json:"valore_aov"`
+	HasCDLCloud       bool     `json:"has_cdl_cloud"`
 }
 
 type aovPreviewResponse struct {
@@ -135,6 +136,7 @@ CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
 	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2))
 END
++ sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
 as totale_nrc,
 CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
@@ -175,13 +177,13 @@ CASE
 			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
 				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
 			)
-			AND odv.annullato = 0
-			AND odv.data_disdetta = o.data_conferma), 0)
-			)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
-	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
-	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12)
-END
-AS  valore_aov
+				AND odv.annullato = 0
+				AND odv.data_disdetta = o.data_conferma), 0)
+				)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+		WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+		ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+	END
+	AS  valore_aov
 
 from loader.v_ordini_ric_spot as o join loader.erp_anagrafiche_clienti eac on o.numero_azienda = eac.numero_azienda
 
@@ -276,12 +278,13 @@ CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN round(o.quantita::decimal * o.canone::decimal,2)
 	ELSE round(o.quantita::decimal * o.setup::decimal,2)
 END
++ CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END
 as totale_nrc,
 CASE
 	WHEN o.tipo_ordine = 'A' THEN
-		(((round(o.quantita::decimal * o.canone::decimal,2))))*12 + (round(o.quantita::decimal * o.setup::decimal,2))
-	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN (round(o.quantita::decimal * o.canone::decimal,2))
-	ELSE (round(o.quantita::decimal * o.setup::decimal,2)) + ((round(o.quantita::decimal * o.canone::decimal,2))*12)
+		(((round(o.quantita::decimal * o.canone::decimal,2))))*12 + (round(o.quantita::decimal * o.setup::decimal,2)) + CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END
+	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN (round(o.quantita::decimal * o.canone::decimal,2)) + CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END
+	ELSE (round(o.quantita::decimal * o.setup::decimal,2)) + ((round(o.quantita::decimal * o.canone::decimal,2))*12) + CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END
 END
 AS  valore_aov,
 (select c.name from products.product_category as c
@@ -368,6 +371,7 @@ CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
 	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2))
 END
++ sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
 as totale_nrc,
 CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
@@ -406,13 +410,13 @@ CASE
 			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
 				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
 			)
-			AND odv.annullato = 0
-			AND odv.data_disdetta = o.data_conferma), 0)
-			)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
-	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
-	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12)
-END
-AS  valore_aov
+				AND odv.annullato = 0
+				AND odv.data_disdetta = o.data_conferma), 0)
+				)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+		WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+		ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+	END
+	AS  valore_aov
 
 
 from loader.v_ordini_ric_spot as o join loader.erp_anagrafiche_clienti eac on o.numero_azienda = eac.numero_azienda
@@ -505,6 +509,7 @@ CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
 	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2))
 END
++ sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
 as totale_nrc,
 
 CASE
@@ -546,13 +551,14 @@ CASE
 			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
 				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
 			)
-			AND odv.annullato = 0
-			AND odv.data_disdetta = o.data_conferma)
-			)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2))
-	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
-	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12)
-END
-AS  valore_aov
+				AND odv.annullato = 0
+				AND odv.data_disdetta = o.data_conferma)
+				)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+		WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+		ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+	END
+	AS  valore_aov,
+	bool_or(trim(o.codice_prodotto) = 'CDL-CLOUD') AS has_cdl_cloud
 
 
 
@@ -592,12 +598,13 @@ o.nome_testata_ordine ASC`, where)
 			totaleMRC, totaleNRC       sql.NullFloat64
 			totaleMRCOdvSost           sql.NullFloat64
 			totaleMRCNew, valoreAOV    sql.NullFloat64
+			hasCDLCloud                sql.NullBool
 		)
 		if err := rows.Scan(
 			&tipoDocumento, &anno, &mese,
 			&nomeTestataOrdine, &tipoOrd, &sostOrd, &commerciale,
 			&totaleMRC, &totaleNRC, &totaleMRCOdvSost,
-			&totaleMRCNew, &valoreAOV,
+			&totaleMRCNew, &valoreAOV, &hasCDLCloud,
 		); err != nil {
 			return nil, err
 		}
@@ -613,6 +620,7 @@ o.nome_testata_ordine ASC`, where)
 		row.TotaleMRCOdvSost = nullFloat64Ptr(totaleMRCOdvSost)
 		row.TotaleMRCNew = nullFloat64Ptr(totaleMRCNew)
 		row.ValoreAOV = nullFloat64Ptr(valoreAOV)
+		row.HasCDLCloud = hasCDLCloud.Valid && hasCDLCloud.Bool
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {

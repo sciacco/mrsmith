@@ -145,6 +145,17 @@ function buildDetailCsvRows(data: AovPreviewResponse['detail']): string[][] {
   ]);
 }
 
+function CdlCloudWarningDot() {
+  return (
+    <span
+      className={styles.cdlCloudDot}
+      role="img"
+      aria-label="CDL-CLOUD: NRC +600 euro"
+      title="CDL-CLOUD: NRC +600 euro"
+    />
+  );
+}
+
 function TableSectionHeader({
   count,
   onExport,
@@ -658,7 +669,12 @@ function DetailTable({ data, onExport }: { data: AovPreviewResponse['detail']; o
             {data.map((row, i) => (
               <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
                 <td>{formatYearMonth(row.anno, row.mese)}</td>
-                <td className={shared.mono}>{row.nome_testata_ordine ?? ''}</td>
+                <td className={shared.mono}>
+                  <span className={styles.orderCodeCell}>
+                    <span>{row.nome_testata_ordine ?? ''}</span>
+                    {row.has_cdl_cloud ? <CdlCloudWarningDot /> : null}
+                  </span>
+                </td>
                 <td>{row.tipo_ordine ?? ''}</td>
                 <td>{row.commerciale ?? ''}</td>
                 <td>{formatTipoDocumento(row.tipo_documento)}</td>

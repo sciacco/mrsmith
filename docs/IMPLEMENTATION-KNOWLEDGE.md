@@ -338,6 +338,15 @@ Alyante ERP ID
 - Used by: `apps/reports` AOV detail, by-type, and by-sales datasets.
 - Open questions: whether the legacy by-category AOV inconsistency should also adopt replacement-delta logic; currently tracked separately in `docs/TODO.md`.
 
+### Reports AOV CDL-CLOUD Adds Fixed NRC
+
+- Context: AOV calculations in `apps/reports` over `loader.v_ordini_ric_spot`.
+- Discovery: each sales-order row with `codice_prodotto = 'CDL-CLOUD'` contributes an extra fixed 600 euro NRC value. The amount is per matching row, not multiplied by `quantita`.
+- Practical rule: include the fixed amount in both `totale_nrc` and `valore_aov` for AOV detail and aggregate views. The detail payload should expose a boolean flag so the UI can mark affected orders with a warning dot.
+- Evidence: business rule provided during AOV update; backend implementation in `backend/internal/reports/handler_aov.go`.
+- Used by: `apps/reports` AOV detail, by-type, by-category, and by-sales datasets.
+- Open questions: none.
+
 ### Reports Carbone Export Payloads May Need Template-Specific Key Aliases
 
 - Context: XLSX exports in `backend/internal/reports` rendered through Carbone templates.
