@@ -3,6 +3,7 @@ import { getRdaQuoteThreshold } from '../runtime-config';
 import type { RdaPermissions, PoDetail } from '../api/types';
 import type { TransitionAction } from '../api/queries';
 import { formatMoney, isApprover, isRequester } from '../lib/format';
+import { canDownloadPOPDF } from '../lib/po-pdf';
 import { PO_STATES } from '../lib/state-labels';
 
 interface ActionBarProps {
@@ -53,13 +54,14 @@ export function ActionBar({
   const pendingVerification = po.state === PO_STATES.PENDING_VERIFICATION;
   const busy = saving || transitioning;
   const quoteThreshold = getRdaQuoteThreshold();
+  const pdfDownloadAvailable = canDownloadPOPDF(po.state);
 
   return (
     <section className="surface actionBar">
       <div className="actionBarGroup">
         <Button variant="secondary" leftIcon={<Icon name="arrow-left" />} onClick={onClose}>Chiudi</Button>
-        {po.state !== PO_STATES.DRAFT ? (
-          <Button variant="secondary" leftIcon={<Icon name="download" />} onClick={onPDF} loading={transitioning}>Genera PDF</Button>
+        {pdfDownloadAvailable ? (
+          <Button variant="secondary" leftIcon={<Icon name="download" />} onClick={onPDF} loading={transitioning}>Scarica PDF</Button>
         ) : null}
         {quoteRuleBlocked ? <span className="warningText">Attenzione: importo superiore a {formatMoney(quoteThreshold, po.currency)}. Carica almeno 2 preventivi.</span> : null}
       </div>

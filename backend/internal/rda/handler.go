@@ -688,7 +688,17 @@ func (h *Handler) handlePDF(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusUnauthorized, "Accesso richiesto")
 		return
 	}
-	h.forwardArak(w, r, http.MethodGet, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id"))+"/download", "", nil, requesterHeaders(email))
+	poID := r.PathValue("id")
+	po, err := h.fetchPODetail(r, email, poID)
+	if err != nil {
+		h.handleFetchPOError(w, r, err)
+		return
+	}
+	if !canDownloadPOPDF(po.State) {
+		httputil.Error(w, http.StatusForbidden, "Il PDF sara disponibile quando il PO e approvato o pronto per l'invio")
+		return
+	}
+	h.forwardArak(w, r, http.MethodGet, arakRDARoot+"/po/"+url.PathEscape(poID)+"/download", "", nil, requesterHeaders(email))
 }
 
 func mergeHeaders(headers ...http.Header) http.Header {

@@ -149,6 +149,15 @@ Alyante ERP ID
 - Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, and RDA backend attachment upload/submit validation.
 - Open questions: none.
 
+### RDA PO PDF Download Is State-Gated
+
+- Context: `apps/rda` PO detail PDF download and backend `GET /api/rda/v1/pos/{id}/pdf`.
+- Discovery: users must not download the generated PO PDF until the PO has reached one of the approved/post-approval states explicitly allowed by the business flow.
+- Practical rule: show and proxy PO PDF download only for `APPROVED`, `PENDING_SEND`, `SENT`, `PENDING_VERIFICATION`, `PENDING_DISPUTE`, `DELIVERED_AND_COMPLIANT`, and `CLOSED`. Block all other states, including Mistra/server intermediary states such as `PENDING_PDF_GENERATION` and `PENDING_ERP_SAVE`.
+- Evidence: RDA implementation plan correction from product; frontend `canDownloadPOPDF`; backend `canDownloadPOPDF`.
+- Used by: `apps/rda` `/rda/po/:id` and RDA backend PDF proxy.
+- Open questions: none.
+
 ### RDA Patch Payload Null Semantics
 
 - Context: `apps/rda` PO header edits forwarded to Mistra `rda-patch`.

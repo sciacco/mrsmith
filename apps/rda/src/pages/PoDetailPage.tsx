@@ -27,7 +27,9 @@ import { PoTabs } from '../components/PoTabs';
 import { ProviderRequestModal } from '../components/ProviderRequestModal';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { countQuoteAttachments } from '../lib/attachments';
+import { apiErrorMessage } from '../lib/api-error';
 import { coerceID, downloadBlob, isRequester, parseMistraMoney } from '../lib/format';
+import { canDownloadPOPDF } from '../lib/po-pdf';
 import { buildPatchPOPayload } from '../lib/po-payload';
 import { buildPOReadinessItems, buildTabBadges, selectedModeID } from '../lib/po-detail-view-model';
 import { buildPaymentMethodOptions, paymentCodeFromProvider, preferredPaymentMethodCode, requiresPaymentMethodVerification } from '../lib/payment-options';
@@ -318,11 +320,15 @@ export function PoDetailPage() {
   }
 
   async function downloadPDF() {
+    if (!canDownloadPOPDF(detail.state)) {
+      toast("Il PDF sara disponibile quando il PO e approvato o pronto per l'invio", 'error');
+      return;
+    }
     try {
       const blob = await downloads.pdf(detail.id);
       downloadBlob(blob, `rda-${detail.code ?? detail.id}.pdf`);
-    } catch {
-      toast('Download non riuscito', 'error');
+    } catch (error) {
+      toast(apiErrorMessage(error, 'Download non riuscito'), 'error');
     }
   }
 

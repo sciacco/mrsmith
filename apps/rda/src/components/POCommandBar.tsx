@@ -5,8 +5,9 @@ import type { PoAction, PoActionMode, PoDetail } from '../api/types';
 import type { TransitionAction } from '../api/queries';
 import { countQuoteAttachments } from '../lib/attachments';
 import { formatMoney, parseMistraMoney } from '../lib/format';
+import { canDownloadPOPDF } from '../lib/po-pdf';
 import { selectedModeID } from '../lib/po-detail-view-model';
-import { PO_STATES, stateLabel } from '../lib/state-labels';
+import { stateLabel } from '../lib/state-labels';
 import { ConfirmDialog } from './ConfirmDialog';
 
 const transitionActions: readonly TransitionAction[] = [
@@ -185,6 +186,7 @@ export function POCommandBar({
   const secondaryActions = actions.filter((action) => !action.primary && action.tone !== 'danger');
   const dangerActions = actions.filter((action) => action.tone === 'danger');
   const permissionUnavailable = actionModel?.permission_status === 'unavailable';
+  const pdfDownloadAvailable = canDownloadPOPDF(summary?.state ?? po.state);
 
   function runAction(action: PoAction) {
     if (action.disabled || !isTransitionAction(action.id)) return;
@@ -243,7 +245,7 @@ export function POCommandBar({
         </div>
 
         <div className="commandActions">
-          {po.state !== PO_STATES.DRAFT ? (
+          {pdfDownloadAvailable ? (
             <Button variant="secondary" leftIcon={<Icon name="download" />} onClick={onPDF} loading={transitioning}>Scarica PDF</Button>
           ) : null}
 

@@ -22,6 +22,8 @@
     "src/lib/row-payload.ts",
     "src/lib/row-payload.test.ts",
     "src/lib/provider-refs.ts",
+    "src/lib/po-pdf.ts",
+    "src/lib/po-pdf.test.ts",
     "src/lib/po-detail-view-model.ts",
     "src/lib/po-detail-view-model.test.ts"
   ]
