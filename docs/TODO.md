@@ -40,6 +40,11 @@ The "Addebiti" view ships CSV export in v1. A future pass should add a PDF expor
 ### DB-Backed Pricing + Admin View (deferred from v1)
 The v1 migration is intentionally narrowed to a source-faithful port of the Appsmith IaaS calculator. The two pricing tiers stay in app-local code for now, there is no pricing database table, and there is no in-app admin route for editing rates. A later phase should move pricing into a backend-owned source of truth and add a dedicated maintenance UI. That follow-up must decide the real host store, introduce read/write pricing endpoints, make PDF generation use server-authoritative pricing, and reopen whether the Appsmith-style `Calcola` interaction should evolve into live recompute.
 
+## Richieste di Fattibilità App
+
+### Reassess AI Analysis and PDF Preview
+The request detail view no longer exposes the AI analysis tab or the PDF tab, and RDF backend LLM calls are disabled while the underlying implementation is kept in place. A future product pass should evaluate whether to reactivate AI-assisted feasibility analysis and frontend PDF generation/preview for this section, including the required UX, permissions, cost controls, and operational guardrails.
+
 ## Quotes App
 
 ### Multi-Product Selection per Group

@@ -1,14 +1,8 @@
-import { Button, Drawer, Icon, Skeleton, TabNav, Tooltip, type TabNavItem } from '@mrsmith/ui';
+import { Button, Drawer, Icon, Skeleton, Tooltip } from '@mrsmith/ui';
 import { hasAnyRole } from '@mrsmith/auth-client';
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-  useAnalysis,
-  useAnalysisJSON,
-  useRDFCapabilities,
-  useRichiestaFull,
-  useRichiestaPdf,
-} from '../api/queries';
+import { useRichiestaFull } from '../api/queries';
 import type { Fattibilita } from '../api/types';
 import { RDFCommentsPanel } from '../components/RDFCommentsPanel';
 import { StatusPill, statusTone } from '../components/StatusPill';
@@ -26,8 +20,6 @@ import {
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import shared from './shared.module.css';
 import styles from './RequestViewPage.module.css';
-
-type TabKey = 'riepilogo' | 'analisi' | 'pdf';
 
 function formatCurrency(value: number | null): string {
   if (value === null || value === undefined) return '—';
@@ -54,41 +46,9 @@ export function RequestViewPage() {
   const { user } = useOptionalAuth();
   const richiestaId = parsePositiveId(params.id);
   const canManage = hasAnyRole(user?.roles, MANAGER_ROLES);
-  const [activeTab, setActiveTab] = useState<TabKey>('riepilogo');
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState<Fattibilita | null>(null);
 
   const richiesta = useRichiestaFull(richiestaId);
-  const capabilities = useRDFCapabilities();
-  const aiEnabled = capabilities.data?.ai_enabled ?? false;
-  const analysisText = useAnalysis(richiestaId, aiEnabled && activeTab === 'analisi');
-  const analysisJSON = useAnalysisJSON(richiestaId, aiEnabled && activeTab === 'analisi');
-  const pdf = useRichiestaPdf(richiestaId, activeTab === 'pdf');
-
-  const tabs = useMemo<TabNavItem[]>(
-    () => [
-      { key: 'riepilogo', label: 'Riepilogo' },
-      ...(aiEnabled ? [{ key: 'analisi', label: 'Analisi AI' }] : []),
-      { key: 'pdf', label: 'PDF' },
-    ],
-    [aiEnabled],
-  );
-
-  useEffect(() => {
-    if (!aiEnabled && activeTab === 'analisi') setActiveTab('riepilogo');
-  }, [aiEnabled, activeTab]);
-
-  useEffect(() => {
-    if (!pdf.data) return;
-    const nextUrl = URL.createObjectURL(pdf.data);
-    setPdfUrl((current) => {
-      if (current) URL.revokeObjectURL(current);
-      return nextUrl;
-    });
-    return () => {
-      URL.revokeObjectURL(nextUrl);
-    };
-  }, [pdf.data]);
 
   if (richiestaId === null) {
     return (
@@ -204,245 +164,94 @@ export function RequestViewPage() {
             </span>
           </div>
 
-          <TabNav
-            items={tabs}
-            activeKey={activeTab}
-            onTabChange={(key) => setActiveTab(key as TabKey)}
-          />
-
-
-          {activeTab === 'riepilogo' && (
-            <div
-              className={styles.summaryWorkspace}
-              role="tabpanel"
-              id="tabpanel-riepilogo"
-              aria-labelledby="tab-riepilogo"
-            >
-              <div className={styles.summaryMain}>
-                <div className={shared.panel}>
-                  <h2 className={shared.panelTitle}>Descrizione richiesta</h2>
-                  <p style={{ marginTop: '0.6rem', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                    {richiesta.data.descrizione || '—'}
-                  </p>
-                </div>
-
-                {richiesta.data.fattibilita.length === 0 ? (
-                  <div className={shared.emptyCard}>
-                    <div className={shared.emptyIcon}>
-                      <Icon name="list" />
-                    </div>
-                    <h3>Nessuna fattibilità registrata</h3>
-                    <p className={shared.muted}>
-                      Non sono ancora state aggiunte valutazioni per questa richiesta.
-                    </p>
-                  </div>
-                ) : (
-                  <div className={styles.fattibilitaBoard} role="table" aria-label="Fattibilità richiesta">
-                    <div className={styles.fattibilitaHeader} role="row">
-                      <span role="columnheader">Fattibilità</span>
-                      <span role="columnheader">Stato</span>
-                      <span role="columnheader">Copertura</span>
-                      <span role="columnheader">Budget</span>
-                      <span role="columnheader">Tempi</span>
-                      <span role="columnheader" className={styles.detailHeader}>Apri</span>
-                    </div>
-                    <div className={styles.fattibilitaRows} role="rowgroup">
-                      {richiesta.data.fattibilita.map((item) => (
-                        <div
-                          key={item.id}
-                          className={styles.fattibilitaRow}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setDetailOpen(item)}
-                          onKeyDown={(event) => handleRowKeyDown(event, item)}
-                          aria-label={`Dettaglio ${item.fornitore_nome} ${item.tecnologia_nome}`}
-                        >
-                          <div className={styles.providerBlock} role="cell">
-                            <div className={styles.providerTopline}>
-                              <span className={styles.providerName}>{item.fornitore_nome}</span>
-                              {item.da_ordinare ? <span className={styles.orderBadge}>Da ordinare</span> : null}
-                            </div>
-                            <div className={styles.providerMeta}>
-                              <span>{item.tecnologia_nome}</span>
-                              {item.profilo_fornitore ? <span>{item.profilo_fornitore}</span> : null}
-                            </div>
-                          </div>
-                          <div className={styles.statusBlock} role="cell">
-                            <StatusPill tone={statusTone(item.stato)}>
-                              {fattibilitaStateLabel(item.stato)}
-                            </StatusPill>
-                          </div>
-                          <div className={styles.coverageBlock} role="cell">
-                            <span className={`${styles.coveragePill} ${item.copertura ? styles.coverageYes : styles.coverageNo}`}>
-                              <Icon name={item.copertura ? 'check' : 'x'} size={13} />
-                              {item.copertura ? 'Sì' : 'No'}
-                            </span>
-                          </div>
-                          <div className={styles.budgetBlock} role="cell">
-                            <span className={styles.budgetChip}>{budgetLabel(item.aderenza_budget)}</span>
-                          </div>
-                          <dl className={styles.timeBlock} role="cell">
-                            <div>
-                              <dt>Esito</dt>
-                              <dd>{item.esito_ricevuto_il ? formatDate(item.esito_ricevuto_il) : '—'}</dd>
-                            </div>
-                            <div>
-                              <dt>Rilascio</dt>
-                              <dd>{formatDays(item.giorni_rilascio)}</dd>
-                            </div>
-                          </dl>
-                          <div className={styles.rowAction} role="cell">
-                            <span className={styles.rowChevron}>
-                              <Icon name="chevron-right" size={16} />
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <RDFCommentsPanel richiestaId={richiesta.data.id} />
-            </div>
-          )}
-
-          {activeTab === 'analisi' && (
-            <div
-              className={styles.aiStack}
-              role="tabpanel"
-              id="tabpanel-analisi"
-              aria-labelledby="tab-analisi"
-            >
+          <div className={styles.summaryWorkspace}>
+            <div className={styles.summaryMain}>
               <div className={shared.panel}>
-                <h2 className={shared.panelTitle}>Azioni raccomandate</h2>
-                {analysisJSON.isLoading ? (
-                  <Skeleton rows={4} />
-                ) : analysisJSON.error || !analysisJSON.data ? (
-                  <p className={shared.muted}>
-                    {copyErrorMessage(analysisJSON.error, 'Raccomandazioni non disponibili.')}
-                  </p>
-                ) : analysisJSON.data.azioni_raccomandate.length === 0 ? (
-                  <p className={shared.muted}>Nessuna azione consigliata.</p>
-                ) : (
-                  <div className={styles.actionList} style={{ marginTop: '0.6rem' }}>
-                    {analysisJSON.data.azioni_raccomandate.map((azione, index) => (
-                      <article key={`${azione.azione}-${index}`} className={styles.actionItem}>
-                        <div className={styles.actionTitle}>{azione.azione}</div>
-                        <div className={styles.actionTarget}>
-                          {azione.fornitore}
-                          {azione.tecnologia ? ` · ${azione.tecnologia}` : ''}
-                        </div>
-                        <p className={styles.actionReason}>{azione.motivo}</p>
-                      </article>
-                    ))}
-                  </div>
-                )}
+                <h2 className={shared.panelTitle}>Descrizione richiesta</h2>
+                <p style={{ marginTop: '0.6rem', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                  {richiesta.data.descrizione || '—'}
+                </p>
               </div>
 
-              {analysisJSON.data && analysisJSON.data.valutazioni.length > 0 && (
-                <div className={shared.panel}>
-                  <h2 className={shared.panelTitle}>Valutazioni sintetiche</h2>
-                  <div className={styles.tableWrap} style={{ marginTop: '0.6rem' }}>
-                    <table className={styles.table}>
-                      <thead>
-                        <tr>
-                          <th>Fornitore</th>
-                          <th>Tecnologia</th>
-                          <th>Stato</th>
-                          <th>Copertura</th>
-                          <th>Budget</th>
-                          <th className={styles.numCell}>Durata</th>
-                          <th className={styles.numCell}>Rilascio</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {analysisJSON.data.valutazioni.map((valutazione, index) => (
-                          <tr key={`${valutazione.fornitore}-${valutazione.tecnologia}-${index}`}>
-                            <td className={styles.fornitoreCell}>{valutazione.fornitore}</td>
-                            <td className={styles.tecnologiaCell}>{valutazione.tecnologia}</td>
-                            <td>
-                              <StatusPill tone={statusTone(valutazione.stato)}>
-                                {valutazione.stato}
-                              </StatusPill>
-                            </td>
-                            <td>{valutazione.copertura ?? '—'}</td>
-                            <td>{valutazione.aderenza_budget ?? '—'}</td>
-                            <td className={styles.numCell}>{formatMonths(valutazione.durata_mesi ?? null)}</td>
-                            <td className={styles.numCell}>
-                              {formatDays(valutazione.giorni_rilascio ?? null)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              <div className={shared.panel}>
-                <h2 className={shared.panelTitle}>Riassunto</h2>
-                {analysisText.isLoading ? (
-                  <Skeleton rows={6} />
-                ) : analysisText.error ? (
-                  <p className={shared.muted}>
-                    {copyErrorMessage(analysisText.error, 'Riassunto non disponibile.')}
-                  </p>
-                ) : (
-                  <div className={shared.analysisBlock} style={{ marginTop: '0.6rem' }}>
-                    {analysisText.data}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'pdf' && (
-            <div
-              className={shared.panel}
-              role="tabpanel"
-              id="tabpanel-pdf"
-              aria-labelledby="tab-pdf"
-            >
-              {pdf.isLoading ? (
-                <Skeleton rows={8} />
-              ) : pdf.error || !pdfUrl ? (
+              {richiesta.data.fattibilita.length === 0 ? (
                 <div className={shared.emptyCard}>
-                  <div className={shared.emptyIconDanger}>
-                    <Icon name="triangle-alert" />
+                  <div className={shared.emptyIcon}>
+                    <Icon name="list" />
                   </div>
-                  <h3>PDF non disponibile</h3>
+                  <h3>Nessuna fattibilità registrata</h3>
                   <p className={shared.muted}>
-                    {copyErrorMessage(pdf.error, 'Il PDF non è disponibile in questo momento.')}
+                    Non sono ancora state aggiunte valutazioni per questa richiesta.
                   </p>
                 </div>
               ) : (
-                <div className={shared.sectionSpacer}>
-                  <div className={shared.actionsRow}>
-                    <Button
-                      variant="secondary"
-                      onClick={() => window.open(pdfUrl, '_blank', 'noopener,noreferrer')}
-                    >
-                      Apri in nuova scheda
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = pdfUrl;
-                        link.download = `rdf-${richiestaId}.pdf`;
-                        link.click();
-                      }}
-                    >
-                      Scarica PDF
-                    </Button>
+                <div className={styles.fattibilitaBoard} role="table" aria-label="Fattibilità richiesta">
+                  <div className={styles.fattibilitaHeader} role="row">
+                    <span role="columnheader">Fattibilità</span>
+                    <span role="columnheader">Stato</span>
+                    <span role="columnheader">Copertura</span>
+                    <span role="columnheader">Budget</span>
+                    <span role="columnheader">Tempi</span>
+                    <span role="columnheader" className={styles.detailHeader}>Apri</span>
                   </div>
-                  <div className={shared.iframeWrap}>
-                    <iframe title="Anteprima PDF RDF" src={pdfUrl} />
+                  <div className={styles.fattibilitaRows} role="rowgroup">
+                    {richiesta.data.fattibilita.map((item) => (
+                      <div
+                        key={item.id}
+                        className={styles.fattibilitaRow}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setDetailOpen(item)}
+                        onKeyDown={(event) => handleRowKeyDown(event, item)}
+                        aria-label={`Dettaglio ${item.fornitore_nome} ${item.tecnologia_nome}`}
+                      >
+                        <div className={styles.providerBlock} role="cell">
+                          <div className={styles.providerTopline}>
+                            <span className={styles.providerName}>{item.fornitore_nome}</span>
+                            {item.da_ordinare ? <span className={styles.orderBadge}>Da ordinare</span> : null}
+                          </div>
+                          <div className={styles.providerMeta}>
+                            <span>{item.tecnologia_nome}</span>
+                            {item.profilo_fornitore ? <span>{item.profilo_fornitore}</span> : null}
+                          </div>
+                        </div>
+                        <div className={styles.statusBlock} role="cell">
+                          <StatusPill tone={statusTone(item.stato)}>
+                            {fattibilitaStateLabel(item.stato)}
+                          </StatusPill>
+                        </div>
+                        <div className={styles.coverageBlock} role="cell">
+                          <span className={`${styles.coveragePill} ${item.copertura ? styles.coverageYes : styles.coverageNo}`}>
+                            <Icon name={item.copertura ? 'check' : 'x'} size={13} />
+                            {item.copertura ? 'Sì' : 'No'}
+                          </span>
+                        </div>
+                        <div className={styles.budgetBlock} role="cell">
+                          <span className={styles.budgetChip}>{budgetLabel(item.aderenza_budget)}</span>
+                        </div>
+                        <dl className={styles.timeBlock} role="cell">
+                          <div>
+                            <dt>Esito</dt>
+                            <dd>{item.esito_ricevuto_il ? formatDate(item.esito_ricevuto_il) : '—'}</dd>
+                          </div>
+                          <div>
+                            <dt>Rilascio</dt>
+                            <dd>{formatDays(item.giorni_rilascio)}</dd>
+                          </div>
+                        </dl>
+                        <div className={styles.rowAction} role="cell">
+                          <span className={styles.rowChevron}>
+                            <Icon name="chevron-right" size={16} />
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
-          )}
+
+            <RDFCommentsPanel richiestaId={richiesta.data.id} />
+          </div>
         </>
       )}
 

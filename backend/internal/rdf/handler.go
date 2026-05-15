@@ -428,7 +428,7 @@ func (h *Handler) handleListRichiesteSummary(w http.ResponseWriter, r *http.Requ
 
 func (h *Handler) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, map[string]bool{
-		"ai_enabled": h.ai != nil,
+		"ai_enabled": rdfAIRequestsEnabled && h.ai != nil,
 	})
 }
 
@@ -799,6 +799,10 @@ func (h *Handler) handleUpdateFattibilita(w http.ResponseWriter, r *http.Request
 }
 
 func (h *Handler) handleAnalyzeRichiesta(w http.ResponseWriter, r *http.Request) {
+	if !rdfAIRequestsEnabled {
+		httputil.Error(w, http.StatusServiceUnavailable, "ai_unavailable")
+		return
+	}
 	if !h.requireAnisetta(w) || !h.requireMistra(w) {
 		return
 	}
@@ -834,6 +838,10 @@ func (h *Handler) handleAnalyzeRichiesta(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) handleAnalyzeRichiestaJSON(w http.ResponseWriter, r *http.Request) {
+	if !rdfAIRequestsEnabled {
+		httputil.Error(w, http.StatusServiceUnavailable, "ai_unavailable")
+		return
+	}
 	if !h.requireAnisetta(w) || !h.requireMistra(w) {
 		return
 	}
@@ -889,13 +897,17 @@ func (h *Handler) handleRenderRichiestaPDF(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	analysis, err := h.analyzeText(r.Context(), id, full)
-	if errors.Is(err, errAIUnavailable) {
-		analysis = ""
-	} else if err != nil {
-		logging.FromContext(r.Context()).Error("rdf pdf analysis failed", "component", "rdf", "richiesta_id", id, "error", err)
-		httputil.Error(w, http.StatusBadGateway, "ai_request_failed")
-		return
+	analysis := ""
+	if rdfAIRequestsEnabled {
+		var err error
+		analysis, err = h.analyzeText(r.Context(), id, full)
+		if errors.Is(err, errAIUnavailable) {
+			analysis = ""
+		} else if err != nil {
+			logging.FromContext(r.Context()).Error("rdf pdf analysis failed", "component", "rdf", "richiesta_id", id, "error", err)
+			httputil.Error(w, http.StatusBadGateway, "ai_request_failed")
+			return
+		}
 	}
 
 	pdfBytes, err := renderRichiestaPDF(full, analysis)

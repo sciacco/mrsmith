@@ -12,8 +12,10 @@ import (
 )
 
 const (
-	analysisTextModel = "google/gemini-2.5-flash-lite-preview-09-2025"
-	analysisJSONModel = "google/gemini-2.5-flash-lite-preview-06-17"
+	// Keep the RDF AI implementation available in code while preventing live LLM calls.
+	rdfAIRequestsEnabled = false
+	analysisTextModel    = "google/gemini-2.5-flash-lite-preview-09-2025"
+	analysisJSONModel    = "google/gemini-2.5-flash-lite-preview-06-17"
 )
 
 var scoreBudgetLabels = []string{
@@ -76,7 +78,7 @@ func (h *Handler) analyzeJSON(ctx context.Context, richiestaID int, full Richies
 }
 
 func (h *Handler) runAICompletion(ctx context.Context, richiestaID int, model, systemPrompt string, jsonMode bool, full RichiestaFull) (string, openrouter.Usage, error) {
-	if h.ai == nil {
+	if !rdfAIRequestsEnabled || h.ai == nil {
 		return "", openrouter.Usage{}, errAIUnavailable
 	}
 
