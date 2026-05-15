@@ -47,7 +47,8 @@ type commentMentionUser struct {
 }
 
 type approverRef struct {
-	Level any `json:"level,omitempty"`
+	Email string `json:"email,omitempty"`
+	Level any    `json:"level,omitempty"`
 	User  struct {
 		Email string `json:"email,omitempty"`
 	} `json:"user,omitempty"`

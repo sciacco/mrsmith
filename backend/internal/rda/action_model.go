@@ -2,6 +2,7 @@ package rda
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 )
 
@@ -79,7 +80,7 @@ func buildPOActionModel(po poDetail, permissions poActionPermissions, email stri
 					ID:          "approver_l1_l2",
 					Label:       "Approvatore",
 					Description: "Valuta la richiesta per il livello corrente.",
-					Reason:      "Il PO attende approvazione.",
+					Reason:      pendingApprovalReason(po),
 				},
 				poAction{
 					ID:             "approve",
@@ -355,6 +356,60 @@ func actionDisabledReason(enabled bool, unavailableReason string, forbiddenReaso
 		return unavailableReason
 	}
 	return forbiddenReason
+}
+
+func pendingApprovalReason(po poDetail) string {
+	emails := pendingApprovalEmails(po)
+	if len(emails) == 0 {
+		return "Il PO è in attesa di approvazione."
+	}
+	return "Il PO è in attesa di approvazione da " + strings.Join(emails, ", ") + "."
+}
+
+func pendingApprovalEmails(po poDetail) []string {
+	currentLevel, hasCurrentLevel := approvalLevelNumber(po.CurrentApprovalLevel)
+	seen := make(map[string]struct{}, len(po.Approvers))
+	emails := make([]string, 0, len(po.Approvers))
+
+	for _, approver := range po.Approvers {
+		email := approverRefEmail(approver)
+		if email == "" {
+			continue
+		}
+		if hasCurrentLevel {
+			level, hasLevel := approvalLevelNumber(approver.Level)
+			if hasLevel && level < currentLevel {
+				continue
+			}
+		}
+		key := strings.ToLower(email)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		emails = append(emails, email)
+	}
+
+	return emails
+}
+
+func approvalLevelNumber(value any) (float64, bool) {
+	normalized := normalizeApprovalLevel(value)
+	if normalized == "" {
+		return 0, false
+	}
+	level, err := strconv.ParseFloat(normalized, 64)
+	if err != nil {
+		return 0, false
+	}
+	return level, true
+}
+
+func approverRefEmail(approver approverRef) string {
+	if email := strings.TrimSpace(approver.Email); email != "" {
+		return email
+	}
+	return strings.TrimSpace(approver.User.Email)
 }
 
 func selectPrimaryModeID(modes []poActionMode) string {

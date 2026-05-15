@@ -137,6 +137,33 @@ func TestBuildPOActionModelApproverWrongLevelDoesNotSeeApprove(t *testing.T) {
 	}
 }
 
+func TestBuildPOActionModelPendingApprovalReasonIncludesCurrentAndNextLevels(t *testing.T) {
+	levelOne := approverWithLevel("first@example.com", 1)
+	current := approverWithLevel("current@example.com", 2)
+	next := approverWithLevel("next@example.com", 3)
+	duplicate := approverWithLevel("CURRENT@example.com", 3)
+
+	po := poForActionModel("PENDING_APPROVAL", "requester@example.com")
+	po.CurrentApprovalLevel = 2
+	po.Approvers = []approverRef{levelOne, current, next, duplicate}
+
+	model := buildPOActionModel(
+		po,
+		poActionPermissions{rdaPermissions: rdaPermissions{IsApprover: true}, Status: poPermissionAvailable},
+		"current@example.com",
+		3000,
+	)
+
+	mode, ok := findMode(model, "approver_l1_l2")
+	if !ok {
+		t.Fatalf("expected approver mode in %#v", model.Modes)
+	}
+	expected := "Il PO è in attesa di approvazione da current@example.com, next@example.com."
+	if mode.Reason != expected {
+		t.Fatalf("expected reason %q, got %q", expected, mode.Reason)
+	}
+}
+
 func TestRDAPermissionsJSONIncludesVisibilityFlags(t *testing.T) {
 	encoded, err := json.Marshal(rdaPermissions{
 		IsApprover:            true,
@@ -261,6 +288,13 @@ func approverEmail(email string) string {
 	return email
 }
 
+func approverWithLevel(email string, level any) approverRef {
+	var approver approverRef
+	approver.Level = level
+	approver.User.Email = email
+	return approver
+}
+
 func permissionsWith(flag rdaPermissionFlag) rdaPermissions {
 	switch flag {
 	case permissionApprover:
@@ -277,12 +311,17 @@ func permissionsWith(flag rdaPermissionFlag) rdaPermissions {
 }
 
 func hasMode(model poActionModel, modeID string) bool {
+	_, ok := findMode(model, modeID)
+	return ok
+}
+
+func findMode(model poActionModel, modeID string) (poActionMode, bool) {
 	for _, mode := range model.Modes {
 		if mode.ID == modeID {
-			return true
+			return mode, true
 		}
 	}
-	return false
+	return poActionMode{}, false
 }
 
 func findAction(model poActionModel, actionID string, modeID string) (poAction, bool) {
