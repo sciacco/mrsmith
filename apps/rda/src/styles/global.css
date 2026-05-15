@@ -285,8 +285,45 @@ textarea {
   gap: 0.7rem;
   border: 1px solid var(--color-border);
   padding: 0.82rem 0.9rem;
+  color: inherit;
   background: color-mix(in srgb, var(--color-bg-elevated) 86%, transparent);
+  font: inherit;
+  text-align: left;
   box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.rdaQuickStat:hover,
+.rdaQuickStat:focus-visible {
+  border-color: var(--color-accent-muted);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.rdaQuickStat:focus-visible {
+  outline: 2px solid var(--color-accent-glow);
+  outline-offset: 2px;
+}
+
+.rdaQuickStat.active {
+  border-color: var(--color-accent-muted);
+  background: color-mix(in srgb, var(--color-accent-subtle) 76%, #fff 24%);
+  box-shadow:
+    var(--shadow-sm),
+    0 14px 28px -24px var(--color-accent);
+}
+
+.rdaQuickStat.active .rdaMetricIcon {
+  color: #fff;
+  background: var(--color-accent);
+  box-shadow: var(--shadow-accent);
 }
 
 .rdaQuickStat:nth-child(1) {

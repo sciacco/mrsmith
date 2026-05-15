@@ -286,6 +286,26 @@ test('own and accessible requests land in the correct views', () => {
   assertEqual(model.counts.ownOpen, 1, 'own open count excludes drafts');
 });
 
+test('quick filters match own draft and own open counts', () => {
+  const draft = poFixture({ id: 61, code: 'PO-61', state: 'DRAFT', requester: { email: 'me@example.com' } });
+  const open = poFixture({ id: 62, code: 'PO-62', state: 'PENDING_APPROVAL', requester: { email: 'me@example.com' } });
+  const closed = poFixture({ id: 63, code: 'PO-63', state: 'CLOSED', requester: { email: 'me@example.com' } });
+  const model = buildRdaDashboardModel({
+    myRows: [draft, open, closed],
+    currentEmail: 'me@example.com',
+    permissions: permissionsFixture(),
+    inboxes: [],
+  });
+
+  const ownDrafts = filterRdaDashboardRows(model.rows, { view: 'mine', quick: 'own-draft' });
+  const ownOpen = filterRdaDashboardRows(model.rows, { view: 'mine', quick: 'own-open' });
+
+  assertEqual(ownDrafts.length, model.counts.ownDrafts, 'own draft quick filter count');
+  assertEqual(ownDrafts[0]?.id, 61, 'own draft quick filter row');
+  assertEqual(ownOpen.length, model.counts.ownOpen, 'own open quick filter count');
+  assertEqual(ownOpen[0]?.id, 62, 'own open quick filter row');
+});
+
 test('rows returned by the PO list are not treated as mine when requester differs', () => {
   const otherRequester = poFixture({ id: 31, code: 'PO-31', requester: { email: 'other@example.com' } });
   const model = buildRdaDashboardModel({

@@ -4,6 +4,7 @@ import { isApprover, parseMistraMoney } from './format.js';
 import { stateLabel } from './state-labels.js';
 
 export type RdaDashboardView = 'todo' | 'mine' | 'all';
+export type RdaDashboardQuickFilter = 'own-draft' | 'own-open';
 export type RdaQueueKey = InboxKind | 'own-draft' | 'requester' | 'supervision' | 'visible';
 export type RdaContextType = 'inbox' | 'draft' | 'requester' | 'visibility';
 export type RdaDashboardSortKey = 'request' | 'state' | 'provider' | 'requester' | 'created' | 'total';
@@ -48,6 +49,7 @@ export interface RdaDashboardModel {
 
 export interface RdaDashboardFilters {
   view: RdaDashboardView;
+  quick?: RdaDashboardQuickFilter | null;
   q?: string;
   state?: string;
   queue?: string;
@@ -80,6 +82,11 @@ const defaultSortDirections: Record<RdaDashboardSortKey, RdaDashboardSortDirecti
 export function parseRdaDashboardView(value: string | null): RdaDashboardView {
   if (value === 'mine' || value === 'all' || value === 'todo') return value;
   return 'todo';
+}
+
+export function parseRdaDashboardQuickFilter(value: string | null): RdaDashboardQuickFilter | null {
+  if (value === 'own-draft' || value === 'own-open') return value;
+  return null;
 }
 
 export function parseRdaDashboardSortKey(value: string | null): RdaDashboardSortKey | null {
@@ -430,6 +437,11 @@ function rowInView(row: RdaDashboardRow, view: RdaDashboardView): boolean {
   return row.isActionable;
 }
 
+function rowMatchesQuickFilter(row: RdaDashboardRow, quick: RdaDashboardQuickFilter): boolean {
+  if (quick === 'own-draft') return row.isOwnDraft;
+  return row.isRequesterOwned && !row.isOwnDraft && !isTerminalPOState(row.state);
+}
+
 function matchesQuery(row: RdaDashboardRow, query: string): boolean {
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
   if (terms.length === 0) return true;
@@ -455,6 +467,7 @@ function matchesQuery(row: RdaDashboardRow, query: string): boolean {
 export function filterRdaDashboardRows(rows: RdaDashboardRow[], filters: RdaDashboardFilters): RdaDashboardRow[] {
   return rows.filter((row) => {
     if (!rowInView(row, filters.view)) return false;
+    if (filters.quick && !rowMatchesQuickFilter(row, filters.quick)) return false;
     if (filters.state && row.state !== filters.state) return false;
     if (
       filters.queue &&

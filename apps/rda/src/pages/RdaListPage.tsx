@@ -11,6 +11,7 @@ import {
   buildRdaDashboardModel,
   defaultRdaDashboardSortDirection,
   filterRdaDashboardRows,
+  parseRdaDashboardQuickFilter,
   parseRdaDashboardSortDirection,
   parseRdaDashboardSortKey,
   parseRdaDashboardView,
@@ -18,6 +19,7 @@ import {
   rdaStateFilterOptions,
   sortRdaDashboardRows,
   type RdaDashboardRow,
+  type RdaDashboardQuickFilter,
   type RdaDashboardSort,
   type RdaDashboardSortKey,
   type RdaDashboardView,
@@ -52,6 +54,7 @@ export function RdaListPage() {
   const budgetInbox = useInbox('budget-increment', Boolean(permissions.data?.is_approver_extra_budget));
 
   const view = parseRdaDashboardView(params.get('view'));
+  const quickFilter = parseRdaDashboardQuickFilter(params.get('quick'));
   const qFilter = params.get('q') ?? '';
   const stateFilter = params.get('state') ?? '';
   const queueFilter = params.get('queue') ?? '';
@@ -122,26 +125,32 @@ export function RdaListPage() {
     () =>
       filterRdaDashboardRows(dashboard.rows, {
         view,
+        quick: quickFilter,
         q: deferredQ,
         state: stateFilter,
         queue: activeQueueFilter,
       }),
-    [activeQueueFilter, dashboard.rows, deferredQ, stateFilter, view],
+    [activeQueueFilter, dashboard.rows, deferredQ, quickFilter, stateFilter, view],
   );
   const visibleRows = useMemo(
     () => sortRdaDashboardRows(filteredRows, sortState),
     [filteredRows, sortState],
   );
 
-  const hasFilters = qFilter !== '' || stateFilter !== '' || activeQueueFilter !== '';
+  const hasFilters = quickFilter !== null || qFilter !== '' || stateFilter !== '' || activeQueueFilter !== '';
   const hasWorkToManage = dashboard.counts.toManage > 0;
   let toManageMessage = 'Nessuna richiesta richiede azione.';
   if (dashboard.counts.toManage === 1) toManageMessage = '1 richiesta richiede azione.';
   if (dashboard.counts.toManage > 1) toManageMessage = `${dashboard.counts.toManage} richieste richiedono azione.`;
+  const noToolbarFilters = qFilter === '' && stateFilter === '' && activeQueueFilter === '';
+  const ownDraftsActive = view === 'mine' && quickFilter === 'own-draft' && noToolbarFilters;
+  const ownOpenActive = view === 'mine' && quickFilter === 'own-open' && noToolbarFilters;
+  const totalAccessibleActive = view === 'all' && quickFilter === null && noToolbarFilters;
 
   function updateParam(key: 'q' | 'state' | 'queue', value: string) {
     setParams((previous) => {
       const next = new URLSearchParams(previous);
+      next.delete('quick');
       if (value) next.set(key, value);
       else next.delete(key);
       return next;
@@ -170,6 +179,39 @@ export function RdaListPage() {
     setParams((previous) => {
       const next = new URLSearchParams(previous);
       next.set('view', nextView);
+      next.delete('quick');
+      return next;
+    });
+  }
+
+  function applyQuickFilter(filter: RdaDashboardQuickFilter | 'total') {
+    setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      const activeQuick = parseRdaDashboardQuickFilter(previous.get('quick'));
+      const activeView = parseRdaDashboardView(previous.get('view'));
+      const noToolbarFilters = !previous.get('q') && !previous.get('state') && !previous.get('queue');
+      const active =
+        filter === 'total'
+          ? activeView === 'all' && activeQuick === null && noToolbarFilters
+          : activeView === 'mine' && activeQuick === filter && noToolbarFilters;
+
+      next.delete('q');
+      next.delete('state');
+      next.delete('queue');
+      next.delete('quick');
+
+      if (active) {
+        next.set('view', 'todo');
+        return next;
+      }
+
+      if (filter === 'total') {
+        next.set('view', 'all');
+      } else {
+        next.set('view', 'mine');
+        next.set('quick', filter);
+      }
+
       return next;
     });
   }
@@ -180,6 +222,7 @@ export function RdaListPage() {
       next.delete('q');
       next.delete('state');
       next.delete('queue');
+      next.delete('quick');
       return next;
     });
   }
@@ -241,27 +284,45 @@ export function RdaListPage() {
           </div>
 
           <div className="rdaQuickStats">
-            <div className="rdaQuickStat">
+            <button
+              type="button"
+              className={`rdaQuickStat ${ownDraftsActive ? 'active' : ''}`}
+              aria-pressed={ownDraftsActive}
+              aria-label="Filtra per bozze proprie"
+              onClick={() => applyQuickFilter('own-draft')}
+            >
               <span className="rdaMetricIcon compact"><Icon name="file-text" size={17} /></span>
               <div>
                 <strong>{dashboard.counts.ownDrafts}</strong>
                 <span>Bozze proprie</span>
               </div>
-            </div>
-            <div className="rdaQuickStat">
+            </button>
+            <button
+              type="button"
+              className={`rdaQuickStat ${ownOpenActive ? 'active' : ''}`}
+              aria-pressed={ownOpenActive}
+              aria-label="Filtra per richieste proprie aperte"
+              onClick={() => applyQuickFilter('own-open')}
+            >
               <span className="rdaMetricIcon compact"><Icon name="clock" size={17} /></span>
               <div>
                 <strong>{dashboard.counts.ownOpen}</strong>
                 <span>Richieste proprie aperte</span>
               </div>
-            </div>
-            <div className="rdaQuickStat">
+            </button>
+            <button
+              type="button"
+              className={`rdaQuickStat ${totalAccessibleActive ? 'active' : ''}`}
+              aria-pressed={totalAccessibleActive}
+              aria-label="Mostra tutte le RDA accessibili"
+              onClick={() => applyQuickFilter('total')}
+            >
               <span className="rdaMetricIcon compact"><Icon name="bar-chart-2" size={17} /></span>
               <div>
                 <strong>{dashboard.counts.totalAccessible}</strong>
                 <span>Totale accessibile</span>
               </div>
-            </div>
+            </button>
           </div>
         </section>
       </header>
