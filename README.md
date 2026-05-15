@@ -15,7 +15,7 @@ The repo is a monorepo:
 
 - Node.js 20
 - pnpm 10.33.0, preferably via Corepack
-- Go 1.25
+- Go 1.26.1 or newer
 - `air` for local Go hot reload
 - `golangci-lint` if you run backend linting
 - Docker only if you use Docker-based dev/build/deploy flows

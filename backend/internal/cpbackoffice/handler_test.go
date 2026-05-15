@@ -35,6 +35,7 @@ var registeredRoutes = []routeCase{
 	{name: "list_users", method: http.MethodGet, path: "/cp-backoffice/v1/users?customer_id=7", needsArak: true},
 	{name: "create_admin", method: http.MethodPost, path: "/cp-backoffice/v1/admins", body: `{"customer_id":1,"nome":"Jane","cognome":"Doe","email":"jane@example.com","telefono":"0000","maintenance_on_primary_email":false,"marketing_on_primary_email":false}`, needsArak: true},
 	{name: "list_biometric_requests", method: http.MethodGet, path: "/cp-backoffice/v1/biometric-requests", needsMistra: true, biometric: true},
+	{name: "download_active_biometric_users_pdf", method: http.MethodGet, path: "/cp-backoffice/v1/biometric-requests/active-users/pdf", needsMistra: true, biometric: true},
 	{name: "set_biometric_completed", method: http.MethodPost, path: "/cp-backoffice/v1/biometric-requests/42/completion", body: `{"completed":true}`, needsMistra: true, biometric: true},
 }
 

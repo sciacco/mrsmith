@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { Button, Modal, SearchInput, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, SearchInput, Skeleton, useToast } from '@mrsmith/ui';
+import { useApiClient } from '../../api/client';
 import { useBiometricRequests } from '../../hooks/useBiometricRequests';
 import { useSetBiometricCompleted } from '../../hooks/useSetBiometricCompleted';
 import type { BiometricRequestRow } from '../../api/biometric';
@@ -24,6 +25,17 @@ function formatTimestamp(value: string | null): string {
   const hours = String(d.getHours()).padStart(2, '0');
   const minutes = String(d.getMinutes()).padStart(2, '0');
   return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
+
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function filterRows(
@@ -68,12 +80,14 @@ function completionErrorMessage(action: CompletionAction): string {
 export function AccessiBiometricoPage() {
   const { data, isLoading, isError, refetch } = useBiometricRequests();
   const mutation = useSetBiometricCompleted();
+  const api = useApiClient();
   const { toast } = useToast();
 
   const [tab, setTab] = useState<TabKey>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearch = useDeferredValue(searchQuery);
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
 
   const rows = data ?? [];
   const pendingRows = useMemo(
@@ -118,13 +132,37 @@ export function AccessiBiometricoPage() {
     );
   }
 
+  async function handleDownloadActiveUsersPDF() {
+    setDownloadingPDF(true);
+    try {
+      const blob = await api.getBlob('/cp-backoffice/v1/biometric-requests/active-users/pdf');
+      saveBlob(blob, 'accessi-biometrici-utenti-attivi.pdf');
+    } catch {
+      toast('Download non riuscito', 'error');
+    } finally {
+      setDownloadingPDF(false);
+    }
+  }
+
   return (
     <section className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Accessi biometrici</h1>
-        <p className={styles.subtitle}>
-          Conferma le richieste di accesso approvate.
-        </p>
+        <div className={styles.titleBlock}>
+          <h1 className={styles.title}>Accessi biometrici</h1>
+          <p className={styles.subtitle}>
+            Conferma le richieste di accesso approvate.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          leftIcon={<Icon name="download" size={15} />}
+          loading={downloadingPDF}
+          onClick={handleDownloadActiveUsersPDF}
+          className={styles.downloadButton}
+        >
+          Scarica PDF
+        </Button>
       </div>
 
       <div className={styles.card}>

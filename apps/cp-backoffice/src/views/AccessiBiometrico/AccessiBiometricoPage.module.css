@@ -13,6 +13,15 @@
 
 .header {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+}
+
+.titleBlock {
+  display: flex;
   flex-direction: column;
   gap: var(--space-1, 4px);
 }
@@ -29,6 +38,16 @@
   font-size: 0.875rem;
   color: var(--color-text-muted, #94a3b8);
   letter-spacing: -0.01em;
+}
+
+.downloadButton {
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .header {
+    flex-direction: row;
+  }
 }
 
 .card {

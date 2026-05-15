@@ -43,6 +43,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handleFull("GET /cp-backoffice/v1/users", handleListUsers(deps))
 	handleFull("POST /cp-backoffice/v1/admins", handleCreateAdmin(deps))
 	handleApp("GET /cp-backoffice/v1/biometric-requests", handleListBiometricRequests(deps))
+	handleApp("GET /cp-backoffice/v1/biometric-requests/active-users/pdf", handleDownloadActiveBiometricUsersPDF(deps))
 	handleApp("POST /cp-backoffice/v1/biometric-requests/{id}/completion", handleSetBiometricCompleted(deps))
 }
 

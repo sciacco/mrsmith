@@ -29,6 +29,20 @@ var biometricListQueryAnchors = []string{
 
 const biometricCompletionAnchor = "UPDATE customers.biometric_request"
 
+var activeBiometricUsersQueryAnchors = []string{
+	"WITH request_balance AS",
+	"customers.biometric_request",
+	"WHEN 'activation' THEN 1",
+	"WHEN 'deactivation' THEN -1",
+	"WHERE br.request_completed IS TRUE",
+	"HAVING SUM",
+	"END) > 0",
+	"latest_activation",
+	"WHERE br.request_type::text = 'activation'",
+	"AND br.request_completed IS TRUE",
+	"ORDER BY azienda ASC, nome ASC, cognome ASC, email ASC",
+}
+
 // ───────────────────────────────── List handler ─────────────────────────────────
 
 func TestHandleListBiometricRequests_QueryAnchorsAndOrdering(t *testing.T) {
@@ -143,6 +157,101 @@ func TestHandleListBiometricRequests_EmptyResultReturnsEmptyArray(t *testing.T) 
 	}
 	if strings.TrimSpace(rec.Body.String()) != "[]" {
 		t.Fatalf("expected empty array, got: %s", rec.Body.String())
+	}
+}
+
+// ───────────────────────────── Active users PDF handler ─────────────────────────────
+
+func TestHandleDownloadActiveBiometricUsersPDF_QueryAndResponse(t *testing.T) {
+	state := newBiometricTestState()
+	state.activeColumns = []string{"azienda", "nome", "cognome", "email", "data_conferma"}
+	state.activeRows = [][]driver.Value{
+		{"Acme Srl", "Alice", "Rossi", "alice@example.com", mustParseTime(t, "2026-04-30T10:24:36Z")},
+		{"Beta Srl", "Bruno", "Verdi", "bruno@example.com", nil},
+	}
+
+	deps := Deps{Mistra: openBiometricTestDB(t, state)}
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/cp-backoffice/v1/biometric-requests/active-users/pdf", nil)
+	rec := httptest.NewRecorder()
+	handleDownloadActiveBiometricUsersPDF(deps)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/pdf" {
+		t.Fatalf("expected application/pdf, got %q", got)
+	}
+	if got := rec.Header().Get("Content-Disposition"); got != `attachment; filename="accessi-biometrici-utenti-attivi.pdf"` {
+		t.Fatalf("unexpected content disposition: %q", got)
+	}
+	if body := rec.Body.String(); !strings.HasPrefix(body, "%PDF-") {
+		t.Fatalf("expected PDF body, got %q", body[:min(len(body), 40)])
+	}
+	if rec.Body.Len() < 1000 {
+		t.Fatalf("expected generated PDF content, got %d bytes", rec.Body.Len())
+	}
+
+	if state.lastActiveUsersQuery == "" {
+		t.Fatalf("expected handler to issue active-users SELECT; got empty query trace")
+	}
+	for _, anchor := range activeBiometricUsersQueryAnchors {
+		if !strings.Contains(state.lastActiveUsersQuery, anchor) {
+			t.Fatalf("expected active-users query to contain %q, got:\n%s", anchor, state.lastActiveUsersQuery)
+		}
+	}
+}
+
+func TestHandleDownloadActiveBiometricUsersPDF_EmptyResultStillDownloadsPDF(t *testing.T) {
+	state := newBiometricTestState()
+	state.activeColumns = []string{"azienda", "nome", "cognome", "email", "data_conferma"}
+
+	deps := Deps{Mistra: openBiometricTestDB(t, state)}
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/cp-backoffice/v1/biometric-requests/active-users/pdf", nil)
+	rec := httptest.NewRecorder()
+	handleDownloadActiveBiometricUsersPDF(deps)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); !strings.HasPrefix(body, "%PDF-") {
+		t.Fatalf("expected PDF body, got %q", body[:min(len(body), 40)])
+	}
+	if rec.Body.Len() < 1000 {
+		t.Fatalf("expected generated PDF content, got %d bytes", rec.Body.Len())
+	}
+}
+
+func TestGroupActiveBiometricUsers_SortsAndGroupsByCompanyAndRequester(t *testing.T) {
+	users := []activeBiometricUser{
+		{Azienda: "Beta Srl", Nome: "Zoe", Cognome: "Verdi", Email: "zoe@example.com"},
+		{Azienda: "Acme Srl", Nome: "Bruno", Cognome: "Bianchi", Email: "bruno@example.com"},
+		{Azienda: "Acme Srl", Nome: "Alice", Cognome: "Rossi", Email: "alice@example.com"},
+		{Azienda: "", Nome: "Carla", Cognome: "Neri", Email: "carla@example.com"},
+	}
+
+	sections := groupActiveBiometricUsers(users)
+
+	if len(sections) != 3 {
+		t.Fatalf("expected 3 sections, got %d: %#v", len(sections), sections)
+	}
+	if sections[0].Azienda != "Acme Srl" {
+		t.Fatalf("expected Acme section first, got %q", sections[0].Azienda)
+	}
+	if got := activeBiometricRequesterName(sections[0].Users[0]); got != "Alice Rossi" {
+		t.Fatalf("expected first Acme requester Alice Rossi, got %q", got)
+	}
+	if got := activeBiometricRequesterName(sections[0].Users[1]); got != "Bruno Bianchi" {
+		t.Fatalf("expected second Acme requester Bruno Bianchi, got %q", got)
+	}
+	if sections[1].Azienda != "Beta Srl" {
+		t.Fatalf("expected Beta section second, got %q", sections[1].Azienda)
+	}
+	if sections[2].Azienda != "Senza azienda" {
+		t.Fatalf("expected fallback company section, got %q", sections[2].Azienda)
 	}
 }
 
@@ -324,13 +433,16 @@ func TestHandleSetBiometricCompleted_InvalidIDReturns400(t *testing.T) {
 // per-test state is threaded through via sql.Open's name argument and looked
 // up in biometricStates.
 type biometricTestState struct {
-	mu                  sync.Mutex
-	listColumns         []string
-	listRows            [][]driver.Value
-	lastListQuery       string
-	lastCompletionQuery string
-	lastCompletionArgs  []driver.NamedValue
-	completionNoRows    bool
+	mu                   sync.Mutex
+	listColumns          []string
+	listRows             [][]driver.Value
+	activeColumns        []string
+	activeRows           [][]driver.Value
+	lastListQuery        string
+	lastActiveUsersQuery string
+	lastCompletionQuery  string
+	lastCompletionArgs   []driver.NamedValue
+	completionNoRows     bool
 }
 
 func newBiometricTestState() *biometricTestState {
@@ -409,6 +521,7 @@ func (c *biometricTestConn) Ping(context.Context) error { return nil }
 func (c *biometricTestConn) QueryContext(_ context.Context, query string,
 	args []driver.NamedValue) (driver.Rows, error) {
 	c.state.mu.Lock()
+	trimmedQuery := strings.TrimSpace(query)
 	if strings.HasPrefix(strings.TrimSpace(query), "UPDATE ") {
 		c.state.lastCompletionQuery = query
 		c.state.lastCompletionArgs = append([]driver.NamedValue(nil), args...)
@@ -420,6 +533,18 @@ func (c *biometricTestConn) QueryContext(_ context.Context, query string,
 			values = nil
 		}
 		return &biometricTestRows{columns: []string{"id"}, values: values}, nil
+	}
+
+	if strings.Contains(trimmedQuery, "request_balance") {
+		c.state.lastActiveUsersQuery = query
+		columns := append([]string(nil), c.state.activeColumns...)
+		rows := make([][]driver.Value, len(c.state.activeRows))
+		for i, r := range c.state.activeRows {
+			rows[i] = append([]driver.Value(nil), r...)
+		}
+		c.state.mu.Unlock()
+
+		return &biometricTestRows{columns: columns, values: rows}, nil
 	}
 
 	c.state.lastListQuery = query
