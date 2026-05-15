@@ -3,6 +3,7 @@ package cpbackoffice
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -22,7 +23,7 @@ const listBiometricRequestsQuery = `SELECT
     us.primary_email AS email,
     c.name AS azienda,
     br.request_type::text AS tipo_richiesta,
-    COALESCE(br.request_completed, false) AS stato_richiesta,
+    br.request_completed AS stato_richiesta,
     br.request_date AS data_richiesta,
     br.request_approval_date AS data_approvazione,
     COALESCE(ued.is_biometric, false) AS is_biometric_lenel
@@ -32,10 +33,18 @@ LEFT JOIN customers.customer c ON c.id = br.customer_id
 LEFT JOIN customers.user_entrance_detail ued ON ued.email = us.primary_email
 ORDER BY data_richiesta DESC`
 
-// setBiometricCompletedQuery is the locked stored-function call used by
-// POST /cp-backoffice/v1/biometric-requests/{id}/completion. Signature and
-// argument types are locked by the Slice S4 contract.
-const setBiometricCompletedQuery = `SELECT customers.biometric_request_set_completed($1::bigint, $2::boolean)`
+// setBiometricCompletedQuery updates the tri-state request_completed value:
+// true=confirmed, false=pending, null=cancelled. The approval timestamp mirrors
+// the old stored-function behavior for true/false and is cleared for cancelled.
+const setBiometricCompletedQuery = `UPDATE customers.biometric_request
+SET
+    request_completed = $2::boolean,
+    request_approval_date = CASE
+        WHEN $2::boolean IS NULL THEN NULL
+        ELSE now()
+    END
+WHERE id = $1::bigint
+RETURNING id`
 
 // handleListBiometricRequests returns every biometric request, ordered by
 // data_richiesta DESC. No pagination and no filters in v1.
@@ -56,10 +65,11 @@ func handleListBiometricRequests(deps Deps) http.HandlerFunc {
 		out := make([]BiometricRequestRow, 0)
 		for rows.Next() {
 			var (
-				row      BiometricRequestRow
-				email    sql.NullString
-				azienda  sql.NullString
-				approval sql.NullTime
+				row       BiometricRequestRow
+				email     sql.NullString
+				azienda   sql.NullString
+				completed sql.NullBool
+				approval  sql.NullTime
 			)
 			if err := rows.Scan(
 				&row.ID,
@@ -68,7 +78,7 @@ func handleListBiometricRequests(deps Deps) http.HandlerFunc {
 				&email,
 				&azienda,
 				&row.TipoRichiesta,
-				&row.StatoRichiesta,
+				&completed,
 				&row.DataRichiesta,
 				&approval,
 				&row.IsBiometricLenel,
@@ -81,6 +91,10 @@ func handleListBiometricRequests(deps Deps) http.HandlerFunc {
 			}
 			if azienda.Valid {
 				row.Azienda = azienda.String
+			}
+			if completed.Valid {
+				v := completed.Bool
+				row.StatoRichiesta = &v
 			}
 			if approval.Valid {
 				t := approval.Time
@@ -97,9 +111,9 @@ func handleListBiometricRequests(deps Deps) http.HandlerFunc {
 	}
 }
 
-// handleSetBiometricCompleted flips `request_completed` for a single biometric
-// request row by calling the locked stored function. The response body is the
-// locked { "ok": true } shape.
+// handleSetBiometricCompleted sets `request_completed` for a single biometric
+// request row. The field is nullable: true=confirmed, false=pending,
+// null=cancelled. The response body is the locked { "ok": true } shape.
 func handleSetBiometricCompleted(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMistra(deps) {
@@ -120,8 +134,18 @@ func handleSetBiometricCompleted(deps Deps) http.HandlerFunc {
 			return
 		}
 
-		if _, err := deps.Mistra.ExecContext(r.Context(),
-			setBiometricCompletedQuery, id, body.Completed); err != nil {
+		var completed any
+		if body.Completed != nil {
+			completed = *body.Completed
+		}
+
+		var updatedID int64
+		if err := deps.Mistra.QueryRowContext(r.Context(),
+			setBiometricCompletedQuery, id, completed).Scan(&updatedID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				httputil.Error(w, http.StatusNotFound, "not_found")
+				return
+			}
 			dbFailure(w, r, err, "biometric.setCompleted")
 			return
 		}

@@ -10,7 +10,7 @@ export interface BiometricRequestRow {
   email: string;
   azienda: string;
   tipo_richiesta: string;
-  stato_richiesta: boolean;
+  stato_richiesta: boolean | null;
   data_richiesta: string;
   data_approvazione: string | null;
   // Returned by the backend for contract parity but intentionally never
@@ -20,10 +20,9 @@ export interface BiometricRequestRow {
 
 // Body shape accepted by
 // POST /api/cp-backoffice/v1/biometric-requests/{id}/completion.
-// `completed` maps 1:1 onto the boolean argument of the stored function
-// customers.biometric_request_set_completed.
+// `completed` is nullable: true=confirmed, false=pending, null=cancelled.
 export interface CompletionRequest {
-  completed: boolean;
+  completed: boolean | null;
 }
 
 // Success shape returned by the completion mutation. The locked payload

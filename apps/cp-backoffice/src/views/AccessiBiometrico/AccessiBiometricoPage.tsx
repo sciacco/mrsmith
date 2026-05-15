@@ -5,11 +5,13 @@ import { useSetBiometricCompleted } from '../../hooks/useSetBiometricCompleted';
 import type { BiometricRequestRow } from '../../api/biometric';
 import styles from './AccessiBiometricoPage.module.css';
 
-type TabKey = 'pending' | 'done';
+type TabKey = 'pending' | 'done' | 'cancelled';
+type CompletionAction = 'confirm' | 'reopen' | 'cancel' | 'restore';
 
 interface ConfirmTarget {
   row: BiometricRequestRow;
-  nextCompleted: boolean;
+  nextCompleted: boolean | null;
+  action: CompletionAction;
 }
 
 function formatTimestamp(value: string | null): string {
@@ -37,6 +39,32 @@ function filterRows(
   );
 }
 
+function completionSuccessMessage(action: CompletionAction): string {
+  switch (action) {
+    case 'confirm':
+      return 'Richiesta confermata';
+    case 'reopen':
+      return 'Richiesta riaperta';
+    case 'cancel':
+      return 'Richiesta annullata';
+    case 'restore':
+      return 'Richiesta ripristinata';
+  }
+}
+
+function completionErrorMessage(action: CompletionAction): string {
+  switch (action) {
+    case 'confirm':
+      return 'Conferma non riuscita';
+    case 'reopen':
+      return 'Riapertura non riuscita';
+    case 'cancel':
+      return 'Annullamento non riuscito';
+    case 'restore':
+      return 'Ripristino non riuscito';
+  }
+}
+
 export function AccessiBiometricoPage() {
   const { data, isLoading, isError, refetch } = useBiometricRequests();
   const mutation = useSetBiometricCompleted();
@@ -49,40 +77,42 @@ export function AccessiBiometricoPage() {
 
   const rows = data ?? [];
   const pendingRows = useMemo(
-    () => rows.filter((r) => !r.stato_richiesta),
+    () => rows.filter((r) => r.stato_richiesta === false),
     [rows],
   );
   const doneRows = useMemo(
-    () => rows.filter((r) => r.stato_richiesta),
+    () => rows.filter((r) => r.stato_richiesta === true),
+    [rows],
+  );
+  const cancelledRows = useMemo(
+    () => rows.filter((r) => r.stato_richiesta === null),
     [rows],
   );
 
   const visibleRows = useMemo(() => {
-    const base = tab === 'pending' ? pendingRows : doneRows;
+    const base = tab === 'pending'
+      ? pendingRows
+      : tab === 'done'
+        ? doneRows
+        : cancelledRows;
     return filterRows(base, deferredSearch);
-  }, [tab, pendingRows, doneRows, deferredSearch]);
+  }, [tab, pendingRows, doneRows, cancelledRows, deferredSearch]);
 
   const hasSearch = deferredSearch.trim().length > 0;
 
   function handleConfirm() {
     if (!confirmTarget) return;
-    const { row, nextCompleted } = confirmTarget;
+    const { row, nextCompleted, action } = confirmTarget;
     mutation.mutate(
       { id: row.id, completed: nextCompleted },
       {
         onSuccess: () => {
           setConfirmTarget(null);
-          toast(
-            nextCompleted ? 'Richiesta confermata' : 'Richiesta riaperta',
-            'success',
-          );
+          toast(completionSuccessMessage(action), 'success');
         },
         onError: () => {
           setConfirmTarget(null);
-          toast(
-            nextCompleted ? 'Conferma non riuscita' : 'Riapertura non riuscita',
-            'error',
-          );
+          toast(completionErrorMessage(action), 'error');
         },
       },
     );
@@ -150,6 +180,21 @@ export function AccessiBiometricoPage() {
                   onClick={() => setTab('done')}
                 >
                   Confermate
+                  {doneRows.length > 0 && (
+                    <span className={styles.tabCount}>{doneRows.length}</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === 'cancelled'}
+                  className={`${styles.tab} ${tab === 'cancelled' ? styles.tabActive : ''}`}
+                  onClick={() => setTab('cancelled')}
+                >
+                  Annullate
+                  {cancelledRows.length > 0 && (
+                    <span className={styles.tabCount}>{cancelledRows.length}</span>
+                  )}
                 </button>
               </div>
               <SearchInput
@@ -170,13 +215,12 @@ export function AccessiBiometricoPage() {
                       <th>Richiedente</th>
                       <th>Azienda</th>
                       <th>Tipo</th>
-                      <th>{tab === 'pending' ? 'Richiesta' : 'Confermata'}</th>
+                      <th>{tab === 'done' ? 'Confermata' : 'Richiesta'}</th>
                       <th className={styles.actionCol} aria-label="Azione" />
                     </tr>
                   </thead>
                   <tbody>
                     {visibleRows.map((row) => {
-                      const isDone = row.stato_richiesta;
                       return (
                         <tr key={row.id}>
                           <td>
@@ -188,24 +232,57 @@ export function AccessiBiometricoPage() {
                           <td>{row.azienda}</td>
                           <td>{row.tipo_richiesta}</td>
                           <td className={styles.timeCell}>
-                            {tab === 'pending' ? (
-                              formatTimestamp(row.data_richiesta)
-                            ) : (
+                            {tab === 'done' ? (
                               <>
                                 <div>{formatTimestamp(row.data_approvazione)}</div>
                                 <div className={styles.timeSub}>
                                   Richiesta {formatTimestamp(row.data_richiesta)}
                                 </div>
                               </>
+                            ) : (
+                              formatTimestamp(row.data_richiesta)
                             )}
                           </td>
                           <td className={styles.actionCol}>
-                            {isDone ? (
+                            {tab === 'pending' ? (
+                              <div className={styles.rowActions}>
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  onClick={() =>
+                                    setConfirmTarget({
+                                      row,
+                                      nextCompleted: true,
+                                      action: 'confirm',
+                                    })
+                                  }
+                                >
+                                  Conferma
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="danger"
+                                  onClick={() =>
+                                    setConfirmTarget({
+                                      row,
+                                      nextCompleted: null,
+                                      action: 'cancel',
+                                    })
+                                  }
+                                >
+                                  Annulla
+                                </Button>
+                              </div>
+                            ) : tab === 'done' ? (
                               <Button
                                 size="sm"
                                 variant="secondary"
                                 onClick={() =>
-                                  setConfirmTarget({ row, nextCompleted: false })
+                                  setConfirmTarget({
+                                    row,
+                                    nextCompleted: false,
+                                    action: 'reopen',
+                                  })
                                 }
                               >
                                 Riapri
@@ -213,12 +290,16 @@ export function AccessiBiometricoPage() {
                             ) : (
                               <Button
                                 size="sm"
-                                variant="primary"
+                                variant="secondary"
                                 onClick={() =>
-                                  setConfirmTarget({ row, nextCompleted: true })
+                                  setConfirmTarget({
+                                    row,
+                                    nextCompleted: false,
+                                    action: 'restore',
+                                  })
                                 }
                               >
-                                Conferma
+                                Ripristina
                               </Button>
                             )}
                           </td>
@@ -252,31 +333,65 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
 }
 
+function getConfirmCopy(target: ConfirmTarget) {
+  const subject = `${target.row.nome} ${target.row.cognome} per ${target.row.azienda}`;
+  switch (target.action) {
+    case 'confirm':
+      return {
+        title: 'Conferma richiesta',
+        body: `La richiesta di ${subject} sarà contrassegnata come confermata.`,
+        confirmLabel: 'Conferma',
+        variant: 'primary' as const,
+      };
+    case 'reopen':
+      return {
+        title: 'Riapri richiesta',
+        body: `La richiesta di ${subject} tornerà tra quelle da confermare.`,
+        confirmLabel: 'Riapri',
+        variant: 'secondary' as const,
+      };
+    case 'cancel':
+      return {
+        title: 'Annulla richiesta',
+        body: `La richiesta di ${subject} sarà spostata tra le annullate e non dovrà essere processata.`,
+        confirmLabel: 'Annulla richiesta',
+        variant: 'danger' as const,
+      };
+    case 'restore':
+      return {
+        title: 'Ripristina richiesta',
+        body: `La richiesta di ${subject} tornerà tra quelle da confermare.`,
+        confirmLabel: 'Ripristina',
+        variant: 'primary' as const,
+      };
+  }
+}
+
 function ConfirmDialog({ target, pending, onCancel, onConfirm }: ConfirmDialogProps) {
-  const isConfirm = target?.nextCompleted ?? true;
-  const title = isConfirm ? 'Conferma richiesta' : 'Riapri richiesta';
-  const body = target
-    ? isConfirm
-      ? `La richiesta di ${target.row.nome} ${target.row.cognome} per ${target.row.azienda} sarà contrassegnata come confermata.`
-      : `La richiesta di ${target.row.nome} ${target.row.cognome} per ${target.row.azienda} tornerà tra quelle da confermare.`
-    : '';
+  const copy = target ? getConfirmCopy(target) : null;
 
   return (
-    <Modal open={target != null} onClose={onCancel} title={title} size="sm" dismissible={!pending}>
+    <Modal
+      open={target != null}
+      onClose={onCancel}
+      title={copy?.title ?? ''}
+      size="sm"
+      dismissible={!pending}
+    >
       <div className={styles.confirmBody}>
-        <p className={styles.confirmText}>{body}</p>
+        <p className={styles.confirmText}>{copy?.body}</p>
       </div>
       <div className={styles.confirmActions}>
         <Button size="md" variant="secondary" onClick={onCancel} disabled={pending}>
-          Annulla
+          Indietro
         </Button>
         <Button
           size="md"
-          variant={isConfirm ? 'primary' : 'secondary'}
+          variant={copy?.variant ?? 'primary'}
           onClick={onConfirm}
           loading={pending}
         >
-          {isConfirm ? 'Conferma' : 'Riapri'}
+          {copy?.confirmLabel}
         </Button>
       </div>
     </Modal>
@@ -311,6 +426,17 @@ function EmptyState({ tab, hasSearch, query }: EmptyStateProps) {
         </div>
         <p className={styles.stateTitle}>Nessuna richiesta in sospeso</p>
         <p className={styles.stateText}>Tutte le richieste sono state evase.</p>
+      </div>
+    );
+  }
+  if (tab === 'cancelled') {
+    return (
+      <div className={styles.stateBox}>
+        <div className={styles.stateIcon}>
+          <InboxIcon />
+        </div>
+        <p className={styles.stateTitle}>Nessuna richiesta annullata</p>
+        <p className={styles.stateText}>Le richieste escluse appariranno qui.</p>
       </div>
     );
   }

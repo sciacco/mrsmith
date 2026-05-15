@@ -1,6 +1,11 @@
 package cpbackoffice
 
-import "time"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"time"
+)
 
 // BiometricRequestRow is the wire contract for a single row returned by
 // GET /cp-backoffice/v1/biometric-requests. Keys and types are locked by
@@ -12,7 +17,7 @@ type BiometricRequestRow struct {
 	Email            string     `json:"email"`
 	Azienda          string     `json:"azienda"`
 	TipoRichiesta    string     `json:"tipo_richiesta"`
-	StatoRichiesta   bool       `json:"stato_richiesta"`
+	StatoRichiesta   *bool      `json:"stato_richiesta"`
 	DataRichiesta    time.Time  `json:"data_richiesta"`
 	DataApprovazione *time.Time `json:"data_approvazione"`
 	IsBiometricLenel bool       `json:"is_biometric_lenel"`
@@ -36,11 +41,11 @@ type CustomerState struct {
 // User is the wire contract for a single row returned by
 // GET /cp-backoffice/v1/users.
 type User struct {
-	ID        int64  `json:"id"`
-	Nome      string `json:"nome"`
-	Cognome   string `json:"cognome"`
-	Email     string `json:"email"`
-	IsAdmin   bool   `json:"is_admin"`
+	ID      int64  `json:"id"`
+	Nome    string `json:"nome"`
+	Cognome string `json:"cognome"`
+	Email   string `json:"email"`
+	IsAdmin bool   `json:"is_admin"`
 }
 
 // UpdateStateRequest is the body accepted by
@@ -53,19 +58,45 @@ type UpdateStateRequest struct {
 // POST /cp-backoffice/v1/admins. skip_keycloak is never accepted from the
 // caller; request assembly pins it to false downstream (see Slice S3 lock).
 type CreateAdminRequest struct {
-	CustomerID                 int64  `json:"customer_id"`
-	Nome                       string `json:"nome"`
-	Cognome                    string `json:"cognome"`
-	Email                      string `json:"email"`
-	Telefono                   string `json:"telefono"`
-	MaintenanceOnPrimaryEmail  bool   `json:"maintenance_on_primary_email"`
-	MarketingOnPrimaryEmail    bool   `json:"marketing_on_primary_email"`
+	CustomerID                int64  `json:"customer_id"`
+	Nome                      string `json:"nome"`
+	Cognome                   string `json:"cognome"`
+	Email                     string `json:"email"`
+	Telefono                  string `json:"telefono"`
+	MaintenanceOnPrimaryEmail bool   `json:"maintenance_on_primary_email"`
+	MarketingOnPrimaryEmail   bool   `json:"marketing_on_primary_email"`
 }
 
 // CompletionRequest is the body accepted by
-// POST /cp-backoffice/v1/biometric-requests/{id}/completion.
+// POST /cp-backoffice/v1/biometric-requests/{id}/completion. Completed is
+// intentionally nullable: true means confirmed, false means pending, and null
+// means cancelled.
 type CompletionRequest struct {
-	Completed bool `json:"completed"`
+	Completed *bool `json:"completed"`
+}
+
+func (r *CompletionRequest) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	completedRaw, ok := raw["completed"]
+	if !ok {
+		return errors.New("completed is required")
+	}
+
+	if bytes.Equal(bytes.TrimSpace(completedRaw), []byte("null")) {
+		r.Completed = nil
+		return nil
+	}
+
+	var completed bool
+	if err := json.Unmarshal(completedRaw, &completed); err != nil {
+		return err
+	}
+	r.Completed = &completed
+	return nil
 }
 
 // CompletionResponse is the success shape returned by the completion

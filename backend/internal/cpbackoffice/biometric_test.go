@@ -23,10 +23,11 @@ var biometricListQueryAnchors = []string{
 	"customers.user_struct",
 	"customers.customer",
 	"customers.user_entrance_detail",
+	"br.request_completed AS stato_richiesta",
 	"ORDER BY data_richiesta DESC",
 }
 
-const biometricCompletionAnchor = "customers.biometric_request_set_completed($1::bigint, $2::boolean)"
+const biometricCompletionAnchor = "UPDATE customers.biometric_request"
 
 // ───────────────────────────────── List handler ─────────────────────────────────
 
@@ -43,6 +44,9 @@ func TestHandleListBiometricRequests_QueryAnchorsAndOrdering(t *testing.T) {
 			mustParseTime(t, "2025-03-03T09:00:00Z"), true},
 		{int64(2), "Null", "Date", "null@bar.com", "Beta Srl",
 			"iscrizione", false, mustParseTime(t, "2025-01-02T03:04:05Z"),
+			nil, false},
+		{int64(3), "Cancelled", "Row", "cancelled@bar.com", "Gamma Srl",
+			"test", nil, mustParseTime(t, "2025-02-02T03:04:05Z"),
 			nil, false},
 	}
 
@@ -71,8 +75,8 @@ func TestHandleListBiometricRequests_QueryAnchorsAndOrdering(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if len(out) != 2 {
-		t.Fatalf("expected 2 rows, got %d", len(out))
+	if len(out) != 3 {
+		t.Fatalf("expected 3 rows, got %d", len(out))
 	}
 
 	requiredKeys := []string{
@@ -112,6 +116,11 @@ func TestHandleListBiometricRequests_QueryAnchorsAndOrdering(t *testing.T) {
 	if got, ok := second["is_biometric_lenel"].(bool); !ok || got != false {
 		t.Fatalf("expected row[1].is_biometric_lenel bool=false, got %#v", second["is_biometric_lenel"])
 	}
+
+	third := out[2]
+	if third["stato_richiesta"] != nil {
+		t.Fatalf("expected row[2].stato_richiesta to be null, got %#v", third["stato_richiesta"])
+	}
 }
 
 func TestHandleListBiometricRequests_EmptyResultReturnsEmptyArray(t *testing.T) {
@@ -139,7 +148,7 @@ func TestHandleListBiometricRequests_EmptyResultReturnsEmptyArray(t *testing.T) 
 
 // ───────────────────────────────── Completion handler ─────────────────────────────────
 
-func TestHandleSetBiometricCompleted_CallsExactStoredFunction(t *testing.T) {
+func TestHandleSetBiometricCompleted_UpdatesCompletedTrue(t *testing.T) {
 	state := newBiometricTestState()
 	deps := Deps{Mistra: openBiometricTestDB(t, state)}
 
@@ -159,13 +168,15 @@ func TestHandleSetBiometricCompleted_CallsExactStoredFunction(t *testing.T) {
 		t.Fatalf("expected {\"ok\":true} body, got %q", rec.Body.String())
 	}
 
-	// Exact stored-function signature.
 	if state.lastCompletionQuery == "" {
-		t.Fatalf("expected handler to exec a SELECT on the stored function; got empty trace")
+		t.Fatalf("expected handler to issue an UPDATE; got empty trace")
 	}
 	if !strings.Contains(state.lastCompletionQuery, biometricCompletionAnchor) {
 		t.Fatalf("expected query to contain %q, got:\n%s",
 			biometricCompletionAnchor, state.lastCompletionQuery)
+	}
+	if strings.Contains(state.lastCompletionQuery, "biometric_request_set_completed") {
+		t.Fatalf("expected direct update, got stored function call:\n%s", state.lastCompletionQuery)
 	}
 
 	// Path id must be parsed as int64 and passed as the first argument.
@@ -205,6 +216,87 @@ func TestHandleSetBiometricCompleted_PassesFalse(t *testing.T) {
 	}
 }
 
+func TestHandleSetBiometricCompleted_PassesNull(t *testing.T) {
+	state := newBiometricTestState()
+	deps := Deps{Mistra: openBiometricTestDB(t, state)}
+
+	req := httptest.NewRequest(http.MethodPost,
+		"/cp-backoffice/v1/biometric-requests/9/completion",
+		strings.NewReader(`{"completed":null}`))
+	req.SetPathValue("id", "9")
+	rec := httptest.NewRecorder()
+	handleSetBiometricCompleted(deps)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(state.lastCompletionArgs) != 2 {
+		t.Fatalf("expected 2 args, got %d", len(state.lastCompletionArgs))
+	}
+	idArg, ok := state.lastCompletionArgs[0].Value.(int64)
+	if !ok || idArg != 9 {
+		t.Fatalf("expected first arg to be int64(9), got %#v", state.lastCompletionArgs[0].Value)
+	}
+	if state.lastCompletionArgs[1].Value != nil {
+		t.Fatalf("expected second arg to be nil, got %#v", state.lastCompletionArgs[1].Value)
+	}
+	if !strings.Contains(state.lastCompletionQuery, "request_approval_date = CASE") {
+		t.Fatalf("expected update to manage request_approval_date, got:\n%s", state.lastCompletionQuery)
+	}
+}
+
+func TestHandleSetBiometricCompleted_InvalidBodyReturns400(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "missing completed", body: `{}`},
+		{name: "string completed", body: `{"completed":"true"}`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			state := newBiometricTestState()
+			deps := Deps{Mistra: openBiometricTestDB(t, state)}
+
+			req := httptest.NewRequest(http.MethodPost,
+				"/cp-backoffice/v1/biometric-requests/7/completion",
+				strings.NewReader(tc.body))
+			req.SetPathValue("id", "7")
+			rec := httptest.NewRecorder()
+			handleSetBiometricCompleted(deps)(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+			}
+			if state.lastCompletionQuery != "" {
+				t.Fatalf("expected handler to reject before hitting DB, got query: %s",
+					state.lastCompletionQuery)
+			}
+		})
+	}
+}
+
+func TestHandleSetBiometricCompleted_NotFoundReturns404(t *testing.T) {
+	state := newBiometricTestState()
+	state.completionNoRows = true
+	deps := Deps{Mistra: openBiometricTestDB(t, state)}
+
+	req := httptest.NewRequest(http.MethodPost,
+		"/cp-backoffice/v1/biometric-requests/404/completion",
+		strings.NewReader(`{"completed":true}`))
+	req.SetPathValue("id", "404")
+	rec := httptest.NewRecorder()
+	handleSetBiometricCompleted(deps)(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if strings.TrimSpace(rec.Body.String()) != `{"error":"not_found"}` {
+		t.Fatalf("expected not_found body, got %q", rec.Body.String())
+	}
+}
+
 func TestHandleSetBiometricCompleted_InvalidIDReturns400(t *testing.T) {
 	state := newBiometricTestState()
 	deps := Deps{Mistra: openBiometricTestDB(t, state)}
@@ -238,6 +330,7 @@ type biometricTestState struct {
 	lastListQuery       string
 	lastCompletionQuery string
 	lastCompletionArgs  []driver.NamedValue
+	completionNoRows    bool
 }
 
 func newBiometricTestState() *biometricTestState {
@@ -245,7 +338,7 @@ func newBiometricTestState() *biometricTestState {
 }
 
 var (
-	biometricStates    = struct {
+	biometricStates = struct {
 		sync.Mutex
 		m map[string]*biometricTestState
 	}{m: map[string]*biometricTestState{}}
@@ -314,8 +407,21 @@ func (c *biometricTestConn) Begin() (driver.Tx, error) {
 func (c *biometricTestConn) Ping(context.Context) error { return nil }
 
 func (c *biometricTestConn) QueryContext(_ context.Context, query string,
-	_ []driver.NamedValue) (driver.Rows, error) {
+	args []driver.NamedValue) (driver.Rows, error) {
 	c.state.mu.Lock()
+	if strings.HasPrefix(strings.TrimSpace(query), "UPDATE ") {
+		c.state.lastCompletionQuery = query
+		c.state.lastCompletionArgs = append([]driver.NamedValue(nil), args...)
+		noRows := c.state.completionNoRows
+		c.state.mu.Unlock()
+
+		values := [][]driver.Value{{int64(1)}}
+		if noRows {
+			values = nil
+		}
+		return &biometricTestRows{columns: []string{"id"}, values: values}, nil
+	}
+
 	c.state.lastListQuery = query
 	columns := append([]string(nil), c.state.listColumns...)
 	rows := make([][]driver.Value, len(c.state.listRows))
@@ -374,4 +480,3 @@ func mustParseTime(t *testing.T, s string) time.Time {
 	}
 	return v
 }
-

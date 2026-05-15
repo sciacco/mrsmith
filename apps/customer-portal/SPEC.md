@@ -25,7 +25,7 @@ Platform-neutral spec ready to hand to `portal-miniapp-generator` (or any implem
   - SQL: Mistra PostgreSQL direct connection (`10.129.32.20`, `customers` schema).
 - **Known audit gaps or ambiguities**:
   - Auth model for `gw-int.cdlan.net`: **already solved in-repo.** `backend/internal/platform/arak` implements an OAuth2 client-credentials client (Keycloak service account → bearer token with caching, refresh, and 401 retry) and is the canonical way to call Mistra NG from the Go backend. Config env vars: `ARAK_BASE_URL`, `ARAK_SERVICE_CLIENT_ID`, `ARAK_SERVICE_CLIENT_SECRET`, `ARAK_SERVICE_TOKEN_URL`. Reference consumer: `backend/internal/afctools/gateway.go` (`proxyGatewayPDF`).
-  - **Resolved**: the stored function `customers.biometric_request_set_completed(bigint, boolean)` performs only `UPDATE biometric_request SET request_completed=$2, request_approval_date=now()`. No Lenel sync, no notifications, no audit log. The audit's "likely has hidden side effects" concern does not apply; sibling functions `biometric_request_set_notified_dc/_user` are not called by this app.
+  - **Resolved**: biometric completion has no Lenel sync, notifications, or audit side effects. The React port now writes `customers.biometric_request.request_completed` directly so `NULL` can represent annullata.
 
 ## Scope rule
 **1:1 port of the wired flows; dead features ignored.**
@@ -90,15 +90,15 @@ Platform-neutral spec ready to hand to `portal-miniapp-generator` (or any implem
   - `email: string` (`user_struct.primary_email`)
   - `azienda: string` (`customer.name`)
   - `tipo_richiesta: string` (enum value from `request_type_enum`)
-  - `stato_richiesta: bool` (`request_completed`)
+  - `stato_richiesta: bool | null` (`request_completed`; `NULL` means annullata)
   - `data_richiesta: timestamptz`
   - `data_approvazione: timestamptz?`
   - `is_biometric_lenel: bool` (computed; included in the DTO but not displayed in the UI).
 - **Order**: `ORDER BY data_richiesta DESC`. No pagination, no filters.
 - **Relationships**: belongs to `Customer` and `UserStruct`; joined with `UserEntranceDetail` (on `email`) for the Lenel flag.
 - **Constraints and business rules**:
-  - `stato_richiesta` is **boolean** end-to-end. The dead "ok"/"pending" string form from JSObject1 is not part of this port.
-  - `request_approval_date` reflects the last time `setCompleted` was called; the stored function sets it unconditionally to `now()`.
+  - `stato_richiesta` is **nullable boolean** end-to-end. The dead "ok"/"pending" string form from JSObject1 is not part of this port.
+  - `request_approval_date` is set to `now()` for true/false updates and cleared when `request_completed` is set to `NULL`.
   - `is_biometric_lenel` is available in the DTO; rendering is hidden (matches source).
 - **Open questions**: none — stored-function body verified.
 
@@ -141,16 +141,16 @@ Platform-neutral spec ready to hand to `portal-miniapp-generator` (or any implem
   - The hidden Appsmith `skip_keycloak` switch is omitted in v1; request assembly pins `skip_keycloak=false`.
 
 ### View: Accessi Biometrico
-- **User intent**: mark biometric requests completed/not-completed.
-- **Interaction pattern**: flat table with per-row inline toggle + Save/Discard (Appsmith `EditActions` pattern).
+- **User intent**: process biometric requests, or annul rows that should not be processed.
+- **Interaction pattern**: flat table with tabs for `Da confermare`, `Confermate`, and `Annullate`.
 - **Main data shown or edited**:
-  - Columns (labels verbatim): `nome`, `cognome`, `email`, `azienda`, `tipo_richiesta`, `stato_richiesta` (checkbox, editable), `data conferma` (formatted `data_approvazione`), `data della richiesta` (formatted `data_richiesta`), `Save / Discard` actions.
+  - Columns: richiedente (`nome`, `cognome`, `email`), `azienda`, `tipo_richiesta`, data richiesta / conferma, row actions.
   - Dates formatted as `new Date(x).toLocaleString()` — browser-locale dependent, preserved 1:1.
   - Hidden: `id`, `is_biometric_lenel`.
 - **Key actions**:
-  - Toggle `stato_richiesta` → row enters edit mode.
-  - Save → `setCompleted(id, completed)` → refetch, single success toast `"Perfetto, stato biometrico cambiato"`. On error: `"Qualcosa e' andato storto"`.
-  - Discard → local revert (no server call).
+  - Conferma → `completed: true`.
+  - Riapri / Ripristina → `completed: false`.
+  - Annulla → `completed: null`.
 - **Entry and exit points**: reached from sidebar; no secondary surfaces.
 - **Notes on current vs intended behavior**: no `onCheckChange` handler is wired (the source's was a no-op); the single success toast fires immediately after the mutation resolves, matching observed behavior today.
 
@@ -209,13 +209,13 @@ Following `docs/API-CONVENTIONS.md` §"Namespacing": `/api/<app-prefix>/v1/...`.
 | GET | `/api/cp-backoffice/v1/users?customer_id=…` | Mistra NG `GET /users/v2/user?customer_id=…&page_number=1&disable_pagination=true` | `customer_id` → `{ items: user-brief[] }` |
 | POST | `/api/cp-backoffice/v1/admins` | Mistra NG `POST /users/v2/admin` | `user-admin-new` → `{ id }` |
 | GET | `/api/cp-backoffice/v1/biometric-requests` | Mistra PostgreSQL (same SELECT as source) | — → `{ items: BiometricRequestRow[] }` |
-| POST | `/api/cp-backoffice/v1/biometric-requests/{id}/completion` | Mistra PostgreSQL `SELECT customers.biometric_request_set_completed($1::bigint, $2::boolean)` | `{ completed: bool }` → `{ ok: true }` |
+| POST | `/api/cp-backoffice/v1/biometric-requests/{id}/completion` | Mistra PostgreSQL direct `UPDATE customers.biometric_request` | `{ completed: bool|null }` → `{ ok: true }` |
 
 Customer/user/admin routes are gated by `app_cpbackoffice_access`; biometric routes accept either `app_cpbackoffice_access` or `app_cpbackoffice_biometric_access`. Frontend calls go through `@mrsmith/api-client` with `baseUrl: '/api'` (same-origin); auth bootstrap from `GET /config`; Vite proxies both `/api` and `/config` during dev.
 
 Non-negotiable shapes under 1:1:
 - `BiometricRequestRow` keys and types exactly as in Phase A.
-- `stato_richiesta` and `completed` are booleans.
+- `stato_richiesta` and `completed` are nullable booleans: `false` da confermare, `true` confermata, `null` annullata.
 - `disable_pagination=true` semantics (no paging).
 - `user-admin-new` remains the upstream-compatible shape; the v1 port pins `skip_keycloak=false` and omits the unused `biometric`/`state` fields.
 

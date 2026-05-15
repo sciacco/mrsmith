@@ -8,7 +8,7 @@ import {
 
 interface SetCompletedVariables {
   id: number;
-  completed: boolean;
+  completed: boolean | null;
 }
 
 // Wraps POST /api/cp-backoffice/v1/biometric-requests/{id}/completion.
