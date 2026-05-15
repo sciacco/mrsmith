@@ -155,7 +155,7 @@ func buildAnalysisRecords(full RichiestaFull) []map[string]any {
 			"mrc":                     item.MRC,
 			"durata_mesi":             item.DurataMesi,
 			"aderenza_budget":         item.AderenzaBudget,
-			"copertura":               boolToInt(item.Copertura),
+			"copertura":               nullableBoolToInt(item.Copertura),
 			"if_ff":                   item.ID,
 			"richiesta_id":            item.RichiestaID,
 			"fornitore_id":            item.FornitoreID,
@@ -180,6 +180,13 @@ func boolToInt(value bool) int {
 		return 1
 	}
 	return 0
+}
+
+func nullableBoolToInt(value *bool) any {
+	if value == nil {
+		return nil
+	}
+	return boolToInt(*value)
 }
 
 var systemPromptText = strings.TrimSpace(`
@@ -214,7 +221,8 @@ Obiettivo: valutare lo stato e l'idoneita delle risposte ricevute, tenendo conto
 
 #### Copertura ('copertura')
 - '1' = copertura presente
-- '0' = assente o non indicata
+- '0' = copertura assente
+- 'null' = copertura non indicata
 
 #### Aderenza al budget ('aderenza_budget')
 Valori ammessi e relativi giudizi:
@@ -275,7 +283,7 @@ Evita ripetizioni inutili, riassumi i punti salienti.
 ## Azioni raccomandate
 - Sollecitare FASTWEB per FIBRA GPON BIZ (nessun esito ricevuto)
 - Valutare positivamente FIBERCOP per FIBRA DEDICATA, se accettabile la durata
-- Escludere proposte con copertura assente o non verificata
+- Escludere proposte con copertura assente; richiedere verifica quando la copertura non e indicata
 
 ## Valutazioni
 
@@ -326,7 +334,8 @@ Esito ricevuto ("esito_ricevuto_il")
 
 Copertura ("copertura")
 - 1 = copertura presente
-- 0 = assente o non indicata
+- 0 = copertura assente
+- null = copertura non indicata
 
 Aderenza al budget ("aderenza_budget")
 0 = Non valutato

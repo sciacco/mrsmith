@@ -60,7 +60,7 @@ type Fattibilita struct {
 	MRC                  *float64 `json:"mrc"`
 	DurataMesi           *int     `json:"durata_mesi"`
 	AderenzaBudget       int      `json:"aderenza_budget"`
-	Copertura            bool     `json:"copertura"`
+	Copertura            *bool    `json:"copertura"`
 	GiorniRilascio       *int     `json:"giorni_rilascio"`
 }
 

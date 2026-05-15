@@ -2073,8 +2073,7 @@
               "name": "copertura",
               "position": 19,
               "type": "smallint",
-              "nullable": true,
-              "default": "0"
+              "nullable": true
             },
             {
               "name": "giorni_rilascio",

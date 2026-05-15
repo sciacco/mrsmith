@@ -87,7 +87,7 @@ Tabelle `anisetta`: `rdf_richieste`, `rdf_fattibilita_fornitori`, `rdf_fornitori
   - `durata_mesi` — idem
   - `giorni_rilascio` — idem
   - `aderenza_budget` int 1..5 (indice in `score_budget`)
-  - `copertura` int 0/1
+  - `copertura` smallint nullable: `1` = presente, `0` = assente, `NULL` = non indicata
   - `data_richiesta` timestamp
 - **Relationships:** N..1 Richiesta, N..1 Fornitore, N..1 Tecnologia.
 - **Constraints & business rules:**
@@ -402,7 +402,7 @@ nrc                   numeric(12,2) NULL default 0       -- currency EUR, confid
 mrc                   numeric(12,2) NULL default 0       -- currency EUR, confidenziale
 durata_mesi           int NULL default 24
 aderenza_budget       int NULL default 0                 -- 0..5 (0 = non valutato)
-copertura             smallint NULL default 0            -- 0|1
+copertura             smallint NULL                      -- 1 presente, 0 assente, NULL non indicata
 giorni_rilascio       int NULL default 0
 ```
 
@@ -441,9 +441,9 @@ Endpoint: Power Automate URL (env `RDF_TEAMS_WEBHOOK_URL`). La URL stessa contie
 ```
 Aggiornamento RDF *<deal_codice>* (_<deal_name>_)
 - <fornitore> / <tecnologia>
-- Stato: *<nuovo_stato>* [/ Copertura: *SI*]
+- Stato: *<nuovo_stato>* [/ Copertura: *SI|NO*]
 ```
-Il suffisso " / Copertura: *SI* " è presente solo se `copertura == 1`.
+Il suffisso copertura è presente solo quando `copertura` è `1` o `0`; con `NULL` viene omesso.
 
 ### A.3 Prompt LLM
 
@@ -478,7 +478,7 @@ I prompt full-text sono checked-in nell'export Appsmith (campo `body` di `utils`
 Le regole LLM descrivono implicitamente il dominio — tenerle allineate col service layer:
 - Enum stati confermati da CHECK constraint DB (non re-validare in BE, fidarsi del DB).
 - `aderenza_budget` semantic: `0 = non valutato`, `1..5` con label in `score_budget`.
-- `copertura` semantic: `1 = presente`, `0 = assente/non-indicata`.
+- `copertura` semantic: `1 = presente`, `0 = assente`, `NULL = non indicata`.
 - `giorni_rilascio`: `0 = non specificato / entro SLA`.
 - `fornitori_preferiti`: lista ID, omettere dai confronti se vuota.
 - Soglie business (durata 3/24 mesi, ritardi 60gg) sono **logica di riepilogo LLM**, non validazioni applicative.

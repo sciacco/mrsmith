@@ -31,13 +31,19 @@ function formatCurrency(value: number | null): string {
 }
 
 function formatDays(value: number | null): string {
-  if (value === null || value === undefined) return '—';
+  if (value === null || value === undefined || value <= 0) return '—';
   return `${value} gg`;
 }
 
 function formatMonths(value: number | null): string {
   if (value === null || value === undefined) return '—';
   return `${value} mesi`;
+}
+
+function coverageLabel(value: boolean | null): string {
+  if (value === true) return 'Sì';
+  if (value === false) return 'No';
+  return '';
 }
 
 export function RequestViewPage() {
@@ -220,10 +226,12 @@ export function RequestViewPage() {
                           </StatusPill>
                         </div>
                         <div className={styles.coverageBlock} role="cell">
-                          <span className={`${styles.coveragePill} ${item.copertura ? styles.coverageYes : styles.coverageNo}`}>
-                            <Icon name={item.copertura ? 'check' : 'x'} size={13} />
-                            {item.copertura ? 'Sì' : 'No'}
-                          </span>
+                          {item.copertura !== null && (
+                            <span className={`${styles.coveragePill} ${item.copertura ? styles.coverageYes : styles.coverageNo}`}>
+                              <Icon name={item.copertura ? 'check' : 'x'} size={13} />
+                              {coverageLabel(item.copertura)}
+                            </span>
+                          )}
                         </div>
                         <div className={styles.budgetBlock} role="cell">
                           <span className={styles.budgetChip}>{budgetLabel(item.aderenza_budget)}</span>
@@ -273,7 +281,7 @@ export function RequestViewPage() {
               <div className={styles.drawerGrid3}>
                 <div className={styles.drawerField}>
                   <span className={styles.drawerLabel}>Copertura</span>
-                  <span className={styles.drawerValue}>{detailOpen.copertura ? 'Sì' : 'No'}</span>
+                  <span className={styles.drawerValue}>{coverageLabel(detailOpen.copertura)}</span>
                 </div>
                 <div className={styles.drawerField}>
                   <span className={styles.drawerLabel}>Esito ricevuto</span>

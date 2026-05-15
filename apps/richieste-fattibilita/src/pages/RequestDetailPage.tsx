@@ -22,9 +22,15 @@ interface FattibilitaFormState {
   mrc: string;
   durata_mesi: string;
   aderenza_budget: string;
-  copertura: boolean;
+  copertura: boolean | null;
   giorni_rilascio: string;
 }
+
+const COPERTURA_OPTIONS = [
+  { value: null, label: 'Non indicata' },
+  { value: true, label: 'Sì' },
+  { value: false, label: 'No' },
+] as const;
 
 function toFormState(item: Fattibilita): FattibilitaFormState {
   return {
@@ -34,7 +40,7 @@ function toFormState(item: Fattibilita): FattibilitaFormState {
     stato: item.stato,
     annotazioni: item.annotazioni ?? '',
     esito_ricevuto_il: item.esito_ricevuto_il ?? '',
-    da_ordinare: item.da_ordinare,
+    da_ordinare: item.copertura === true ? item.da_ordinare : false,
     profilo_fornitore: item.profilo_fornitore ?? '',
     nrc: item.nrc == null ? '' : String(item.nrc),
     mrc: item.mrc == null ? '' : String(item.mrc),
@@ -149,6 +155,17 @@ export function RequestDetailPage() {
     setFormState((current) => (current ? { ...current, [key]: value } : current));
   }
 
+  function handleCoperturaChange(value: boolean | null) {
+    setFormState((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        copertura: value,
+        da_ordinare: value === true ? current.da_ordinare : false,
+      };
+    });
+  }
+
   function buildPatchBody(state: FattibilitaFormState): UpdateFattibilitaBody {
     const payload: UpdateFattibilitaBody = {
       descrizione: state.descrizione,
@@ -157,7 +174,7 @@ export function RequestDetailPage() {
       stato: state.stato,
       annotazioni: state.annotazioni,
       esito_ricevuto_il: state.esito_ricevuto_il,
-      da_ordinare: state.da_ordinare,
+      da_ordinare: state.copertura === true ? state.da_ordinare : false,
       profilo_fornitore: state.profilo_fornitore,
       copertura: state.copertura,
     };
@@ -498,10 +515,7 @@ export function RequestDetailPage() {
 
             <div className={styles.formCard}>
               <div className={styles.panelHeader}>
-                <div>
-                  <h2 className={styles.panelTitle}>Scheda di fattibilità</h2>
-                  <p className={styles.small}>Aggiorna i dati ricevuti dal fornitore e salva le note operative.</p>
-                </div>
+                <h2 className={styles.panelTitle}>Scheda di fattibilità</h2>
               </div>
 
               {!selectedFattibilita || !formState ? (
@@ -517,19 +531,38 @@ export function RequestDetailPage() {
                       <span id="rdf-section-esito" className={styles.formSectionTitle}>Esito</span>
                     </header>
 
-                    <div className={styles.toggleRow}>
-                      <ToggleSwitch
-                        id="copertura"
-                        checked={formState.copertura}
-                        onChange={(checked) => handleUpdateField('copertura', checked)}
-                        label="Copertura presente"
-                      />
-                      <ToggleSwitch
-                        id="da_ordinare"
-                        checked={formState.da_ordinare}
-                        onChange={(checked) => handleUpdateField('da_ordinare', checked)}
-                        label="Da ordinare"
-                      />
+                    <div className={styles.fieldRow}>
+                      <label id="copertura-label">Copertura</label>
+                      <div className={styles.outcomeControls}>
+                        <div
+                          className={styles.segmented}
+                          role="radiogroup"
+                          aria-labelledby="copertura-label"
+                        >
+                          {COPERTURA_OPTIONS.map((option) => {
+                            const active = formState.copertura === option.value;
+                            return (
+                              <button
+                                key={String(option.value)}
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                className={`${styles.segmentedOption} ${active ? styles.segmentedOptionActive : ''}`}
+                                onClick={() => handleCoperturaChange(option.value)}
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <ToggleSwitch
+                          id="da_ordinare"
+                          checked={formState.copertura === true && formState.da_ordinare}
+                          disabled={formState.copertura !== true}
+                          onChange={(checked) => handleUpdateField('da_ordinare', checked)}
+                          label="Da ordinare"
+                        />
+                      </div>
                     </div>
 
                     <div className={styles.fieldRowPair}>

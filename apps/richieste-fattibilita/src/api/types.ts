@@ -74,7 +74,7 @@ export interface Fattibilita {
   mrc: number | null;
   durata_mesi: number | null;
   aderenza_budget: number;
-  copertura: boolean;
+  copertura: boolean | null;
   giorni_rilascio: number | null;
 }
 
@@ -181,6 +181,6 @@ export interface UpdateFattibilitaBody {
   mrc?: number;
   durata_mesi?: number;
   aderenza_budget?: number;
-  copertura?: boolean;
+  copertura?: boolean | null;
   giorni_rilascio?: number;
 }

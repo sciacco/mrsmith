@@ -80,7 +80,7 @@
   - frontend uses authenticated blob download for PDF
 - Data contracts:
   - `fornitori_preferiti` exposed as `number[]`, persisted as PG literal text
-  - `copertura` exposed as boolean
+  - `copertura` exposed as `boolean | null` (`true` = sì, `false` = no, `null` = non indicata)
   - `summary` remains the only list endpoint used by UI
 
 ## Exceptions

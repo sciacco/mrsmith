@@ -59,7 +59,9 @@ func renderRichiestaPDF(full RichiestaFull, analysis string) ([]byte, error) {
 	for _, item := range items {
 		lines = append(lines, fmt.Sprintf("%s - %s", item.FornitoreNome, item.TecnologiaNome))
 		lines = append(lines, fmt.Sprintf("Stato: %s", item.Stato))
-		lines = append(lines, fmt.Sprintf("Copertura: %s", yesNo(item.Copertura)))
+		if item.Copertura != nil {
+			lines = append(lines, fmt.Sprintf("Copertura: %s", yesNo(*item.Copertura)))
+		}
 		if item.DurataMesi != nil {
 			lines = append(lines, fmt.Sprintf("Durata: %d mesi", *item.DurataMesi))
 		}

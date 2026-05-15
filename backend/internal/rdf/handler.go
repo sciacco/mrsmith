@@ -99,21 +99,43 @@ type createFattibilitaRequest struct {
 	Items []createFattibilitaItem `json:"items"`
 }
 
+type nullableBoolPatch struct {
+	Set   bool
+	Valid bool
+	Value bool
+}
+
+func (b *nullableBoolPatch) UnmarshalJSON(data []byte) error {
+	b.Set = true
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		b.Valid = false
+		b.Value = false
+		return nil
+	}
+	var value bool
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	b.Valid = true
+	b.Value = value
+	return nil
+}
+
 type updateFattibilitaRequest struct {
-	Descrizione          *string  `json:"descrizione"`
-	ContattoFornitore    *string  `json:"contatto_fornitore"`
-	RiferimentoFornitore *string  `json:"riferimento_fornitore"`
-	Stato                *string  `json:"stato"`
-	Annotazioni          *string  `json:"annotazioni"`
-	EsitoRicevutoIl      *string  `json:"esito_ricevuto_il"`
-	DaOrdinare           *bool    `json:"da_ordinare"`
-	ProfiloFornitore     *string  `json:"profilo_fornitore"`
-	NRC                  *float64 `json:"nrc"`
-	MRC                  *float64 `json:"mrc"`
-	DurataMesi           *int     `json:"durata_mesi"`
-	AderenzaBudget       *int     `json:"aderenza_budget"`
-	Copertura            *bool    `json:"copertura"`
-	GiorniRilascio       *int     `json:"giorni_rilascio"`
+	Descrizione          *string           `json:"descrizione"`
+	ContattoFornitore    *string           `json:"contatto_fornitore"`
+	RiferimentoFornitore *string           `json:"riferimento_fornitore"`
+	Stato                *string           `json:"stato"`
+	Annotazioni          *string           `json:"annotazioni"`
+	EsitoRicevutoIl      *string           `json:"esito_ricevuto_il"`
+	DaOrdinare           *bool             `json:"da_ordinare"`
+	ProfiloFornitore     *string           `json:"profilo_fornitore"`
+	NRC                  *float64          `json:"nrc"`
+	MRC                  *float64          `json:"mrc"`
+	DurataMesi           *int              `json:"durata_mesi"`
+	AderenzaBudget       *int              `json:"aderenza_budget"`
+	Copertura            nullableBoolPatch `json:"copertura"`
+	GiorniRilascio       *int              `json:"giorni_rilascio"`
 }
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
@@ -596,8 +618,8 @@ func (h *Handler) handleCreateFattibilita(w http.ResponseWriter, r *http.Request
 		var createdID int
 		if err := tx.QueryRowContext(
 			r.Context(),
-			`INSERT INTO public.rdf_fattibilita_fornitori (richiesta_id, fornitore_id, tecnologia_id)
-			 VALUES ($1, $2, $3)
+			`INSERT INTO public.rdf_fattibilita_fornitori (richiesta_id, fornitore_id, tecnologia_id, copertura)
+			 VALUES ($1, $2, $3, NULL)
 			 RETURNING id`,
 			richiestaID,
 			item.FornitoreID,
@@ -759,8 +781,12 @@ func (h *Handler) handleUpdateFattibilita(w http.ResponseWriter, r *http.Request
 		}
 		setClauses = append(setClauses, "aderenza_budget = "+placeholder(&args, *body.AderenzaBudget))
 	}
-	if body.Copertura != nil {
-		setClauses = append(setClauses, "copertura = "+placeholder(&args, boolToInt(*body.Copertura)))
+	if body.Copertura.Set {
+		var value any
+		if body.Copertura.Valid {
+			value = boolToInt(body.Copertura.Value)
+		}
+		setClauses = append(setClauses, "copertura = "+placeholder(&args, value))
 	}
 	if body.GiorniRilascio != nil {
 		setClauses = append(setClauses, "giorni_rilascio = "+placeholder(&args, *body.GiorniRilascio))
@@ -1119,7 +1145,7 @@ func (h *Handler) listFattibilitaByRichiesta(ctx context.Context, richiestaID in
 		`SELECT ff.id, ff.richiesta_id, ff.fornitore_id, COALESCE(f.nome, ''), ff.data_richiesta,
 		        ff.tecnologia_id, t.nome, ff.descrizione, ff.contatto_fornitore, ff.riferimento_fornitore,
 		        ff.stato, ff.annotazioni, ff.esito_ricevuto_il, COALESCE(ff.da_ordinare, false), ff.profilo_fornitore,
-		        ff.nrc, ff.mrc, ff.durata_mesi, COALESCE(ff.aderenza_budget, 0), COALESCE(ff.copertura, 0), ff.giorni_rilascio
+		        ff.nrc, ff.mrc, ff.durata_mesi, COALESCE(ff.aderenza_budget, 0), ff.copertura, ff.giorni_rilascio
 		 FROM public.rdf_fattibilita_fornitori ff
 		 JOIN public.rdf_fornitori f ON f.id = ff.fornitore_id
 		 JOIN public.rdf_tecnologie t ON t.id = ff.tecnologia_id
@@ -1152,7 +1178,7 @@ func (h *Handler) fetchFattibilita(ctx context.Context, id int) (Fattibilita, er
 		`SELECT ff.id, ff.richiesta_id, ff.fornitore_id, COALESCE(f.nome, ''), ff.data_richiesta,
 		        ff.tecnologia_id, t.nome, ff.descrizione, ff.contatto_fornitore, ff.riferimento_fornitore,
 		        ff.stato, ff.annotazioni, ff.esito_ricevuto_il, COALESCE(ff.da_ordinare, false), ff.profilo_fornitore,
-		        ff.nrc, ff.mrc, ff.durata_mesi, COALESCE(ff.aderenza_budget, 0), COALESCE(ff.copertura, 0), ff.giorni_rilascio
+		        ff.nrc, ff.mrc, ff.durata_mesi, COALESCE(ff.aderenza_budget, 0), ff.copertura, ff.giorni_rilascio
 		 FROM public.rdf_fattibilita_fornitori ff
 		 JOIN public.rdf_fornitori f ON f.id = ff.fornitore_id
 		 JOIN public.rdf_tecnologie t ON t.id = ff.tecnologia_id
@@ -1217,7 +1243,7 @@ func scanFattibilita(scanner fattibilitaScanner) (Fattibilita, error) {
 	item.NRC = nullFloat64Ptr(nrc)
 	item.MRC = nullFloat64Ptr(mrc)
 	item.DurataMesi = nullIntPtr(durata)
-	item.Copertura = copertura.Valid && copertura.Int64 == 1
+	item.Copertura = nullBoolPtr(copertura)
 	item.GiorniRilascio = nullIntPtr(giorniRilascio)
 	return item, nil
 }
@@ -1299,8 +1325,8 @@ func (h *Handler) notifyFattibilitaUpdate(ctx context.Context, full RichiestaFul
 		item.TecnologiaNome,
 		item.Stato,
 	)
-	if item.Copertura {
-		text += " / Copertura: *SI*"
+	if item.Copertura != nil {
+		text += " / Copertura: *" + yesNo(*item.Copertura) + "*"
 	}
 	return h.sendTeamsPayload(ctx, map[string]string{"text": text})
 }
@@ -1472,7 +1498,7 @@ func shouldNotifyDiff(before, after Fattibilita) bool {
 	if before.Stato != after.Stato {
 		return true
 	}
-	if before.Copertura != after.Copertura {
+	if !equalBoolPointers(before.Copertura, after.Copertura) {
 		return true
 	}
 	return !equalFloatPointers(before.NRC, after.NRC) || !equalFloatPointers(before.MRC, after.MRC)
@@ -1730,6 +1756,24 @@ func equalFloatPointers(left, right *float64) bool {
 
 func stringPointer(value string) *string {
 	return &value
+}
+
+func boolPointer(value bool) *bool {
+	return &value
+}
+
+func nullBoolPtr(value sql.NullInt64) *bool {
+	if !value.Valid {
+		return nil
+	}
+	return boolPointer(value.Int64 == 1)
+}
+
+func equalBoolPointers(left, right *bool) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return *left == *right
 }
 
 func derefString(value *string, fallback string) string {
