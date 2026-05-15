@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { Fragment, useState, useCallback } from 'react';
 import { Icon, Skeleton, MultiSelect, useToast } from '@mrsmith/ui';
 import { useOrderStatuses } from '../api/queries';
 import { useApiClient } from '../api/client';
@@ -129,10 +129,20 @@ function buildBySalesCsvRows(data: AovPreviewResponse['bySales']): string[][] {
   ]);
 }
 
+function formatDealCodes(row: AovPreviewResponse['detail'][number]): string {
+  return (row.deals ?? []).map((deal) => deal.codice).filter(Boolean).join(' | ');
+}
+
+function formatDealNames(row: AovPreviewResponse['detail'][number]): string {
+  return (row.deals ?? []).map((deal) => deal.name ?? '').filter(Boolean).join(' | ');
+}
+
 function buildDetailCsvRows(data: AovPreviewResponse['detail']): string[][] {
   return data.map((row) => [
     formatYearMonth(row.anno, row.mese),
     row.nome_testata_ordine ?? '',
+    formatDealCodes(row),
+    formatDealNames(row),
     row.tipo_ordine ?? '',
     row.commerciale ?? '',
     formatTipoDocumento(row.tipo_documento),
@@ -266,6 +276,8 @@ export default function AovPage() {
       [
         'Anno/Mese',
         'Codice ordine',
+        'Codice deal',
+        'Nome deal',
         'Tipo ordine',
         'Account',
         'Tipo documento',
@@ -667,24 +679,46 @@ function DetailTable({ data, onExport }: { data: AovPreviewResponse['detail']; o
           </thead>
           <tbody>
             {data.map((row, i) => (
-              <tr key={i} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
-                <td>{formatYearMonth(row.anno, row.mese)}</td>
-                <td className={shared.mono}>
-                  <span className={styles.orderCodeCell}>
-                    <span>{row.nome_testata_ordine ?? ''}</span>
-                    {row.has_cdl_cloud ? <CdlCloudWarningDot /> : null}
-                  </span>
-                </td>
-                <td>{row.tipo_ordine ?? ''}</td>
-                <td>{row.commerciale ?? ''}</td>
-                <td>{formatTipoDocumento(row.tipo_documento)}</td>
-                <td className={shared.mono}>{row.sost_ord ?? ''}</td>
-                <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
-                <td className={shared.numCol}>{row.totale_mrc_odv_sost != null ? formatMoneyEUR(row.totale_mrc_odv_sost) : ''}</td>
-                <td className={shared.numCol}>{row.totale_mrc_new != null ? formatMoneyEUR(row.totale_mrc_new) : ''}</td>
-                <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
-                <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
-              </tr>
+              <Fragment key={`${row.nome_testata_ordine ?? 'ordine'}-${i}`}>
+                <tr style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
+                  <td>{formatYearMonth(row.anno, row.mese)}</td>
+                  <td className={shared.mono}>
+                    <span className={styles.orderCodeCell}>
+                      <span>{row.nome_testata_ordine ?? ''}</span>
+                      {row.has_cdl_cloud ? <CdlCloudWarningDot /> : null}
+                    </span>
+                  </td>
+                  <td>{row.tipo_ordine ?? ''}</td>
+                  <td>{row.commerciale ?? ''}</td>
+                  <td>{formatTipoDocumento(row.tipo_documento)}</td>
+                  <td className={shared.mono}>{row.sost_ord ?? ''}</td>
+                  <td className={shared.numCol}>{row.totale_mrc != null ? formatMoneyEUR(row.totale_mrc) : ''}</td>
+                  <td className={shared.numCol}>{row.totale_mrc_odv_sost != null ? formatMoneyEUR(row.totale_mrc_odv_sost) : ''}</td>
+                  <td className={shared.numCol}>{row.totale_mrc_new != null ? formatMoneyEUR(row.totale_mrc_new) : ''}</td>
+                  <td className={shared.numCol}>{row.totale_nrc != null ? formatMoneyEUR(row.totale_nrc) : ''}</td>
+                  <td className={shared.numCol}>{row.valore_aov != null ? formatMoneyEUR(row.valore_aov) : ''}</td>
+                </tr>
+                {(row.deals?.length ?? 0) > 0 ? (
+                  <tr className={styles.dealRow} style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}>
+                    <td />
+                    <td className={`${shared.mono} ${styles.dealCodeCell}`}>
+                      {row.deals.map((deal, dealIndex) => (
+                        <span key={`${deal.codice}-${dealIndex}`} className={styles.dealCodeItem}>
+                          <span className={styles.dealLabel}>Deal</span>
+                          {deal.codice}
+                        </span>
+                      ))}
+                    </td>
+                    <td colSpan={9} className={styles.dealNameCell}>
+                      {row.deals.map((deal, dealIndex) => (
+                        <span key={`${deal.codice}-${dealIndex}`} className={styles.dealNameItem}>
+                          {deal.name ?? ''}
+                        </span>
+                      ))}
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
             ))}
           </tbody>
         </table>

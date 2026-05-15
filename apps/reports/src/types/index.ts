@@ -108,6 +108,11 @@ export interface AovBySalesRow {
   totale_nrc: number | null;
 }
 
+export interface AovDeal {
+  codice: string;
+  name: string | null;
+}
+
 export interface AovDetailRow {
   tipo_documento: string | null;
   anno: string | null;
@@ -122,6 +127,7 @@ export interface AovDetailRow {
   totale_mrc_new: number | null;
   valore_aov: number | null;
   has_cdl_cloud: boolean;
+  deals: AovDeal[];
 }
 
 export interface AovPreviewResponse {

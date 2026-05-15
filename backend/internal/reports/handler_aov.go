@@ -48,19 +48,25 @@ type aovBySales struct {
 }
 
 type aovDetail struct {
-	TipoDocumento     *string  `json:"tipo_documento"`
-	Anno              *string  `json:"anno"`
-	Mese              *string  `json:"mese"`
-	NomeTestataOrdine *string  `json:"nome_testata_ordine"`
-	TipoOrdine        *string  `json:"tipo_ordine"`
-	SostOrd           *string  `json:"sost_ord"`
-	Commerciale       *string  `json:"commerciale"`
-	TotaleMRC         *float64 `json:"totale_mrc"`
-	TotaleNRC         *float64 `json:"totale_nrc"`
-	TotaleMRCOdvSost  *float64 `json:"totale_mrc_odv_sost"`
-	TotaleMRCNew      *float64 `json:"totale_mrc_new"`
-	ValoreAOV         *float64 `json:"valore_aov"`
-	HasCDLCloud       bool     `json:"has_cdl_cloud"`
+	TipoDocumento     *string   `json:"tipo_documento"`
+	Anno              *string   `json:"anno"`
+	Mese              *string   `json:"mese"`
+	NomeTestataOrdine *string   `json:"nome_testata_ordine"`
+	TipoOrdine        *string   `json:"tipo_ordine"`
+	SostOrd           *string   `json:"sost_ord"`
+	Commerciale       *string   `json:"commerciale"`
+	TotaleMRC         *float64  `json:"totale_mrc"`
+	TotaleNRC         *float64  `json:"totale_nrc"`
+	TotaleMRCOdvSost  *float64  `json:"totale_mrc_odv_sost"`
+	TotaleMRCNew      *float64  `json:"totale_mrc_new"`
+	ValoreAOV         *float64  `json:"valore_aov"`
+	HasCDLCloud       bool      `json:"has_cdl_cloud"`
+	Deals             []aovDeal `json:"deals"`
+}
+
+type aovDeal struct {
+	Codice string  `json:"codice"`
+	Name   *string `json:"name"`
 }
 
 type aovPreviewResponse struct {
@@ -358,7 +364,10 @@ as tipo_ordine,
 o.nome_testata_ordine,
 coalesce((SELECT  concat(own.first_name, ' ', own.last_name)
 	FROM loader.hubs_deal AS d JOIN loader.hubs_owner AS own ON d.hubspot_owner_id = own.id
-	WHERE d.codice=o.nome_testata_ordine OR REPLACE(d.codice,'/','-') = o.nome_testata_ordine
+	WHERE TRIM(d.codice) <> ''
+	AND REPLACE(TRIM(d.codice), '/', '-') = REPLACE(TRIM(o.nome_testata_ordine), '/', '-')
+	ORDER BY d.id DESC
+	LIMIT 1
 ),'CP') AS commerciale,
  o.sost_ord,
 CASE
@@ -497,8 +506,19 @@ as tipo_ordine,
  o.sost_ord,
  coalesce((SELECT  concat(own.first_name, ' ', own.last_name)
 	FROM loader.hubs_deal AS d JOIN loader.hubs_owner AS own ON d.hubspot_owner_id = own.id
-	WHERE d.codice=o.nome_testata_ordine OR REPLACE(d.codice,'/','-') = o.nome_testata_ordine
+	WHERE TRIM(d.codice) <> ''
+	AND REPLACE(TRIM(d.codice), '/', '-') = REPLACE(TRIM(o.nome_testata_ordine), '/', '-')
+	ORDER BY d.id DESC
+	LIMIT 1
 ),'CP') AS commerciale,
+ COALESCE((SELECT json_agg(json_build_object(
+	'codice', TRIM(d.codice),
+	'name', NULLIF(TRIM(d.name), '')
+) ORDER BY TRIM(d.codice), TRIM(d.name), d.id)::text
+	FROM loader.hubs_deal AS d
+	WHERE TRIM(d.codice) <> ''
+	AND REPLACE(TRIM(d.codice), '/', '-') = REPLACE(TRIM(o.nome_testata_ordine), '/', '-')
+),'[]') AS deals,
 CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
 	ELSE sum(round(o.quantita::decimal * o.canone::decimal,2))
@@ -592,21 +612,25 @@ o.nome_testata_ordine ASC`, where)
 	for rows.Next() {
 		var row aovDetail
 		var (
-			tipoDocumento, anno, mese  sql.NullString
-			nomeTestataOrdine, tipoOrd sql.NullString
-			sostOrd, commerciale       sql.NullString
-			totaleMRC, totaleNRC       sql.NullFloat64
-			totaleMRCOdvSost           sql.NullFloat64
-			totaleMRCNew, valoreAOV    sql.NullFloat64
-			hasCDLCloud                sql.NullBool
+			tipoDocumento, anno, mese      sql.NullString
+			nomeTestataOrdine, tipoOrd     sql.NullString
+			sostOrd, commerciale, dealsRaw sql.NullString
+			totaleMRC, totaleNRC           sql.NullFloat64
+			totaleMRCOdvSost               sql.NullFloat64
+			totaleMRCNew, valoreAOV        sql.NullFloat64
+			hasCDLCloud                    sql.NullBool
 		)
 		if err := rows.Scan(
 			&tipoDocumento, &anno, &mese,
 			&nomeTestataOrdine, &tipoOrd, &sostOrd, &commerciale,
-			&totaleMRC, &totaleNRC, &totaleMRCOdvSost,
+			&dealsRaw, &totaleMRC, &totaleNRC, &totaleMRCOdvSost,
 			&totaleMRCNew, &valoreAOV, &hasCDLCloud,
 		); err != nil {
 			return nil, err
+		}
+		deals, err := decodeAovDeals(dealsRaw)
+		if err != nil {
+			return nil, fmt.Errorf("decode aov deals: %w", err)
 		}
 		row.TipoDocumento = nullStringPtr(tipoDocumento)
 		row.Anno = nullStringPtr(anno)
@@ -621,6 +645,7 @@ o.nome_testata_ordine ASC`, where)
 		row.TotaleMRCNew = nullFloat64Ptr(totaleMRCNew)
 		row.ValoreAOV = nullFloat64Ptr(valoreAOV)
 		row.HasCDLCloud = hasCDLCloud.Valid && hasCDLCloud.Bool
+		row.Deals = deals
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -630,6 +655,21 @@ o.nome_testata_ordine ASC`, where)
 		result = []aovDetail{}
 	}
 	return result, nil
+}
+
+func decodeAovDeals(raw sql.NullString) ([]aovDeal, error) {
+	if !raw.Valid || raw.String == "" {
+		return []aovDeal{}, nil
+	}
+
+	var deals []aovDeal
+	if err := json.Unmarshal([]byte(raw.String), &deals); err != nil {
+		return nil, err
+	}
+	if deals == nil {
+		return []aovDeal{}, nil
+	}
+	return deals, nil
 }
 
 // ── HTTP handlers ──

@@ -284,6 +284,15 @@ Alyante ERP ID
 - Used by: `apps/quotes` deal list, create flow, and detail header.
 - Open questions: whether to add a separate backfill for already-corrupted `quotes.quote.deal_number` rows.
 
+### HubSpot Deal Codes Match ERP Orders After Separator Normalization
+
+- Context: Reports AOV detail and any flow matching ERP order numbers to HubSpot deals.
+- Discovery: ERP order codes conventionally use `XXXXXXX-YYYY`, while `loader.hubs_deal.codice` can store the corresponding deal as `XXXXXXX/YYYY`.
+- Practical rule: match order codes to deal codes with whitespace trimming and `/` -> `-` normalization on both sides. When displaying the matched deal, keep the original deal code from `loader.hubs_deal.codice` and pair it with `loader.hubs_deal.name`.
+- Evidence: `loader.v_ordini_ric_spot.nome_testata_ordine`, `loader.hubs_deal.codice`, `loader.hubs_deal.name`, Reports AOV detail implementation.
+- Used by: `apps/reports` AOV detail.
+- Open questions: none.
+
 ### Quotes Customer Default Payment Must Use Alyante `CODICE_PAGAMENTO`
 
 - Context: quotes create enrichment endpoint `GET /quotes/v1/customer-payment/{customerId}` against Alyante `Tsmi_Anagrafiche_clienti`.
