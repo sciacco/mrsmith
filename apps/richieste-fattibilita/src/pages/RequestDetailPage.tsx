@@ -669,7 +669,7 @@ export function RequestDetailPage() {
                     </header>
 
                     <div className={styles.fieldGroup}>
-                      <label htmlFor="descrizione_ff">Descrizione</label>
+                      <label htmlFor="descrizione_ff">Dettagli richiesta a fornitore</label>
                       <textarea
                         id="descrizione_ff"
                         className={styles.textArea}
@@ -679,7 +679,7 @@ export function RequestDetailPage() {
                     </div>
 
                     <div className={styles.fieldGroup}>
-                      <label htmlFor="annotazioni">Annotazioni</label>
+                      <label htmlFor="annotazioni">Commento di Carrier Relations</label>
                       <textarea
                         id="annotazioni"
                         className={styles.textArea}

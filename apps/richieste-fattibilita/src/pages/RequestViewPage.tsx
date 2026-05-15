@@ -346,11 +346,11 @@ export function RequestViewPage() {
               <div className={styles.drawerSectionHeading}>Note</div>
               <div className={styles.drawerGrid}>
                 <div className={`${styles.drawerField} ${styles.drawerFull}`}>
-                  <span className={styles.drawerLabel}>Descrizione</span>
+                  <span className={styles.drawerLabel}>Dettagli richiesta a fornitore</span>
                   <div className={styles.drawerText}>{detailOpen.descrizione || '—'}</div>
                 </div>
                 <div className={`${styles.drawerField} ${styles.drawerFull}`}>
-                  <span className={styles.drawerLabel}>Annotazioni</span>
+                  <span className={styles.drawerLabel}>Commento di Carrier Relations</span>
                   <div className={styles.drawerText}>{detailOpen.annotazioni || '—'}</div>
                 </div>
               </div>
