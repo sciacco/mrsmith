@@ -116,7 +116,7 @@ export function compactAddress(address: string | null | undefined): string {
   const city = match?.[1]?.replace(/^[^A-Za-zÀ-ÿ]+/, '').trim();
   const province = match?.[2];
   if (city && province) return `${city} (${province})`;
-  return address.length > 48 ? `${address.slice(0, 48).trimEnd()}…` : address;
+  return address;
 }
 
 export function budgetLabel(score: number): string {
