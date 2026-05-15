@@ -145,26 +145,6 @@ export function RequestDetailPage() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [isDirty]);
 
-  if (!canManage) {
-    return (
-      <section className={styles.forbiddenCard}>
-        <div className={styles.emptyIconDanger}><Icon name="lock" /></div>
-        <h3>Accesso riservato</h3>
-        <p className={styles.muted}>Il dettaglio carrier è disponibile solo per il ruolo manager RDF.</p>
-      </section>
-    );
-  }
-
-  if (richiestaId === null) {
-    return (
-      <section className={styles.emptyCard}>
-        <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
-        <h3>Identificativo non valido</h3>
-        <p className={styles.muted}>Il dettaglio richiesto non può essere aperto con questo URL.</p>
-      </section>
-    );
-  }
-
   function handleUpdateField<K extends keyof FattibilitaFormState>(key: K, value: FattibilitaFormState[K]) {
     setFormState((current) => (current ? { ...current, [key]: value } : current));
   }
@@ -242,6 +222,26 @@ export function RequestDetailPage() {
     const dedupedItems = pairs.filter((pair) => !existingPairs.has(`${pair.fornitore_id}:${pair.tecnologia_id}`));
     return { total: pairs.length, duplicates: pairs.length - dedupedItems.length, items: dedupedItems };
   }, [selectedFornitori, selectedTecnologie, existingPairs]);
+
+  if (!canManage) {
+    return (
+      <section className={styles.forbiddenCard}>
+        <div className={styles.emptyIconDanger}><Icon name="lock" /></div>
+        <h3>Accesso riservato</h3>
+        <p className={styles.muted}>Il dettaglio carrier è disponibile solo per il ruolo manager RDF.</p>
+      </section>
+    );
+  }
+
+  if (richiestaId === null) {
+    return (
+      <section className={styles.emptyCard}>
+        <div className={styles.emptyIconDanger}><Icon name="triangle-alert" /></div>
+        <h3>Identificativo non valido</h3>
+        <p className={styles.muted}>Il dettaglio richiesto non può essere aperto con questo URL.</p>
+      </section>
+    );
+  }
 
   function handleAddFattibilita() {
     if (addPreview.items.length === 0) return;
@@ -331,7 +331,7 @@ export function RequestDetailPage() {
               <button
                 type="button"
                 className={styles.breadcrumbLink}
-                onClick={() => navigate('/richieste/gestione')}
+                onClick={() => navigate('/richieste')}
               >
                 ‹ Tutte le richieste
               </button>

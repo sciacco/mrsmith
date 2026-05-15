@@ -10,6 +10,10 @@ import type {
   LookupItem,
   PagedResponse,
   RDFCapabilities,
+  RDFComment,
+  RDFCommentsResponse,
+  RDFCommentUser,
+  RDFUsersResponse,
   RichiestaBase,
   RichiestaFull,
   RichiestaSummary,
@@ -39,6 +43,8 @@ const queryKeys = {
   pdf: (id: number) => ['rdf', 'pdf', id] as const,
   analysis: (id: number) => ['rdf', 'analysis', id] as const,
   analysisJson: (id: number) => ['rdf', 'analysis-json', id] as const,
+  comments: (id: number) => ['rdf', 'comments', id] as const,
+  users: (search: string) => ['rdf', 'users', search] as const,
   deals: (params: DealsParams) => ['rdf', 'deals', params] as const,
   fornitori: ['rdf', 'fornitori'] as const,
   tecnologie: ['rdf', 'tecnologie'] as const,
@@ -134,6 +140,54 @@ export function useRichiestaPdf(id: number | null, enabled = true) {
     queryKey: id ? queryKeys.pdf(id) : ['rdf', 'pdf', 'empty'],
     enabled: id !== null && enabled,
     queryFn: () => api.getBlob(`/rdf/v1/richieste/${id}/pdf`),
+  });
+}
+
+export function useRichiestaComments(id: number | null) {
+  const api = useRDFApiClient();
+  return useQuery({
+    queryKey: id ? queryKeys.comments(id) : ['rdf', 'comments', 'empty'],
+    enabled: id !== null,
+    queryFn: () => api.get<RDFCommentsResponse>(`/rdf/v1/richieste/${id}/comments`),
+  });
+}
+
+export function useRDFUserSearch(search: string, enabled = true) {
+  const api = useRDFApiClient();
+  const normalized = search.trim();
+  return useQuery({
+    queryKey: queryKeys.users(normalized),
+    enabled: enabled && normalized.length > 0,
+    queryFn: async () => {
+      const params = new URLSearchParams({ search: normalized });
+      const response = await api.get<RDFUsersResponse>(`/rdf/v1/users?${params.toString()}`);
+      return response.items;
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateRichiestaComment() {
+  const api = useRDFApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      richiestaId,
+      comment,
+      mentioned_users,
+    }: {
+      richiestaId: number;
+      comment: string;
+      mentioned_users: RDFCommentUser[];
+    }) =>
+      api.post<RDFComment>(`/rdf/v1/richieste/${richiestaId}/comments`, {
+        comment,
+        mentioned_users,
+      }),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.comments(variables.richiestaId) });
+    },
   });
 }
 

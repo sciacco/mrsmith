@@ -10,12 +10,14 @@ import {
   useRichiestaPdf,
 } from '../api/queries';
 import type { Fattibilita } from '../api/types';
+import { RDFCommentsPanel } from '../components/RDFCommentsPanel';
 import { StatusPill, statusTone } from '../components/StatusPill';
 import {
   MANAGER_ROLES,
   budgetLabel,
   compactAddress,
   copyErrorMessage,
+  fattibilitaStateLabel,
   formatCountsBreakdown,
   formatDate,
   parsePositiveId,
@@ -55,7 +57,6 @@ export function RequestViewPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('riepilogo');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState<Fattibilita | null>(null);
-  const [drawerTab, setDrawerTab] = useState<'dettaglio' | 'commenti'>('dettaglio');
 
   const richiesta = useRichiestaFull(richiestaId);
   const capabilities = useRDFCapabilities();
@@ -76,10 +77,6 @@ export function RequestViewPage() {
   useEffect(() => {
     if (!aiEnabled && activeTab === 'analisi') setActiveTab('riepilogo');
   }, [aiEnabled, activeTab]);
-
-  useEffect(() => {
-    if (detailOpen) setDrawerTab('dettaglio');
-  }, [detailOpen?.id]);
 
   useEffect(() => {
     if (!pdf.data) return;
@@ -105,7 +102,7 @@ export function RequestViewPage() {
     );
   }
 
-  function handleRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, item: Fattibilita) {
+  function handleRowKeyDown(event: KeyboardEvent<HTMLElement>, item: Fattibilita) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       setDetailOpen(item);
@@ -216,70 +213,97 @@ export function RequestViewPage() {
 
           {activeTab === 'riepilogo' && (
             <div
-              className={shared.sectionSpacer}
+              className={styles.summaryWorkspace}
               role="tabpanel"
               id="tabpanel-riepilogo"
               aria-labelledby="tab-riepilogo"
             >
-              <div className={shared.panel}>
-                <h2 className={shared.panelTitle}>Descrizione richiesta</h2>
-                <p style={{ marginTop: '0.6rem', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                  {richiesta.data.descrizione || '—'}
-                </p>
-              </div>
-
-              {richiesta.data.fattibilita.length === 0 ? (
-                <div className={shared.emptyCard}>
-                  <div className={shared.emptyIcon}>
-                    <Icon name="list" />
-                  </div>
-                  <h3>Nessuna fattibilità registrata</h3>
-                  <p className={shared.muted}>
-                    Non sono ancora state aggiunte valutazioni per questa richiesta.
+              <div className={styles.summaryMain}>
+                <div className={shared.panel}>
+                  <h2 className={shared.panelTitle}>Descrizione richiesta</h2>
+                  <p style={{ marginTop: '0.6rem', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {richiesta.data.descrizione || '—'}
                   </p>
                 </div>
-              ) : (
-                <div className={styles.tableWrap}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>Fornitore</th>
-                        <th>Tecnologia</th>
-                        <th>Stato</th>
-                        <th>Copertura</th>
-                        <th>Budget</th>
-                        <th>Esito</th>
-                        <th className={styles.numCell}>Rilascio</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+
+                {richiesta.data.fattibilita.length === 0 ? (
+                  <div className={shared.emptyCard}>
+                    <div className={shared.emptyIcon}>
+                      <Icon name="list" />
+                    </div>
+                    <h3>Nessuna fattibilità registrata</h3>
+                    <p className={shared.muted}>
+                      Non sono ancora state aggiunte valutazioni per questa richiesta.
+                    </p>
+                  </div>
+                ) : (
+                  <div className={styles.fattibilitaBoard} role="table" aria-label="Fattibilità richiesta">
+                    <div className={styles.fattibilitaHeader} role="row">
+                      <span role="columnheader">Fattibilità</span>
+                      <span role="columnheader">Stato</span>
+                      <span role="columnheader">Copertura</span>
+                      <span role="columnheader">Budget</span>
+                      <span role="columnheader">Tempi</span>
+                      <span role="columnheader" className={styles.detailHeader}>Apri</span>
+                    </div>
+                    <div className={styles.fattibilitaRows} role="rowgroup">
                       {richiesta.data.fattibilita.map((item) => (
-                        <tr
+                        <div
                           key={item.id}
-                          className={styles.row}
+                          className={styles.fattibilitaRow}
                           role="button"
                           tabIndex={0}
                           onClick={() => setDetailOpen(item)}
                           onKeyDown={(event) => handleRowKeyDown(event, item)}
                           aria-label={`Dettaglio ${item.fornitore_nome} ${item.tecnologia_nome}`}
                         >
-                          <td className={styles.fornitoreCell}>{item.fornitore_nome}</td>
-                          <td className={styles.tecnologiaCell}>{item.tecnologia_nome}</td>
-                          <td>
-                            <StatusPill tone={statusTone(item.stato)}>{item.stato}</StatusPill>
-                          </td>
-                          <td>{item.copertura ? 'Sì' : 'No'}</td>
-                          <td>{budgetLabel(item.aderenza_budget)}</td>
-                          <td>
-                            {item.esito_ricevuto_il ? formatDate(item.esito_ricevuto_il) : '—'}
-                          </td>
-                          <td className={styles.numCell}>{formatDays(item.giorni_rilascio)}</td>
-                        </tr>
+                          <div className={styles.providerBlock} role="cell">
+                            <div className={styles.providerTopline}>
+                              <span className={styles.providerName}>{item.fornitore_nome}</span>
+                              {item.da_ordinare ? <span className={styles.orderBadge}>Da ordinare</span> : null}
+                            </div>
+                            <div className={styles.providerMeta}>
+                              <span>{item.tecnologia_nome}</span>
+                              {item.profilo_fornitore ? <span>{item.profilo_fornitore}</span> : null}
+                            </div>
+                          </div>
+                          <div className={styles.statusBlock} role="cell">
+                            <StatusPill tone={statusTone(item.stato)}>
+                              {fattibilitaStateLabel(item.stato)}
+                            </StatusPill>
+                          </div>
+                          <div className={styles.coverageBlock} role="cell">
+                            <span className={`${styles.coveragePill} ${item.copertura ? styles.coverageYes : styles.coverageNo}`}>
+                              <Icon name={item.copertura ? 'check' : 'x'} size={13} />
+                              {item.copertura ? 'Sì' : 'No'}
+                            </span>
+                          </div>
+                          <div className={styles.budgetBlock} role="cell">
+                            <span className={styles.budgetChip}>{budgetLabel(item.aderenza_budget)}</span>
+                          </div>
+                          <dl className={styles.timeBlock} role="cell">
+                            <div>
+                              <dt>Esito</dt>
+                              <dd>{item.esito_ricevuto_il ? formatDate(item.esito_ricevuto_il) : '—'}</dd>
+                            </div>
+                            <div>
+                              <dt>Rilascio</dt>
+                              <dd>{formatDays(item.giorni_rilascio)}</dd>
+                            </div>
+                          </dl>
+                          <div className={styles.rowAction} role="cell">
+                            <span className={styles.rowChevron}>
+                              <Icon name="chevron-right" size={16} />
+                            </span>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <RDFCommentsPanel richiestaId={richiesta.data.id} />
             </div>
           )}
 
@@ -434,132 +458,95 @@ export function RequestViewPage() {
         }
       >
         {detailOpen && (
-          <>
-            <div className={styles.drawerTabs} role="tablist" aria-label="Sezioni dettaglio fattibilità">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={drawerTab === 'dettaglio'}
-                className={styles.drawerTab}
-                onClick={() => setDrawerTab('dettaglio')}
-              >
-                Dettaglio
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={drawerTab === 'commenti'}
-                className={styles.drawerTab}
-                disabled
-                title="Disponibile presto"
-              >
-                Commenti
-                <span className={styles.drawerTabBadge}>Presto</span>
-              </button>
+          <div className={styles.drawerBody}>
+            <div className={styles.drawerSectionGroup}>
+              <div className={styles.drawerSectionHeading}>Esito</div>
+              <div className={styles.drawerGrid3}>
+                <div className={styles.drawerField}>
+                  <span className={styles.drawerLabel}>Copertura</span>
+                  <span className={styles.drawerValue}>{detailOpen.copertura ? 'Sì' : 'No'}</span>
+                </div>
+                <div className={styles.drawerField}>
+                  <span className={styles.drawerLabel}>Esito ricevuto</span>
+                  <span className={styles.drawerValue}>
+                    {detailOpen.esito_ricevuto_il ? formatDate(detailOpen.esito_ricevuto_il) : '—'}
+                  </span>
+                </div>
+                <div className={styles.drawerField}>
+                  <span className={styles.drawerLabel}>Giorni rilascio</span>
+                  <span className={styles.drawerValue}>{formatDays(detailOpen.giorni_rilascio)}</span>
+                </div>
+              </div>
             </div>
 
-            {drawerTab === 'dettaglio' && (
-              <div className={styles.drawerBody} role="tabpanel">
-                <div className={styles.drawerSectionGroup}>
-                  <div className={styles.drawerSectionHeading}>Esito</div>
-                  <div className={styles.drawerGrid3}>
-                    <div className={styles.drawerField}>
-                      <span className={styles.drawerLabel}>Copertura</span>
-                      <span className={styles.drawerValue}>{detailOpen.copertura ? 'Sì' : 'No'}</span>
-                    </div>
-                    <div className={styles.drawerField}>
-                      <span className={styles.drawerLabel}>Esito ricevuto</span>
-                      <span className={styles.drawerValue}>
-                        {detailOpen.esito_ricevuto_il ? formatDate(detailOpen.esito_ricevuto_il) : '—'}
-                      </span>
-                    </div>
-                    <div className={styles.drawerField}>
-                      <span className={styles.drawerLabel}>Giorni rilascio</span>
-                      <span className={styles.drawerValue}>{formatDays(detailOpen.giorni_rilascio)}</span>
-                    </div>
+            <div className={styles.drawerSectionGroup}>
+              <div className={styles.drawerSectionHeading}>Commerciale</div>
+              <div className={styles.drawerSubgrid}>
+                <div className={styles.drawerGrid3}>
+                  <div className={styles.drawerField}>
+                    <span className={styles.drawerLabel}>Budget</span>
+                    <span className={styles.drawerValue}>{budgetLabel(detailOpen.aderenza_budget)}</span>
+                  </div>
+                  <div className={styles.drawerField}>
+                    <span className={styles.drawerLabel}>Durata</span>
+                    <span className={styles.drawerValue}>{formatMonths(detailOpen.durata_mesi)}</span>
+                  </div>
+                  <div className={styles.drawerField}>
+                    <span className={styles.drawerLabel}>Da ordinare</span>
+                    <span className={styles.drawerValue}>{detailOpen.da_ordinare ? 'Sì' : 'No'}</span>
                   </div>
                 </div>
-
-                <div className={styles.drawerSectionGroup}>
-                  <div className={styles.drawerSectionHeading}>Commerciale</div>
-                  <div className={styles.drawerSubgrid}>
-                    <div className={styles.drawerGrid3}>
-                      <div className={styles.drawerField}>
-                        <span className={styles.drawerLabel}>Budget</span>
-                        <span className={styles.drawerValue}>{budgetLabel(detailOpen.aderenza_budget)}</span>
-                      </div>
-                      <div className={styles.drawerField}>
-                        <span className={styles.drawerLabel}>Durata</span>
-                        <span className={styles.drawerValue}>{formatMonths(detailOpen.durata_mesi)}</span>
-                      </div>
-                      <div className={styles.drawerField}>
-                        <span className={styles.drawerLabel}>Da ordinare</span>
-                        <span className={styles.drawerValue}>{detailOpen.da_ordinare ? 'Sì' : 'No'}</span>
-                      </div>
-                    </div>
-                    {canManage && (
-                      <div className={styles.drawerGrid}>
-                        <div className={styles.drawerField}>
-                          <span className={styles.drawerLabel}>NRC</span>
-                          <span className={styles.drawerValue}>{formatCurrency(detailOpen.nrc)}</span>
-                        </div>
-                        <div className={styles.drawerField}>
-                          <span className={styles.drawerLabel}>MRC</span>
-                          <span className={styles.drawerValue}>{formatCurrency(detailOpen.mrc)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className={styles.drawerSectionGroup}>
-                  <div className={styles.drawerSectionHeading}>Fornitore</div>
+                {canManage && (
                   <div className={styles.drawerGrid}>
                     <div className={styles.drawerField}>
-                      <span className={styles.drawerLabel}>Profilo</span>
-                      <span className={styles.drawerValue}>{detailOpen.profilo_fornitore || '—'}</span>
+                      <span className={styles.drawerLabel}>NRC</span>
+                      <span className={styles.drawerValue}>{formatCurrency(detailOpen.nrc)}</span>
                     </div>
                     <div className={styles.drawerField}>
-                      <span className={styles.drawerLabel}>Data richiesta</span>
-                      <span className={styles.drawerValue}>{formatDate(detailOpen.data_richiesta)}</span>
-                    </div>
-                    <div className={styles.drawerField}>
-                      <span className={styles.drawerLabel}>Contatto</span>
-                      <span className={styles.drawerValue}>{detailOpen.contatto_fornitore || '—'}</span>
-                    </div>
-                    <div className={styles.drawerField}>
-                      <span className={styles.drawerLabel}>Riferimento</span>
-                      <span className={styles.drawerValue}>{detailOpen.riferimento_fornitore || '—'}</span>
+                      <span className={styles.drawerLabel}>MRC</span>
+                      <span className={styles.drawerValue}>{formatCurrency(detailOpen.mrc)}</span>
                     </div>
                   </div>
-                </div>
+                )}
+              </div>
+            </div>
 
-                <div className={styles.drawerSectionGroup}>
-                  <div className={styles.drawerSectionHeading}>Note</div>
-                  <div className={styles.drawerGrid}>
-                    <div className={`${styles.drawerField} ${styles.drawerFull}`}>
-                      <span className={styles.drawerLabel}>Descrizione</span>
-                      <div className={styles.drawerText}>{detailOpen.descrizione || '—'}</div>
-                    </div>
-                    <div className={`${styles.drawerField} ${styles.drawerFull}`}>
-                      <span className={styles.drawerLabel}>Annotazioni</span>
-                      <div className={styles.drawerText}>{detailOpen.annotazioni || '—'}</div>
-                    </div>
-                  </div>
+            <div className={styles.drawerSectionGroup}>
+              <div className={styles.drawerSectionHeading}>Fornitore</div>
+              <div className={styles.drawerGrid}>
+                <div className={styles.drawerField}>
+                  <span className={styles.drawerLabel}>Profilo</span>
+                  <span className={styles.drawerValue}>{detailOpen.profilo_fornitore || '—'}</span>
+                </div>
+                <div className={styles.drawerField}>
+                  <span className={styles.drawerLabel}>Data richiesta</span>
+                  <span className={styles.drawerValue}>{formatDate(detailOpen.data_richiesta)}</span>
+                </div>
+                <div className={styles.drawerField}>
+                  <span className={styles.drawerLabel}>Contatto</span>
+                  <span className={styles.drawerValue}>{detailOpen.contatto_fornitore || '—'}</span>
+                </div>
+                <div className={styles.drawerField}>
+                  <span className={styles.drawerLabel}>Riferimento</span>
+                  <span className={styles.drawerValue}>{detailOpen.riferimento_fornitore || '—'}</span>
                 </div>
               </div>
-            )}
+            </div>
 
-            {drawerTab === 'commenti' && (
-              <div className={styles.drawerEmpty} role="tabpanel">
-                <Icon name="mail" size={32} />
-                <h4>Sezione commenti in arrivo</h4>
-                <p className={shared.muted}>
-                  Qui potrai scambiare messaggi tra richiedente e carrier manager sulla fattibilità.
-                </p>
+            <div className={styles.drawerSectionGroup}>
+              <div className={styles.drawerSectionHeading}>Note</div>
+              <div className={styles.drawerGrid}>
+                <div className={`${styles.drawerField} ${styles.drawerFull}`}>
+                  <span className={styles.drawerLabel}>Descrizione</span>
+                  <div className={styles.drawerText}>{detailOpen.descrizione || '—'}</div>
+                </div>
+                <div className={`${styles.drawerField} ${styles.drawerFull}`}>
+                  <span className={styles.drawerLabel}>Annotazioni</span>
+                  <div className={styles.drawerText}>{detailOpen.annotazioni || '—'}</div>
+                </div>
               </div>
-            )}
-          </>
+            </div>
+          </div>
         )}
       </Drawer>
     </section>

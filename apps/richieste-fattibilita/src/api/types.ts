@@ -119,6 +119,37 @@ export interface RDFCapabilities {
   ai_enabled: boolean;
 }
 
+export interface RDFCommentUser {
+  id: string;
+  subject: string;
+  name: string;
+  email: string;
+}
+
+export interface RDFUser extends RDFCommentUser {
+  username: string;
+  first_name: string;
+  last_name: string;
+}
+
+export interface RDFComment {
+  id: number;
+  richiesta_id: number;
+  comment: string;
+  author: RDFCommentUser;
+  created_at: string;
+  mentioned_users: RDFCommentUser[];
+}
+
+export interface RDFCommentsResponse {
+  items: RDFComment[];
+  notified_users: RDFCommentUser[];
+}
+
+export interface RDFUsersResponse {
+  items: RDFUser[];
+}
+
 export interface CreateRichiestaBody {
   deal_id: number;
   indirizzo: string;
