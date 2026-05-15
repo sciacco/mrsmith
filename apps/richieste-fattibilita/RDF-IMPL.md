@@ -4,7 +4,7 @@
 - Mini-app path: `/apps/richieste-fattibilita/`
 - API prefix: `/api/rdf/v1/*`
 - Roles: `app_rdf_access` for read/create, `app_rdf_manager` for carrier management, `app_devadmin` as shared superuser override
-- Runtime dependencies: `ANISETTA_DSN`, `MISTRA_DSN`, optional `OPENROUTER_API_KEY`, optional `RDF_TEAMS_WEBHOOK_URL`, `RDF_TEAMS_NOTIFICATIONS_ENABLED`
+- Runtime dependencies: `ANISETTA_DSN`, `MISTRA_DSN`, optional `OPENROUTER_API_KEY`; internal notifications also use the shared MrSmith notifications setup on Anisetta
 - Initial launcher status: `test`
 
 ## Comparable Apps Audit
@@ -34,7 +34,7 @@
 
 ## Implementation Changes
 - Backend:
-  - added `backend/internal/rdf` for request, summary, detail, fattibilita mutation, AI, PDF, and Teams notification flows
+  - added `backend/internal/rdf` for request, summary, detail, fattibilita mutation, AI, PDF, and MrSmith notification flows
   - added shared `backend/internal/platform/openrouter`
   - mounted routes in `backend/cmd/server/main.go`
   - added launcher/catalog entry and split-server href override on port `5182`
@@ -47,8 +47,6 @@
 - Runtime and deploy:
   - added `RICHIESTE_FATTIBILITA_APP_URL`
   - added `OPENROUTER_API_KEY`
-  - added `RDF_TEAMS_WEBHOOK_URL`
-  - added `RDF_TEAMS_NOTIFICATIONS_ENABLED`
   - added Docker copy for `/static/apps/richieste-fattibilita`
   - added root `package.json` and `Makefile` dev targets
 

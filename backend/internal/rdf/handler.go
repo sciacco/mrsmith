@@ -7,9 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -57,9 +55,6 @@ type Handler struct {
 	roleResolver               RoleUserResolver
 	richiesteFattibilitaAppURL string
 	staticDir                  string
-	teamsWebhookURL            string
-	teamsNotificationsEnabled  bool
-	httpCli                    *http.Client
 }
 
 type RoleUserResolver interface {
@@ -75,8 +70,6 @@ type Deps struct {
 	RoleResolver               RoleUserResolver
 	RichiesteFattibilitaAppURL string
 	StaticDir                  string
-	TeamsWebhookURL            string
-	TeamsNotificationsEnabled  bool
 }
 
 type createRichiestaRequest struct {
@@ -152,9 +145,6 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		roleResolver:               deps.RoleResolver,
 		richiesteFattibilitaAppURL: strings.TrimSpace(deps.RichiesteFattibilitaAppURL),
 		staticDir:                  strings.TrimSpace(deps.StaticDir),
-		teamsWebhookURL:            strings.TrimSpace(deps.TeamsWebhookURL),
-		teamsNotificationsEnabled:  deps.TeamsNotificationsEnabled,
-		httpCli:                    &http.Client{Timeout: 20 * time.Second},
 	}
 
 	accessProtect := acl.RequireRole(applaunch.RichiesteFattibilitaAccessRoles()...)
@@ -567,7 +557,7 @@ func (h *Handler) handleCreateRichiesta(w http.ResponseWriter, r *http.Request) 
 		h.dbFailure(w, r, "create_richiesta_load", err, "richiesta_id", richiestaID)
 		return
 	}
-	if err := h.notifyCreate(r.Context(), full); err != nil {
+	if err := h.notifyRDFRichiestaCreated(r.Context(), full); err != nil {
 		logging.FromContext(r.Context()).Warn("rdf create notification failed", "component", "rdf", "richiesta_id", richiestaID, "error", err)
 	}
 
@@ -716,12 +706,10 @@ func (h *Handler) handleUpdateFattibilita(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	current, err := h.fetchFattibilita(r.Context(), id)
-	if errors.Is(err, sql.ErrNoRows) {
+	if _, err := h.fetchFattibilita(r.Context(), id); errors.Is(err, sql.ErrNoRows) {
 		httputil.Error(w, http.StatusNotFound, "fattibilita_not_found")
 		return
-	}
-	if err != nil {
+	} else if err != nil {
 		h.dbFailure(w, r, "update_fattibilita_fetch", err, "fattibilita_id", id)
 		return
 	}
@@ -812,15 +800,6 @@ func (h *Handler) handleUpdateFattibilita(w http.ResponseWriter, r *http.Request
 		h.dbFailure(w, r, "update_fattibilita_load", err, "fattibilita_id", id)
 		return
 	}
-	if shouldNotifyDiff(current, updated) {
-		full, loadErr := h.loadRichiestaFull(r.Context(), updated.RichiestaID)
-		if loadErr == nil {
-			if err := h.notifyFattibilitaUpdate(r.Context(), full, updated); err != nil {
-				logging.FromContext(r.Context()).Warn("rdf update notification failed", "component", "rdf", "fattibilita_id", id, "error", err)
-			}
-		}
-	}
-
 	httputil.JSON(w, http.StatusOK, updated)
 }
 
@@ -1280,89 +1259,6 @@ func (h *Handler) lookupSupplierNames(ctx context.Context, ids []int) ([]string,
 	return result, nil
 }
 
-func (h *Handler) notifyCreate(ctx context.Context, full RichiestaFull) error {
-	if !h.notificationsEnabled() {
-		return nil
-	}
-
-	payload := map[string]any{
-		"type": "MessageCard",
-		"attachments": []map[string]any{
-			{
-				"contentType": "application/vnd.microsoft.card.adaptive",
-				"content": map[string]any{
-					"type":    "AdaptiveCard",
-					"version": "1.2",
-					"body": []map[string]any{
-						{"type": "TextBlock", "text": fmt.Sprintf("Richiesta Nuova Fattibilita - Deal %s", firstNonEmpty(full.CodiceDeal, fmt.Sprintf("#%d", full.ID))), "weight": "Bolder", "size": "Medium"},
-						{"type": "TextBlock", "text": fmt.Sprintf("Da %s", derefString(full.CreatedBy, "utente non disponibile")), "weight": "Normal", "size": "Small"},
-						{"type": "TextBlock", "text": "Dettagli della richiesta", "weight": "Bolder", "size": "Small"},
-						{"type": "TextBlock", "text": fmt.Sprintf("Cliente: %s", derefString(full.CompanyName, "Non disponibile")), "wrap": true},
-						{"type": "TextBlock", "text": fmt.Sprintf("Deal: %s", derefString(full.DealName, "Non disponibile")), "wrap": true},
-						{"type": "TextBlock", "text": fmt.Sprintf("Indirizzo: %s", full.Indirizzo), "wrap": true},
-						{"type": "TextBlock", "text": fmt.Sprintf("Descrizione: %s", full.Descrizione), "wrap": true},
-					},
-					"actions": []map[string]any{
-						{"type": "Action.OpenUrl", "title": "Apri Smartapp", "url": applaunch.RichiesteFattibilitaAppHref},
-					},
-				},
-			},
-		},
-	}
-	return h.sendTeamsPayload(ctx, payload)
-}
-
-func (h *Handler) notifyFattibilitaUpdate(ctx context.Context, full RichiestaFull, item Fattibilita) error {
-	if !h.notificationsEnabled() {
-		return nil
-	}
-
-	text := fmt.Sprintf(
-		"Aggiornamento RDF *%s* (_%s_)\n- %s / %s\n- Stato: *%s*",
-		firstNonEmpty(full.CodiceDeal, fmt.Sprintf("#%d", full.ID)),
-		derefString(full.DealName, "Deal non disponibile"),
-		item.FornitoreNome,
-		item.TecnologiaNome,
-		item.Stato,
-	)
-	if item.Copertura != nil {
-		text += " / Copertura: *" + yesNo(*item.Copertura) + "*"
-	}
-	return h.sendTeamsPayload(ctx, map[string]string{"text": text})
-}
-
-func (h *Handler) sendTeamsPayload(ctx context.Context, payload any) error {
-	if !h.notificationsEnabled() {
-		return nil
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal teams payload: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.teamsWebhookURL, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("create teams request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := h.httpCli.Do(req)
-	if err != nil {
-		return fmt.Errorf("teams request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("teams request failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(respBody)))
-	}
-	return nil
-}
-
-func (h *Handler) notificationsEnabled() bool {
-	return h.teamsNotificationsEnabled && h.teamsWebhookURL != ""
-}
-
 func buildRichiestaWhereClause(args *[]any, stati []string, q string, dealIDsForCompany []int64, dataDa, dataA string) string {
 	parts := make([]string, 0, 4)
 	if len(stati) > 0 {
@@ -1492,16 +1388,6 @@ func countFattibilita(items []Fattibilita) FattibilitaCounts {
 		}
 	}
 	return counts
-}
-
-func shouldNotifyDiff(before, after Fattibilita) bool {
-	if before.Stato != after.Stato {
-		return true
-	}
-	if !equalBoolPointers(before.Copertura, after.Copertura) {
-		return true
-	}
-	return !equalFloatPointers(before.NRC, after.NRC) || !equalFloatPointers(before.MRC, after.MRC)
 }
 
 func eligibleDealCondition(dealAlias, stageAlias string) string {
@@ -1747,13 +1633,6 @@ func nullIfEmpty(value string) any {
 	return trimmed
 }
 
-func equalFloatPointers(left, right *float64) bool {
-	if left == nil || right == nil {
-		return left == right
-	}
-	return math.Abs(*left-*right) < 0.000001
-}
-
 func stringPointer(value string) *string {
 	return &value
 }
@@ -1767,13 +1646,6 @@ func nullBoolPtr(value sql.NullInt64) *bool {
 		return nil
 	}
 	return boolPointer(value.Int64 == 1)
-}
-
-func equalBoolPointers(left, right *bool) bool {
-	if left == nil || right == nil {
-		return left == right
-	}
-	return *left == *right
 }
 
 func derefString(value *string, fallback string) string {

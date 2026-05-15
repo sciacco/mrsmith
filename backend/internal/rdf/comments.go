@@ -23,8 +23,9 @@ import (
 )
 
 const (
-	rdfCommentNotificationType = "rdf_comment_created"
-	rdfNotificationEntityType  = "rdf_richiesta"
+	rdfCommentNotificationType          = "rdf_comment_created"
+	rdfRichiestaCreatedNotificationType = "rdf_richiesta_created"
+	rdfNotificationEntityType           = "rdf_richiesta"
 )
 
 var (
@@ -563,11 +564,19 @@ func rdfCommentNotificationRecipients(managers, notifiedUsers, mentionedUsers []
 	inputs = append(inputs, notifiedUsers...)
 	inputs = append(inputs, mentionedUsers...)
 
-	recipients := make([]notifications.Recipient, 0, len(inputs))
-	seen := make(map[string]struct{}, len(inputs))
+	return rdfNotificationRecipients(inputs, author)
+}
+
+func rdfRichiestaCreatedNotificationRecipients(managers []rdfUserRef, author rdfUserRef) []notifications.Recipient {
+	return rdfNotificationRecipients(managers, author)
+}
+
+func rdfNotificationRecipients(users []rdfUserRef, author rdfUserRef) []notifications.Recipient {
+	recipients := make([]notifications.Recipient, 0, len(users))
+	seen := make(map[string]struct{}, len(users))
 	authorEmail := strings.ToLower(strings.TrimSpace(author.Email))
 	authorSubject := rdfUserSubject(author)
-	for _, user := range inputs {
+	for _, user := range users {
 		user = normalizeRDFUserRef(user)
 		if user.Email == "" {
 			continue
@@ -587,6 +596,57 @@ func rdfCommentNotificationRecipients(managers, notifiedUsers, mentionedUsers []
 		})
 	}
 	return recipients
+}
+
+func (h *Handler) notifyRDFRichiestaCreated(ctx context.Context, full RichiestaFull) error {
+	if h.notifier == nil {
+		return nil
+	}
+	managers, err := h.listRDFUsersByRoles(ctx, applaunch.RichiesteFattibilitaManagerRoles())
+	if err != nil {
+		return err
+	}
+	author := rdfAuthorFromContext(ctx)
+	if author.Email == "" && full.CreatedBy != nil {
+		author.Email = normalizeRDFEmail(*full.CreatedBy)
+	}
+	if author.Name == "" {
+		author.Name = firstNonEmpty(author.Email, derefString(full.CreatedBy, ""))
+	}
+	recipients := rdfRichiestaCreatedNotificationRecipients(managers, author)
+	if len(recipients) == 0 {
+		return nil
+	}
+
+	code := firstNonEmpty(full.CodiceDeal, fmt.Sprintf("#%d", full.ID))
+	authorLabel := firstNonEmpty(author.Name, author.Email, derefString(full.CreatedBy, ""), "Un utente")
+	companyLabel := derefString(full.CompanyName, "cliente non disponibile")
+	var dealID any
+	if full.DealID != nil {
+		dealID = *full.DealID
+	}
+	_, err = h.notifier.Notify(ctx, notifications.NotifyInput{
+		TypeKey:    rdfRichiestaCreatedNotificationType,
+		Title:      fmt.Sprintf("Nuova RDF %s", code),
+		Body:       fmt.Sprintf("%s ha inserito una nuova richiesta di fattibilita per %s.", authorLabel, companyLabel),
+		EntityType: rdfNotificationEntityType,
+		EntityID:   strconv.Itoa(full.ID),
+		DedupeKey:  fmt.Sprintf("rdf:richiesta:%d:created", full.ID),
+		DeepLink:   h.rdfRichiestaDeepLink(full.ID),
+		Metadata: map[string]any{
+			"richiesta_id": full.ID,
+			"codice_deal":  full.CodiceDeal,
+			"deal_id":      dealID,
+			"company_name": derefString(full.CompanyName, ""),
+			"deal_name":    derefString(full.DealName, ""),
+			"created_by":   derefString(full.CreatedBy, author.Email),
+		},
+		PolicyOverride:   rdfCommentEmailPolicyOverride(time.Now()),
+		Recipients:       recipients,
+		CreatedBySubject: rdfUserSubject(author),
+		CreatedByEmail:   author.Email,
+	})
+	return err
 }
 
 func rdfCommentEmailPolicyOverride(now time.Time) map[string]any {

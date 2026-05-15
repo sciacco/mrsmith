@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/auth"
+	"github.com/sciacco/mrsmith/internal/notifications"
 	"github.com/sciacco/mrsmith/internal/platform/keycloak"
 )
 
@@ -152,6 +153,100 @@ func TestRDFCommentNotificationRecipientsDeduplicateAndExcludeAuthor(t *testing.
 	}
 }
 
+func TestNotifyRDFRichiestaCreatedNotifiesManagersWithEmailPolicy(t *testing.T) {
+	dealID := int64(12345)
+	notifier := &fakeRDFNotifier{}
+	h := &Handler{
+		notifier:                   notifier,
+		richiesteFattibilitaAppURL: "https://portal.example/apps/richieste-fattibilita/",
+		roleResolver: &fakeRDFRoleResolver{usersByRole: map[string][]keycloak.User{
+			"app_rdf_manager": {
+				{ID: "creator-subject", Email: "creator@example.com", Name: "Creator Manager"},
+				{ID: "manager-subject", Email: "manager@example.com", Name: "Manager"},
+				{ID: "manager-duplicate", Email: "MANAGER@example.com", Name: "Duplicate"},
+			},
+		}},
+	}
+	ctx := context.WithValue(context.Background(), auth.ClaimsKey, auth.Claims{
+		Subject: "creator-subject",
+		Email:   "creator@example.com",
+		Name:    "Creator",
+	})
+
+	err := h.notifyRDFRichiestaCreated(ctx, RichiestaFull{
+		Richiesta: Richiesta{
+			ID:         42,
+			DealID:     &dealID,
+			CodiceDeal: "DL-42",
+			CreatedBy:  stringPointer("creator@example.com"),
+		},
+		DealName:    stringPointer("Upgrade connettivita"),
+		CompanyName: stringPointer("Acme"),
+	})
+	if err != nil {
+		t.Fatalf("notify failed: %v", err)
+	}
+	if len(notifier.notifies) != 1 {
+		t.Fatalf("expected one notification, got %#v", notifier.notifies)
+	}
+	input := notifier.notifies[0]
+	if input.TypeKey != rdfRichiestaCreatedNotificationType {
+		t.Fatalf("unexpected type key: %q", input.TypeKey)
+	}
+	if input.EntityType != rdfNotificationEntityType || input.EntityID != "42" {
+		t.Fatalf("unexpected entity: type=%q id=%q", input.EntityType, input.EntityID)
+	}
+	if input.DedupeKey != "rdf:richiesta:42:created" {
+		t.Fatalf("unexpected dedupe key: %q", input.DedupeKey)
+	}
+	if input.DeepLink != "https://portal.example/apps/richieste-fattibilita/richieste/42/view" {
+		t.Fatalf("unexpected deep link: %q", input.DeepLink)
+	}
+	if input.Title != "Nuova RDF DL-42" {
+		t.Fatalf("unexpected title: %q", input.Title)
+	}
+	if input.Body != "Creator ha inserito una nuova richiesta di fattibilita per Acme." {
+		t.Fatalf("unexpected body: %q", input.Body)
+	}
+	if input.CreatedBySubject != "creator-subject" || input.CreatedByEmail != "creator@example.com" {
+		t.Fatalf("unexpected creator: subject=%q email=%q", input.CreatedBySubject, input.CreatedByEmail)
+	}
+	if len(input.Recipients) != 1 || input.Recipients[0].Email != "manager@example.com" {
+		t.Fatalf("unexpected recipients: %#v", input.Recipients)
+	}
+	if input.Metadata["richiesta_id"] != 42 || input.Metadata["codice_deal"] != "DL-42" || input.Metadata["company_name"] != "Acme" {
+		t.Fatalf("unexpected metadata: %#v", input.Metadata)
+	}
+	if input.Metadata["deal_id"] != dealID {
+		t.Fatalf("unexpected deal id metadata: %#v", input.Metadata)
+	}
+	steps := rdfCommentEmailSteps(t, input.PolicyOverride)
+	if len(steps) != 3 {
+		t.Fatalf("expected 3 email steps, got %#v", steps)
+	}
+}
+
+func TestRDFRichiestaCreatedNotificationRecipientsDeduplicateAndExcludeAuthor(t *testing.T) {
+	recipients := rdfRichiestaCreatedNotificationRecipients(
+		[]rdfUserRef{
+			{Subject: "author", Email: "author@example.com", Name: "Author Manager"},
+			{Subject: "manager", Email: "manager@example.com", Name: "Manager"},
+			{Subject: "manager-copy", Email: "MANAGER@example.com", Name: "Duplicate"},
+			{Subject: "author", Email: "alias@example.com", Name: "Author Alias"},
+		},
+		rdfUserRef{Subject: "author", Email: "author@example.com"},
+	)
+
+	got := make([]string, 0, len(recipients))
+	for _, recipient := range recipients {
+		got = append(got, recipient.Email)
+	}
+	want := []string{"manager@example.com"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected recipients: got %#v want %#v", got, want)
+	}
+}
+
 func TestRDFCommentEmailScheduleUsesRomeBusinessWindow(t *testing.T) {
 	loc := rdfRomeLocation()
 	cases := []struct {
@@ -214,6 +309,26 @@ func TestRDFCommentsMigrationDefinesExpectedConstraints(t *testing.T) {
 	}
 }
 
+func TestRDFCreateNotificationMigrationDefinesExpectedType(t *testing.T) {
+	raw, err := os.ReadFile("../../../deploy/migrations/010_anisetta_rdf_create_notifications.sql")
+	if err != nil {
+		t.Fatalf("read migration: %v", err)
+	}
+	sql := string(raw)
+	required := []string{
+		"'rdf_richiesta_created'",
+		"'richieste-fattibilita'",
+		"'Nuova RDF'",
+		`"portal":`,
+		`"email":`,
+	}
+	for _, snippet := range required {
+		if !bytes.Contains(raw, []byte(snippet)) {
+			t.Fatalf("migration missing %q\n%s", snippet, sql)
+		}
+	}
+}
+
 func rdfCommentEmailSteps(t *testing.T, policy map[string]any) []map[string]any {
 	t.Helper()
 	emailPolicy, ok := policy["email"].(map[string]any)
@@ -249,4 +364,23 @@ func (r *fakeRDFRoleResolver) UsersByRealmRole(_ context.Context, roleName strin
 		return nil, r.err
 	}
 	return append([]keycloak.User(nil), r.usersByRole[roleName]...), nil
+}
+
+type fakeRDFNotifier struct {
+	notifies []notifications.NotifyInput
+	resolves []notifications.ResolveInput
+}
+
+func (n *fakeRDFNotifier) Notify(_ context.Context, input notifications.NotifyInput) (notifications.NotifyResult, error) {
+	n.notifies = append(n.notifies, input)
+	return notifications.NotifyResult{
+		NotificationID: int64(len(n.notifies)),
+		RecipientCount: len(input.Recipients),
+		Created:        true,
+	}, nil
+}
+
+func (n *fakeRDFNotifier) Resolve(_ context.Context, input notifications.ResolveInput) error {
+	n.resolves = append(n.resolves, input)
+	return nil
 }

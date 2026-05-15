@@ -522,8 +522,6 @@ func main() {
 		RoleResolver:               keycloakRoleResolver,
 		RichiesteFattibilitaAppURL: cfg.RichiesteFattibilitaAppURL,
 		StaticDir:                  cfg.StaticDir,
-		TeamsWebhookURL:            cfg.RDFTeamsWebhookURL,
-		TeamsNotificationsEnabled:  cfg.RDFTeamsNotificationsEnabled,
 	})
 	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)

@@ -87,10 +87,6 @@ type Config struct {
 	// OpenRouter AI integration (optional)
 	OpenRouterAPIKey string
 
-	// RDF Teams notifications (optional)
-	RDFTeamsWebhookURL           string
-	RDFTeamsNotificationsEnabled bool
-
 	// SMTP email delivery (optional, disabled by default)
 	SMTPEnabled       bool
 	SMTPHost          string
@@ -199,24 +195,22 @@ func Load() Config {
 			"CARBONE_AFCTOOLS_TRANSAZIONI_TEMPLATE_ID",
 			afctools.DefaultTransazioniTemplateID,
 		),
-		OpenRouterAPIKey:             envOr("OPENROUTER_API_KEY", ""),
-		RDFTeamsWebhookURL:           envOr("RDF_TEAMS_WEBHOOK_URL", ""),
-		RDFTeamsNotificationsEnabled: boolEnvOr("RDF_TEAMS_NOTIFICATIONS_ENABLED", false),
-		SMTPEnabled:                  boolEnvOr("SMTP_ENABLED", false),
-		SMTPHost:                     envOr("SMTP_HOST", ""),
-		SMTPPort:                     envOr("SMTP_PORT", "587"),
-		SMTPUsername:                 envOr("SMTP_USERNAME", ""),
-		SMTPPassword:                 envOr("SMTP_PASSWORD", ""),
-		SMTPFrom:                     envOr("SMTP_FROM", ""),
-		SMTPTLSMode:                  envOr("SMTP_TLS_MODE", "auto"),
-		SMTPTLSSkipVerify:            boolEnvOr("SMTP_TLS_SKIP_VERIFY", false),
-		SMTPTLSServerName:            envOr("SMTP_TLS_SERVER_NAME", ""),
-		SMTPAuthMode:                 envOr("SMTP_AUTH_MODE", "auto"),
-		MrSmithPublicBaseURL:         envOr("MRSMITH_PUBLIC_BASE_URL", ""),
-		NotificationsWorkerEnabled:   boolEnvOr("NOTIFICATIONS_WORKER_ENABLED", true),
-		NotificationsWorkerInterval:  durationEnvOr("NOTIFICATIONS_WORKER_INTERVAL", time.Minute),
-		NotifySelfMentions:           boolEnvOr("NOTIFY_SELF_MENTIONS", false),
-		DiagnosticEventsEnabled:      boolEnvOr("DIAGNOSTIC_EVENTS_ENABLED", envOr("ANISETTA_DSN", "") != ""),
+		OpenRouterAPIKey:            envOr("OPENROUTER_API_KEY", ""),
+		SMTPEnabled:                 boolEnvOr("SMTP_ENABLED", false),
+		SMTPHost:                    envOr("SMTP_HOST", ""),
+		SMTPPort:                    envOr("SMTP_PORT", "587"),
+		SMTPUsername:                envOr("SMTP_USERNAME", ""),
+		SMTPPassword:                envOr("SMTP_PASSWORD", ""),
+		SMTPFrom:                    envOr("SMTP_FROM", ""),
+		SMTPTLSMode:                 envOr("SMTP_TLS_MODE", "auto"),
+		SMTPTLSSkipVerify:           boolEnvOr("SMTP_TLS_SKIP_VERIFY", false),
+		SMTPTLSServerName:           envOr("SMTP_TLS_SERVER_NAME", ""),
+		SMTPAuthMode:                envOr("SMTP_AUTH_MODE", "auto"),
+		MrSmithPublicBaseURL:        envOr("MRSMITH_PUBLIC_BASE_URL", ""),
+		NotificationsWorkerEnabled:  boolEnvOr("NOTIFICATIONS_WORKER_ENABLED", true),
+		NotificationsWorkerInterval: durationEnvOr("NOTIFICATIONS_WORKER_INTERVAL", time.Minute),
+		NotifySelfMentions:          boolEnvOr("NOTIFY_SELF_MENTIONS", false),
+		DiagnosticEventsEnabled:     boolEnvOr("DIAGNOSTIC_EVENTS_ENABLED", envOr("ANISETTA_DSN", "") != ""),
 		DiagnosticEventsRetentionDays: positiveIntEnvOr(
 			"DIAGNOSTIC_EVENTS_RETENTION_DAYS",
 			90,
