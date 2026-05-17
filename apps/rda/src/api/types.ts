@@ -264,7 +264,10 @@ export interface PatchPOPayload {
   project?: string;
   provider_offer_code?: string;
   provider_offer_date?: string;
-  recipient_ids?: number[];
+}
+
+export interface UpdatePORecipientsPayload {
+  recipient_ids: number[];
 }
 
 export interface ProviderPayload {

@@ -16,6 +16,7 @@ import {
   useTransitionMutation,
   useUploadAttachment,
   usePatchPO,
+  useUpdatePORecipients,
 } from '../api/queries';
 import type { AttachmentType, PoAttachment, PoDetail, PoRow, ProviderReference, ProviderSummary } from '../api/types';
 import { BudgetSelect } from '../components/BudgetSelect';
@@ -59,7 +60,7 @@ import {
   preferredPaymentMethodCode,
   requiresPaymentMethodVerification,
 } from '../lib/payment-options';
-import { QUALIFICATION_REF } from '../lib/provider-refs';
+import { canManageProviderContacts, QUALIFICATION_REF } from '../lib/provider-refs';
 import { PO_STATES } from '../lib/state-labels';
 import { firstError, validateNewPO } from '../lib/validation';
 
@@ -151,6 +152,7 @@ export function NewRdaWizardPage() {
   const po = usePODetail(poId);
   const createPO = useCreatePO();
   const patchPO = usePatchPO(poId);
+  const updateRecipients = useUpdatePORecipients(poId);
   const transition = useTransitionMutation();
   const upload = useUploadAttachment();
   const removeAttachment = useDeleteAttachment();
@@ -201,6 +203,7 @@ export function NewRdaWizardPage() {
   const headerDirty = detail ? JSON.stringify(header) !== JSON.stringify(initialHeader) : true;
   const requester = isRequester(detail, user?.email);
   const draftEditable = !detail || (detail.state === PO_STATES.DRAFT && requester);
+  const contactsEditable = draftEditable && canManageProviderContacts(detail, provider.data);
   const providerDefault = paymentCodeFromProvider(fullProvider);
   const cdlanDefault = defaultPayment.data?.code ?? '';
   const paymentOptions = useMemo(
@@ -260,7 +263,7 @@ export function NewRdaWizardPage() {
     },
   ];
   const readyToSubmit = draftEditable && readinessItems.every((item) => item.ready);
-  const footerBusy = createPO.isPending || patchPO.isPending || transition.isPending;
+  const footerBusy = createPO.isPending || patchPO.isPending || updateRecipients.isPending || transition.isPending;
 
   function headerFieldError(key: string): string | undefined {
     if (!attemptedHeader) return undefined;
@@ -331,7 +334,11 @@ export function NewRdaWizardPage() {
     }
     if (!headerDirty && !providerChanged) return true;
     try {
-      await patchPO.mutateAsync(buildPatchPOPayload(header, budgets.data ?? [], providerChanged));
+      await patchPO.mutateAsync(buildPatchPOPayload(header, budgets.data ?? []));
+      if (providerChanged) {
+        await updateRecipients.mutateAsync({ recipient_ids: [] });
+        setContactDraftIds([]);
+      }
       toast('Dati richiesta salvati');
       return true;
     } catch {
@@ -345,7 +352,10 @@ export function NewRdaWizardPage() {
     const deliveryHeader = header.type === 'ECOMMERCE' ? { ...header, note: '' } : header;
     const recipientIds = header.type === 'ECOMMERCE' ? [] : contactDraftIds;
     try {
-      await patchPO.mutateAsync(buildPatchPOPayload(deliveryHeader, budgets.data ?? [], false, recipientIds));
+      if (headerDirty || providerChanged) {
+        await patchPO.mutateAsync(buildPatchPOPayload(deliveryHeader, budgets.data ?? []));
+      }
+      await updateRecipients.mutateAsync({ recipient_ids: recipientIds });
       if (header.type === 'ECOMMERCE') setContactDraftIds([]);
       toast('Contenuto del PO aggiornato');
       return true;
@@ -456,7 +466,8 @@ export function NewRdaWizardPage() {
     const deliveryHeader = header.type === 'ECOMMERCE' ? { ...header, note: '' } : header;
     const recipientIds = header.type === 'ECOMMERCE' ? [] : contactDraftIds;
     try {
-      if (headerDirty || providerChanged) await patchPO.mutateAsync(buildPatchPOPayload(deliveryHeader, budgets.data ?? [], providerChanged, recipientIds));
+      if (headerDirty || providerChanged) await patchPO.mutateAsync(buildPatchPOPayload(deliveryHeader, budgets.data ?? []));
+      await updateRecipients.mutateAsync({ recipient_ids: recipientIds });
       await transition.mutateAsync({ id: detail.id, action: 'submit' });
       toast('Richiesta mandata in approvazione');
       navigate('/rda');
@@ -730,7 +741,8 @@ export function NewRdaWizardPage() {
                   <ProviderRefTable
                     po={detail}
                     provider={fullProvider}
-                    editable={draftEditable}
+                    editable={contactsEditable}
+                    savingRecipients={updateRecipients.isPending}
                     showSaveAction={false}
                     onSelectionChange={setContactDraftIds}
                   />
@@ -813,7 +825,7 @@ export function NewRdaWizardPage() {
             <Button
               leftIcon={<Icon name="check" />}
               disabled={!readyToSubmit || footerBusy}
-              loading={patchPO.isPending || transition.isPending}
+              loading={patchPO.isPending || updateRecipients.isPending || transition.isPending}
               onClick={() => void nextStep()}
             >
               Manda in approvazione
@@ -865,7 +877,7 @@ export function NewRdaWizardPage() {
         title="Manda in approvazione"
         message="Confermi l'invio della richiesta in approvazione?"
         confirmLabel="Manda in approvazione"
-        loading={patchPO.isPending || transition.isPending}
+        loading={patchPO.isPending || updateRecipients.isPending || transition.isPending}
         onClose={() => setSubmitConfirm(false)}
         onConfirm={() => void submitPO()}
       />

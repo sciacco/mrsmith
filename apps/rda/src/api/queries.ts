@@ -21,6 +21,7 @@ import type {
   RdaPermissions,
   RdaUser,
   RowPayload,
+  UpdatePORecipientsPayload,
 } from './types';
 import { useApiClient } from './client';
 
@@ -193,6 +194,15 @@ export function usePatchPO(id: number | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: PatchPOPayload) => api.patch<PoDetail>(`${rdaRoot}/pos/${id}`, body),
+    onSuccess: () => invalidatePO(queryClient, id ?? undefined),
+  });
+}
+
+export function useUpdatePORecipients(id: number | null) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdatePORecipientsPayload) => api.patch<unknown>(`${rdaRoot}/pos/${id}/recipients`, body),
     onSuccess: () => invalidatePO(queryClient, id ?? undefined),
   });
 }

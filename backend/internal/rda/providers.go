@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 const providerQualificationReferenceType = "QUALIFICATION_REF"
+
+var providerReferencePhonePattern = regexp.MustCompile(`^\+[1-9][0-9]{4,19}$`)
 
 var allowedRDAProviderReferenceTypes = map[string]struct{}{
 	"OTHER_REF":          {},
@@ -108,6 +111,10 @@ func (h *Handler) handleCreateProviderReference(w http.ResponseWriter, r *http.R
 		httputil.Error(w, http.StatusBadRequest, "Tipo contatto non valido")
 		return
 	}
+	if payload.Email == nil {
+		httputil.Error(w, http.StatusBadRequest, "Inserisci l'email del contatto")
+		return
+	}
 	h.forwardProviderReference(
 		w,
 		r,
@@ -169,6 +176,10 @@ func decodeProviderReferencePayload(w http.ResponseWriter, r *http.Request) (pro
 		httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
 		return providerReferencePayload{}, false
 	}
+	if !isValidRDAProviderReferencePhone(phone) {
+		httputil.Error(w, http.StatusBadRequest, "Telefono contatto non valido")
+		return providerReferencePayload{}, false
+	}
 	payload.Phone = phone
 	refType, ok := referencePayloadString(raw, "reference_type")
 	if !ok {
@@ -194,6 +205,10 @@ func referencePayloadString(raw map[string]any, key string) (string, bool) {
 func isAllowedRDAProviderReferenceType(value string) bool {
 	_, ok := allowedRDAProviderReferenceTypes[value]
 	return ok
+}
+
+func isValidRDAProviderReferencePhone(value string) bool {
+	return value == "" || providerReferencePhonePattern.MatchString(value)
 }
 
 func (p providerReferencePayload) arakBody(opts providerReferenceForwardOptions) ([]byte, error) {

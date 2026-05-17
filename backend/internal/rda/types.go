@@ -175,6 +175,10 @@ type clonePORequest struct {
 	IncludeOfferFields bool   `json:"include_offer_fields,omitempty"`
 }
 
+type updatePORecipientsRequest struct {
+	RecipientIDs []int64 `json:"recipient_ids"`
+}
+
 func (req clonePORequest) includeRows() bool {
 	return req.IncludeRows == nil || *req.IncludeRows
 }

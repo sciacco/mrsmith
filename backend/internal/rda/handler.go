@@ -77,6 +77,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handle("GET /rda/v1/pos/{id}", h.handleGetPO)
 	handle("POST /rda/v1/pos/{id}/clone", h.handleClonePO)
 	handle("PATCH /rda/v1/pos/{id}", h.handlePatchPO)
+	handle("PATCH /rda/v1/pos/{id}/recipients", h.handleUpdatePORecipients)
 	handle("DELETE /rda/v1/pos/{id}", h.handleDeletePO)
 
 	handle("POST /rda/v1/pos/{id}/submit", h.handleSubmitPO)
@@ -652,6 +653,56 @@ func (h *Handler) handlePatchPO(w http.ResponseWriter, r *http.Request) {
 	h.forwardArak(w, r, http.MethodPatch, arakRDARoot+"/po/"+url.PathEscape(r.PathValue("id")), "", encoded, mergeHeaders(requesterHeaders(email), jsonHeaders()))
 }
 
+func (h *Handler) handleUpdatePORecipients(w http.ResponseWriter, r *http.Request) {
+	if !h.requireArak(w) {
+		return
+	}
+	email, ok := currentEmail(r)
+	if !ok {
+		httputil.Error(w, http.StatusUnauthorized, "Accesso richiesto")
+		return
+	}
+	poID, err := positivePathID(r.PathValue("id"))
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+		return
+	}
+	var req updatePORecipientsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+		return
+	}
+	if err := validateUpdatePORecipients(req); err != nil {
+		httputil.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	encoded, err := encodeJSONBody(req)
+	if err != nil {
+		httputil.InternalError(w, r, err, "rda recipients body encode failed")
+		return
+	}
+	response, err := h.patchPORecipientsUpstream(email, poID, encoded)
+	if err != nil {
+		h.requestLogger(r, "rda_update_recipients", "upstream_path", arakRDARoot+"/po/"+url.PathEscape(poID)+"/recipients").Error("upstream request failed", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio RDA temporaneamente non disponibile",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	if response.status < 200 || response.status >= 300 {
+		h.writeUpstreamBodyRejected(w, r, response, arakRDARoot+"/po/"+url.PathEscape(poID)+"/recipients")
+		return
+	}
+	copyResponseHeaders(w.Header(), response.header)
+	w.Header().Del("Content-Length")
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
+	w.WriteHeader(response.status)
+	_, _ = w.Write(response.body)
+}
+
 func (h *Handler) handleDeletePO(w http.ResponseWriter, r *http.Request) {
 	if !h.requireArak(w) {
 		return
@@ -826,7 +877,7 @@ func decodeAllowedPatch(reader io.Reader) (map[string]any, error) {
 	allowed := map[string]struct{}{
 		"type": {}, "budget_id": {}, "budget_user_id": {}, "cost_center": {}, "description": {},
 		"object": {}, "note": {}, "payment_method": {}, "reference_warehouse": {}, "provider_id": {},
-		"project": {}, "provider_offer_code": {}, "provider_offer_date": {}, "currency": {}, "recipient_ids": {},
+		"project": {}, "provider_offer_code": {}, "provider_offer_date": {}, "currency": {},
 	}
 	out := make(map[string]any)
 	for key, value := range raw {

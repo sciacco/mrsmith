@@ -14,6 +14,7 @@ import {
   useProviders,
   useRdaDownloads,
   useTransitionMutation,
+  useUpdatePORecipients,
   type TransitionAction,
 } from '../api/queries';
 import type { ClonePOResponse, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
@@ -33,6 +34,7 @@ import { canDownloadPOPDF } from '../lib/po-pdf';
 import { buildPatchPOPayload } from '../lib/po-payload';
 import { buildPOReadinessItems, buildTabBadges, selectedModeID } from '../lib/po-detail-view-model';
 import { buildPaymentMethodOptions, paymentCodeFromProvider, preferredPaymentMethodCode, requiresPaymentMethodVerification } from '../lib/payment-options';
+import { canManageProviderContacts } from '../lib/provider-refs';
 import { PO_STATES } from '../lib/state-labels';
 
 function afterTransitionRoute(po: PoDetail, action: TransitionAction): string | null {
@@ -88,6 +90,7 @@ export function PoDetailPage() {
   const editProvider = useProvider(editProviderID && editProviderID !== persistedProviderID ? editProviderID : null);
   const patchPO = usePatchPO(poId);
   const patchPayment = usePatchPaymentMethod(poId);
+  const updateRecipients = useUpdatePORecipients(poId);
   const transition = useTransitionMutation();
   const downloads = useRdaDownloads();
   const providerOptions = useMemo(() => {
@@ -163,11 +166,11 @@ export function PoDetailPage() {
   const detail = po.data;
   const currentHeader = header;
   const initialHeader = headerStateFromPO(detail);
-  const providerChanged = currentHeader.provider_id !== initialHeader.provider_id;
   const requester = isRequester(detail, user?.email);
   const draftEditable = detail.state === PO_STATES.DRAFT && requester;
   const paymentEditable = detail.state === PO_STATES.PENDING_APPROVAL_PAYMENT_METHOD && requester;
   const headerCanEdit = draftEditable || paymentEditable;
+  const contactsEditable = canManageProviderContacts(detail, provider.data);
   const headerEditDisabledReason = requester
     ? 'I dati di testata non sono modificabili in questo stato.'
     : 'Solo il richiedente puo modificare i dati della richiesta.';
@@ -251,8 +254,11 @@ export function PoDetailPage() {
     if (!draftEditable) return;
     try {
       const nextProviderChanged = nextHeader.provider_id !== initialHeader.provider_id;
-      await patchPO.mutateAsync(buildPatchPOPayload(nextHeader, budgets.data ?? [], nextProviderChanged));
-      if (nextProviderChanged) setRecipientDraftIds([]);
+      await patchPO.mutateAsync(buildPatchPOPayload(nextHeader, budgets.data ?? []));
+      if (nextProviderChanged) {
+        await updateRecipients.mutateAsync({ recipient_ids: [] });
+        setRecipientDraftIds([]);
+      }
       toast('Bozza aggiornata');
       closeHeaderModal();
     } catch {
@@ -308,11 +314,7 @@ export function PoDetailPage() {
   async function saveRecipients(ids: number[]) {
     try {
       setRecipientDraftIds(ids);
-      if (providerChanged && draftEditable) {
-        await patchPO.mutateAsync(buildPatchPOPayload(currentHeader, budgets.data ?? [], providerChanged, ids));
-      } else {
-        await patchPO.mutateAsync({ recipient_ids: ids });
-      }
+      await updateRecipients.mutateAsync({ recipient_ids: ids });
       toast('Contatti aggiornati');
     } catch {
       toast('Salvataggio contatti non riuscito', 'error');
@@ -348,7 +350,7 @@ export function PoDetailPage() {
         selectedMode={selectedActionMode}
         canSubmit={canSubmit}
         quoteRuleBlocked={quoteRuleBlocked}
-        saving={patchPO.isPending || patchPayment.isPending}
+        saving={patchPO.isPending || patchPayment.isPending || updateRecipients.isPending}
         transitioning={transition.isPending}
         onModeChange={setSelectedActionMode}
         onClose={() => navigate('/rda')}
@@ -373,7 +375,10 @@ export function PoDetailPage() {
           <PoTabs
             po={detailWithDisplayedRecipients ?? detail}
             provider={fullProvider}
-            editable={draftEditable}
+            rowsEditable={draftEditable}
+            attachmentsEditable={draftEditable}
+            contactsEditable={contactsEditable}
+            contactsSaving={updateRecipients.isPending}
             badges={tabBadges}
             onRecipientSelectionChange={setRecipientDraftIds}
             onSaveRecipients={(ids) => void saveRecipients(ids)}
@@ -390,7 +395,7 @@ export function PoDetailPage() {
         title="Manda in approvazione"
         message="Confermi l'invio della richiesta in approvazione?"
         confirmLabel="Manda in approvazione"
-        loading={patchPO.isPending || transition.isPending}
+        loading={patchPO.isPending || updateRecipients.isPending || transition.isPending}
         onClose={() => setSubmitConfirm(false)}
         onConfirm={() => void submitPO()}
       />
@@ -404,7 +409,7 @@ export function PoDetailPage() {
         paymentRequiresVerification={editPaymentRequiresVerification}
         draftEditable={draftEditable}
         paymentEditable={paymentEditable}
-        saving={patchPO.isPending || patchPayment.isPending}
+        saving={patchPO.isPending || patchPayment.isPending || updateRecipients.isPending}
         onChange={setEditHeader}
         onSave={(next) => void saveHeaderModal(next)}
         onClose={closeHeaderModal}

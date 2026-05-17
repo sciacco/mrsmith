@@ -545,7 +545,7 @@ func (h *Handler) copyPORecipients(r *http.Request, email string, newPOID string
 		h.requestLogger(r, "rda_clone_recipients", "new_po_id", newPOID).Warn("recipient body encode failed", "error", err)
 		return 0, []string{"I destinatari non sono stati copiati: verifica la nuova bozza."}
 	}
-	response, err := h.patchPOUpstream(email, newPOID, encoded)
+	response, err := h.patchPORecipientsUpstream(email, newPOID, encoded)
 	if err != nil {
 		h.requestLogger(r, "rda_clone_recipients", "new_po_id", newPOID).Warn("upstream recipient copy failed", "error", err)
 		return 0, []string{"I destinatari non sono stati copiati: verifica la nuova bozza."}
@@ -578,8 +578,8 @@ func recipientIDsFromRaw(recipients []json.RawMessage) []int64 {
 	return ids
 }
 
-func (h *Handler) patchPOUpstream(email string, poID string, body io.Reader) (upstreamBodyResponse, error) {
-	path := arakRDARoot + "/po/" + url.PathEscape(poID)
+func (h *Handler) patchPORecipientsUpstream(email string, poID string, body io.Reader) (upstreamBodyResponse, error) {
+	path := arakRDARoot + "/po/" + url.PathEscape(poID) + "/recipients"
 	resp, err := h.arak.DoWithHeaders(http.MethodPatch, path, "", body, mergeHeaders(requesterHeaders(email), jsonHeaders()))
 	if err != nil {
 		return upstreamBodyResponse{}, err

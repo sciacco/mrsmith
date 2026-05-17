@@ -253,6 +253,8 @@ type paymentValidationFixture struct {
 	rowCreateBody    string
 	rowDeleteStatus  int
 	rowDeleteBody    string
+	recipientStatus  int
+	recipientBody    string
 	quoteThreshold   float64
 }
 
@@ -334,6 +336,15 @@ func (s *paymentValidationArakState) ServeHTTP(w http.ResponseWriter, r *http.Re
 		}
 		if s.fixture.rowDeleteBody != "" {
 			_, _ = w.Write([]byte(s.fixture.rowDeleteBody))
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	case r.Method == http.MethodPatch && strings.HasPrefix(r.URL.Path, "/arak/rda/v1/po/") && strings.HasSuffix(r.URL.Path, "/recipients"):
+		if s.fixture.recipientStatus != 0 {
+			w.WriteHeader(s.fixture.recipientStatus)
+		}
+		if s.fixture.recipientBody != "" {
+			_, _ = w.Write([]byte(s.fixture.recipientBody))
 			return
 		}
 		_, _ = w.Write([]byte(`{"ok":true}`))

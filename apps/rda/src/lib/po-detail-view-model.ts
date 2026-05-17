@@ -70,7 +70,8 @@ export function buildPOReadinessItems(po: PoDetail, header: POHeaderState, optio
   const quoteCount = countQuoteAttachments(po.attachments);
   const quoteRuleReady = total < options.quoteThreshold || quoteCount >= 2;
   const recipients = options.recipients ?? po.recipients ?? [];
-  const contactsReady = recipients.length > 0 || hasQualificationFallback(options.provider ?? po.provider);
+  const sendsToProvider = po.type !== 'ECOMMERCE';
+  const contactsReady = !sendsToProvider || recipients.length > 0 || hasQualificationFallback(options.provider ?? po.provider);
   const headerReady = Boolean(
     header.budget_id &&
       header.provider_id &&
@@ -106,7 +107,11 @@ export function buildPOReadinessItems(po: PoDetail, header: POHeaderState, optio
       id: 'contacts',
       label: 'Destinatari',
       ready: contactsReady,
-      detail: contactsReady ? 'Destinatari selezionati o referente qualifica disponibile.' : 'Seleziona un contatto fornitore.',
+      detail: !sendsToProvider
+        ? 'PO e-commerce: nessun invio automatico al fornitore.'
+        : contactsReady
+          ? 'Destinatari selezionati o referente qualifica disponibile.'
+          : 'Seleziona un contatto fornitore.',
     },
     {
       id: 'payment',

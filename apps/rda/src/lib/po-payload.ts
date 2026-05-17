@@ -66,8 +66,6 @@ export function buildCreatePOPayload(header: POHeaderDraft, budgets: BudgetForUs
 export function buildPatchPOPayload(
   header: POHeaderDraft,
   budgets: BudgetForUser[],
-  providerChanged: boolean,
-  recipientIds?: number[],
 ): PatchPOPayload {
   return {
     ...(header.type ? { type: header.type } : {}),
@@ -83,7 +81,5 @@ export function buildPatchPOPayload(
     description: header.description.trim(),
     note: header.note.trim(),
     reference_warehouse: 'MILANO',
-    ...(providerChanged ? { recipient_ids: [] } : {}),
-    ...(recipientIds ? { recipient_ids: recipientIds } : {}),
   };
 }

@@ -176,6 +176,15 @@ Alyante ERP ID
 - Used by: `apps/rda` PO detail and new-RDA wizard header save flows.
 - Open questions: whether Mistra exposes a supported way to clear an existing `provider_offer_date`; the current safe behavior omits empty dates on PATCH.
 
+### RDA PO Recipients Use The Dedicated Recipients Endpoint
+
+- Context: `apps/rda` PO contact selection, clone flows, and any backend code that changes the provider recipients of an RDA PO.
+- Discovery: Mistra exposes `PATCH /arak/rda/v1/po/{id}/recipients` for recipient selection. This endpoint accepts `recipient_ids` as an array and an empty array clears the selection. Recipient changes are not part of the generic PO header patch contract.
+- Practical rule: the RDA frontend and BFF must save header fields and recipient selections as separate operations. Use `PATCH /api/rda/v1/pos/{id}/recipients` for selection and clearing, including clone recipient copy and provider-change clearing. Do not send `recipient_ids` through `PATCH /api/rda/v1/pos/{id}`.
+- Evidence: `docs/mistra-dist.yaml` path `/arak/rda/v1/po/{id}/recipients`; backend `backend/internal/rda/handler.go` and `backend/internal/rda/clone.go`; frontend `apps/rda/src/api/queries.ts`.
+- Used by: `apps/rda` PO detail, `/rda/new`, and PO clone.
+- Open questions: none.
+
 ### RDA Budget Selection Keys
 
 - Context: `apps/rda` budget selection in new/clone/edit RDA flows.

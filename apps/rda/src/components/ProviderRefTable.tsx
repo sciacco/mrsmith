@@ -3,43 +3,33 @@ import { useEffect, useMemo, useState } from 'react';
 import { useProviderMutations } from '../api/queries';
 import type { PoDetail, ProviderReference, ProviderSummary } from '../api/types';
 import {
-  PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE,
-  PROVIDER_REFERENCE_PHONE_PATTERN,
-  availableReferenceTypes,
   QUALIFICATION_REF,
-  isValidOptionalProviderRefPhone,
   referenceTypeLabel,
 } from '../lib/provider-refs';
+import { ProviderContactModal } from './ProviderContactModal';
 
 function providerRefs(provider?: ProviderSummary): ProviderReference[] {
   if (!provider) return [];
   const refs = provider.refs?.length ? provider.refs : provider.ref ? [provider.ref] : [];
-  return refs;
+  return [...refs].sort(compareProviderRefs);
+}
+
+const referenceTypeOrder: Record<string, number> = {
+  [QUALIFICATION_REF]: 0,
+  ADMINISTRATIVE_REF: 1,
+  TECHNICAL_REF: 2,
+  OTHER_REF: 3,
+};
+
+function compareProviderRefs(left: ProviderReference, right: ProviderReference): number {
+  const leftOrder = referenceTypeOrder[left.reference_type ?? ''] ?? 4;
+  const rightOrder = referenceTypeOrder[right.reference_type ?? ''] ?? 4;
+  if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+  return contactName(left).localeCompare(contactName(right), 'it', { sensitivity: 'base' });
 }
 
 function recipientIDs(po: PoDetail): number[] {
   return (po.recipients ?? []).map((ref) => ref.id).filter((id): id is number => id != null);
-}
-
-function refFromForm(form: HTMLFormElement, referenceType: string): ProviderReference {
-  const data = new FormData(form);
-  return {
-    first_name: String(data.get('first_name') ?? '').trim(),
-    last_name: String(data.get('last_name') ?? '').trim(),
-    email: String(data.get('email') ?? '').trim(),
-    phone: String(data.get('phone') ?? '').trim(),
-    reference_type: referenceType,
-  };
-}
-
-function phoneInputFromForm(form: HTMLFormElement) {
-  return form.elements.namedItem('phone') as HTMLInputElement | null;
-}
-
-function clearPhoneInvalid(event: React.FormEvent<HTMLInputElement>) {
-  if (isValidOptionalProviderRefPhone(event.currentTarget.value)) {
-    event.currentTarget.removeAttribute('aria-invalid');
-  }
 }
 
 function refKey(ref: ProviderReference): string {
@@ -58,6 +48,7 @@ export function ProviderRefTable({
   onSelectionChange,
   onSaveRecipients,
   showSaveAction = true,
+  savingRecipients = false,
 }: {
   po: PoDetail;
   provider?: ProviderSummary;
@@ -65,14 +56,14 @@ export function ProviderRefTable({
   onSelectionChange?: (ids: number[]) => void;
   onSaveRecipients?: (ids: number[]) => void;
   showSaveAction?: boolean;
+  savingRecipients?: boolean;
 }) {
   const [selected, setSelected] = useState<number[]>(() => recipientIDs(po));
-  const [newType, setNewType] = useState<string>(availableReferenceTypes()[0]?.value ?? 'ADMINISTRATIVE_REF');
-  const [editing, setEditing] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [contactModal, setContactModal] = useState<{ mode: 'create' } | { mode: 'edit'; ref: ProviderReference } | null>(null);
   const mutations = useProviderMutations();
   const { toast } = useToast();
   const refs = useMemo(() => providerRefs(provider), [provider]);
+  const savingContact = mutations.createReference.isPending || mutations.updateReference.isPending;
 
   useEffect(() => {
     setSelected(recipientIDs(po));
@@ -86,39 +77,23 @@ export function ProviderRefTable({
     });
   }
 
-  function rejectInvalidPhone(form: HTMLFormElement) {
-    const phoneInput = phoneInputFromForm(form);
-    if (!phoneInput || isValidOptionalProviderRefPhone(phoneInput.value)) {
-      phoneInput?.removeAttribute('aria-invalid');
-      return false;
-    }
-    phoneInput.setAttribute('aria-invalid', 'true');
-    phoneInput.focus();
-    toast(PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE, 'warning');
-    return true;
-  }
-
-  async function update(ref: ProviderReference, form: HTMLFormElement) {
-    if (!provider || !ref.id || ref.reference_type === QUALIFICATION_REF) return;
-    if (rejectInvalidPhone(form)) return;
+  async function saveContact(body: ProviderReference) {
+    if (!provider || !contactModal) return;
     try {
-      await mutations.updateReference.mutateAsync({ providerId: provider.id, refId: ref.id, body: refFromForm(form, ref.reference_type ?? newType) });
-      setEditing(null);
-      toast('Contatto aggiornato');
-    } catch {
-      toast('Salvataggio contatto non riuscito', 'error');
-    }
-  }
-
-  async function add(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!provider) return;
-    if (rejectInvalidPhone(event.currentTarget)) return;
-    try {
-      await mutations.createReference.mutateAsync({ providerId: provider.id, body: refFromForm(event.currentTarget, newType) });
-      event.currentTarget.reset();
-      setAdding(false);
-      toast('Contatto aggiunto');
+      if (contactModal.mode === 'edit') {
+        const ref = contactModal.ref;
+        if (!ref.id || ref.reference_type === QUALIFICATION_REF) return;
+        await mutations.updateReference.mutateAsync({
+          providerId: provider.id,
+          refId: ref.id,
+          body: { ...body, reference_type: ref.reference_type },
+        });
+        toast('Contatto aggiornato');
+      } else {
+        await mutations.createReference.mutateAsync({ providerId: provider.id, body });
+        toast('Contatto aggiunto');
+      }
+      setContactModal(null);
     } catch {
       toast('Salvataggio contatto non riuscito', 'error');
     }
@@ -132,40 +107,11 @@ export function ProviderRefTable({
           <p className="muted">Seleziona i contatti che riceveranno il PO, incluso Qualifica se serve. Senza selezione viene usato Qualifica automaticamente.</p>
         </div>
         {editable ? (
-          <Button size="sm" variant="secondary" leftIcon={<Icon name={adding ? 'x' : 'plus'} />} onClick={() => setAdding((current) => !current)}>
-            {adding ? 'Chiudi' : 'Aggiungi contatto'}
+          <Button size="sm" variant="secondary" leftIcon={<Icon name="plus" />} onClick={() => setContactModal({ mode: 'create' })}>
+            Aggiungi contatto
           </Button>
         ) : null}
       </div>
-
-      {adding && editable ? (
-        <form className="contactEditorForm contactEditorPanel" onSubmit={(event) => void add(event)} noValidate>
-          <div className="field"><label>Email</label><input name="email" type="email" placeholder="nome@azienda.it" /></div>
-          <div className="field"><label>Nome</label><input name="first_name" placeholder="Nome" /></div>
-          <div className="field"><label>Cognome</label><input name="last_name" placeholder="Cognome" /></div>
-          <div className="field">
-            <label>Telefono</label>
-            <input
-              name="phone"
-              type="tel"
-              inputMode="tel"
-              pattern={PROVIDER_REFERENCE_PHONE_PATTERN}
-              title={PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE}
-              placeholder="+39..."
-              onInput={clearPhoneInvalid}
-            />
-          </div>
-          <div className="field">
-            <label>Tipo</label>
-            <select value={newType} onChange={(event) => setNewType(event.target.value)}>
-              {availableReferenceTypes().map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </select>
-          </div>
-          <div className="contactEditorActions">
-            <Button size="sm" type="submit" leftIcon={<Icon name="plus" />} loading={mutations.createReference.isPending}>Aggiungi</Button>
-          </div>
-        </form>
-      ) : null}
 
       <div className="contactCardList">
         {refs.map((ref) => {
@@ -202,44 +148,12 @@ export function ProviderRefTable({
                 <button
                   className="iconButton"
                   type="button"
-                  aria-label={editing === key ? 'Chiudi modifica contatto' : 'Modifica contatto'}
-                  title={editing === key ? 'Chiudi' : 'Modifica'}
-                  onClick={() => setEditing((current) => (current === key ? null : key))}
+                  aria-label="Modifica contatto"
+                  title="Modifica"
+                  onClick={() => setContactModal({ mode: 'edit', ref })}
                 >
-                  <Icon name={editing === key ? 'x' : 'pencil'} size={16} />
+                  <Icon name="pencil" size={16} />
                 </button>
-              ) : null}
-              {editing === key ? (
-                <div className="providerContactEditor">
-                  <form
-                    className="contactEditorForm"
-                    noValidate
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void update(ref, event.currentTarget);
-                    }}
-                  >
-                    <div className="field"><label>Email</label><input name="email" type="email" defaultValue={ref.email} placeholder="Email" /></div>
-                    <div className="field"><label>Nome</label><input name="first_name" defaultValue={ref.first_name} placeholder="Nome" /></div>
-                    <div className="field"><label>Cognome</label><input name="last_name" defaultValue={ref.last_name} placeholder="Cognome" /></div>
-                    <div className="field">
-                      <label>Telefono</label>
-                      <input
-                        name="phone"
-                        type="tel"
-                        inputMode="tel"
-                        pattern={PROVIDER_REFERENCE_PHONE_PATTERN}
-                        title={PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE}
-                        defaultValue={ref.phone}
-                        placeholder="Telefono"
-                        onInput={clearPhoneInvalid}
-                      />
-                    </div>
-                    <div className="contactEditorActions">
-                      <Button size="sm" type="submit" leftIcon={<Icon name="check" />} loading={mutations.updateReference.isPending}>Salva</Button>
-                    </div>
-                  </form>
-                </div>
               ) : null}
             </article>
           );
@@ -255,9 +169,18 @@ export function ProviderRefTable({
 
       {showSaveAction && onSaveRecipients ? (
         <div className="actionRow">
-          <Button leftIcon={<Icon name="check" />} disabled={!editable} onClick={() => onSaveRecipients(selected)}>Salva destinatari</Button>
+          <Button leftIcon={<Icon name="check" />} disabled={!editable} loading={savingRecipients} onClick={() => onSaveRecipients(selected)}>Salva destinatari</Button>
         </div>
       ) : null}
+
+      <ProviderContactModal
+        open={contactModal != null}
+        mode={contactModal?.mode ?? 'create'}
+        contact={contactModal?.mode === 'edit' ? contactModal.ref : null}
+        saving={savingContact}
+        onClose={() => setContactModal(null)}
+        onSubmit={(body) => void saveContact(body)}
+      />
     </div>
   );
 }

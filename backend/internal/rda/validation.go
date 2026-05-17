@@ -71,6 +71,18 @@ func validateCreatePO(req createPORequest) error {
 	return nil
 }
 
+func validateUpdatePORecipients(req updatePORecipientsRequest) error {
+	if req.RecipientIDs == nil {
+		return errors.New("Seleziona i destinatari")
+	}
+	for _, id := range req.RecipientIDs {
+		if id <= 0 {
+			return errors.New("Destinatario non valido")
+		}
+	}
+	return nil
+}
+
 func createPOCurrency(value string) (string, error) {
 	currency := strings.ToUpper(strings.TrimSpace(value))
 	if currency == "" {
