@@ -1,12 +1,12 @@
 openapi: 3.0.9
 info:
-  version: 2.8.8
+  version: 2.10.6
   title: Mistra NG Internal API
   license:
     name: CDLAN
     url: https://www.cdlan.it
   description: |
-    # Mistra NG Internal API Reference Build: 2.8.8
+    # Mistra NG Internal API Reference Build: 2.10.6
 servers:
   - url: /
 security:
@@ -40,6 +40,8 @@ tags:
     description: endpoints to manage arak's Purchase requests
   - name: files
     description: endpoints to manage files
+  - name: documents
+    description: endpoints to manage docs
 paths:
   /users/v2/user:
     get:
@@ -4385,6 +4387,58 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/po-details'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+  /arak/rda/v1/po/{id}/recipients:
+    patch:
+      summary: edit RDA Recipients
+      operationId: EditRDARecipients
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del RDA
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: Requester-Email
+          in: header
+          required: true
+          description: Email of the user performing the request
+          schema:
+            type: string
+            format: email
+      tags:
+        - arak-rda
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: ID dei recipients
+              required:
+                - recipient_ids
+              properties:
+                recipient_ids:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+      responses:
+        '200':
+          description: Successfully Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/message'
         '400':
           $ref: '#/components/responses/400'
         '403':
@@ -9749,8 +9803,8 @@ components:
             required:
               - message
             properties:
-              message:
                 type: string
+              message:
                 description: text description
           example:
             message: Internal server error
