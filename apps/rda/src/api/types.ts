@@ -132,6 +132,7 @@ export interface PoRow {
 export interface PoPreview {
   id: number;
   code?: string;
+  type?: string;
   state?: string;
   current_approval_level?: string | number;
   project?: string;

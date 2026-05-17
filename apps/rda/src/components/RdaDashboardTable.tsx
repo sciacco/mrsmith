@@ -73,6 +73,10 @@ function rowAction(po: RdaDashboardRow): RowAction {
   return { iconName: 'eye', label: openLabel(po) };
 }
 
+function isEcommercePO(po: RdaDashboardRow): boolean {
+  return po.type === 'ECOMMERCE';
+}
+
 function ariaSort(sort: RdaDashboardSort | null | undefined, key: RdaDashboardSortKey): 'ascending' | 'descending' | 'none' {
   if (sort?.key !== key) return 'none';
   return sort.direction === 'asc' ? 'ascending' : 'descending';
@@ -162,7 +166,16 @@ export function RdaDashboardTable({ rows, sort, onSortChange, onDelete }: RdaDas
               <tr key={po.id} onDoubleClick={() => navigate(`/rda/po/${po.id}`)}>
                 <td>
                   <div className="requestCell">
-                    <span className="requestCode">{code}</span>
+                    <span className="requestCodeLine">
+                      <span className="requestCode">{code}</span>
+                      {isEcommercePO(po) ? (
+                        <Tooltip content="PO e-commerce">
+                          <span className="requestCodeIcon" aria-label="PO e-commerce">
+                            <Icon name="shopping-cart" size={14} strokeWidth={2} />
+                          </span>
+                        </Tooltip>
+                      ) : null}
+                    </span>
                     <strong>{rdaDashboardRequestTitle(po)}</strong>
                     {po.project && po.project !== po.object ? <small>{po.project}</small> : null}
                   </div>

@@ -719,6 +719,27 @@ textarea {
   white-space: nowrap;
 }
 
+.requestCodeLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.requestCodeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.18rem;
+  height: 1.18rem;
+  border: 1px solid var(--color-accent-muted);
+  border-radius: var(--radius-full);
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+}
+
 .statusCell {
   justify-items: start;
 }
