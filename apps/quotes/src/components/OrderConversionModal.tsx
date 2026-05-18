@@ -42,6 +42,8 @@ function apiErrorMessage(error: unknown): string {
     switch (code) {
       case 'order_already_exists_without_bridge':
         return 'Esiste già un ordine con lo stesso codice. Verifica il deal prima di procedere.';
+      case 'quote_status_not_approved':
+        return 'Non è possibile effettuare la conversione di una proposta in stato diverso da APPROVED.';
       case 'deal_number_invalid':
         return 'Il codice deal non è nel formato numero/anno.';
       case 'hubspot_deal_not_found':

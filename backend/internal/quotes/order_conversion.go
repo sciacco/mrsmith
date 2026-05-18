@@ -175,6 +175,9 @@ func (h *Handler) convertQuoteToOrder(ctx context.Context, quoteID int) (*orderC
 		}
 		return nil, nil, err
 	}
+	if !canConvertQuoteToOrder(source.Status) {
+		return nil, &conversionRequestError{status: http.StatusConflict, code: "quote_status_not_approved"}, nil
+	}
 	cdlanNdoc, cdlanAnno, err := parseDealOrderCode(nullStringValue(source.DealNumber))
 	if err != nil {
 		return nil, &conversionRequestError{status: http.StatusUnprocessableEntity, code: "deal_number_invalid"}, nil
@@ -815,6 +818,10 @@ func mapProposalTypeToLegacyOrderType(proposalType string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func canConvertQuoteToOrder(status string) bool {
+	return strings.EqualFold(strings.TrimSpace(status), "APPROVED")
 }
 
 func parseServiceCategoryIDs(raw string) []int {

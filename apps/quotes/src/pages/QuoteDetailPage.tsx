@@ -141,16 +141,20 @@ export function QuoteDetailPage() {
     [isDirty, hsStatus, publishPrecheck.data],
   );
   const publishBlocked = publishBlockers.length > 0;
-  const conversionBlocked = isDirty || !!orderConversion?.conflict;
+  const conversionStatusBlocked = localQuote?.status !== 'APPROVED';
+  const conversionBlocked = isDirty || conversionStatusBlocked || !!orderConversion?.conflict;
   const isRepublish = !!hsStatus?.hs_quote_id;
   const orderConversionLabel = orderConversion?.converted ? 'Completa invio' : 'Converti';
   const orderConversionTooltip = useMemo(() => {
     if (isDirty) return 'Salva le modifiche prima di convertire.';
+    if (conversionStatusBlocked) {
+      return 'Non è possibile effettuare la conversione di una proposta in stato diverso da APPROVED.';
+    }
     if (orderConversion?.conflict) return 'Esiste già un ordine con lo stesso codice.';
     return orderConversion?.converted
       ? 'Completa PDF e nota HubSpot per l’ordine.'
       : 'Crea l’ordine e allega il PDF al deal HubSpot.';
-  }, [isDirty, orderConversion?.conflict, orderConversion?.converted]);
+  }, [conversionStatusBlocked, isDirty, orderConversion?.conflict, orderConversion?.converted]);
   const pdfAction = useMemo(() => {
     if (!hsStatus?.hs_quote_id) {
       return {

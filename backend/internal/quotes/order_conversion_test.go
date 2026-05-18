@@ -1,8 +1,14 @@
 package quotes
 
 import (
+	"context"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -140,6 +146,43 @@ func TestOrderConversionParsingAndFormattingHelpers(t *testing.T) {
 	}
 }
 
+func TestCanConvertQuoteToOrderOnlyAllowsApproved(t *testing.T) {
+	for _, tt := range []struct {
+		status string
+		want   bool
+	}{
+		{status: "APPROVED", want: true},
+		{status: " approved ", want: true},
+		{status: "DRAFT", want: false},
+		{status: "PENDING_APPROVAL", want: false},
+		{status: "APPROVAL_NOT_NEEDED", want: false},
+		{status: "ESIGN_COMPLETED", want: false},
+		{status: "", want: false},
+	} {
+		if got := canConvertQuoteToOrder(tt.status); got != tt.want {
+			t.Fatalf("canConvertQuoteToOrder(%q) = %v, want %v", tt.status, got, tt.want)
+		}
+	}
+}
+
+func TestConvertQuoteToOrderRejectsNonApprovedBeforeSideEffects(t *testing.T) {
+	h := &Handler{db: openOrderConversionStatusTestDB(t, "DRAFT")}
+
+	result, reqErr, err := h.convertQuoteToOrder(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("convertQuoteToOrder returned unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Fatalf("result = %#v, want nil", result)
+	}
+	if reqErr == nil {
+		t.Fatalf("expected request error")
+	}
+	if reqErr.status != http.StatusConflict || reqErr.code != "quote_status_not_approved" {
+		t.Fatalf("request error = %#v, want 409 quote_status_not_approved", reqErr)
+	}
+}
+
 func ns(value string) sql.NullString {
 	return sql.NullString{String: value, Valid: true}
 }
@@ -150,3 +193,85 @@ func ptrValue(value *string) string {
 	}
 	return *value
 }
+
+func openOrderConversionStatusTestDB(t *testing.T, status string) *sql.DB {
+	t.Helper()
+
+	registerOrderConversionStatusTestDriver()
+
+	db, err := sql.Open(orderConversionStatusTestDriverName, status)
+	if err != nil {
+		t.Fatalf("failed to open order conversion status test db: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+	return db
+}
+
+const orderConversionStatusTestDriverName = "quotes_order_conversion_status_test_driver"
+
+var registerOrderConversionStatusDriverOnce sync.Once
+
+func registerOrderConversionStatusTestDriver() {
+	registerOrderConversionStatusDriverOnce.Do(func() {
+		sql.Register(orderConversionStatusTestDriverName, orderConversionStatusTestDriver{})
+	})
+}
+
+type orderConversionStatusTestDriver struct{}
+
+func (orderConversionStatusTestDriver) Open(name string) (driver.Conn, error) {
+	return &orderConversionStatusTestConn{status: name}, nil
+}
+
+type orderConversionStatusTestConn struct {
+	status string
+}
+
+func (c *orderConversionStatusTestConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c *orderConversionStatusTestConn) Close() error { return nil }
+
+func (c *orderConversionStatusTestConn) Begin() (driver.Tx, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c *orderConversionStatusTestConn) Ping(context.Context) error { return nil }
+
+func (c *orderConversionStatusTestConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+	if strings.Contains(query, `FROM quotes.quote q`) && strings.Contains(query, `LEFT JOIN loader.hubs_company hc`) {
+		return &publishHandlerTestRows{
+			columns: []string{
+				"id", "quote_number", "customer_id", "deal_number", "owner",
+				"document_type", "replace_orders", "template", "services",
+				"proposal_type", "initial_term_months", "next_term_months", "bill_months",
+				"delivered_in_days", "status", "notes", "trial", "nrc_charge_time",
+				"hs_deal_id", "description", "payment_method",
+				"customer_name", "customer_number", "partita_iva", "owner_name",
+				"city", "zip", "country", "provincia_di_fatturazione", "codice_fiscale",
+				"address", "lingua", "template_description", "rif_ordcli", "rif_tech_nom",
+				"rif_tech_tel", "rif_tech_email", "rif_altro_tech_nom", "rif_altro_tech_tel",
+				"rif_altro_tech_email", "rif_adm_nom", "rif_adm_tech_tel", "rif_adm_tech_email",
+			},
+			values: [][]driver.Value{{
+				int64(42), "SP-42/2026", int64(1001), "HP-7363/2026", "owner-1",
+				"TSC-ORDINE", nil, "template-1", "[1]",
+				"NUOVO", int64(12), int64(12), int64(1),
+				int64(30), c.status, nil, nil, int64(1),
+				int64(240882923764), "Descrizione", "402",
+				"ACME S.p.A.", "C-1001", "IT123", "Sales Owner",
+				"Milano", "20100", "IT", "MI", "CF123",
+				"Via Roma 1", "ITA", "Standard IT", nil, nil,
+				nil, nil, nil, nil,
+				nil, nil, nil, nil,
+			}},
+		}, nil
+	}
+	return nil, errors.New("unexpected query before APPROVED guard: " + query)
+}
+
+var _ driver.QueryerContext = (*orderConversionStatusTestConn)(nil)
+var _ driver.Pinger = (*orderConversionStatusTestConn)(nil)
