@@ -158,6 +158,27 @@ func (h *Handler) resolveRDACommentMentions(ctx context.Context, logger *slog.Lo
 	}
 }
 
+func (h *Handler) resolveRDADeleteNotifications(ctx context.Context, logger *slog.Logger, poID string) {
+	if h.notifier == nil {
+		return
+	}
+	poID = strings.TrimSpace(poID)
+	if err := h.notifier.Resolve(ctx, notifications.ResolveInput{
+		TypeKey:    rdaApprovalNotificationType,
+		EntityType: rdaNotificationEntityType,
+		EntityID:   poID,
+	}); err != nil {
+		logger.Warn("failed to resolve stale RDA approval notifications", "po_id", poID, "error", err)
+	}
+	if err := h.notifier.Resolve(ctx, notifications.ResolveInput{
+		TypeKey:    rdaCommentMentionNotificationType,
+		EntityType: rdaNotificationEntityType,
+		EntityID:   poID,
+	}); err != nil {
+		logger.Warn("failed to resolve stale RDA comment mention notifications", "po_id", poID, "error", err)
+	}
+}
+
 func rdaApprovalRecipients(po poDetail) []notifications.Recipient {
 	recipients := make([]notifications.Recipient, 0, len(po.Approvers))
 	seen := map[string]struct{}{}

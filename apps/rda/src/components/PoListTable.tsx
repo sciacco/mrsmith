@@ -2,6 +2,7 @@ import { Icon, Tooltip } from '@mrsmith/ui';
 import { useNavigate } from 'react-router-dom';
 import type { PoPreview } from '../api/types';
 import { extractApproverList, formatDateIT, formatMoney } from '../lib/format';
+import { isRequesterDeletablePOState } from '../lib/po-permissions';
 import { StateBadge } from './StateBadge';
 
 interface PoListTableProps {
@@ -11,13 +12,20 @@ interface PoListTableProps {
   onDelete?: (po: PoPreview) => void;
 }
 
-function canEdit(po: PoPreview, currentEmail?: string | null): boolean {
+function requesterMatches(po: PoPreview, currentEmail?: string | null): boolean {
   return Boolean(
-    po.state === 'DRAFT' &&
-      po.requester?.email &&
+    po.requester?.email &&
       currentEmail &&
       po.requester.email.toLowerCase() === currentEmail.toLowerCase(),
   );
+}
+
+function canEdit(po: PoPreview, currentEmail?: string | null): boolean {
+  return po.state === 'DRAFT' && requesterMatches(po, currentEmail);
+}
+
+function canDelete(po: PoPreview, currentEmail?: string | null): boolean {
+  return requesterMatches(po, currentEmail) && isRequesterDeletablePOState(po.state);
 }
 
 function rowDate(po: PoPreview): string {
@@ -57,6 +65,7 @@ export function PoListTable({ rows, mode, currentEmail, onDelete }: PoListTableP
         <tbody>
           {rows.map((po) => {
             const editable = canEdit(po, currentEmail);
+            const deletable = canDelete(po, currentEmail);
             const path = `/rda/po/${po.id}`;
             const openLabel = editable ? 'Modifica richiesta' : 'Visualizza richiesta';
             return (
@@ -76,7 +85,7 @@ export function PoListTable({ rows, mode, currentEmail, onDelete }: PoListTableP
                             <Icon name={editable ? 'pencil' : 'eye'} size={16} />
                           </button>
                         </Tooltip>
-                        {editable ? (
+                        {deletable ? (
                           <Tooltip content="Elimina richiesta">
                             <button
                               className="iconButton dangerButton"

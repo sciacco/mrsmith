@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/sciacco/mrsmith/internal/acl"
@@ -154,6 +155,19 @@ func currentEmail(r *http.Request) (string, bool) {
 
 func requesterHeaders(email string) http.Header {
 	return http.Header{"Requester-Email": []string{email}}
+}
+
+func isRequesterDeleteState(state string) bool {
+	switch strings.TrimSpace(state) {
+	case "DRAFT",
+		"PENDING_APPROVAL_PROVIDER",
+		"PENDING_APPROVAL",
+		"PENDING_APPROVAL_PAYMENT_METHOD",
+		"PENDING_BUDGET_INCREMENT":
+		return true
+	default:
+		return false
+	}
 }
 
 func budgetHeaders(email string) http.Header {
@@ -763,11 +777,42 @@ func (h *Handler) handleDeletePO(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !isRequester(po, email) || po.State != "DRAFT" {
-		httputil.Error(w, http.StatusForbidden, "La bozza puo essere eliminata solo dal richiedente")
+	if !isRequester(po, email) || !isRequesterDeleteState(po.State) {
+		httputil.Error(w, http.StatusForbidden, "La richiesta puo essere eliminata solo dal richiedente prima dell'invio al fornitore")
 		return
 	}
 	poID := r.PathValue("id")
+	if po.State != "DRAFT" {
+		if !h.requireArakDB(w) {
+			return
+		}
+		parsedID, err := strconv.ParseInt(strings.TrimSpace(poID), 10, 64)
+		if err != nil || parsedID <= 0 {
+			httputil.Error(w, http.StatusBadRequest, "Richiesta non valida")
+			return
+		}
+		result, err := h.arakDB.ExecContext(
+			r.Context(),
+			"UPDATE rda.purchase_order SET deleted=NOW(), state='CANCELED' WHERE id=$1",
+			parsedID,
+		)
+		if err != nil {
+			httputil.InternalError(w, r, err, "rda direct delete failed", "po_id", poID, "state", po.State)
+			return
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			httputil.InternalError(w, r, err, "rda direct delete rows affected failed", "po_id", poID, "state", po.State)
+			return
+		}
+		if affected == 0 {
+			httputil.Error(w, http.StatusNotFound, "Richiesta non disponibile")
+			return
+		}
+		h.resolveRDADeleteNotifications(r.Context(), h.requestLogger(r, "rda_delete_notifications"), poID)
+		httputil.JSON(w, http.StatusOK, map[string]string{"message": "Successfully Deleted"})
+		return
+	}
 	h.forwardArakAfterSuccess(
 		w,
 		r,
@@ -777,7 +822,7 @@ func (h *Handler) handleDeletePO(w http.ResponseWriter, r *http.Request) {
 		nil,
 		requesterHeaders(email),
 		func() {
-			h.resolveRDACommentMentions(r.Context(), h.requestLogger(r, "rda_delete_comment_notifications"), poID)
+			h.resolveRDADeleteNotifications(r.Context(), h.requestLogger(r, "rda_delete_notifications"), poID)
 		},
 	)
 }

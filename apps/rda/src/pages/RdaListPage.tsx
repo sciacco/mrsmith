@@ -237,7 +237,7 @@ export function RdaListPage() {
     if (!deleteTarget) return;
     try {
       await deletePO.mutateAsync(deleteTarget.id);
-      toast('Bozza eliminata');
+      toast('Richiesta eliminata');
       setDeleteTarget(null);
     } catch {
       toast('Eliminazione non riuscita', 'error');
@@ -397,8 +397,8 @@ export function RdaListPage() {
 
       <ConfirmDialog
         open={deleteTarget != null}
-        title="Elimina bozza"
-        message="Confermi eliminazione della bozza selezionata?"
+        title="Elimina richiesta"
+        message="Confermi eliminazione della richiesta selezionata?"
         confirmLabel="Elimina"
         danger
         loading={deletePO.isPending}

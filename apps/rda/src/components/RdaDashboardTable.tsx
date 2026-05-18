@@ -256,7 +256,7 @@ export function RdaDashboardTable({ rows, sort, onSortChange, onDelete }: RdaDas
                         <Icon name={action.iconName} size={16} />
                       </button>
                     </Tooltip>
-                    {po.isOwnDraft ? (
+                    {po.canDelete ? (
                       <Tooltip content="Elimina richiesta">
                         <button
                           className="iconButton dangerButton"

@@ -1,6 +1,7 @@
 import type { PoApprover, PoPreview, RdaPermissions } from '../api/types';
 import { inboxConfig, inboxOrder, type InboxKind } from './inbox.js';
 import { isApprover, parseMistraMoney } from './format.js';
+import { isRequesterDeletablePOState } from './po-permissions.js';
 import { stateLabel } from './state-labels.js';
 
 export type RdaDashboardView = 'todo' | 'mine' | 'all';
@@ -32,6 +33,7 @@ export interface RdaDashboardRow extends PoPreview {
   actionLabel: string;
   isRequesterOwned: boolean;
   isOwnDraft: boolean;
+  canDelete: boolean;
   isActionable: boolean;
 }
 
@@ -477,6 +479,7 @@ function toDashboardRow(row: MutableRow): RdaDashboardRow {
   const contexts = sortContexts(row.contexts.values());
   const primaryQueue = contexts.find((context) => context.type === 'inbox') ?? contexts[0] ?? requesterContext();
   const isOwnDraft = row.isRequesterOwned && row.po.state === 'DRAFT';
+  const canDelete = row.isRequesterOwned && isRequesterDeletablePOState(row.po.state);
   const isActionable = isAssignedDashboardWork({
     isOwnDraft,
     isRequesterOwned: row.isRequesterOwned,
@@ -491,6 +494,7 @@ function toDashboardRow(row: MutableRow): RdaDashboardRow {
     actionLabel: actionLabel(row.po, primaryQueue, isActionable),
     isRequesterOwned: row.isRequesterOwned,
     isOwnDraft,
+    canDelete,
     isActionable,
   };
 }

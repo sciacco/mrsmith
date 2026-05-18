@@ -185,6 +185,64 @@ test('own draft enters the to-do view', () => {
   assertEqual(model.counts.ownDrafts, 1, 'own draft count');
   assertEqual(todo.length, 1, 'to-do should include own draft');
   assertEqual(todo[0]?.primaryQueue.key, 'own-draft', 'draft queue context');
+  assertEqual(todo[0]?.canDelete, true, 'own draft can be deleted');
+});
+
+test('requester can delete pre-send states', () => {
+  const states = [
+    'DRAFT',
+    'PENDING_APPROVAL_PROVIDER',
+    'PENDING_APPROVAL',
+    'PENDING_APPROVAL_PAYMENT_METHOD',
+    'PENDING_BUDGET_INCREMENT',
+  ];
+
+  for (const state of states) {
+    const model = buildRdaDashboardModel({
+      myRows: [poFixture({ id: 90, state, requester: { email: 'me@example.com' } })],
+      currentEmail: 'me@example.com',
+      permissions: permissionsFixture(),
+      inboxes: [],
+    });
+
+    assertEqual(model.rows[0]?.canDelete, true, `${state} can be deleted by requester`);
+  }
+});
+
+test('requester cannot delete post-send and unconfirmed states', () => {
+  const states = [
+    'PENDING_VERIFICATION',
+    'PENDING_DISPUTE',
+    'CLOSED',
+    'DELIVERED_AND_COMPLIANT',
+    'PENDING_LEASING',
+    'PENDING_APPROVAL_NO_LEASING',
+    'PENDING_LEASING_ORDER_CREATION',
+    'PENDING_SEND',
+    'PENDING_PDF_GENERATION',
+  ];
+
+  for (const state of states) {
+    const model = buildRdaDashboardModel({
+      myRows: [poFixture({ id: 91, state, requester: { email: 'me@example.com' } })],
+      currentEmail: 'me@example.com',
+      permissions: permissionsFixture(),
+      inboxes: [],
+    });
+
+    assertEqual(model.rows[0]?.canDelete, false, `${state} cannot be deleted by requester`);
+  }
+});
+
+test('non-requester cannot delete pre-send states', () => {
+  const model = buildRdaDashboardModel({
+    myRows: [poFixture({ id: 92, state: 'PENDING_APPROVAL', requester: { email: 'other@example.com' } })],
+    currentEmail: 'me@example.com',
+    permissions: permissionsFixture({ can_see_all_po: true }),
+    inboxes: [],
+  });
+
+  assertEqual(model.rows[0]?.canDelete, false, 'foreign pre-send request cannot be deleted');
 });
 
 test('requester pending send enters the to-do view', () => {

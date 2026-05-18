@@ -249,6 +249,7 @@ type paymentValidationFixture struct {
 	providerDefault  string
 	providerDefaults map[int64]string
 	poDetail         string
+	poDeleteRows     int64
 	rowCreateStatus  int
 	rowCreateBody    string
 	rowDeleteStatus  int
@@ -480,10 +481,36 @@ func (c paymentValidationConn) QueryContext(_ context.Context, query string, arg
 	}
 }
 
+func (c paymentValidationConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	switch {
+	case strings.Contains(query, "UPDATE rda.purchase_order SET deleted=NOW(), state='CANCELED' WHERE id=$1"):
+		if len(args) != 1 {
+			return nil, errors.New("missing purchase order id arg")
+		}
+		rows := c.fixture.poDeleteRows
+		if rows == 0 {
+			rows = 1
+		}
+		return paymentValidationResult(rows), nil
+	default:
+		return nil, errors.New("unexpected exec: " + query)
+	}
+}
+
 type paymentValidationRows struct {
 	columns []string
 	values  [][]driver.Value
 	index   int
+}
+
+type paymentValidationResult int64
+
+func (r paymentValidationResult) LastInsertId() (int64, error) {
+	return 0, errors.New("last insert id not supported")
+}
+
+func (r paymentValidationResult) RowsAffected() (int64, error) {
+	return int64(r), nil
 }
 
 func (r *paymentValidationRows) Columns() []string {
@@ -502,4 +529,5 @@ func (r *paymentValidationRows) Next(dest []driver.Value) error {
 }
 
 var _ driver.QueryerContext = paymentValidationConn{}
+var _ driver.ExecerContext = paymentValidationConn{}
 var _ http.Handler = (*paymentValidationArakState)(nil)
