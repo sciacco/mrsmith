@@ -1,5 +1,11 @@
 // ── Shared enums ──
-export type QuoteStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'APPROVAL_NOT_NEEDED' | 'ESIGN_COMPLETED';
+export type QuoteStatus =
+  | 'DRAFT'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'APPROVAL_NOT_NEEDED'
+  | 'ESIGN_COMPLETED'
+  | 'REJECTED';
 export type DocumentType = 'TSC-ORDINE-RIC' | 'TSC-ORDINE';
 export type ProposalType = 'NUOVO' | 'SOSTITUZIONE' | 'RINNOVO';
 export type TemplateType = 'standard' | 'iaas' | 'legacy';

@@ -7,6 +7,7 @@ const statusConfig: Record<QuoteStatus, { label: string; className: string }> = 
   APPROVED: { label: 'Approvata', className: styles.approved ?? '' },
   APPROVAL_NOT_NEEDED: { label: 'Pronta', className: styles.approvalNotNeeded ?? '' },
   ESIGN_COMPLETED: { label: 'Firmata', className: styles.esignCompleted ?? '' },
+  REJECTED: { label: 'Respinta', className: styles.rejected ?? '' },
 };
 
 export function StatusBadge({ status }: { status: QuoteStatus }) {

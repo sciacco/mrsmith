@@ -287,11 +287,11 @@ Riferimento: `docs/IMPLEMENTATION-KNOWLEDGE.md` → "Customer Identity Across Sy
 | Direction | Trigger | Mechanism |
 |---|---|---|
 | App → HS | Publish esplicita (`POST .../publish`) | Backend REST calls |
-| HS → App | Status changes (APPROVAL_NOT_NEEDED) | **Non esiste sync automatica**. Lo status HS viene letto on-demand via `GET .../hs-status`. |
+| HS → App | Status changes while local status is `PENDING_APPROVAL` | Backend scheduled worker every 5 minutes. Reads HubSpot `hs_status` and updates local DB only for `APPROVED`, `APPROVAL_NOT_NEEDED`, or `REJECTED`. |
 
-**Implication**: Se un approvatore cambia lo status su HubSpot, la nostra app non lo sa finché qualcuno non apre la quote e il frontend chiama `hs-status`. Il campo `status` nel DB potrebbe essere stale.
+**Implication**: Se un approvatore cambia lo status su HubSpot, il database locale viene riallineato automaticamente dal worker. Il dettaglio continua a leggere `hs-status` on-demand per link/PDF/lock/sign status, ma non è più l'unico meccanismo di aggiornamento stato.
 
-**Question D1**: Serve un meccanismo di sync periodica HS→DB per lo status? O il read-on-demand è sufficiente? Oggi Appsmith fa la stessa cosa (legge lo status HS a ogni apertura del Dettaglio).
+**Question D1**: ~~RESOLVED~~ — sync periodica HS→DB necessaria per riallineare le proposte in approvazione senza intervento utente.
 
 ---
 

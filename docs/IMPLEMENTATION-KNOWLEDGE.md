@@ -347,6 +347,15 @@ Alyante ERP ID
 - Used by: `apps/quotes` republish flow and `GET /quotes/v1/quotes/:id/hs-status`.
 - Open questions: none.
 
+### Quotes Pending Approval Status Is Finalized From HubSpot
+
+- Context: `apps/quotes` proposals published with legal notes and stored locally as `PENDING_APPROVAL`.
+- Discovery: HubSpot is the source of truth after approval review. Local pending quotes must be synchronized from HubSpot `hs_status`; `hs_sign_status` is separate and remains out of scope for local status transitions.
+- Practical rule: the backend scheduled worker should inspect only local quotes with `status = PENDING_APPROVAL` and `hs_quote_id IS NOT NULL`. It may update local status to `APPROVED`, `APPROVAL_NOT_NEEDED`, or `REJECTED`; it must skip `DRAFT`, `PENDING_APPROVAL`, empty, and unknown HubSpot statuses. Conversion to order remains allowed only for local `APPROVED`.
+- Evidence: GitHub issue #44 implementation plan; `backend/internal/quotes/status_sync.go`; `apps/quotes/QUOTES-SPEC.md`.
+- Used by: `apps/quotes` list/detail status display and order-conversion gating.
+- Open questions: none.
+
 ### Quotes Order Conversion Uses Vodka Bridge Plus HubSpot Note Attachment
 
 - Context: `apps/quotes` conversion from proposal to legacy Vodka/daiquiri sales order.

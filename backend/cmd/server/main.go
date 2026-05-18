@@ -587,6 +587,23 @@ func main() {
 	} else {
 		logger.Info("notifications worker disabled", "component", "notifications")
 	}
+	if mistraDB != nil && hubspotCli != nil {
+		worker := quotes.NewHubSpotStatusSyncWorker(quotes.HubSpotStatusSyncDeps{
+			Mistra:        mistraDB,
+			RuntimeConfig: anisettaDB,
+			HubSpot:       hubspotCli,
+			Logger:        logger,
+		})
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			worker.Run(appCtx)
+		}()
+	} else if mistraDB == nil {
+		logger.Info("quotes hubspot status sync worker not started without mistra database", "component", "quotes")
+	} else {
+		logger.Info("quotes hubspot status sync worker not started without hubspot client", "component", "quotes")
+	}
 	if diagnosticSink != nil && diagnosticSink.Enabled() {
 		workerWG.Add(1)
 		go func() {

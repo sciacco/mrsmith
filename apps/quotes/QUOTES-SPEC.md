@@ -78,13 +78,15 @@
   - DELETE — `DELETE /api/quotes/v1/quotes/:id`. RBAC-gated (Keycloak role). Orchestrates: HS delete (if `hs_quote_id` set) → DB delete. Atomic: HS failure blocks DB delete.
   - PUBLISH — `POST /api/quotes/v1/quotes/:id/publish`. Idempotent 5-step orchestration: save → validate → HS create/update → line item sync → status update.
 
-- **Key fields**: `id` (PK), `quote_number` (unique, auto `SP-{seq}/{YYYY}`), `customer_id` (→ hubs_company), `hs_deal_id`, `owner`, `document_type` (TSC-ORDINE-RIC | TSC-ORDINE), `proposal_type` (NUOVO | SOSTITUZIONE | RINNOVO), `template` (→ quotes.template), `status` (DRAFT | PENDING_APPROVAL | APPROVED | APPROVAL_NOT_NEEDED | ESIGN_COMPLETED), `services` (comma-separated category IDs), `bill_months`, `initial_term_months`, `next_term_months`, `nrc_charge_time`, `payment_method`, `description` (HTML), `notes` (HTML, legal — triggers PENDING_APPROVAL), `trial`, `hs_quote_id`, contact reference fields (10 columns: rif_ordcli, rif_tech_*, rif_altro_tech_*, rif_adm_*).
+- **Key fields**: `id` (PK), `quote_number` (unique, auto `SP-{seq}/{YYYY}`), `customer_id` (→ hubs_company), `hs_deal_id`, `owner`, `document_type` (TSC-ORDINE-RIC | TSC-ORDINE), `proposal_type` (NUOVO | SOSTITUZIONE | RINNOVO), `template` (→ quotes.template), `status` (DRAFT | PENDING_APPROVAL | APPROVED | APPROVAL_NOT_NEEDED | ESIGN_COMPLETED | REJECTED), `services` (comma-separated category IDs), `bill_months`, `initial_term_months`, `next_term_months`, `nrc_charge_time`, `payment_method`, `description` (HTML), `notes` (HTML, legal — triggers PENDING_APPROVAL), `trial`, `hs_quote_id`, contact reference fields (10 columns: rif_ordcli, rif_tech_*, rif_altro_tech_*, rif_adm_*).
 
 - **Fields NOT exposed**: `ragione_sociale` (always NULL, legacy), `hs_esign_enabled`, `hs_esign_contacts`, `hs_sign_status`, `hs_esign_date` (e-signature removed).
 
 - **Relationships**: 1:N → quote_rows, 1:0..1 → quote_customer (auto-trigger). Logical FKs: customer_id → hubs_company, hs_deal_id → hubs_deal, owner → hubs_owner, template → quotes.template, payment_method → erp_metodi_pagamento.
 
 - **Triggers**: `set_timestamp` (BEFORE UPDATE → updated_at), `update_quote_customer_from_erp` (auto-snapshot ERP customer data).
+
+- **HubSpot status sync**: the backend starts a scheduled worker when `MISTRA_DSN` and `HUBSPOT_API_KEY` are configured. Every run selects local quotes with `status = PENDING_APPROVAL` and `hs_quote_id IS NOT NULL`, fetches HubSpot `hs_status`, and updates the local status only when HubSpot returns `APPROVED`, `APPROVAL_NOT_NEEDED`, or `REJECTED`. `DRAFT`, `PENDING_APPROVAL`, empty, and unknown remote statuses are skipped. Defaults are controlled by Anisetta `mrsmith.runtime_config` row `quotes.hubspot_status_sync`: `{"enabled": true, "interval_seconds": 300, "batch_size": 50}`. If Anisetta is unavailable, the worker uses the same defaults. Persistent retry state is not stored; skipped/error quotes remain pending and are retried on later runs.
 
 ### Entity: Quote Row (Kit)
 
@@ -181,7 +183,7 @@ ALTER TABLE quotes.template
 
 **Filter state in URL**: `?status=DRAFT&q=CDLAN&owner=123` — shareable, preserved on back
 
-**Status badges**: DRAFT→gray, PENDING_APPROVAL→amber, APPROVED→green, APPROVAL_NOT_NEEDED→light green "Pronta", ESIGN_COMPLETED→gray "Firmata" (legacy)
+**Status badges**: DRAFT→gray, PENDING_APPROVAL→amber, APPROVED→green, APPROVAL_NOT_NEEDED→light green "Pronta", ESIGN_COMPLETED→gray "Firmata" (legacy), REJECTED→red "Respinta"
 
 **Loading**: Skeleton rows (8, shimmer). Filter change: opacity fade + progress bar (not full skeleton swap).
 
@@ -290,7 +292,7 @@ Step icons: green check (done), indigo spinner (in progress), gray circle (pendi
 
 | Contract | Values |
 |---|---|
-| Status enum | `DRAFT` \| `PENDING_APPROVAL` \| `APPROVED` \| `APPROVAL_NOT_NEEDED` \| `ESIGN_COMPLETED` |
+| Status enum | `DRAFT` \| `PENDING_APPROVAL` \| `APPROVED` \| `APPROVAL_NOT_NEEDED` \| `ESIGN_COMPLETED` \| `REJECTED` |
 | Document type | `TSC-ORDINE-RIC` (recurring) \| `TSC-ORDINE` (spot) |
 | Proposal type | `NUOVO` \| `SOSTITUZIONE` \| `RINNOVO` |
 | Template type | `standard` \| `iaas` \| `legacy` |
@@ -481,6 +483,7 @@ StatusBadge, QuoteTable (accent bars, sort headers), FilterBar (status pills + s
 - `ragione_sociale` is a legacy residue
 - `services` stays comma-separated for coexistence
 - `APPROVAL_NOT_NEEDED` is a HubSpot-set status (read-only)
+- `REJECTED` is a HubSpot-set approval outcome synchronized back to the local DB
 - `ESIGN_COMPLETED` is legacy (neutral display, no logic)
 - Unified wizard (Standard + IaaS, same users)
 - Explicit save with dirty-state indicator

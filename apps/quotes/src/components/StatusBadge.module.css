@@ -35,3 +35,8 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
 }
+
+.rejected {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
