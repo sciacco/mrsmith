@@ -227,6 +227,58 @@ func (h *Handler) forwardArakAfterSuccess(w http.ResponseWriter, r *http.Request
 	}
 }
 
+func (h *Handler) forwardArakPOList(w http.ResponseWriter, r *http.Request, path, rawQuery string, headers http.Header) {
+	resp, err := h.arak.DoWithHeaders(http.MethodGet, path, rawQuery, nil, headers)
+	if err != nil {
+		h.requestLogger(r, "proxy_to_arak", "upstream_path", path).Error("upstream request failed", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio RDA temporaneamente non disponibile",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Autorizzazione verso il servizio RDA non riuscita",
+			"code":  codeUpstreamAuthFailed,
+		})
+		return
+	}
+
+	if resp.StatusCode >= http.StatusBadRequest && resp.StatusCode <= 599 {
+		h.writeUpstreamRejected(w, r, resp, path, rawQuery)
+		return
+	}
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		h.requestLogger(r, "proxy_to_arak", "upstream_path", path).Warn("failed to read upstream response", "error", err)
+		httputil.JSON(w, http.StatusBadGateway, map[string]string{
+			"error": "Servizio RDA temporaneamente non disponibile",
+			"code":  codeUpstreamUnavailable,
+		})
+		return
+	}
+
+	if enriched, err := h.enrichPOListApprovers(r.Context(), responseBody); err == nil {
+		responseBody = enriched
+	} else {
+		h.requestLogger(r, "rda_po_list_approvers").Warn("failed to enrich approvers", "error", err)
+	}
+
+	copyResponseHeaders(w.Header(), resp.Header)
+	w.Header().Del("Content-Length")
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
+	w.WriteHeader(resp.StatusCode)
+	if _, err := w.Write(responseBody); err != nil {
+		h.requestLogger(r, "proxy_to_arak", "upstream_path", path).Warn("failed to write upstream response", "error", err)
+	}
+}
+
 func (h *Handler) writeUpstreamRejected(w http.ResponseWriter, r *http.Request, resp *http.Response, path, rawQuery string) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -397,7 +449,7 @@ func (h *Handler) handlePOList(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusUnauthorized, "Accesso richiesto")
 		return
 	}
-	h.forwardArak(w, r, http.MethodGet, arakRDARoot+"/po", queryWithDefaults(r), nil, requesterHeaders(email))
+	h.forwardArakPOList(w, r, arakRDARoot+"/po", queryWithDefaults(r), requesterHeaders(email))
 }
 
 func (h *Handler) handlePOInbox(w http.ResponseWriter, r *http.Request) {
@@ -422,7 +474,7 @@ func (h *Handler) handlePOInbox(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusForbidden, "Operazione riservata agli utenti abilitati")
 		return
 	}
-	h.forwardArak(w, r, http.MethodGet, arakRDARoot+cfg.upstreamPath, queryWithDefaults(r), nil, requesterHeaders(email))
+	h.forwardArakPOList(w, r, arakRDARoot+cfg.upstreamPath, queryWithDefaults(r), requesterHeaders(email))
 }
 
 func (h *Handler) handleGetPO(w http.ResponseWriter, r *http.Request) {

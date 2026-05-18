@@ -1,4 +1,4 @@
-import type { PoPreview, RdaPermissions } from '../api/types';
+import type { PoApprover, PoPreview, RdaPermissions } from '../api/types';
 import { inboxConfig, inboxOrder, type InboxKind } from './inbox.js';
 import { isApprover, parseMistraMoney } from './format.js';
 import { stateLabel } from './state-labels.js';
@@ -59,6 +59,18 @@ export interface RdaFilterOption {
   value: string;
   label: string;
   count: number;
+}
+
+export interface RdaDashboardApproverGroup {
+  label: string;
+  emails: string[];
+}
+
+export interface RdaDashboardApproverSummary {
+  visible: string;
+  full: string;
+  ariaLabel: string;
+  groups: RdaDashboardApproverGroup[];
 }
 
 interface MutableRow {
@@ -128,6 +140,143 @@ export function rdaDashboardRequesterLabel(po: Pick<PoPreview, 'requester'>): st
 
 export function rdaDashboardRequestTitle(po: Pick<PoPreview, 'object' | 'project'>): string {
   return po.object || po.project || 'Richiesta senza oggetto';
+}
+
+interface NormalizedApprover {
+  email: string;
+  level: {
+    label: string;
+    value: number;
+  } | null;
+}
+
+function approverEmail(approver: PoApprover): string {
+  return (approver.email ?? approver.user?.email ?? '').trim();
+}
+
+function approvalLevel(value: string | number | null | undefined): NormalizedApprover['level'] {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return null;
+  return {
+    label: Number.isInteger(parsed) ? String(parsed) : raw,
+    value: parsed,
+  };
+}
+
+function normalizeApprovers(approvers?: PoApprover[]): NormalizedApprover[] {
+  const normalized: NormalizedApprover[] = [];
+  const seen = new Set<string>();
+
+  for (const approver of approvers ?? []) {
+    const email = approverEmail(approver);
+    if (!email) continue;
+
+    const level = approvalLevel(approver.level);
+    const key = `${level?.value ?? 'none'}|${email.toLocaleLowerCase('it')}`;
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    normalized.push({ email, level });
+  }
+
+  return normalized;
+}
+
+function currentOrMinimumLevelApprovers(
+  approvers: NormalizedApprover[],
+  currentApprovalLevel?: string | number | null,
+): {
+  approvers: NormalizedApprover[];
+  levelLabel: string | null;
+} {
+  const currentLevel = approvalLevel(currentApprovalLevel);
+  if (currentLevel) {
+    const currentApprovers = approvers.filter((approver) => approver.level?.value === currentLevel.value);
+    if (currentApprovers.length > 0) {
+      return { approvers: currentApprovers, levelLabel: currentLevel.label };
+    }
+  }
+
+  const validLevels = approvers
+    .map((approver) => approver.level?.value)
+    .filter((level): level is number => typeof level === 'number' && Number.isFinite(level));
+
+  if (validLevels.length === 0) {
+    return { approvers, levelLabel: null };
+  }
+
+  const minimum = Math.min(...validLevels);
+  const reduced = approvers.filter((approver) => approver.level?.value === minimum);
+  const levelLabel = reduced[0]?.level?.label ?? String(minimum);
+  return { approvers: reduced, levelLabel };
+}
+
+function emailLocalPart(email: string): string {
+  const atIndex = email.indexOf('@');
+  return atIndex > 0 ? email.slice(0, atIndex) : email;
+}
+
+function compactApproverList(approvers: NormalizedApprover[], requesterEmail?: string | null): string {
+  const requesterLocalPart = requesterEmail ? emailLocalPart(requesterEmail).toLocaleLowerCase('it') : '';
+  const localPartCounts = new Map<string, number>();
+  for (const approver of approvers) {
+    const key = emailLocalPart(approver.email).toLocaleLowerCase('it');
+    localPartCounts.set(key, (localPartCounts.get(key) ?? 0) + 1);
+  }
+
+  const visible = approvers.slice(0, 2).map((approver) => {
+    const localPart = emailLocalPart(approver.email);
+    const normalizedLocalPart = localPart.toLocaleLowerCase('it');
+    if (requesterLocalPart && normalizedLocalPart === requesterLocalPart) {
+      return 'richiedente';
+    }
+    const duplicate = (localPartCounts.get(normalizedLocalPart) ?? 0) > 1;
+    return duplicate ? approver.email : localPart;
+  });
+
+  const extra = approvers.length - visible.length;
+  return extra > 0 ? `${visible.join(', ')}, +${extra}` : visible.join(', ');
+}
+
+function groupedApproverList(approvers: NormalizedApprover[]): RdaDashboardApproverGroup[] {
+  const groups = new Map<string, string[]>();
+
+  for (const approver of approvers) {
+    const key = approver.level ? `L. ${approver.level.label}` : 'Senza livello';
+    const current = groups.get(key) ?? [];
+    current.push(approver.email);
+    groups.set(key, current);
+  }
+
+  return Array.from(groups.entries()).map(([label, emails]) => ({ label, emails }));
+}
+
+function fullApproverList(groups: RdaDashboardApproverGroup[]): string {
+  return groups
+    .map((group) => `${group.label}: ${group.emails.join(', ')}`)
+    .join('; ');
+}
+
+export function rdaDashboardApproverSummary(
+  po: Pick<PoPreview, 'approvers' | 'current_approval_level' | 'requester'>,
+): RdaDashboardApproverSummary | null {
+  const allApprovers = normalizeApprovers(po.approvers);
+  if (allApprovers.length === 0) return null;
+
+  const reduced = currentOrMinimumLevelApprovers(allApprovers, po.current_approval_level);
+  const compactList = compactApproverList(reduced.approvers, po.requester?.email);
+  const visible = reduced.levelLabel ? `L. ${reduced.levelLabel}: ${compactList}` : compactList;
+  const groups = groupedApproverList(allApprovers);
+  const full = fullApproverList(groups);
+
+  return {
+    visible,
+    full,
+    ariaLabel: `Approvatori: ${full}`,
+    groups,
+  };
 }
 
 function requesterMatches(po: PoPreview, currentEmail?: string | null): boolean {

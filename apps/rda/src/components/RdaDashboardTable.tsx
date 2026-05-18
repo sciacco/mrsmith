@@ -2,6 +2,7 @@ import { Icon, Tooltip, type IconName } from '@mrsmith/ui';
 import { useNavigate } from 'react-router-dom';
 import {
   defaultRdaDashboardSortDirection,
+  rdaDashboardApproverSummary,
   rdaDashboardRequesterLabel,
   rdaDashboardRequestTitle,
   type RdaDashboardRow,
@@ -20,6 +21,32 @@ interface RdaDashboardTableProps {
 
 function rowDate(po: RdaDashboardRow): string {
   return formatDateIT(po.created ?? po.creation_date ?? po.updated);
+}
+
+function requesterDisplayLabel(po: RdaDashboardRow): string {
+  return po.requester?.email?.trim() || rdaDashboardRequesterLabel(po);
+}
+
+function approverTooltipContent(summary: ReturnType<typeof rdaDashboardApproverSummary>) {
+  if (!summary) return null;
+
+  return (
+    <div className="approverTooltip">
+      <strong>Elenco approvatori</strong>
+      <div className="approverTooltipRows">
+        {summary.groups.map((group) => (
+          <div className="approverTooltipRow" key={group.label}>
+            <span>{group.label}</span>
+            <div>
+              {group.emails.map((email) => (
+                <span key={`${group.label}-${email}`}>{email}</span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function openLabel(po: RdaDashboardRow): string {
@@ -146,7 +173,7 @@ export function RdaDashboardTable({ rows, sort, onSortChange, onDelete }: RdaDas
             <SortableHeader label="Richiesta" sortKey="request" sort={sort} onSortChange={onSortChange} />
             <SortableHeader label="Stato" sortKey="state" sort={sort} onSortChange={onSortChange} />
             <SortableHeader label="Fornitore" sortKey="provider" sort={sort} onSortChange={onSortChange} />
-            <SortableHeader label="Richiedente" sortKey="requester" sort={sort} onSortChange={onSortChange} />
+            <SortableHeader label="Richiedente / Approvatori" sortKey="requester" sort={sort} onSortChange={onSortChange} />
             <SortableHeader label="Creata" sortKey="created" sort={sort} onSortChange={onSortChange} />
             <SortableHeader label="Totale" sortKey="total" sort={sort} onSortChange={onSortChange} className="moneyCell" />
             <th className="actionsCell">Azione</th>
@@ -161,6 +188,8 @@ export function RdaDashboardTable({ rows, sort, onSortChange, onDelete }: RdaDas
             const extraContexts = visibleContexts.length - contexts.length;
             const contextTooltip = visibleContexts.map((context) => context.label).join(', ');
             const hasContexts = contexts.length > 0;
+            const requesterLabel = requesterDisplayLabel(po);
+            const approverSummary = rdaDashboardApproverSummary(po);
 
             return (
               <tr key={po.id} onDoubleClick={() => navigate(`/rda/po/${po.id}`)}>
@@ -199,7 +228,18 @@ export function RdaDashboardTable({ rows, sort, onSortChange, onDelete }: RdaDas
                   <span className="textCell">{po.provider?.company_name ?? '-'}</span>
                 </td>
                 <td>
-                  <span className="textCell">{rdaDashboardRequesterLabel(po)}</span>
+                  <div className="peopleCell">
+                    <span className="peoplePrimary" aria-label={`Richiedente: ${requesterLabel}`} title={requesterLabel}>
+                      {requesterLabel}
+                    </span>
+                    {approverSummary ? (
+                      <Tooltip content={approverTooltipContent(approverSummary)} maxWidth={360}>
+                        <span className="peopleSecondary" aria-label={approverSummary.ariaLabel}>
+                          {approverSummary.visible}
+                        </span>
+                      </Tooltip>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="dateCell">{rowDate(po)}</td>
                 <td className="moneyCell">{formatMoney(po.total_price, po.currency)}</td>

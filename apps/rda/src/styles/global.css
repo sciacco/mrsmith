@@ -695,7 +695,8 @@ textarea {
 }
 
 .requestCell,
-.statusCell {
+.statusCell,
+.peopleCell {
   display: grid;
   gap: 0.2rem;
   min-width: 0;
@@ -779,6 +780,75 @@ textarea {
   text-overflow: ellipsis;
   vertical-align: middle;
   white-space: nowrap;
+}
+
+.peoplePrimary,
+.peopleSecondary {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peoplePrimary {
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.18;
+}
+
+.peopleSecondary {
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  line-height: 1.18;
+}
+
+.approverTooltip {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 15rem;
+}
+
+.approverTooltip > strong {
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.approverTooltipRows {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.approverTooltipRow {
+  display: grid;
+  grid-template-columns: 2.7rem minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+}
+
+.approverTooltipRow > span {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.approverTooltipRow > div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.approverTooltipRow > div span {
+  color: var(--color-text);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .dateCell,
