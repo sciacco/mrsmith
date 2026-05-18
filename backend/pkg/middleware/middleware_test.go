@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
@@ -197,6 +198,70 @@ func TestAccessLogEmitsWarnForClientErrors(t *testing.T) {
 	}
 	if entry["status"] != float64(http.StatusBadRequest) {
 		t.Fatalf("expected 400 status, got %#v", entry["status"])
+	}
+}
+
+func TestAccessLogCapturesAuthIdentityFromDownstreamMiddleware(t *testing.T) {
+	t.Setenv("DEV_FAKE_SUBJECT", "subject-123")
+	t.Setenv("DEV_FAKE_NAME", "mario.rossi")
+	t.Setenv("DEV_FAKE_EMAIL", "mario.rossi@example.com")
+
+	var buf bytes.Buffer
+	logger := logging.NewWithWriter(&buf, "debug")
+
+	handler := RequestID(AccessLog(logger)(auth.NewNoopMiddleware().Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("bad request"))
+	}))))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/demo", nil)
+	req.Header.Set("X-Request-ID", "req-auth")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	entry := decodeMiddlewareLog(t, buf.String())
+	if entry["level"] != "WARN" {
+		t.Fatalf("expected WARN level, got %#v", entry["level"])
+	}
+	if entry["auth_subject"] != "subject-123" {
+		t.Fatalf("expected auth_subject, got %#v", entry["auth_subject"])
+	}
+	if entry["auth_username"] != "mario.rossi" {
+		t.Fatalf("expected auth_username, got %#v", entry["auth_username"])
+	}
+	if entry["auth_email"] != "mario.rossi@example.com" {
+		t.Fatalf("expected auth_email, got %#v", entry["auth_email"])
+	}
+}
+
+func TestAccessLogEmitsInfoForRoutineAuthUnauthorized(t *testing.T) {
+	var buf bytes.Buffer
+	logger := logging.NewWithWriter(&buf, "debug")
+
+	handler := RequestID(AccessLog(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logging.AddAccessLogAttrs(r.Context(), "auth_failure_reason", "missing_bearer")
+		http.Error(w, "missing or invalid authorization header", http.StatusUnauthorized)
+	})))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/demo", nil)
+	req.Header.Set("X-Request-ID", "req-auth-failure")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	entry := decodeMiddlewareLog(t, buf.String())
+	if entry["level"] != "INFO" {
+		t.Fatalf("expected INFO level, got %#v", entry["level"])
+	}
+	if entry["msg"] != "request completed with auth failure" {
+		t.Fatalf("expected auth failure access log, got %#v", entry["msg"])
+	}
+	if entry["auth_failure_reason"] != "missing_bearer" {
+		t.Fatalf("expected auth_failure_reason, got %#v", entry["auth_failure_reason"])
+	}
+	if entry["status"] != float64(http.StatusUnauthorized) {
+		t.Fatalf("expected 401 status, got %#v", entry["status"])
 	}
 }
 

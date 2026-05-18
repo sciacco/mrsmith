@@ -88,13 +88,14 @@ func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			requestID := logging.RequestID(r.Context())
+			ctx := logging.WithAccessLogAttrs(r.Context())
 			reqLogger := logger.With(
 				"component", "http",
 				"request_id", requestID,
 				"method", r.Method,
 				"path", r.URL.Path,
 			)
-			r = r.WithContext(logging.IntoContext(r.Context(), reqLogger))
+			r = r.WithContext(logging.IntoContext(ctx, reqLogger))
 			rec := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(rec, r)
 
@@ -111,6 +112,8 @@ func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 			if ctxErr := r.Context().Err(); ctxErr != nil {
 				args = append(args, "request_context_error", ctxErr.Error())
 			}
+			accessAttrs := logging.AccessLogAttrs(r.Context())
+			args = append(args, accessAttrs...)
 
 			switch {
 			case rec.writeErr != nil:
@@ -119,6 +122,8 @@ func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 				reqLogger.Warn("request aborted by client", args...)
 			case rec.status >= http.StatusInternalServerError:
 				reqLogger.Error("request completed with server error", args...)
+			case isRoutineAuthUnauthorized(rec.status, accessAttrs):
+				reqLogger.Info("request completed with auth failure", args...)
 			case rec.status >= http.StatusBadRequest:
 				reqLogger.Warn("request completed with client error", args...)
 			default:
@@ -126,6 +131,23 @@ func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 			}
 		})
 	}
+}
+
+func isRoutineAuthUnauthorized(status int, attrs []any) bool {
+	if status != http.StatusUnauthorized {
+		return false
+	}
+	for i := 0; i+1 < len(attrs); i += 2 {
+		key, _ := attrs[i].(string)
+		if key != "auth_failure_reason" {
+			continue
+		}
+		reason, _ := attrs[i+1].(string)
+		if reason == "missing_bearer" || reason == "token_verify_failed" {
+			return true
+		}
+	}
+	return false
 }
 
 type responseRecorder struct {

@@ -51,7 +51,7 @@ func (h *Handler) handleSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	email, ok := currentUserEmail(r)
 	if !ok {
-		httputil.Error(w, http.StatusUnauthorized, "missing_user_email")
+		writeMissingUserEmail(w, r)
 		return
 	}
 	summary, err := h.store.Summary(r.Context(), email)
@@ -68,7 +68,7 @@ func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	email, ok := currentUserEmail(r)
 	if !ok {
-		httputil.Error(w, http.StatusUnauthorized, "missing_user_email")
+		writeMissingUserEmail(w, r)
 		return
 	}
 	query := r.URL.Query()
@@ -111,7 +111,7 @@ func (h *Handler) handleRead(w http.ResponseWriter, r *http.Request) {
 	}
 	email, ok := currentUserEmail(r)
 	if !ok {
-		httputil.Error(w, http.StatusUnauthorized, "missing_user_email")
+		writeMissingUserEmail(w, r)
 		return
 	}
 	id, ok := parseRecipientID(w, r)
@@ -136,7 +136,7 @@ func (h *Handler) handleReadAll(w http.ResponseWriter, r *http.Request) {
 	}
 	email, ok := currentUserEmail(r)
 	if !ok {
-		httputil.Error(w, http.StatusUnauthorized, "missing_user_email")
+		writeMissingUserEmail(w, r)
 		return
 	}
 	count, err := h.store.MarkAllRead(r.Context(), email)
@@ -153,7 +153,7 @@ func (h *Handler) handleArchive(w http.ResponseWriter, r *http.Request) {
 	}
 	email, ok := currentUserEmail(r)
 	if !ok {
-		httputil.Error(w, http.StatusUnauthorized, "missing_user_email")
+		writeMissingUserEmail(w, r)
 		return
 	}
 	id, ok := parseRecipientID(w, r)
@@ -187,6 +187,11 @@ func (h *Handler) handleStoreError(w http.ResponseWriter, r *http.Request, err e
 		return
 	}
 	httputil.InternalError(w, r, err, "notifications request failed", "component", component, "operation", operation)
+}
+
+func writeMissingUserEmail(w http.ResponseWriter, r *http.Request) {
+	logging.AddAccessLogAttrs(r.Context(), "response_error", "missing_user_email")
+	httputil.Error(w, http.StatusUnauthorized, "missing_user_email")
 }
 
 func (h *Handler) requestLogger(r *http.Request, operation string) *slog.Logger {

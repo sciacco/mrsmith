@@ -1,14 +1,18 @@
 package notifications
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/auth"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
+	"github.com/sciacco/mrsmith/pkg/middleware"
 )
 
 func TestHandlerUsesClaimsEmailForRecipientScopedReads(t *testing.T) {
@@ -77,6 +81,52 @@ func TestHandlerRequiresStoreAndClaimsEmail(t *testing.T) {
 			t.Fatalf("expected 401, got %d", res.Code)
 		}
 	})
+	t.Run("email missing remains warn access diagnostic", func(t *testing.T) {
+		var buf bytes.Buffer
+		logger := logging.NewWithWriter(&buf, "debug")
+		mux := http.NewServeMux()
+		RegisterRoutes(mux, Deps{Store: &fakeHandlerStore{}})
+		handler := middleware.RequestID(middleware.AccessLog(logger)(mux))
+
+		req := httptest.NewRequest(http.MethodGet, "/notifications/v1/summary", nil)
+		req.Header.Set("X-Request-ID", "req-missing-email")
+		req = req.WithContext(context.WithValue(req.Context(), auth.ClaimsKey, auth.Claims{Subject: "u1", Name: "user"}))
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		if res.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401, got %d", res.Code)
+		}
+
+		entry := decodeNotificationAccessLog(t, buf.String())
+		if entry["level"] != "WARN" {
+			t.Fatalf("expected WARN level, got %#v", entry["level"])
+		}
+		if entry["msg"] != "request completed with client error" {
+			t.Fatalf("expected client error access log, got %#v", entry["msg"])
+		}
+		if entry["status"] != float64(http.StatusUnauthorized) {
+			t.Fatalf("expected 401 status, got %#v", entry["status"])
+		}
+		if entry["response_error"] != "missing_user_email" {
+			t.Fatalf("expected missing_user_email response_error, got %#v", entry["response_error"])
+		}
+	})
+}
+
+func decodeNotificationAccessLog(t *testing.T, raw string) map[string]any {
+	t.Helper()
+
+	lines := strings.Split(strings.TrimSpace(raw), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 log line, got %d", len(lines))
+	}
+
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &entry); err != nil {
+		t.Fatalf("failed to decode log line: %v", err)
+	}
+	return entry
 }
 
 type fakeHandlerStore struct {

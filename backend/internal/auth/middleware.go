@@ -95,14 +95,20 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		if m.verifier == nil {
 			claims := *m.noopFakeClaims
 			ctx := context.WithValue(r.Context(), ClaimsKey, claims)
-			ctx = logging.WithAttrs(ctx, "auth_subject", claims.Subject)
+			addAuthAccessLogAttrs(ctx, claims)
+			ctx = logging.WithAttrs(ctx,
+				"auth_subject", claims.Subject,
+				"auth_username", claims.Name,
+				"auth_email", claims.Email,
+			)
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 
 		authHeader := r.Header.Get("Authorization")
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			logger.Warn("authentication failed", "reason", "missing_bearer")
+			logging.AddAccessLogAttrs(r.Context(), "auth_failure_reason", "missing_bearer")
+			logger.Info("authentication failed", "reason", "missing_bearer")
 			http.Error(w, "missing or invalid authorization header", http.StatusUnauthorized)
 			return
 		}
@@ -110,7 +116,8 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		idToken, err := m.verifier.Verify(r.Context(), rawToken)
 		if err != nil {
-			logger.Warn("authentication failed", "reason", "token_verify_failed", "error", err)
+			logging.AddAccessLogAttrs(r.Context(), "auth_failure_reason", "token_verify_failed")
+			logger.Info("authentication failed", "reason", "token_verify_failed", "error", err)
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
@@ -137,9 +144,22 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), ClaimsKey, claims)
-		ctx = logging.WithAttrs(ctx, "auth_subject", claims.Subject)
+		addAuthAccessLogAttrs(ctx, claims)
+		ctx = logging.WithAttrs(ctx,
+			"auth_subject", claims.Subject,
+			"auth_username", claims.Name,
+			"auth_email", claims.Email,
+		)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func addAuthAccessLogAttrs(ctx context.Context, claims Claims) {
+	logging.AddAccessLogAttrs(ctx,
+		"auth_subject", claims.Subject,
+		"auth_username", claims.Name,
+		"auth_email", claims.Email,
+	)
 }
 
 func GetClaims(ctx context.Context) (Claims, bool) {
