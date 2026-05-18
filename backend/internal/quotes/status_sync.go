@@ -97,7 +97,7 @@ func (w *HubSpotStatusSyncWorker) Run(ctx context.Context) {
 		cfg := w.loadRuntimeConfig(ctx)
 		if cfg.Enabled {
 			if _, err := w.processOnceWithConfig(ctx, cfg); err != nil && ctx.Err() == nil {
-				w.logger.Warn("hubspot status sync run failed", "error", err)
+				w.logger.Warn("hubspot status sync run failed", "operation", "hubspot_status_sync_run", "error", err)
 			}
 		} else {
 			w.logger.Info("hubspot status sync worker disabled by runtime config")
@@ -193,6 +193,7 @@ func (w *HubSpotStatusSyncWorker) syncQuoteStatus(ctx context.Context, conn *sql
 		stats.Errors++
 		w.logger.Warn(
 			"hubspot quote status lookup failed",
+			"operation", "hubspot_status_sync_hubspot_lookup",
 			"quote_id", quote.ID,
 			"hs_quote_id", quote.HSQuoteID,
 			"error", err,
@@ -221,6 +222,7 @@ func (w *HubSpotStatusSyncWorker) syncQuoteStatus(ctx context.Context, conn *sql
 		stats.Errors++
 		w.logger.Warn(
 			"local quote status update failed",
+			"operation", "hubspot_status_sync_update",
 			"quote_id", quote.ID,
 			"hs_quote_id", quote.HSQuoteID,
 			"remote_hs_status", remoteStatus,
@@ -266,13 +268,21 @@ func (w *HubSpotStatusSyncWorker) loadRuntimeConfig(ctx context.Context) hubSpot
 		return cfg
 	}
 	if err != nil {
-		w.logger.Warn("hubspot status sync runtime config read failed; using defaults", "error", err)
+		w.logger.Warn(
+			"hubspot status sync runtime config read failed; using defaults",
+			"operation", "hubspot_status_sync_config_read",
+			"error", err,
+		)
 		return cfg
 	}
 
 	var payload hubSpotStatusSyncConfigPayload
 	if err := json.Unmarshal(raw, &payload); err != nil {
-		w.logger.Warn("hubspot status sync runtime config parse failed; using defaults", "error", err)
+		w.logger.Warn(
+			"hubspot status sync runtime config parse failed; using defaults",
+			"operation", "hubspot_status_sync_config_parse",
+			"error", err,
+		)
 		return cfg
 	}
 	if payload.Enabled != nil {
@@ -341,11 +351,18 @@ func (w *HubSpotStatusSyncWorker) releaseAdvisoryLock(conn *sql.Conn) {
 
 	var unlocked bool
 	if err := conn.QueryRowContext(ctx, `SELECT pg_advisory_unlock($1)`, w.lockKey).Scan(&unlocked); err != nil {
-		w.logger.Warn("release hubspot status sync advisory lock failed", "error", err)
+		w.logger.Warn(
+			"release hubspot status sync advisory lock failed",
+			"operation", "hubspot_status_sync_unlock",
+			"error", err,
+		)
 		return
 	}
 	if !unlocked {
-		w.logger.Warn("hubspot status sync advisory lock was not held during release")
+		w.logger.Warn(
+			"hubspot status sync advisory lock was not held during release",
+			"operation", "hubspot_status_sync_unlock",
+		)
 	}
 }
 

@@ -351,7 +351,7 @@ Alyante ERP ID
 
 - Context: `apps/quotes` proposals published with legal notes and stored locally as `PENDING_APPROVAL`.
 - Discovery: HubSpot is the source of truth after approval review. Local pending quotes must be synchronized from HubSpot `hs_status`; `hs_sign_status` is separate and remains out of scope for local status transitions.
-- Practical rule: the backend scheduled worker should inspect only local quotes with `status = PENDING_APPROVAL` and `hs_quote_id IS NOT NULL`. It may update local status to `APPROVED`, `APPROVAL_NOT_NEEDED`, or `REJECTED`; it must skip `DRAFT`, `PENDING_APPROVAL`, empty, and unknown HubSpot statuses. Conversion to order remains allowed only for local `APPROVED`.
+- Practical rule: the backend scheduled worker should inspect only local quotes with `status = PENDING_APPROVAL` and `hs_quote_id IS NOT NULL`. It may update local status to `APPROVED`, `APPROVAL_NOT_NEEDED`, or `REJECTED`; it must skip `DRAFT`, `PENDING_APPROVAL`, empty, and unknown HubSpot statuses. Conversion to order remains allowed only for local `APPROVED`. HubSpot lookup failures, local update failures, runtime config failures, and advisory-lock release failures must be logged as `WARN` records with `component = quotes` and an explicit `operation`, so deployments with diagnostics enabled persist them to `mrsmith.diagnostic_event`.
 - Evidence: GitHub issue #44 implementation plan; `backend/internal/quotes/status_sync.go`; `apps/quotes/QUOTES-SPEC.md`.
 - Used by: `apps/quotes` list/detail status display and order-conversion gating.
 - Open questions: none.
