@@ -2,24 +2,46 @@ package quotes
 
 import (
 	"database/sql"
+	"log/slog"
 	"net/http"
 
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
+	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 )
 
+// Deps bundles the external systems used by the Quotes BFF.
+type Deps struct {
+	Mistra  *sql.DB
+	Vodka   *sql.DB
+	Alyante *sql.DB
+	HubSpot *hubspot.Client
+	Arak    *arak.Client
+	Logger  *slog.Logger
+}
+
 // Handler holds dependencies for all quotes endpoints.
 type Handler struct {
 	db        *sql.DB         // Mistra PostgreSQL (quotes, products, loader schemas)
+	vodkaDB   *sql.DB         // Vodka/daiquiri MySQL (legacy orders)
 	alyanteDB *sql.DB         // Alyante ERP MSSQL (read-only, optional)
 	hs        *hubspot.Client // HubSpot API client (optional)
+	arak      *arak.Client    // Mistra NG/gw-int API client (optional)
+	logger    *slog.Logger
 }
 
 // RegisterRoutes mounts all quotes endpoints on the given mux.
-func RegisterRoutes(mux *http.ServeMux, db, alyanteDB *sql.DB, hs *hubspot.Client) {
-	h := &Handler{db: db, alyanteDB: alyanteDB, hs: hs}
+func RegisterRoutes(mux *http.ServeMux, deps Deps) {
+	h := &Handler{
+		db:        deps.Mistra,
+		vodkaDB:   deps.Vodka,
+		alyanteDB: deps.Alyante,
+		hs:        deps.HubSpot,
+		arak:      deps.Arak,
+		logger:    deps.Logger,
+	}
 	protect := acl.RequireRole(applaunch.QuotesAccessRoles()...)
 	handle := func(pattern string, handler http.HandlerFunc) {
 		mux.Handle(pattern, protect(http.HandlerFunc(handler)))
@@ -44,6 +66,7 @@ func RegisterRoutes(mux *http.ServeMux, db, alyanteDB *sql.DB, hs *hubspot.Clien
 	handle("PUT /quotes/v1/quotes/{id}", h.handleUpdateQuote)
 	handle("GET /quotes/v1/quotes/{id}/hs-status", h.handleGetHSStatus)
 	handle("GET /quotes/v1/quotes/{id}/publish-precheck", h.handlePublishPrecheck)
+	handle("GET /quotes/v1/quotes/{id}/order-conversion", h.handleGetOrderConversion)
 
 	// ── Kit rows and products ──
 	handle("GET /quotes/v1/quotes/{id}/rows", h.handleListRows)
@@ -55,6 +78,7 @@ func RegisterRoutes(mux *http.ServeMux, db, alyanteDB *sql.DB, hs *hubspot.Clien
 
 	// ── Publish ──
 	handle("POST /quotes/v1/quotes/{id}/publish", h.handlePublish)
+	handle("POST /quotes/v1/quotes/{id}/convert-order", h.handleConvertOrder)
 
 	// ── Delete ──
 	handle("DELETE /quotes/v1/quotes/{id}", h.handleDeleteQuote)
@@ -78,9 +102,25 @@ func (h *Handler) requireAlyante(w http.ResponseWriter) bool {
 	return true
 }
 
+func (h *Handler) requireVodka(w http.ResponseWriter) bool {
+	if h.vodkaDB == nil {
+		httputil.Error(w, http.StatusServiceUnavailable, "vodka_database_not_configured")
+		return false
+	}
+	return true
+}
+
 func (h *Handler) requireHS(w http.ResponseWriter) bool {
 	if h.hs == nil {
 		httputil.Error(w, http.StatusServiceUnavailable, "hubspot_not_configured")
+		return false
+	}
+	return true
+}
+
+func (h *Handler) requireArak(w http.ResponseWriter) bool {
+	if h.arak == nil {
+		httputil.Error(w, http.StatusServiceUnavailable, "arak_gateway_not_configured")
 		return false
 	}
 	return true

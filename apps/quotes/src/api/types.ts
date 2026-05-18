@@ -189,3 +189,32 @@ export interface PublishPrecheck {
   invalid_required_groups: number;
   has_missing_required_products: boolean;
 }
+
+export interface OrderConversionStep {
+  step: number;
+  name: string;
+  status: 'completed' | 'skipped' | 'error';
+  detail?: string;
+  error?: string;
+}
+
+export interface OrderConversionStatus {
+  converted: boolean;
+  order_id: number | null;
+  order_code: string | null;
+  hubspot_deal_id: string | null;
+  hubspot_deal_url: string | null;
+  conflict?: boolean;
+  conflict_order_id?: number | null;
+}
+
+export interface OrderConversionResult {
+  success: boolean;
+  order_id?: number;
+  order_code?: string;
+  hubspot_deal_id?: string;
+  hubspot_deal_url?: string;
+  file_id?: string;
+  note_id?: number;
+  steps: OrderConversionStep[];
+}

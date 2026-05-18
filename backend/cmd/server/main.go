@@ -512,7 +512,14 @@ func main() {
 		Logger:      logger,
 	})
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
-	quotes.RegisterRoutes(api, mistraDB, alyanteDB, hubspotCli)
+	quotes.RegisterRoutes(api, quotes.Deps{
+		Mistra:  mistraDB,
+		Vodka:   vodkaDB,
+		Alyante: alyanteDB,
+		HubSpot: hubspotCli,
+		Arak:    arakCli,
+		Logger:  logger,
+	})
 	rdf.RegisterRoutes(api, rdf.Deps{
 		AnisettaDB:                 anisettaDB,
 		MistraDB:                   mistraDB,

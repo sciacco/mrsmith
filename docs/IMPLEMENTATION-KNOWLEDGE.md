@@ -347,6 +347,15 @@ Alyante ERP ID
 - Used by: `apps/quotes` republish flow and `GET /quotes/v1/quotes/:id/hs-status`.
 - Open questions: none.
 
+### Quotes Order Conversion Uses Vodka Bridge Plus HubSpot Note Attachment
+
+- Context: `apps/quotes` conversion from proposal to legacy Vodka/daiquiri sales order.
+- Discovery: the active Appsmith conversion flow creates the Vodka `orders` header and `orders_rows`, records `orders.legacy_orders`, generates the order PDF through `GET /orders/v1/order/pdf/{orderId}/generate`, uploads it to HubSpot Files under `/deal-documents`, then creates a HubSpot note associated to the deal with association type `214`. The dormant `AssociateFileToDeal` query is not part of the active flow and contains a bad field reference.
+- Practical rule: retry and status logic should use `orders.legacy_orders.quote_id -> vodka_id` as the canonical bridge. Do not recreate Vodka orders when the bridge exists. If a matching Vodka order exists by `cdlan_ndoc` + `cdlan_anno` without the bridge, stop with a conflict instead of creating a duplicate. Attach the PDF through the note association, not the dormant file-to-deal endpoint.
+- Evidence: `apps/quotes/quotes-main.tar.gz` `Converti in ordine/jsobjects/utilsCopy/utilsCopy.js`; recovered `artifacts/Ordini-gestione-portale.json` `gpUtils.newOrderFromQuote` and `gpUtils.rowsFromQuote`; implementation in `backend/internal/quotes/order_conversion.go`.
+- Used by: `apps/quotes` `POST /api/quotes/v1/quotes/{id}/convert-order` and `GET /api/quotes/v1/quotes/{id}/order-conversion`.
+- Open questions: whether HubSpot file/note IDs should be persisted for exact retry de-duplication after a note creation failure.
+
 ### Panoramica Orders Summary Text Columns Can Be NULL
 
 - Context: `GET /api/panoramica/v1/orders/summary` backed by `loader.v_ordini_sintesi`.

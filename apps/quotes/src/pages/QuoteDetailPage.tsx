@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Icon, TabNav, Tooltip, type TabNavDotIndicator } from '@mrsmith/ui';
-import { useHSStatus, usePublishPrecheck, useQuote, useUpdateQuote } from '../api/queries';
+import { useHSStatus, useOrderConversion, usePublishPrecheck, useQuote, useUpdateQuote } from '../api/queries';
 import type { HSStatus, PublishPrecheck, Quote } from '../api/types';
 import { StatusBadge } from '../components/StatusBadge';
 import { HeaderTab } from '../components/HeaderTab';
@@ -9,6 +9,7 @@ import { ContactsTab } from '../components/ContactsTab';
 import { NotesTab } from '../components/NotesTab';
 import { KitsTab } from '../components/KitsTab';
 import { PublishModal } from '../components/PublishModal';
+import { OrderConversionModal } from '../components/OrderConversionModal';
 import { useDirtyState } from '../hooks/useDirtyState';
 import { buildQuoteSavePayload, prepareQuoteForDetail } from '../utils/quoteRules';
 import styles from './QuoteDetailPage.module.css';
@@ -63,6 +64,7 @@ export function QuoteDetailPage() {
   const navigate = useNavigate();
   const { data: quote, isLoading } = useQuote(quoteId);
   const { data: hsStatus, refetch: refetchHSStatus } = useHSStatus(quoteId);
+  const { data: orderConversion } = useOrderConversion(quoteId);
   const publishPrecheck = usePublishPrecheck(quoteId);
   const updateQuote = useUpdateQuote();
   const { isDirty, dirtyTabs, markDirty, markClean, setSnapshot } = useDirtyState();
@@ -70,6 +72,7 @@ export function QuoteDetailPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('header');
   const [localQuote, setLocalQuote] = useState<Quote | null>(null);
   const [showPublish, setShowPublish] = useState(false);
+  const [showConvertOrder, setShowConvertOrder] = useState(false);
 
   const dotIndicator = useMemo<Record<string, TabNavDotIndicator>>(
     () => ({
@@ -138,7 +141,16 @@ export function QuoteDetailPage() {
     [isDirty, hsStatus, publishPrecheck.data],
   );
   const publishBlocked = publishBlockers.length > 0;
+  const conversionBlocked = isDirty || !!orderConversion?.conflict;
   const isRepublish = !!hsStatus?.hs_quote_id;
+  const orderConversionLabel = orderConversion?.converted ? 'Completa invio' : 'Converti';
+  const orderConversionTooltip = useMemo(() => {
+    if (isDirty) return 'Salva le modifiche prima di convertire.';
+    if (orderConversion?.conflict) return 'Esiste già un ordine con lo stesso codice.';
+    return orderConversion?.converted
+      ? 'Completa PDF e nota HubSpot per l’ordine.'
+      : 'Crea l’ordine e allega il PDF al deal HubSpot.';
+  }, [isDirty, orderConversion?.conflict, orderConversion?.converted]);
   const pdfAction = useMemo(() => {
     if (!hsStatus?.hs_quote_id) {
       return {
@@ -200,6 +212,26 @@ export function QuoteDetailPage() {
           )}
 
           <div className={styles.actionBarSpacer} />
+
+          {orderConversion?.converted && (
+            <span className={styles.orderBadge}>
+              <Icon name="shopping-cart" size={14} />
+              {orderConversion.order_code ?? `Ordine ${orderConversion.order_id ?? ''}`}
+            </span>
+          )}
+
+          <Tooltip content={<span>{orderConversionTooltip}</span>} placement="bottom">
+            <span className={styles.hsLinkWrap}>
+              <Button
+                variant="secondary"
+                leftIcon={<Icon name="shopping-cart" size={16} />}
+                disabled={conversionBlocked}
+                onClick={() => setShowConvertOrder(true)}
+              >
+                {orderConversionLabel}
+              </Button>
+            </span>
+          </Tooltip>
 
           {hsStatus?.hs_quote_id && hsStatus.quote_url && (
             <a
@@ -312,6 +344,12 @@ export function QuoteDetailPage() {
           precheck={publishPrecheck.data ?? null}
           refreshHSStatus={refreshHSStatus}
           onClose={() => setShowPublish(false)}
+        />
+        <OrderConversionModal
+          open={showConvertOrder}
+          quoteId={quoteId}
+          status={orderConversion ?? null}
+          onClose={() => setShowConvertOrder(false)}
         />
       </div>
   );

@@ -4,6 +4,7 @@ import type {
   Template, ProductCategory, Kit, Customer, Deal, Owner,
   PaymentMethod, CustomerPayment, CustomerOrder, QuoteListResponse,
   Quote, HSStatus, QuoteRow, ProductGroup, PublishPrecheck, ProductVariant,
+  OrderConversionStatus, OrderConversionResult,
 } from './types';
 
 // ── Reference data hooks ──
@@ -187,6 +188,15 @@ export function usePublishPrecheck(id: number) {
   });
 }
 
+export function useOrderConversion(id: number) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['order-conversion', id],
+    queryFn: () => api.get<OrderConversionStatus>(`/quotes/v1/quotes/${id}/order-conversion`),
+    enabled: id > 0,
+  });
+}
+
 // ── Publish ──
 
 export function usePublishQuote() {
@@ -202,6 +212,20 @@ export function usePublishQuote() {
       void qc.invalidateQueries({ queryKey: ['hs-status', id] });
       void qc.invalidateQueries({ queryKey: ['quotes'] });
       void qc.invalidateQueries({ queryKey: ['publish-precheck', id] });
+    },
+  });
+}
+
+export function useConvertQuoteToOrder() {
+  const api = useApiClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      api.post<OrderConversionResult>(`/quotes/v1/quotes/${id}/convert-order`, {}),
+    onSuccess: (_data, id) => {
+      void qc.invalidateQueries({ queryKey: ['quote', id] });
+      void qc.invalidateQueries({ queryKey: ['quotes'] });
+      void qc.invalidateQueries({ queryKey: ['order-conversion', id] });
     },
   });
 }
