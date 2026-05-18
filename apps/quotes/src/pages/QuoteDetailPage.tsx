@@ -144,7 +144,15 @@ export function QuoteDetailPage() {
   const conversionStatusBlocked = localQuote?.status !== 'APPROVED';
   const conversionBlocked = isDirty || conversionStatusBlocked || !!orderConversion?.conflict;
   const isRepublish = !!hsStatus?.hs_quote_id;
-  const orderConversionLabel = orderConversion?.converted ? 'Completa invio' : 'Converti';
+  const hasExistingOrder = !!orderConversion?.converted || !!orderConversion?.conflict;
+  const existingOrderId = orderConversion?.converted
+    ? orderConversion.order_id
+    : orderConversion?.conflict_order_id ?? null;
+  const existingOrderLabel = existingOrderId
+    ? `Ordine ${existingOrderId}`
+    : orderConversion?.order_code
+      ? `Ordine ${orderConversion.order_code}`
+      : 'Ordine esistente';
   const orderConversionTooltip = useMemo(() => {
     if (isDirty) return 'Salva le modifiche prima di convertire.';
     if (conversionStatusBlocked) {
@@ -217,25 +225,30 @@ export function QuoteDetailPage() {
 
           <div className={styles.actionBarSpacer} />
 
-          {orderConversion?.converted && (
-            <span className={styles.orderBadge}>
+          {hasExistingOrder && (
+            <span
+              className={`${styles.orderBadge} ${orderConversion?.conflict ? styles.orderBadgeWarning : ''}`}
+              title={orderConversion?.conflict ? 'Ordine presente in Vodka senza collegamento alla proposta' : undefined}
+            >
               <Icon name="shopping-cart" size={14} />
-              {orderConversion.order_code ?? `Ordine ${orderConversion.order_id ?? ''}`}
+              {existingOrderLabel}
             </span>
           )}
 
-          <Tooltip content={<span>{orderConversionTooltip}</span>} placement="bottom">
-            <span className={styles.hsLinkWrap}>
-              <Button
-                variant="secondary"
-                leftIcon={<Icon name="shopping-cart" size={16} />}
-                disabled={conversionBlocked}
-                onClick={() => setShowConvertOrder(true)}
-              >
-                {orderConversionLabel}
-              </Button>
-            </span>
-          </Tooltip>
+          {!hasExistingOrder && (
+            <Tooltip content={<span>{orderConversionTooltip}</span>} placement="bottom">
+              <span className={styles.hsLinkWrap}>
+                <Button
+                  variant="secondary"
+                  leftIcon={<Icon name="shopping-cart" size={16} />}
+                  disabled={conversionBlocked}
+                  onClick={() => setShowConvertOrder(true)}
+                >
+                  Converti
+                </Button>
+              </span>
+            </Tooltip>
+          )}
 
           {hsStatus?.hs_quote_id && hsStatus.quote_url && (
             <a

@@ -77,6 +77,12 @@
   text-overflow: ellipsis;
 }
 
+.orderBadgeWarning {
+  border-color: var(--color-warning);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
 .dirtyHint {
   display: inline-flex;
   align-items: center;
