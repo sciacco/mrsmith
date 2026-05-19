@@ -28,7 +28,7 @@
 11. **Hidden enums embedded in the UI** — these are the de-facto business catalogs:
     - `cdlan_tipodoc`: `TSC-ORDINE-RIC` (Ordine ricorrente) / `TSC-ORDINE` (Ordine spot).
     - `cdlan_tipo_ord`: `A` Sostituzione / `N` Nuovo / `R` Rinnovo.
-    - `cdlan_dur_rin`, `cdlan_int_fatturazione`: `1,2,3,4,6,12` (Mensile … Annuale). **Note:** `Form ordine` uses `4` = Quadrimestrale, but `Order` SQL CASE uses `5` = Quadrimestrale — mismatched, verify which is canonical.
+    - `cdlan_dur_rin`, `cdlan_int_fatturazione`: `1,2,3,4,6,12` (Mensile … Annuale). **Q3 resolved:** the value is written through verbatim from `quotes.quote.bill_months` by the converter — there is no enum mapping on the write side. The `4` vs `5` "drift" exists only in display-side CASE expressions; the read path must accept the value as-is and the display map lives in the frontend formatter.
     - `cdlan_int_fatturazione_att`: `1` All'ordine / `2` All'attivazione del servizio/Consegna.
     - `profile_lang`: `it` / `en`.
     - `is_colo`: `0` = Altre soluzioni, `Colocation variabile`, `Iaas payperuse` (diretto), `Iaas payperuse indiretto`.
@@ -83,7 +83,10 @@
 - **`CheckConfirmRows` SQL bug.** Fixing the `<> null` bug changes the count for rows with `data_annullamento` set. Confirm whether the promotion to ATTIVO should include cancelled rows (the bug currently says no).
 - **Customer ID vs display name on `orders.cdlan_cliente`.** The column stores the string. Migrating to an ID reference requires a backfill script over existing data (map `RAGIONE_SOCIALE → NUMERO_AZIENDA`) and a schema change (`customer_id` column).
 - **Authorization source of truth.** The current app reads `appsmith.user.groups`. The rewrite uses Keycloak with `app_ordini_access`; mapping the `CustomerRelations` group to a Keycloak role needs to be confirmed.
-- **Order creation scope.** Not implemented here, but likely needed. Before migrating, decide whether the rewrite implements it, reuses the Customer Portal, or keeps it entirely in the ERP.
+- **Order creation scope.** ✅ Resolved — out-of-scope by design. Ordini app is lifecycle-only post-creation. Two creation paths live elsewhere:
+  - **Conversion from quote/proposta** → `apps/quotes/` (UI) + `backend/internal/quotes/order_conversion.go` (handlers `handleGetOrderConversion` / `handleConvertOrder`). The legacy Appsmith package that produced the Go port is documented in `apps/quotes/package-gpUtils.md`.
+  - **Ex-novo creation** → Customer Portal (external domain).
+  Ordini reads `vodka.orders` rows after they exist. The only Mistra Postgres touch-point is read-only on `orders.legacy_orders` for quote↔order traceability (see Phase D §Traceability).
 - **Partial-success UX.** The rewrite needs a designed error state for "some rows failed to sync to ERP". The Appsmith version hides this.
 
 ## Recommended next steps

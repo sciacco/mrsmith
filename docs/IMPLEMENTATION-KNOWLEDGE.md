@@ -53,6 +53,7 @@ Add new discoveries under the most relevant domain:
 | --- | --- | --- | --- |
 | Alyante | — | — | ERP company ID |
 | Mistra | PostgreSQL | `customers.customer` | `id` = Alyante ERP ID |
+| Mistra | PostgreSQL | `loader.hubs_company` | `numero_azienda` = Alyante ERP ID (varchar) |
 | Grappa | MySQL | `cli_fatturazione` | `id` = internal Grappa ID |
 
 #### Key Mapping
@@ -62,9 +63,13 @@ Alyante ERP ID
     |
     ├── Mistra PG:  customers.customer.id
     |
+    ├── Mistra PG:  loader.hubs_company.numero_azienda     (HubSpot mirror; varchar)
+    |
     └── Grappa MySQL: cli_fatturazione.codice_aggancio_gest
                       cli_fatturazione.id                    (internal Grappa ID)
 ```
+
+`loader.hubs_company.numero_azienda` carries the Alyante ERP ID on the HubSpot mirror side. When a flow starts from a HubSpot deal or company (e.g. quote→order conversion in `backend/internal/quotes/order_conversion.go`, or the `HubSpot Company Lookup from Grappa` recipe below), reading `numero_azienda` avoids a round-trip to Alyante MSSQL for the same value. Treat it as the same identifier — stored as `varchar` rather than `int` — and cast to the integer form when joining against `customers.customer.id`. Evidence: Appsmith package `Ordini gestione portale` (`gpUtils` module) which reads `loader.hubs_company.numero_azienda as customer_number` in `get_quote_by_id`, mirrored by the Go port `loadQuoteOrderSource`.
 
 #### ERP Bridge in Mistra
 

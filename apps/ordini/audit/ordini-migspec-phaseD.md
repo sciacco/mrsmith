@@ -10,7 +10,7 @@ Scope reminder: only Home + Dettaglio ordine carry forward; cancel-request flow 
 
 ### 1.1 vodka — MySQL (`10.129.32.7:3306`)
 - **Owner of:** `orders` (header), `orders_rows` (lines).
-- **Owner of these fields:** vodka-side state (`cdlan_stato`), `cdlan_evaso`, per-row activation state (`cdlan_data_attivazione`, `confirm_data_attivazione`), `cdlan_serialnumber`, `note_tecnici`, `arx_doc_number` (read; write path is external — see §5), `from_cp`, `cdlan_cliente`, `cdlan_cliente_id` (writeable per C2).
+- **Owner of these fields:** vodka-side state (`cdlan_stato`), `cdlan_evaso`, per-row activation state (`cdlan_data_attivazione`, `confirm_data_attivazione`), `cdlan_serialnumber`, `note_tecnici`, `arx_doc_number` (read; write path is external — see §7), `from_cp`, `cdlan_cliente`, `cdlan_cliente_id` (writeable per C2).
 - **Access pattern in rewrite:** Go backend connects directly. All queries are parameterized (no Appsmith-style raw-string interpolation).
 
 ### 1.2 Alyante — Microsoft SQL Server (`172.16.1.16:1433`)
@@ -54,11 +54,64 @@ The sanctioned bridge between this app and ERP / PDF generation / Arxivar. The r
 
 | Dropped | Why |
 |---|---|
-| `db-mistra` (PostgreSQL, `10.129.32.20`) | Used only by `Ordini semplificati` (HubSpot potentials) and the unused `get_payment_methods`. Both pages dropped. |
+| `db-mistra` (PostgreSQL, `10.129.32.20`) — Appsmith-era full access | The legacy Appsmith app used Mistra Postgres for `Ordini semplificati` (HubSpot potentials) and `get_payment_methods`. Both pages are dropped from v1. **Partial re-inclusion:** Ordini opens a read-only connection scoped to `orders.legacy_orders` only, used for quote↔order traceability (see §4 below). No access to `quotes.*`, `loader.*`, `products.*`, or the Mistra sequences — those remain exclusively in the quotes domain. |
+
+## 3. Input contract — invariants Ordini assumes on incoming records
+
+Order rows in `vodka.orders` and `vodka.orders_rows` reach Ordini already populated by an external creator (quotes converter or customer portal). Ordini consumes them as-is and trusts the following invariants. Any violation is a defect of the creator, not of Ordini.
+
+| Field | Invariant | Notes for Ordini |
+|---|---|---|
+| `orders.cdlan_systemodv` | not null, allocated by the creator from Mistra sequence `orders.system_odv_alyante` | Stable ERP-correlated key. Never re-allocate. |
+| `orders.cdlan_ndoc`, `orders.cdlan_anno` | stored as strings (MySQL coerces to INT on read) | Treat as `string` in the DTO; concatenate `<ndoc>/<anno>` for display. |
+| `orders.cdlan_stato` | always `BOZZA` at creation | Ordini drives the transitions BOZZA→INVIATO→ATTIVO. |
+| `orders.cdlan_dataconferma` | always `NULL` at creation | Ordini lets the operator set it in BOZZA Info SALVA. |
+| `orders.cdlan_evaso`, `cdlan_chiuso` | always `0` at creation | Ordini sets `cdlan_evaso = 1` on send-to-ERP. |
+| `orders.cdlan_valuta` | always `"EURO"` | Display-only. |
+| `orders.cdlan_cliente_id` | **may be `NULL`** for orders created by the quotes converter today (bug Q-new-1 tracked in `apps/quotes/package-gpUtils.md`) | Fallback to `cdlan_cliente` (RAGIONE_SOCIALE) when null. Ordini populates the field when the operator edits Ragione sociale. |
+| `orders.profile_lang` | 2-char code (`it`/`en`); derived from `quote.lingua` (3-char) by the creator | Used for PDF filename localization. |
+| `orders.profile_pv` | 2-char province code (`provincia.slice(0,2)` by the creator) | Display as-is; no validation. |
+| `orders.data_decorrenza` | empty string `""`, not NULL | Treat as nullable; display blank. |
+| `orders.is_colo` | one of `0` / `Colocation variabile` / `Iaas payperuse` / `Iaas payperuse indiretto`; auto-derived only for `Colocation variabile` | Source of the IaaS variants is outside the quotes converter (unconfirmed creator path). |
+| `orders.service_type` | comma-joined category names (derived from `quote.services` JSON by the creator) | Display as-is; do not re-derive. |
+| `orders_rows.cdlan_systemodv_row` | not null per row, allocated from the same Mistra sequence | Used by GW endpoints for ERP sync. |
+| `orders_rows.cdlan_prezzo` | **Italian-locale string** (`"1234,56"` with comma) | Parse on read for arithmetic/aggregation; render as-is for display. |
+| `orders_rows.cdlan_prezzo_attivazione` | string with dot decimal (`"1234.56"`) | Historical asymmetry vs `cdlan_prezzo` — DTO normalizes both to `decimal`. See Phase A Q4. |
+| `orders_rows.cdlan_descart` | multiline (CRLF-joined translated short + extended description) | Render with `<pre>`-style preservation of `\r\n`. |
+| `orders_rows.cdlan_ragg_fatturazione` | `"A"` at creation | Display-only. |
+| `orders_rows.cdlan_prezzo_cessazione` | `"0"` at creation | Display-only. |
+| `orders_rows.confirm_data_attivazione` | `0` at creation | Ordini flips to `1` on per-row activation save. |
 
 ---
 
-## 3. End-to-end user journeys
+## 4. Traceability — origine ordine (quote ↔ order)
+
+Mistra owns `orders.legacy_orders(quote_id, vodka_id, jdata)`, written by the quotes converter on every successful order creation. The unique writer in the monorepo is `backend/internal/quotes/order_conversion.go:insertLegacyOrder`. Ordini can rely on it as a read-only back-pointer.
+
+**Endpoint contract.**
+- `GET /api/ordini/:id` includes an optional `origin` field when the order has a quote ancestor:
+  ```json
+  "origin": {
+    "type": "quote",
+    "quote_id": 1234,
+    "quote_code": "ABC-2025-0042",
+    "quote_url": "/quotes/1234"
+  }
+  ```
+- When no row in `legacy_orders` matches `vodka_id = :order_id`, `origin` is omitted. Ex-novo orders from the customer portal will not have a quote ancestor.
+
+**Backend wiring.**
+- Ordini Go module opens a Mistra Postgres connection scoped to `SELECT` on `orders.legacy_orders` only. The connection is reused for the entire request lifecycle of `GET /api/ordini/:id`; no other Mistra schemas are touched.
+- The lookup is a single `SELECT quote_id FROM orders.legacy_orders WHERE vodka_id = $1` keyed by `vodka.orders.id`. Joined `quote_code` is resolved by querying `quotes.quote` via the **quotes module's existing API**, not directly — Ordini stays out of the quotes schema.
+
+**UI affordance.**
+- Dettaglio ordine header bar: when `origin.type == "quote"`, render an anchor `Da proposta {quote_code}` linking to `quote_url`. Hide if `origin` is absent.
+
+---
+
+---
+
+## 5. End-to-end user journeys
 
 ### 3.1 Open and inspect an order
 ```
@@ -66,8 +119,8 @@ User → Portal sidebar → /ordini
   └─ GET /api/ordini  (vodka SELECT_Orders_Table-equivalent)
 User → click "Visualizza" on a row → /ordini/:id
   └─ GET /api/ordini/:id          (vodka Order-equivalent + cdlan_cliente_id surfaced)
-  └─ GET /api/ordini/:id/rows     (vodka RigheOrdine — header line for §3.4 + §3.5)
-  └─ GET /api/ordini/:id/technical-rows (vodka RigheOrdineTecnici — header line for §3.6)
+  └─ GET /api/ordini/:id/rows     (vodka RigheOrdine — header line for §5.4 + §5.5)
+  └─ GET /api/ordini/:id/technical-rows (vodka RigheOrdineTecnici — header line for §5.6)
   └─ GET /api/ordini/ref/customers (Alyante erp_anagrafiche_cli — only when state == BOZZA)
 ```
 The Alyante customer call is gated to BOZZA on the backend so non-editable detail loads stay quick and don't hit Alyante for nothing.
@@ -136,7 +189,7 @@ Four parallel one-shot flows, all backend-proxied (see Phase C §3 for filename 
 
 ---
 
-## 4. Background or triggered processes
+## 6. Background or triggered processes
 
 The Appsmith app has no timers, schedules, or webhook listeners. All effects are user-initiated. The "background-like" behaviours that exist are all **synchronous side-effects of a user action**:
 
@@ -147,11 +200,11 @@ The Appsmith app has no timers, schedules, or webhook listeners. All effects are
 | `confirm_data_attivazione → 1` | side-effect of every `PATCH /api/ordini/:id/rows/:rowId/activate` | backend handler |
 | `cdlan_stato → ATTIVO` | conditional on the row count match inside `PATCH /api/ordini/:id/rows/:rowId/activate` | backend handler |
 | `cdlan_stato → ANNULLATO` | external — Mistra NG `cancel` endpoint flips the ERP-side state; **vodka is not updated by this flow**. Today this is silent divergence. Out of v1 scope but flagged. | external |
-| `arx_doc_number → <value>` (write) | **not visible in the Appsmith export.** The app only reads it. See §5 — preserved as-is under 1:1. | external (out of this app's scope) |
+| `arx_doc_number → <value>` (write) | **not visible in the Appsmith export.** The app only reads it. See §7 — preserved as-is under 1:1. | external (out of this app's scope) |
 
 ---
 
-## 5. Flows the export cannot reveal
+## 7. Flows the export cannot reveal
 
 ### `arx_doc_number` write path — invisible but irrelevant under 1:1
 The Appsmith app only reads `orders.arx_doc_number` (Info-tab Arxivar link, PDF button enable rules). It never writes it. The actual write happens somewhere outside this app — likely the GW after `send-to-arxivar` succeeds, possibly an Arxivar callback into another service. Under 1:1 the rewrite preserves that exact split: the new backend reads `arx_doc_number` the same way Appsmith does and does not attempt to write it. Whatever populates the column today continues to populate it tomorrow.
@@ -164,7 +217,7 @@ Out of v1 scope (cancel deferred). The post-v1 cancel re-enablement TODO already
 
 ---
 
-## 6. Data ownership boundaries (canonical)
+## 8. Data ownership boundaries (canonical)
 
 | Data | Owner | Read in this app | Write in this app |
 |---|---|---|---|
@@ -179,6 +232,6 @@ Out of v1 scope (cancel deferred). The post-v1 cancel re-enablement TODO already
 
 ---
 
-## 7. Phase D exit criteria
+## 9. Phase D exit criteria
 
 **Phase D complete.** No open question — the only invisible flows (the `arx_doc_number` write path, the cancel-side state divergence) are either irrelevant under 1:1 or already covered by the cancel-deferral TODO. Ready for Phase E (final spec assembly).

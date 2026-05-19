@@ -20,8 +20,8 @@ Scope directive: **port 1:1, ignore dead features**. Only `Home` and `Dettaglio 
 | `cdlan_ndoc` | int | `concat(cdlan_ndoc,'/',cdlan_anno)` | Proposta number. |
 | `cdlan_anno` | int (4-digit year) | composite key display | |
 | `cdlan_sost_ord` | string \| null | "Sostituisce ordini (Num/Anno)" | Free text. |
-| `cdlan_cliente` | string | `UPDATE … SET cdlan_cliente = erp_an_cli.selectedOptionValue` | **Persisted as the RAGIONE_SOCIALE string** today. Audit recommends adding a `customer_id` (NUMERO_AZIENDA). **Phase A open question.** |
-| `cdlan_cliente_id` | ? | present in `Order` SELECT list | Unused in the UI; value/semantics unknown. |
+| `cdlan_cliente` | string | `UPDATE … SET cdlan_cliente = erp_an_cli.selectedOptionValue` | Persisted as the RAGIONE_SOCIALE display string. Ordini reads this as primary display and writes it on Info SALVA in BOZZA. |
+| `cdlan_cliente_id` | int \| null | present in `Order` SELECT list; populated on Info SALVA by Ordini | **C2 resolved.** The column exists for the NUMERO_AZIENDA. Its *initial* population is responsibility of whoever creates the order — today the quotes converter (`backend/internal/quotes/order_conversion.go`) **leaves it null** (tracked as outstanding finding in `apps/quotes/package-gpUtils.md` → Q-new-1), so all historical orders start with `cdlan_cliente_id IS NULL`. Ordini fills the gap opportunistically: when an operator edits Ragione sociale on the BOZZA Info tab, `updateBozzaHeader` resolves the chosen Alyante customer and persists both `cdlan_cliente` (string) and `cdlan_cliente_id` (NUMERO_AZIENDA). Read-side fallback: when `cdlan_cliente_id IS NULL`, Ordini surfaces `cdlan_cliente` only. |
 | `cdlan_datadoc` | date | display | |
 | `cdlan_dataconferma` | date \| null | editable in BOZZA, precondition for "INVIA in ERP" | |
 | `cdlan_stato` | enum `BOZZA` \| `INVIATO` \| `ATTIVO` \| `PERSO` \| `ANNULLATO` | state machine | PERSO/ANNULLATO transitions not driven from this app in current scope. |
@@ -31,7 +31,7 @@ Scope directive: **port 1:1, ignore dead features**. Only `Home` and `Dettaglio 
 | `cdlan_dur_rin` | int ∈ {1,2,3,4,6,12} | display | Months. |
 | `cdlan_tacito_rin` | 0 \| 1 | display | |
 | `cdlan_tacito_rin_in_pdf` | 0 \| 1 | `Order` SELECT | Not rendered in UI. |
-| `cdlan_int_fatturazione` | int | CASE in `Order` SQL | **Enum drift:** `Order` SQL maps `5`→Quadrimestrale; `Form ordine` dropdown uses `4`. `Form ordine` is dead — 1:1 port means `5` wins. |
+| `cdlan_int_fatturazione` | int | CASE in `Order` SQL | **Q3 resolved.** The value is written verbatim from `quote.bill_months` by the converter (`backend/internal/quotes/order_conversion.go`); there is no enum mapping on the write side. The `4` vs `5` discrepancy is a display-only CASE in the legacy SQL — the read path accepts the value as-is and the label map lives in the frontend formatter. |
 | `cdlan_int_fatturazione_att` | enum `1` \| `2` | display | 1 = All'ordine, 2 = All'attivazione. |
 | `cdlan_cod_termini_pag` | string code | display only | ~30 codes; live in the DB (`loader.erp_metodi_pagamento`), not maintained here. |
 | `origin_cod_termini_pag` | string | `Order` SELECT | Not rendered. |

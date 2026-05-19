@@ -25,7 +25,11 @@
   - `updateReferents(id, payload)` — 9 contact fields. Auth: `app_customer_relations` + state ∈ {BOZZA, INVIATO}.
   - `sendToErp(id, signedPdf)` — per-row push to ERP, vodka state flip and Arxivar upload only on full success (per Q8 / C1). Auth: `app_customer_relations` + state `BOZZA` + preconditions (dataconferma set, customer set, PDF attached). Returns per-row outcome report.
   - `getKickoffPdf(id)`, `getActivationFormPdf(id)`, `getOrderPdf(id)`, `getSignedPdf(id)` — backend-proxied GW PDF endpoints, each with its own auth and state gates (see API Contract).
-  - **Excluded in v1 (deferred via TODO):** `requestCancellation` (RICHIEDI ANNULLAMENTO), `markAsLost` (ORDINE PERSO), order creation.
+  - **Excluded in v1 (deferred via TODO):** `requestCancellation` (RICHIEDI ANNULLAMENTO), `markAsLost` (ORDINE PERSO).
+  - **Out-of-scope by design (lives elsewhere):** order creation. Two creation paths:
+    - Conversion from quote/proposta → `apps/quotes/` UI + `backend/internal/quotes/order_conversion.go` (handlers `handleGetOrderConversion` / `handleConvertOrder`). Source artifact documented in `apps/quotes/package-gpUtils.md`.
+    - Ex-novo creation → Customer Portal (external domain).
+    Ordini consumes records that already exist in `vodka.orders`. See Phase D §3 Input contract for the invariants Ordini assumes on incoming records.
 - **Fields and inferred types.** See Phase A §1 for the full table. Salient ones:
   - `id: int` (vodka PK).
   - `cdlan_systemodv: string` (ERP-side identifier).
@@ -45,8 +49,9 @@
   - `from_cp: 0|1` (CP-originated flag — relevant only to the deferred cancel flow).
 - **Relationships.**
   - `Order` 1:N `OrderRow` via `orders_rows.orders_id = orders.id`.
-  - `Order.cdlan_cliente_id` → `Customer.NUMERO_AZIENDA` (newly persisted per C2; `Order.cdlan_cliente` continues to hold the RAGIONE_SOCIALE string for backward compatibility).
+  - `Order.cdlan_cliente_id` → `Customer.NUMERO_AZIENDA` (writeable per C2; `Order.cdlan_cliente` continues to hold the RAGIONE_SOCIALE string for display).
   - `Order.arx_doc_number` → external Arxivar document.
+  - `Order ↔ Quote` via `mistra.orders.legacy_orders.vodka_id = orders.id` (left join, optional). When present, surfaces as `origin.type == "quote"` on `GET /api/ordini/:id`. See Phase D §4 Traceability.
 - **Constraints and business rules.**
   - State machine: `BOZZA → INVIATO` (sendToErp full success); `INVIATO → ATTIVO` (every row confirmed); `INVIATO → ANNULLATO` is server-side via Mistra NG (not driven from v1 of this app).
   - `confirm_data_attivazione = 1` is set unconditionally as a side-effect of every per-row activation save.
@@ -140,8 +145,8 @@ Not a local entity. Referenced only by `orders.arx_doc_number` and the deep-link
   - **Keycloak** — OAuth2/OIDC; `app_ordini_access` and `app_customer_relations` claims drive authorization.
   - **Mistra NG Internal API** — used **only for the deferred cancel flow** (not in v1).
   - **Arxivar (web UI)** — anchor target only; no API integration.
-- **End-to-end user journeys.** See Phase D §3 for the seven flows: open order, BOZZA→INVIATO, edit referents, edit serial number, per-row activation→auto-ATTIVO, edit technical notes, PDF downloads.
-- **Background or triggered processes.** None scheduled. All mutations are synchronous side-effects of user actions; auto-ATTIVO and INVIATO transitions live inside their respective handlers (Phase D §4).
+- **End-to-end user journeys.** See Phase D §5 for the seven flows: open order, BOZZA→INVIATO, edit referents, edit serial number, per-row activation→auto-ATTIVO, edit technical notes, PDF downloads.
+- **Background or triggered processes.** None scheduled. All mutations are synchronous side-effects of user actions; auto-ATTIVO and INVIATO transitions live inside their respective handlers (Phase D §6).
 - **Data ownership boundaries.** vodka owns the order lifecycle state and metadata; Alyante owns customer master; ERP owns its own document and state vocabulary; Arxivar owns the signed-PDF storage; Keycloak owns identity. The `arx_doc_number` write path lives outside this app — preserved as-is under 1:1.
 
 ---
@@ -153,7 +158,7 @@ All endpoints are namespaced under `/api/ordini`. Every handler validates state 
 | Method | Path | Purpose | Auth |
 |---|---|---|---|
 | GET | `/api/ordini` | Home list (paginated/searchable; client-side in v1). | `app_ordini_access` |
-| GET | `/api/ordini/:id` | Full order header. | `app_ordini_access` |
+| GET | `/api/ordini/:id` | Full order header; may include optional `origin: {type:"quote", quote_id, quote_code, quote_url}` field when a row exists in `mistra.orders.legacy_orders` (Phase D §4 Traceability). | `app_ordini_access` |
 | GET | `/api/ordini/:id/rows` | Order rows for the Righe tab. | `app_ordini_access` |
 | GET | `/api/ordini/:id/technical-rows` | Order rows projected for the Informazioni dai tecnici tab (UTF8 conversion preserved). | `app_ordini_access` |
 | GET | `/api/ordini/ref/customers` | Alyante customer list (filtered as in §Customer entity). | `app_ordini_access`; backend may load lazily only when state == BOZZA. |
