@@ -65,7 +65,7 @@ export function BlockCreateModal({ open, onClose }: BlockCreateModalProps) {
 
   return (
     <Modal open={open} onClose={onClose} title="Nuova richiesta di blocco">
-      <form onSubmit={handleSubmit}>
+      <form className={styles.modalScrollArea} onSubmit={handleSubmit}>
         <div className={styles.formGroup}>
           <label className={styles.label}>Data</label>
           <input className={styles.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} required />

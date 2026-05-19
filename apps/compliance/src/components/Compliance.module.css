@@ -1,4 +1,15 @@
 /* ═══ Textarea ═══ */
+.modalScrollArea {
+  display: flex;
+  flex-direction: column;
+  max-height: min(40rem, calc(100vh - 12rem));
+  max-height: min(40rem, calc(100dvh - 12rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
 .textarea {
   width: 100%;
   min-height: 120px;
@@ -20,7 +31,7 @@
 
 /* ═══ Domain Preview ═══ */
 .previewContainer {
-  max-height: 240px;
+  max-height: min(240px, 32dvh);
   overflow-y: auto;
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: var(--radius-md, 10px);
@@ -171,6 +182,16 @@
   margin-top: var(--space-8, 32px);
   padding-top: var(--space-6, 24px);
   border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+.modalScrollArea .actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding-bottom: var(--space-1, 4px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0), var(--color-bg-elevated, #fff) 28%),
+    var(--color-bg-elevated, #fff);
 }
 
 /* ═══ Confirm message ═══ */

@@ -34,28 +34,30 @@ export function AddDomainsModal({ open, onClose, onSubmit, isPending, title }: A
 
   return (
     <Modal open={open} onClose={onClose} title={title}>
-      <div className={styles.formGroup}>
-        <label className={styles.label}>Domini</label>
-        <textarea
-          className={styles.textarea}
-          value={text}
-          onChange={(e) => handleChange(e.target.value)}
-          placeholder="Inserisci un dominio per riga"
-        />
-        {text.trim() && <DomainPreview valid={parsed.valid} invalid={parsed.invalid} />}
-      </div>
-      <div className={styles.actions}>
-        <button type="button" className={styles.btnSecondary} onClick={onClose}>
-          Annulla
-        </button>
-        <button
-          type="button"
-          className={styles.btnPrimary}
-          onClick={() => onSubmit(parsed.valid)}
-          disabled={isPending || !text.trim() || parsed.invalid.length > 0 || parsed.valid.length === 0}
-        >
-          {isPending ? 'Aggiunta...' : 'Aggiungi'}
-        </button>
+      <div className={styles.modalScrollArea}>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Domini</label>
+          <textarea
+            className={styles.textarea}
+            value={text}
+            onChange={(e) => handleChange(e.target.value)}
+            placeholder="Inserisci un dominio per riga"
+          />
+          {text.trim() && <DomainPreview valid={parsed.valid} invalid={parsed.invalid} />}
+        </div>
+        <div className={styles.actions}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose}>
+            Annulla
+          </button>
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={() => onSubmit(parsed.valid)}
+            disabled={isPending || !text.trim() || parsed.invalid.length > 0 || parsed.valid.length === 0}
+          >
+            {isPending ? 'Aggiunta...' : 'Aggiungi'}
+          </button>
+        </div>
       </div>
     </Modal>
   );
