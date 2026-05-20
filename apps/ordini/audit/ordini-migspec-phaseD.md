@@ -72,7 +72,7 @@ Order rows in `vodka.orders` and `vodka.orders_rows` reach Ordini already popula
 | `orders.profile_lang` | 2-char code (`it`/`en`); derived from `quote.lingua` (3-char) by the creator | Used for PDF filename localization. |
 | `orders.profile_pv` | 2-char province code (`provincia.slice(0,2)` by the creator) | Display as-is; no validation. |
 | `orders.data_decorrenza` | empty string `""`, not NULL | Treat as nullable; display blank. |
-| `orders.is_colo` | one of `0` / `Colocation variabile` / `Iaas payperuse` / `Iaas payperuse indiretto`; auto-derived only for `Colocation variabile` | Source of the IaaS variants is outside the quotes converter (unconfirmed creator path). |
+| `orders.is_colo` | one of `0` / `Colocation variabile` / `Iaas payperuse` / `Iaas payperuse indiretto` (authoritative list = historical DB values) | Il creator dei valori IaaS non è documentato; Ordini tratta il campo come stringa opaca, lo legge as-is e lo mostra senza logica condizionale. Eventuali nuovi valori introdotti a monte verranno mostrati così come sono. |
 | `orders.service_type` | comma-joined category names (derived from `quote.services` JSON by the creator) | Display as-is; do not re-derive. |
 | `orders_rows.cdlan_systemodv_row` | not null per row, allocated from the same Mistra sequence | Used by GW endpoints for ERP sync. |
 | `orders_rows.cdlan_prezzo` | **Italian-locale string** (`"1234,56"` with comma) | Parse on read for arithmetic/aggregation; render as-is for display. |
