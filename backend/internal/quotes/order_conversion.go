@@ -303,6 +303,7 @@ type quoteOrderSource struct {
 	Address                 sql.NullString
 	Lingua                  sql.NullString
 	TemplateDescription     sql.NullString
+	TemplateIsColo          bool
 	RifOrdcli               sql.NullString
 	RifTechNom              sql.NullString
 	RifTechTel              sql.NullString
@@ -329,6 +330,7 @@ SELECT q.id, q.quote_number, q.customer_id, q.deal_number, q.owner,
        hc.city, hc.zip, hc.country, hc.provincia_di_fatturazione,
        hc.codice_fiscale, hc.address, hc.lingua,
        t.description AS template_description,
+       COALESCE(t.is_colo, false) AS template_is_colo,
        q.rif_ordcli, q.rif_tech_nom, q.rif_tech_tel, q.rif_tech_email,
        q.rif_altro_tech_nom, q.rif_altro_tech_tel, q.rif_altro_tech_email,
        q.rif_adm_nom, q.rif_adm_tech_tel, q.rif_adm_tech_email
@@ -348,6 +350,7 @@ WHERE q.id = $1`, quoteID)
 		&q.CustomerName, &q.CustomerNumber, &q.PartitaIVA,
 		&q.OwnerName, &q.City, &q.ZIP, &q.Country, &q.ProvinciaDiFatturazione,
 		&q.CodiceFiscale, &q.Address, &q.Lingua, &q.TemplateDescription,
+		&q.TemplateIsColo,
 		&q.RifOrdcli, &q.RifTechNom, &q.RifTechTel, &q.RifTechEmail,
 		&q.RifAltroTechNom, &q.RifAltroTechTel, &q.RifAltroTechEmail,
 		&q.RifAdmNom, &q.RifAdmTechTel, &q.RifAdmTechEmail,
@@ -622,7 +625,7 @@ func buildVodkaOrderHeader(source *quoteOrderSource, categoryNames map[int]strin
 		ServiceType:           serviceNamesForLegacy(source.Services, categoryNames),
 		DataDecorrenza:        "",
 		CdlanTacitoRinInPDF:   "0",
-		IsColo:                legacyIsColo(nullStringValue(source.TemplateDescription)),
+		IsColo:                legacyIsColo(source.TemplateIsColo),
 	}, nil
 }
 
@@ -886,8 +889,8 @@ func legacyPaymentMethod(value sql.NullString) string {
 	return payment
 }
 
-func legacyIsColo(templateDescription string) string {
-	if strings.HasPrefix(strings.TrimSpace(templateDescription), "COLO") {
+func legacyIsColo(isColo bool) string {
+	if isColo {
 		return "Colocation variabile"
 	}
 	return "0"
