@@ -380,12 +380,13 @@ type ImportSheet struct {
 }
 
 type ImportSummary struct {
-	ParsedRows         int `json:"parsedRows"`
-	CandidateRows      int `json:"candidateRows"`
-	SkippedRows        int `json:"skippedRows"`
-	AmbiguousRows      int `json:"ambiguousRows"`
-	CreatedEnrollments int `json:"createdEnrollments,omitempty"`
-	UpdatedEnrollments int `json:"updatedEnrollments,omitempty"`
+	ParsedRows           int `json:"parsedRows"`
+	CandidateRows        int `json:"candidateRows"`
+	SkippedRows          int `json:"skippedRows"`
+	AmbiguousRows        int `json:"ambiguousRows"`
+	CreatedEnrollments   int `json:"createdEnrollments,omitempty"`
+	UpdatedEnrollments   int `json:"updatedEnrollments,omitempty"`
+	UnchangedEnrollments int `json:"unchangedEnrollments,omitempty"`
 }
 
 type ImportWarning struct {

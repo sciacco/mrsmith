@@ -36,7 +36,7 @@ Queste decisioni sono state validate e sono **input** dello sviluppo, non più d
 
 | # | Decisione | Stato |
 |---|---|---|
-| Q1 | Perimetro utenti = solo dipendenti diretti (no esterni/consulenti) | chiusa |
+| Q1 | Perimetro utenti = persone in scope formazione: dipendenti diretti + consulenti/somministrati full-time indicati da People | chiusa |
 | Q2 | Nessun workflow di approvazione formale, nessuna soglia di costo, nessuna ratifica CFO | chiusa |
 | Q3 | Formazione obbligatoria gestita dal tool; owner = `people_admin` (ruolo unico) | chiusa |
 | Q4 | Percorsi pluriennali (`learning_path*`) modellati ma non bloccanti al go-live | chiusa |
@@ -50,7 +50,7 @@ Queste decisioni sono state validate e sono **input** dello sviluppo, non più d
 - **Q7** (migrazione): dipende dalla data di go-live decisa dal business. Lo schema regge entrambi gli scenari (import 1:1 vs anno zero pulito). Quando si deciderà:
   - se go-live entro Q3 2026 → import 1:1 del piano 2026 in corso + storico certificazioni;
   - se go-live Q4 2026 o successivo → solo storico certificazioni, piano 2027 nato pulito nel tool.
-  Lo script di migrazione sarà un job Python parametrizzato che legge `PROPOSTA_FORMAZIONE_2026.xlsx` e popola le tabelle del dominio.
+  La migrazione passa da CLI Go one-shot (`backend/cmd/training-import`), con dry-run di default, report JSON e commit esplicito.
 
 ---
 
@@ -250,9 +250,11 @@ Le UI seguono il design system MrSmith. Pagine da implementare (priorità decres
 
 Training usa `training.employee` come anagrafica locale. La mini-app non implementa integrazioni HR, credenziali Factorial, webhook o job di sincronizzazione.
 
-**Responsabilità esterna**: connettori/sync fuori scope popolano e aggiornano `training.employee`. Training legge questa tabella per ownership, viste People, import Excel e report.
+Nel dominio Training, `employee` indica una persona da includere in pianificazione, attestati e report formazione. Non coincide necessariamente con il perimetro legale dei soli dipendenti diretti: consulenti/somministrati full-time possono essere inclusi se People li considera in scope.
 
-**Regole applicative**: login e import Excel non creano dipendenti. Se una persona manca o è ambigua, la UI/report segnala il problema e attende la correzione dell'anagrafica esterna.
+**Responsabilità esterna**: connettori/sync fuori scope popolano e aggiornano `training.employee` dopo il go-live. Per il cutover iniziale è ammesso bootstrap da CSV tramite CLI one-shot. Training legge questa tabella per ownership, viste People, import Excel e report.
+
+**Regole applicative**: login e workflow UI non creano dipendenti. La sola eccezione è la CLI di migrazione iniziale, che crea/aggiorna employee da CSV usando `email` come chiave idempotente. Se una persona manca o è ambigua nel piano Excel, il report segnala il problema e attende correzione dell'anagrafica o del file sorgente.
 
 **Identità**: `email` resta UNIQUE e viene usata per il matching SSO. `external_id` è opzionale e riservato ai connettori esterni.
 
@@ -260,16 +262,43 @@ Training usa `training.employee` come anagrafica locale. La mini-app non impleme
 
 ## 13. Migrazione storica (Q7 — TBD)
 
-Lo script di migrazione **non è ancora da scrivere**: dipende dalla data di go-live (vedi sezione 3).
+La migrazione è un tool di cutover, non una feature operativa della mini-app. La CLI iniziale è in `backend/cmd/training-import`:
 
-Quando si potrà scrivere, sarà un job Python parametrizzato che:
+```bash
+ANISETTA_DSN=... go run ./cmd/training-import \
+  --employees-csv ../apps/training/dist/dipendenti_cdlan.csv \
+  --training-xlsx ../PROPOSTA_FORMAZIONE_2026.xlsx \
+  --dry-run \
+  --report /tmp/training-import-report.json
+```
 
-1. legge `PROPOSTA_FORMAZIONE_2026.xlsx`;
-2. normalizza i nomi dei team (trim, case);
-3. dedupica i fornitori via `name_normalized`;
-4. crea le `certification` mancanti nel catalogo a partire da quelle elencate nel foglio "Certificazioni";
-5. crea i `certification_award` con `validation_source = 'imported_legacy'` per lo storico — esplicitamente marcati come "da verificare" finché l'utente non carica l'attestato;
-6. (solo se import 1:1) crea le `enrollment` del piano in corso con bypass `SET LOCAL training.allow_status_override = 'true'` per impostare stati arbitrari coerenti con la storia.
+Il commit richiede flag esplicito:
+
+```bash
+ANISETTA_DSN=... go run ./cmd/training-import \
+  --employees-csv ../apps/training/dist/dipendenti_cdlan.csv \
+  --training-xlsx ../PROPOSTA_FORMAZIONE_2026.xlsx \
+  --commit \
+  --operator people@example.com \
+  --report /tmp/training-import-report.json
+```
+
+Regole implementate:
+
+1. bootstrap employee da CSV `Nome,Cognome,Email`, con `email` come chiave idempotente;
+2. nessuna scrittura senza `--commit`;
+3. report JSON con righe valide, warning e contatori create/update/unchanged dove applicabile;
+4. normalizzazione in-process dell'Excel: match nome/cognome dal CSV dipendenti, split celle multi-persona, skip righe non-persona e corsi placeholder;
+5. il foglio `Certificazioni` non alimenta l'import enrollment del piano; richiede eventuale import dedicato;
+6. import enrollments idempotente su dipendente + corso + anno piano, con rerun invariati contati come `unchanged`;
+7. `SET LOCAL training.allow_status_override = 'true'` resta confinato alla transazione di import enrollment.
+
+Quando la modalità Q7 sarà decisa, completare il mapping per:
+
+1. normalizzazione team/fornitori, se verranno importati dal file legacy;
+2. eventuale creazione `certification` mancanti dal foglio "Certificazioni";
+3. eventuali `certification_award` con `validation_source = 'imported_legacy'` per lo storico;
+4. scelta finale tra import 1:1 del piano in corso o solo storico + nuovo anno pulito.
 
 Casi noti da gestire nei dati legacy (osservati nel foglio):
 
@@ -317,7 +346,7 @@ Casi noti da gestire nei dati legacy (osservati nel foglio):
 Il prodotto si considera in go-live quando:
 
 - [ ] Schema deployato su ambiente di produzione MrSmith.
-- [ ] Anagrafica `training.employee` popolata dai connettori esterni.
+- [ ] Anagrafica `training.employee` popolata da bootstrap CLI iniziale e/o connettori esterni.
 - [ ] Auth SSO M365 integrato.
 - [ ] CRUD completi per: team, vendor, skill_area, course, certification, training_plan.
 - [ ] Lifecycle completo di `enrollment` (tutte le transizioni, audit log popolato).

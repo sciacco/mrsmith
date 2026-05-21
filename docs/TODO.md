@@ -11,7 +11,7 @@ Future implementation plan is tracked in [docs/DEV-GATEWAY-IMPLEMENTATION-PLAN.m
 The Training mini-app intentionally excludes Outlook/iCal calendar integration from v1. When Product asks to reopen it, prefer a backend-owned read-only iCal feed for employee-visible training dates. Do not add Microsoft Graph writes or calendar mutation flows without a new product decision.
 
 ### Legacy Excel Import Mode Depends on Go-Live Date
-The Training schema supports both a 2026 in-flight import and a clean future-year start, but the import mode remains a business decision tied to the real go-live date. Before enabling the import job against staging or production, confirm whether Q3 2026 requires a 1:1 import of the active 2026 plan or whether a later go-live should import only historical certifications and start the next annual plan cleanly.
+The Training schema supports both a 2026 in-flight import and a clean future-year start, but the import mode remains a business decision tied to the real go-live date. The import path is a one-shot CLI cutover tool, not an ongoing People UI workflow. Before running it against staging or production, confirm whether Q3 2026 requires a 1:1 import of the active 2026 plan or whether a later go-live should import only historical certifications and start the next annual plan cleanly.
 
 ### Staging Gates for Training
 Final go-live still requires staging resources: Anisetta migration application and view smoke test, Keycloak roles `app_training_access` and `app_training_people_admin`, object storage configuration for attestati, notification delivery/deep links, and People validation of the Excel dry-run report. Local build/test/screenshot gates are run through Docker so they do not depend on host Go/Node/pnpm binaries.
@@ -20,7 +20,7 @@ Final go-live still requires staging resources: Anisetta migration application a
 Training v1 has a local filesystem `StorageAdapter` for dev and controlled deployments. Before production go-live, confirm whether the target storage is S3-compatible and add explicit endpoint/bucket/region/credential/path-prefix/TLS env contracts if object storage is required instead of a mounted private volume.
 
 ### Training Employee Connectors
-Training treats `training.employee` as a local read model. Population and synchronization are delegated to external connectors outside the Training mini-app scope; login and Excel import must not create employee records.
+Training treats `training.employee` as a local read model. Initial cutover may bootstrap active employees from the one-shot import CLI, while ongoing population and synchronization are delegated to external connectors outside the Training mini-app scope. Login and ordinary app workflows must not create employee records.
 
 ## Listini e Sconti App
 

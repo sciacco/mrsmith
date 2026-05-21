@@ -19,7 +19,6 @@ var trainingImportSheets = map[string]struct{}{
 	"Team Tecnici - individuali":  {},
 	"Team Tecnici - integrazione": {},
 	"Per budget ":                 {},
-	"Certificazioni ":             {},
 	"Formazione 2024_2025":        {},
 }
 
@@ -91,12 +90,13 @@ func ParseTrainingImport(ctx context.Context, filename string, body io.Reader, c
 	}
 
 	if commit {
-		created, updated, err := store.ImportTrainingRows(ctx, principal, response.Rows)
+		summary, err := store.ImportTrainingRowsDetailed(ctx, principal, response.Rows)
 		if err != nil {
 			return ImportDryRunResponse{}, err
 		}
-		response.Summary.CreatedEnrollments = created
-		response.Summary.UpdatedEnrollments = updated
+		response.Summary.CreatedEnrollments = summary.CreatedEnrollments
+		response.Summary.UpdatedEnrollments = summary.UpdatedEnrollments
+		response.Summary.UnchangedEnrollments = summary.UnchangedEnrollments
 	}
 	return response, nil
 }
@@ -251,11 +251,34 @@ func intFromText(value string, fallback int) int {
 }
 
 func (s *SQLStore) ImportTrainingRows(ctx context.Context, principal Principal, rows []ImportRow) (int, int, error) {
-	if !principal.IsPeopleAdmin {
-		return 0, 0, forbiddenError("people_role_required", "azione riservata a People")
+	summary, err := s.ImportTrainingRowsDetailed(ctx, principal, rows)
+	return summary.CreatedEnrollments, summary.UpdatedEnrollments, err
+}
+
+func RecomputeTrainingImportSummary(response *ImportDryRunResponse) {
+	var summary ImportSummary
+	summary.CreatedEnrollments = response.Summary.CreatedEnrollments
+	summary.UpdatedEnrollments = response.Summary.UpdatedEnrollments
+	summary.UnchangedEnrollments = response.Summary.UnchangedEnrollments
+	summary.ParsedRows = len(response.Rows)
+	for _, row := range response.Rows {
+		if row.Status == "candidate" {
+			summary.CandidateRows++
+			if strings.TrimSpace(row.EmployeeEmail) == "" {
+				summary.AmbiguousRows++
+			}
+		} else {
+			summary.SkippedRows++
+		}
 	}
-	created := 0
-	updated := 0
+	response.Summary = summary
+}
+
+func (s *SQLStore) ImportTrainingRowsDetailed(ctx context.Context, principal Principal, rows []ImportRow) (ImportSummary, error) {
+	if !principal.IsPeopleAdmin {
+		return ImportSummary{}, forbiddenError("people_role_required", "azione riservata a People")
+	}
+	var summary ImportSummary
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `SET LOCAL training.allow_status_override = 'true'`); err != nil {
 			return fmt.Errorf("enable training import status override: %w", err)
@@ -276,19 +299,22 @@ func (s *SQLStore) ImportTrainingRows(ctx context.Context, principal Principal, 
 			if err != nil {
 				return err
 			}
-			inserted, err := s.upsertImportEnrollment(ctx, tx, employeeID, courseID, planID, row)
+			result, err := s.upsertImportEnrollment(ctx, tx, employeeID, courseID, planID, row)
 			if err != nil {
 				return err
 			}
-			if inserted {
-				created++
-			} else {
-				updated++
+			switch result {
+			case "created":
+				summary.CreatedEnrollments++
+			case "updated":
+				summary.UpdatedEnrollments++
+			case "unchanged":
+				summary.UnchangedEnrollments++
 			}
 		}
 		return nil
 	})
-	return created, updated, err
+	return summary, err
 }
 
 func (s *SQLStore) matchImportEmployee(ctx context.Context, tx *sql.Tx, row ImportRow) (string, error) {
@@ -372,7 +398,7 @@ RETURNING id::text`
 	return id, nil
 }
 
-func (s *SQLStore) upsertImportEnrollment(ctx context.Context, tx *sql.Tx, employeeID string, courseID string, planID string, row ImportRow) (bool, error) {
+func (s *SQLStore) upsertImportEnrollment(ctx context.Context, tx *sql.Tx, employeeID string, courseID string, planID string, row ImportRow) (string, error) {
 	status := "proposed"
 	if row.Year <= 2025 {
 		status = "completed"
@@ -395,7 +421,14 @@ WITH existing AS (
   FROM training.course c
   WHERE en.id IN (SELECT id FROM existing)
     AND c.id = en.course_id
-  RETURNING false AS inserted
+    AND (
+      en.course_title_snapshot IS DISTINCT FROM c.title
+      OR (
+        $4::training.enrollment_status = 'completed'::training.enrollment_status
+        AND en.status <> 'completed'::training.enrollment_status
+      )
+    )
+  RETURNING 'updated' AS result
 ), inserted AS (
   INSERT INTO training.enrollment (
     employee_id,
@@ -409,15 +442,19 @@ WITH existing AS (
   FROM training.course c
   WHERE c.id = $2::uuid
     AND NOT EXISTS (SELECT 1 FROM existing)
-  RETURNING true AS inserted
+  RETURNING 'created' AS result
 )
-SELECT inserted FROM inserted
+SELECT result FROM inserted
 UNION ALL
-SELECT inserted FROM updated
+SELECT result FROM updated
+UNION ALL
+SELECT 'unchanged' AS result
+WHERE EXISTS (SELECT 1 FROM existing)
+  AND NOT EXISTS (SELECT 1 FROM updated)
 LIMIT 1`
-	var inserted bool
-	if err := tx.QueryRowContext(ctx, stmt, employeeID, courseID, planID, status).Scan(&inserted); err != nil {
-		return false, fmt.Errorf("upsert training import enrollment: %w", err)
+	var result string
+	if err := tx.QueryRowContext(ctx, stmt, employeeID, courseID, planID, status).Scan(&result); err != nil {
+		return "", fmt.Errorf("upsert training import enrollment: %w", err)
 	}
-	return inserted, nil
+	return result, nil
 }
