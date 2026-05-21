@@ -446,3 +446,40 @@ export interface BulkReviewEmployeeRequestsResponse {
   failed: number;
   failures?: Array<{ employee_id: string; code?: string; message?: string }>;
 }
+
+export interface ComplianceExpiringRow {
+  employee_id: string;
+  employee_name: string;
+  rule_id: string;
+  rule_title: string;
+  expires_in_days: number;
+  severity: 'critical' | 'warning' | 'info';
+}
+
+export interface ComplianceRuleGap {
+  employee_id: string;
+  employee_name: string;
+  status: 'never_covered' | 'expired' | 'expiring_soon';
+  detail?: string;
+}
+
+export interface ComplianceRule {
+  id: string;
+  title: string;
+  cadence_label?: string;
+  population_target?: string;
+  coverage_pct: number;
+  covered_count: number;
+  target_count: number;
+  gaps: ComplianceRuleGap[];
+  severity: 'critical' | 'warning' | 'ok';
+  suggested_course_ids: string[];
+}
+
+export interface ComplianceOverviewResponse {
+  year: number;
+  team_scope: string;
+  deadline_days: number;
+  expiring_deadlines: ComplianceExpiringRow[];
+  rules: ComplianceRule[];
+}

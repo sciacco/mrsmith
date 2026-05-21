@@ -9,6 +9,7 @@ import type {
   BulkReviewEmployeeRequestsResponse,
   BulkTargetState,
   BulkTransitionResponse,
+  ComplianceOverviewResponse,
   CreatePlanInput,
   JobRunResponse,
   LookupResponse,
@@ -589,6 +590,21 @@ export function useBulkReviewEmployeeRequests() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
       queryClient.invalidateQueries({ queryKey: ['training', 'workspace'] });
+    },
+  });
+}
+
+export function useComplianceOverview(year: string, team: string, deadlineDays: number, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'compliance', year, team, deadlineDays],
+    enabled,
+    queryFn: async (): Promise<ComplianceOverviewResponse> => {
+      const params = new URLSearchParams();
+      if (year) params.set('year', year);
+      if (team) params.set('team', team);
+      if (deadlineDays) params.set('deadline_days', String(deadlineDays));
+      return api.get<ComplianceOverviewResponse>(`/training/v1/people/compliance?${params.toString()}`);
     },
   });
 }

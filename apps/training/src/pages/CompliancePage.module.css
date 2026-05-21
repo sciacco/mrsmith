@@ -1,0 +1,82 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding-bottom: var(--space-12);
+  animation: pageEnter 0.5s var(--ease-out) both;
+}
+
+.accessDenied {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.subtitle {
+  margin: var(--space-1) 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.manageLink {
+  font-size: 0.8125rem;
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.manageLink:hover {
+  text-decoration: underline;
+}
+
+.rulesHeader {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.rulesTitle {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+
+.rulesCount {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+  font-size: 0.9375rem;
+  color: var(--color-success);
+  background: var(--color-bg-elevated);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+}
