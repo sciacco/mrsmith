@@ -143,7 +143,8 @@ LEFT JOIN training.vendor v ON v.id = c.vendor_id
 LEFT JOIN training.skill_area sa ON sa.id = c.skill_area_id
 LEFT JOIN training.team_membership tm
   ON tm.employee_id = e.id
- AND tm.valid_during @> CURRENT_TIMESTAMP
+ AND tm.start_date <= CURRENT_TIMESTAMP
+ AND (tm.end_date IS NULL OR tm.end_date >= CURRENT_TIMESTAMP)
 LEFT JOIN training.team t ON t.id = tm.team_id
 LEFT JOIN LATERAL (
   SELECT d.id::text, d.filename, d.is_validated

@@ -16,7 +16,6 @@
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;     -- gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS citext;       -- case-insensitive text
-CREATE EXTENSION IF NOT EXISTS btree_gist;   -- exclusion constraints with =
 
 CREATE SCHEMA IF NOT EXISTS training;
 SET search_path TO training, public;
@@ -106,10 +105,14 @@ CREATE TABLE team_membership (
     employee_id     uuid NOT NULL REFERENCES employee(id) ON DELETE CASCADE,
     team_id         uuid NOT NULL REFERENCES team(id),
     role            text,                                      -- 'member', 'lead', ...
-    valid_during    tstzrange NOT NULL DEFAULT tstzrange(now(), NULL, '[)'),
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    EXCLUDE USING gist (employee_id WITH =, team_id WITH =, valid_during WITH &&)
+    start_date      timestamptz NOT NULL DEFAULT now(),
+    end_date        timestamptz,
+    created_at      timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_team_membership_active_uniq
+  ON team_membership (employee_id, team_id)
+  WHERE (end_date IS NULL);
 COMMENT ON TABLE team_membership IS 'Storico appartenenza dipendente-team con range temporale.';
 
 -- Fornitore di formazione (Linux Foundation, eForHum, POLIMI GSoM, ...)
@@ -523,7 +526,8 @@ JOIN training_plan tp ON tp.id = en.training_plan_id
 JOIN course        c  ON c.id  = en.course_id
 LEFT JOIN team_membership tm
        ON tm.employee_id = en.employee_id
-      AND tm.valid_during @> CURRENT_TIMESTAMP
+      AND tm.start_date <= CURRENT_TIMESTAMP
+      AND (tm.end_date IS NULL OR tm.end_date >= CURRENT_TIMESTAMP)
 LEFT JOIN team t      ON t.id  = tm.team_id
 GROUP BY tp.year, t.code;
 
@@ -550,7 +554,8 @@ WITH active_employees AS (
   FROM employee e
   LEFT JOIN team_membership tm
          ON tm.employee_id = e.id
-        AND tm.valid_during @> CURRENT_TIMESTAMP
+        AND tm.start_date <= CURRENT_TIMESTAMP
+        AND (tm.end_date IS NULL OR tm.end_date >= CURRENT_TIMESTAMP)
   WHERE e.status = 'active'
 ),
 required AS (

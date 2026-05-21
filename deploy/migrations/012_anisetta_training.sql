@@ -5,7 +5,6 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS citext;
-CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE SCHEMA IF NOT EXISTS training;
 SET search_path TO training, public;
@@ -83,10 +82,14 @@ CREATE TABLE IF NOT EXISTS training.team_membership (
   employee_id uuid NOT NULL REFERENCES training.employee(id) ON DELETE CASCADE,
   team_id uuid NOT NULL REFERENCES training.team(id),
   role text,
-  valid_during tstzrange NOT NULL DEFAULT tstzrange(now(), NULL, '[)'),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  EXCLUDE USING gist (employee_id WITH =, team_id WITH =, valid_during WITH &&)
+  start_date timestamptz NOT NULL DEFAULT now(),
+  end_date timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_team_membership_active_uniq
+  ON training.team_membership (employee_id, team_id)
+  WHERE (end_date IS NULL);
 
 CREATE TABLE IF NOT EXISTS training.vendor (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -445,7 +448,8 @@ JOIN training.training_plan tp ON tp.id = en.training_plan_id
 JOIN training.course c ON c.id = en.course_id
 LEFT JOIN training.team_membership tm
   ON tm.employee_id = en.employee_id
- AND tm.valid_during @> CURRENT_TIMESTAMP
+ AND tm.start_date <= CURRENT_TIMESTAMP
+ AND (tm.end_date IS NULL OR tm.end_date >= CURRENT_TIMESTAMP)
 LEFT JOIN training.team t ON t.id = tm.team_id
 GROUP BY tp.year, t.code;
 
@@ -473,7 +477,8 @@ WITH active_employees AS (
   FROM training.employee e
   LEFT JOIN training.team_membership tm
     ON tm.employee_id = e.id
-   AND tm.valid_during @> CURRENT_TIMESTAMP
+   AND tm.start_date <= CURRENT_TIMESTAMP
+   AND (tm.end_date IS NULL OR tm.end_date >= CURRENT_TIMESTAMP)
   WHERE e.status = 'active'
 ),
 required AS (
