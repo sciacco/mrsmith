@@ -4,13 +4,21 @@ import { mockWorkspace } from './mockData';
 import type {
   ActionResponse,
   BulkAssignResponse,
+  BulkPlanFromSuggestionInput,
+  BulkReviewEmployeeRequestsInput,
+  BulkReviewEmployeeRequestsResponse,
   BulkTargetState,
   BulkTransitionResponse,
+  CreatePlanInput,
   JobRunResponse,
   LookupResponse,
   OverviewResponse,
   PersonProfile,
   PersonSummary,
+  PlanningResponse,
+  PlanTransition,
+  TrainingPlanRow,
+  TransitionPlanResponse,
   WorkspaceResponse,
 } from './types';
 
@@ -512,5 +520,85 @@ export function useTrainingExport() {
       const blob = await api.getBlob(path);
       downloadBlob(blob, `formazione-${kind}.xlsx`);
     },
+  });
+}
+
+export function usePlanningSuggestions(year: string, team: string, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'planning', year, team],
+    enabled,
+    queryFn: async (): Promise<PlanningResponse> => {
+      const params = new URLSearchParams();
+      if (year) params.set('year', year);
+      if (team) params.set('team', team);
+      const suffix = params.toString();
+      return api.get<PlanningResponse>(`/training/v1/people/planning/suggestions${suffix ? `?${suffix}` : ''}`);
+    },
+  });
+}
+
+export function useCreatePlan() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreatePlanInput): Promise<TrainingPlanRow> =>
+      api.post<TrainingPlanRow>('/training/v1/people/plans', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'overview'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'lookups'] });
+    },
+  });
+}
+
+export function useTransitionPlan() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ planId, target }: { planId: string; target: PlanTransition }): Promise<TransitionPlanResponse> =>
+      api.post<TransitionPlanResponse>(`/training/v1/people/plans/${planId}/transition`, { target }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'overview'] });
+    },
+  });
+}
+
+export function useBulkPlanFromSuggestion() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BulkPlanFromSuggestionInput): Promise<BulkAssignResponse> =>
+      api.post<BulkAssignResponse>('/training/v1/people/enrollments/bulk-plan-from-suggestion', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'overview'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
+    },
+  });
+}
+
+export function useBulkReviewEmployeeRequests() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BulkReviewEmployeeRequestsInput): Promise<BulkReviewEmployeeRequestsResponse> =>
+      api.post<BulkReviewEmployeeRequestsResponse>('/training/v1/people/enrollments/bulk-review', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'workspace'] });
+    },
+  });
+}
+
+export function useDismissSuggestion() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ suggestionId, planId }: { suggestionId: string; planId: string }) =>
+      api.post<{ ok: boolean }>(`/training/v1/people/planning/suggestions/${suggestionId}/dismiss`, { plan_id: planId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['training', 'planning'] }),
   });
 }

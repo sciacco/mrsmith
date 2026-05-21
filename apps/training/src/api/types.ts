@@ -361,3 +361,88 @@ export interface JobRunResponse {
   complianceNotifications: number;
   certificationNotifications: number;
 }
+
+export type SuggestionSeverity = 'critical' | 'warning' | 'info';
+export type SuggestionOrigin = 'compliance' | 'expiring' | 'skill_gap' | 'employee_request';
+
+export interface PlanningSuggestion {
+  id: string;
+  severity: SuggestionSeverity;
+  origin: SuggestionOrigin;
+  title: string;
+  description?: string;
+  affected_count: number;
+  affected_employee_ids: string[];
+  suggested_course_id?: string;
+  suggested_course_name?: string;
+  suggested_course_hours?: number;
+  suggested_course_cost?: number;
+  alternative_course_ids?: string[];
+  estimated_cost: number;
+  dismissed: boolean;
+  rule_id?: string;
+}
+
+export type PlanStatus = 'draft' | 'open' | 'frozen' | 'closed' | 'missing';
+
+export interface PlanningSummary {
+  plan_id: string;
+  year: number;
+  status: PlanStatus;
+  budget_total: number;
+  budget_spent: number;
+  budget_residual: number;
+  budget_pct: number;
+  calendar_alignment: 'in_linea' | 'in_ritardo' | 'in_anticipo';
+  enrollments_planned: number;
+  has_prev_year_plan: boolean;
+}
+
+export interface PlanningResponse {
+  year: number;
+  team_scope: string;
+  plan: PlanningSummary | null;
+  suggestions: PlanningSuggestion[];
+}
+
+export interface CreatePlanInput {
+  year: number;
+  budget_total?: number;
+  duplicate_from?: number;
+}
+
+export type PlanTransition = 'open' | 'closed' | 'reopened' | 'frozen';
+
+export interface TransitionPlanResponse {
+  ok: boolean;
+  plan_id: string;
+  status: string;
+  expired_enrollments_count?: number;
+}
+
+export interface BulkPlanFromSuggestionInput {
+  suggestion_id: string;
+  employee_ids: string[];
+  course_id: string;
+  plan_params: {
+    year: number;
+    planned_start?: string;
+    planned_end?: string;
+    hours_planned?: number;
+    cost_planned?: number;
+    mandatory: boolean;
+  };
+}
+
+export interface BulkReviewEmployeeRequestsInput {
+  request_ids: string[];
+  target: 'approved' | 'rejected';
+  motivation?: string;
+  course_id?: string;
+}
+
+export interface BulkReviewEmployeeRequestsResponse {
+  succeeded: number;
+  failed: number;
+  failures?: Array<{ employee_id: string; code?: string; message?: string }>;
+}

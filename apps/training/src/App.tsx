@@ -17,6 +17,7 @@ const navItems: TabNavItem[] = [
   { label: 'Overview', path: '/' },
   { label: 'Pipeline', path: '/pipeline' },
   { label: 'Persone', path: '/persone' },
+  { label: 'Pianificazione', path: '/pianificazione' },
   { label: 'Piano', path: '/piano' },
   { label: 'Catalogo', path: '/catalogo' },
   { label: 'Certificazioni', path: '/certificazioni' },
