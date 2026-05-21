@@ -226,16 +226,16 @@ Le UI seguono il design system MrSmith. Pagine da implementare (priorità decres
 2. **Carica attestato / dichiara certificazione** — form con upload, scelta certificazione dal catalogo, date, eventuale link al credential esterno.
 3. **Catalogo corsi** — sfogliabile, filtrabile per area; pulsante "richiedi questo corso" che apre il form di `training_request`.
 4. **Richiedi formazione (libero)** — form di `training_request` con `free_text_title` se il corso non è a catalogo.
-5. **Self-assessment** — periodico, una riga per area skill rilevante, slider 0–5.
+5. **Self-assessment** — post-MVP: il modello puo restare disponibile per una fase successiva, ma non e richiesto nella UI v1.
 
 ### Per `people_admin`
 
 1. **Coda richieste** — `training_request` in `submitted` / `under_review` / `accepted`, con triage rapido (start_review / accept / reject / convert).
-2. **Pianificazione annuale** — vista per piano, drag of corsi/iscrizioni, approvazione massiva, chiusura piano (innesca job expire).
+2. **Pianificazione annuale** — vista tabellare per piano, creazione/modifica iscrizioni, approvazione, chiusura piano (innesca job expire).
 3. **Anagrafica catalogo** — CRUD su `team`, `vendor`, `skill_area`, `course`, `certification`.
 4. **Regole formazione obbligatoria** — CRUD su `mandatory_assignment_rule`.
 5. **Audit / scadenze** — viste `v_employee_certifications`, `v_expiring_certifications`, `v_mandatory_compliance_gap` esposte come pagine filtrabili.
-6. **Report** — export Excel/CSV/PDF di qualunque vista (continuità operativa rispetto all'Excel attuale, è un must).
+6. **Report** — export XLSX delle viste operative e di report principali (continuita operativa rispetto all'Excel attuale).
 
 ### Note di design
 
@@ -350,11 +350,11 @@ Il prodotto si considera in go-live quando:
 - [ ] Auth SSO M365 integrato.
 - [ ] CRUD completi per: team, vendor, skill_area, course, certification, training_plan.
 - [ ] Lifecycle completo di `enrollment` (tutte le transizioni, audit log popolato).
-- [ ] Lifecycle completo di `certification_award` e `training_request`.
-- [ ] Upload attestati funzionante (object storage + validazione).
+- [ ] Gestione `certification_award` semplificata completa: creazione/update People, upload attestati, validazione documenti e audit.
+- [ ] Upload attestati funzionante (storage privato configurato + validazione PDF server-side).
 - [ ] Pagine UI per `employee` e `people_admin` (sezione 11).
 - [ ] Job 1 (expire), 2 (compliance gap), 3 (scadenze) schedulati.
-- [ ] Export Excel/CSV/PDF delle 3 viste principali (`v_employee_certifications`, `v_plan_budget`, `v_expiring_certifications`).
+- [ ] Export XLSX delle viste operative e di report principali (`plan`, `requests`, `catalog`, `v_employee_certifications`, `v_plan_budget`, `v_expiring_certifications`, `v_mandatory_compliance_gap`).
 - [ ] Test di integrazione app ↔ trigger DB su tutte le transizioni di stato.
 - [ ] Migrazione storica eseguita (modalità dipendente da Q7).
 

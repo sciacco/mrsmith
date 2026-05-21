@@ -31,11 +31,10 @@ Status: approved
 
 Evidence:
 
-- Build: `docker run --rm ... node:20-slim ... corepack pnpm --filter @mrsmith/ui build && corepack pnpm --filter mrsmith-training build` passed.
+- Build: `pnpm --filter mrsmith-training build` passed; earlier screenshot evidence used Dockerized tooling.
 - Desktop populated `Piano`: `/tmp/training-ui/piano-populated.png`.
 - Desktop filtered-empty `Piano`: `/tmp/training-ui/piano-filtered-empty.png`.
 - Desktop destructive confirmation: `/tmp/training-ui/piano-destructive-confirm.png`.
-- Desktop import dry-run review: `/tmp/training-ui/import-dry-run.png`.
 - Desktop catalog course actions: `/tmp/training-ui/catalogo-course-actions.png`.
 - Desktop catalog course edit: `/tmp/training-ui/catalogo-course-edit.png`.
 - Desktop catalog master data: `/tmp/training-ui/catalogo-master-data.png`.
@@ -49,13 +48,14 @@ Findings: none.
 
 Residual risks:
 
-- Screenshots use dev auth bypass and mock Training data; staging must repeat smoke checks with real Keycloak roles, Anisetta data, storage, HR provider, and notification configuration.
+- Screenshots use dev auth bypass and mock Training data; staging must repeat smoke checks with real Keycloak roles, Anisetta data, storage, external employee connectors, and notification configuration.
 - Error-state screenshot was not captured in this sandbox run; code still routes workspace query failures through the existing business-facing `Dati non disponibili` state.
 
 Current implementation notes:
 
 - Workspace tabs are implemented for `Piano`, `Richieste`, `Catalogo`, `Certificazioni`, and `Report`.
-- People actions now include enrollment create/update/import with dry-run review and commit, enrollment document upload/download/validation, full enrollment lifecycle transitions including revert and reopen with reason, request review/reject/convert, course catalog create/edit/inactivate/reactivate, catalog create/edit/inactivate maintenance for vendors, teams, areas, certifications, plans and mandatory rules, manual plan/scadenze checks, certificate registration/update, certificate document upload/download/validation, URL-driven certification filters, and workspace/report XLSX export.
+- People actions now include enrollment create/update, enrollment document upload/download/validation, full enrollment lifecycle transitions including revert and reopen with reason, request review/reject/convert, course catalog create/edit/inactivate/reactivate, catalog create/edit/inactivate maintenance for vendors, teams, areas, certifications, plans and mandatory rules, manual plan/scadenze checks, certificate registration/update, certificate document upload/download/validation, URL-driven certification filters, and workspace/report XLSX export.
+- Import XLSX is intentionally not an application workflow: cutover import is CLI-only and has no Training UI/API endpoint.
 - Employee actions include catalog-backed or free-title request creation, request withdrawal, enrollment start/complete, enrollment document upload/download, certificate registration, and own certificate document upload/download where permitted by the backend.
 - User-facing copy scan is clean for the banned technical terms in issue 45.
-- Build and screenshot evidence were produced through Docker because local `node`, `pnpm`, `go`, and browser tooling are unavailable on the host.
+- Screenshot evidence was produced through Dockerized browser tooling during the UI review pass.
