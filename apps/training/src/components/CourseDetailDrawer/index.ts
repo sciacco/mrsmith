@@ -1,0 +1,1 @@
+export { CourseDetailDrawer } from './CourseDetailDrawer';

@@ -9,6 +9,7 @@ import type {
   BulkReviewEmployeeRequestsResponse,
   BulkTargetState,
   BulkTransitionResponse,
+  CatalogListResponse,
   ComplianceOverviewResponse,
   CreatePlanInput,
   JobRunResponse,
@@ -589,6 +590,44 @@ export function useBulkReviewEmployeeRequests() {
       api.post<BulkReviewEmployeeRequestsResponse>('/training/v1/people/enrollments/bulk-review', body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'workspace'] });
+    },
+  });
+}
+
+export interface CatalogQueryFilters {
+  skillArea?: string;
+  fornitore?: string;
+  stato?: 'attivo' | 'disattivato' | '';
+  q?: string;
+}
+
+export function useCatalogCourses(filters: CatalogQueryFilters, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'catalog-courses', filters],
+    enabled,
+    queryFn: async (): Promise<CatalogListResponse> => {
+      const params = new URLSearchParams();
+      if (filters.skillArea) params.set('skill_area', filters.skillArea);
+      if (filters.fornitore) params.set('fornitore', filters.fornitore);
+      if (filters.stato) params.set('stato', filters.stato);
+      if (filters.q) params.set('q', filters.q);
+      const suffix = params.toString();
+      return api.get<CatalogListResponse>(`/training/v1/courses${suffix ? `?${suffix}` : ''}`);
+    },
+  });
+}
+
+export function useArchiveCourse() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.post<ActionResponse>(`/training/v1/people/courses/${id}/archive`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'catalog-courses'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'lookups'] });
       queryClient.invalidateQueries({ queryKey: ['training', 'workspace'] });
     },
   });

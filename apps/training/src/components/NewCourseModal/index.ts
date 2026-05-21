@@ -1,0 +1,1 @@
+export { NewCourseModal } from './NewCourseModal';

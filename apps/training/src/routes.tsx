@@ -7,10 +7,10 @@ import { PersonPage } from './pages/PersonPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { PlanningPage } from './pages/PlanningPage';
 import { CompliancePage } from './pages/CompliancePage';
+import { CatalogPage } from './pages/CatalogPage';
 
 const legacyViewRoutes: Array<{ path: string; view: TrainingView }> = [
   { path: 'piano', view: 'piano' },
-  { path: 'catalogo', view: 'catalogo' },
   { path: 'certificazioni', view: 'certificazioni' },
 ];
 
@@ -29,6 +29,7 @@ export function routes(isPeopleAdmin: boolean): RouteObject[] {
     { path: 'compliance', element: <CompliancePage isPeopleAdmin={isPeopleAdmin} /> },
     { path: 'compliance/regole', element: <StubPage title="Gestione regole" description="CRUD mandatory rules: prossimamente." /> },
     { path: 'pianificazione', element: <PlanningPage isPeopleAdmin={isPeopleAdmin} /> },
+    { path: 'catalogo', element: <CatalogPage isPeopleAdmin={isPeopleAdmin} /> },
     { path: '*', element: <Navigate to="/" replace /> },
   ];
 }

@@ -483,3 +483,12 @@ export interface ComplianceOverviewResponse {
   expiring_deadlines: ComplianceExpiringRow[];
   rules: ComplianceRule[];
 }
+
+export interface CatalogCourseWithCounts extends CatalogCourse {
+  enrollments_current_year: number;
+  enrollments_completed_historical: number;
+}
+
+export interface CatalogListResponse {
+  courses: CatalogCourseWithCounts[];
+}
