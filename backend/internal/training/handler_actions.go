@@ -388,31 +388,6 @@ func (h *handler) handleValidateDocument(w http.ResponseWriter, r *http.Request)
 	httputil.JSON(w, http.StatusOK, response)
 }
 
-func (h *handler) handleImportTrainingPlan(w http.ResponseWriter, r *http.Request) {
-	principal, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<20)
-	if err := r.ParseMultipartForm(64 << 20); err != nil {
-		httputil.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_import_upload"})
-		return
-	}
-	file, header, err := r.FormFile("file")
-	if err != nil {
-		httputil.JSON(w, http.StatusBadRequest, map[string]string{"error": "file_required"})
-		return
-	}
-	defer file.Close()
-	commit := r.URL.Query().Get("commit") == "true"
-	response, err := ParseTrainingImport(r.Context(), header.Filename, file, commit, h.store, principal)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.import")
-		return
-	}
-	httputil.JSON(w, http.StatusOK, response)
-}
-
 func (h *handler) handleRunJobs(w http.ResponseWriter, r *http.Request) {
 	runner := NewJobRunner(h.store, h.notifier, h.logger, h.trainingAppURL)
 	response, err := runner.RunOnce(r.Context())

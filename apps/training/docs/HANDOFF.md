@@ -252,7 +252,7 @@ Training usa `training.employee` come anagrafica locale. La mini-app non impleme
 
 Nel dominio Training, `employee` indica una persona da includere in pianificazione, attestati e report formazione. Non coincide necessariamente con il perimetro legale dei soli dipendenti diretti: consulenti/somministrati full-time possono essere inclusi se People li considera in scope.
 
-**Responsabilità esterna**: connettori/sync fuori scope popolano e aggiornano `training.employee` dopo il go-live. Per il cutover iniziale è ammesso bootstrap da CSV tramite CLI one-shot. Training legge questa tabella per ownership, viste People, import Excel e report.
+**Responsabilità esterna**: connettori/sync fuori scope popolano e aggiornano `training.employee` dopo il go-live. Per il cutover iniziale è ammesso bootstrap da CSV tramite CLI one-shot. Training legge questa tabella per ownership, viste People e report; l'import Excel resta confinato alla CLI di migrazione e non ha endpoint o UI applicativa.
 
 **Regole applicative**: login e workflow UI non creano dipendenti. La sola eccezione è la CLI di migrazione iniziale, che crea/aggiorna employee da CSV usando `email` come chiave idempotente. Se una persona manca o è ambigua nel piano Excel, il report segnala il problema e attende correzione dell'anagrafica o del file sorgente.
 

@@ -79,7 +79,6 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("PUT /training/v1/people/enrollments/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdateEnrollment)))))
 	mux.Handle("POST /training/v1/people/enrollments/{id}/transition", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleTransitionEnrollment)))))
 	mux.Handle("POST /training/v1/people/documents/{id}/validate", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleValidateDocument)))))
-	mux.Handle("POST /training/v1/people/imports/training-plan", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleImportTrainingPlan)))))
 	mux.Handle("POST /training/v1/people/jobs/run", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleRunJobs)))))
 	mux.Handle("PUT /training/v1/people/awards/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdateAward)))))
 	mux.Handle("POST /training/v1/people/vendors", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor)))))
