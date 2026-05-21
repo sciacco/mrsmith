@@ -364,7 +364,6 @@ export function PoDetailPage() {
           <PoHeaderSummary
             po={detail}
             value={currentHeader}
-            budgets={budgets.data ?? []}
             providers={providerOptions}
             paymentMethods={paymentOptions}
             paymentRequiresVerification={paymentRequiresVerification}

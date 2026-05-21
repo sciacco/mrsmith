@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useClonePO } from '../api/queries';
 import type { BudgetForUser, ClonePOPayload, ClonePOResponse, PoDetail } from '../api/types';
 import { apiErrorMessage } from '../lib/api-error';
-import { budgetID, budgetSelectionKey, selectedBudgetID, type BudgetSelection } from '../lib/budgets';
+import { budgetSelectionKey, selectedBudgetID, type BudgetSelection } from '../lib/budgets';
 import { formatMoney } from '../lib/format';
 import { selectedBudgetBinding } from '../lib/po-payload';
 import { stateLabel } from '../lib/state-labels';
@@ -20,12 +20,7 @@ interface ClonePoModalProps {
 function availableSourceBudget(po: PoDetail, budgets: BudgetForUser[]): BudgetSelection {
   if (!po.budget) return '';
   const sourceKey = budgetSelectionKey(po.budget);
-  if (budgets.some((budget) => budgetSelectionKey(budget) === sourceKey)) return sourceKey;
-  const sourceID = budgetID(po.budget);
-  if (!sourceID) return '';
-  const matches = budgets.filter((budget) => budgetID(budget) === sourceID);
-  const [match] = matches;
-  return matches.length === 1 && match ? budgetSelectionKey(match) : '';
+  return budgets.some((budget) => budgetSelectionKey(budget) === sourceKey) ? sourceKey : '';
 }
 
 function providerLabel(po: PoDetail): string {

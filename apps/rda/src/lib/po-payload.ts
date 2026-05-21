@@ -1,6 +1,6 @@
 import type { BudgetForUser, CreatePOPayload, PatchPOPayload, PaymentMethod, ProviderSummary } from '../api/types';
-import { budgetBinding, findBudget, selectedBudgetID, type BudgetSelection } from './budgets';
-import { DEFAULT_RDA_CURRENCY, normalizeCurrency } from './format';
+import { budgetBinding, budgetBindingFromSelection, findBudget, selectedBudgetID, type BudgetSelection } from './budgets.js';
+import { DEFAULT_RDA_CURRENCY, normalizeCurrency } from './format.js';
 
 export type POType = 'STANDARD' | 'ECOMMERCE';
 
@@ -35,7 +35,8 @@ export function methodUnion(methods: PaymentMethod[], ...extraCodes: string[]): 
 }
 
 export function selectedBudgetBinding(budgets: BudgetForUser[], budgetId: BudgetSelection) {
-  return budgetBinding(findBudget(budgets, budgetId));
+  const budget = findBudget(budgets, budgetId);
+  return budget ? budgetBinding(budget) : budgetBindingFromSelection(budgetId);
 }
 
 function selectedBudgetPatchBinding(budgets: BudgetForUser[], budgetId: BudgetSelection): Pick<PatchPOPayload, 'budget_user_id' | 'cost_center'> {

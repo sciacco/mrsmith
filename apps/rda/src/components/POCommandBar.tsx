@@ -4,6 +4,7 @@ import { getRdaQuoteThreshold } from '../runtime-config';
 import type { PoAction, PoActionMode, PoDetail } from '../api/types';
 import type { TransitionAction } from '../api/queries';
 import { countQuoteAttachments } from '../lib/attachments';
+import { budgetDisplayLabel } from '../lib/budgets';
 import { formatMoney, parseMistraMoney } from '../lib/format';
 import { canDownloadPOPDF } from '../lib/po-pdf';
 import { selectedModeID } from '../lib/po-detail-view-model';
@@ -51,9 +52,7 @@ function providerLabel(po: PoDetail): string {
 }
 
 function budgetLabel(po: PoDetail): string {
-  const budget = po.budget;
-  if (!budget) return '-';
-  return budget.name ?? `Budget ${budget.budget_id ?? budget.id ?? '-'}`;
+  return budgetDisplayLabel(po.budget);
 }
 
 function actionIcon(action: PoAction): 'check' | 'check-circle' | 'arrow-right' | 'mail' | 'x' | 'x-circle' {

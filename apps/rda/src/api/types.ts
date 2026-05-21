@@ -46,7 +46,9 @@ export interface BudgetForUser {
   budget_id?: number;
   id?: number;
   name?: string;
+  budget_name?: string;
   year?: number;
+  budget_year?: number;
   cost_center?: string | null;
   budget_user_id?: number | null;
   user_id?: number | null;

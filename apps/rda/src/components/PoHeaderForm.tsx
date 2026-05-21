@@ -1,7 +1,7 @@
 import { Button, Icon, Modal, Tooltip } from '@mrsmith/ui';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { BudgetForUser, PoDetail, ProviderSummary } from '../api/types';
-import { budgetOptionLabel, budgetSelectionKey, findBudget, type BudgetSelection } from '../lib/budgets';
+import { budgetDisplayLabel, budgetSelectionKey, type BudgetSelection } from '../lib/budgets';
 import { formatDateIT, normalizeCurrency, RDA_CURRENCIES } from '../lib/format';
 import type { PaymentMethodOption } from '../lib/payment-options';
 import { BudgetSelect } from './BudgetSelect';
@@ -45,12 +45,6 @@ export function headerStateFromPO(po: PoDetail): HeaderFormState {
 
 function providerLabel(provider?: ProviderSummary): string {
   return provider?.company_name?.trim() || (provider?.id ? `Fornitore ${provider.id}` : '-');
-}
-
-function budgetLabel(budgets: BudgetForUser[], value: BudgetSelection, fallback?: BudgetForUser): string {
-  const selected = findBudget(budgets, value) ?? fallback;
-  if (!selected) return '-';
-  return budgetOptionLabel(selected);
 }
 
 function paymentLabel(value: string, methods: PaymentMethodOption[], po: PoDetail): string {
@@ -106,7 +100,6 @@ function InspectorFact({
 export function PoHeaderSummary({
   po,
   value,
-  budgets,
   providers,
   paymentMethods,
   paymentRequiresVerification,
@@ -116,7 +109,6 @@ export function PoHeaderSummary({
 }: {
   po: PoDetail;
   value: HeaderFormState;
-  budgets: BudgetForUser[];
   providers: ProviderSummary[];
   paymentMethods: PaymentMethodOption[];
   paymentRequiresVerification?: boolean;
@@ -147,7 +139,7 @@ export function PoHeaderSummary({
       <div className="poSummaryBody">
         <div className="poInspectorPanel">
           <div className="poInspectorPrimary">
-            <InspectorRow label="Budget" value={budgetLabel(budgets, value.budget_id, po.budget)} />
+            <InspectorRow label="Budget" value={budgetDisplayLabel(po.budget)} />
             <InspectorRow label="Progetto" value={optionalText(value.project)} />
             <InspectorRow label="Fornitore" value={providerLabel(provider)} />
           </div>
