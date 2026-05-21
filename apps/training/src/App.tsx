@@ -19,9 +19,7 @@ const navItems: TabNavItem[] = [
   { label: 'Persone', path: '/persone' },
   { label: 'Pianificazione', path: '/pianificazione' },
   { label: 'Compliance', path: '/compliance' },
-  { label: 'Piano', path: '/piano' },
   { label: 'Catalogo', path: '/catalogo' },
-  { label: 'Certificazioni', path: '/certificazioni' },
 ];
 
 const ROUTES_WITHOUT_GLOBAL_HEADER = new Set(['/pipeline']);
