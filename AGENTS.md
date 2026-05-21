@@ -22,6 +22,7 @@
 - `make dev-docker` — same via docker-compose
 - Backend proxy: Vite proxies `/api` → `localhost:8080`
 - Auth: OAuth2/OIDC with remote Keycloak (no local instance)
+- When sandbox tooling is missing, use [`docs/TOOLING-WITH-DOCKER.md`](docs/TOOLING-WITH-DOCKER.md) to run Go/Node/Playwright checks through Docker with minimal approval prompts.
 - Before running Playwright, browser checks, or similar UI tests, first check whether `make dev` or the relevant Vite dev server is already running and reuse that URL. Do not start a second dev/preview server unless no suitable server is active.
 
 ## UI/UX

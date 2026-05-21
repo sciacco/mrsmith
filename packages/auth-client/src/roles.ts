@@ -9,6 +9,13 @@ export const CP_BACKOFFICE_APP_ACCESS_ROLES = [
   ...CP_BACKOFFICE_BIOMETRIC_ACCESS_ROLES,
 ] as const;
 
+export const TRAINING_ACCESS_ROLES = ['app_training_access'] as const;
+export const TRAINING_PEOPLE_ADMIN_ROLES = ['app_training_people_admin'] as const;
+export const TRAINING_APP_ACCESS_ROLES = [
+  ...TRAINING_ACCESS_ROLES,
+  ...TRAINING_PEOPLE_ADMIN_ROLES,
+] as const;
+
 export const APP_ACCESS_ROLES = {
   budget: ['app_budget_access'],
   fornitori: ['app_fornitori_access'],
@@ -27,6 +34,7 @@ export const APP_ACCESS_ROLES = {
   'rdf-backend': ['app_rdf_backend_access'],
   reports: ['app_reports_access'],
   'afc-tools': ['app_afctools_access'],
+  training: TRAINING_APP_ACCESS_ROLES,
 } as const satisfies Record<string, readonly string[]>;
 
 export type AppAccessState =

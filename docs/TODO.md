@@ -5,6 +5,23 @@
 ### Single-Origin Dev Gateway
 Future implementation plan is tracked in [docs/DEV-GATEWAY-IMPLEMENTATION-PLAN.md](DEV-GATEWAY-IMPLEMENTATION-PLAN.md). This work would replace browser-visible per-app localhost ports with a backend-owned single-origin dev gateway while preserving independent app Vite servers as opt-in processes.
 
+## Training App
+
+### Calendar Integration Deferred Post Go-Live
+The Training mini-app intentionally excludes Outlook/iCal calendar integration from v1. When Product asks to reopen it, prefer a backend-owned read-only iCal feed for employee-visible training dates. Do not add Microsoft Graph writes or calendar mutation flows without a new product decision.
+
+### Legacy Excel Import Mode Depends on Go-Live Date
+The Training schema supports both a 2026 in-flight import and a clean future-year start, but the import mode remains a business decision tied to the real go-live date. Before enabling the import job against staging or production, confirm whether Q3 2026 requires a 1:1 import of the active 2026 plan or whether a later go-live should import only historical certifications and start the next annual plan cleanly.
+
+### Staging Gates for Training
+Final go-live still requires staging resources: Anisetta migration application and view smoke test, Keycloak roles `app_training_access` and `app_training_people_admin`, object storage configuration for attestati, notification delivery/deep links, and People validation of the Excel dry-run report. Local build/test/screenshot gates are run through Docker so they do not depend on host Go/Node/pnpm binaries.
+
+### Storage Adapter Hardening
+Training v1 has a local filesystem `StorageAdapter` for dev and controlled deployments. Before production go-live, confirm whether the target storage is S3-compatible and add explicit endpoint/bucket/region/credential/path-prefix/TLS env contracts if object storage is required instead of a mounted private volume.
+
+### Factorial Provider Wiring
+Training now has a provider-neutral `HRProvider` contract and a People-only sync service path. The concrete Factorial adapter remains a staging/go-live task because API credentials and webhook shape are not available in this sandbox. When credentials are available, wire the adapter through backend config without exposing secrets through `/config`.
+
 ## Listini e Sconti App
 
 ### Portal Admin Module — Carbone Template Management

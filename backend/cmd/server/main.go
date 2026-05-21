@@ -49,6 +49,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/reports"
 	"github.com/sciacco/mrsmith/internal/simulatorivendita"
 	"github.com/sciacco/mrsmith/internal/support"
+	"github.com/sciacco/mrsmith/internal/training"
 	"github.com/sciacco/mrsmith/pkg/middleware"
 )
 
@@ -386,6 +387,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.ManutenzioniAppID] = "http://localhost:5188"
 	}
+	if cfg.TrainingAppURL != "" {
+		hrefOverrides[applaunch.TrainingAppID] = cfg.TrainingAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.TrainingAppID] = "http://localhost:5191"
+	}
 	if cfg.PanoramicaAppURL != "" {
 		hrefOverrides[applaunch.PanoramicaAppID] = cfg.PanoramicaAppURL
 	} else if cfg.StaticDir == "" {
@@ -452,6 +458,9 @@ func main() {
 			if definition.ID == applaunch.ManutenzioniAppID && cfg.ManutenzioniDSN == "" {
 				continue
 			}
+			if definition.ID == applaunch.TrainingAppID && cfg.AnisettaDSN == "" {
+				continue
+			}
 			if definition.ID == applaunch.PanoramicaAppID && cfg.MistraDSN == "" && cfg.GrappaDSN == "" && cfg.AnisettaDSN == "" {
 				continue
 			}
@@ -510,6 +519,15 @@ func main() {
 		Mistra:      mistraDB,
 		AI:          openrouterCli,
 		Logger:      logger,
+	})
+	training.RegisterRoutes(api, training.Deps{
+		DB:              anisettaDB,
+		Notifier:        notificationNotifier,
+		Logger:          logger,
+		StorageDir:      cfg.TrainingStorageDir,
+		StorageMaxBytes: cfg.TrainingStorageMaxBytes,
+		TrainingAppURL:  cfg.TrainingAppURL,
+		StaticDir:       cfg.StaticDir,
 	})
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 	quotes.RegisterRoutes(api, quotes.Deps{
@@ -603,6 +621,23 @@ func main() {
 		logger.Info("quotes hubspot status sync worker not started without mistra database", "component", "quotes")
 	} else {
 		logger.Info("quotes hubspot status sync worker not started without hubspot client", "component", "quotes")
+	}
+	if cfg.TrainingJobsEnabled && anisettaDB != nil {
+		worker := training.NewJobRunner(
+			training.NewSQLStore(anisettaDB),
+			notificationNotifier,
+			logger,
+			cfg.TrainingAppURL,
+		)
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			worker.Run(appCtx, cfg.TrainingJobsInterval)
+		}()
+	} else if cfg.TrainingJobsEnabled {
+		logger.Info("training jobs worker not started without anisetta database", "component", "training")
+	} else {
+		logger.Info("training jobs worker disabled", "component", "training")
 	}
 	if diagnosticSink != nil && diagnosticSink.Enabled() {
 		workerWG.Add(1)

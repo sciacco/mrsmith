@@ -79,3 +79,13 @@
     transform: translateY(0);
   }
 }
+
+@media (max-width: 768px) {
+  .trigger {
+    gap: 0;
+  }
+
+  .userName {
+    display: none;
+  }
+}

@@ -1,0 +1,481 @@
+.page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--space-6);
+  animation: pageEnter 0.35s var(--ease-out) both;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin: 0 0 var(--space-1);
+}
+
+.header p {
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+}
+
+.scopeBadge,
+.inlineBadge,
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+.scopeBadge {
+  margin-top: 3px;
+}
+
+.inlineBadge {
+  min-height: 20px;
+  margin-left: var(--space-2);
+  border-color: rgba(14, 116, 144, 0.18);
+  background: var(--color-info-subtle);
+  color: var(--color-info-strong);
+}
+
+.statusPill {
+  min-height: 22px;
+  font-size: 0.72rem;
+}
+
+.okPill {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: var(--color-success-bg);
+  color: #047857;
+}
+
+.warnPill {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
+.surface,
+.reportPanel {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.toolbar > :first-child {
+  min-width: min(320px, 100%);
+}
+
+.resultBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.surface > .resultBar {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.tableWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 1180px;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.table th {
+  padding: var(--space-3);
+  text-align: left;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  vertical-align: top;
+}
+
+.table th:last-child,
+.table td:last-child {
+  min-width: 520px;
+}
+
+.table tr:hover td {
+  background: var(--color-accent-subtle);
+}
+
+.table td strong {
+  display: block;
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.table td span {
+  display: block;
+  margin-top: 2px;
+}
+
+.numCol {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: nowrap;
+  width: max-content;
+}
+
+.requestGrid,
+.catalogGrid,
+.reportGrid {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.requestGrid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.catalogGrid {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.reportGrid {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+}
+
+.requestItem,
+.catalogItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 180px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.requestItem h2,
+.catalogItem h2,
+.reportHeader h2,
+.stateBlock h2,
+.emptyState h2 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.requestItem p {
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.itemTopline,
+.itemFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.catalogItem dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.catalogItem dt {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.catalogItem dd {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.masterDataPanel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-4);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.masterDataSection {
+  display: grid;
+  gap: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--space-4);
+}
+
+.masterDataHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.masterDataHeader h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.masterDataHeader span,
+.masterDataEmpty {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.masterDataSection ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.masterDataSection li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 54px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  padding: var(--space-3);
+}
+
+.masterDataSection strong,
+.masterDataSection span {
+  display: block;
+}
+
+.masterDataSection strong {
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.masterDataSection li span {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.masterDataSection li .statusPill {
+  display: inline-flex;
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+.reportPanel {
+  overflow: hidden;
+}
+
+.reportHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.emptyState,
+.stateBlock {
+  display: grid;
+  place-items: center;
+  gap: var(--space-2);
+  min-height: 220px;
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.emptyCompact {
+  min-height: 140px;
+}
+
+.emptyState svg,
+.stateBlock svg {
+  color: var(--color-text-muted);
+}
+
+.emptyState p,
+.stateBlock p {
+  max-width: 34rem;
+}
+
+.stateBlock {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-elevated);
+}
+
+.info {
+  border-color: rgba(14, 116, 144, 0.18);
+}
+
+.warning {
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.modalBody {
+  display: grid;
+  gap: var(--space-5);
+  color: var(--color-text-secondary);
+}
+
+.modalText {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.modalScroll {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.formStack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.formStack label {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.formStack input,
+.formStack textarea,
+.formStack select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.formStack textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.checkboxRow {
+  display: flex !important;
+  grid-template-columns: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.checkboxRow input {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: var(--space-4);
+  }
+
+  .header {
+    flex-direction: column;
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .toolbar > * {
+    width: 100%;
+  }
+
+  .catalogItem dl {
+    grid-template-columns: 1fr;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .modalActions {
+    flex-direction: column-reverse;
+  }
+}

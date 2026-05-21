@@ -41,6 +41,13 @@ test('cp backoffice biometric role grants app access but not full access', () =>
   assert.equal(hasAnyRole(roles, CP_BACKOFFICE_FULL_ACCESS_ROLES), false);
 });
 
+test('training people role grants app access', () => {
+  assert.equal(
+    getAppAccessState(auth({ user: { roles: ['app_training_people_admin'] } }), APP_ACCESS_ROLES.training),
+    'allowed',
+  );
+});
+
 test('app_devadmin bypass is allowed', () => {
   assert.equal(
     getAppAccessState(auth({ user: { roles: ['app_devadmin'] } }), ['app_budget_access']),

@@ -38,6 +38,9 @@ const (
 	ManutenzioniAppID   = "manutenzioni"
 	ManutenzioniAppHref = "/apps/manutenzioni/"
 
+	TrainingAppID   = "training"
+	TrainingAppHref = "/apps/training/"
+
 	PanoramicaAppID   = "panoramica-cliente"
 	PanoramicaAppHref = "/apps/panoramica-cliente/"
 
@@ -76,6 +79,8 @@ var (
 	manutenzioniManagerRoles         = []string{"app_manutenzioni_manager"}
 	manutenzioniOperatorRoles        = []string{"app_manutenzioni_operator"}
 	manutenzioniApproverRoles        = []string{"app_manutenzioni_approver"}
+	trainingAccessRoles              = []string{"app_training_access"}
+	trainingPeopleAdminRoles         = []string{"app_training_people_admin"}
 	panoramicaAccessRoles            = []string{"app_panoramica_access"}
 	quotesAccessRoles                = []string{"app_quotes_access"}
 	quotesDeleteRoles                = []string{"app_quotes_delete"}
@@ -303,6 +308,17 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		},
 		// ── Backoffice ──
 		{
+			ID:            TrainingAppID,
+			Name:          "Formazione",
+			Description:   "Piano formativo, richieste, certificazioni e attestati.",
+			Icon:          "clipboard",
+			Href:          TrainingAppHref,
+			Status:        "dev",
+			CategoryID:    "backoffice",
+			CategoryTitle: "Backoffice",
+			AccessRoles:   TrainingAppAccessRoles(),
+		},
+		{
 			ID:            CPBackofficeAppID,
 			Name:          "CP Backoffice",
 			Description:   "Gestione aziende, utenti e accessi biometrico per il back-office clienti.",
@@ -468,6 +484,19 @@ func ManutenzioniApproverRoles() []string {
 	return slices.Clone(manutenzioniApproverRoles)
 }
 
+func TrainingAccessRoles() []string {
+	return slices.Clone(trainingAccessRoles)
+}
+
+func TrainingPeopleAdminRoles() []string {
+	return slices.Clone(trainingPeopleAdminRoles)
+}
+
+func TrainingAppAccessRoles() []string {
+	roles := slices.Clone(trainingAccessRoles)
+	return append(roles, trainingPeopleAdminRoles...)
+}
+
 func PanoramicaAccessRoles() []string {
 	return slices.Clone(panoramicaAccessRoles)
 }
@@ -529,6 +558,8 @@ func AllRoles() []string {
 		manutenzioniManagerRoles,
 		manutenzioniOperatorRoles,
 		manutenzioniApproverRoles,
+		trainingAccessRoles,
+		trainingPeopleAdminRoles,
 		panoramicaAccessRoles,
 		quotesAccessRoles,
 		quotesDeleteRoles,

@@ -45,6 +45,9 @@ dev-listini:          ## Solo listini-e-sconti app
 dev-manutenzioni:     ## Solo manutenzioni app
 	pnpm --filter mrsmith-manutenzioni dev
 
+dev-training:         ## Solo training app
+	pnpm --filter mrsmith-training dev
+
 dev-panoramica:       ## Solo panoramica-cliente app
 	pnpm --filter mrsmith-panoramica-cliente dev
 
@@ -135,5 +138,5 @@ tidy:                 ## go mod tidy
 help:                 ## Mostra questo help
 	@grep -h -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget dev-fornitori dev-rda dev-compliance dev-kit-products dev-listini dev-manutenzioni dev-panoramica dev-quotes dev-richieste-fattibilita dev-rdf-backend dev-reports dev-coperture dev-energia-dc dev-simulatori-vendita dev-afc-tools dev-cp-backoffice build build-frontend build-backend docker-build docker-build-amd64 package-prod-amd64 deploy-prod rollback-prod test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
+.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget dev-fornitori dev-rda dev-compliance dev-kit-products dev-listini dev-manutenzioni dev-training dev-panoramica dev-quotes dev-richieste-fattibilita dev-rdf-backend dev-reports dev-coperture dev-energia-dc dev-simulatori-vendita dev-afc-tools dev-cp-backoffice build build-frontend build-backend docker-build docker-build-amd64 package-prod-amd64 deploy-prod rollback-prod test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
 .DEFAULT_GOAL := help
