@@ -128,7 +128,7 @@ SELECT
   COALESCE(en.planned_end::text, ''),
   en.hours_planned,
   en.cost_planned::float8,
-  COALESCE(en.motivation, ''),
+  COALESCE(NULLIF(en.motivation, 'Import storico'), ''),
   COALESCE(en.objective, ''),
   COALESCE(en.notes, ''),
   COALESCE(doc.id, ''),

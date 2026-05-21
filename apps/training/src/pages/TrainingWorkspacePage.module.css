@@ -414,6 +414,20 @@
   gap: var(--space-3);
 }
 
+.editEnrollmentForm {
+  max-height: calc(100vh - 160px);
+}
+
+.editEnrollmentGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.editEnrollmentTextGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
 .formStack label {
   display: grid;
   gap: var(--space-2);
@@ -438,6 +452,10 @@
   resize: vertical;
 }
 
+.editEnrollmentTextGrid textarea {
+  min-height: 180px;
+}
+
 .checkboxRow {
   display: flex !important;
   grid-template-columns: none;
@@ -448,6 +466,13 @@
 .checkboxRow input {
   width: 16px;
   height: 16px;
+}
+
+@media (max-width: 1120px) {
+  .editEnrollmentGrid,
+  .editEnrollmentTextGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -472,6 +497,11 @@
   }
 
   .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .editEnrollmentGrid,
+  .editEnrollmentTextGrid {
     grid-template-columns: 1fr;
   }
 

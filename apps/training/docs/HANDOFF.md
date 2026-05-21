@@ -289,16 +289,17 @@ Regole implementate:
 2. nessuna scrittura senza `--commit`;
 3. report JSON con righe valide, warning e contatori create/update/unchanged dove applicabile;
 4. normalizzazione in-process dell'Excel: match nome/cognome dal CSV dipendenti, split celle multi-persona, skip righe non-persona e corsi placeholder;
-5. il foglio `Certificazioni` non alimenta l'import enrollment del piano; richiede eventuale import dedicato;
-6. import enrollments idempotente su dipendente + corso + anno piano, con rerun invariati contati come `unchanged`;
-7. `SET LOCAL training.allow_status_override = 'true'` resta confinato alla transazione di import enrollment.
+5. il foglio `Per budget` alimenta i campi di pianificazione sull'iscrizione, non sul corso: `OBIETTIVO FORMATIVO` va in `training.enrollment.objective` perché è legato alla persona in quel piano;
+6. il foglio `Per budget` crea/aggiorna automaticamente `team`, `team_membership`, `vendor`, `skill_area` e dettagli corso quando il dato è presente nel legacy;
+7. il foglio `Certificazioni` non alimenta l'import enrollment del piano; richiede eventuale import dedicato;
+8. import enrollments idempotente su dipendente + corso + anno piano, con rerun invariati contati come `unchanged`;
+9. `SET LOCAL training.allow_status_override = 'true'` resta confinato alla transazione di import enrollment.
 
 Quando la modalità Q7 sarà decisa, completare il mapping per:
 
-1. normalizzazione team/fornitori, se verranno importati dal file legacy;
-2. eventuale creazione `certification` mancanti dal foglio "Certificazioni";
-3. eventuali `certification_award` con `validation_source = 'imported_legacy'` per lo storico;
-4. scelta finale tra import 1:1 del piano in corso o solo storico + nuovo anno pulito.
+1. eventuale creazione `certification` mancanti dal foglio "Certificazioni";
+2. eventuali `certification_award` con `validation_source = 'imported_legacy'` per lo storico;
+3. scelta finale tra import 1:1 del piano in corso o solo storico + nuovo anno pulito.
 
 Casi noti da gestire nei dati legacy (osservati nel foglio):
 

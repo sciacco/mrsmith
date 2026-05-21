@@ -93,6 +93,104 @@ func TestParseTrainingImportPrefersBudgetSheetDuplicate(t *testing.T) {
 	assertImportWarning(t, result.Warnings, "duplicate_candidate")
 }
 
+func TestParseTrainingImportReadsBudgetPlanningFields(t *testing.T) {
+	var workbook bytes.Buffer
+	file := excelize.NewFile()
+	budgetSheet := "Per budget "
+	file.SetSheetName(file.GetSheetName(0), budgetSheet)
+	writeImportRows(t, file, budgetSheet, [][]any{
+		{
+			"TEAM",
+			"NOME E COGNOME",
+			"AREA FORMAZIONE",
+			"CORSO",
+			"OBIETTIVO FORMATIVO",
+			"PRIORITA'",
+			"LIVELLO AS IS",
+			"LIVELLO TO BE",
+			"LINK AL CORSO",
+			"FORNITORE",
+			"H TOTALI",
+			"DATA INIZIO",
+			"DATA FINE",
+			"COSTO",
+			"NOTE",
+			"TO DO",
+			"STATO",
+		},
+		{
+			"PEOPLE",
+			"Rossi Marco",
+			"AI",
+			"AI per HR",
+			"Applicare AI ai processi People",
+			"1",
+			"0",
+			"2",
+			"https://example.com/course",
+			"Academy",
+			"16",
+			46090,
+			46295,
+			"1200.50",
+			"Nota operativa",
+			"Verificare date",
+			"in corso",
+		},
+	})
+	if err := file.Write(&workbook); err != nil {
+		t.Fatalf("Write workbook: %v", err)
+	}
+
+	result, err := ParseTrainingImport(context.Background(), "training.xlsx", &workbook, false, nil, Principal{IsPeopleAdmin: true})
+	if err != nil {
+		t.Fatalf("ParseTrainingImport: %v", err)
+	}
+	if result.Summary.CandidateRows != 1 {
+		t.Fatalf("CandidateRows = %d, want 1", result.Summary.CandidateRows)
+	}
+	row := result.Rows[0]
+	if row.TeamName != "PEOPLE" {
+		t.Fatalf("TeamName = %q, want PEOPLE", row.TeamName)
+	}
+	if row.SkillAreaName != "AI" {
+		t.Fatalf("SkillAreaName = %q, want AI", row.SkillAreaName)
+	}
+	if row.VendorName != "Academy" {
+		t.Fatalf("VendorName = %q, want Academy", row.VendorName)
+	}
+	if row.CourseURL != "https://example.com/course" {
+		t.Fatalf("CourseURL = %q", row.CourseURL)
+	}
+	if row.Priority == nil || *row.Priority != 1 {
+		t.Fatalf("Priority = %#v, want 1", row.Priority)
+	}
+	if row.LevelAsIs == nil || *row.LevelAsIs != 0 {
+		t.Fatalf("LevelAsIs = %#v, want 0", row.LevelAsIs)
+	}
+	if row.LevelToBe == nil || *row.LevelToBe != 2 {
+		t.Fatalf("LevelToBe = %#v, want 2", row.LevelToBe)
+	}
+	if row.HoursPlanned == nil || *row.HoursPlanned != 16 {
+		t.Fatalf("HoursPlanned = %#v, want 16", row.HoursPlanned)
+	}
+	if row.CostPlanned == nil || *row.CostPlanned != 1200.50 {
+		t.Fatalf("CostPlanned = %#v, want 1200.50", row.CostPlanned)
+	}
+	if row.PlannedStart != "2026-03-09" || row.PlannedEnd != "2026-09-30" {
+		t.Fatalf("planned dates = %q/%q", row.PlannedStart, row.PlannedEnd)
+	}
+	if row.EnrollmentStatus != "in_progress" {
+		t.Fatalf("EnrollmentStatus = %q, want in_progress", row.EnrollmentStatus)
+	}
+	if row.Objective != "Applicare AI ai processi People" {
+		t.Fatalf("Objective = %q", row.Objective)
+	}
+	if row.Notes != "Nota operativa\nVerificare date" {
+		t.Fatalf("Notes = %q", row.Notes)
+	}
+}
+
 func writeImportRows(t *testing.T, file *excelize.File, sheet string, rows [][]any) {
 	t.Helper()
 	for rowIndex, row := range rows {

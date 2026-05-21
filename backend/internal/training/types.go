@@ -397,13 +397,28 @@ type ImportWarning struct {
 }
 
 type ImportRow struct {
-	Sheet         string `json:"sheet"`
-	Row           int    `json:"row"`
-	EmployeeName  string `json:"employeeName,omitempty"`
-	EmployeeEmail string `json:"employeeEmail,omitempty"`
-	CourseTitle   string `json:"courseTitle,omitempty"`
-	Year          int    `json:"year,omitempty"`
-	Status        string `json:"status"`
+	Sheet            string   `json:"sheet"`
+	Row              int      `json:"row"`
+	EmployeeName     string   `json:"employeeName,omitempty"`
+	EmployeeEmail    string   `json:"employeeEmail,omitempty"`
+	CourseTitle      string   `json:"courseTitle,omitempty"`
+	TeamName         string   `json:"teamName,omitempty"`
+	SkillAreaName    string   `json:"skillAreaName,omitempty"`
+	VendorName       string   `json:"vendorName,omitempty"`
+	CourseURL        string   `json:"courseUrl,omitempty"`
+	Priority         *int     `json:"priority,omitempty"`
+	LevelAsIs        *int     `json:"levelAsIs,omitempty"`
+	LevelToBe        *int     `json:"levelToBe,omitempty"`
+	PlannedStart     string   `json:"plannedStart,omitempty"`
+	PlannedEnd       string   `json:"plannedEnd,omitempty"`
+	HoursPlanned     *int     `json:"hoursPlanned,omitempty"`
+	CostPlanned      *float64 `json:"costPlanned,omitempty"`
+	Motivation       string   `json:"motivation,omitempty"`
+	Objective        string   `json:"objective,omitempty"`
+	Notes            string   `json:"notes,omitempty"`
+	EnrollmentStatus string   `json:"enrollmentStatus,omitempty"`
+	Year             int      `json:"year,omitempty"`
+	Status           string   `json:"status"`
 }
 
 type JobRunResponse struct {

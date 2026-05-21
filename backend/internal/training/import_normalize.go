@@ -145,8 +145,9 @@ func ResolveTrainingImportEmployees(response *ImportDryRunResponse, employees []
 }
 
 type employeeNameMatcher struct {
-	byName    map[string][]EmployeeImportRow
-	bySurname map[string][]EmployeeImportRow
+	byName        map[string][]EmployeeImportRow
+	byPartialName map[string][]EmployeeImportRow
+	bySurname     map[string][]EmployeeImportRow
 }
 
 type employeeNameMatch struct {
@@ -158,10 +159,12 @@ type employeeNameMatch struct {
 
 func newEmployeeNameMatcher(employees []EmployeeImportRow) employeeNameMatcher {
 	matcher := employeeNameMatcher{
-		byName:    map[string][]EmployeeImportRow{},
-		bySurname: map[string][]EmployeeImportRow{},
+		byName:        map[string][]EmployeeImportRow{},
+		byPartialName: map[string][]EmployeeImportRow{},
+		bySurname:     map[string][]EmployeeImportRow{},
 	}
 	seen := map[string]map[string]struct{}{}
+	seenPartial := map[string]map[string]struct{}{}
 	seenSurname := map[string]map[string]struct{}{}
 	for _, employee := range employees {
 		if employee.Status != "candidate" || employee.Email == "" {
@@ -179,6 +182,19 @@ func newEmployeeNameMatcher(employees []EmployeeImportRow) employeeNameMatcher {
 			}
 			seen[key][employee.Email] = struct{}{}
 			matcher.byName[key] = append(matcher.byName[key], employee)
+		}
+		for _, key := range employeePartialNameKeys(employee.FirstName, employee.LastName) {
+			if key == "" {
+				continue
+			}
+			if seenPartial[key] == nil {
+				seenPartial[key] = map[string]struct{}{}
+			}
+			if _, ok := seenPartial[key][employee.Email]; ok {
+				continue
+			}
+			seenPartial[key][employee.Email] = struct{}{}
+			matcher.byPartialName[key] = append(matcher.byPartialName[key], employee)
 		}
 		surname := normalizeImportPersonName(employee.LastName)
 		if surname == "" {
@@ -204,6 +220,14 @@ func (m employeeNameMatcher) match(value string) employeeNameMatch {
 	matches := m.byName[key]
 	switch len(matches) {
 	case 0:
+		if partialMatches := m.byPartialName[key]; len(partialMatches) > 0 {
+			switch len(partialMatches) {
+			case 1:
+				return employeeNameMatch{status: "matched", strategy: "partial_name", employee: partialMatches[0]}
+			default:
+				return employeeNameMatch{status: "ambiguous", employees: partialMatches}
+			}
+		}
 		if len(strings.Fields(key)) == 1 {
 			surnameMatches := m.bySurname[key]
 			switch len(surnameMatches) {
@@ -347,6 +371,22 @@ func employeeNameKeys(firstName, lastName string) []string {
 	}
 }
 
+func employeePartialNameKeys(firstName, lastName string) []string {
+	firstFields := strings.Fields(normalizeImportPersonName(firstName))
+	if len(firstFields) == 0 {
+		return nil
+	}
+	last := normalizeImportPersonName(lastName)
+	if last == "" {
+		return nil
+	}
+	first := firstFields[0]
+	return []string{
+		strings.TrimSpace(first + " " + last),
+		strings.TrimSpace(last + " " + first),
+	}
+}
+
 func normalizeImportPersonName(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
 	replacer := strings.NewReplacer(
@@ -370,6 +410,9 @@ func isNonPersonImportValue(value string) bool {
 		return true
 	}
 	if normalized == "?" || normalized == "/" || normalized == "all" {
+		return true
+	}
+	if strings.HasPrefix(normalized, "nessuno") || strings.HasPrefix(normalized, "nessun ") {
 		return true
 	}
 	if strings.HasPrefix(normalized, "definire ") {

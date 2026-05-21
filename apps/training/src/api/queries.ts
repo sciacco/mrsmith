@@ -4,7 +4,7 @@ import { mockWorkspace } from './mockData';
 import type { ActionResponse, JobRunResponse, LookupResponse, WorkspaceResponse } from './types';
 
 const useMocks =
-  import.meta.env.DEV && import.meta.env.VITE_TRAINING_USE_MOCKS !== 'false';
+  import.meta.env.DEV && import.meta.env.VITE_TRAINING_USE_MOCKS === 'true';
 
 export type TrainingMasterDataKind =
   | 'vendors'

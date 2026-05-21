@@ -1195,10 +1195,10 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
           setEditEnrollmentDraft(emptyEditEnrollmentDraft);
         }}
         title="Modifica iscrizione"
-        size="md"
+        size="xwide"
       >
         <form
-          className={styles.formStack}
+          className={`${styles.formStack} ${styles.modalScroll} ${styles.editEnrollmentForm}`}
           onSubmit={(event) => {
             event.preventDefault();
             if (!editEnrollmentTarget) return;
@@ -1232,7 +1232,7 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
           <p className={styles.modalText}>
             {editEnrollmentTarget?.employeeName} - {editEnrollmentTarget?.courseTitle}
           </p>
-          <div className={styles.formGrid}>
+          <div className={`${styles.formGrid} ${styles.editEnrollmentGrid}`}>
             <label>
               <span>Priorita</span>
               <input type="number" min="1" value={editEnrollmentDraft.priority} onChange={(event) => setEditEnrollmentDraft((draft) => ({ ...draft, priority: event.target.value }))} inputMode="numeric" />
@@ -1257,23 +1257,25 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
               <span>Fine</span>
               <input type="date" value={editEnrollmentDraft.plannedEnd} onChange={(event) => setEditEnrollmentDraft((draft) => ({ ...draft, plannedEnd: event.target.value }))} />
             </label>
+            <label>
+              <span>Costo</span>
+              <input type="number" min="0" step="0.01" value={editEnrollmentDraft.costPlanned} onChange={(event) => setEditEnrollmentDraft((draft) => ({ ...draft, costPlanned: event.target.value }))} inputMode="decimal" />
+            </label>
           </div>
-          <label>
-            <span>Costo</span>
-            <input type="number" min="0" step="0.01" value={editEnrollmentDraft.costPlanned} onChange={(event) => setEditEnrollmentDraft((draft) => ({ ...draft, costPlanned: event.target.value }))} inputMode="decimal" />
-          </label>
-          <label>
-            <span>Motivazione</span>
-            <textarea value={editEnrollmentDraft.motivation} onChange={(event) => setEditEnrollmentDraft((draft) => ({ ...draft, motivation: event.target.value }))} />
-          </label>
-          <label>
-            <span>Obiettivo</span>
-            <textarea value={editEnrollmentDraft.objective} onChange={(event) => setEditEnrollmentDraft((draft) => ({ ...draft, objective: event.target.value }))} />
-          </label>
-          <label>
-            <span>Note</span>
-            <textarea value={editEnrollmentDraft.notes} onChange={(event) => setEditEnrollmentDraft((draft) => ({ ...draft, notes: event.target.value }))} />
-          </label>
+          <div className={styles.editEnrollmentTextGrid}>
+            <label>
+              <span>Motivazione</span>
+              <textarea value={editEnrollmentDraft.motivation} onChange={(event) => setEditEnrollmentDraft((draft) => ({ ...draft, motivation: event.target.value }))} />
+            </label>
+            <label>
+              <span>Obiettivo</span>
+              <textarea value={editEnrollmentDraft.objective} onChange={(event) => setEditEnrollmentDraft((draft) => ({ ...draft, objective: event.target.value }))} />
+            </label>
+            <label>
+              <span>Note</span>
+              <textarea value={editEnrollmentDraft.notes} onChange={(event) => setEditEnrollmentDraft((draft) => ({ ...draft, notes: event.target.value }))} />
+            </label>
+          </div>
           <div className={styles.modalActions}>
             <Button
               type="button"

@@ -259,6 +259,42 @@ func (s *SQLStore) PlanImportEmployees(ctx context.Context, principal Principal,
 	return summary, nil
 }
 
+func (s *SQLStore) ListImportEmployees(ctx context.Context, principal Principal) ([]EmployeeImportRow, error) {
+	if !principal.IsPeopleAdmin {
+		return nil, forbiddenError("people_role_required", "azione riservata a People")
+	}
+	if s == nil || s.db == nil {
+		return nil, errors.New("training database not configured")
+	}
+	const q = `
+SELECT first_name, last_name, email::text
+FROM training.employee
+WHERE status = 'active'::training.employee_status
+ORDER BY last_name, first_name, email`
+	rows, err := s.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("list training import employees: %w", err)
+	}
+	defer rows.Close()
+
+	result := []EmployeeImportRow{}
+	rowNumber := 1
+	for rows.Next() {
+		var row EmployeeImportRow
+		row.Row = rowNumber
+		row.Status = "candidate"
+		if err := rows.Scan(&row.FirstName, &row.LastName, &row.Email); err != nil {
+			return nil, fmt.Errorf("scan training import employee: %w", err)
+		}
+		result = append(result, row)
+		rowNumber++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list training import employees: %w", err)
+	}
+	return result, nil
+}
+
 func (s *SQLStore) upsertImportEmployee(ctx context.Context, tx *sql.Tx, row EmployeeImportRow) (string, error) {
 	var existing struct {
 		id        string
