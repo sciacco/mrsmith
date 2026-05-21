@@ -1,0 +1,36 @@
+.bar {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg-elevated);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.count {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.summary {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

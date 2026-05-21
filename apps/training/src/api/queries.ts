@@ -1,7 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from './client';
 import { mockWorkspace } from './mockData';
-import type { ActionResponse, JobRunResponse, LookupResponse, WorkspaceResponse } from './types';
+import type {
+  ActionResponse,
+  BulkAssignResponse,
+  BulkTargetState,
+  BulkTransitionResponse,
+  JobRunResponse,
+  LookupResponse,
+  OverviewResponse,
+  PersonProfile,
+  PersonSummary,
+  WorkspaceResponse,
+} from './types';
 
 const useMocks =
   import.meta.env.DEV && import.meta.env.VITE_TRAINING_USE_MOCKS === 'true';
@@ -105,6 +116,126 @@ export function useEnrollmentTransition(isPeopleAdmin: boolean) {
         ? `/training/v1/people/enrollments/${id}/transition`
         : `/training/v1/enrollments/${id}/transition`;
       return api.post<ActionResponse>(path, { transition, reason });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['training', 'workspace', isPeopleAdmin] }),
+  });
+}
+
+export interface PeopleDirectoryFilters {
+  year?: string;
+  team?: string;
+  filter?: string;
+  q?: string;
+}
+
+export function usePeopleDirectory(filters: PeopleDirectoryFilters, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'people-directory', filters],
+    enabled,
+    queryFn: async (): Promise<PersonSummary[]> => {
+      const params = new URLSearchParams();
+      if (filters.year) params.set('year', filters.year);
+      if (filters.team) params.set('team', filters.team);
+      if (filters.filter) params.set('filter', filters.filter);
+      if (filters.q) params.set('q', filters.q);
+      const suffix = params.toString();
+      const path = `/training/v1/people/directory${suffix ? `?${suffix}` : ''}`;
+      if (useMocks) return [];
+      return api.get<PersonSummary[]>(path);
+    },
+  });
+}
+
+export function useOverviewKpis(filters: { year?: string; team?: string }, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'overview', filters],
+    enabled,
+    queryFn: async (): Promise<OverviewResponse> => {
+      const params = new URLSearchParams();
+      if (filters.year) params.set('year', filters.year);
+      if (filters.team) params.set('team', filters.team);
+      const suffix = params.toString();
+      const path = `/training/v1/people/overview${suffix ? `?${suffix}` : ''}`;
+      return api.get<OverviewResponse>(path);
+    },
+  });
+}
+
+export function usePersonProfile(id: string | undefined, year: string, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'person-profile', id, year],
+    enabled: enabled && !!id,
+    queryFn: async (): Promise<PersonProfile> => {
+      const params = new URLSearchParams();
+      if (year) params.set('year', year);
+      const suffix = params.toString();
+      const path = `/training/v1/people/${id}/profile${suffix ? `?${suffix}` : ''}`;
+      return api.get<PersonProfile>(path);
+    },
+  });
+}
+
+export function useBulkAssignEnrollment(isPeopleAdmin: boolean) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: {
+      employeeIds: string[];
+      courseId: string;
+      planParams: {
+        year: number;
+        plannedStart?: string;
+        plannedEnd?: string;
+        hoursPlanned?: number;
+        costPlanned?: number;
+        mandatory: boolean;
+      };
+    }): Promise<BulkAssignResponse> => {
+      if (useMocks) return { created: body.employeeIds.length, failed: 0 };
+      return api.post<BulkAssignResponse>('/training/v1/people/enrollments/bulk-assign', {
+        employee_ids: body.employeeIds,
+        course_id: body.courseId,
+        plan_params: {
+          year: body.planParams.year,
+          planned_start: body.planParams.plannedStart,
+          planned_end: body.planParams.plannedEnd,
+          hours_planned: body.planParams.hoursPlanned,
+          cost_planned: body.planParams.costPlanned,
+          mandatory: body.planParams.mandatory,
+        },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'workspace', isPeopleAdmin] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
+    },
+  });
+}
+
+export function useBulkEnrollmentTransition(isPeopleAdmin: boolean) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      enrollmentIds,
+      targetState,
+      motivation,
+    }: {
+      enrollmentIds: string[];
+      targetState: BulkTargetState;
+      motivation?: string;
+    }): Promise<BulkTransitionResponse> => {
+      if (useMocks) {
+        return { succeeded: enrollmentIds.length, failed: 0, failures: [] };
+      }
+      return api.post<BulkTransitionResponse>('/training/v1/people/enrollments/bulk-transition', {
+        enrollment_ids: enrollmentIds,
+        target_state: targetState,
+        motivation,
+      });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['training', 'workspace', isPeopleAdmin] }),
   });

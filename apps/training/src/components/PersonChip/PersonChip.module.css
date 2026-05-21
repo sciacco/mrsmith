@@ -1,0 +1,21 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.a_norma { background: var(--color-success-bg, #ecfdf5); color: #047857; }
+.con_gap { background: var(--color-warning-subtle, #fef2f2); color: #b91c1c; }
+.senza_piano { background: var(--color-warning-subtle, #fef3c7); color: #b45309; }
+.nuovo_assunto { background: var(--color-info-subtle, #ecfeff); color: #155e75; }

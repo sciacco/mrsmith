@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": false,
+    "outDir": "../../artifacts/claude/training-tests",
+    "rootDir": "src",
+    "sourceMap": false,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  },
+  "include": [
+    "src/api/types.ts",
+    "src/lib/alertLevel.ts",
+    "src/lib/alertLevel.test.ts",
+    "src/lib/priorityScore.ts",
+    "src/lib/priorityScore.test.ts",
+    "src/lib/temporalGrouping.ts",
+    "src/lib/temporalGrouping.test.ts"
+  ]
+}

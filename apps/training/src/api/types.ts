@@ -223,6 +223,138 @@ export interface ActionResponse {
   status?: string;
 }
 
+export type BulkTargetState = 'approved' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface BulkTransitionFailure {
+  enrollment_id: string;
+  code?: string;
+  message?: string;
+}
+
+export interface BulkTransitionResponse {
+  succeeded: number;
+  failed: number;
+  failures?: BulkTransitionFailure[];
+}
+
+export type PersonComplianceStatus = 'a_norma' | 'con_gap' | 'senza_piano' | 'nuovo_assunto';
+
+export interface PersonNextDeadline {
+  type: 'cert' | 'course_end' | 'mandatory_due';
+  date: string;
+  label: string;
+}
+
+export interface PersonSummary {
+  id: string;
+  name: string;
+  email: string;
+  team_code: string;
+  compliance_status: PersonComplianceStatus;
+  active_enrollments_count: number;
+  next_deadline: PersonNextDeadline | null;
+  priority_score: number;
+  gaps_open: number;
+  expiring_certs_count: number;
+  historical_enrollments: number;
+}
+
+export interface BulkAssignResponse {
+  created: number;
+  failed: number;
+  failures?: Array<{ employee_id: string; code?: string; message?: string }>;
+}
+
+export interface PersonComplianceMandatoryRule {
+  course_id: string;
+  course_title: string;
+  compliance_framework?: string;
+  status: string;
+  last_valid_awarded_on?: string;
+}
+
+export interface PersonComplianceSection {
+  mandatory_rules: PersonComplianceMandatoryRule[];
+  coverage_pct: number;
+  open_gaps: PersonComplianceMandatoryRule[];
+  expiring_certs: ExpiringCertificationRow[];
+}
+
+export interface PersonHistoryYearRow {
+  year: number;
+  completed_count: number;
+  failed_count: number;
+  hours_total: number;
+  cost_total: number;
+}
+
+export interface PersonSkillEvidence {
+  courses_completed: string[];
+  certs: string[];
+}
+
+export interface PersonSkillArea {
+  skill_area_id: string;
+  name: string;
+  derived_level: string;
+  evidence: PersonSkillEvidence;
+}
+
+export interface PersonGap {
+  type: string;
+  description: string;
+}
+
+export interface PersonSuggestion {
+  gap: PersonGap;
+  recommended_courses: CatalogCourse[];
+}
+
+export interface OverviewException {
+  id: string;
+  severity: 'critical' | 'warning' | 'info';
+  title: string;
+  drilldown_url: string;
+}
+
+export interface OverviewTrend {
+  vs_previous_year?: string;
+  vs_target?: string | null;
+}
+
+export interface OverviewFamily {
+  value: string;
+  trend: OverviewTrend;
+  exceptions: OverviewException[];
+  spent_pct?: number;
+  calendar_alignment?: 'in_linea' | 'in_ritardo' | 'in_anticipo';
+  courses_per_person?: number;
+}
+
+export interface OverviewResponse {
+  year: number;
+  team_scope: string;
+  esecuzione: OverviewFamily;
+  compliance: OverviewFamily;
+  budget: OverviewFamily;
+  engagement: OverviewFamily;
+}
+
+export interface PersonProfile {
+  identity_min: {
+    id: string;
+    name: string;
+    email: string;
+    team_code: string;
+  };
+  compliance: PersonComplianceSection;
+  enrollments_current_year: PlanEnrollment[];
+  certifications: CertificationRow[];
+  history_by_year: PersonHistoryYearRow[];
+  skill_areas: PersonSkillArea[];
+  suggestions: PersonSuggestion[];
+}
+
 export interface JobRunResponse {
   ok: boolean;
   expiredEnrollments: number;

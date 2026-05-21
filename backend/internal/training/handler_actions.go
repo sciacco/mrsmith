@@ -95,6 +95,190 @@ func (h *handler) handleTransitionEnrollment(w http.ResponseWriter, r *http.Requ
 	httputil.JSON(w, http.StatusOK, response)
 }
 
+func (h *handler) handleBulkTransitionEnrollment(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	input, ok := decodeJSONBody[BulkEnrollmentTransitionInput](w, r)
+	if !ok {
+		return
+	}
+	if len(input.EnrollmentIDs) == 0 {
+		h.writeActionError(w, r, validationError("missing_enrollment_ids", "indica almeno una iscrizione"), "training.bulk_transition_enrollment")
+		return
+	}
+	transition, err := bulkTargetStateToTransition(input.TargetState)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.bulk_transition_enrollment")
+		return
+	}
+	response := BulkEnrollmentTransitionResponse{Failures: []BulkEnrollmentTransitionFailure{}}
+	for _, id := range input.EnrollmentIDs {
+		_, err := h.store.TransitionEnrollment(r.Context(), principal, strings.TrimSpace(id), EnrollmentTransitionInput{
+			Transition: transition,
+			Reason:     input.Motivation,
+		})
+		if err != nil {
+			failure := BulkEnrollmentTransitionFailure{EnrollmentID: id, Message: err.Error()}
+			if appErr, ok := asAppError(err); ok {
+				failure.Code = appErr.code
+				failure.Message = appErr.message
+			}
+			response.Failures = append(response.Failures, failure)
+			response.Failed++
+			continue
+		}
+		response.Succeeded++
+	}
+	httputil.JSON(w, http.StatusOK, response)
+}
+
+func (h *handler) handleBulkAssignEnrollment(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	input, ok := decodeJSONBody[BulkAssignInput](w, r)
+	if !ok {
+		return
+	}
+	if len(input.EmployeeIDs) == 0 {
+		h.writeActionError(w, r, validationError("missing_employee_ids", "indica almeno una persona"), "training.bulk_assign")
+		return
+	}
+	if strings.TrimSpace(input.CourseID) == "" {
+		h.writeActionError(w, r, validationError("missing_course_id", "corso obbligatorio"), "training.bulk_assign")
+		return
+	}
+	if input.PlanParams.Year == 0 {
+		h.writeActionError(w, r, validationError("missing_year", "anno piano obbligatorio"), "training.bulk_assign")
+		return
+	}
+	planID, err := h.store.TrainingPlanIDByYear(r.Context(), input.PlanParams.Year)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.bulk_assign")
+		return
+	}
+	response := BulkAssignResponse{Failures: []BulkAssignFailure{}}
+	for _, employeeID := range input.EmployeeIDs {
+		_, err := h.store.CreateEnrollment(r.Context(), principal, EnrollmentInput{
+			EmployeeID:     strings.TrimSpace(employeeID),
+			CourseID:       input.CourseID,
+			TrainingPlanID: planID,
+			PlannedStart:   input.PlanParams.PlannedStart,
+			PlannedEnd:     input.PlanParams.PlannedEnd,
+			HoursPlanned:   input.PlanParams.HoursPlanned,
+			CostPlanned:    input.PlanParams.CostPlanned,
+		})
+		if err != nil {
+			failure := BulkAssignFailure{EmployeeID: employeeID, Message: err.Error()}
+			if appErr, ok := asAppError(err); ok {
+				failure.Code = appErr.code
+				failure.Message = appErr.message
+			}
+			response.Failures = append(response.Failures, failure)
+			response.Failed++
+			continue
+		}
+		response.Created++
+	}
+	httputil.JSON(w, http.StatusOK, response)
+}
+
+func (h *handler) handleOverview(w http.ResponseWriter, r *http.Request) {
+	_, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	year := time.Now().Year()
+	if yearStr := strings.TrimSpace(r.URL.Query().Get("year")); yearStr != "" {
+		if parsed, err := strconvAtoi(yearStr); err == nil {
+			year = parsed
+		}
+	}
+	team := strings.TrimSpace(r.URL.Query().Get("team"))
+	overview, err := h.store.Overview(r.Context(), year, team)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.overview")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, overview)
+}
+
+func (h *handler) handlePersonProfile(w http.ResponseWriter, r *http.Request) {
+	_, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	id := r.PathValue("id")
+	if strings.TrimSpace(id) == "" {
+		h.writeActionError(w, r, validationError("missing_id", "id persona obbligatorio"), "training.person_profile")
+		return
+	}
+	year := time.Now().Year()
+	if yearStr := strings.TrimSpace(r.URL.Query().Get("year")); yearStr != "" {
+		if parsed, err := strconvAtoi(yearStr); err == nil {
+			year = parsed
+		}
+	}
+	profile, err := h.store.GetPersonProfile(r.Context(), id, year)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.person_profile")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, profile)
+}
+
+func (h *handler) handlePeopleDirectory(w http.ResponseWriter, r *http.Request) {
+	_, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	filters := PeopleDirectoryFilters{
+		Team:   strings.TrimSpace(r.URL.Query().Get("team")),
+		Filter: strings.TrimSpace(r.URL.Query().Get("filter")),
+		Search: strings.TrimSpace(r.URL.Query().Get("q")),
+	}
+	if yearStr := strings.TrimSpace(r.URL.Query().Get("year")); yearStr != "" {
+		if year, err := strconvAtoi(yearStr); err == nil {
+			filters.Year = year
+		}
+	}
+	directory, err := h.store.ListPeopleDirectory(r.Context(), Principal{IsPeopleAdmin: true}, filters)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.people_directory")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, directory)
+}
+
+func strconvAtoi(s string) (int, error) {
+	var n int
+	for _, ch := range s {
+		if ch < '0' || ch > '9' {
+			return 0, fmt.Errorf("invalid integer")
+		}
+		n = n*10 + int(ch-'0')
+	}
+	return n, nil
+}
+
+func bulkTargetStateToTransition(targetState string) (string, error) {
+	switch strings.TrimSpace(targetState) {
+	case "approved":
+		return "approve", nil
+	case "in_progress":
+		return "start", nil
+	case "completed":
+		return "complete", nil
+	case "cancelled":
+		return "cancel", nil
+	default:
+		return "", validationError("invalid_target_state", "stato di destinazione non supportato")
+	}
+}
+
 func (h *handler) handleCreateRequest(w http.ResponseWriter, r *http.Request) {
 	principal, ok := h.principalOrUnauthorized(w, r)
 	if !ok {

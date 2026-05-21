@@ -252,6 +252,170 @@ type EnrollmentTransitionInput struct {
 	ActualEnd   string `json:"actualEnd,omitempty"`
 }
 
+type PersonNextDeadline struct {
+	Type  string `json:"type"`
+	Date  string `json:"date"`
+	Label string `json:"label"`
+}
+
+type PersonSummary struct {
+	ID                     string              `json:"id"`
+	Name                   string              `json:"name"`
+	Email                  string              `json:"email"`
+	TeamCode               string              `json:"team_code"`
+	ComplianceStatus       string              `json:"compliance_status"`
+	ActiveEnrollmentsCount int                 `json:"active_enrollments_count"`
+	NextDeadline           *PersonNextDeadline `json:"next_deadline,omitempty"`
+	PriorityScore          float64             `json:"priority_score"`
+	GapsOpen               int                 `json:"gaps_open"`
+	ExpiringCertsCount     int                 `json:"expiring_certs_count"`
+	HistoricalEnrollments  int                 `json:"historical_enrollments"`
+}
+
+type PeopleDirectoryFilters struct {
+	Year   int
+	Team   string
+	Filter string
+	Search string
+}
+
+type BulkAssignPlanParams struct {
+	Year         int      `json:"year"`
+	PlannedStart string   `json:"planned_start,omitempty"`
+	PlannedEnd   string   `json:"planned_end,omitempty"`
+	HoursPlanned *int     `json:"hours_planned,omitempty"`
+	CostPlanned  *float64 `json:"cost_planned,omitempty"`
+	Mandatory    bool     `json:"mandatory"`
+}
+
+type BulkAssignInput struct {
+	EmployeeIDs []string             `json:"employee_ids"`
+	CourseID    string               `json:"course_id"`
+	PlanParams  BulkAssignPlanParams `json:"plan_params"`
+}
+
+type BulkAssignFailure struct {
+	EmployeeID string `json:"employee_id"`
+	Code       string `json:"code,omitempty"`
+	Message    string `json:"message,omitempty"`
+}
+
+type BulkAssignResponse struct {
+	Created  int                 `json:"created"`
+	Failed   int                 `json:"failed"`
+	Failures []BulkAssignFailure `json:"failures,omitempty"`
+}
+
+type PersonIdentityMin struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	TeamCode string `json:"team_code"`
+}
+
+type PersonComplianceMandatoryRule struct {
+	CourseID            string `json:"course_id"`
+	CourseTitle         string `json:"course_title"`
+	ComplianceFramework string `json:"compliance_framework,omitempty"`
+	Status              string `json:"status"`
+	LastValidAwardedOn  string `json:"last_valid_awarded_on,omitempty"`
+}
+
+type PersonComplianceSection struct {
+	MandatoryRules []PersonComplianceMandatoryRule `json:"mandatory_rules"`
+	CoveragePct    float64                         `json:"coverage_pct"`
+	OpenGaps       []PersonComplianceMandatoryRule `json:"open_gaps"`
+	ExpiringCerts  []ExpiringCertificationRow      `json:"expiring_certs"`
+}
+
+type PersonHistoryYearRow struct {
+	Year           int     `json:"year"`
+	CompletedCount int     `json:"completed_count"`
+	FailedCount    int     `json:"failed_count"`
+	HoursTotal     float64 `json:"hours_total"`
+	CostTotal      float64 `json:"cost_total"`
+}
+
+type PersonSkillEvidence struct {
+	CoursesCompleted []string `json:"courses_completed"`
+	Certs            []string `json:"certs"`
+}
+
+type PersonSkillArea struct {
+	SkillAreaID  string              `json:"skill_area_id"`
+	Name         string              `json:"name"`
+	DerivedLevel string              `json:"derived_level"`
+	Evidence     PersonSkillEvidence `json:"evidence"`
+}
+
+type PersonGap struct {
+	Type        string `json:"type"`
+	Description string `json:"description"`
+}
+
+type PersonSuggestion struct {
+	Gap                PersonGap       `json:"gap"`
+	RecommendedCourses []CatalogCourse `json:"recommended_courses"`
+}
+
+type OverviewException struct {
+	ID           string `json:"id"`
+	Severity     string `json:"severity"`
+	Title        string `json:"title"`
+	DrilldownURL string `json:"drilldown_url"`
+}
+
+type OverviewTrend struct {
+	VsPreviousYear string  `json:"vs_previous_year,omitempty"`
+	VsTarget       *string `json:"vs_target,omitempty"`
+}
+
+type OverviewFamily struct {
+	Value             string              `json:"value"`
+	Trend             OverviewTrend       `json:"trend"`
+	Exceptions        []OverviewException `json:"exceptions"`
+	SpentPct          *float64            `json:"spent_pct,omitempty"`
+	CalendarAlignment string              `json:"calendar_alignment,omitempty"`
+	CoursesPerPerson  *float64            `json:"courses_per_person,omitempty"`
+}
+
+type OverviewResponse struct {
+	Year       int            `json:"year"`
+	TeamScope  string         `json:"team_scope"`
+	Esecuzione OverviewFamily `json:"esecuzione"`
+	Compliance OverviewFamily `json:"compliance"`
+	Budget     OverviewFamily `json:"budget"`
+	Engagement OverviewFamily `json:"engagement"`
+}
+
+type PersonProfile struct {
+	IdentityMin             PersonIdentityMin       `json:"identity_min"`
+	Compliance              PersonComplianceSection `json:"compliance"`
+	EnrollmentsCurrentYear  []PlanEnrollment        `json:"enrollments_current_year"`
+	Certifications          []CertificationRow      `json:"certifications"`
+	HistoryByYear           []PersonHistoryYearRow  `json:"history_by_year"`
+	SkillAreas              []PersonSkillArea       `json:"skill_areas"`
+	Suggestions             []PersonSuggestion      `json:"suggestions"`
+}
+
+type BulkEnrollmentTransitionInput struct {
+	EnrollmentIDs []string `json:"enrollment_ids"`
+	TargetState   string   `json:"target_state"`
+	Motivation    string   `json:"motivation,omitempty"`
+}
+
+type BulkEnrollmentTransitionFailure struct {
+	EnrollmentID string `json:"enrollment_id"`
+	Code         string `json:"code,omitempty"`
+	Message      string `json:"message,omitempty"`
+}
+
+type BulkEnrollmentTransitionResponse struct {
+	Succeeded int                               `json:"succeeded"`
+	Failed    int                               `json:"failed"`
+	Failures  []BulkEnrollmentTransitionFailure `json:"failures,omitempty"`
+}
+
 type TrainingRequestInput struct {
 	CourseID      string `json:"courseId,omitempty"`
 	FreeTextTitle string `json:"freeTextTitle,omitempty"`

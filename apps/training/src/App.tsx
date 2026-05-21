@@ -8,14 +8,16 @@ import {
 import { AccessNotice, AppShell, TabNav, type TabNavItem } from '@mrsmith/ui';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
+import { TrainingHeader } from './components/TrainingHeader';
 import styles from './App.module.css';
 
 const navItems: TabNavItem[] = [
+  { label: 'Overview', path: '/' },
+  { label: 'Pipeline', path: '/pipeline' },
+  { label: 'Persone', path: '/persone' },
   { label: 'Piano', path: '/piano' },
-  { label: 'Richieste', path: '/richieste' },
   { label: 'Catalogo', path: '/catalogo' },
   { label: 'Certificazioni', path: '/certificazioni' },
-  { label: 'Report', path: '/report' },
 ];
 
 function AppRoutes({ isPeopleAdmin }: { isPeopleAdmin: boolean }) {
@@ -47,6 +49,7 @@ export function App() {
         </div>
       </AppShell.Nav>
       <AppShell.Content>
+        {isPeopleAdmin && <TrainingHeader />}
         <AppRoutes isPeopleAdmin={isPeopleAdmin} />
       </AppShell.Content>
     </AppShell>

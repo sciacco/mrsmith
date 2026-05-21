@@ -1,0 +1,130 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 4rem;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.family {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg-elevated);
+}
+
+.familyHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.familyHead h2 {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.kpi {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.familySubtitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.trend {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.exceptions {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.exceptions h3 {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: 0 0 0.5rem;
+}
+
+.exceptions ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.exception {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.dot {
+  font-size: 0.625rem;
+  width: 1rem;
+  text-align: center;
+}
+
+.severity_critical { color: #dc2626; }
+.severity_warning  { color: #d97706; }
+.severity_info     { color: #94a3b8; }
+
+.exceptionLink {
+  color: var(--color-text);
+  text-decoration: none;
+  flex: 1;
+}
+
+.exceptionLink:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.allGood {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #047857;
+}

@@ -1,0 +1,119 @@
+.row {
+  border: 1px solid transparent;
+  border-bottom-color: var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+}
+
+.row:hover { background: var(--color-accent-subtle); }
+
+.selected {
+  background: var(--color-accent-muted);
+}
+
+.head {
+  display: grid;
+  grid-template-columns: 1.5rem 2rem minmax(160px, 1.5fr) 80px 100px 56px 1fr 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  min-height: 32px;
+}
+
+.checkboxWrap {
+  display: flex;
+  align-items: center;
+}
+
+.checkboxWrap input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.name {
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name:hover { color: var(--color-accent); text-decoration: underline; }
+
+.team {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.counter,
+.deadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.muted { color: var(--color-text-faint); }
+
+.expand {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 0.25rem;
+  display: grid;
+  place-items: center;
+}
+
+.expand:hover { color: var(--color-text); }
+
+.expanded { background: var(--color-accent-subtle); }
+
+.peek {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 0.75rem 1rem 1rem 4.5rem;
+  border-top: 1px dashed var(--color-border-subtle);
+}
+
+.peekStat {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.peekStat strong {
+  font-size: 1.125rem;
+  color: var(--color-text);
+}
+
+.peekActions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  align-self: center;
+}
+
+.peekActions a {
+  font-size: 0.875rem;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.peekActions a:hover { text-decoration: underline; }
