@@ -223,45 +223,6 @@ export interface ActionResponse {
   status?: string;
 }
 
-export interface ImportWarning {
-  sheet: string;
-  row: number;
-  code: string;
-  message: string;
-}
-
-export interface ImportSheet {
-  name: string;
-  rows: number;
-}
-
-export interface ImportRow {
-  sheet: string;
-  row: number;
-  employeeName?: string;
-  employeeEmail?: string;
-  courseTitle?: string;
-  year?: number;
-  status: string;
-}
-
-export interface ImportDryRunResponse {
-  ok: boolean;
-  dryRun: boolean;
-  fileName: string;
-  sheets: ImportSheet[];
-  summary: {
-    parsedRows: number;
-    candidateRows: number;
-    skippedRows: number;
-    ambiguousRows: number;
-    createdEnrollments?: number;
-    updatedEnrollments?: number;
-  };
-  warnings: ImportWarning[];
-  rows: ImportRow[];
-}
-
 export interface JobRunResponse {
   ok: boolean;
   expiredEnrollments: number;

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from './client';
 import { mockWorkspace } from './mockData';
-import type { ActionResponse, ImportDryRunResponse, JobRunResponse, LookupResponse, WorkspaceResponse } from './types';
+import type { ActionResponse, JobRunResponse, LookupResponse, WorkspaceResponse } from './types';
 
 const useMocks =
   import.meta.env.DEV && import.meta.env.VITE_TRAINING_USE_MOCKS !== 'false';
@@ -349,43 +349,6 @@ export function useDownloadDocument() {
       const blob = await api.getBlob(`/training/v1/documents/${documentId}/download`);
       downloadBlob(blob, filename || 'attestato.pdf');
     },
-  });
-}
-
-export function useImportTrainingPlan(isPeopleAdmin: boolean) {
-  const api = useApiClient();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ file, commit }: { file: File; commit: boolean }): Promise<ImportDryRunResponse> => {
-      const body = new FormData();
-      body.append('file', file);
-      if (useMocks) {
-        return Promise.resolve({
-          ok: true,
-          dryRun: !commit,
-          fileName: file.name,
-          sheets: [
-            { name: 'Team ', rows: 8 },
-            { name: 'Per budget ', rows: 4 },
-          ],
-          summary: {
-            parsedRows: 12,
-            candidateRows: 10,
-            skippedRows: 2,
-            ambiguousRows: 1,
-            createdEnrollments: commit ? 6 : undefined,
-            updatedEnrollments: commit ? 4 : undefined,
-          },
-          warnings: [{ sheet: 'Team ', row: 8, code: 'employee_match_required', message: 'Manca email, serve match HR univoco' }],
-          rows: [
-            { sheet: 'Team ', row: 2, employeeName: 'Doe John', employeeEmail: 'john.doe@acme.com', courseTitle: 'Terraform Associate', year: 2026, status: 'candidate' },
-            { sheet: 'Team ', row: 8, employeeName: 'Persona da verificare', courseTitle: 'Kubernetes', year: 2026, status: 'candidate' },
-          ],
-        });
-      }
-      return api.postFormData<ImportDryRunResponse>(`/training/v1/people/imports/training-plan?commit=${commit ? 'true' : 'false'}`, body);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['training', 'workspace', isPeopleAdmin] }),
   });
 }
 

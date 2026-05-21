@@ -10,7 +10,6 @@ import {
   useCreateTrainingRequest,
   useDownloadDocument,
   useEnrollmentTransition,
-  useImportTrainingPlan,
   useRunTrainingJobs,
   useTrainingExport,
   useTrainingLookups,
@@ -32,7 +31,6 @@ import type {
   CertificationRow,
   ComplianceGapRow,
   ExpiringCertificationRow,
-  ImportDryRunResponse,
   PlanBudgetRow,
   PlanEnrollment,
   TrainingRequest,
@@ -252,9 +250,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
   });
   const [uploadAwardId, setUploadAwardId] = useState<string | null>(null);
   const [uploadEnrollmentId, setUploadEnrollmentId] = useState<string | null>(null);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importPreview, setImportPreview] = useState<ImportDryRunResponse | null>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const uploadEnrollmentInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -274,7 +269,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
   const uploadEnrollmentDocument = useUploadEnrollmentDocument(isPeopleAdmin);
   const validateDocument = useValidateDocument(isPeopleAdmin);
   const downloadDocument = useDownloadDocument();
-  const importTrainingPlan = useImportTrainingPlan(isPeopleAdmin);
   const runTrainingJobs = useRunTrainingJobs(isPeopleAdmin);
   const trainingExport = useTrainingExport();
 
@@ -786,7 +780,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
               },
             );
           }}
-          onImport={() => importInputRef.current?.click()}
           onExport={() => exportKind('plan')}
           onNew={() => setEnrollmentModalOpen(true)}
         />
@@ -922,29 +915,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
       )}
 
       <input
-        ref={importInputRef}
-        type="file"
-        accept=".xlsx"
-        hidden
-        onChange={(event) => {
-          const file = event.currentTarget.files?.[0];
-          event.currentTarget.value = '';
-          if (!file) return;
-          importTrainingPlan.mutate(
-            { file, commit: false },
-            {
-              onSuccess: (result) => {
-                setImportFile(file);
-                setImportPreview(result);
-                toast(`${result.summary.candidateRows} righe pronte, ${result.summary.ambiguousRows} da verificare`);
-              },
-              onError: (error) => toast(apiErrorMessage(error, 'Import non riuscito'), 'error'),
-            },
-          );
-        }}
-      />
-
-      <input
         ref={uploadInputRef}
         type="file"
         accept="application/pdf,.pdf"
@@ -963,94 +933,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
           );
         }}
       />
-
-      <Modal
-        open={importPreview !== null}
-        onClose={() => {
-          setImportPreview(null);
-          setImportFile(null);
-        }}
-        title={importPreview?.dryRun ? 'Verifica import' : 'Import completato'}
-        size="md"
-      >
-        <div className={styles.formStack}>
-          <p className={styles.modalText}>
-            {importPreview?.fileName}
-          </p>
-          <div className={styles.resultBar}>
-            <span>{importPreview?.summary.candidateRows ?? 0} righe pronte</span>
-            <span>{importPreview?.summary.skippedRows ?? 0} saltate</span>
-            <span>{importPreview?.summary.ambiguousRows ?? 0} da verificare</span>
-            {!importPreview?.dryRun && (
-              <>
-                <span>{importPreview?.summary.createdEnrollments ?? 0} create</span>
-                <span>{importPreview?.summary.updatedEnrollments ?? 0} aggiornate</span>
-              </>
-            )}
-          </div>
-          {(importPreview?.sheets.length ?? 0) > 0 && (
-            <ReportTable
-              headers={['Foglio', 'Righe']}
-              rows={(importPreview?.sheets ?? []).map((sheet) => [sheet.name, String(sheet.rows)])}
-            />
-          )}
-          {(importPreview?.warnings.length ?? 0) > 0 && (
-            <ReportTable
-              headers={['Foglio', 'Riga', 'Avviso']}
-              rows={(importPreview?.warnings ?? []).slice(0, 12).map((warning) => [
-                warning.sheet,
-                warning.row ? String(warning.row) : '-',
-                warning.message,
-              ])}
-            />
-          )}
-          {(importPreview?.rows.length ?? 0) > 0 && (
-            <ReportTable
-              headers={['Persona', 'Corso', 'Anno', 'Stato']}
-              rows={(importPreview?.rows ?? []).slice(0, 8).map((row) => [
-                row.employeeName || row.employeeEmail || '-',
-                row.courseTitle || '-',
-                row.year ? String(row.year) : '-',
-                label(row.status),
-              ])}
-            />
-          )}
-          <div className={styles.modalActions}>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setImportPreview(null);
-                setImportFile(null);
-              }}
-            >
-              Chiudi
-            </Button>
-            {importPreview?.dryRun && (
-              <Button
-                type="button"
-                disabled={!importFile || importTrainingPlan.isPending || importPreview.summary.candidateRows === 0}
-                onClick={() => {
-                  if (!importFile) return;
-                  importTrainingPlan.mutate(
-                    { file: importFile, commit: true },
-                    {
-                      onSuccess: (result) => {
-                        setImportPreview(result);
-                        setImportFile(null);
-                        toast(`${result.summary.createdEnrollments ?? 0} iscrizioni create, ${result.summary.updatedEnrollments ?? 0} aggiornate`);
-                      },
-                      onError: (error) => toast(apiErrorMessage(error, 'Conferma import non riuscita'), 'error'),
-                    },
-                  );
-                }}
-              >
-                Conferma import
-              </Button>
-            )}
-          </div>
-        </div>
-      </Modal>
 
       <input
         ref={uploadEnrollmentInputRef}
@@ -2026,7 +1908,6 @@ function PlanView({
   onValidateDocument,
   onUploadDocument,
   onTransition,
-  onImport,
   onExport,
   onNew,
 }: {
@@ -2049,7 +1930,6 @@ function PlanView({
   onValidateDocument: (documentId: string) => void;
   onUploadDocument: (enrollmentId: string) => void;
   onTransition: (id: string, transition: string) => void;
-  onImport: () => void;
   onExport: () => void;
   onNew: () => void;
 }) {
@@ -2070,14 +1950,9 @@ function PlanView({
         <SingleSelect options={teams} selected={team || null} onChange={onTeam} placeholder="Team" allowClear />
         <SingleSelect options={statuses} selected={status || null} onChange={onStatus} placeholder="Stato" allowClear />
         {isPeopleAdmin && (
-          <>
-            <Button variant="secondary" leftIcon={<Icon name="file-up" size={16} />} disabled={!actionsEnabled} onClick={onImport}>
-              Importa XLSX
-            </Button>
-            <Button variant="secondary" leftIcon={<Icon name="plus" size={16} />} disabled={!actionsEnabled} onClick={onNew}>
-              Nuova iscrizione
-            </Button>
-          </>
+          <Button variant="secondary" leftIcon={<Icon name="plus" size={16} />} disabled={!actionsEnabled} onClick={onNew}>
+            Nuova iscrizione
+          </Button>
         )}
         <Button variant="secondary" leftIcon={<Icon name="download" size={16} />} disabled={!actionsEnabled} onClick={onExport}>
           Esporta XLSX
