@@ -46,6 +46,8 @@ export function classifyAlertLevel(enrollment: PlanEnrollment, options: Classify
   }
 
   if (status === 'proposed') {
+    if (plannedStart && daysBetween(now, plannedStart) > 0) return 'critical';
+    if (plannedStart && daysBetween(plannedStart, now) <= 7) return 'warning';
     if (enrollment.mandatory) return 'warning';
     return 'info';
   }

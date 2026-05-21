@@ -1,6 +1,8 @@
 import { Icon } from '@mrsmith/ui';
 import type { PlanEnrollment } from '../../api/types';
 import { ALERT_LEVEL_LABEL, classifyAlertLevel, type AlertLevel } from '../../lib/alertLevel';
+import { formatBudget } from '../../lib/formatBudget';
+import { formatTeamLabel, type TeamLabelMap } from '../../lib/teamLabels';
 import styles from './PipelineCard.module.css';
 
 interface PipelineCardProps {
@@ -8,46 +10,50 @@ interface PipelineCardProps {
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
+  teamLabels: TeamLabelMap;
   now?: Date;
 }
 
-const STATUS_VERB: Record<string, string> = {
-  proposed: 'Approva',
-  approved: 'Avvia',
-  in_progress: 'Chiudi',
-  completed: 'Rivedi',
-  failed: 'Riapri',
-  cancelled: 'Riapri',
-  expired: 'Riapri',
-};
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function formatProposalAge(enrollment: PlanEnrollment, now: Date): string | null {
+interface DelayInfo {
+  text: string;
+  isPast: boolean;
+}
+
+function formatDelay(enrollment: PlanEnrollment, now: Date): DelayInfo | null {
   const ref = enrollment.plannedStart ?? enrollment.plannedEnd;
   if (!ref) return null;
   const stamped = ref.length > 10 ? ref : `${ref}T00:00:00`;
   const date = new Date(stamped);
   if (!Number.isFinite(date.getTime())) return null;
   const diff = Math.floor((date.getTime() - now.getTime()) / DAY_MS);
-  if (diff >= 0) return `inizio in ${diff}gg`;
-  return `${-diff}gg di ritardo`;
-}
-
-function formatMoney(value: number | undefined): string | undefined {
-  if (value === undefined) return undefined;
-  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
+  if (diff >= 0) return { text: `in ${diff}gg`, isPast: false };
+  return { text: `${-diff}gg in ritardo`, isPast: true };
 }
 
 function alertClass(level: AlertLevel) {
   return styles[`alert_${level}`] ?? '';
 }
 
-export function PipelineCard({ enrollment, selected, onToggle, onOpen, now = new Date() }: PipelineCardProps) {
+function delayClass(level: AlertLevel, isPast: boolean) {
+  if (level === 'critical' && isPast) return styles.delayCritical;
+  if (level === 'warning') return styles.delayWarning;
+  return styles.delayMuted;
+}
+
+export function PipelineCard({
+  enrollment,
+  selected,
+  onToggle,
+  onOpen,
+  teamLabels,
+  now = new Date(),
+}: PipelineCardProps) {
   const level = classifyAlertLevel(enrollment, { now });
-  const verb = STATUS_VERB[enrollment.status] ?? 'Apri';
-  const proposalAge = formatProposalAge(enrollment, now);
-  const budget = formatMoney(enrollment.costPlanned);
+  const delay = formatDelay(enrollment, now);
+  const budget = formatBudget(enrollment.costPlanned);
+  const teamLabel = formatTeamLabel(enrollment.teamCode, teamLabels);
 
   function handleKeyDown(event: React.KeyboardEvent) {
     if (event.key === 'Enter') {
@@ -61,30 +67,49 @@ export function PipelineCard({ enrollment, selected, onToggle, onOpen, now = new
   }
 
   return (
-    <article className={`${styles.card} ${selected ? styles.selected : ''}`} tabIndex={0} onKeyDown={handleKeyDown}>
+    <article
+      className={`${styles.card} ${selected ? styles.selected : ''}`}
+      tabIndex={0}
+      role="button"
+      aria-label={`Apri ${enrollment.courseTitle}`}
+      onClick={onOpen}
+      onKeyDown={handleKeyDown}
+    >
       <label className={styles.checkboxWrap} onClick={(e) => e.stopPropagation()}>
         <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Seleziona ${enrollment.courseTitle}`} />
       </label>
-      <button type="button" className={styles.body} onClick={onOpen}>
+      <span
+        className={`${styles.alertBadge} ${alertClass(level)}`}
+        title={ALERT_LEVEL_LABEL[level]}
+        aria-label={ALERT_LEVEL_LABEL[level]}
+      >
+        ●
+      </span>
+      <div className={styles.body}>
         <div className={styles.headline}>
-          <span className={`${styles.alertBadge} ${alertClass(level)}`} title={ALERT_LEVEL_LABEL[level]} aria-label={ALERT_LEVEL_LABEL[level]}>
-            ●
-          </span>
-          <strong className={styles.verb}>{verb}</strong>
           <span className={styles.title}>{enrollment.courseTitle}</span>
           <span className={styles.separator}>·</span>
           <span className={styles.person}>{enrollment.employeeName}</span>
-          {enrollment.teamCode && <span className={styles.team}>{enrollment.teamCode}</span>}
+          {teamLabel && <span className={styles.team}>{teamLabel}</span>}
           {enrollment.mandatory && <span className={styles.tag}>Obbligatoria</span>}
-          <Icon name="chevron-right" size={14} className={styles.chev} />
         </div>
-        <div className={styles.context}>
-          {proposalAge && <span>{proposalAge}</span>}
-          {budget && <span>{budget}</span>}
-          {enrollment.hoursPlanned !== undefined && <span>{enrollment.hoursPlanned}h</span>}
-          {enrollment.vendorName && <span>{enrollment.vendorName}</span>}
-        </div>
-      </button>
+        {(enrollment.vendorName || enrollment.hoursPlanned !== undefined) && (
+          <div className={styles.subline}>
+            {enrollment.vendorName && <span>{enrollment.vendorName}</span>}
+            {enrollment.hoursPlanned !== undefined && (
+              <>
+                {enrollment.vendorName && <span className={styles.dotSep}>·</span>}
+                <span>{enrollment.hoursPlanned}h</span>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      <div className={styles.meta}>
+        {delay && <span className={`${styles.delay} ${delayClass(level, delay.isPast)}`}>{delay.text}</span>}
+        {budget && <span className={styles.budget}>{budget}</span>}
+      </div>
+      <Icon name="chevron-right" size={14} className={styles.chev} />
     </article>
   );
 }

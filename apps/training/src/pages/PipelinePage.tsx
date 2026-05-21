@@ -1,20 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Modal, SearchInput, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Modal, SearchInput, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import { useBulkEnrollmentTransition, useTrainingWorkspace } from '../api/queries';
 import type { BulkTargetState, PlanEnrollment } from '../api/types';
 import { BulkActionBar } from '../components/BulkActionBar';
 import { EnrollmentDrawer } from '../components/EnrollmentDrawer';
 import { PipelineCard } from '../components/PipelineCard';
-import { classifyAlertLevel } from '../lib/alertLevel';
+import { formatBudget } from '../lib/formatBudget';
 import { priorityScore } from '../lib/priorityScore';
 import {
-  TEMPORAL_BUCKET_LABEL,
-  TEMPORAL_BUCKET_ORDER,
-  bucketForEnrollment,
-  type TemporalBucket,
-} from '../lib/temporalGrouping';
+  SEVERITY_BUCKET_DESCRIPTION,
+  SEVERITY_BUCKET_LABEL,
+  SEVERITY_BUCKET_ORDER,
+  groupBySeverity,
+  type SeverityBucket,
+} from '../lib/severityGrouping';
+import { buildTeamLabelMap } from '../lib/teamLabels';
 import styles from './PipelinePage.module.css';
 
 interface PipelinePageProps {
@@ -33,9 +35,10 @@ const CHIP_PRESETS: Array<{ value: string; label: string; status?: string }> = [
   { value: 'in_progress', label: 'In corso', status: 'in_progress' },
 ];
 
-const RITARDO_OPTIONS = [
+const RITARDO_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '', label: 'Qualsiasi' },
   { value: '>0', label: 'In ritardo' },
-  { value: '>30', label: 'In ritardo > 30gg' },
+  { value: '>30', label: '> 30 giorni' },
 ];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -61,8 +64,16 @@ function delayDays(enrollment: PlanEnrollment, now: Date): number {
   return Math.floor((now.getTime() - planned.getTime()) / DAY_MS);
 }
 
-function isAccessDenied(): boolean {
-  return false;
+function buildYearOptions(enrollments: PlanEnrollment[]): Array<{ value: string; label: string }> {
+  const years = new Set<number>();
+  const current = new Date().getFullYear();
+  years.add(current - 1);
+  years.add(current);
+  years.add(current + 1);
+  for (const e of enrollments) if (Number.isFinite(e.year)) years.add(e.year);
+  return Array.from(years)
+    .sort((a, b) => b - a)
+    .map((y) => ({ value: String(y), label: String(y) }));
 }
 
 export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
@@ -73,10 +84,11 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
   const [pendingBulk, setPendingBulk] = useState<PendingBulk | null>(null);
+  const [collapsedBuckets, setCollapsedBuckets] = useState<Set<SeverityBucket>>(new Set(['info']));
 
   const now = useMemo(() => new Date(), []);
 
-  if (!isPeopleAdmin || isAccessDenied()) {
+  if (!isPeopleAdmin) {
     return (
       <main className={styles.page}>
         <p className={styles.accessDenied}>Accesso riservato al team People.</p>
@@ -84,12 +96,11 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
     );
   }
 
-  const queryString = params;
-  const q = queryString.get('q') ?? '';
-  const teamFilter = queryString.get('team') ?? '';
-  const yearFilter = queryString.get('year') ?? String(new Date().getFullYear());
-  const statoFilter = queryString.get('stato') ?? 'tutti';
-  const ritardoFilter = queryString.get('ritardo_gg') ?? '';
+  const q = params.get('q') ?? '';
+  const teamFilter = params.get('team') ?? '';
+  const yearFilter = params.get('year') ?? String(new Date().getFullYear());
+  const statoFilter = params.get('stato') ?? 'tutti';
+  const ritardoFilter = params.get('ritardo_gg') ?? '';
 
   function updateParam(key: string, value: string | null) {
     setParams((previous) => {
@@ -101,6 +112,13 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
   }
 
   const allEnrollments = workspace.data?.plan ?? [];
+  const teams = workspace.data?.masterData?.teams ?? [];
+  const teamLabels = useMemo(() => buildTeamLabelMap(teams), [teams]);
+  const teamOptions = useMemo(
+    () => teams.map((t) => ({ value: t.code, label: t.name || t.code })),
+    [teams],
+  );
+  const yearOptions = useMemo(() => buildYearOptions(allEnrollments), [allEnrollments]);
 
   const filtered = useMemo(() => {
     return allEnrollments
@@ -126,15 +144,20 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
       .sort((a, b) => priorityScore(b, { now }) - priorityScore(a, { now }));
   }, [allEnrollments, yearFilter, teamFilter, statoFilter, ritardoFilter, q, now]);
 
-  const grouped = useMemo(() => {
-    const map = new Map<TemporalBucket, PlanEnrollment[]>();
-    for (const bucket of TEMPORAL_BUCKET_ORDER) map.set(bucket, []);
-    for (const enrollment of filtered) {
-      const bucket = bucketForEnrollment(enrollment, now);
-      map.get(bucket)!.push(enrollment);
-    }
-    return map;
-  }, [filtered, now]);
+  const grouped = useMemo(() => groupBySeverity(filtered, now), [filtered, now]);
+
+  useEffect(() => {
+    const nonEmpty = SEVERITY_BUCKET_ORDER.filter((b) => (grouped.get(b)?.length ?? 0) > 0);
+    if (nonEmpty.length !== 1) return;
+    const only = nonEmpty[0];
+    if (!only) return;
+    setCollapsedBuckets((prev) => {
+      if (!prev.has(only)) return prev;
+      const next = new Set(prev);
+      next.delete(only);
+      return next;
+    });
+  }, [grouped]);
 
   const selectedEnrollments = useMemo(() => filtered.filter((e) => selectedIds.has(e.id)), [filtered, selectedIds]);
   const selectedBudget = useMemo(
@@ -147,6 +170,10 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
     [allEnrollments, openId],
   );
 
+  const criticalCount = grouped.get('critical')?.length ?? 0;
+  const warningCount = grouped.get('warning')?.length ?? 0;
+  const attentionCount = criticalCount + warningCount;
+
   function toggleSelection(id: string) {
     setSelectedIds((previous) => {
       const next = new Set(previous);
@@ -158,6 +185,15 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
 
   function clearSelection() {
     setSelectedIds(new Set());
+  }
+
+  function toggleBucket(bucket: SeverityBucket) {
+    setCollapsedBuckets((previous) => {
+      const next = new Set(previous);
+      if (next.has(bucket)) next.delete(bucket);
+      else next.add(bucket);
+      return next;
+    });
   }
 
   function performBulk(target: BulkTargetState, label: string) {
@@ -184,8 +220,6 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
     );
   }
 
-  const ritardoBanner = ritardoFilter ? RITARDO_OPTIONS.find((o) => o.value === ritardoFilter)?.label : null;
-
   if (workspace.isLoading) {
     return (
       <main className={styles.page}>
@@ -199,42 +233,64 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <div>
-          <h1>Pipeline</h1>
-          <p className={styles.subtitle}>Inbox unificata: cose da approvare, avviare, chiudere.</p>
-        </div>
-        <SearchInput value={q} onChange={(value) => updateParam('q', value)} placeholder="Cerca persone o corsi" />
+        <h1>Pipeline</h1>
+        {attentionCount > 0 && (
+          <span className={styles.attention}>
+            <span className={styles.attentionDot} aria-hidden="true">●</span>
+            {attentionCount} {attentionCount === 1 ? 'richiede attenzione' : 'richiedono attenzione'}
+          </span>
+        )}
       </header>
 
-      <div className={styles.filters}>
-        <div className={styles.chips}>
-          {CHIP_PRESETS.map((preset) => (
-            <button
-              key={preset.value}
-              type="button"
-              className={`${styles.chip} ${statoFilter === preset.value ? styles.chipActive : ''}`}
-              onClick={() => updateParam('stato', preset.value === 'tutti' ? null : preset.value)}
-            >
-              {preset.label}
-            </button>
-          ))}
-          {RITARDO_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`${styles.chip} ${ritardoFilter === option.value ? styles.chipActive : ''}`}
-              onClick={() => updateParam('ritardo_gg', ritardoFilter === option.value ? null : option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        {ritardoBanner && (
-          <div className={styles.banner}>
-            <span>Filtro: {ritardoBanner}</span>
-            <button type="button" onClick={() => updateParam('ritardo_gg', null)}>Rimuovi</button>
+      <div className={styles.toolbar}>
+        <div className={styles.toolbarLeft}>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Anno</span>
+            <SingleSelect
+              options={yearOptions}
+              selected={yearFilter}
+              onChange={(value) => updateParam('year', value ? String(value) : null)}
+              placeholder="Anno"
+            />
           </div>
-        )}
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Team</span>
+            <SingleSelect
+              options={teamOptions}
+              selected={teamFilter || null}
+              onChange={(value) => updateParam('team', value ? String(value) : null)}
+              placeholder="Tutti"
+              allowClear
+              clearLabel="Tutti"
+            />
+          </div>
+          <div className={styles.chips} role="tablist" aria-label="Filtra per stato">
+            {CHIP_PRESETS.map((preset) => (
+              <button
+                key={preset.value}
+                type="button"
+                role="tab"
+                aria-selected={statoFilter === preset.value}
+                className={`${styles.chip} ${statoFilter === preset.value ? styles.chipActive : ''}`}
+                onClick={() => updateParam('stato', preset.value === 'tutti' ? null : preset.value)}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Ritardo</span>
+            <SingleSelect
+              options={RITARDO_OPTIONS}
+              selected={ritardoFilter || ''}
+              onChange={(value) => updateParam('ritardo_gg', value ? String(value) : null)}
+              placeholder="Qualsiasi"
+            />
+          </div>
+        </div>
+        <div className={styles.searchWrap}>
+          <SearchInput value={q} onChange={(value) => updateParam('q', value)} placeholder="Cerca persone o corsi" />
+        </div>
       </div>
 
       {totalFiltered === 0 ? (
@@ -244,30 +300,43 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
         </div>
       ) : (
         <div className={styles.groups}>
-          {TEMPORAL_BUCKET_ORDER.map((bucket) => {
+          {SEVERITY_BUCKET_ORDER.map((bucket) => {
             const rows = grouped.get(bucket) ?? [];
             if (rows.length === 0) return null;
-            const criticals = rows.filter((r) => classifyAlertLevel(r, { now }) === 'critical').length;
+            const isCollapsed = collapsedBuckets.has(bucket);
+            const bucketBudget = rows.reduce((sum, r) => sum + (r.costPlanned ?? 0), 0);
             return (
-              <section key={bucket} className={styles.group}>
-                <header className={styles.groupHead}>
-                  <h2>{TEMPORAL_BUCKET_LABEL[bucket]}</h2>
-                  <span className={styles.count}>
-                    {rows.length} iscrizioni{criticals > 0 ? ` · ${criticals} critiche` : ''}
-                  </span>
-                </header>
-                <div className={styles.cardList}>
-                  {rows.map((enrollment) => (
-                    <PipelineCard
-                      key={enrollment.id}
-                      enrollment={enrollment}
-                      selected={selectedIds.has(enrollment.id)}
-                      onToggle={() => toggleSelection(enrollment.id)}
-                      onOpen={() => setOpenId(enrollment.id)}
-                      now={now}
-                    />
-                  ))}
-                </div>
+              <section key={bucket} className={`${styles.group} ${styles[`group_${bucket}`] ?? ''}`}>
+                <button
+                  type="button"
+                  className={styles.groupHead}
+                  onClick={() => toggleBucket(bucket)}
+                  aria-expanded={!isCollapsed}
+                >
+                  <span className={`${styles.groupDot} ${styles[`dot_${bucket}`] ?? ''}`} aria-hidden="true">●</span>
+                  <span className={styles.groupTitle}>{SEVERITY_BUCKET_LABEL[bucket]}</span>
+                  <span className={styles.groupCount}>{rows.length}</span>
+                  <span className={styles.groupDescription}>{SEVERITY_BUCKET_DESCRIPTION[bucket]}</span>
+                  {bucketBudget > 0 && (
+                    <span className={styles.groupBudget}>{formatBudget(bucketBudget)}</span>
+                  )}
+                  <span className={`${styles.chevron} ${isCollapsed ? '' : styles.chevronOpen}`} aria-hidden="true">▾</span>
+                </button>
+                {!isCollapsed && (
+                  <div className={styles.cardList}>
+                    {rows.map((enrollment) => (
+                      <PipelineCard
+                        key={enrollment.id}
+                        enrollment={enrollment}
+                        selected={selectedIds.has(enrollment.id)}
+                        onToggle={() => toggleSelection(enrollment.id)}
+                        onOpen={() => setOpenId(enrollment.id)}
+                        teamLabels={teamLabels}
+                        now={now}
+                      />
+                    ))}
+                  </div>
+                )}
               </section>
             );
           })}
@@ -277,7 +346,7 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
       <BulkActionBar
         selectedCount={selectedIds.size}
         onClear={clearSelection}
-        summary={selectedBudget > 0 ? `Budget impatto ${new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(selectedBudget)}` : undefined}
+        summary={selectedBudget > 0 ? `Budget impatto ${formatBudget(selectedBudget)}` : undefined}
       >
         <Button variant="primary" size="sm" disabled={bulkTransition.isPending} onClick={() => performBulk('approved', 'Approva selezionati')}>
           Approva selezionati
@@ -294,7 +363,7 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
         <div className={styles.modalBody}>
           <p>
             Confermi <strong>{pendingBulk?.label.toLowerCase()}</strong> per {selectedIds.size} iscrizioni
-            {selectedBudget > 0 ? ` (impatto budget ${new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(selectedBudget)})` : ''}?
+            {selectedBudget > 0 ? ` (impatto budget ${formatBudget(selectedBudget)})` : ''}?
           </p>
           <div className={styles.modalActions}>
             <Button variant="secondary" onClick={() => setPendingBulk(null)}>Annulla</Button>

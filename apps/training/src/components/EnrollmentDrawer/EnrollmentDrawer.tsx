@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '@mrsmith/api-client';
 import { Button, Drawer, Icon, useToast } from '@mrsmith/ui';
 import {
@@ -10,6 +10,14 @@ import {
 } from '../../api/queries';
 import type { PlanEnrollment } from '../../api/types';
 import { classifyAlertLevel } from '../../lib/alertLevel';
+import {
+  costPerHour,
+  durationDays,
+  formatEuro2,
+  formatEuroCompact,
+  isDirty as draftIsDirty,
+  type EnrollmentDraft,
+} from '../../lib/enrollmentDerived';
 import styles from './EnrollmentDrawer.module.css';
 
 interface EnrollmentDrawerProps {
@@ -28,13 +36,26 @@ const STATUS_LABELS: Record<string, string> = {
   expired: 'Scaduta',
 };
 
+const STATUS_CLASS: Record<string, string | undefined> = {
+  proposed: styles.status_proposed,
+  approved: styles.status_approved,
+  in_progress: styles.status_in_progress,
+  completed: styles.status_completed,
+  failed: styles.status_failed,
+  cancelled: styles.status_cancelled,
+  expired: styles.status_expired,
+};
+
 const ALERT_LABEL: Record<string, string> = {
   critical: 'Critico',
   warning: 'Attenzione',
   info: 'Info',
 };
 
-const emptyDraft = {
+const LEVEL_OPTIONS = [0, 1, 2, 3, 4, 5];
+const PRIORITY_OPTIONS = [1, 2, 3, 4, 5];
+
+const emptyDraft: EnrollmentDraft = {
   priority: '',
   levelAsIs: '',
   levelToBe: '',
@@ -61,6 +82,15 @@ function optionalNumber(value: string): number | undefined {
 function formatDateValue(value: string | undefined): string {
   if (!value) return '';
   return value.slice(0, 10);
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  const first = parts[0] ?? '';
+  if (parts.length === 1) return first.slice(0, 2).toUpperCase() || '?';
+  const last = parts[parts.length - 1] ?? '';
+  return ((first[0] ?? '') + (last[0] ?? '')).toUpperCase() || '?';
 }
 
 function apiErrorMessage(error: unknown, fallback: string): string {
@@ -114,9 +144,48 @@ function transitionsFor(enrollment: PlanEnrollment, isPeopleAdmin: boolean): Tra
   }
 }
 
+interface SegmentedProps {
+  options: number[];
+  value: string;
+  onChange: (next: string) => void;
+  readOnly?: boolean;
+  ariaLabel: string;
+}
+
+function Segmented({ options, value, onChange, readOnly, ariaLabel }: SegmentedProps) {
+  const selected = value.trim() === '' ? null : Number(value);
+  return (
+    <div
+      className={`${styles.segmented} ${readOnly ? styles.segmentedReadonly : ''}`}
+      role="radiogroup"
+      aria-label={ariaLabel}
+    >
+      {options.map((opt) => {
+        const active = selected === opt;
+        return (
+          <button
+            key={opt}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            disabled={readOnly}
+            className={`${styles.segmentedBtn} ${active ? styles.segmentedActive : ''}`}
+            onClick={() => {
+              if (readOnly) return;
+              onChange(active ? '' : String(opt));
+            }}
+          >
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: EnrollmentDrawerProps) {
   const { toast } = useToast();
-  const [draft, setDraft] = useState(emptyDraft);
+  const [draft, setDraft] = useState<EnrollmentDraft>(emptyDraft);
   const [reasonRequest, setReasonRequest] = useState<TransitionDef | null>(null);
   const [reason, setReason] = useState('');
 
@@ -144,6 +213,8 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
     setReason('');
   }, [enrollment]);
 
+  const dirty = useMemo(() => (enrollment ? draftIsDirty(draft, enrollment) : false), [draft, enrollment]);
+
   if (!enrollment) {
     return <Drawer open={false} onClose={onClose} size="lg">{null}</Drawer>;
   }
@@ -152,7 +223,11 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
   const transitions = transitionsFor(enrollment, isPeopleAdmin);
   const primaryTransition = transitions.find((t) => t.primary);
   const secondaryTransitions = transitions.filter((t) => !t.primary);
-  const requiresReason = (t: TransitionDef) => t.transition === 'revert_to_proposed' || t.transition === 'reopen' || t.transition === 'cancel';
+  const requiresReason = (t: TransitionDef) =>
+    t.transition === 'revert_to_proposed' || t.transition === 'reopen' || t.transition === 'cancel';
+
+  const days = durationDays(draft.plannedStart, draft.plannedEnd);
+  const perHour = costPerHour(draft.costPlanned, draft.hoursPlanned);
 
   function runTransition(t: TransitionDef, reasonText?: string) {
     if (!enrollment) return;
@@ -178,8 +253,8 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
     runTransition(t);
   }
 
-  function handleSave(event: React.FormEvent) {
-    event.preventDefault();
+  function handleSave(event?: React.FormEvent | React.MouseEvent) {
+    event?.preventDefault();
     if (!enrollment) return;
     update.mutate(
       {
@@ -234,6 +309,20 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
   }
 
   const pending = transition.isPending || update.isPending || uploadDoc.isPending || validateDoc.isPending;
+  const statusLabel = STATUS_LABELS[enrollment.status] ?? enrollment.status;
+  const statusClass = STATUS_CLASS[enrollment.status] ?? '';
+
+  const subtitle = (
+    <div className={styles.subtitle}>
+      <span className={styles.subtitleAvatar} aria-hidden>{initials(enrollment.employeeName)}</span>
+      <span className={styles.subtitleName}>{enrollment.employeeName}</span>
+      <span className={styles.subtitleEmail}>{enrollment.employeeEmail}</span>
+    </div>
+  );
+
+  const headerExtra = (
+    <span className={`${styles.statusPill} ${statusClass}`}>{statusLabel}</span>
+  );
 
   return (
     <Drawer
@@ -241,11 +330,15 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
       onClose={onClose}
       size="lg"
       title={enrollment.courseTitle}
-      subtitle={`${enrollment.employeeName} · ${enrollment.employeeEmail}`}
+      subtitle={subtitle}
+      headerExtra={headerExtra}
       footer={
         <div className={styles.footer}>
+          {isPeopleAdmin && dirty && (
+            <span className={styles.footerLeft}>Modifiche non salvate</span>
+          )}
           {isPeopleAdmin && (
-            <Button variant="secondary" onClick={handleSave} disabled={pending}>
+            <Button variant="secondary" onClick={handleSave} disabled={pending || !dirty}>
               Salva modifiche
             </Button>
           )}
@@ -262,169 +355,32 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
       }
     >
       <div className={styles.body}>
-        <section className={styles.summary}>
-          <div className={`${styles.alertBadge} ${styles[`alert_${alertLevel}`]}`}>
-            <span className={styles.alertDot} aria-hidden /> {ALERT_LABEL[alertLevel]}
-          </div>
-          <dl className={styles.meta}>
-            <div>
-              <dt>Stato</dt>
-              <dd>{STATUS_LABELS[enrollment.status] ?? enrollment.status}</dd>
-            </div>
-            <div>
-              <dt>Anno</dt>
-              <dd>{enrollment.year}</dd>
-            </div>
-            {enrollment.teamCode && (
-              <div>
-                <dt>Team</dt>
-                <dd>{enrollment.teamCode}</dd>
-              </div>
-            )}
-            {enrollment.vendorName && (
-              <div>
-                <dt>Fornitore</dt>
-                <dd>{enrollment.vendorName}</dd>
-              </div>
-            )}
-            {enrollment.skillAreaName && (
-              <div>
-                <dt>Area</dt>
-                <dd>{enrollment.skillAreaName}</dd>
-              </div>
-            )}
-            {enrollment.mandatory && (
-              <div>
-                <dt>Tipo</dt>
-                <dd>Obbligatoria</dd>
-              </div>
-            )}
-          </dl>
-        </section>
-
-        {isPeopleAdmin && (
-          <section className={styles.section}>
-            <h3>Pianificazione</h3>
-            <div className={styles.grid}>
-              <label>
-                <span>Priorità</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={draft.priority}
-                  onChange={(e) => setDraft((d) => ({ ...d, priority: e.target.value }))}
-                />
-              </label>
-              <label>
-                <span>Ore pianificate</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={draft.hoursPlanned}
-                  onChange={(e) => setDraft((d) => ({ ...d, hoursPlanned: e.target.value }))}
-                />
-              </label>
-              <label>
-                <span>Costo</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={draft.costPlanned}
-                  onChange={(e) => setDraft((d) => ({ ...d, costPlanned: e.target.value }))}
-                />
-              </label>
-              <label>
-                <span>Livello attuale</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={draft.levelAsIs}
-                  onChange={(e) => setDraft((d) => ({ ...d, levelAsIs: e.target.value }))}
-                />
-              </label>
-              <label>
-                <span>Livello obiettivo</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={draft.levelToBe}
-                  onChange={(e) => setDraft((d) => ({ ...d, levelToBe: e.target.value }))}
-                />
-              </label>
-              <label>
-                <span>Inizio</span>
-                <input
-                  type="date"
-                  value={draft.plannedStart}
-                  onChange={(e) => setDraft((d) => ({ ...d, plannedStart: e.target.value }))}
-                />
-              </label>
-              <label>
-                <span>Fine</span>
-                <input
-                  type="date"
-                  value={draft.plannedEnd}
-                  onChange={(e) => setDraft((d) => ({ ...d, plannedEnd: e.target.value }))}
-                />
-              </label>
-            </div>
-            <div className={styles.textStack}>
-              <label>
-                <span>Motivazione</span>
-                <textarea
-                  value={draft.motivation}
-                  onChange={(e) => setDraft((d) => ({ ...d, motivation: e.target.value }))}
-                />
-              </label>
-              <label>
-                <span>Obiettivo</span>
-                <textarea
-                  value={draft.objective}
-                  onChange={(e) => setDraft((d) => ({ ...d, objective: e.target.value }))}
-                />
-              </label>
-              <label>
-                <span>Note</span>
-                <textarea
-                  value={draft.notes}
-                  onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
-                />
-              </label>
-            </div>
-          </section>
-        )}
-
-        <section className={styles.section}>
-          <h3>Documento</h3>
-          {enrollment.documentFilename ? (
-            <div className={styles.docRow}>
-              <strong>{enrollment.documentFilename}</strong>
-              <span className={styles.docBadge}>{enrollment.documentValidated ? 'Validato' : 'Da validare'}</span>
-              <div className={styles.docActions}>
-                <Button variant="ghost" size="sm" leftIcon={<Icon name="download" size={14} />} disabled={pending} onClick={handleDownload}>
-                  Scarica
-                </Button>
-                {isPeopleAdmin && !enrollment.documentValidated && (
-                  <Button variant="ghost" size="sm" disabled={pending} onClick={handleValidate}>
-                    Valida
-                  </Button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <p className={styles.muted}>Nessun documento caricato.</p>
+        {/* Meta chips — anno / team / area / tipo + alert */}
+        <div className={styles.metaChips}>
+          <span className={styles.chip}><span className={styles.chipKey}>Anno</span> {enrollment.year}</span>
+          {enrollment.teamCode && (
+            <span className={styles.chip}><span className={styles.chipKey}>Team</span> {enrollment.teamCode}</span>
           )}
-          <label className={styles.upload}>
-            <span>Carica documento (PDF)</span>
-            <input type="file" accept="application/pdf,.pdf" onChange={handleUpload} disabled={pending} />
-          </label>
-        </section>
+          {enrollment.skillAreaName && (
+            <span className={styles.chip}><span className={styles.chipKey}>Area</span> {enrollment.skillAreaName}</span>
+          )}
+          {enrollment.mandatory && (
+            <span className={`${styles.chip} ${styles.chipMandatory}`}>Obbligatoria</span>
+          )}
+          <span className={`${styles.alertChip} ${styles[`alert_${alertLevel}`]}`}>
+            {ALERT_LABEL[alertLevel]}
+          </span>
+        </div>
 
-        {secondaryTransitions.length > 0 && (
-          <section className={styles.section}>
-            <h3>Altre azioni</h3>
-            <div className={styles.actionsRow}>
+        {/* Sticky action ribbon */}
+        {(primaryTransition || secondaryTransitions.length > 0) && (
+          <div className={styles.ribbon}>
+            <span className={styles.ribbonHint}>
+              {enrollment.status === 'proposed' && 'Decidi se approvare o annullare la proposta.'}
+              {enrollment.status === 'approved' && 'Quando il corso parte, avvialo per registrare le ore.'}
+              {enrollment.status === 'in_progress' && 'Completa quando il corso è terminato.'}
+            </span>
+            <div className={styles.ribbonActions}>
               {secondaryTransitions.map((t) => (
                 <Button
                   key={t.transition}
@@ -436,13 +392,234 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
                   {t.label}
                 </Button>
               ))}
+              {primaryTransition && (
+                <Button
+                  variant={primaryTransition.variant ?? 'primary'}
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => handleTransitionClick(primaryTransition)}
+                >
+                  {primaryTransition.label}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Card 1: Sintesi formativa */}
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h3 className={styles.cardTitle}>Sintesi formativa</h3>
+            {enrollment.vendorName && (
+              <span className={styles.cardHint}>Fornitore · <strong>{enrollment.vendorName}</strong></span>
+            )}
+          </div>
+
+          {/* Competence delta */}
+          <div className={styles.competence}>
+            <div className={styles.competenceLabel}>
+              Gap di competenza{enrollment.skillAreaName && (
+                <> su <span className={styles.competenceArea}>{enrollment.skillAreaName}</span></>
+              )}
+            </div>
+            <div className={styles.levelRow}>
+              <div className={styles.levelGroup}>
+                <span className={styles.levelGroupLabel}>Livello attuale</span>
+                <Segmented
+                  options={LEVEL_OPTIONS}
+                  value={draft.levelAsIs}
+                  onChange={(v) => setDraft((d) => ({ ...d, levelAsIs: v }))}
+                  readOnly={!isPeopleAdmin}
+                  ariaLabel="Livello attuale"
+                />
+              </div>
+              <span className={styles.levelArrow} aria-hidden>→</span>
+              <div className={styles.levelGroup}>
+                <span className={styles.levelGroupLabel}>Livello obiettivo</span>
+                <Segmented
+                  options={LEVEL_OPTIONS}
+                  value={draft.levelToBe}
+                  onChange={(v) => setDraft((d) => ({ ...d, levelToBe: v }))}
+                  readOnly={!isPeopleAdmin}
+                  ariaLabel="Livello obiettivo"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Motivazione + Obiettivo */}
+          {(isPeopleAdmin || draft.motivation || draft.objective) && (
+            <div className={styles.editorialStack}>
+              {(isPeopleAdmin || draft.motivation) && (
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Motivazione</span>
+                  <textarea
+                    className={styles.textarea}
+                    readOnly={!isPeopleAdmin}
+                    value={draft.motivation}
+                    placeholder={isPeopleAdmin ? 'Perché questa iscrizione è necessaria?' : ''}
+                    onChange={(e) => setDraft((d) => ({ ...d, motivation: e.target.value }))}
+                  />
+                </label>
+              )}
+              {(isPeopleAdmin || draft.objective) && (
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Obiettivo</span>
+                  <textarea
+                    className={`${styles.textarea} ${styles.textareaLg}`}
+                    readOnly={!isPeopleAdmin}
+                    value={draft.objective}
+                    placeholder={isPeopleAdmin ? 'Cosa la persona saprà fare al termine?' : ''}
+                    onChange={(e) => setDraft((d) => ({ ...d, objective: e.target.value }))}
+                  />
+                </label>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Card 2: Pianificazione operativa (admin only) */}
+        {isPeopleAdmin && (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h3 className={styles.cardTitle}>Pianificazione operativa</h3>
+            </div>
+
+            {/* Schedulazione */}
+            <div className={styles.planGroup}>
+              <span className={styles.planGroupTitle}>Schedulazione</span>
+              <div className={styles.dateRange}>
+                <label className={`${styles.field} ${styles.dateField}`}>
+                  <span className={styles.fieldLabel}>Inizio</span>
+                  <input
+                    type="date"
+                    value={draft.plannedStart}
+                    onChange={(e) => setDraft((d) => ({ ...d, plannedStart: e.target.value }))}
+                  />
+                </label>
+                <span className={styles.dateArrow} aria-hidden>→</span>
+                <label className={`${styles.field} ${styles.dateField}`}>
+                  <span className={styles.fieldLabel}>Fine</span>
+                  <input
+                    type="date"
+                    value={draft.plannedEnd}
+                    onChange={(e) => setDraft((d) => ({ ...d, plannedEnd: e.target.value }))}
+                  />
+                </label>
+              </div>
+              {days !== undefined && (
+                <div className={styles.derivedRow}>
+                  Durata <strong>{days} {days === 1 ? 'giorno' : 'giorni'}</strong>
+                </div>
+              )}
+            </div>
+
+            {/* Impegno & Budget */}
+            <div className={styles.planGroup}>
+              <span className={styles.planGroupTitle}>Impegno &amp; budget</span>
+              <div className={styles.budgetGrid}>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Ore pianificate</span>
+                  <span className={styles.inputAddon}>
+                    <input
+                      type="number"
+                      min={1}
+                      value={draft.hoursPlanned}
+                      onChange={(e) => setDraft((d) => ({ ...d, hoursPlanned: e.target.value }))}
+                    />
+                    <span className={styles.inputAddonSuffix}>h</span>
+                  </span>
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Costo previsto</span>
+                  <span className={styles.inputAddon}>
+                    <span className={styles.inputAddonPrefix}>€</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={draft.costPlanned}
+                      onChange={(e) => setDraft((d) => ({ ...d, costPlanned: e.target.value }))}
+                    />
+                  </span>
+                </label>
+              </div>
+              {perHour !== undefined && (
+                <div className={styles.derivedRow}>
+                  Costo orario derivato <strong>€ {formatEuro2(perHour)} / h</strong>
+                  {draft.costPlanned && (
+                    <> · totale <strong>€ {formatEuroCompact(Number(draft.costPlanned))}</strong></>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Priorità */}
+            <div className={styles.planGroup}>
+              <span className={styles.planGroupTitle}>Priorità in coda</span>
+              <Segmented
+                options={PRIORITY_OPTIONS}
+                value={draft.priority}
+                onChange={(v) => setDraft((d) => ({ ...d, priority: v }))}
+                ariaLabel="Priorità"
+              />
             </div>
           </section>
         )}
 
+        {/* Card 3: Documento */}
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h3 className={styles.cardTitle}>Documento</h3>
+          </div>
+          {enrollment.documentFilename ? (
+            <div className={styles.docRow}>
+              <span className={styles.docIcon} aria-hidden><Icon name="download" size={14} /></span>
+              <span className={styles.docName}>{enrollment.documentFilename}</span>
+              <span className={`${styles.docBadge} ${enrollment.documentValidated ? styles.docBadgeValid : styles.docBadgePending}`}>
+                {enrollment.documentValidated ? 'Validato' : 'Da validare'}
+              </span>
+              <div className={styles.docActions}>
+                <Button variant="ghost" size="sm" disabled={pending} onClick={handleDownload}>
+                  Scarica
+                </Button>
+                {isPeopleAdmin && !enrollment.documentValidated && (
+                  <Button variant="ghost" size="sm" disabled={pending} onClick={handleValidate}>
+                    Valida
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className={styles.docEmpty}>
+              <span>Nessun documento caricato.</span>
+            </div>
+          )}
+          <label className={styles.upload}>
+            <span className={styles.fieldLabel}>Carica documento (PDF)</span>
+            <input type="file" accept="application/pdf,.pdf" onChange={handleUpload} disabled={pending} />
+          </label>
+        </section>
+
+        {/* Note (admin only, collapsible) */}
+        {isPeopleAdmin && (
+          <section className={styles.card}>
+            <details className={styles.notes} open={Boolean(draft.notes)}>
+              <summary>Note interne{draft.notes && ' (compilate)'}</summary>
+              <textarea
+                className={styles.textarea}
+                value={draft.notes}
+                placeholder="Annotazioni operative non visibili alla persona."
+                onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
+              />
+            </details>
+          </section>
+        )}
+
+        {/* Reason form */}
         {reasonRequest && (
           <section className={styles.reasonForm}>
-            <h3>Motivazione richiesta</h3>
+            <h3>Motivazione richiesta · {reasonRequest.label.toLowerCase()}</h3>
             <textarea
               autoFocus
               value={reason}
