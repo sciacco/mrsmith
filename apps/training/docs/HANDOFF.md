@@ -26,7 +26,7 @@ Obiettivi non negoziabili:
 1. **Single source of truth** per dipendente, corsi, iscrizioni, certificazioni, attestati;
 2. **Storicizzazione corretta**: nessuna sovrascrittura distruttiva;
 3. **Eliminazione duplicati**: il dato vive in un posto solo;
-4. **Disaccoppiamento HR**: l'anagrafica dipendenti viene oggi da Factorial, domani da un altro gestionale, senza riscrivere il dominio.
+4. **Disaccoppiamento HR**: Training usa l'anagrafica locale `employee`; connettori esterni, fuori scope mini-app, la popolano e sincronizzano.
 
 ---
 
@@ -62,13 +62,13 @@ Tutti gli artefatti sono autoritativi e già allineati tra loro. Sono il punto d
 |---|---|---|---|
 | Schema DB | `schema-v2.sql` | DDL PostgreSQL 16+ | validato sintatticamente con libpg_query (64 statement) |
 | State machine documentate | `state-machines.md` | Markdown con diagrammi Mermaid | validato manualmente |
-| State machine eseguibili | `state_machines.ts` | TypeScript strict-mode | type-check pulito |
+| State machine runtime | `backend/internal/training/state_machine.go` | Go | fonte runtime |
 | Trigger guard DB | `enrollment_state_trigger.sql` | PL/pgSQL | validato sintatticamente |
 | File sorgente legacy | `PROPOSTA_FORMAZIONE_2026.xlsx` | Excel | input per migrazione |
 
 ### Allineamento verificato
 
-- 14 transizioni di `enrollment` definite nel diagramma Mermaid del `state-machines.md` corrispondono esattamente alle 14 entrate di `ENROLLMENT_TARGETS` in `state_machines.ts` (zero drift).
+- Le transizioni applicative sono implementate nel backend Go; `state-machines.md` resta riferimento di dominio.
 - Il trigger DB copre la matrice meccanica delle transizioni di `enrollment`; le precondizioni "ricche" (attore, reason, stato del piano) vivono nell'application layer.
 
 ---
@@ -79,7 +79,7 @@ Riferimento autoritativo: `schema-v2.sql`. Qui un riepilogo per orientarsi.
 
 ### Entità principali
 
-- `employee` — proiezione locale del gestionale HR (`external_source`, `external_id` come chiave esterna stabile).
+- `employee` — anagrafica locale letta da Training e alimentata da connettori esterni fuori scope.
 - `team` + `team_membership` — appartenenza storicizzata via `tstzrange` con exclusion constraint anti-overlap.
 - `vendor` — fornitori di formazione (dedup via `name_normalized citext`).
 - `skill_area` — aree formative gerarchiche (self-referencing `parent_id`).
@@ -119,21 +119,20 @@ Sono già SQL standard. Non riscriverle in ORM se la query è complessa: chiamar
 
 ## 6. State machine
 
-Riferimento autoritativo: `state-machines.md` (con diagrammi Mermaid) + `state_machines.ts` (codice).
+Riferimento runtime: `backend/internal/training/state_machine.go`. `state-machines.md` documenta il dominio.
 
 Tre macchine:
 
 - **`enrollment`** — 7 stati, 11 transizioni. La più complessa. Trigger DB di rete di sicurezza già fornito.
-- **`certification_award`** — 4 outcome operativi + "expired" calcolato. La transizione `correct` va auditata pesantemente.
+- **`certification_award`** — solo conseguimenti positivi (`passed_exam`, `attendance_only`) + "expired" calcolato. Le correzioni People sono normali update amministrativi con audit leggero.
 - **`training_request`** — coda di triage; `accepted` è intermedio (in attesa che il piano dell'anno target sia apribile), `converted` chiude collegando alla `enrollment` nata dalla richiesta.
 
 ### Regole vincolanti per il codice
 
-1. **Mai bypassare la macchina** con UPDATE diretti su `status` o `outcome`. Sempre passare dalle funzioni dichiarate in `state_machines.ts`.
+1. **Mai bypassare la macchina** con UPDATE diretti su `enrollment.status`. Sempre passare dal service layer Go.
 2. **Bypass legittimo solo per migrazione**: `SET LOCAL training.allow_status_override = 'true'` dentro la transazione del job di import. Non usare in nessun altro contesto.
 3. **`reopen` è la transizione pericolosa**: UI con conferma esplicita, audit entry dedicata (`audit_log.action = 'enrollment.reopened'`, `before_state` JSON completo).
-4. **Le precondizioni applicative** (attore, reason, stato piano, ownership) vivono in `state_machines.ts`. Il trigger DB blocca solo transizioni meccanicamente assurde.
-5. **Sincronizzazione MD ↔ TS ↔ SQL**: ogni modifica alla matrice transizioni va replicata in tutti e tre. Cross-check da fare in CI.
+4. **Le precondizioni applicative** (attore, reason, stato piano, ownership) vivono nel backend Go. Il trigger DB blocca solo transizioni meccanicamente assurde.
 
 ---
 
@@ -143,8 +142,8 @@ Quando una transizione produce side-effect, sono dichiarati in tabella nel `stat
 
 - `enrollment.start` → se `actual_start` è NULL, impostarlo a `CURRENT_DATE`.
 - `enrollment.complete` / `fail` / `cancel` / `expire` → popolare `course_title_snapshot` e `vendor_name_snapshot` con i valori correnti dal catalogo.
-- `enrollment.complete` su corso con `leads_to_cert_id` valorizzato → **proporre** (non creare automaticamente) un `certification_award`. L'utente o People decide l'outcome (passed/failed/attendance).
-- `certification_award.issue` / `mark_passed` su certificazione con `typical_validity` → calcolare `expires_on = awarded_on + typical_validity`.
+- `enrollment.complete` su corso con `leads_to_cert_id` valorizzato → non creare automaticamente un `certification_award`; l'utente o People registra esplicitamente la certificazione/frequenza quando serve.
+- `certification_award` accetta solo `passed_exam` e `attendance_only`; l'esame non superato resta su `enrollment.status = failed`.
 - `training_request.convert` → creare la `enrollment` collegata, popolare `converted_to_enrollment_id`. La transizione fallisce se non esiste un `training_plan(year = desired_year)` in stato `draft` o `open`.
 
 ---
@@ -190,9 +189,9 @@ WHERE tp.status = 'closed'
 
 **Identità**: SSO Microsoft 365, come tutte le app MrSmith. Il claim utilizzato per il matching con `employee` è quello già in uso negli altri moduli del portale.
 
-**Mapping utente ↔ `employee`**: via `employee.email` (citext). Se al primo login l'utente SSO non è in `employee`, il flusso è una pagina "in attesa di onboarding HR" — **mai** auto-creare il record `employee` dal flusso applicativo (l'anagrafica è proiezione del gestionale HR, non writable lato app).
+**Mapping utente ↔ `employee`**: via `employee.email` (citext). Se al primo login l'utente SSO non è in `employee`, il flusso è una pagina "in attesa di onboarding HR" — **mai** auto-creare il record `employee` dal flusso applicativo. La popolazione e sincronizzazione dell'anagrafica locale è demandata a connettori esterni fuori scope Training.
 
-**Ruoli applicativi**: quattro, come in `state_machines.ts`:
+**Ruoli applicativi**: quattro:
 
 - `employee` — tutti i dipendenti attivi (default).
 - `manager` — modellato ma non assegnato a nessuno al go-live. Lasciare l'hook nel codice.
@@ -242,22 +241,20 @@ Le UI seguono il design system MrSmith. Pagine da implementare (priorità decres
 
 - **Export Excel è prima-class**, non ripiego. È il formato in cui People oggi vive.
 - **Filtri persistenti via querystring**, per condividere link a viste filtrate.
-- **No bulk actions distruttive** senza conferma esplicita (in particolare `reopen` e `correct`).
+- **No bulk actions distruttive** senza conferma esplicita (in particolare `reopen`).
 - **Skeleton/loading state** consistenti col resto del portale.
 
 ---
 
-## 12. Sync con gestionale HR
+## 12. Anagrafica persone
 
-**Oggi**: Factorial. **Domani**: altro gestionale (a breve, da quanto comunicato dal business).
+Training usa `training.employee` come anagrafica locale. La mini-app non implementa integrazioni HR, credenziali Factorial, webhook o job di sincronizzazione.
 
-**Pattern**: adapter pattern. Definire un'interfaccia `HRProvider` con metodi `ListEmployees`, `GetEmployee`, `Webhook(event)`. Implementazione concreta `FactorialProvider`, da scrivere quando si avranno le credenziali API.
+**Responsabilità esterna**: connettori/sync fuori scope popolano e aggiornano `training.employee`. Training legge questa tabella per ownership, viste People, import Excel e report.
 
-**Frequenza sync**: nightly batch + webhook in real-time se Factorial li espone. Per ogni dipendente: upsert su `(external_source, external_id)`, mai `DELETE`. Cessazione → `status = 'terminated'`, `termination_date = today`.
+**Regole applicative**: login e import Excel non creano dipendenti. Se una persona manca o è ambigua, la UI/report segnala il problema e attende la correzione dell'anagrafica esterna.
 
-**Conflitti**: l'`email` è UNIQUE. Se cambia in Factorial, lato app il dipendente è lo stesso record `employee` (chiave esterna `external_id` è la verità). Aggiornare l'email e basta. Mai duplicare.
-
-**Schema readiness per il successore**: `hr_source` è un enum con valori `('factorial', 'manual', 'successor')`. Quando si conoscerà il nuovo gestionale, aggiungere il valore concreto e scrivere il nuovo `HRProvider`. Durante la migrazione, entrambi i source possono coesistere; la riconciliazione si fa con un job dedicato che marca i vecchi record `factorial` come `terminated` mano a mano che si validano i nuovi `successor`.
+**Identità**: `email` resta UNIQUE e viene usata per il matching SSO. `external_id` è opzionale e riservato ai connettori esterni.
 
 ---
 
@@ -280,7 +277,7 @@ Casi noti da gestire nei dati legacy (osservati nel foglio):
 - multi-valore in una cella (5 certificazioni in un bullet list per Angelucci) → split in righe distinte;
 - spazi finali nei nomi (`"Team "`, `"Zenoni "`, `"Nardin "`) → trim sistematico;
 - macro-aree come colonne (`O365 | FORTINET | LINUX | CCNA | CCNP`) → pivot inverso in `skill_area`;
-- stato implicito nel testo (`"BOCCIATO ESAME"`, `"IN CORSO"`, `"NON HA CERTIFICAZIONI"`) → mapping esplicito su `award_outcome`.
+- stato implicito nel testo (`"BOCCIATO ESAME"`, `"IN CORSO"`, `"NON HA CERTIFICAZIONI"`) → mapping esplicito su `enrollment.status` o warning manuale; non creare `certification_award` negativi/in corso.
 
 ---
 
@@ -297,11 +294,11 @@ Casi noti da gestire nei dati legacy (osservati nel foglio):
 
 - **Q5** (calendario) e **Q7** (migrazione): non implementare nulla senza decisione esplicita.
 - Modifiche allo **schema di dominio** (`schema-v2.sql`): qualunque tabella/colonna nuova oltre a quanto già definito richiede validazione, perché va riconciliata con i requisiti business.
-- Modifiche alle **state machine**: qualunque transizione aggiunta/rimossa richiede aggiornamento simultaneo di `state-machines.md`, `state_machines.ts`, e (per `enrollment`) `enrollment_state_trigger.sql`. Da non fare senza conferma.
+- Modifiche alle **state machine**: qualunque transizione aggiunta/rimossa richiede aggiornamento di `state-machines.md`, backend Go e, per `enrollment`, del trigger DB se cambia la matrice meccanica. Da non fare senza conferma.
 - **Promozione di un ruolo applicativo** (es. abilitare davvero `manager`): cambia la matrice di autorizzazioni in modo significativo.
 - **Bypass del state machine guard** in contesti diversi dalla migrazione storica: vietato senza conferma esplicita.
 - **Cancellazione fisica** di qualunque record che abbia un `audit_log` collegato: vietato.
-- **Cambio del gestionale HR** (introduzione del successore di Factorial): l'adapter va scritto solo quando si avranno API e credenziali del nuovo sistema.
+- **Integrazioni HR**: restano fuori scope Training e vanno gestite da connettori esterni.
 
 ---
 
@@ -320,7 +317,7 @@ Casi noti da gestire nei dati legacy (osservati nel foglio):
 Il prodotto si considera in go-live quando:
 
 - [ ] Schema deployato su ambiente di produzione MrSmith.
-- [ ] Sync HR (Factorial) attivo e funzionante.
+- [ ] Anagrafica `training.employee` popolata dai connettori esterni.
 - [ ] Auth SSO M365 integrato.
 - [ ] CRUD completi per: team, vendor, skill_area, course, certification, training_plan.
 - [ ] Lifecycle completo di `enrollment` (tutte le transizioni, audit log popolato).

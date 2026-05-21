@@ -146,18 +146,18 @@ func (h *handler) handleCreateAward(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusCreated, response)
 }
 
-func (h *handler) handleTransitionAward(w http.ResponseWriter, r *http.Request) {
+func (h *handler) handleUpdateAward(w http.ResponseWriter, r *http.Request) {
 	principal, ok := h.principalOrUnauthorized(w, r)
 	if !ok {
 		return
 	}
-	input, ok := decodeJSONBody[AwardTransitionInput](w, r)
+	input, ok := decodeJSONBody[AwardUpdateInput](w, r)
 	if !ok {
 		return
 	}
-	response, err := h.store.TransitionAward(r.Context(), principal, r.PathValue("id"), input)
+	response, err := h.store.UpdateAward(r.Context(), principal, r.PathValue("id"), input)
 	if err != nil {
-		h.writeActionError(w, r, err, "training.transition_award")
+		h.writeActionError(w, r, err, "training.update_award")
 		return
 	}
 	httputil.JSON(w, http.StatusOK, response)
@@ -418,19 +418,6 @@ func (h *handler) handleRunJobs(w http.ResponseWriter, r *http.Request) {
 	response, err := runner.RunOnce(r.Context())
 	if err != nil {
 		h.writeActionError(w, r, err, "training.jobs")
-		return
-	}
-	httputil.JSON(w, http.StatusOK, response)
-}
-
-func (h *handler) handleHRSync(w http.ResponseWriter, r *http.Request) {
-	principal, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	response, err := h.store.SyncEmployeesFromProvider(r.Context(), principal, h.hr)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.hr_sync")
 		return
 	}
 	httputil.JSON(w, http.StatusOK, response)

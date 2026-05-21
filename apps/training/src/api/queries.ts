@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from './client';
 import { mockWorkspace } from './mockData';
-import type { ActionResponse, HRSyncResponse, ImportDryRunResponse, JobRunResponse, LookupResponse, WorkspaceResponse } from './types';
+import type { ActionResponse, ImportDryRunResponse, JobRunResponse, LookupResponse, WorkspaceResponse } from './types';
 
 const useMocks =
   import.meta.env.DEV && import.meta.env.VITE_TRAINING_USE_MOCKS !== 'false';
@@ -228,35 +228,32 @@ export function useCreateAward(isPeopleAdmin: boolean) {
   });
 }
 
-export function useAwardTransition(isPeopleAdmin: boolean) {
+export function useUpdateAward(isPeopleAdmin: boolean) {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       id,
-      transition,
       outcome,
       awardedOn,
       expiresOn,
       validationSource,
-      reason,
+      notes,
     }: {
       id: string;
-      transition: string;
-      outcome?: string;
-      awardedOn?: string;
+      outcome: string;
+      awardedOn: string;
       expiresOn?: string;
       validationSource?: string;
-      reason?: string;
+      notes?: string;
     }) => {
-      if (useMocks) return Promise.resolve({ ok: true, id, status: outcome || transition } satisfies ActionResponse);
-      return api.post<ActionResponse>(`/training/v1/awards/${id}/transition`, {
-        transition,
+      if (useMocks) return Promise.resolve({ ok: true, id, status: outcome } satisfies ActionResponse);
+      return api.put<ActionResponse>(`/training/v1/people/awards/${id}`, {
         outcome,
         awardedOn,
         expiresOn,
         validationSource,
-        reason,
+        notes,
       });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['training', 'workspace', isPeopleAdmin] }),
@@ -408,28 +405,6 @@ export function useRunTrainingJobs(isPeopleAdmin: boolean) {
       return api.post<JobRunResponse>('/training/v1/people/jobs/run');
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['training', 'workspace', isPeopleAdmin] }),
-  });
-}
-
-export function useSyncTrainingHR(isPeopleAdmin: boolean) {
-  const api = useApiClient();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (): Promise<HRSyncResponse> => {
-      if (useMocks) {
-        return Promise.resolve({
-          ok: true,
-          created: 1,
-          updated: 4,
-          skipped: 0,
-        });
-      }
-      return api.post<HRSyncResponse>('/training/v1/people/hr/sync');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['training', 'workspace', isPeopleAdmin] });
-      queryClient.invalidateQueries({ queryKey: ['training', 'lookups'] });
-    },
   });
 }
 

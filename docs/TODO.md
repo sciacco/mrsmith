@@ -19,8 +19,8 @@ Final go-live still requires staging resources: Anisetta migration application a
 ### Storage Adapter Hardening
 Training v1 has a local filesystem `StorageAdapter` for dev and controlled deployments. Before production go-live, confirm whether the target storage is S3-compatible and add explicit endpoint/bucket/region/credential/path-prefix/TLS env contracts if object storage is required instead of a mounted private volume.
 
-### Factorial Provider Wiring
-Training now has a provider-neutral `HRProvider` contract and a People-only sync service path. The concrete Factorial adapter remains a staging/go-live task because API credentials and webhook shape are not available in this sandbox. When credentials are available, wire the adapter through backend config without exposing secrets through `/config`.
+### Training Employee Connectors
+Training treats `training.employee` as a local read model. Population and synchronization are delegated to external connectors outside the Training mini-app scope; login and Excel import must not create employee records.
 
 ## Listini e Sconti App
 

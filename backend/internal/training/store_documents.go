@@ -34,10 +34,8 @@ func (s *SQLStore) CreateAward(ctx context.Context, principal Principal, input A
 				return validationError("enrollment_employee_mismatch", "iscrizione e certificazione devono riferirsi alla stessa persona")
 			}
 		}
-		actor := actorForPrincipal(principal)
-		result := AttemptAwardTransition(AwardInProgress, AwardIssue, TransitionContext{Actor: actor, Reason: input.Reason})
-		if !result.OK {
-			return conflictError(result.Code, result.Message)
+		if !validAwardOutcome(input.Outcome) {
+			return validationError("invalid_outcome", "esito non valido")
 		}
 		source := strings.TrimSpace(input.ValidationSource)
 		if source == "" {
@@ -96,6 +94,15 @@ INSERT INTO training.certification_award (
 	return response, err
 }
 
+func validAwardOutcome(outcome string) bool {
+	switch strings.TrimSpace(outcome) {
+	case "passed_exam", "attendance_only":
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *SQLStore) awardGuard(ctx context.Context, q sqlRunner, principal Principal, id string, lock bool) (awardGuard, error) {
 	lockClause := ""
 	if lock {
@@ -124,51 +131,47 @@ WHERE ca.id = $1::uuid` + lockClause
 	return guard, nil
 }
 
-func (s *SQLStore) TransitionAward(ctx context.Context, principal Principal, id string, input AwardTransitionInput) (ActionResponse, error) {
+func (s *SQLStore) UpdateAward(ctx context.Context, principal Principal, id string, input AwardUpdateInput) (ActionResponse, error) {
+	if !principal.IsPeopleAdmin {
+		return ActionResponse{}, forbiddenError("people_role_required", "azione riservata a People")
+	}
 	var response ActionResponse
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
-		guard, err := s.awardGuard(ctx, tx, principal, id, true)
-		if err != nil {
+		if _, err := s.awardGuard(ctx, tx, principal, id, true); err != nil {
 			return err
 		}
-		before, err := entitySnapshot(ctx, tx, "certification_award", id)
-		if err != nil {
-			return err
-		}
-		actor := actorForPrincipal(principal)
-		transition := AwardTransition(strings.TrimSpace(input.Transition))
-		result := AttemptAwardTransition(AwardOutcome(guard.Outcome), transition, TransitionContext{Actor: actor, Reason: input.Reason})
-		if !result.OK {
-			return conflictError(result.Code, result.Message)
-		}
-		outcome := result.Target
-		if transition == AwardCorrect && strings.TrimSpace(input.Outcome) != "" {
-			outcome = strings.TrimSpace(input.Outcome)
-		}
-		if outcome == "" {
+		outcome := strings.TrimSpace(input.Outcome)
+		if !validAwardOutcome(outcome) {
 			return validationError("invalid_outcome", "esito non valido")
 		}
 		source := strings.TrimSpace(input.ValidationSource)
 		if source == "" {
 			source = "document_verified"
 		}
+		if strings.TrimSpace(input.AwardedOn) == "" {
+			return validationError("awarded_on_required", "data obbligatoria")
+		}
 		const stmt = `
 UPDATE training.certification_award
 SET outcome = $2::training.award_outcome,
-    awarded_on = COALESCE(NULLIF($3, '')::date, awarded_on),
+    awarded_on = $3::date,
     expires_on = NULLIF($4, '')::date,
     validation_source = $5::training.validation_source,
-    notes = COALESCE(NULLIF($6, ''), notes)
+    notes = CASE WHEN $6 THEN NULLIF($7, '') ELSE notes END
 WHERE id = $1::uuid
 RETURNING id::text, outcome::text`
-		if err := tx.QueryRowContext(ctx, stmt, id, outcome, input.AwardedOn, input.ExpiresOn, source, input.Reason).Scan(&response.ID, &response.Status); err != nil {
-			return fmt.Errorf("transition training award: %w", err)
+		notes := ""
+		if input.Notes != nil {
+			notes = *input.Notes
 		}
-		after, err := entitySnapshot(ctx, tx, "certification_award", id)
-		if err != nil {
-			return err
+		if err := tx.QueryRowContext(ctx, stmt, id, outcome, input.AwardedOn, input.ExpiresOn, source, input.Notes != nil, notes).Scan(&response.ID, &response.Status); err != nil {
+			return fmt.Errorf("update training award: %w", err)
 		}
-		if err := s.audit(ctx, tx, principal, "certification_award", id, "transition:"+input.Transition, before, after); err != nil {
+		fields := []string{"outcome", "awarded_on", "expires_on", "validation_source"}
+		if input.Notes != nil {
+			fields = append(fields, "notes")
+		}
+		if err := s.auditFields(ctx, tx, principal, "certification_award", id, "update", fields); err != nil {
 			return err
 		}
 		response.OK = true

@@ -96,23 +96,3 @@ func TestRequestConvertRequiresOpenablePlan(t *testing.T) {
 		t.Fatalf("convert result = %+v, want converted", got)
 	}
 }
-
-func TestAwardCorrectRequiresPeopleReason(t *testing.T) {
-	got := AttemptAwardTransition(
-		AwardPassedExam,
-		AwardCorrect,
-		TransitionContext{Actor: ActorEmployee, Reason: "errore data"},
-	)
-	if got.OK || got.Code != "UNAUTHORIZED_ACTOR" {
-		t.Fatalf("employee correction = %+v, want unauthorized", got)
-	}
-
-	got = AttemptAwardTransition(
-		AwardPassedExam,
-		AwardCorrect,
-		TransitionContext{Actor: ActorPeopleAdmin, Reason: "errore data"},
-	)
-	if !got.OK || got.Target != string(AwardPassedExam) {
-		t.Fatalf("people correction = %+v, want passed_exam", got)
-	}
-}

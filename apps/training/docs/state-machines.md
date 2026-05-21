@@ -6,12 +6,12 @@ Documento di riferimento per le transizioni di stato delle tre entità dinamiche
 2. [`certification_award`](#2-certification_award) — conseguimento di una certificazione
 3. [`training_request`](#3-training_request) — richiesta/suggerimento di formazione
 
-Le state machine descritte qui sono la fonte autoritativa. La loro implementazione è duplicata in due punti:
+Le state machine descritte qui sono il riferimento di dominio. Il runtime autoritativo è il backend Go:
 
-- `state_machines.ts` — specifica eseguibile applicativa (traduzione meccanica in Go nel backend)
-- `enrollment_state_trigger.sql` — guardia di ultimo livello a livello DB (solo per `enrollment`)
+- `backend/internal/training/state_machine.go` — valida le regole applicative.
+- `enrollment_state_trigger.sql` — guardia meccanica di ultimo livello a livello DB, solo per `enrollment`.
 
-Quando una transizione viene aggiunta o modificata qui, **entrambe** le implementazioni vanno aggiornate. Un test di integrazione dedicato verifica la sincronizzazione.
+Quando una transizione viene aggiunta o modificata qui, aggiornare il backend Go e il trigger DB solo se cambia la matrice meccanica di `enrollment`.
 
 ---
 
@@ -120,7 +120,7 @@ stateDiagram-v2
 
 ## 2. `certification_award`
 
-Più semplice di `enrollment`. Quattro outcome operativi più un quinto stato derivato (`expired`) che non è scritto in tabella ma calcolato da `expires_on < today`.
+Un `certification_award` rappresenta solo un conseguimento positivo già avvenuto. Gli stati "in corso" e "non superata" appartengono a `enrollment`, non alla tabella delle certificazioni.
 
 ### Diagramma
 
@@ -128,18 +128,8 @@ Più semplice di `enrollment`. Quattro outcome operativi più un quinto stato de
 stateDiagram-v2
     direction LR
 
-    [*] --> in_progress: issue (in_progress)
     [*] --> passed_exam: issue (passed)
-    [*] --> failed_exam: issue (failed)
     [*] --> attendance_only: issue (attendance)
-
-    in_progress --> passed_exam: mark_passed
-    in_progress --> failed_exam: mark_failed
-    in_progress --> attendance_only: mark_attendance
-
-    passed_exam --> passed_exam: correct
-    failed_exam --> failed_exam: correct
-    attendance_only --> attendance_only: correct
 
     note right of passed_exam
         Lo stato "expired" non
@@ -148,14 +138,10 @@ stateDiagram-v2
         su expires_on.
     end note
 
-    classDef pending fill:#E6F1FB,stroke:#185FA5,color:#0C447C
     classDef ok fill:#E1F5EE,stroke:#0F6E56,color:#085041
-    classDef ko fill:#FAEEDA,stroke:#854F0B,color:#633806
     classDef neutral fill:#F1EFE8,stroke:#5F5E5A,color:#444441
 
-    class in_progress pending
     class passed_exam ok
-    class failed_exam ko
     class attendance_only neutral
 ```
 
@@ -163,9 +149,7 @@ stateDiagram-v2
 
 | Outcome | Descrizione |
 |---|---|
-| `in_progress` | Certificazione in corso (es. *Certified Kubernetes Administrator - IN CORSO*) |
 | `passed_exam` | Esame superato; certificazione valida (fino a `expires_on`) |
-| `failed_exam` | Esame sostenuto e non superato |
 | `attendance_only` | Solo attestato di frequenza, senza esame |
 
 ### Transizioni
@@ -173,10 +157,6 @@ stateDiagram-v2
 | Transizione | Da → A | Attore | Guard | Side effect |
 |---|---|---|---|---|
 | `issue` | `[*]` → outcome scelto | `people_admin`, `employee` | — | se `passed_exam` e cert ha `typical_validity`, calcola `expires_on` automaticamente |
-| `mark_passed` | `in_progress` → `passed_exam` | `people_admin`, `employee` | doc verificato richiesto se attore = `employee` | popola `awarded_on` (se NULL = today); calcola `expires_on` |
-| `mark_failed` | `in_progress` → `failed_exam` | `people_admin`, `employee` | — | popola `awarded_on` |
-| `mark_attendance` | `in_progress` → `attendance_only` | `people_admin`, `employee` | — | popola `awarded_on` |
-| `correct` | qualunque → stesso outcome (con valori modificati) | `people_admin` | `reason` obbligatoria | audit pesante: `before_state` e `after_state` JSON completi |
 
 ### Note di design
 
@@ -187,7 +167,7 @@ stateDiagram-v2
 
 **Il rinnovo non è una transizione**, è una nuova award. La vecchia resta intatta come storico — uno dei punti dove lo schema diverge esplicitamente dall'Excel attuale, che cancella e sovrascrive.
 
-**`correct` riresta nello stesso stato** ma con valori modificati (correzione di date, outcome, allegati). È il punto in cui si manomette lo storico e va auditato pesantemente. La UI di People deve usarlo solo per correzioni reali, non per rinnovi.
+**Correzioni ordinarie**: People può aggiornare date, scadenze e origine con una normale modifica amministrativa. Il sistema registra audit leggero, senza richiedere un motivo testuale per ogni typo.
 
 ---
 
@@ -257,9 +237,9 @@ stateDiagram-v2
 
 ## Sincronizzazione fra applicazione e database
 
-Le state machine vivono in due implementazioni che devono restare sincronizzate:
+Le state machine vivono nel backend Go. Il database mantiene solo una guardia meccanica su `enrollment.status`:
 
-1. **Applicativa** (`state_machines.ts` → Go nel backend): valida tutte le precondizioni con il contesto completo (attore, reason, stato piano, ownership). È la prima linea di difesa.
+1. **Applicativa** (`state_machine.go`): valida tutte le precondizioni con il contesto completo (attore, reason, stato piano, ownership). È la prima linea di difesa.
 2. **Database** (`enrollment_state_trigger.sql`): valida solo la matrice meccanica delle transizioni, indipendentemente dal contesto applicativo. È la rete di sicurezza contro UPDATE diretti via psql/migration/script.
 
 Le precondizioni "esterne" (chi è l'attore, esiste la reason, lo stato del piano) non sono replicate nel trigger DB perché:
@@ -268,7 +248,7 @@ Le precondizioni "esterne" (chi è l'attore, esiste la reason, lo stato del pian
 - duplicarle aumenta la superficie di drift fra le due implementazioni,
 - il trigger blocca comunque transizioni meccanicamente assurde, che è il bug class più probabile.
 
-**Test di integrazione**: per ogni coppia `(stato_origine, transizione)` definita qui, un test verifica che applicazione e trigger DB concordino sul risultato (entrambi accettano o entrambi rifiutano). Eseguito in CI a ogni modifica di una delle due implementazioni.
+**Test**: i test backend coprono la matrice applicativa e le guardie business. La validazione del trigger DB resta una smoke check di migration.
 
 ---
 
@@ -277,7 +257,7 @@ Le precondizioni "esterne" (chi è l'attore, esiste la reason, lo stato del pian
 Quando si modifica una state machine:
 
 1. Aggiornare il diagramma Mermaid e la tabella delle transizioni in questo file
-2. Aggiornare `state_machines.ts` (matrice + guard)
+2. Aggiornare `backend/internal/training/state_machine.go`
 3. Aggiornare il trigger DB se la modifica riguarda `enrollment`
 4. Eseguire il test di integrazione e verificare il pass
 5. Aggiornare la versione del documento sotto

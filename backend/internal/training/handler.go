@@ -22,7 +22,6 @@ type Deps struct {
 	StorageMaxBytes int64
 	TrainingAppURL  string
 	StaticDir       string
-	HRProvider      HRProvider
 }
 
 type handler struct {
@@ -33,7 +32,6 @@ type handler struct {
 	storageMaxBytes int64
 	trainingAppURL  string
 	staticDir       string
-	hr              HRProvider
 }
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
@@ -57,7 +55,6 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		storageMaxBytes: deps.StorageMaxBytes,
 		trainingAppURL:  deps.TrainingAppURL,
 		staticDir:       deps.StaticDir,
-		hr:              deps.HRProvider,
 	}
 
 	protect := acl.RequireRole(applaunch.TrainingAppAccessRoles()...)
@@ -71,7 +68,6 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("POST /training/v1/requests", protect(h.requireStore(http.HandlerFunc(h.handleCreateRequest))))
 	mux.Handle("POST /training/v1/requests/{id}/transition", protect(h.requireStore(http.HandlerFunc(h.handleTransitionRequest))))
 	mux.Handle("POST /training/v1/awards", protect(h.requireStore(http.HandlerFunc(h.handleCreateAward))))
-	mux.Handle("POST /training/v1/awards/{id}/transition", protect(h.requireStore(http.HandlerFunc(h.handleTransitionAward))))
 	mux.Handle("POST /training/v1/enrollments/{id}/documents", protect(h.requireStore(http.HandlerFunc(h.handleUploadEnrollmentDocument))))
 	mux.Handle("POST /training/v1/awards/{id}/documents", protect(h.requireStore(http.HandlerFunc(h.handleUploadAwardDocument))))
 	mux.Handle("GET /training/v1/documents/{id}/download", protect(h.requireStore(http.HandlerFunc(h.handleDownloadDocument))))
@@ -84,8 +80,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("POST /training/v1/people/enrollments/{id}/transition", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleTransitionEnrollment)))))
 	mux.Handle("POST /training/v1/people/documents/{id}/validate", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleValidateDocument)))))
 	mux.Handle("POST /training/v1/people/imports/training-plan", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleImportTrainingPlan)))))
-	mux.Handle("POST /training/v1/people/hr/sync", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleHRSync)))))
 	mux.Handle("POST /training/v1/people/jobs/run", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleRunJobs)))))
+	mux.Handle("PUT /training/v1/people/awards/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdateAward)))))
 	mux.Handle("POST /training/v1/people/vendors", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor)))))
 	mux.Handle("PUT /training/v1/people/vendors/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor)))))
 	mux.Handle("POST /training/v1/people/teams", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam)))))
@@ -123,7 +119,6 @@ func (h *handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		"databaseConfigured": h.store != nil,
 		"storageConfigured":  h.storage != nil,
 		"notifications":      h.notifier != nil,
-		"hrProvider":         h.hr != nil,
 		"appUrlConfigured":   strings.TrimSpace(h.trainingAppURL) != "",
 		"staticHosting":      strings.TrimSpace(h.staticDir) != "",
 	})

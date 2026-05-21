@@ -37,7 +37,7 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Matrice transizioni consentite (deve coincidere con state_machines.ts)
+  -- Matrice meccanica consentita. Le regole business complete vivono nel backend Go.
   v_allowed := CASE
     -- da proposed
     WHEN OLD.status = 'proposed'    AND NEW.status IN ('approved','cancelled','expired') THEN true
@@ -54,8 +54,7 @@ BEGIN
     RAISE EXCEPTION 'Transizione enrollment.status non consentita: % -> % (enrollment_id=%)',
       OLD.status, NEW.status, NEW.id
       USING ERRCODE = 'check_violation',
-            HINT    = 'Vedi state_machines.ts per la matrice delle transizioni consentite, '
-                      'oppure SET LOCAL training.allow_status_override=''true'' per bypass.';
+            HINT    = 'Usare il service layer Training oppure SET LOCAL training.allow_status_override=''true'' solo per import storico.';
   END IF;
 
   RETURN NEW;
@@ -69,4 +68,4 @@ CREATE TRIGGER trg_enrollment_state_guard
   EXECUTE FUNCTION training.validate_enrollment_transition();
 
 COMMENT ON FUNCTION training.validate_enrollment_transition() IS
-  'Guard delle transizioni di enrollment.status. La matrice deve restare sincronizzata con state_machines.ts.';
+  'Guard meccanica delle transizioni di enrollment.status; le regole business complete vivono nel backend Go.';

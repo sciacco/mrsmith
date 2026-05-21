@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
 import { Button, Icon, Modal, SearchInput, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import {
-  useAwardTransition,
   useCreateEnrollment,
   useCreateAward,
   useCreateCourse,
@@ -13,7 +12,6 @@ import {
   useEnrollmentTransition,
   useImportTrainingPlan,
   useRunTrainingJobs,
-  useSyncTrainingHR,
   useTrainingExport,
   useTrainingLookups,
   useTrainingRequestAction,
@@ -21,6 +19,7 @@ import {
   useUpdateEnrollment,
   useUpdateCourse,
   useUpdateTrainingMasterData,
+  useUpdateAward,
   useUploadAwardDocument,
   useUploadEnrollmentDocument,
   useValidateDocument,
@@ -82,7 +81,6 @@ const statusLabels: Record<string, string> = {
   rejected: 'Respinta',
   converted: 'Convertita',
   passed_exam: 'Esame superato',
-  failed_exam: 'Esame non superato',
   attendance_only: 'Frequenza',
   valid: 'Valida',
   valid_no_expiry: 'Valida senza scadenza',
@@ -193,7 +191,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
   const [catalogEditTarget, setCatalogEditTarget] = useState<{ kind: TrainingMasterDataKind; id: string } | null>(null);
   const [awardModalOpen, setAwardModalOpen] = useState(false);
   const [runJobsConfirm, setRunJobsConfirm] = useState(false);
-  const [hrSyncConfirm, setHrSyncConfirm] = useState(false);
   const [correctTarget, setCorrectTarget] = useState<CertificationRow | null>(null);
   const [enrollmentDraft, setEnrollmentDraft] = useState({ employeeId: '', courseId: '', trainingPlanId: '' });
   const [editEnrollmentTarget, setEditEnrollmentTarget] = useState<PlanEnrollment | null>(null);
@@ -252,7 +249,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
     awardedOn: todayISO(),
     expiresOn: '',
     validationSource: 'document_verified',
-    reason: '',
   });
   const [uploadAwardId, setUploadAwardId] = useState<string | null>(null);
   const [uploadEnrollmentId, setUploadEnrollmentId] = useState<string | null>(null);
@@ -267,7 +263,7 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
   const createEnrollment = useCreateEnrollment(isPeopleAdmin);
   const updateEnrollment = useUpdateEnrollment(isPeopleAdmin);
   const createAward = useCreateAward(isPeopleAdmin);
-  const awardTransition = useAwardTransition(isPeopleAdmin);
+  const updateAward = useUpdateAward(isPeopleAdmin);
   const requestAction = useTrainingRequestAction(isPeopleAdmin);
   const createRequest = useCreateTrainingRequest(isPeopleAdmin);
   const createCourse = useCreateCourse(isPeopleAdmin);
@@ -280,7 +276,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
   const downloadDocument = useDownloadDocument();
   const importTrainingPlan = useImportTrainingPlan(isPeopleAdmin);
   const runTrainingJobs = useRunTrainingJobs(isPeopleAdmin);
-  const syncTrainingHR = useSyncTrainingHR(isPeopleAdmin);
   const trainingExport = useTrainingExport();
 
   const workspace = query.data;
@@ -872,7 +867,7 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
           actionsEnabled={
             !uploadAwardDocument.isPending &&
             !createAward.isPending &&
-            !awardTransition.isPending &&
+            !updateAward.isPending &&
             !trainingExport.isPending &&
             !validateDocument.isPending &&
             !downloadDocument.isPending
@@ -885,11 +880,10 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
           onCorrect={(row) => {
             setCorrectTarget(row);
             setCorrectDraft({
-              outcome: row.outcome === 'in_progress' ? 'passed_exam' : row.outcome,
+              outcome: row.outcome,
               awardedOn: formatDate(row.awardedOn) || todayISO(),
               expiresOn: formatDate(row.expiresOn),
               validationSource: row.validationSource || 'document_verified',
-              reason: '',
             });
           }}
           onDownload={(row) => {
@@ -921,10 +915,9 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
           expiring={workspace?.expiringCertifications ?? []}
           gaps={workspace?.mandatoryComplianceGaps ?? []}
           isPeopleAdmin={isPeopleAdmin}
-          actionsEnabled={!trainingExport.isPending && !runTrainingJobs.isPending && !syncTrainingHR.isPending}
+          actionsEnabled={!trainingExport.isPending && !runTrainingJobs.isPending}
           onExport={exportKind}
           onRunJobs={() => setRunJobsConfirm(true)}
-          onSyncHR={() => setHrSyncConfirm(true)}
         />
       )}
 
@@ -1265,39 +1258,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
               disabled={runTrainingJobs.isPending}
             >
               Esegui
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        open={hrSyncConfirm}
-        onClose={() => setHrSyncConfirm(false)}
-        title="Sincronizza persone"
-        size="sm"
-      >
-        <div className={styles.modalBody}>
-          <p>
-            Vuoi aggiornare l&apos;anagrafica persone dalla sorgente HR configurata?
-            Le persone non riconosciute verranno saltate.
-          </p>
-          <div className={styles.modalActions}>
-            <Button variant="secondary" onClick={() => setHrSyncConfirm(false)}>
-              Annulla
-            </Button>
-            <Button
-              onClick={() => {
-                syncTrainingHR.mutate(undefined, {
-                  onSuccess: (result) => {
-                    setHrSyncConfirm(false);
-                    toast(`${result.created} nuove, ${result.updated} aggiornate, ${result.skipped} saltate`);
-                  },
-                  onError: (error) => toast(apiErrorMessage(error, 'Sincronizzazione persone non riuscita'), 'error'),
-                });
-              }}
-              disabled={syncTrainingHR.isPending}
-            >
-              Sincronizza
             </Button>
           </div>
         </div>
@@ -1906,7 +1866,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
             <select value={awardDraft.outcome} onChange={(event) => setAwardDraft((draft) => ({ ...draft, outcome: event.target.value }))} required>
               <option value="passed_exam">Esame superato</option>
               <option value="attendance_only">Frequenza</option>
-              <option value="failed_exam">Esame non superato</option>
             </select>
           </label>
           <label>
@@ -1933,30 +1892,25 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
             awardedOn: todayISO(),
             expiresOn: '',
             validationSource: 'document_verified',
-            reason: '',
           });
         }}
-        title="Correggi certificazione"
+        title="Modifica certificazione"
         size="md"
       >
         <form
           className={styles.formStack}
           onSubmit={(event) => {
             event.preventDefault();
-            const reason = correctDraft.reason.trim();
-            if (!correctTarget || reason.length < 3) {
-              toast('Indica un motivo valido', 'warning');
+            if (!correctTarget) {
               return;
             }
-            awardTransition.mutate(
+            updateAward.mutate(
               {
                 id: correctTarget.awardId,
-                transition: 'correct',
                 outcome: correctDraft.outcome,
                 awardedOn: correctDraft.awardedOn,
                 expiresOn: correctDraft.expiresOn,
                 validationSource: correctDraft.validationSource,
-                reason,
               },
               {
                 onSuccess: () => {
@@ -1966,11 +1920,10 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
                     awardedOn: todayISO(),
                     expiresOn: '',
                     validationSource: 'document_verified',
-                    reason: '',
                   });
-                  toast('Certificazione corretta');
+                  toast('Certificazione aggiornata');
                 },
-                onError: (error) => toast(apiErrorMessage(error, 'Correzione certificazione non riuscita'), 'error'),
+                onError: (error) => toast(apiErrorMessage(error, 'Aggiornamento certificazione non riuscito'), 'error'),
               },
             );
           }}
@@ -1983,7 +1936,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
             <select value={correctDraft.outcome} onChange={(event) => setCorrectDraft((draft) => ({ ...draft, outcome: event.target.value }))} required>
               <option value="passed_exam">Esame superato</option>
               <option value="attendance_only">Frequenza</option>
-              <option value="failed_exam">Esame non superato</option>
             </select>
           </label>
           <div className={styles.formGrid}>
@@ -2004,15 +1956,6 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
               ))}
             </select>
           </label>
-          <label>
-            <span>Motivo</span>
-            <textarea
-              value={correctDraft.reason}
-              onChange={(event) => setCorrectDraft((draft) => ({ ...draft, reason: event.target.value }))}
-              minLength={3}
-              required
-            />
-          </label>
           <div className={styles.modalActions}>
             <Button
               type="button"
@@ -2024,14 +1967,13 @@ export function TrainingWorkspacePage({ view, isPeopleAdmin }: TrainingWorkspace
                   awardedOn: todayISO(),
                   expiresOn: '',
                   validationSource: 'document_verified',
-                  reason: '',
                 });
               }}
             >
               Annulla
             </Button>
-            <Button type="submit" disabled={awardTransition.isPending || correctDraft.reason.trim().length < 3}>
-              Salva correzione
+            <Button type="submit" disabled={updateAward.isPending}>
+              Salva
             </Button>
           </div>
         </form>
@@ -2701,8 +2643,8 @@ function CertificationsView({
                           <Button variant="ghost" size="sm" leftIcon={<Icon name="check-circle" size={15} />} disabled={!actionsEnabled || !row.documentId || row.documentValidated} onClick={() => row.documentId && onValidate(row.documentId)}>
                             Valida
                           </Button>
-                          <Button variant="ghost" size="sm" leftIcon={<Icon name="pencil" size={15} />} disabled={!actionsEnabled || row.outcome === 'in_progress'} onClick={() => onCorrect(row)}>
-                            Correggi
+                          <Button variant="ghost" size="sm" leftIcon={<Icon name="pencil" size={15} />} disabled={!actionsEnabled} onClick={() => onCorrect(row)}>
+                            Modifica
                           </Button>
                         </>
                       )}
@@ -2729,7 +2671,6 @@ function ReportsView({
   actionsEnabled,
   onExport,
   onRunJobs,
-  onSyncHR,
 }: {
   planBudget: PlanBudgetRow[];
   expiring: ExpiringCertificationRow[];
@@ -2738,7 +2679,6 @@ function ReportsView({
   actionsEnabled: boolean;
   onExport: (kind: string) => void;
   onRunJobs: () => void;
-  onSyncHR: () => void;
 }) {
   return (
     <section className={styles.reportGrid}>
@@ -2750,9 +2690,6 @@ function ReportsView({
             </div>
             <Button variant="secondary" leftIcon={<Icon name="settings" size={16} />} disabled={!actionsEnabled} onClick={onRunJobs}>
               Esegui controlli
-            </Button>
-            <Button variant="secondary" leftIcon={<Icon name="user" size={16} />} disabled={!actionsEnabled} onClick={onSyncHR}>
-              Sincronizza persone
             </Button>
           </div>
         </section>

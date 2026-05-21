@@ -344,13 +344,12 @@ type AwardInput struct {
 	Reason                string `json:"reason,omitempty"`
 }
 
-type AwardTransitionInput struct {
-	Transition       string `json:"transition"`
-	Outcome          string `json:"outcome,omitempty"`
-	AwardedOn        string `json:"awardedOn,omitempty"`
-	ExpiresOn        string `json:"expiresOn,omitempty"`
-	ValidationSource string `json:"validationSource,omitempty"`
-	Reason           string `json:"reason,omitempty"`
+type AwardUpdateInput struct {
+	Outcome          string  `json:"outcome"`
+	AwardedOn        string  `json:"awardedOn"`
+	ExpiresOn        string  `json:"expiresOn,omitempty"`
+	ValidationSource string  `json:"validationSource,omitempty"`
+	Notes            *string `json:"notes,omitempty"`
 }
 
 type DocumentMetadata struct {

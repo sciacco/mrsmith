@@ -15,11 +15,6 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE training.hr_source AS ENUM ('factorial', 'manual', 'successor');
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
   CREATE TYPE training.course_delivery_mode AS ENUM ('classroom', 'online_live', 'online_self', 'on_the_job', 'mixed');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
@@ -35,7 +30,7 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE training.award_outcome AS ENUM ('passed_exam', 'attendance_only', 'failed_exam', 'in_progress');
+  CREATE TYPE training.award_outcome AS ENUM ('passed_exam', 'attendance_only');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -61,8 +56,7 @@ CREATE TABLE IF NOT EXISTS training.team (
 
 CREATE TABLE IF NOT EXISTS training.employee (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  external_id text NOT NULL,
-  external_source training.hr_source NOT NULL DEFAULT 'factorial',
+  external_id text,
   first_name text NOT NULL,
   last_name text NOT NULL,
   email citext NOT NULL,
@@ -73,9 +67,12 @@ CREATE TABLE IF NOT EXISTS training.employee (
   notes text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (external_source, external_id),
   UNIQUE (email)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_employee_external_id
+  ON training.employee(external_id)
+  WHERE external_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS training.team_membership (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -426,7 +423,6 @@ SELECT
   ca.awarded_on,
   ca.expires_on,
   CASE
-    WHEN ca.outcome <> 'passed_exam' THEN 'not_certified'
     WHEN ca.expires_on IS NULL THEN 'valid_no_expiry'
     WHEN ca.expires_on > CURRENT_DATE THEN 'valid'
     ELSE 'expired'

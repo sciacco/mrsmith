@@ -25,7 +25,6 @@ SET search_path TO training, public;
 -- -----------------------------------------------------------------------------
 
 CREATE TYPE employee_status        AS ENUM ('active', 'on_leave', 'terminated');
-CREATE TYPE hr_source              AS ENUM ('factorial', 'manual', 'successor');
 CREATE TYPE course_delivery_mode   AS ENUM ('classroom', 'online_live', 'online_self', 'on_the_job', 'mixed');
 CREATE TYPE course_provider_kind   AS ENUM ('internal', 'external');
 
@@ -43,9 +42,7 @@ CREATE TYPE enrollment_status      AS ENUM
 -- Esito al conseguimento certificazione
 CREATE TYPE award_outcome          AS ENUM
   ('passed_exam',         -- certificazione vera e propria
-   'attendance_only',     -- solo attestato di frequenza, no esame
-   'failed_exam',         -- es. "CCNP BOCCIATO ESAME"
-   'in_progress');        -- es. "Certified Kubernetes Administrator - IN CORSO"
+   'attendance_only');    -- solo attestato di frequenza, no esame
 
 -- Provenienza del dato: utile per audit + per dare "peso" diverso a un
 -- self-assessment vs un attestato verificato (vedi colonne "Da Survey" / "A voce")
@@ -54,7 +51,7 @@ CREATE TYPE validation_source      AS ENUM
    'declared_survey',     -- dichiarato in survey
    'declared_verbal',     -- dichiarato a voce
    'declared_cv',         -- estratto da CV
-   'imported_legacy');    -- importato da Excel/Factorial, non verificato
+   'imported_legacy');    -- importato da Excel o sorgenti legacy, non verificato
 
 CREATE TYPE plan_status            AS ENUM ('draft', 'open', 'frozen', 'closed');
 
@@ -75,11 +72,10 @@ CREATE TABLE team (
 );
 COMMENT ON TABLE  team IS 'Team / area aziendale (sostituisce la colonna TEAM dell''Excel).';
 
--- Dipendente. Proiezione locale del gestionale HR.
+-- Dipendente. Anagrafica locale alimentata da connettori esterni fuori scope.
 CREATE TABLE employee (
     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    external_id     text NOT NULL,                             -- id stabile da gestionale HR
-    external_source hr_source NOT NULL DEFAULT 'factorial',
+    external_id     text,                                      -- id opzionale gestito dal connettore esterno
     first_name      text NOT NULL,
     last_name       text NOT NULL,
     email           citext NOT NULL,
@@ -90,13 +86,10 @@ CREATE TABLE employee (
     notes           text,
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now(),
-    -- un employee_id è unico nello specifico source: se cambiate gestionale
-    -- mantenete entrambi gli storici fino a riconciliazione completata
-    UNIQUE (external_source, external_id),
     UNIQUE (email)
 );
-COMMENT ON COLUMN employee.external_id     IS 'ID del dipendente nel gestionale HR esterno (Factorial oggi).';
-COMMENT ON COLUMN employee.external_source IS 'Sistema HR di provenienza. Permette migrazione senza perdita storico.';
+CREATE UNIQUE INDEX idx_employee_external_id ON employee(external_id) WHERE external_id IS NOT NULL;
+COMMENT ON COLUMN employee.external_id IS 'ID opzionale gestito da connettori esterni; Training non implementa sync HR.';
 
 -- Membership: un dipendente può appartenere a più team nel tempo.
 -- Con tstzrange + exclusion constraint impediamo overlap sullo stesso (employee, team).
@@ -503,7 +496,6 @@ SELECT
   ca.awarded_on,
   ca.expires_on,
   CASE
-    WHEN ca.outcome <> 'passed_exam'           THEN 'not_certified'
     WHEN ca.expires_on IS NULL                 THEN 'valid_no_expiry'
     WHEN ca.expires_on > CURRENT_DATE          THEN 'valid'
     ELSE 'expired'

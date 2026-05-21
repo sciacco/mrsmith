@@ -268,10 +268,3 @@ export interface JobRunResponse {
   complianceNotifications: number;
   certificationNotifications: number;
 }
-
-export interface HRSyncResponse {
-  ok: boolean;
-  created: number;
-  updated: number;
-  skipped: number;
-}

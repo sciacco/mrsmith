@@ -121,6 +121,14 @@ INSERT INTO training.audit_log (
 	return nil
 }
 
+func (s *SQLStore) auditFields(ctx context.Context, q sqlRunner, principal Principal, entityType, entityID, action string, fields []string) error {
+	payload, err := json.Marshal(map[string]any{"changed_fields": fields})
+	if err != nil {
+		return fmt.Errorf("marshal training audit fields: %w", err)
+	}
+	return s.audit(ctx, q, principal, entityType, entityID, action, nil, payload)
+}
+
 func entitySnapshot(ctx context.Context, q sqlRunner, table string, id string) (json.RawMessage, error) {
 	query := fmt.Sprintf(`SELECT to_jsonb(row) FROM (SELECT * FROM training.%s WHERE id = $1::uuid) row`, table)
 	var raw []byte
@@ -385,11 +393,6 @@ func (s *SQLStore) TransitionEnrollment(ctx context.Context, principal Principal
 		if err := s.applyEnrollmentTransition(ctx, tx, id, status, input); err != nil {
 			return err
 		}
-		if status == string(EnrollmentCompleted) || status == string(EnrollmentFailed) {
-			if err := s.createAwardFromEnrollmentOutcome(ctx, tx, id, status); err != nil {
-				return err
-			}
-		}
 		after, err := entitySnapshot(ctx, tx, "enrollment", id)
 		if err != nil {
 			return err
@@ -439,48 +442,6 @@ WHERE id = $1::uuid`, id, status)
 		if err != nil {
 			return fmt.Errorf("transition training enrollment: %w", err)
 		}
-	}
-	return nil
-}
-
-func (s *SQLStore) createAwardFromEnrollmentOutcome(ctx context.Context, tx *sql.Tx, enrollmentID string, status string) error {
-	outcome := "passed_exam"
-	if status == string(EnrollmentFailed) {
-		outcome = "failed_exam"
-	}
-	const stmt = `
-INSERT INTO training.certification_award (
-  employee_id,
-  certification_id,
-  enrollment_id,
-  outcome,
-  awarded_on,
-  expires_on,
-  validation_source,
-  notes
-)
-SELECT
-  en.employee_id,
-  c.leads_to_cert_id,
-  en.id,
-  $2::training.award_outcome,
-  COALESCE(en.actual_end, CURRENT_DATE),
-  CASE
-    WHEN cert.typical_validity IS NULL THEN NULL
-    ELSE COALESCE(en.actual_end, CURRENT_DATE) + cert.typical_validity
-  END,
-  'document_verified'::training.validation_source,
-  'Generata dalla chiusura iscrizione'
-FROM training.enrollment en
-JOIN training.course c ON c.id = en.course_id
-JOIN training.certification cert ON cert.id = c.leads_to_cert_id
-WHERE en.id = $1::uuid
-  AND c.leads_to_cert_id IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM training.certification_award ca WHERE ca.enrollment_id = en.id
-  )`
-	if _, err := tx.ExecContext(ctx, stmt, enrollmentID, outcome); err != nil {
-		return fmt.Errorf("create training award from enrollment: %w", err)
 	}
 	return nil
 }

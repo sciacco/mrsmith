@@ -184,62 +184,6 @@ func AttemptEnrollmentTransition(
 	return allow(string(target))
 }
 
-type AwardOutcome string
-type AwardTransition string
-
-const (
-	AwardInProgress     AwardOutcome    = "in_progress"
-	AwardPassedExam     AwardOutcome    = "passed_exam"
-	AwardFailedExam     AwardOutcome    = "failed_exam"
-	AwardAttendance     AwardOutcome    = "attendance_only"
-	AwardIssue          AwardTransition = "issue"
-	AwardMarkPassed     AwardTransition = "mark_passed"
-	AwardMarkFailed     AwardTransition = "mark_failed"
-	AwardMarkAttendance AwardTransition = "mark_attendance"
-	AwardCorrect        AwardTransition = "correct"
-)
-
-var awardTargets = map[AwardOutcome]map[AwardTransition]AwardOutcome{
-	AwardInProgress: {
-		AwardMarkPassed:     AwardPassedExam,
-		AwardMarkFailed:     AwardFailedExam,
-		AwardMarkAttendance: AwardAttendance,
-	},
-	AwardPassedExam: {AwardCorrect: AwardPassedExam},
-	AwardFailedExam: {AwardCorrect: AwardFailedExam},
-	AwardAttendance: {AwardCorrect: AwardAttendance},
-}
-
-func AttemptAwardTransition(
-	current AwardOutcome,
-	transition AwardTransition,
-	ctx TransitionContext,
-) TransitionResult {
-	if transition == AwardIssue {
-		return allow("")
-	}
-
-	target, ok := awardTargets[current][transition]
-	if !ok {
-		return deny("INVALID_TRANSITION", "transizione non consentita dall'esito corrente")
-	}
-
-	if transition == AwardCorrect {
-		if r := requireActor(ctx, ActorPeopleAdmin); r != nil {
-			return *r
-		}
-		if r := requireReason(ctx); r != nil {
-			return *r
-		}
-		return allow(string(target))
-	}
-
-	if r := requireActor(ctx, ActorPeopleAdmin, ActorEmployee); r != nil {
-		return *r
-	}
-	return allow(string(target))
-}
-
 type RequestState string
 type RequestTransition string
 
