@@ -2,7 +2,6 @@ package training
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"sort"
 	"strings"
@@ -80,23 +79,39 @@ LIMIT 500`
 	return out, rows.Err()
 }
 
-// complianceRulesAggregated builds one ComplianceRule per active mandatory_assignment_rule,
-// joined with the gap view + a courses list (currently only the rule's primary course).
+// complianceRulesAggregated builds one ComplianceRule per active Training rule.
 func (s *SQLStore) complianceRulesAggregated(ctx context.Context, team string) ([]ComplianceRule, error) {
 	const ruleQ = `
 SELECT
   r.id::text                                              AS rule_id,
+  r.name                                                  AS rule_name,
   c.id::text                                              AS course_id,
   c.title                                                 AS course_title,
   COALESCE(c.compliance_framework, '')                    AS framework,
   COALESCE(c.recurrence_interval::text, '')               AS cadence,
-  COALESCE(t.code, '')                                    AS team_code,
-  COALESCE(t.name, '')                                    AS team_name
-FROM training.mandatory_assignment_rule r
+  COALESCE(
+    CASE r.population_target->>'kind'
+      WHEN 'all' THEN 'Tutte le persone'
+      WHEN 'team' THEN team.code || ' - ' || team.name
+      WHEN 'skill_area' THEN skill.code || ' - ' || skill.name
+      WHEN 'custom_group' THEN groups.name
+      ELSE ''
+    END,
+    ''
+  )                                                       AS population_label
+FROM training.mandatory_rules r
 JOIN training.course c ON c.id = r.course_id
-LEFT JOIN training.team t ON t.id = r.team_id
+LEFT JOIN training.team team
+  ON r.population_target->>'kind' = 'team'
+ AND team.id = (r.population_target->>'id')::uuid
+LEFT JOIN training.skill_area skill
+  ON r.population_target->>'kind' = 'skill_area'
+ AND skill.id = (r.population_target->>'id')::uuid
+LEFT JOIN training.custom_groups groups
+  ON r.population_target->>'kind' = 'custom_group'
+ AND groups.id = (r.population_target->>'id')::uuid
 WHERE r.is_active
-ORDER BY c.title`
+ORDER BY r.name, c.title`
 	rows, err := s.db.QueryContext(ctx, ruleQ)
 	if err != nil {
 		return nil, fmt.Errorf("compliance rules: %w", err)
@@ -104,28 +119,24 @@ ORDER BY c.title`
 	defer rows.Close()
 
 	type ruleAcc struct {
-		rule   ComplianceRule
-		teamCode string
+		rule     ComplianceRule
+		ruleID   string
 		courseID string
 	}
 	rules := make([]ruleAcc, 0)
 	for rows.Next() {
 		var (
-			ruleID, courseID, courseTitle, framework, cadence, teamCode, teamName string
+			ruleID, ruleName, courseID, courseTitle, framework, cadence, population string
 		)
-		if err := rows.Scan(&ruleID, &courseID, &courseTitle, &framework, &cadence, &teamCode, &teamName); err != nil {
+		if err := rows.Scan(&ruleID, &ruleName, &courseID, &courseTitle, &framework, &cadence, &population); err != nil {
 			return nil, fmt.Errorf("scan compliance rule: %w", err)
 		}
-		if team != "" && teamCode != "" && teamCode != team {
-			continue
+		title := strings.TrimSpace(ruleName)
+		if title == "" {
+			title = courseTitle
 		}
-		title := courseTitle
-		if framework != "" {
-			title = fmt.Sprintf("%s · %s", framework, courseTitle)
-		}
-		population := "tutti i dipendenti"
-		if teamName != "" {
-			population = fmt.Sprintf("team %s", teamName)
+		if framework != "" && !strings.Contains(title, framework) {
+			title = fmt.Sprintf("%s · %s", framework, title)
 		}
 		rules = append(rules, ruleAcc{
 			rule: ComplianceRule{
@@ -136,7 +147,7 @@ ORDER BY c.title`
 				Gaps:               []ComplianceRuleGap{},
 				SuggestedCourseIDs: []string{courseID},
 			},
-			teamCode: teamCode,
+			ruleID:   ruleID,
 			courseID: courseID,
 		})
 	}
@@ -146,7 +157,7 @@ ORDER BY c.title`
 
 	for i := range rules {
 		acc := &rules[i]
-		covered, target, gaps, err := s.complianceRuleCoverage(ctx, acc.courseID, acc.teamCode, team)
+		covered, target, gaps, err := s.complianceRuleCoverage(ctx, acc.ruleID, team)
 		if err != nil {
 			return nil, err
 		}
@@ -163,6 +174,9 @@ ORDER BY c.title`
 
 	out := make([]ComplianceRule, 0, len(rules))
 	for _, r := range rules {
+		if team != "" && r.rule.TargetCount == 0 {
+			continue
+		}
 		out = append(out, r.rule)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -180,28 +194,24 @@ func cadenceLabel(raw string) string {
 	return raw
 }
 
-func (s *SQLStore) complianceRuleCoverage(ctx context.Context, courseID, ruleTeam, filterTeam string) (covered int, target int, gaps []ComplianceRuleGap, err error) {
+func (s *SQLStore) complianceRuleCoverage(ctx context.Context, ruleID, filterTeam string) (covered int, target int, gaps []ComplianceRuleGap, err error) {
 	gaps = []ComplianceRuleGap{}
 	const q = `
 SELECT
   g.employee_id::text,
   concat(g.last_name, ' ', g.first_name)            AS employee_name,
   g.compliance_status,
-  COALESCE(g.last_valid_awarded_on::text, '')       AS detail
+  COALESCE(g.last_valid_awarded_on::text, g.last_valid_completed_on::text, '') AS detail
 FROM training.v_mandatory_compliance_gap g
 LEFT JOIN training.team_membership tm
   ON tm.employee_id = g.employee_id
   AND tm.start_date <= now()
   AND (tm.end_date IS NULL OR tm.end_date >= now())
 LEFT JOIN training.team t ON t.id = tm.team_id
-WHERE g.course_id = $1::uuid
+WHERE g.rule_id = $1::uuid
   AND ($2 = '' OR t.code = $2)
 ORDER BY g.compliance_status DESC, g.last_name, g.first_name`
-	teamFilter := filterTeam
-	if teamFilter == "" {
-		teamFilter = ruleTeam
-	}
-	rows, queryErr := s.db.QueryContext(ctx, q, courseID, teamFilter)
+	rows, queryErr := s.db.QueryContext(ctx, q, ruleID, filterTeam)
 	if queryErr != nil {
 		return 0, 0, nil, fmt.Errorf("compliance rule coverage: %w", queryErr)
 	}
@@ -231,12 +241,9 @@ ORDER BY g.compliance_status DESC, g.last_name, g.first_name`
 	if err = rows.Err(); err != nil {
 		return 0, 0, nil, err
 	}
-	// Special case: no_cert_linked rows still count as covered (rule has no certifying cert)
-	// Already handled by view returning 'no_cert_linked' status; treat as covered.
 	if len(gaps) > 10 {
 		gaps = gaps[:10]
 	}
-	_ = sql.ErrNoRows
 	return covered, target, gaps, nil
 }
 

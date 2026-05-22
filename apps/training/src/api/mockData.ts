@@ -1,7 +1,15 @@
-import type { PersonFlagKey, PersonFlags, PersonSummary, WorkspaceResponse } from './types';
+import type {
+  CustomGroup,
+  MandatoryRule,
+  PersonFlagKey,
+  PersonFlags,
+  PersonSummary,
+  WorkspaceResponse,
+} from './types';
 
 interface MockPeopleDirectoryFilters {
   team?: string;
+  group?: string;
   filter?: string;
   q?: string;
 }
@@ -120,14 +128,100 @@ function filterMatches(row: PersonSummary, filter: string): boolean {
 
 export function mockPeopleDirectory(filters: MockPeopleDirectoryFilters = {}): PersonSummary[] {
   const team = filters.team?.trim() ?? '';
+  const group = filters.group?.trim() ?? '';
   const q = filters.q?.trim().toLowerCase() ?? '';
   const filter = filters.filter?.trim() ?? '';
+  const groupMembers = group
+    ? new Set((mockCustomGroups().find((item) => item.id === group)?.members ?? []).map((member) => member.id))
+    : null;
 
   return mockDirectoryRows.filter((row) => {
     if (team && row.team_code !== team) return false;
+    if (groupMembers && !groupMembers.has(row.id)) return false;
     if (q && !`${row.name} ${row.email}`.toLowerCase().includes(q)) return false;
     return filterMatches(row, filter);
   });
+}
+
+export function mockCustomGroups(): CustomGroup[] {
+  return [
+    {
+      id: 'group-cyber-2026',
+      name: 'Cybersecurity 2026',
+      description: 'Popolazione trasversale per aggiornamento sicurezza',
+      active: true,
+      member_count: 3,
+      members: [
+        { id: 'employee-ada', name: 'Verdi Ada', email: 'ada.verdi@cdlan.it', team_code: 'CLOUD' },
+        { id: 'employee-marco', name: 'Rossi Marco', email: 'marco.rossi@cdlan.it', team_code: 'APPLICATIONS' },
+        { id: 'employee-marta', name: 'Conti Marta', email: 'marta.conti@cdlan.it', team_code: 'APPLICATIONS' },
+      ],
+      used_by: [{ kind: 'rule', id: 'rule-security', label: 'Sicurezza applicativa' }],
+    },
+    {
+      id: 'group-cloud-leads',
+      name: 'Cloud leads',
+      description: 'Referenti operativi Cloud',
+      active: true,
+      member_count: 2,
+      members: [
+        { id: 'employee-ada', name: 'Verdi Ada', email: 'ada.verdi@cdlan.it', team_code: 'CLOUD' },
+        { id: 'employee-laura', name: 'Bianchi Laura', email: 'laura.bianchi@cdlan.it', team_code: 'CLOUD' },
+      ],
+      used_by: [],
+    },
+  ];
+}
+
+export function mockMandatoryRules(): MandatoryRule[] {
+  return [
+    {
+      id: 'rule-security',
+      name: 'Sicurezza applicativa',
+      course_id: 'course-2',
+      course_title: 'Sicurezza applicativa OWASP',
+      compliance_framework: 'ISO 27001',
+      cadence_label: '12 mesi',
+      population_target: {
+        kind: 'custom_group',
+        id: 'group-cyber-2026',
+        label: 'Cybersecurity 2026',
+        count: 3,
+      },
+      active: true,
+      coverage_pct: 33,
+      covered_count: 1,
+      target_count: 3,
+      gap_count: 2,
+      gaps: [
+        { employee_id: 'employee-ada', employee_name: 'Verdi Ada', status: 'never_covered' },
+        { employee_id: 'employee-marta', employee_name: 'Conti Marta', status: 'expired', detail: '2025-03-12' },
+      ],
+      severity: 'critical',
+      used_by: [{ kind: 'enrollment', label: 'Iscrizioni collegate', count: 4 }],
+    },
+    {
+      id: 'rule-cloud',
+      name: 'Kubernetes base',
+      course_id: 'course-1',
+      course_title: 'Certified Kubernetes Administrator',
+      cadence_label: 'una tantum',
+      population_target: {
+        kind: 'team',
+        id: 'team-cloud',
+        label: 'CLOUD - Cloud Operations',
+        count: 2,
+      },
+      active: true,
+      coverage_pct: 100,
+      covered_count: 2,
+      target_count: 2,
+      gap_count: 0,
+      gaps: [],
+      severity: 'ok',
+      used_by: [],
+    },
+  ];
 }
 
 export function mockWorkspace(isPeopleAdmin: boolean): WorkspaceResponse {

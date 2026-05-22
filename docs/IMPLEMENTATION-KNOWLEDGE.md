@@ -118,6 +118,15 @@ Alyante ERP ID
 - Used by: `apps/training` `/persone` directory and planning bulk assignment flows.
 - Open questions: none.
 
+### Training Rule Populations Stay Training-Side
+
+- Context: `apps/training` compliance rules, custom groups, directory filters, and planning suggestions.
+- Discovery: rule populations are owned by the Training domain and must remain limited to `all`, `team`, `skill_area`, and `custom_group`; custom group membership is resolved live from Training tables.
+- Practical rule: do not add manager, role, hire-date, site, or external HR population predicates to Training mandatory rules. If a population does not fit team, skill area, or all employees, model it as a Training custom group.
+- Evidence: Training M5 rule/group schema in `deploy/migrations/016_training_m5_rules_groups.sql`, population resolver view `training.v_mandatory_rule_population`, and backend handlers under `backend/internal/training`.
+- Used by: `apps/training` `/compliance/regole`, `/persone/gruppi`, `/persone`, and `/pianificazione`.
+- Open questions: none.
+
 ### CP Backoffice Active Biometric Users Are Balance-Based
 
 - Context: `apps/cp-backoffice` Accessi biometrici PDF export and any future biometric active-user report.

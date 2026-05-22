@@ -58,31 +58,23 @@ history AS (
 required_mandatory AS (
   SELECT
     ae.id AS employee_id,
+    rule.id AS rule_id,
     c.id AS course_id,
     c.leads_to_cert_id,
     c.recurrence_interval
   FROM active_emp ae
-  JOIN training.mandatory_assignment_rule rule
-    ON rule.is_active
-    AND (rule.team_id IS NULL OR rule.team_id = ae.team_id)
+  JOIN training.v_mandatory_rule_population population
+    ON population.employee_id = ae.id
+  JOIN training.mandatory_rules rule
+    ON rule.id = population.rule_id
   JOIN training.course c
     ON c.id = rule.course_id
     AND c.is_active
-    AND c.is_mandatory
 ),
 mandatory_gaps AS (
-  SELECT rm.employee_id, rm.course_id
-  FROM required_mandatory rm
-  WHERE rm.leads_to_cert_id IS NULL
-    OR NOT EXISTS (
-      SELECT 1
-      FROM training.certification_award ca
-      WHERE ca.employee_id = rm.employee_id
-        AND ca.certification_id = rm.leads_to_cert_id
-        AND ca.outcome = 'passed_exam'
-        AND (ca.expires_on IS NULL OR ca.expires_on > CURRENT_DATE)
-        AND (rm.recurrence_interval IS NULL OR ca.awarded_on + rm.recurrence_interval > CURRENT_DATE)
-    )
+  SELECT employee_id, rule_id, course_id
+  FROM training.v_mandatory_compliance_gap
+  WHERE compliance_status <> 'compliant'
 ),
 gap_summary AS (
   SELECT
@@ -199,10 +191,16 @@ LEFT JOIN failed f ON f.employee_id = ae.id
 LEFT JOIN next_deadline nd ON nd.employee_id = ae.id
 WHERE ($2 = '' OR t.code = $2)
   AND ($3 = '' OR ae.last_name || ' ' || ae.first_name ILIKE '%' || $3 || '%' OR ae.email::text ILIKE '%' || $3 || '%')
+  AND ($4 = '' OR EXISTS (
+    SELECT 1
+    FROM training.custom_group_members group_filter
+    WHERE group_filter.group_id = $4::uuid
+      AND group_filter.employee_id = ae.id
+  ))
 ORDER BY ae.last_name, ae.first_name
 LIMIT 500`
 
-	rows, err := s.db.QueryContext(ctx, q, effectiveYear, filters.Team, filters.Search)
+	rows, err := s.db.QueryContext(ctx, q, effectiveYear, filters.Team, filters.Search, filters.Group)
 	if err != nil {
 		return nil, fmt.Errorf("list training people directory: %w", err)
 	}

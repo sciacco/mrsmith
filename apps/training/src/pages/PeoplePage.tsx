@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
 import { Button, Modal, SearchInput, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import {
   useBulkAssignEnrollment,
+  useCustomGroups,
   usePeopleDirectory,
   useTrainingLookups,
 } from '../api/queries';
@@ -47,13 +48,15 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
 
   const year = params.get('year') ?? String(new Date().getFullYear());
   const team = params.get('team') ?? '';
+  const group = params.get('group') ?? '';
   const rawFilter = params.get('filter') ?? '';
   const filter = VALID_FILTERS.has(rawFilter) ? rawFilter : '';
   const q = params.get('q') ?? '';
   const sort = params.get('sort') === 'priority' ? 'priority' : 'alpha';
 
-  const directory = usePeopleDirectory({ year, team, filter, q }, isPeopleAdmin);
+  const directory = usePeopleDirectory({ year, team, group, filter, q }, isPeopleAdmin);
   const lookups = useTrainingLookups(isPeopleAdmin);
+  const groups = useCustomGroups({ status: 'attivo' }, isPeopleAdmin);
   const bulkAssign = useBulkAssignEnrollment(isPeopleAdmin);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -122,6 +125,7 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
       {
         employeeIds: ids,
         courseId: assignDraft.courseId,
+        sourceCustomGroupId: selectedGroup ? selectedGroup.id : undefined,
         planParams: {
           year: Number(year),
           plannedStart: assignDraft.plannedStart || undefined,
@@ -145,6 +149,14 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
   }
 
   const courses = lookups.data?.courses ?? [];
+  const groupOptions = useMemo(
+    () => [
+      { value: '', label: 'Tutti i gruppi' },
+      ...(groups.data?.groups ?? []).map((item) => ({ value: item.id, label: `${item.name} (${item.member_count})` })),
+    ],
+    [groups.data],
+  );
+  const selectedGroup = (groups.data?.groups ?? []).find((item) => item.id === group);
   const courseOptions = useMemo(
     () => courses.filter((c) => c.active).map((c) => ({ value: c.id, label: c.label })),
     [courses],
@@ -165,7 +177,12 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
           <h1>Persone</h1>
           <p className={styles.subtitle}>Directory dipendenti con priorità formative e azioni da gestire.</p>
         </div>
-        <SearchInput value={q} onChange={(value) => updateParam('q', value)} placeholder="Cerca per nome o email" />
+        <div className={styles.headerActions}>
+          <Link to="/persone/gruppi" className={styles.manageLink}>
+            Gestisci gruppi
+          </Link>
+          <SearchInput value={q} onChange={(value) => updateParam('q', value)} placeholder="Cerca per nome o email" />
+        </div>
       </header>
 
       <div className={styles.toolbar}>
@@ -183,6 +200,13 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
           ))}
         </div>
         <div className={styles.sortRow}>
+          <SingleSelect
+            options={groupOptions}
+            selected={group || null}
+            onChange={(value) => updateParam('group', value || null)}
+            placeholder="Gruppo"
+            allowClear
+          />
           <span className={styles.sortLabel}>Ordina</span>
           <button
             type="button"
@@ -202,6 +226,18 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
       </div>
 
       <div className={styles.counter}>{filteredPeople.length} persone</div>
+
+      {selectedGroup && filteredPeople.length > 0 && (
+        <div className={styles.groupStrip}>
+          <span>{selectedGroup.name}</span>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set(filteredPeople.map((person) => person.id)))}
+          >
+            Seleziona gruppo
+          </button>
+        </div>
+      )}
 
       {filteredPeople.length === 0 ? (
         <div className={styles.empty}>
@@ -236,7 +272,10 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
             submitAssign();
           }}
         >
-          <p className={styles.modalText}>{selected.size} persone selezionate · anno {year}</p>
+          <p className={styles.modalText}>
+            {selected.size} persone selezionate · anno {year}
+            {selectedGroup ? ` · ${selectedGroup.name}` : ''}
+          </p>
           <label>
             <span>Corso</span>
             <SingleSelect

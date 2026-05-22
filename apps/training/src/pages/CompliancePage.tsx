@@ -61,7 +61,7 @@ export function CompliancePage({ isPeopleAdmin }: CompliancePageProps) {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Compliance</h1>
-          <p className={styles.subtitle}>Copertura mandatory rules e scadenze imminenti.</p>
+          <p className={styles.subtitle}>Copertura delle regole obbligatorie e scadenze imminenti.</p>
         </div>
         <Link to="/compliance/regole" className={styles.manageLink}>
           Gestisci regole →
@@ -80,7 +80,7 @@ export function CompliancePage({ isPeopleAdmin }: CompliancePageProps) {
       </div>
 
       {data.rules.length === 0 ? (
-        <p className={styles.empty}>100% copertura su tutte le rule applicate al team.</p>
+        <p className={styles.empty}>Nessuna regola attiva. Crea la prima per iniziare.</p>
       ) : (
         <div className={styles.rules}>
           {data.rules.map((rule) => (

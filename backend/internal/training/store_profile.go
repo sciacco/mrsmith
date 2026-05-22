@@ -98,7 +98,7 @@ SELECT
   course_title,
   COALESCE(compliance_framework, ''),
   compliance_status,
-  COALESCE(last_valid_awarded_on::text, '')
+  COALESCE(last_valid_awarded_on::text, last_valid_completed_on::text, '')
 FROM training.v_mandatory_compliance_gap
 WHERE employee_id = $1::uuid
 ORDER BY compliance_status DESC, course_title`

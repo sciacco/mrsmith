@@ -18,6 +18,7 @@ type PlanningSuggestion struct {
 	EstimatedCost        float64  `json:"estimated_cost"`
 	Dismissed            bool     `json:"dismissed"`
 	RuleID               string   `json:"rule_id,omitempty"`
+	SourceCustomGroupID  string   `json:"source_custom_group_id,omitempty"`
 }
 
 type PlanningSummary struct {
@@ -82,10 +83,12 @@ type TransitionPlanResponse struct {
 }
 
 type BulkPlanFromSuggestionInput struct {
-	SuggestionID *string              `json:"suggestion_id"`
-	EmployeeIDs  []string             `json:"employee_ids"`
-	CourseID     string               `json:"course_id"`
-	PlanParams   BulkAssignPlanParams `json:"plan_params"`
+	SuggestionID        *string              `json:"suggestion_id"`
+	EmployeeIDs         []string             `json:"employee_ids"`
+	CourseID            string               `json:"course_id"`
+	PlanParams          BulkAssignPlanParams `json:"plan_params"`
+	MandatoryRuleID     string               `json:"mandatory_rule_id,omitempty"`
+	SourceCustomGroupID string               `json:"source_custom_group_id,omitempty"`
 }
 
 type BulkReviewEmployeeRequestsInput struct {

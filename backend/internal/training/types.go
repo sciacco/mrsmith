@@ -230,19 +230,21 @@ type ActionResponse struct {
 }
 
 type EnrollmentInput struct {
-	EmployeeID     string   `json:"employeeId"`
-	CourseID       string   `json:"courseId"`
-	TrainingPlanID string   `json:"trainingPlanId"`
-	Priority       *int     `json:"priority,omitempty"`
-	LevelAsIs      *int     `json:"levelAsIs,omitempty"`
-	LevelToBe      *int     `json:"levelToBe,omitempty"`
-	PlannedStart   string   `json:"plannedStart,omitempty"`
-	PlannedEnd     string   `json:"plannedEnd,omitempty"`
-	HoursPlanned   *int     `json:"hoursPlanned,omitempty"`
-	CostPlanned    *float64 `json:"costPlanned,omitempty"`
-	Motivation     string   `json:"motivation,omitempty"`
-	Objective      string   `json:"objective,omitempty"`
-	Notes          string   `json:"notes,omitempty"`
+	EmployeeID          string   `json:"employeeId"`
+	CourseID            string   `json:"courseId"`
+	TrainingPlanID      string   `json:"trainingPlanId"`
+	Priority            *int     `json:"priority,omitempty"`
+	LevelAsIs           *int     `json:"levelAsIs,omitempty"`
+	LevelToBe           *int     `json:"levelToBe,omitempty"`
+	PlannedStart        string   `json:"plannedStart,omitempty"`
+	PlannedEnd          string   `json:"plannedEnd,omitempty"`
+	HoursPlanned        *int     `json:"hoursPlanned,omitempty"`
+	CostPlanned         *float64 `json:"costPlanned,omitempty"`
+	Motivation          string   `json:"motivation,omitempty"`
+	Objective           string   `json:"objective,omitempty"`
+	Notes               string   `json:"notes,omitempty"`
+	MandatoryRuleID     string   `json:"mandatoryRuleId,omitempty"`
+	SourceCustomGroupID string   `json:"sourceCustomGroupId,omitempty"`
 }
 
 type EnrollmentTransitionInput struct {
@@ -283,6 +285,7 @@ type PersonSummary struct {
 type PeopleDirectoryFilters struct {
 	Year   int
 	Team   string
+	Group  string
 	Filter string
 	Search string
 }
@@ -297,9 +300,11 @@ type BulkAssignPlanParams struct {
 }
 
 type BulkAssignInput struct {
-	EmployeeIDs []string             `json:"employee_ids"`
-	CourseID    string               `json:"course_id"`
-	PlanParams  BulkAssignPlanParams `json:"plan_params"`
+	EmployeeIDs         []string             `json:"employee_ids"`
+	CourseID            string               `json:"course_id"`
+	PlanParams          BulkAssignPlanParams `json:"plan_params"`
+	MandatoryRuleID     string               `json:"mandatory_rule_id,omitempty"`
+	SourceCustomGroupID string               `json:"source_custom_group_id,omitempty"`
 }
 
 type BulkAssignFailure struct {

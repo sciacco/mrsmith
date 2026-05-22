@@ -4,6 +4,7 @@ import { Button, Drawer, SingleSelect, StatusBadge, useToast } from '@mrsmith/ui
 import {
   useBulkPlanFromSuggestion,
   useBulkReviewEmployeeRequests,
+  useCustomGroups,
   usePeopleDirectory,
   useTrainingLookups,
   useTrainingWorkspace,
@@ -168,6 +169,8 @@ function CreateFromSuggestion({
           cost_planned: suggestion.suggested_course_cost,
           mandatory: suggestion.origin === 'compliance',
         },
+        mandatory_rule_id: suggestion.rule_id,
+        source_custom_group_id: suggestion.source_custom_group_id,
       });
       toast(`Create ${res.created} iscrizioni`);
       onCompleted?.(res.created);
@@ -467,6 +470,7 @@ function CreateFromScratch({
   const bulkPlan = useBulkPlanFromSuggestion();
   const [search, setSearch] = useState('');
   const people = usePeopleDirectory({ year: String(year), team, q: search }, open);
+  const groups = useCustomGroups({ status: 'attivo' }, open);
   const [courseId, setCourseId] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [plannedStart, setPlannedStart] = useState('');
@@ -474,12 +478,16 @@ function CreateFromScratch({
   const [filterTeam, setFilterTeam] = useState<string>('all');
   const [filterOnlyGap, setFilterOnlyGap] = useState(false);
   const [filterHideEnrolled, setFilterHideEnrolled] = useState(true);
+  const [selectionMode, setSelectionMode] = useState<'people' | 'group'>('people');
+  const [selectedGroupId, setSelectedGroupId] = useState('');
 
   useEffect(() => {
     if (!open) return;
     setSearch('');
     setCourseId('');
     setSelectedIds(new Set());
+    setSelectionMode('people');
+    setSelectedGroupId('');
     setFilterTeam('all');
     setFilterOnlyGap(false);
     setFilterHideEnrolled(true);
@@ -499,8 +507,16 @@ function CreateFromScratch({
     () => activeCourses.map((course) => ({ value: course.id, label: course.title })),
     [activeCourses],
   );
+  const groupOptions = useMemo(
+    () =>
+      (groups.data?.groups ?? [])
+        .filter((group) => group.active)
+        .map((group) => ({ value: group.id, label: `${group.name} (${group.member_count})` })),
+    [groups.data],
+  );
 
   const selectedCourse = activeCourses.find((course) => course.id === courseId);
+  const selectedGroup = (groups.data?.groups ?? []).find((group) => group.id === selectedGroupId);
   const directoryPeople = people.data ?? [];
 
   const alreadyEnrolledEmails = useMemo(() => {
@@ -601,6 +617,12 @@ function CreateFromScratch({
     });
   }
 
+  function chooseGroup(groupId: string) {
+    setSelectedGroupId(groupId);
+    const group = (groups.data?.groups ?? []).find((item) => item.id === groupId);
+    setSelectedIds(new Set((group?.members ?? []).map((member) => member.id)));
+  }
+
   const selectableDisplayedCount = displayedPeople.filter(
     (p) => !alreadyEnrolledEmails.has(p.email.toLowerCase()),
   ).length;
@@ -625,6 +647,7 @@ function CreateFromScratch({
           cost_planned: selectedCourse.defaultCost,
           mandatory: selectedCourse.mandatory,
         },
+        source_custom_group_id: selectionMode === 'group' ? selectedGroupId || undefined : undefined,
       });
       toast(`Create ${res.created} iscrizioni`);
       onCompleted?.(res.created);
@@ -740,6 +763,48 @@ function CreateFromScratch({
             )}
           </header>
 
+          <div className={styles.segmented} role="tablist" aria-label="Origine selezione">
+            <button
+              type="button"
+              className={`${styles.segmentedButton} ${selectionMode === 'people' ? styles.segmentedActive : ''}`}
+              onClick={() => {
+                setSelectionMode('people');
+                setSelectedGroupId('');
+                setSelectedIds(new Set());
+              }}
+            >
+              Scegli persone
+            </button>
+            <button
+              type="button"
+              className={`${styles.segmentedButton} ${selectionMode === 'group' ? styles.segmentedActive : ''}`}
+              onClick={() => {
+                setSelectionMode('group');
+                setSelectedIds(new Set());
+              }}
+            >
+              Scegli gruppo
+            </button>
+          </div>
+
+          {selectionMode === 'group' && (
+            <div className={styles.groupPicker}>
+              <SingleSelect
+                options={groupOptions}
+                selected={selectedGroupId || null}
+                onChange={(value) => chooseGroup(value ?? '')}
+                placeholder="Seleziona gruppo"
+                searchable
+              />
+              {selectedGroup && (
+                <p className={styles.sectionHint}>
+                  {selectedGroup.member_count} persone · {selectedGroup.description || 'Popolazione ad-hoc'}
+                </p>
+              )}
+            </div>
+          )}
+
+          {selectionMode === 'people' && (
           <div className={styles.peopleFilters}>
             <div className={styles.peopleFiltersRow}>
               <input
@@ -784,6 +849,7 @@ function CreateFromScratch({
               )}
             </div>
           </div>
+          )}
 
           {selectedPeopleArray.length > 0 && (
             <div className={styles.selectedStack}>
@@ -814,7 +880,32 @@ function CreateFromScratch({
             </div>
           )}
 
-          {people.isLoading ? (
+          {selectionMode === 'group' && !selectedGroupId ? (
+            <p className={styles.empty}>Nessun gruppo selezionato.</p>
+          ) : selectionMode === 'group' && selectedGroup && selectedGroup.member_count === 0 ? (
+            <p className={styles.empty}>Il gruppo non contiene persone.</p>
+          ) : selectionMode === 'group' ? (
+            <ul className={styles.personList}>
+              {(selectedGroup?.members ?? []).map((member) => (
+                <li key={member.id} className={styles.personRow}>
+                  <label className={styles.personLabel}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(member.id)}
+                      onChange={() => toggle(member.id)}
+                    />
+                    <span className={styles.personBody}>
+                      <span className={styles.personHeader}>
+                        <span className={styles.personName}>{member.name}</span>
+                        {member.team_code && <span className={styles.personTeam}>{member.team_code}</span>}
+                      </span>
+                      <span className={styles.personMeta}>{member.email}</span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          ) : people.isLoading ? (
             <p className={styles.empty}>Caricamento persone...</p>
           ) : displayedPeople.length === 0 ? (
             <p className={styles.empty}>Nessuna persona trovata.</p>

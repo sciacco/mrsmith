@@ -151,6 +151,14 @@ func (h *handler) handleBulkAssignEnrollment(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
+	if len(input.EmployeeIDs) == 0 && strings.TrimSpace(input.SourceCustomGroupID) != "" {
+		ids, err := h.store.CustomGroupMemberIDs(r.Context(), h.store.db, input.SourceCustomGroupID)
+		if err != nil {
+			h.writeActionError(w, r, err, "training.bulk_assign")
+			return
+		}
+		input.EmployeeIDs = ids
+	}
 	if len(input.EmployeeIDs) == 0 {
 		h.writeActionError(w, r, validationError("missing_employee_ids", "indica almeno una persona"), "training.bulk_assign")
 		return
@@ -171,13 +179,15 @@ func (h *handler) handleBulkAssignEnrollment(w http.ResponseWriter, r *http.Requ
 	response := BulkAssignResponse{Failures: []BulkAssignFailure{}}
 	for _, employeeID := range input.EmployeeIDs {
 		_, err := h.store.CreateEnrollment(r.Context(), principal, EnrollmentInput{
-			EmployeeID:     strings.TrimSpace(employeeID),
-			CourseID:       input.CourseID,
-			TrainingPlanID: planID,
-			PlannedStart:   input.PlanParams.PlannedStart,
-			PlannedEnd:     input.PlanParams.PlannedEnd,
-			HoursPlanned:   input.PlanParams.HoursPlanned,
-			CostPlanned:    input.PlanParams.CostPlanned,
+			EmployeeID:          strings.TrimSpace(employeeID),
+			CourseID:            input.CourseID,
+			TrainingPlanID:      planID,
+			PlannedStart:        input.PlanParams.PlannedStart,
+			PlannedEnd:          input.PlanParams.PlannedEnd,
+			HoursPlanned:        input.PlanParams.HoursPlanned,
+			CostPlanned:         input.PlanParams.CostPlanned,
+			MandatoryRuleID:     input.MandatoryRuleID,
+			SourceCustomGroupID: input.SourceCustomGroupID,
 		})
 		if err != nil {
 			failure := BulkAssignFailure{EmployeeID: employeeID, Message: err.Error()}
@@ -267,6 +277,7 @@ func (h *handler) handlePeopleDirectory(w http.ResponseWriter, r *http.Request) 
 	}
 	filters := PeopleDirectoryFilters{
 		Team:   strings.TrimSpace(r.URL.Query().Get("team")),
+		Group:  strings.TrimSpace(r.URL.Query().Get("group")),
 		Filter: strings.TrimSpace(r.URL.Query().Get("filter")),
 		Search: strings.TrimSpace(r.URL.Query().Get("q")),
 	}

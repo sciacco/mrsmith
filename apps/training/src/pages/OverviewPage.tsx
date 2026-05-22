@@ -59,7 +59,7 @@ export function OverviewPage({ isPeopleAdmin }: OverviewPageProps) {
         <FamilyCard
           title="Compliance"
           family={data.compliance}
-          subtitle="Copertura mandatory rules"
+          subtitle="Copertura regole obbligatorie"
         />
         <FamilyCard
           title="Budget"

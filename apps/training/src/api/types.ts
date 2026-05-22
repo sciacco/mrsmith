@@ -411,6 +411,7 @@ export interface PlanningSuggestion {
   estimated_cost: number;
   dismissed: boolean;
   rule_id?: string;
+  source_custom_group_id?: string;
 }
 
 export type PlanStatus = 'draft' | 'open' | 'frozen' | 'closed' | 'missing';
@@ -486,6 +487,8 @@ export interface BulkPlanFromSuggestionInput {
     cost_planned?: number;
     mandatory: boolean;
   };
+  mandatory_rule_id?: string;
+  source_custom_group_id?: string;
 }
 
 export interface BulkReviewEmployeeRequestsInput {
@@ -537,6 +540,107 @@ export interface ComplianceOverviewResponse {
   deadline_days: number;
   expiring_deadlines: ComplianceExpiringRow[];
   rules: ComplianceRule[];
+}
+
+export type PopulationKind = 'all' | 'team' | 'skill_area' | 'custom_group';
+
+export interface PopulationTarget {
+  kind: PopulationKind;
+  id?: string;
+  label?: string;
+  count?: number;
+}
+
+export interface RuleUsage {
+  kind: 'enrollment' | 'rule';
+  id?: string;
+  label: string;
+  count?: number;
+}
+
+export interface RuleImpact {
+  target_count: number;
+  covered_count: number;
+  gap_count: number;
+  coverage_pct: number;
+  severity: 'critical' | 'warning' | 'ok';
+  gaps?: ComplianceRuleGap[];
+}
+
+export interface MandatoryRule {
+  id: string;
+  name: string;
+  course_id: string;
+  course_title: string;
+  compliance_framework?: string;
+  cadence_label?: string;
+  population_target: PopulationTarget;
+  active: boolean;
+  notes?: string;
+  coverage_pct: number;
+  covered_count: number;
+  target_count: number;
+  gap_count: number;
+  gaps?: ComplianceRuleGap[];
+  severity: 'critical' | 'warning' | 'ok';
+  used_by?: RuleUsage[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface MandatoryRuleInput {
+  name: string;
+  course_id: string;
+  population_target: PopulationTarget;
+  active?: boolean;
+  notes?: string;
+}
+
+export interface MandatoryRulesResponse {
+  rules: MandatoryRule[];
+}
+
+export interface MandatoryRuleMutationResponse {
+  rule: MandatoryRule;
+  warnings?: string[];
+  impact: RuleImpact;
+}
+
+export interface GroupMember {
+  id: string;
+  name: string;
+  email: string;
+  team_code?: string;
+}
+
+export interface CustomGroupUsage {
+  kind: 'rule' | 'enrollment';
+  id?: string;
+  label: string;
+  count?: number;
+}
+
+export interface CustomGroup {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  member_count: number;
+  members?: GroupMember[];
+  used_by?: CustomGroupUsage[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CustomGroupInput {
+  name: string;
+  description?: string;
+  active?: boolean;
+  member_ids: string[];
+}
+
+export interface CustomGroupsResponse {
+  groups: CustomGroup[];
 }
 
 export interface CatalogCourseWithCounts extends CatalogCourse {

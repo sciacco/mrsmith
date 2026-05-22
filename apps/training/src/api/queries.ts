@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from './client';
-import { mockPeopleDirectory, mockWorkspace } from './mockData';
+import { mockCustomGroups, mockMandatoryRules, mockPeopleDirectory, mockWorkspace } from './mockData';
 import type {
   ActionResponse,
   BulkAssignResponse,
@@ -12,8 +12,14 @@ import type {
   CatalogListResponse,
   ComplianceOverviewResponse,
   CreatePlanInput,
+  CustomGroup,
+  CustomGroupInput,
+  CustomGroupsResponse,
   JobRunResponse,
   LookupResponse,
+  MandatoryRuleInput,
+  MandatoryRuleMutationResponse,
+  MandatoryRulesResponse,
   PersonUpdateInput,
   OverviewResponse,
   PersonProfile,
@@ -139,6 +145,7 @@ export function useEnrollmentTransition(isPeopleAdmin: boolean) {
 export interface PeopleDirectoryFilters {
   year?: string;
   team?: string;
+  group?: string;
   filter?: string;
   q?: string;
 }
@@ -152,6 +159,7 @@ export function usePeopleDirectory(filters: PeopleDirectoryFilters, enabled: boo
       const params = new URLSearchParams();
       if (filters.year) params.set('year', filters.year);
       if (filters.team) params.set('team', filters.team);
+      if (filters.group) params.set('group', filters.group);
       if (filters.filter) params.set('filter', filters.filter);
       if (filters.q) params.set('q', filters.q);
       const suffix = params.toString();
@@ -228,6 +236,8 @@ export function useBulkAssignEnrollment(isPeopleAdmin: boolean) {
         costPlanned?: number;
         mandatory: boolean;
       };
+      mandatoryRuleId?: string;
+      sourceCustomGroupId?: string;
     }): Promise<BulkAssignResponse> => {
       if (useMocks) return { created: body.employeeIds.length, failed: 0 };
       return api.post<BulkAssignResponse>('/training/v1/people/enrollments/bulk-assign', {
@@ -241,6 +251,8 @@ export function useBulkAssignEnrollment(isPeopleAdmin: boolean) {
           cost_planned: body.planParams.costPlanned,
           mandatory: body.planParams.mandatory,
         },
+        mandatory_rule_id: body.mandatoryRuleId,
+        source_custom_group_id: body.sourceCustomGroupId,
       });
     },
     onSuccess: () => {
@@ -740,6 +752,130 @@ export function useComplianceOverview(year: string, team: string, deadlineDays: 
       if (team) params.set('team', team);
       if (deadlineDays) params.set('deadline_days', String(deadlineDays));
       return api.get<ComplianceOverviewResponse>(`/training/v1/people/compliance?${params.toString()}`);
+    },
+  });
+}
+
+export function useMandatoryRules(
+  filters: { status?: string; populationKind?: string; q?: string },
+  enabled: boolean,
+) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'mandatory-rules-v2', filters],
+    enabled,
+    queryFn: async (): Promise<MandatoryRulesResponse> => {
+      const params = new URLSearchParams();
+      if (filters.status) params.set('status', filters.status);
+      if (filters.populationKind) params.set('population_kind', filters.populationKind);
+      if (filters.q) params.set('q', filters.q);
+      const suffix = params.toString();
+      if (useMocks) return { rules: mockMandatoryRules() };
+      return api.get<MandatoryRulesResponse>(`/training/v1/compliance/rules${suffix ? `?${suffix}` : ''}`);
+    },
+  });
+}
+
+export function useCreateMandatoryRule() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MandatoryRuleInput): Promise<MandatoryRuleMutationResponse> =>
+      api.post<MandatoryRuleMutationResponse>('/training/v1/compliance/rules', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'mandatory-rules-v2'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'compliance'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
+    },
+  });
+}
+
+export function useUpdateMandatoryRule() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: MandatoryRuleInput }): Promise<MandatoryRuleMutationResponse> =>
+      api.patch<MandatoryRuleMutationResponse>(`/training/v1/compliance/rules/${id}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'mandatory-rules-v2'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'compliance'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
+    },
+  });
+}
+
+export function useDeleteMandatoryRule() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string): Promise<{ ok: boolean }> =>
+      api.delete<{ ok: boolean }>(`/training/v1/compliance/rules/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'mandatory-rules-v2'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'compliance'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
+    },
+  });
+}
+
+export function useCustomGroups(filters: { status?: string; q?: string }, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'custom-groups', filters],
+    enabled,
+    queryFn: async (): Promise<CustomGroupsResponse> => {
+      const params = new URLSearchParams();
+      if (filters.status) params.set('status', filters.status);
+      if (filters.q) params.set('q', filters.q);
+      const suffix = params.toString();
+      if (useMocks) return { groups: mockCustomGroups() };
+      return api.get<CustomGroupsResponse>(`/training/v1/people/groups${suffix ? `?${suffix}` : ''}`);
+    },
+  });
+}
+
+export function useCreateCustomGroup() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CustomGroupInput): Promise<CustomGroup> =>
+      api.post<CustomGroup>('/training/v1/people/groups', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'custom-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'mandatory-rules-v2'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
+    },
+  });
+}
+
+export function useUpdateCustomGroup() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: CustomGroupInput }): Promise<CustomGroup> =>
+      api.patch<CustomGroup>(`/training/v1/people/groups/${id}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'custom-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'mandatory-rules-v2'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'compliance'] });
+    },
+  });
+}
+
+export function useDeleteCustomGroup() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string): Promise<{ ok: boolean }> =>
+      api.delete<{ ok: boolean }>(`/training/v1/people/groups/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'custom-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
     },
   });
 }

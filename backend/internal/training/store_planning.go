@@ -244,14 +244,21 @@ func scanTextArray(value *pgtype.FlatArray[string]) sql.Scanner {
 func (s *SQLStore) suggestionsCompliance(ctx context.Context, team string) ([]PlanningSuggestion, error) {
 	const q = `
 SELECT
+  g.rule_id::text,
+  rule.name,
   g.course_id::text,
   g.course_title,
   COALESCE(g.compliance_framework, ''),
   COUNT(*) AS affected,
   array_agg(g.employee_id::text ORDER BY g.last_name, g.first_name) AS emp_ids,
   c.default_cost::float8,
-  c.default_hours
+  c.default_hours,
+  CASE
+    WHEN rule.population_target->>'kind' = 'custom_group' THEN rule.population_target->>'id'
+    ELSE ''
+  END AS source_custom_group_id
 FROM training.v_mandatory_compliance_gap g
+JOIN training.mandatory_rules rule ON rule.id = g.rule_id
 JOIN training.course c ON c.id = g.course_id
 LEFT JOIN training.team_membership tm
   ON tm.employee_id = g.employee_id
@@ -260,7 +267,7 @@ LEFT JOIN training.team_membership tm
 LEFT JOIN training.team t ON t.id = tm.team_id
 WHERE g.compliance_status = 'missing_or_expired'
   AND ($1 = '' OR t.code = $1)
-GROUP BY g.course_id, g.course_title, g.compliance_framework, c.default_cost, c.default_hours
+GROUP BY g.rule_id, rule.name, g.course_id, g.course_title, g.compliance_framework, c.default_cost, c.default_hours, rule.population_target
 ORDER BY affected DESC`
 	rows, err := s.db.QueryContext(ctx, q, team)
 	if err != nil {
@@ -269,23 +276,27 @@ ORDER BY affected DESC`
 	defer rows.Close()
 	result := make([]PlanningSuggestion, 0)
 	for rows.Next() {
-		var courseID, title, framework string
+		var ruleID, ruleName, courseID, title, framework, sourceCustomGroupID string
 		var affected int
 		var empIDs pgtype.FlatArray[string]
 		var cost sql.NullFloat64
 		var hours sql.NullInt32
-		if err := rows.Scan(&courseID, &title, &framework, &affected, scanTextArray(&empIDs), &cost, &hours); err != nil {
+		if err := rows.Scan(&ruleID, &ruleName, &courseID, &title, &framework, &affected, scanTextArray(&empIDs), &cost, &hours, &sourceCustomGroupID); err != nil {
 			return nil, fmt.Errorf("scan compliance suggestion: %w", err)
 		}
 		costVal := 0.0
 		if cost.Valid {
 			costVal = cost.Float64
 		}
-		sig := suggestionSignature("compliance", courseID)
-		title2 := fmt.Sprintf("%d dipendenti senza %s", affected, title)
+		sig := suggestionSignature("compliance", ruleID)
+		displayTitle := strings.TrimSpace(ruleName)
+		if displayTitle == "" {
+			displayTitle = title
+		}
+		title2 := fmt.Sprintf("%d persone senza %s", affected, displayTitle)
 		desc := framework
 		if desc == "" {
-			desc = "Mandatory rule non coperta"
+			desc = "Regola non coperta"
 		}
 		sug := PlanningSuggestion{
 			ID:                   sig,
@@ -299,6 +310,8 @@ ORDER BY affected DESC`
 			SuggestedCourseName:  title,
 			EstimatedCost:        costVal * float64(affected),
 			AlternativeCourseIDs: []string{},
+			RuleID:               ruleID,
+			SourceCustomGroupID:  sourceCustomGroupID,
 		}
 		if hours.Valid {
 			hv := int(hours.Int32)
@@ -923,6 +936,13 @@ func (s *SQLStore) BulkPlanFromSuggestion(ctx context.Context, principal Princip
 	if strings.TrimSpace(input.CourseID) == "" {
 		return BulkAssignResponse{}, validationError("missing_course_id", "corso obbligatorio")
 	}
+	if len(input.EmployeeIDs) == 0 && strings.TrimSpace(input.SourceCustomGroupID) != "" {
+		ids, err := s.CustomGroupMemberIDs(ctx, s.db, input.SourceCustomGroupID)
+		if err != nil {
+			return BulkAssignResponse{}, err
+		}
+		input.EmployeeIDs = ids
+	}
 	if len(input.EmployeeIDs) == 0 {
 		return BulkAssignResponse{}, validationError("missing_employee_ids", "indica almeno una persona")
 	}
@@ -935,13 +955,15 @@ func (s *SQLStore) BulkPlanFromSuggestion(ctx context.Context, principal Princip
 	for _, employeeID := range input.EmployeeIDs {
 		empID := strings.TrimSpace(employeeID)
 		created, err := s.CreateEnrollment(ctx, principal, EnrollmentInput{
-			EmployeeID:     empID,
-			CourseID:       input.CourseID,
-			TrainingPlanID: planID,
-			PlannedStart:   input.PlanParams.PlannedStart,
-			PlannedEnd:     input.PlanParams.PlannedEnd,
-			HoursPlanned:   input.PlanParams.HoursPlanned,
-			CostPlanned:    input.PlanParams.CostPlanned,
+			EmployeeID:          empID,
+			CourseID:            input.CourseID,
+			TrainingPlanID:      planID,
+			PlannedStart:        input.PlanParams.PlannedStart,
+			PlannedEnd:          input.PlanParams.PlannedEnd,
+			HoursPlanned:        input.PlanParams.HoursPlanned,
+			CostPlanned:         input.PlanParams.CostPlanned,
+			MandatoryRuleID:     input.MandatoryRuleID,
+			SourceCustomGroupID: input.SourceCustomGroupID,
 		})
 		if err != nil {
 			response.Failed++
@@ -957,14 +979,22 @@ func (s *SQLStore) BulkPlanFromSuggestion(ctx context.Context, principal Princip
 	}
 	eventType := bulkPlanAuditEventType(input.SuggestionID)
 	payload := map[string]any{
-		"suggestion_id":  normalizeSuggestionID(input.SuggestionID),
-		"course_id":      input.CourseID,
-		"employee_count": len(input.EmployeeIDs),
-		"created":        response.Created,
-		"failed":         response.Failed,
+		"suggestion_id":          normalizeSuggestionID(input.SuggestionID),
+		"course_id":              input.CourseID,
+		"employee_count":         len(input.EmployeeIDs),
+		"created":                response.Created,
+		"failed":                 response.Failed,
+		"mandatory_rule_id":      strings.TrimSpace(input.MandatoryRuleID),
+		"source_custom_group_id": strings.TrimSpace(input.SourceCustomGroupID),
 	}
 	if normalizeSuggestionID(input.SuggestionID) == "" {
 		delete(payload, "suggestion_id")
+	}
+	if strings.TrimSpace(input.MandatoryRuleID) == "" {
+		delete(payload, "mandatory_rule_id")
+	}
+	if strings.TrimSpace(input.SourceCustomGroupID) == "" {
+		delete(payload, "source_custom_group_id")
 	}
 	if err := s.withTx(ctx, func(tx *sql.Tx) error {
 		return emitPlanAuditEvent(ctx, tx, principal, planID, eventType, payload)

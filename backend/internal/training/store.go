@@ -525,15 +525,17 @@ SELECT
   rule.id::text,
   rule.course_id::text,
   course.title,
-  COALESCE(rule.team_id::text, ''),
+  CASE WHEN rule.population_target->>'kind' = 'team' THEN COALESCE(rule.population_target->>'id', '') ELSE '' END,
   COALESCE(team.code || ' - ' || team.name, ''),
-  COALESCE(rule.role_filter, ''),
+  '',
   COALESCE(rule.notes, ''),
   rule.is_active
-FROM training.mandatory_assignment_rule rule
+FROM training.mandatory_rules rule
 JOIN training.course course ON course.id = rule.course_id
-LEFT JOIN training.team team ON team.id = rule.team_id
-ORDER BY rule.is_active DESC, course.title, team.code NULLS FIRST, rule.role_filter NULLS FIRST
+LEFT JOIN training.team team
+  ON rule.population_target->>'kind' = 'team'
+ AND team.id = (rule.population_target->>'id')::uuid
+ORDER BY rule.is_active DESC, course.title, team.code NULLS FIRST
 LIMIT 500`
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
@@ -694,7 +696,7 @@ SELECT
   concat(last_name, ' ', first_name),
   course_title,
   COALESCE(compliance_framework, ''),
-  COALESCE(last_valid_awarded_on::text, ''),
+  COALESCE(last_valid_awarded_on::text, last_valid_completed_on::text, ''),
   compliance_status
 FROM training.v_mandatory_compliance_gap
 WHERE $1::boolean OR employee_id = (

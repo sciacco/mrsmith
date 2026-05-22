@@ -427,6 +427,8 @@ INSERT INTO training.enrollment (
   employee_id,
   course_id,
   training_plan_id,
+  mandatory_rule_id,
+  source_custom_group_id,
   priority,
   level_as_is,
   level_to_be,
@@ -444,6 +446,8 @@ SELECT
   $1::uuid,
   c.id,
   $3::uuid,
+  $14::uuid,
+  $15::uuid,
   $4,
   $5,
   $6,
@@ -476,6 +480,8 @@ RETURNING id::text, status::text`
 			input.Motivation,
 			input.Objective,
 			input.Notes,
+			nullableUUID(input.MandatoryRuleID),
+			nullableUUID(input.SourceCustomGroupID),
 		).Scan(&response.ID, &response.Status); err != nil {
 			return fmt.Errorf("create training enrollment: %w", err)
 		}
@@ -1053,13 +1059,40 @@ func (s *SQLStore) UpsertMandatoryRule(ctx context.Context, principal Principal,
 	if strings.TrimSpace(input.CourseID) == "" {
 		return ActionResponse{}, validationError("course_required", "corso obbligatorio")
 	}
-	return s.upsertSimple(ctx, principal, "mandatory_assignment_rule", id, []upsertField{
-		typedField("course_id", nullableUUID(input.CourseID), "::uuid"),
-		typedField("team_id", nullableUUID(input.TeamID), "::uuid"),
-		field("role_filter", nullableText(input.RoleFilter)),
-		field("is_active", boolValue(input.Active, true)),
-		field("notes", nullableText(input.Notes)),
-	})
+	active := boolValue(input.Active, true)
+	notes := strings.TrimSpace(input.Notes)
+	if strings.TrimSpace(input.RoleFilter) != "" {
+		active = false
+		notes = strings.TrimSpace(strings.Join([]string{
+			notes,
+			"Disattivata: filtro ruolo legacy non supportato nelle popolazioni M5.",
+		}, "\n"))
+	}
+	target := PopulationTarget{Kind: "all"}
+	if strings.TrimSpace(input.TeamID) != "" {
+		target = PopulationTarget{Kind: "team", ID: strings.TrimSpace(input.TeamID)}
+	}
+	title, err := s.courseTitle(ctx, s.db, input.CourseID)
+	if err != nil {
+		return ActionResponse{}, err
+	}
+	body := MandatoryRuleInputV2{
+		Name:             title,
+		CourseID:         input.CourseID,
+		PopulationTarget: target,
+		Active:           &active,
+		Notes:            notes,
+	}
+	var response MandatoryRuleMutationResponse
+	if strings.TrimSpace(id) == "" {
+		response, err = s.CreateMandatoryRule(ctx, principal, body)
+	} else {
+		response, err = s.UpdateMandatoryRule(ctx, principal, id, body)
+	}
+	if err != nil {
+		return ActionResponse{}, err
+	}
+	return ActionResponse{OK: true, ID: response.Rule.ID}, nil
 }
 
 func monthsInterval(months *int) any {
