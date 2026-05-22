@@ -1,4 +1,134 @@
-import type { WorkspaceResponse } from './types';
+import type { PersonFlagKey, PersonFlags, PersonSummary, WorkspaceResponse } from './types';
+
+interface MockPeopleDirectoryFilters {
+  team?: string;
+  filter?: string;
+  q?: string;
+}
+
+const EMPTY_FLAGS: PersonFlags = {
+  da_pianificare: false,
+  compliance_gap: false,
+  scadenze_imminenti: false,
+  failed_recente: false,
+  senza_formazione_attiva: false,
+};
+
+function flags(overrides: Partial<PersonFlags>): PersonFlags {
+  return { ...EMPTY_FLAGS, ...overrides };
+}
+
+const mockDirectoryRows: PersonSummary[] = [
+  {
+    id: 'employee-ada',
+    name: 'Verdi Ada',
+    email: 'ada.verdi@cdlan.it',
+    team_code: 'CLOUD',
+    flags: flags({ da_pianificare: true, compliance_gap: true }),
+    active_enrollments_count: 1,
+    next_deadline: null,
+    priority_score: 5010,
+    gaps_open: 1,
+    expiring_certs_count: 0,
+    historical_enrollments: 4,
+  },
+  {
+    id: 'employee-marco',
+    name: 'Rossi Marco',
+    email: 'marco.rossi@cdlan.it',
+    team_code: 'APPLICATIONS',
+    flags: flags({ compliance_gap: true }),
+    active_enrollments_count: 2,
+    next_deadline: null,
+    priority_score: 4010,
+    gaps_open: 1,
+    expiring_certs_count: 0,
+    historical_enrollments: 8,
+  },
+  {
+    id: 'employee-laura',
+    name: 'Bianchi Laura',
+    email: 'laura.bianchi@cdlan.it',
+    team_code: 'CLOUD',
+    flags: flags({ scadenze_imminenti: true }),
+    active_enrollments_count: 1,
+    next_deadline: { type: 'cert', date: '2026-06-19', label: 'Cert in scadenza' },
+    priority_score: 3005,
+    gaps_open: 0,
+    expiring_certs_count: 1,
+    historical_enrollments: 6,
+  },
+  {
+    id: 'employee-federico',
+    name: 'Neri Federico',
+    email: 'federico.neri@cdlan.it',
+    team_code: 'SECURITY',
+    flags: flags({ failed_recente: true }),
+    active_enrollments_count: 1,
+    next_deadline: null,
+    priority_score: 2503,
+    gaps_open: 0,
+    expiring_certs_count: 0,
+    historical_enrollments: 5,
+  },
+  {
+    id: 'employee-giulia',
+    name: 'Gallo Giulia',
+    email: 'giulia.gallo@cdlan.it',
+    team_code: 'PEOPLE',
+    flags: flags({ senza_formazione_attiva: true }),
+    active_enrollments_count: 0,
+    next_deadline: null,
+    priority_score: 1001,
+    gaps_open: 0,
+    expiring_certs_count: 0,
+    historical_enrollments: 2,
+  },
+  {
+    id: 'employee-marta',
+    name: 'Conti Marta',
+    email: 'marta.conti@cdlan.it',
+    team_code: 'APPLICATIONS',
+    flags: flags({ da_pianificare: true, compliance_gap: true, scadenze_imminenti: true }),
+    active_enrollments_count: 0,
+    next_deadline: { type: 'mandatory_due', date: '2026-06-04', label: 'Ricorrenza obbligatoria' },
+    priority_score: 5016,
+    gaps_open: 1,
+    expiring_certs_count: 1,
+    historical_enrollments: 3,
+  },
+  {
+    id: 'employee-nadia',
+    name: 'Ferri Nadia',
+    email: 'nadia.ferri@cdlan.it',
+    team_code: 'FINANCE',
+    flags: flags({}),
+    active_enrollments_count: 2,
+    next_deadline: { type: 'course_end', date: '2026-07-10', label: 'Fine corso prevista' },
+    priority_score: 0,
+    gaps_open: 0,
+    expiring_certs_count: 0,
+    historical_enrollments: 9,
+  },
+];
+
+function filterMatches(row: PersonSummary, filter: string): boolean {
+  if (!filter) return true;
+  if (filter in row.flags) return row.flags[filter as PersonFlagKey];
+  return true;
+}
+
+export function mockPeopleDirectory(filters: MockPeopleDirectoryFilters = {}): PersonSummary[] {
+  const team = filters.team?.trim() ?? '';
+  const q = filters.q?.trim().toLowerCase() ?? '';
+  const filter = filters.filter?.trim() ?? '';
+
+  return mockDirectoryRows.filter((row) => {
+    if (team && row.team_code !== team) return false;
+    if (q && !`${row.name} ${row.email}`.toLowerCase().includes(q)) return false;
+    return filterMatches(row, filter);
+  });
+}
 
 export function mockWorkspace(isPeopleAdmin: boolean): WorkspaceResponse {
   const me = {

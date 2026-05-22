@@ -15,7 +15,19 @@
   background: currentColor;
 }
 
-.a_norma { background: var(--color-success-bg, #ecfdf5); color: #047857; }
-.con_gap { background: var(--color-warning-subtle, #fef2f2); color: #b91c1c; }
-.senza_piano { background: var(--color-warning-subtle, #fef3c7); color: #b45309; }
-.nuovo_assunto { background: var(--color-info-subtle, #ecfeff); color: #155e75; }
+.da_pianificare,
+.compliance_gap {
+  background: var(--color-danger-subtle, rgba(239, 68, 68, 0.08));
+  color: #b91c1c;
+}
+
+.scadenze_imminenti,
+.failed_recente {
+  background: var(--color-warning-subtle, rgba(245, 158, 11, 0.12));
+  color: #92400e;
+}
+
+.senza_formazione_attiva {
+  background: var(--color-surface, #f1f5f9);
+  color: var(--color-text-secondary, #334155);
+}

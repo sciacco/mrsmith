@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Drawer, SingleSelect, useToast } from '@mrsmith/ui';
+import { Button, Drawer, SingleSelect, StatusBadge, useToast } from '@mrsmith/ui';
 import {
   useBulkPlanFromSuggestion,
   useBulkReviewEmployeeRequests,
@@ -39,6 +39,13 @@ export type ReviewActionDrawerProps = {
   onClose: () => void;
   onCompleted?: (created: number) => void;
 } & (CreateFromSuggestionConfig | ReviewEmployeeRequestsConfig | CreateFromScratchConfig);
+
+function personRank(p: PersonSummary): number {
+  if (p.flags.compliance_gap) return 0;
+  if (p.flags.scadenze_imminenti) return 1;
+  if (p.flags.da_pianificare || p.flags.senza_formazione_attiva) return 2;
+  return 3;
+}
 
 function formatEuro(value: number): string {
   return new Intl.NumberFormat('it-IT', {
@@ -464,12 +471,18 @@ function CreateFromScratch({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [plannedStart, setPlannedStart] = useState('');
   const [plannedEnd, setPlannedEnd] = useState('');
+  const [filterTeam, setFilterTeam] = useState<string>('all');
+  const [filterOnlyGap, setFilterOnlyGap] = useState(false);
+  const [filterHideEnrolled, setFilterHideEnrolled] = useState(true);
 
   useEffect(() => {
     if (!open) return;
     setSearch('');
     setCourseId('');
     setSelectedIds(new Set());
+    setFilterTeam('all');
+    setFilterOnlyGap(false);
+    setFilterHideEnrolled(true);
     const now = new Date();
     const end = new Date(now);
     end.setDate(end.getDate() + 90);
@@ -488,12 +501,72 @@ function CreateFromScratch({
   );
 
   const selectedCourse = activeCourses.find((course) => course.id === courseId);
-  const selectedPeople = people.data ?? [];
+  const directoryPeople = people.data ?? [];
+
+  const alreadyEnrolledEmails = useMemo(() => {
+    if (!selectedCourse) return new Set<string>();
+    const planEnrollments = workspace.data?.plan ?? [];
+    const courseTitle = selectedCourse.title;
+    return new Set(
+      planEnrollments
+        .filter(
+          (e) =>
+            e.year === year &&
+            e.courseTitle === courseTitle &&
+            (e.status ?? '').toUpperCase() !== 'ANNULLATO',
+        )
+        .map((e) => e.employeeEmail.toLowerCase()),
+    );
+  }, [workspace.data, selectedCourse, year]);
+
+  const teamOptions = useMemo(() => {
+    const teams = new Set<string>();
+    directoryPeople.forEach((p) => {
+      if (p.team_code) teams.add(p.team_code);
+    });
+    return Array.from(teams).sort();
+  }, [directoryPeople]);
+
+  const displayedPeople = useMemo(() => {
+    let list = directoryPeople.slice();
+    if (filterTeam !== 'all') {
+      list = list.filter((p) => p.team_code === filterTeam);
+    }
+    if (filterOnlyGap) {
+      list = list.filter((p) => p.flags.compliance_gap);
+    }
+    if (filterHideEnrolled && selectedCourse) {
+      list = list.filter((p) => !alreadyEnrolledEmails.has(p.email.toLowerCase()));
+    }
+    if (selectedCourse) {
+      list.sort((a, b) => {
+        const ra = personRank(a);
+        const rb = personRank(b);
+        if (ra !== rb) return ra - rb;
+        if (b.priority_score !== a.priority_score) return b.priority_score - a.priority_score;
+        return a.name.localeCompare(b.name);
+      });
+    }
+    return list;
+  }, [directoryPeople, filterTeam, filterOnlyGap, filterHideEnrolled, selectedCourse, alreadyEnrolledEmails]);
+
+  const gapCountForCurrentFilter = useMemo(() => {
+    let list = directoryPeople;
+    if (filterTeam !== 'all') list = list.filter((p) => p.team_code === filterTeam);
+    return list.filter((p) => p.flags.compliance_gap).length;
+  }, [directoryPeople, filterTeam]);
+
+  const selectedPeopleArray = useMemo(
+    () => directoryPeople.filter((p) => selectedIds.has(p.id)),
+    [directoryPeople, selectedIds],
+  );
+
   const courseCost = selectedCourse?.defaultCost ?? 0;
   const courseHours = selectedCourse?.defaultHours ?? 0;
   const totalCost = courseCost * selectedIds.size;
   const totalHours = courseHours * selectedIds.size;
   const residualAfter = budgetResidual - totalCost;
+  const residualPct = budgetResidual > 0 ? Math.round((residualAfter / budgetResidual) * 100) : null;
   const canSubmit = courseId !== '' && selectedIds.size > 0 && !bulkPlan.isPending;
 
   function toggle(id: string) {
@@ -505,18 +578,37 @@ function CreateFromScratch({
     });
   }
 
-  function toggleVisible() {
-    const visibleIds = selectedPeople.map((person) => person.id);
-    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  function removeSelected(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      visibleIds.forEach((id) => {
-        if (allVisibleSelected) next.delete(id);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function selectAllDisplayed() {
+    const ids = displayedPeople
+      .filter((p) => !alreadyEnrolledEmails.has(p.email.toLowerCase()))
+      .map((p) => p.id);
+    const allSelected = ids.length > 0 && ids.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => {
+        if (allSelected) next.delete(id);
         else next.add(id);
       });
       return next;
     });
   }
+
+  const selectableDisplayedCount = displayedPeople.filter(
+    (p) => !alreadyEnrolledEmails.has(p.email.toLowerCase()),
+  ).length;
+  const allDisplayedSelected =
+    selectableDisplayedCount > 0 &&
+    displayedPeople
+      .filter((p) => !alreadyEnrolledEmails.has(p.email.toLowerCase()))
+      .every((p) => selectedIds.has(p.id));
 
   async function handleSubmit() {
     if (!canSubmit || !selectedCourse) return;
@@ -547,17 +639,23 @@ function CreateFromScratch({
     <Drawer
       open={open}
       onClose={onClose}
-      size="lg"
+      size="xl"
       title="Nuova iscrizione"
       subtitle={<span className={styles.subtitle}>Piano {year}{team ? ` · ${team}` : ''}</span>}
       footer={
         <div className={styles.footer}>
-          <div className={styles.totals}>
-            <span className={styles.totalsValue}>{formatEuro(totalCost)}</span>
-            <span className={`${styles.totalsLabel} ${residualAfter < 0 ? styles.totalsWarning : ''}`}>
-              Residuo dopo iscrizione {formatEuro(residualAfter)}
+          <div className={styles.summaryFooter}>
+            <span className={styles.summaryHeadline}>
+              {selectedIds.size > 0
+                ? `${selectedIds.size} ${selectedIds.size === 1 ? 'persona' : 'persone'} · ${totalHours}h · ${formatEuro(totalCost)}`
+                : 'Nessuna persona selezionata'}
             </span>
-            {totalHours > 0 && <span className={styles.totalsHours}>{totalHours} ore totali</span>}
+            {selectedCourse && (
+              <span className={`${styles.summaryLine} ${residualAfter < 0 ? styles.totalsWarning : ''}`}>
+                Residuo dopo: {formatEuro(residualAfter)}
+                {residualPct !== null && ` (${residualPct}%)`}
+              </span>
+            )}
           </div>
           <div className={styles.footerActions}>
             <Button variant="ghost" size="md" onClick={onClose}>Annulla</Button>
@@ -568,78 +666,176 @@ function CreateFromScratch({
               loading={bulkPlan.isPending}
               disabled={!canSubmit}
             >
-              Pianifica {selectedIds.size} selezionati
+              {selectedIds.size > 0 ? `Pianifica ${selectedIds.size}` : 'Pianifica'}
             </Button>
           </div>
         </div>
       }
     >
-      <div className={styles.body}>
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Corso</h3>
-          <SingleSelect
-            options={courseOptions}
-            selected={courseId}
-            onChange={(value) => setCourseId(value ?? '')}
-            placeholder="Seleziona corso"
-          />
-          {selectedCourse && <CourseHint course={selectedCourse} />}
-        </section>
+      <div className={styles.bodySplit}>
+        <div className={styles.topRow}>
+          <div className={styles.column}>
+            <h3 className={styles.sectionTitle}>Corso</h3>
+            <SingleSelect
+              options={courseOptions}
+              selected={courseId}
+              onChange={(value) => setCourseId(value ?? '')}
+              placeholder="Seleziona corso"
+              searchable
+            />
+            {selectedCourse ? (
+              <>
+                <div className={styles.courseBadges}>
+                  {selectedCourse.mandatory && (
+                    <StatusBadge value="" label="Obbligatorio" variant="warning" dot />
+                  )}
+                  {selectedCourse.complianceFramework && (
+                    <StatusBadge
+                      value=""
+                      label={selectedCourse.complianceFramework}
+                      variant="neutral"
+                      dot={false}
+                    />
+                  )}
+                </div>
+                <CourseHint course={selectedCourse} />
+              </>
+            ) : (
+              <small className={styles.fieldCaption}>&nbsp;</small>
+            )}
+          </div>
 
-        <section className={styles.section}>
+          <label className={`${styles.column} ${styles.dateField}`}>
+            <h3 className={styles.sectionTitle}>Inizio</h3>
+            <input
+              type="date"
+              value={plannedStart}
+              onChange={(e) => setPlannedStart(e.target.value)}
+              className={styles.dateInput}
+            />
+            <small className={styles.fieldCaption}>Finestra di completamento</small>
+          </label>
+
+          <label className={`${styles.column} ${styles.dateField}`}>
+            <h3 className={styles.sectionTitle}>Fine</h3>
+            <input
+              type="date"
+              value={plannedEnd}
+              onChange={(e) => setPlannedEnd(e.target.value)}
+              className={styles.dateInput}
+            />
+            <small className={styles.fieldCaption}>&nbsp;</small>
+          </label>
+        </div>
+
+        <section className={styles.column}>
           <header className={styles.sectionHeader}>
             <h3 className={styles.sectionTitle}>Persone</h3>
-            <button type="button" className={styles.linkBtn} onClick={toggleVisible}>
-              Seleziona visibili
-            </button>
+            {selectableDisplayedCount > 0 && (
+              <button type="button" className={styles.linkBtn} onClick={selectAllDisplayed}>
+                {allDisplayedSelected
+                  ? 'Deseleziona tutti'
+                  : `Seleziona tutti (${selectableDisplayedCount})`}
+              </button>
+            )}
           </header>
-          <input
-            className={styles.searchInput}
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Cerca per nome o email"
-          />
+
+          <div className={styles.peopleFilters}>
+            <div className={styles.peopleFiltersRow}>
+              <input
+                className={styles.searchInput}
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Cerca per nome o email"
+              />
+              {teamOptions.length > 0 && (
+                <div className={styles.peopleFiltersTeam}>
+                  <SingleSelect
+                    options={[
+                      { value: 'all', label: 'Tutti i team' },
+                      ...teamOptions.map((t) => ({ value: t, label: t })),
+                    ]}
+                    selected={filterTeam}
+                    onChange={(value) => setFilterTeam(value ?? 'all')}
+                    placeholder="Team"
+                  />
+                </div>
+              )}
+            </div>
+            <div className={styles.peopleFiltersToggles}>
+              <label className={styles.peopleFiltersToggle}>
+                <input
+                  type="checkbox"
+                  checked={filterOnlyGap}
+                  onChange={(e) => setFilterOnlyGap(e.target.checked)}
+                />
+                Solo con gap{gapCountForCurrentFilter > 0 && ` (${gapCountForCurrentFilter})`}
+              </label>
+              {selectedCourse && (
+                <label className={styles.peopleFiltersToggle}>
+                  <input
+                    type="checkbox"
+                    checked={filterHideEnrolled}
+                    onChange={(e) => setFilterHideEnrolled(e.target.checked)}
+                  />
+                  Nascondi già iscritti
+                </label>
+              )}
+            </div>
+          </div>
+
+          {selectedPeopleArray.length > 0 && (
+            <div className={styles.selectedStack}>
+              <div className={styles.selectedStackHeader}>
+                Selezionati ({selectedPeopleArray.length})
+              </div>
+              <ul className={styles.selectedStackList}>
+                {selectedPeopleArray.map((p) => (
+                  <li key={p.id} className={styles.selectedChip}>
+                    <span className={styles.selectedChipName}>{p.name}</span>
+                    <button
+                      type="button"
+                      className={styles.selectedChipRemove}
+                      onClick={() => removeSelected(p.id)}
+                      aria-label={`Rimuovi ${p.name}`}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {!selectedCourse && (
+            <div className={styles.peopleEmptyHint}>
+              Scegli un corso per ordinare le persone per fabbisogno.
+            </div>
+          )}
+
           {people.isLoading ? (
             <p className={styles.empty}>Caricamento persone...</p>
-          ) : selectedPeople.length === 0 ? (
+          ) : displayedPeople.length === 0 ? (
             <p className={styles.empty}>Nessuna persona trovata.</p>
           ) : (
             <ul className={styles.personList}>
-              {selectedPeople.map((person) => (
-                <PersonOption
-                  key={person.id}
-                  person={person}
-                  checked={selectedIds.has(person.id)}
-                  onToggle={() => toggle(person.id)}
-                />
-              ))}
+              {displayedPeople.map((person) => {
+                const isAlreadyEnrolled = alreadyEnrolledEmails.has(person.email.toLowerCase());
+                return (
+                  <PersonOption
+                    key={person.id}
+                    person={person}
+                    checked={selectedIds.has(person.id)}
+                    onToggle={() => toggle(person.id)}
+                    isAlreadyEnrolled={isAlreadyEnrolled}
+                    courseSelected={Boolean(selectedCourse)}
+                    courseTitle={selectedCourse?.title}
+                  />
+                );
+              })}
             </ul>
           )}
-        </section>
-
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Tempistica</h3>
-          <div className={styles.dateRow}>
-            <label className={styles.dateField}>
-              <span className={styles.dateLabel}>Inizio</span>
-              <input
-                type="date"
-                value={plannedStart}
-                onChange={(e) => setPlannedStart(e.target.value)}
-                className={styles.dateInput}
-              />
-            </label>
-            <label className={styles.dateField}>
-              <span className={styles.dateLabel}>Fine</span>
-              <input
-                type="date"
-                value={plannedEnd}
-                onChange={(e) => setPlannedEnd(e.target.value)}
-                className={styles.dateInput}
-              />
-            </label>
-          </div>
         </section>
       </div>
     </Drawer>
@@ -660,18 +856,93 @@ function PersonOption({
   person,
   checked,
   onToggle,
+  isAlreadyEnrolled,
+  courseSelected,
+  courseTitle,
 }: {
   person: PersonSummary;
   checked: boolean;
   onToggle: () => void;
+  isAlreadyEnrolled: boolean;
+  courseSelected: boolean;
+  courseTitle?: string;
 }) {
+  const badges: ReactNode[] = [];
+  if (isAlreadyEnrolled) {
+    badges.push(
+      <StatusBadge
+        key="enrolled"
+        value=""
+        label="Già iscritta"
+        variant="neutral"
+        dot
+        tooltip={courseTitle ? `Già iscritta a ${courseTitle}` : 'Già iscritta'}
+      />,
+    );
+  } else {
+    if (person.flags.compliance_gap && person.gaps_open > 0) {
+      badges.push(
+        <StatusBadge
+          key="gap"
+          value=""
+          label={person.gaps_open === 1 ? 'Gap' : `Gap ×${person.gaps_open}`}
+          variant="danger"
+          dot={false}
+        />,
+      );
+    }
+    if (person.expiring_certs_count > 0 && badges.length < 2) {
+      badges.push(
+        <StatusBadge
+          key="cert"
+          value=""
+          label={
+            person.expiring_certs_count === 1
+              ? 'Cert in scadenza'
+              : `Cert ×${person.expiring_certs_count}`
+          }
+          variant="warning"
+          dot={false}
+          tooltip={person.next_deadline?.label}
+        />,
+      );
+    }
+    if (person.flags.da_pianificare && badges.length < 2) {
+      badges.push(
+        <StatusBadge key="todo" value="" label="Da pianificare" variant="accent" dot={false} />,
+      );
+    }
+  }
+
+  const showActiveHint =
+    !isAlreadyEnrolled && courseSelected && person.active_enrollments_count > 0;
+
+  const rowClass = `${styles.personRow} ${isAlreadyEnrolled ? styles.personRowDisabled : ''}`;
+
   return (
-    <li className={styles.personRow}>
+    <li className={rowClass}>
       <label className={styles.personLabel}>
-        <input type="checkbox" checked={checked} onChange={onToggle} />
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggle}
+          disabled={isAlreadyEnrolled}
+        />
         <span className={styles.personBody}>
-          <span>{person.name}</span>
-          <span className={styles.personMeta}>{person.email}{person.team_code ? ` · ${person.team_code}` : ''}</span>
+          <span className={styles.personHeader}>
+            <span className={styles.personName}>{person.name}</span>
+            {person.team_code && <span className={styles.personTeam}>{person.team_code}</span>}
+          </span>
+          <span className={styles.personMeta}>{person.email}</span>
+          {badges.length > 0 && <span className={styles.personBadges}>{badges}</span>}
+          {showActiveHint && (
+            <span className={styles.personSubMeta}>
+              {person.active_enrollments_count}{' '}
+              {person.active_enrollments_count === 1
+                ? 'iscrizione attiva nel piano'
+                : 'iscrizioni attive nel piano'}
+            </span>
+          )}
         </span>
       </label>
     </li>

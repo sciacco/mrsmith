@@ -12,7 +12,7 @@
 
 .head {
   display: grid;
-  grid-template-columns: 1.5rem 2rem minmax(160px, 1.5fr) 80px 100px 56px 1fr 2rem;
+  grid-template-columns: 1.5rem 2rem minmax(140px, 1.4fr) 80px minmax(160px, max-content) 56px minmax(160px, 1fr) 2rem;
   align-items: center;
   gap: 0.5rem;
   padding: 0.25rem 0.5rem;
@@ -56,6 +56,10 @@
 .team {
   font-size: 0.75rem;
   color: var(--color-text-secondary);
+}
+
+.flagCell {
+  min-width: 0;
 }
 
 .counter,
@@ -117,3 +121,37 @@
 }
 
 .peekActions a:hover { text-decoration: underline; }
+
+@media (max-width: 760px) {
+  .head {
+    grid-template-columns: 1.5rem 2rem minmax(0, 1fr) 2rem;
+    grid-template-areas:
+      "check avatar name expand"
+      ". . team team"
+      ". . flag counter"
+      ". . deadline deadline";
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    padding: 0.75rem;
+    min-height: auto;
+  }
+
+  .checkboxWrap { grid-area: check; }
+  .avatar { grid-area: avatar; }
+  .name { grid-area: name; }
+  .team { grid-area: team; }
+  .flagCell { grid-area: flag; }
+  .counter { grid-area: counter; }
+  .deadline { grid-area: deadline; }
+  .expand { grid-area: expand; }
+
+  .team,
+  .deadline {
+    white-space: normal;
+  }
+
+  .peek {
+    padding: 0.75rem 1rem 1rem;
+    gap: 1rem;
+  }
+}

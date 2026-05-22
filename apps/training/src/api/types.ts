@@ -237,7 +237,20 @@ export interface BulkTransitionResponse {
   failures?: BulkTransitionFailure[];
 }
 
-export type PersonComplianceStatus = 'a_norma' | 'con_gap' | 'senza_piano' | 'nuovo_assunto';
+export type PersonFlagKey =
+  | 'da_pianificare'
+  | 'compliance_gap'
+  | 'scadenze_imminenti'
+  | 'failed_recente'
+  | 'senza_formazione_attiva';
+
+export interface PersonFlags {
+  da_pianificare: boolean;
+  compliance_gap: boolean;
+  scadenze_imminenti: boolean;
+  failed_recente: boolean;
+  senza_formazione_attiva: boolean;
+}
 
 export interface PersonNextDeadline {
   type: 'cert' | 'course_end' | 'mandatory_due';
@@ -250,7 +263,7 @@ export interface PersonSummary {
   name: string;
   email: string;
   team_code: string;
-  compliance_status: PersonComplianceStatus;
+  flags: PersonFlags;
   active_enrollments_count: number;
   next_deadline: PersonNextDeadline | null;
   priority_score: number;

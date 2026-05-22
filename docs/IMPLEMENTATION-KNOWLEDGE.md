@@ -109,6 +109,15 @@ Alyante ERP ID
 
 ## API and Backend Contract Quirks
 
+### Training Directory Chips Are Action-First
+
+- Context: `apps/training` People directory (`/persone`) and backend `GET /api/training/v1/people/directory`.
+- Discovery: directory chips are planning/action flags, not passive HR-style person statuses. The directory must not derive chips from dormant employee fields such as hire date, manager hierarchy, or other external HR-ish attributes.
+- Practical rule: expose `PersonSummary.flags` with action-first booleans (`da_pianificare`, `compliance_gap`, `scadenze_imminenti`, `failed_recente`, `senza_formazione_attiva`) and derive them only from Training-domain plans, enrollments, mandatory rules, courses, certifications, and mandatory coverage. Do not reintroduce legacy passive chips such as "a norma", "nuovo assunto", or "senza piano".
+- Evidence: Training M4 directory refactor in `backend/internal/training/store_directory.go`, `backend/internal/training/types.go`, and `apps/training/src/pages/PeoplePage.tsx`.
+- Used by: `apps/training` `/persone` directory and planning bulk assignment flows.
+- Open questions: none.
+
 ### CP Backoffice Active Biometric Users Are Balance-Based
 
 - Context: `apps/cp-backoffice` Accessi biometrici PDF export and any future biometric active-user report.

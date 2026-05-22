@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 )
 
 func (s *SQLStore) TrainingPlanIDByYear(ctx context.Context, year int) (string, error) {
@@ -20,6 +21,7 @@ func (s *SQLStore) TrainingPlanIDByYear(ctx context.Context, year int) (string, 
 }
 
 func (s *SQLStore) ListPeopleDirectory(ctx context.Context, principal Principal, filters PeopleDirectoryFilters) ([]PersonSummary, error) {
+	effectiveYear := effectiveDirectoryYear(filters.Year, time.Now())
 	const q = `
 WITH active_emp AS (
   SELECT
@@ -35,12 +37,17 @@ WITH active_emp AS (
     AND (tm.end_date IS NULL OR tm.end_date >= now())
   WHERE e.status = 'active'
 ),
+year_plan AS (
+  SELECT id
+  FROM training.training_plan
+  WHERE year = $1
+  LIMIT 1
+),
 active_enrollments AS (
   SELECT employee_id, COUNT(*) AS active_count
   FROM training.enrollment en
-  JOIN training.training_plan tp ON tp.id = en.training_plan_id
+  JOIN year_plan yp ON yp.id = en.training_plan_id
   WHERE en.status IN ('proposed','approved','in_progress')
-    AND ($1 = 0 OR tp.year = $1)
   GROUP BY employee_id
 ),
 history AS (
@@ -48,24 +55,122 @@ history AS (
   FROM training.enrollment
   GROUP BY employee_id
 ),
-gaps AS (
-  SELECT employee_id, COUNT(*) FILTER (WHERE compliance_status = 'missing_or_expired') AS gap_count
-  FROM training.v_mandatory_compliance_gap
+required_mandatory AS (
+  SELECT
+    ae.id AS employee_id,
+    c.id AS course_id,
+    c.leads_to_cert_id,
+    c.recurrence_interval
+  FROM active_emp ae
+  JOIN training.mandatory_assignment_rule rule
+    ON rule.is_active
+    AND (rule.team_id IS NULL OR rule.team_id = ae.team_id)
+  JOIN training.course c
+    ON c.id = rule.course_id
+    AND c.is_active
+    AND c.is_mandatory
+),
+mandatory_gaps AS (
+  SELECT rm.employee_id, rm.course_id
+  FROM required_mandatory rm
+  WHERE rm.leads_to_cert_id IS NULL
+    OR NOT EXISTS (
+      SELECT 1
+      FROM training.certification_award ca
+      WHERE ca.employee_id = rm.employee_id
+        AND ca.certification_id = rm.leads_to_cert_id
+        AND ca.outcome = 'passed_exam'
+        AND (ca.expires_on IS NULL OR ca.expires_on > CURRENT_DATE)
+        AND (rm.recurrence_interval IS NULL OR ca.awarded_on + rm.recurrence_interval > CURRENT_DATE)
+    )
+),
+gap_summary AS (
+  SELECT
+    mg.employee_id,
+    COUNT(*) AS gap_count,
+    BOOL_OR(NOT EXISTS (
+      SELECT 1
+      FROM training.enrollment en
+      JOIN year_plan yp ON yp.id = en.training_plan_id
+      WHERE en.employee_id = mg.employee_id
+        AND en.course_id = mg.course_id
+        AND en.status IN ('proposed','approved','in_progress')
+    )) AS da_pianificare
+  FROM mandatory_gaps mg
   GROUP BY employee_id
 ),
+failed AS (
+  SELECT en.employee_id, COUNT(*) AS failed_count
+  FROM training.enrollment en
+  JOIN year_plan yp ON yp.id = en.training_plan_id
+  WHERE en.status = 'failed'
+  GROUP BY en.employee_id
+),
+cert_expiring_events AS (
+  SELECT
+    ca.employee_id,
+    ca.expires_on AS deadline
+  FROM training.certification_award ca
+  WHERE ca.outcome = 'passed_exam'
+    AND ca.expires_on IS NOT NULL
+    AND ca.expires_on > CURRENT_DATE
+    AND ca.expires_on <= CURRENT_DATE + INTERVAL '60 days'
+),
+mandatory_recurrence_events AS (
+  SELECT
+    rm.employee_id,
+    (latest.awarded_on + rm.recurrence_interval)::date AS deadline
+  FROM required_mandatory rm
+  JOIN LATERAL (
+    SELECT ca.awarded_on
+    FROM training.certification_award ca
+    WHERE ca.employee_id = rm.employee_id
+      AND ca.certification_id = rm.leads_to_cert_id
+      AND ca.outcome = 'passed_exam'
+    ORDER BY ca.awarded_on DESC
+    LIMIT 1
+  ) latest ON true
+  WHERE rm.leads_to_cert_id IS NOT NULL
+    AND rm.recurrence_interval IS NOT NULL
+    AND latest.awarded_on + rm.recurrence_interval > CURRENT_DATE
+    AND latest.awarded_on + rm.recurrence_interval <= CURRENT_DATE + INTERVAL '60 days'
+),
+expiring_events AS (
+  SELECT employee_id, 'cert' AS deadline_type, deadline, 'Cert in scadenza' AS deadline_label
+  FROM cert_expiring_events
+  UNION ALL
+  SELECT employee_id, 'mandatory_due' AS deadline_type, deadline, 'Ricorrenza obbligatoria' AS deadline_label
+  FROM mandatory_recurrence_events
+),
 expiring AS (
-  SELECT employee_id, COUNT(*) AS exp_count, MIN(expires_on) AS soonest_cert_expiry
-  FROM training.v_expiring_certifications
-  WHERE days_to_expiry <= 60
+  SELECT employee_id, COUNT(*) AS exp_count
+  FROM expiring_events
   GROUP BY employee_id
 ),
 next_course_end AS (
   SELECT employee_id, MIN(planned_end) AS next_planned_end
-  FROM training.enrollment
-  WHERE status IN ('approved','in_progress')
-    AND planned_end IS NOT NULL
-    AND planned_end >= CURRENT_DATE
-  GROUP BY employee_id
+  FROM training.enrollment en
+  JOIN year_plan yp ON yp.id = en.training_plan_id
+  WHERE en.status IN ('approved','in_progress')
+    AND en.planned_end IS NOT NULL
+    AND en.planned_end >= CURRENT_DATE
+  GROUP BY en.employee_id
+),
+deadline_events AS (
+  SELECT employee_id, deadline_type, deadline, deadline_label
+  FROM expiring_events
+  UNION ALL
+  SELECT employee_id, 'course_end' AS deadline_type, next_planned_end AS deadline, 'Fine corso prevista' AS deadline_label
+  FROM next_course_end
+),
+next_deadline AS (
+  SELECT DISTINCT ON (employee_id)
+    employee_id,
+    deadline_type,
+    deadline::text AS deadline_date,
+    deadline_label
+  FROM deadline_events
+  ORDER BY employee_id, deadline, deadline_type
 )
 SELECT
   ae.id::text,
@@ -76,20 +181,28 @@ SELECT
   COALESCE(ac.active_count, 0) AS active_enrollments_count,
   COALESCE(ex.exp_count, 0) AS expiring_certs_count,
   COALESCE(h.hist_count, 0) AS hist_count,
-  ex.soonest_cert_expiry::text AS soonest_cert_expiry,
-  nc.next_planned_end::text AS next_planned_end
+  COALESCE(g.da_pianificare, false) AS da_pianificare,
+  COALESCE(g.gap_count, 0) > 0 AS compliance_gap,
+  COALESCE(ex.exp_count, 0) > 0 AS scadenze_imminenti,
+  COALESCE(f.failed_count, 0) > 0 AS failed_recente,
+  COALESCE(ac.active_count, 0) = 0 AS senza_formazione_attiva,
+  nd.deadline_type,
+  nd.deadline_date,
+  nd.deadline_label
 FROM active_emp ae
 LEFT JOIN training.team t ON t.id = ae.team_id
 LEFT JOIN active_enrollments ac ON ac.employee_id = ae.id
 LEFT JOIN history h ON h.employee_id = ae.id
-LEFT JOIN gaps g ON g.employee_id = ae.id
+LEFT JOIN gap_summary g ON g.employee_id = ae.id
 LEFT JOIN expiring ex ON ex.employee_id = ae.id
-LEFT JOIN next_course_end nc ON nc.employee_id = ae.id
+LEFT JOIN failed f ON f.employee_id = ae.id
+LEFT JOIN next_deadline nd ON nd.employee_id = ae.id
 WHERE ($2 = '' OR t.code = $2)
+  AND ($3 = '' OR ae.last_name || ' ' || ae.first_name ILIKE '%' || $3 || '%' OR ae.email::text ILIKE '%' || $3 || '%')
 ORDER BY ae.last_name, ae.first_name
 LIMIT 500`
 
-	rows, err := s.db.QueryContext(ctx, q, filters.Year, filters.Team)
+	rows, err := s.db.QueryContext(ctx, q, effectiveYear, filters.Team, filters.Search)
 	if err != nil {
 		return nil, fmt.Errorf("list training people directory: %w", err)
 	}
@@ -99,8 +212,9 @@ LIMIT 500`
 	for rows.Next() {
 		var (
 			summary       PersonSummary
-			soonestCert   sql.NullString
-			nextCourseEnd sql.NullString
+			deadlineType  sql.NullString
+			deadlineDate  sql.NullString
+			deadlineLabel sql.NullString
 		)
 		if err := rows.Scan(
 			&summary.ID,
@@ -111,13 +225,18 @@ LIMIT 500`
 			&summary.ActiveEnrollmentsCount,
 			&summary.ExpiringCertsCount,
 			&summary.HistoricalEnrollments,
-			&soonestCert,
-			&nextCourseEnd,
+			&summary.Flags.DaPianificare,
+			&summary.Flags.ComplianceGap,
+			&summary.Flags.ScadenzeImminenti,
+			&summary.Flags.FailedRecente,
+			&summary.Flags.SenzaFormazioneAttiva,
+			&deadlineType,
+			&deadlineDate,
+			&deadlineLabel,
 		); err != nil {
 			return nil, fmt.Errorf("scan training person summary: %w", err)
 		}
-		summary.ComplianceStatus = derivePersonComplianceStatus(summary)
-		summary.NextDeadline = pickNextDeadline(soonestCert, nextCourseEnd)
+		summary.NextDeadline = personNextDeadline(deadlineType, deadlineDate, deadlineLabel)
 		summary.PriorityScore = computePersonPriorityScore(summary)
 		if filterMatches(summary, filters) {
 			result = append(result, summary)
@@ -126,60 +245,80 @@ LIMIT 500`
 	return result, rows.Err()
 }
 
-func derivePersonComplianceStatus(summary PersonSummary) string {
-	if summary.GapsOpen > 0 {
-		return "con_gap"
+func effectiveDirectoryYear(requested int, now time.Time) int {
+	if requested > 0 {
+		return requested
 	}
-	if summary.HistoricalEnrollments == 0 {
-		return "nuovo_assunto"
-	}
-	if summary.ActiveEnrollmentsCount == 0 {
-		return "senza_piano"
-	}
-	return "a_norma"
+	return now.Year()
 }
 
-func pickNextDeadline(certExpiry sql.NullString, courseEnd sql.NullString) *PersonNextDeadline {
-	switch {
-	case certExpiry.Valid && courseEnd.Valid:
-		if certExpiry.String <= courseEnd.String {
-			return &PersonNextDeadline{Type: "cert", Date: certExpiry.String, Label: "Cert in scadenza"}
-		}
-		return &PersonNextDeadline{Type: "course_end", Date: courseEnd.String, Label: "Fine corso prevista"}
-	case certExpiry.Valid:
-		return &PersonNextDeadline{Type: "cert", Date: certExpiry.String, Label: "Cert in scadenza"}
-	case courseEnd.Valid:
-		return &PersonNextDeadline{Type: "course_end", Date: courseEnd.String, Label: "Fine corso prevista"}
-	default:
+func personNextDeadline(deadlineType sql.NullString, deadlineDate sql.NullString, deadlineLabel sql.NullString) *PersonNextDeadline {
+	if !deadlineType.Valid || !deadlineDate.Valid {
 		return nil
 	}
+	label := deadlineLabel.String
+	if label == "" {
+		label = "Scadenza"
+	}
+	return &PersonNextDeadline{Type: deadlineType.String, Date: deadlineDate.String, Label: label}
 }
 
 func computePersonPriorityScore(summary PersonSummary) float64 {
 	score := 0.0
-	score += float64(summary.GapsOpen) * 100
-	score += float64(summary.ExpiringCertsCount) * 40
-	if summary.ComplianceStatus == "nuovo_assunto" {
-		score += 30
+	switch dominantPersonFlag(summary.Flags) {
+	case "da_pianificare":
+		score = 5000
+	case "compliance_gap":
+		score = 4000
+	case "scadenze_imminenti":
+		score = 3000
+	case "failed_recente":
+		score = 2500
+	case "senza_formazione_attiva":
+		score = 1000
 	}
-	if summary.ActiveEnrollmentsCount == 0 {
-		score += 10
+	score += float64(summary.GapsOpen) * 10
+	score += float64(summary.ExpiringCertsCount) * 5
+	if summary.Flags.FailedRecente {
+		score += 3
+	}
+	if summary.Flags.SenzaFormazioneAttiva {
+		score += 1
 	}
 	return score
+}
+
+func dominantPersonFlag(flags PersonFlags) string {
+	switch {
+	case flags.DaPianificare:
+		return "da_pianificare"
+	case flags.ComplianceGap:
+		return "compliance_gap"
+	case flags.ScadenzeImminenti:
+		return "scadenze_imminenti"
+	case flags.FailedRecente:
+		return "failed_recente"
+	case flags.SenzaFormazioneAttiva:
+		return "senza_formazione_attiva"
+	default:
+		return ""
+	}
 }
 
 func filterMatches(summary PersonSummary, filters PeopleDirectoryFilters) bool {
 	switch filters.Filter {
 	case "":
 		return true
-	case "a_norma":
-		return summary.ComplianceStatus == "a_norma"
-	case "con_gap":
-		return summary.ComplianceStatus == "con_gap"
-	case "senza_piano":
-		return summary.ComplianceStatus == "senza_piano"
-	case "nuovo_assunto":
-		return summary.ComplianceStatus == "nuovo_assunto"
+	case "da_pianificare":
+		return summary.Flags.DaPianificare
+	case "compliance_gap":
+		return summary.Flags.ComplianceGap
+	case "scadenze_imminenti":
+		return summary.Flags.ScadenzeImminenti
+	case "failed_recente":
+		return summary.Flags.FailedRecente
+	case "senza_formazione_attiva":
+		return summary.Flags.SenzaFormazioneAttiva
 	default:
 		return true
 	}

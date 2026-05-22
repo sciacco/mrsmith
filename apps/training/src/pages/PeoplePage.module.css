@@ -41,6 +41,9 @@
 }
 
 .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
   padding: 0.375rem 0.875rem;
   border: 1px solid var(--color-border);
   border-radius: 999px;
@@ -49,6 +52,28 @@
   font-size: 0.8125rem;
   cursor: pointer;
   transition: all 0.15s;
+}
+
+.chipDot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--chip-dot, currentColor);
+}
+
+.chip_red {
+  --chip-dot: #dc2626;
+  color: #b91c1c;
+}
+
+.chip_yellow {
+  --chip-dot: #d97706;
+  color: #92400e;
+}
+
+.chip_neutral {
+  --chip-dot: #64748b;
+  color: var(--color-text-secondary);
 }
 
 .chip:hover {
@@ -150,4 +175,23 @@
   margin: 0;
   color: var(--color-text-secondary);
   font-size: 0.875rem;
+}
+
+@media (max-width: 760px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar {
+    align-items: flex-start;
+  }
+
+  .sortRow {
+    width: 100%;
+  }
+
+  .list {
+    border-radius: 10px;
+  }
 }

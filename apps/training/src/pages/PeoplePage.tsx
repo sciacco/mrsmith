@@ -16,13 +16,22 @@ interface PeoplePageProps {
   isPeopleAdmin: boolean;
 }
 
-const CHIP_PRESETS: Array<{ value: string; label: string }> = [
-  { value: '', label: 'Tutti' },
-  { value: 'a_norma', label: 'A norma' },
-  { value: 'con_gap', label: 'Con gap' },
-  { value: 'senza_piano', label: 'Senza piano' },
-  { value: 'nuovo_assunto', label: 'Nuovi assunti' },
+const CHIP_PRESETS = [
+  { value: '', label: 'Tutti', tone: 'neutral' },
+  { value: 'compliance_gap', label: 'Obblighi da gestire', tone: 'red' },
+  { value: 'scadenze_imminenti', label: 'Scadenze entro 60 giorni', tone: 'yellow' },
+  { value: 'failed_recente', label: 'Esiti negativi', tone: 'yellow' },
+  { value: 'senza_formazione_attiva', label: 'Senza corsi attivi', tone: 'neutral' },
 ];
+
+const VALID_FILTERS = new Set(CHIP_PRESETS.map((preset) => preset.value).filter(Boolean));
+
+const EMPTY_STATE_BY_FILTER: Record<string, string> = {
+  compliance_gap: 'Nessuna persona ha obblighi formativi scoperti per i filtri selezionati.',
+  scadenze_imminenti: 'Nessuna certificazione o ricorrenza formativa è in scadenza nei prossimi 60 giorni.',
+  failed_recente: 'Nessuna iscrizione risulta con esito negativo nel piano selezionato.',
+  senza_formazione_attiva: 'Tutte le persone filtrate hanno almeno un corso attivo nel piano selezionato.',
+};
 
 function apiErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
@@ -38,9 +47,10 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
 
   const year = params.get('year') ?? String(new Date().getFullYear());
   const team = params.get('team') ?? '';
-  const filter = params.get('filter') ?? '';
+  const rawFilter = params.get('filter') ?? '';
+  const filter = VALID_FILTERS.has(rawFilter) ? rawFilter : '';
   const q = params.get('q') ?? '';
-  const sort = params.get('sort') ?? 'alpha';
+  const sort = params.get('sort') === 'priority' ? 'priority' : 'alpha';
 
   const directory = usePeopleDirectory({ year, team, filter, q }, isPeopleAdmin);
   const lookups = useTrainingLookups(isPeopleAdmin);
@@ -51,13 +61,13 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignDraft, setAssignDraft] = useState({ courseId: '', plannedStart: '', plannedEnd: '' });
 
-  function updateParam(key: string, value: string | null) {
+  function updateParam(key: string, value: string | null, replace = true) {
     setParams((previous) => {
       const next = new URLSearchParams(previous);
       if (value && value !== '') next.set(key, value);
       else next.delete(key);
       return next;
-    }, { replace: true });
+    }, { replace });
   }
 
   const people = directory.data ?? [];
@@ -153,7 +163,7 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
       <header className={styles.header}>
         <div>
           <h1>Persone</h1>
-          <p className={styles.subtitle}>Directory dipendenti con stato formativo aggregato.</p>
+          <p className={styles.subtitle}>Directory dipendenti con priorità formative e azioni da gestire.</p>
         </div>
         <SearchInput value={q} onChange={(value) => updateParam('q', value)} placeholder="Cerca per nome o email" />
       </header>
@@ -164,9 +174,10 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
             <button
               key={preset.value || 'all'}
               type="button"
-              className={`${styles.chip} ${filter === preset.value ? styles.chipActive : ''}`}
-              onClick={() => updateParam('filter', preset.value || null)}
+              className={`${styles.chip} ${styles[`chip_${preset.tone}`]} ${filter === preset.value ? styles.chipActive : ''}`}
+              onClick={() => updateParam('filter', preset.value || null, false)}
             >
+              <span className={styles.chipDot} aria-hidden />
               {preset.label}
             </button>
           ))}
@@ -193,7 +204,9 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
       <div className={styles.counter}>{filteredPeople.length} persone</div>
 
       {filteredPeople.length === 0 ? (
-        <div className={styles.empty}>Nessuna persona corrisponde ai filtri.</div>
+        <div className={styles.empty}>
+          {EMPTY_STATE_BY_FILTER[filter] ?? 'Nessuna persona corrisponde ai filtri.'}
+        </div>
       ) : (
         <div className={styles.list}>
           {filteredPeople.map((person: PersonSummary) => (

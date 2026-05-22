@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from './client';
-import { mockWorkspace } from './mockData';
+import { mockPeopleDirectory, mockWorkspace } from './mockData';
 import type {
   ActionResponse,
   BulkAssignResponse,
@@ -155,7 +155,7 @@ export function usePeopleDirectory(filters: PeopleDirectoryFilters, enabled: boo
       if (filters.q) params.set('q', filters.q);
       const suffix = params.toString();
       const path = `/training/v1/people/directory${suffix ? `?${suffix}` : ''}`;
-      if (useMocks) return [];
+      if (useMocks) return mockPeopleDirectory(filters);
       return api.get<PersonSummary[]>(path);
     },
   });

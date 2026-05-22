@@ -38,7 +38,9 @@ export function PersonRow({ person, selected, expanded, onToggleSelect, onToggle
           {person.name}
         </Link>
         <span className={styles.team}>{person.team_code || '—'}</span>
-        <PersonChip status={person.compliance_status} gaps={person.gaps_open} />
+        <span className={styles.flagCell}>
+          <PersonChip flags={person.flags} gaps={person.gaps_open} />
+        </span>
         <span className={styles.counter}>
           <Icon name="clipboard-check" size={14} /> {person.active_enrollments_count}
         </span>

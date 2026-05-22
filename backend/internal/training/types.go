@@ -258,12 +258,20 @@ type PersonNextDeadline struct {
 	Label string `json:"label"`
 }
 
+type PersonFlags struct {
+	DaPianificare         bool `json:"da_pianificare"`
+	ComplianceGap         bool `json:"compliance_gap"`
+	ScadenzeImminenti     bool `json:"scadenze_imminenti"`
+	FailedRecente         bool `json:"failed_recente"`
+	SenzaFormazioneAttiva bool `json:"senza_formazione_attiva"`
+}
+
 type PersonSummary struct {
 	ID                     string              `json:"id"`
 	Name                   string              `json:"name"`
 	Email                  string              `json:"email"`
 	TeamCode               string              `json:"team_code"`
-	ComplianceStatus       string              `json:"compliance_status"`
+	Flags                  PersonFlags         `json:"flags"`
 	ActiveEnrollmentsCount int                 `json:"active_enrollments_count"`
 	NextDeadline           *PersonNextDeadline `json:"next_deadline,omitempty"`
 	PriorityScore          float64             `json:"priority_score"`
@@ -389,13 +397,13 @@ type OverviewResponse struct {
 }
 
 type PersonProfile struct {
-	IdentityMin             PersonIdentityMin       `json:"identity_min"`
-	Compliance              PersonComplianceSection `json:"compliance"`
-	EnrollmentsCurrentYear  []PlanEnrollment        `json:"enrollments_current_year"`
-	Certifications          []CertificationRow      `json:"certifications"`
-	HistoryByYear           []PersonHistoryYearRow  `json:"history_by_year"`
-	SkillAreas              []PersonSkillArea       `json:"skill_areas"`
-	Suggestions             []PersonSuggestion      `json:"suggestions"`
+	IdentityMin            PersonIdentityMin       `json:"identity_min"`
+	Compliance             PersonComplianceSection `json:"compliance"`
+	EnrollmentsCurrentYear []PlanEnrollment        `json:"enrollments_current_year"`
+	Certifications         []CertificationRow      `json:"certifications"`
+	HistoryByYear          []PersonHistoryYearRow  `json:"history_by_year"`
+	SkillAreas             []PersonSkillArea       `json:"skill_areas"`
+	Suggestions            []PersonSuggestion      `json:"suggestions"`
 }
 
 type BulkEnrollmentTransitionInput struct {
