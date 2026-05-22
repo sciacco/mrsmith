@@ -277,21 +277,30 @@ courses_per AS (
 SELECT
   (SELECT COUNT(*) FROM filtered_emp) AS total_emp,
   (SELECT COUNT(DISTINCT i.employee_id) FROM involved i JOIN filtered_emp f ON f.id = i.employee_id) AS involved_emp,
-  COALESCE((SELECT AVG(cnt) FROM courses_per p JOIN filtered_emp f ON f.id = p.employee_id), 0)::float8 AS avg_courses`
+  (SELECT MIN(cnt) FROM courses_per p JOIN filtered_emp f ON f.id = p.employee_id) AS min_courses,
+  (SELECT MAX(cnt) FROM courses_per p JOIN filtered_emp f ON f.id = p.employee_id) AS max_courses`
 	var total, involved int
-	var avg float64
-	if err := s.db.QueryRowContext(ctx, q, year, team).Scan(&total, &involved, &avg); err != nil {
+	var minCourses, maxCourses sql.NullInt64
+	if err := s.db.QueryRowContext(ctx, q, year, team).Scan(&total, &involved, &minCourses, &maxCourses); err != nil {
 		return OverviewFamily{}, fmt.Errorf("overview engagement: %w", err)
 	}
 	pct := 0
 	if total > 0 {
 		pct = involved * 100 / total
 	}
-	return OverviewFamily{
-		Value:            fmt.Sprintf("%d%%", pct),
-		CoursesPerPerson: &avg,
-		Exceptions:       []OverviewException{},
-	}, nil
+	family := OverviewFamily{
+		Value:      fmt.Sprintf("%d%%", pct),
+		Exceptions: []OverviewException{},
+	}
+	if minCourses.Valid {
+		v := int(minCourses.Int64)
+		family.MinCoursesPerPerson = &v
+	}
+	if maxCourses.Valid {
+		v := int(maxCourses.Int64)
+		family.MaxCoursesPerPerson = &v
+	}
+	return family, nil
 }
 
 func buildDrilldownURL(path string, params map[string]string) string {

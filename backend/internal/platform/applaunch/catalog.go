@@ -314,8 +314,8 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			Icon:          "clipboard",
 			Href:          TrainingAppHref,
 			Status:        "test",
-			CategoryID:    "backoffice",
-			CategoryTitle: "Backoffice",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
 			AccessRoles:   TrainingAppAccessRoles(),
 		},
 		{

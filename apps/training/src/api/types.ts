@@ -345,7 +345,8 @@ export interface OverviewFamily {
   exceptions: OverviewException[];
   spent_pct?: number;
   calendar_alignment?: 'in_linea' | 'in_ritardo' | 'in_anticipo';
-  courses_per_person?: number;
+  min_courses_per_person?: number;
+  max_courses_per_person?: number;
 }
 
 export interface OverviewResponse {

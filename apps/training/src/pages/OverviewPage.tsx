@@ -73,11 +73,12 @@ export function OverviewPage({ isPeopleAdmin }: OverviewPageProps) {
           }
         />
         <FamilyCard
-          title="Engagement"
+          title="Engagement sul totale"
           family={data.engagement}
           subtitle={
-            data.engagement.courses_per_person !== undefined
-              ? `${data.engagement.courses_per_person.toFixed(1)} corsi / persona`
+            data.engagement.min_courses_per_person !== undefined &&
+            data.engagement.max_courses_per_person !== undefined
+              ? `Persone ingaggiate: min: ${data.engagement.min_courses_per_person} max ${data.engagement.max_courses_per_person} corsi`
               : undefined
           }
         />
@@ -112,9 +113,9 @@ function FamilyCard({ title, family, subtitle }: { title: string; family: Overvi
         <p className={styles.trend}>vs anno precedente: {family.trend.vs_previous_year}</p>
       )}
       <div className={styles.exceptions}>
-        <h3>Top eccezioni</h3>
+        <h3>Eccezioni principali</h3>
         {sortedExceptions.length === 0 ? (
-          <p className={styles.allGood}>Tutto in linea</p>
+          <p className={styles.allGood}>-</p>
         ) : (
           <ul>
             {sortedExceptions.slice(0, 3).map((exception) => (

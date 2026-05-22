@@ -399,7 +399,8 @@ type OverviewFamily struct {
 	Exceptions        []OverviewException `json:"exceptions"`
 	SpentPct          *float64            `json:"spent_pct,omitempty"`
 	CalendarAlignment string              `json:"calendar_alignment,omitempty"`
-	CoursesPerPerson  *float64            `json:"courses_per_person,omitempty"`
+	MinCoursesPerPerson *int `json:"min_courses_per_person,omitempty"`
+	MaxCoursesPerPerson *int `json:"max_courses_per_person,omitempty"`
 }
 
 type OverviewResponse struct {
