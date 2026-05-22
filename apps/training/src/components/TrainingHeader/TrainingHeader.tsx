@@ -118,9 +118,14 @@ function YearSelector({
   const currentYear = new Date().getFullYear();
   const options = useMemo(() => {
     const byYear = new Map<number, TrainingPlanListRow | null>();
+    const selectedYearNumber = Number(selectedYear);
+    const addYear = (year: number) => {
+      if (Number.isFinite(year) && !byYear.has(year)) byYear.set(year, null);
+    };
+
     plans.forEach((plan) => byYear.set(plan.year, plan));
-    if (!byYear.has(currentYear)) byYear.set(currentYear, null);
-    if (!byYear.has(Number(selectedYear))) byYear.set(Number(selectedYear), null);
+    [currentYear - 1, currentYear, currentYear + 1].forEach(addYear);
+    [selectedYearNumber - 1, selectedYearNumber, selectedYearNumber + 1].forEach(addYear);
     return [...byYear.entries()].sort((a, b) => b[0] - a[0]);
   }, [plans, currentYear, selectedYear]);
   const selectedPlan = plans.find((plan) => String(plan.year) === selectedYear);
