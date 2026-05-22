@@ -48,12 +48,12 @@ func (s *SQLStore) ensurePopulationTarget(ctx context.Context, q sqlRunner, targ
 		return normalized, nil
 	case "team":
 		err = q.QueryRowContext(ctx, `
-SELECT code || ' - ' || name
+SELECT name
 FROM training.team
 WHERE id = $1::uuid`, normalized.ID).Scan(&label)
 	case "skill_area":
 		err = q.QueryRowContext(ctx, `
-SELECT code || ' - ' || name
+SELECT name
 FROM training.skill_area
 WHERE id = $1::uuid`, normalized.ID).Scan(&label)
 	case "custom_group":
@@ -173,8 +173,8 @@ SELECT
   COALESCE(
     CASE rule.population_target->>'kind'
       WHEN 'all' THEN 'Tutte le persone'
-      WHEN 'team' THEN team.code || ' - ' || team.name
-      WHEN 'skill_area' THEN skill.code || ' - ' || skill.name
+      WHEN 'team' THEN team.name
+      WHEN 'skill_area' THEN skill.name
       WHEN 'custom_group' THEN groups.name
       ELSE ''
     END,
@@ -397,7 +397,7 @@ func (s *SQLStore) CreateMandatoryRule(ctx context.Context, principal Principal,
 		if err != nil {
 			return fmt.Errorf("marshal population target: %w", err)
 		}
-		if _, err := s.courseTitle(ctx, tx, input.CourseID); err != nil {
+		if err := s.ensureComplianceRuleCourse(ctx, tx, input.CourseID); err != nil {
 			return err
 		}
 		err = tx.QueryRowContext(ctx, `
@@ -451,7 +451,7 @@ func (s *SQLStore) UpdateMandatoryRule(ctx context.Context, principal Principal,
 		if err != nil {
 			return fmt.Errorf("marshal population target: %w", err)
 		}
-		if _, err := s.courseTitle(ctx, tx, input.CourseID); err != nil {
+		if err := s.ensureComplianceRuleCourse(ctx, tx, input.CourseID); err != nil {
 			return err
 		}
 		res, err := tx.ExecContext(ctx, `
@@ -568,6 +568,25 @@ WHERE id = $1::uuid`, strings.TrimSpace(courseID)).Scan(&title)
 		return "", fmt.Errorf("load training course: %w", err)
 	}
 	return title, nil
+}
+
+func (s *SQLStore) ensureComplianceRuleCourse(ctx context.Context, q sqlRunner, courseID string) error {
+	var framework string
+	var active, mandatory bool
+	err := q.QueryRowContext(ctx, `
+SELECT is_active, is_mandatory, COALESCE(compliance_framework, '')
+FROM training.course
+WHERE id = $1::uuid`, strings.TrimSpace(courseID)).Scan(&active, &mandatory, &framework)
+	if errors.Is(err, sql.ErrNoRows) {
+		return validationError("course_not_found", "corso non trovato")
+	}
+	if err != nil {
+		return fmt.Errorf("load training course: %w", err)
+	}
+	if !active || !mandatory || strings.TrimSpace(framework) == "" {
+		return validationError("course_not_compliance", "seleziona un corso compliance attivo")
+	}
+	return nil
 }
 
 func (s *SQLStore) ListCustomGroups(ctx context.Context, principal Principal, status, search string) ([]CustomGroup, error) {
@@ -696,7 +715,8 @@ SELECT
   employee.id::text,
   employee.last_name || ' ' || employee.first_name AS name,
   employee.email::text,
-  COALESCE(team.code, '') AS team_code
+  COALESCE(team.code, '') AS team_code,
+  COALESCE(team.name, '') AS team_name
 FROM training.custom_group_members member
 JOIN training.employee employee ON employee.id = member.employee_id
 LEFT JOIN training.team_membership tm
@@ -713,7 +733,7 @@ ORDER BY employee.last_name, employee.first_name`, groupID)
 	members := []GroupMember{}
 	for rows.Next() {
 		var member GroupMember
-		if err := rows.Scan(&member.ID, &member.Name, &member.Email, &member.TeamCode); err != nil {
+		if err := rows.Scan(&member.ID, &member.Name, &member.Email, &member.TeamCode, &member.TeamName); err != nil {
 			return nil, fmt.Errorf("scan custom group member: %w", err)
 		}
 		members = append(members, member)

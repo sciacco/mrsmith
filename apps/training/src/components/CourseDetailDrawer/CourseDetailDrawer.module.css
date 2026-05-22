@@ -37,6 +37,17 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.req {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-danger);
 }
 
 .input,
@@ -72,6 +83,34 @@
 
 .textarea {
   resize: vertical;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.toggle input {
+  margin: 0;
+}
+
+.complianceGrid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.42fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
 }
 
 .gridTwo {
@@ -128,4 +167,11 @@
 .footerRight {
   display: flex;
   gap: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .gridTwo,
+  .complianceGrid {
+    grid-template-columns: 1fr;
+  }
 }

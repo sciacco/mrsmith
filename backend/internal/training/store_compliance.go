@@ -92,8 +92,8 @@ SELECT
   COALESCE(
     CASE r.population_target->>'kind'
       WHEN 'all' THEN 'Tutte le persone'
-      WHEN 'team' THEN team.code || ' - ' || team.name
-      WHEN 'skill_area' THEN skill.code || ' - ' || skill.name
+      WHEN 'team' THEN team.name
+      WHEN 'skill_area' THEN skill.name
       WHEN 'custom_group' THEN groups.name
       ELSE ''
     END,

@@ -52,7 +52,7 @@ SELECT
   COALESCE(c.vendor_id::text, ''),
   COALESCE(v.name, ''),
   COALESCE(c.skill_area_id::text, ''),
-  COALESCE(sa.code || ' - ' || sa.name, ''),
+  COALESCE(sa.name, ''),
   COALESCE(c.leads_to_cert_id::text, ''),
   COALESCE(cert.name, ''),
   c.delivery_mode::text,

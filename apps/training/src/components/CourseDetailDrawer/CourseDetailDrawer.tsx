@@ -19,6 +19,11 @@ const DELIVERY_OPTIONS = [
   { value: 'mixed', label: 'Misto' },
 ];
 
+const PROVIDER_OPTIONS = [
+  { value: 'internal', label: 'Interna' },
+  { value: 'external', label: 'Esterna' },
+];
+
 function formatEuro(value: number): string {
   return new Intl.NumberFormat('it-IT', {
     style: 'currency',
@@ -37,8 +42,11 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [skillAreaId, setSkillAreaId] = useState<string | null>(null);
   const [deliveryMode, setDeliveryMode] = useState('mixed');
+  const [providerKind, setProviderKind] = useState('external');
   const [defaultHours, setDefaultHours] = useState('');
   const [defaultCost, setDefaultCost] = useState('');
+  const [mandatory, setMandatory] = useState(false);
+  const [complianceFramework, setComplianceFramework] = useState('');
   const [description, setDescription] = useState('');
 
   useEffect(() => {
@@ -47,8 +55,11 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
     setVendorId(course.vendorId ?? null);
     setSkillAreaId(course.skillAreaId ?? null);
     setDeliveryMode(course.deliveryMode);
+    setProviderKind(course.providerKind);
     setDefaultHours(course.defaultHours !== undefined ? String(course.defaultHours) : '');
     setDefaultCost(course.defaultCost !== undefined ? String(course.defaultCost) : '');
+    setMandatory(course.mandatory);
+    setComplianceFramework(course.complianceFramework ?? '');
     setDescription(course.description ?? '');
   }, [course]);
 
@@ -62,9 +73,21 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
 
   const vendorOptions = (lookups.data?.vendors ?? []).filter((v) => v.active).map((v) => ({ value: v.id, label: v.label }));
   const skillOptions = (lookups.data?.skillAreas ?? []).filter((s) => s.active).map((s) => ({ value: s.id, label: s.label }));
+  const vendorRequired = providerKind === 'external';
+  const frameworkRequired = mandatory;
+  const canSave =
+    isPeopleAdmin &&
+    title.trim().length > 0 &&
+    (!vendorRequired || Boolean(vendorId)) &&
+    (!frameworkRequired || complianceFramework.trim().length > 0) &&
+    !update.isPending;
 
   async function handleSave() {
     if (!isPeopleAdmin || !course) return;
+    if (!canSave) {
+      toast('Completa i campi obbligatori', 'warning');
+      return;
+    }
     try {
       await update.mutateAsync({
         id: course.id,
@@ -73,12 +96,12 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
           vendorId: vendorId ?? undefined,
           skillAreaId: skillAreaId ?? undefined,
           deliveryMode,
-          providerKind: course.providerKind,
+          providerKind,
           defaultHours: defaultHours ? Number(defaultHours) : undefined,
           defaultCost: defaultCost ? Number(defaultCost.replace(',', '.')) : undefined,
           description: description.trim() || undefined,
-          mandatory: course.mandatory,
-          complianceFramework: course.complianceFramework,
+          mandatory,
+          complianceFramework: mandatory ? complianceFramework.trim() : undefined,
           active: course.active,
         },
       });
@@ -124,7 +147,7 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
           <div className={styles.footerRight}>
             <Button variant="ghost" size="md" onClick={onClose}>Chiudi</Button>
             {isPeopleAdmin && (
-              <Button variant="primary" size="md" onClick={handleSave} loading={update.isPending}>
+              <Button variant="primary" size="md" onClick={handleSave} loading={update.isPending} disabled={!canSave}>
                 Salva
               </Button>
             )}
@@ -154,51 +177,97 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
                 onChange={(v) => setSkillAreaId(v ?? null)}
                 allowClear
                 placeholder="Seleziona"
+                disabled={!isPeopleAdmin}
               />
             </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Fornitore</label>
-              <SingleSelect
-                options={vendorOptions}
-                selected={vendorId}
-                onChange={(v) => setVendorId(v ?? null)}
-                allowClear
-                placeholder="Seleziona"
-              />
-            </div>
-          </div>
-          <div className={styles.gridTwo}>
             <div className={styles.field}>
               <label className={styles.label}>Modalità</label>
               <SingleSelect
                 options={DELIVERY_OPTIONS}
                 selected={deliveryMode}
                 onChange={(v) => setDeliveryMode(v ?? 'mixed')}
+                disabled={!isPeopleAdmin}
+              />
+            </div>
+          </div>
+          <div className={styles.gridTwo}>
+            <div className={styles.field}>
+              <label className={styles.label}>Erogazione</label>
+              <SingleSelect
+                options={PROVIDER_OPTIONS}
+                selected={providerKind}
+                onChange={(v) => setProviderKind(v ?? 'external')}
+                disabled={!isPeopleAdmin}
               />
             </div>
             <div className={styles.field}>
-              <label className={styles.label}>Durata · Costo</label>
-              <div className={styles.inlineInputs}>
-                <input
-                  className={styles.input}
-                  type="number"
-                  min={1}
-                  value={defaultHours}
-                  onChange={(e) => setDefaultHours(e.target.value)}
-                  placeholder="ore"
-                  disabled={!isPeopleAdmin}
-                />
-                <input
-                  className={styles.input}
-                  inputMode="decimal"
-                  value={defaultCost}
-                  onChange={(e) => setDefaultCost(e.target.value)}
-                  placeholder="€"
-                  disabled={!isPeopleAdmin}
-                />
-              </div>
+              <label className={styles.label}>
+                Fornitore {vendorRequired && <span className={styles.req} aria-hidden="true" />}
+              </label>
+              <SingleSelect
+                options={vendorOptions}
+                selected={vendorId}
+                onChange={(v) => setVendorId(v ?? null)}
+                allowClear
+                placeholder="Seleziona"
+                disabled={!isPeopleAdmin}
+              />
             </div>
           </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Durata · Costo</label>
+            <div className={styles.inlineInputs}>
+              <input
+                className={styles.input}
+                type="number"
+                min={1}
+                value={defaultHours}
+                onChange={(e) => setDefaultHours(e.target.value)}
+                placeholder="ore"
+                disabled={!isPeopleAdmin}
+              />
+              <input
+                className={styles.input}
+                inputMode="decimal"
+                value={defaultCost}
+                onChange={(e) => setDefaultCost(e.target.value)}
+                placeholder="€"
+                disabled={!isPeopleAdmin}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Compliance</h3>
+          <div className={styles.complianceGrid}>
+            <label className={styles.toggle}>
+              <input
+                type="checkbox"
+                checked={mandatory}
+                onChange={(e) => setMandatory(e.target.checked)}
+                disabled={!isPeopleAdmin}
+              />
+              <span>Corso compliance</span>
+            </label>
+            <div className={styles.field}>
+              <label htmlFor="cd-framework" className={styles.label}>
+                Framework compliance {frameworkRequired && <span className={styles.req} aria-hidden="true" />}
+              </label>
+              <input
+                id="cd-framework"
+                className={styles.input}
+                placeholder="es. GDPR, ISO 27001"
+                value={complianceFramework}
+                onChange={(e) => setComplianceFramework(e.target.value)}
+                disabled={!isPeopleAdmin || !mandatory}
+                required={frameworkRequired}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.section}>
           <div className={styles.field}>
             <label htmlFor="cd-desc" className={styles.label}>Descrizione</label>
             <textarea

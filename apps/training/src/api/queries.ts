@@ -90,8 +90,8 @@ export function useTrainingLookups(enabled: boolean) {
             { id: 'employee-laura', label: 'Bianchi Laura - laura.bianchi@cdlan.it', active: true },
           ],
           teams: [
-            { id: 'team-cloud', label: 'CLOUD - Cloud Operations', active: true },
-            { id: 'team-app', label: 'APPLICATIONS - Applications', active: true },
+            { id: 'team-cloud', label: 'Cloud Operations', active: true },
+            { id: 'team-app', label: 'Applications', active: true },
           ],
           vendors: [
             { id: 'vendor-linux', label: 'Linux Foundation', active: true },
@@ -99,11 +99,17 @@ export function useTrainingLookups(enabled: boolean) {
             { id: 'vendor-internal', label: 'Internal Academy', active: true },
           ],
           skillAreas: [
-            { id: 'skill-kubernetes', label: 'K8S - Kubernetes', active: true },
-            { id: 'skill-iac', label: 'IAC - Infrastructure as Code', active: true },
-            { id: 'skill-security', label: 'SEC - Security', active: true },
+            { id: 'skill-kubernetes', label: 'Kubernetes', active: true },
+            { id: 'skill-iac', label: 'Infrastructure as Code', active: true },
+            { id: 'skill-security', label: 'Security', active: true },
           ],
-          courses: workspace.catalog.map((course) => ({ id: course.id, label: course.title, active: course.active })),
+          courses: workspace.catalog.map((course) => ({
+            id: course.id,
+            label: course.title,
+            active: course.active,
+            mandatory: course.mandatory,
+            complianceFramework: course.complianceFramework,
+          })),
           certifications: [
             { id: 'cert-itil4', label: 'ITIL4 - ITIL 4 Foundation', active: true },
             { id: 'cert-cka', label: 'CKA - Certified Kubernetes Administrator', active: true },

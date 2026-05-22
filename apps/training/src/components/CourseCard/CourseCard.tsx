@@ -60,7 +60,7 @@ export function CourseCard({ course, currentYear, onOpen }: CourseCardProps) {
       {course.vendorName && <p className={styles.vendor}>Fornitore: {course.vendorName}</p>}
       {course.mandatory && course.complianceFramework && (
         <p className={styles.mandatory}>
-          Mandatory rule: <strong>{course.complianceFramework}</strong>
+          Framework compliance: <strong>{course.complianceFramework}</strong>
         </p>
       )}
       <footer className={styles.foot}>

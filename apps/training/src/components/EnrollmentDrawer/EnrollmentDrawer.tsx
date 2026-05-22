@@ -338,8 +338,8 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
         {/* Meta chips — anno / team / area / tipo + alert */}
         <div className={styles.metaChips}>
           <span className={styles.chip}><span className={styles.chipKey}>Anno</span> {enrollment.year}</span>
-          {enrollment.teamCode && (
-            <span className={styles.chip}><span className={styles.chipKey}>Team</span> {enrollment.teamCode}</span>
+          {enrollment.teamName && (
+            <span className={styles.chip}><span className={styles.chipKey}>Team</span> {enrollment.teamName}</span>
           )}
           {enrollment.skillAreaName && (
             <span className={styles.chip}><span className={styles.chipKey}>Area</span> {enrollment.skillAreaName}</span>

@@ -64,7 +64,7 @@ export function PersonEditModal({ open, profile, teams, onClose }: PersonEditMod
       const options = teams.filter((team) => team.active).map((team) => ({ value: team.id, label: team.label }));
       const identity = profile.identity_min;
       if (identity.team_id && !options.some((option) => option.value === identity.team_id)) {
-        const label = [identity.team_code, identity.team_name].filter(Boolean).join(' - ') || 'Team attuale';
+        const label = identity.team_name || 'Team attuale';
         options.push({ value: identity.team_id, label });
       }
       return options;

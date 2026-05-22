@@ -19,8 +19,8 @@ const DELIVERY_OPTIONS = [
 ];
 
 const PROVIDER_OPTIONS = [
-  { value: 'internal', label: 'Interno' },
-  { value: 'external', label: 'Esterno' },
+  { value: 'internal', label: 'Interna' },
+  { value: 'external', label: 'Esterna' },
 ];
 
 const emptyDraft = {
@@ -32,6 +32,7 @@ const emptyDraft = {
   defaultHours: '',
   defaultCost: '',
   description: '',
+  mandatory: false,
   complianceFramework: '',
 };
 
@@ -77,11 +78,14 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
   const skillOptions = (lookups.data?.skillAreas ?? []).filter((s) => s.active).map((s) => ({ value: s.id, label: s.label }));
   const hoursError = validateOptionalHours(draft.defaultHours);
   const costError = validateOptionalCost(draft.defaultCost);
+  const vendorRequired = draft.providerKind === 'external';
+  const frameworkRequired = draft.mandatory;
 
   const canSubmit =
     draft.title.trim().length > 0 &&
-    draft.vendorId.length > 0 &&
+    (!vendorRequired || draft.vendorId.length > 0) &&
     draft.skillAreaId.length > 0 &&
+    (!frameworkRequired || draft.complianceFramework.trim().length > 0) &&
     !hoursError &&
     !costError &&
     !create.isPending;
@@ -94,15 +98,15 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
     try {
       await create.mutateAsync({
         title: draft.title.trim(),
-        vendorId: draft.vendorId,
+        vendorId: draft.vendorId || undefined,
         skillAreaId: draft.skillAreaId,
         deliveryMode: draft.deliveryMode,
         providerKind: draft.providerKind,
         defaultHours,
         defaultCost,
         description: draft.description.trim() || undefined,
-        complianceFramework: draft.complianceFramework.trim() || undefined,
-        mandatory: draft.complianceFramework.trim().length > 0,
+        complianceFramework: draft.mandatory ? draft.complianceFramework.trim() : undefined,
+        mandatory: draft.mandatory,
         active: true,
       });
       toast('Corso creato');
@@ -143,20 +147,6 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
             />
           </div>
           <div className={styles.field}>
-            <label className={styles.label}>
-              Fornitore <span className={styles.req} aria-hidden="true" />
-            </label>
-            <SingleSelect
-              options={vendorOptions}
-              selected={draft.vendorId || null}
-              onChange={(v) => setDraft((d) => ({ ...d, vendorId: v ?? '' }))}
-              placeholder="Seleziona fornitore"
-            />
-          </div>
-        </div>
-
-        <div className={styles.gridTwo}>
-          <div className={styles.field}>
             <label className={styles.label}>Modalità</label>
             <SingleSelect
               options={DELIVERY_OPTIONS}
@@ -164,12 +154,26 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
               onChange={(v) => setDraft((d) => ({ ...d, deliveryMode: v ?? 'mixed' }))}
             />
           </div>
+        </div>
+
+        <div className={styles.gridTwo}>
           <div className={styles.field}>
-            <label className={styles.label}>Provider</label>
+            <label className={styles.label}>Erogazione</label>
             <SingleSelect
               options={PROVIDER_OPTIONS}
               selected={draft.providerKind}
               onChange={(v) => setDraft((d) => ({ ...d, providerKind: v ?? 'external' }))}
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Fornitore {vendorRequired && <span className={styles.req} aria-hidden="true" />}
+            </label>
+            <SingleSelect
+              options={vendorOptions}
+              selected={draft.vendorId || null}
+              onChange={(v) => setDraft((d) => ({ ...d, vendorId: v ?? '' }))}
+              placeholder="Seleziona fornitore"
             />
           </div>
         </div>
@@ -209,17 +213,33 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
           </div>
         </div>
 
-        <div className={styles.field}>
-          <label htmlFor="nc-framework" className={styles.label}>Mandatory framework</label>
-          <input
-            id="nc-framework"
-            className={styles.input}
-            placeholder="es. GDPR, ISO 27001"
-            value={draft.complianceFramework}
-            onChange={(e) => setDraft((d) => ({ ...d, complianceFramework: e.target.value }))}
-          />
-          <p className={styles.hint}>Compila se il corso è obbligatorio e deve essere coperto da una rule.</p>
-        </div>
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Compliance</h3>
+          <div className={styles.complianceGrid}>
+            <label className={styles.toggle}>
+              <input
+                type="checkbox"
+                checked={draft.mandatory}
+                onChange={(e) => setDraft((d) => ({ ...d, mandatory: e.target.checked }))}
+              />
+              <span>Corso compliance</span>
+            </label>
+            <div className={styles.field}>
+              <label htmlFor="nc-framework" className={styles.label}>
+                Framework compliance {frameworkRequired && <span className={styles.req} aria-hidden="true" />}
+              </label>
+              <input
+                id="nc-framework"
+                className={styles.input}
+                placeholder="es. GDPR, ISO 27001"
+                value={draft.complianceFramework}
+                onChange={(e) => setDraft((d) => ({ ...d, complianceFramework: e.target.value }))}
+                disabled={!draft.mandatory}
+                required={frameworkRequired}
+              />
+            </div>
+          </div>
+        </section>
 
         <div className={styles.field}>
           <label htmlFor="nc-description" className={styles.label}>Descrizione</label>

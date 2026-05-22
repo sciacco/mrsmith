@@ -89,7 +89,20 @@ export function RulesPage({ isPeopleAdmin }: { isPeopleAdmin: boolean }) {
   const gapCount = list.reduce((sum, rule) => sum + rule.gap_count, 0);
 
   const drawerDraft = drawer.mode === 'closed' ? null : drawer.draft;
-  const canSubmit = Boolean(drawerDraft?.name.trim() && drawerDraft.course_id && drawerDraft.population_target.kind);
+  const selectedCourse = drawerDraft?.course_id
+    ? lookups.data?.courses.find((course) => course.id === drawerDraft.course_id)
+    : null;
+  const selectedCourseValid = Boolean(
+    selectedCourse?.active &&
+    selectedCourse.mandatory &&
+    selectedCourse.complianceFramework?.trim(),
+  );
+  const canSubmit = Boolean(
+    drawerDraft?.name.trim() &&
+    drawerDraft.course_id &&
+    drawerDraft.population_target.kind &&
+    selectedCourseValid,
+  );
 
   const titleByCourse = useMemo(() => {
     const map = new Map<string, string>();

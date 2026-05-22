@@ -13,9 +13,20 @@ interface RuleFormProps {
 }
 
 export function RuleForm({ value, courses, teams, skillAreas, groups, onChange }: RuleFormProps) {
+  const selectedCourse = courses.find((course) => course.id === value.course_id);
+  const selectedCourseValid = selectedCourse
+    ? selectedCourse.active && selectedCourse.mandatory && Boolean(selectedCourse.complianceFramework?.trim())
+    : !value.course_id;
   const courseOptions = courses
-    .filter((course) => course.active)
-    .map((course) => ({ value: course.id, label: course.label }));
+    .filter((course) =>
+      (course.active && course.mandatory && Boolean(course.complianceFramework?.trim()))
+      || course.id === value.course_id
+    )
+    .map((course) => ({
+      value: course.id,
+      label: course.label,
+      secondaryLabel: course.complianceFramework?.trim() || 'Completa compliance sul corso',
+    }));
 
   return (
     <div className={styles.form}>
@@ -37,6 +48,7 @@ export function RuleForm({ value, courses, teams, skillAreas, groups, onChange }
           placeholder="Seleziona corso"
           searchable
         />
+        {!selectedCourseValid && <p className={styles.errorText}>Seleziona un corso compliance attivo.</p>}
       </label>
 
       <div className={styles.field}>

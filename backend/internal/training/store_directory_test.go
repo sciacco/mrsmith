@@ -158,19 +158,19 @@ func (c trainingDirectoryTestConn) QueryContext(_ context.Context, query string,
 	if c.mode == "directory" && strings.Contains(query, "WITH active_emp AS") {
 		return &trainingDirectoryTestRows{
 			columns: []string{
-				"id", "name", "email", "team_code",
+				"id", "name", "email", "team_code", "team_name",
 				"gaps_open", "active_enrollments_count", "expiring_certs_count", "hist_count",
 				"da_pianificare", "compliance_gap", "scadenze_imminenti", "failed_recente", "senza_formazione_attiva",
 				"deadline_type", "deadline_date", "deadline_label",
 			},
 			values: [][]driver.Value{
-				{"to-plan", "Verdi Ada", "ada.verdi@example.com", "CLOUD", int64(1), int64(1), int64(0), int64(4), true, true, false, false, false, nil, nil, nil},
-				{"gap", "Rossi Marco", "marco.rossi@example.com", "APP", int64(1), int64(1), int64(0), int64(6), false, true, false, false, false, nil, nil, nil},
-				{"expiring", "Bianchi Laura", "laura.bianchi@example.com", "CLOUD", int64(0), int64(1), int64(1), int64(5), false, false, true, false, false, "cert", "2026-06-19", "Cert in scadenza"},
-				{"failed", "Neri Federico", "federico.neri@example.com", "SEC", int64(0), int64(1), int64(0), int64(5), false, false, false, true, false, nil, nil, nil},
-				{"no-active", "Gallo Giulia", "giulia.gallo@example.com", "PEOPLE", int64(0), int64(0), int64(0), int64(2), false, false, false, false, true, nil, nil, nil},
-				{"multi", "Conti Marta", "marta.conti@example.com", "APP", int64(2), int64(0), int64(1), int64(3), true, true, true, true, true, "mandatory_due", "2026-06-04", "Ricorrenza obbligatoria"},
-				{"zero", "Ferri Nadia", "nadia.ferri@example.com", "FIN", int64(0), int64(2), int64(0), int64(9), false, false, false, false, false, "course_end", "2026-07-10", "Fine corso prevista"},
+				{"to-plan", "Verdi Ada", "ada.verdi@example.com", "CLOUD", "Cloud Operations", int64(1), int64(1), int64(0), int64(4), true, true, false, false, false, nil, nil, nil},
+				{"gap", "Rossi Marco", "marco.rossi@example.com", "APP", "Applications", int64(1), int64(1), int64(0), int64(6), false, true, false, false, false, nil, nil, nil},
+				{"expiring", "Bianchi Laura", "laura.bianchi@example.com", "CLOUD", "Cloud Operations", int64(0), int64(1), int64(1), int64(5), false, false, true, false, false, "cert", "2026-06-19", "Cert in scadenza"},
+				{"failed", "Neri Federico", "federico.neri@example.com", "SEC", "Security", int64(0), int64(1), int64(0), int64(5), false, false, false, true, false, nil, nil, nil},
+				{"no-active", "Gallo Giulia", "giulia.gallo@example.com", "PEOPLE", "People", int64(0), int64(0), int64(0), int64(2), false, false, false, false, true, nil, nil, nil},
+				{"multi", "Conti Marta", "marta.conti@example.com", "APP", "Applications", int64(2), int64(0), int64(1), int64(3), true, true, true, true, true, "mandatory_due", "2026-06-04", "Ricorrenza obbligatoria"},
+				{"zero", "Ferri Nadia", "nadia.ferri@example.com", "FIN", "Finance", int64(0), int64(2), int64(0), int64(9), false, false, false, false, false, "course_end", "2026-07-10", "Fine corso prevista"},
 			},
 		}, nil
 	}

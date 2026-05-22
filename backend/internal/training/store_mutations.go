@@ -1107,6 +1107,19 @@ func (s *SQLStore) UpsertCourse(ctx context.Context, principal Principal, id str
 	if providerKind == "" {
 		providerKind = "external"
 	}
+	if providerKind != "internal" && providerKind != "external" {
+		return ActionResponse{}, validationError("provider_kind_invalid", "erogazione non valida")
+	}
+	if providerKind == "external" && strings.TrimSpace(input.VendorID) == "" {
+		return ActionResponse{}, validationError("vendor_required", "fornitore obbligatorio per corsi a erogazione esterna")
+	}
+	complianceFramework := strings.TrimSpace(input.ComplianceFramework)
+	if input.Mandatory && complianceFramework == "" {
+		return ActionResponse{}, validationError("compliance_framework_required", "framework compliance obbligatorio per corsi compliance")
+	}
+	if !input.Mandatory {
+		complianceFramework = ""
+	}
 	return s.upsertSimple(ctx, principal, "course", id, []upsertField{
 		field("title", strings.TrimSpace(input.Title)),
 		typedField("vendor_id", nullableUUID(input.VendorID), "::uuid"),
@@ -1120,7 +1133,7 @@ func (s *SQLStore) UpsertCourse(ctx context.Context, principal Principal, id str
 		field("description", nullableText(input.Description)),
 		field("is_mandatory", input.Mandatory),
 		typedField("recurrence_interval", monthsInterval(input.RecurrenceMonths), "::interval"),
-		field("compliance_framework", nullableText(input.ComplianceFramework)),
+		field("compliance_framework", nullableText(complianceFramework)),
 		field("is_active", boolValue(input.Active, true)),
 	})
 }

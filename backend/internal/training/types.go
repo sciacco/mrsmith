@@ -27,6 +27,7 @@ type PlanEnrollment struct {
 	EmployeeName      string   `json:"employeeName"`
 	EmployeeEmail     string   `json:"employeeEmail"`
 	TeamCode          string   `json:"teamCode,omitempty"`
+	TeamName          string   `json:"teamName,omitempty"`
 	CourseTitle       string   `json:"courseTitle"`
 	VendorName        string   `json:"vendorName,omitempty"`
 	SkillAreaName     string   `json:"skillAreaName,omitempty"`
@@ -192,9 +193,11 @@ type MandatoryRuleRow struct {
 }
 
 type LookupItem struct {
-	ID     string `json:"id"`
-	Label  string `json:"label"`
-	Active bool   `json:"active"`
+	ID                  string `json:"id"`
+	Label               string `json:"label"`
+	Active              bool   `json:"active"`
+	Mandatory           bool   `json:"mandatory,omitempty"`
+	ComplianceFramework string `json:"complianceFramework,omitempty"`
 }
 
 type LookupResponse struct {
@@ -273,6 +276,7 @@ type PersonSummary struct {
 	Name                   string              `json:"name"`
 	Email                  string              `json:"email"`
 	TeamCode               string              `json:"team_code"`
+	TeamName               string              `json:"team_name,omitempty"`
 	Flags                  PersonFlags         `json:"flags"`
 	ActiveEnrollmentsCount int                 `json:"active_enrollments_count"`
 	NextDeadline           *PersonNextDeadline `json:"next_deadline,omitempty"`

@@ -116,6 +116,7 @@ SELECT
   concat(e.last_name, ' ', e.first_name),
   e.email::text,
   COALESCE(t.code, ''),
+  COALESCE(t.name, ''),
   c.title,
   COALESCE(v.name, ''),
   COALESCE(sa.name, ''),
@@ -175,6 +176,7 @@ LIMIT 500`
 			&row.EmployeeName,
 			&row.EmployeeEmail,
 			&row.TeamCode,
+			&row.TeamName,
 			&row.CourseTitle,
 			&row.VendorName,
 			&row.SkillAreaName,
@@ -419,7 +421,7 @@ SELECT
   sa.code,
   sa.name,
   COALESCE(sa.parent_id::text, ''),
-  COALESCE(parent.code || ' - ' || parent.name, ''),
+  COALESCE(parent.name, ''),
   COALESCE(sa.description, ''),
   sa.is_active
 FROM training.skill_area sa
@@ -452,7 +454,7 @@ SELECT
   COALESCE(cert.issuer_vendor_id::text, ''),
   COALESCE(v.name, ''),
   COALESCE(cert.skill_area_id::text, ''),
-  COALESCE(sa.code || ' - ' || sa.name, ''),
+  COALESCE(sa.name, ''),
   CASE
     WHEN cert.typical_validity IS NULL THEN NULL
     ELSE EXTRACT(YEAR FROM cert.typical_validity)::int * 12 + EXTRACT(MONTH FROM cert.typical_validity)::int
@@ -526,7 +528,7 @@ SELECT
   rule.course_id::text,
   course.title,
   CASE WHEN rule.population_target->>'kind' = 'team' THEN COALESCE(rule.population_target->>'id', '') ELSE '' END,
-  COALESCE(team.code || ' - ' || team.name, ''),
+  COALESCE(team.name, ''),
   '',
   COALESCE(rule.notes, ''),
   rule.is_active
@@ -736,7 +738,7 @@ func (s *SQLStore) Lookups(ctx context.Context, principal Principal) (LookupResp
 			return LookupResponse{}, err
 		}
 	}
-	teams, err := s.lookup(ctx, "training.team", "name", "code")
+	teams, err := s.lookup(ctx, "training.team", "name", "")
 	if err != nil {
 		return LookupResponse{}, err
 	}
@@ -744,11 +746,11 @@ func (s *SQLStore) Lookups(ctx context.Context, principal Principal) (LookupResp
 	if err != nil {
 		return LookupResponse{}, err
 	}
-	skillAreas, err := s.lookup(ctx, "training.skill_area", "name", "code")
+	skillAreas, err := s.lookup(ctx, "training.skill_area", "name", "")
 	if err != nil {
 		return LookupResponse{}, err
 	}
-	courses, err := s.lookup(ctx, "training.course", "title", "")
+	courses, err := s.courseLookup(ctx)
 	if err != nil {
 		return LookupResponse{}, err
 	}
@@ -787,6 +789,29 @@ LIMIT 1000`
 		var item LookupItem
 		if err := rows.Scan(&item.ID, &item.Label, &item.Active); err != nil {
 			return nil, fmt.Errorf("scan training employee lookup: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *SQLStore) courseLookup(ctx context.Context) ([]LookupItem, error) {
+	const q = `
+SELECT id::text, title, is_active, is_mandatory, COALESCE(compliance_framework, '')
+FROM training.course
+ORDER BY is_active DESC, title
+LIMIT 500`
+	rows, err := s.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("load training course lookup: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]LookupItem, 0)
+	for rows.Next() {
+		var item LookupItem
+		if err := rows.Scan(&item.ID, &item.Label, &item.Active, &item.Mandatory, &item.ComplianceFramework); err != nil {
+			return nil, fmt.Errorf("scan training course lookup: %w", err)
 		}
 		items = append(items, item)
 	}

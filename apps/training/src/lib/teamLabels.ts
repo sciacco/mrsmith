@@ -11,16 +11,7 @@ export function buildTeamLabelMap(teams: TeamRow[] | undefined): TeamLabelMap {
   return map;
 }
 
-function humanizeCode(code: string): string {
-  return code
-    .toLowerCase()
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 export function formatTeamLabel(code: string | undefined, map: TeamLabelMap): string {
   if (!code) return '';
-  return map[code] ?? humanizeCode(code);
+  return map[code] ?? '';
 }

@@ -147,7 +147,7 @@ export function SettingsPage({ isPeopleAdmin }: { isPeopleAdmin: boolean }) {
   const certifications = masterData?.certifications ?? [];
 
   const skillAreaOptions = useMemo(
-    () => skillAreas.map((area) => ({ value: area.id, label: labelWithCode(area.code, area.name), active: area.active })),
+    () => skillAreas.map((area) => ({ value: area.id, label: area.name, active: area.active })),
     [skillAreas],
   );
   const vendorOptions = useMemo(
@@ -236,19 +236,11 @@ export function SettingsPage({ isPeopleAdmin }: { isPeopleAdmin: boolean }) {
       return null;
     },
     getTitle: (item) => item.name,
-    getCode: (item) => item.code,
     getMeta: (item) => [item.description || 'Nessuna descrizione'],
     searchText: (item) => joinSearch(item.code, item.name, item.description),
-    renderFields: ({ draft, item, prefix, updateDraft }) => (
+    renderFields: ({ draft, prefix, updateDraft }) => (
       <>
-        {item ? (
-          <div className={styles.gridTwo}>
-            <ReadOnlyCodeField label="Codice" value={item.code} />
-            <TextField id={`${prefix}-name`} label="Nome" value={draft.name} onChange={(name) => updateDraft({ name })} required />
-          </div>
-        ) : (
-          <TextField id={`${prefix}-name`} label="Nome" value={draft.name} onChange={(name) => updateDraft({ name })} required />
-        )}
+        <TextField id={`${prefix}-name`} label="Nome" value={draft.name} onChange={(name) => updateDraft({ name })} required />
         <TextareaField
           id={`${prefix}-description`}
           label="Descrizione"
@@ -295,7 +287,6 @@ export function SettingsPage({ isPeopleAdmin }: { isPeopleAdmin: boolean }) {
       return null;
     },
     getTitle: (item) => item.name,
-    getCode: (item) => item.code,
     getMeta: (item) => [
       item.parentLabel ? `Area padre: ${item.parentLabel}` : 'Nessuna area padre',
       item.description ?? '',
@@ -307,14 +298,7 @@ export function SettingsPage({ isPeopleAdmin }: { isPeopleAdmin: boolean }) {
         .map(({ value, label }) => ({ value, label }));
       return (
         <>
-          {item ? (
-            <div className={styles.gridTwo}>
-              <ReadOnlyCodeField label="Codice" value={item.code} />
-              <TextField id={`${prefix}-name`} label="Nome" value={draft.name} onChange={(name) => updateDraft({ name })} required />
-            </div>
-          ) : (
-            <TextField id={`${prefix}-name`} label="Nome" value={draft.name} onChange={(name) => updateDraft({ name })} required />
-          )}
+          <TextField id={`${prefix}-name`} label="Nome" value={draft.name} onChange={(name) => updateDraft({ name })} required />
           <SelectField
             id={`${prefix}-parent`}
             label="Area padre"
@@ -877,10 +861,6 @@ function toSectionKey(value: string | null): SectionKey | null {
 
 function countLabel(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function labelWithCode(code: string, name: string): string {
-  return `${code} - ${name}`;
 }
 
 function joinSearch(...parts: Array<string | undefined>): string {

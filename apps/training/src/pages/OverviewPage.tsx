@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { Skeleton } from '@mrsmith/ui';
-import { useOverviewKpis } from '../api/queries';
+import { useOverviewKpis, useTrainingWorkspace } from '../api/queries';
 import type { OverviewException, OverviewFamily } from '../api/types';
 import styles from './OverviewPage.module.css';
 
@@ -30,6 +30,8 @@ export function OverviewPage({ isPeopleAdmin }: OverviewPageProps) {
   const year = params.get('year') ?? String(new Date().getFullYear());
   const team = params.get('team') ?? '';
   const overview = useOverviewKpis({ year, team }, isPeopleAdmin);
+  const workspace = useTrainingWorkspace(isPeopleAdmin);
+  const teamLabel = workspace.data?.masterData?.teams.find((item) => item.code === team)?.name;
 
   if (!isPeopleAdmin) {
     return <main className={styles.page}><p>Accesso riservato al team People.</p></main>;
@@ -46,7 +48,7 @@ export function OverviewPage({ isPeopleAdmin }: OverviewPageProps) {
       <header className={styles.header}>
         <h1>Overview</h1>
         <p className={styles.subtitle}>
-          Stato formativo {data.year}{team ? ` · ${team}` : ''}.
+          Stato formativo {data.year}{teamLabel ? ` · ${teamLabel}` : ''}.
         </p>
       </header>
 

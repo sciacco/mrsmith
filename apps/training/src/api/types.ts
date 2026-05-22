@@ -25,6 +25,7 @@ export interface PlanEnrollment {
   employeeName: string;
   employeeEmail: string;
   teamCode?: string;
+  teamName?: string;
   courseTitle: string;
   vendorName?: string;
   skillAreaName?: string;
@@ -205,6 +206,8 @@ export interface LookupItem {
   id: string;
   label: string;
   active: boolean;
+  mandatory?: boolean;
+  complianceFramework?: string;
 }
 
 export interface LookupResponse {
@@ -263,6 +266,7 @@ export interface PersonSummary {
   name: string;
   email: string;
   team_code: string;
+  team_name?: string;
   flags: PersonFlags;
   active_enrollments_count: number;
   next_deadline: PersonNextDeadline | null;
@@ -620,6 +624,7 @@ export interface GroupMember {
   name: string;
   email: string;
   team_code?: string;
+  team_name?: string;
 }
 
 export interface CustomGroupUsage {

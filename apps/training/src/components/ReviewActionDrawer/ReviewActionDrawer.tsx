@@ -530,6 +530,10 @@ function CreateFromScratch({
     () => activeCourses.map((course) => ({ value: course.id, label: course.title })),
     [activeCourses],
   );
+  const teamLabel = useMemo(
+    () => workspace.data?.masterData?.teams.find((item) => item.code === team)?.name,
+    [workspace.data, team],
+  );
   const groupOptions = useMemo(
     () =>
       (groups.data?.groups ?? [])
@@ -559,11 +563,12 @@ function CreateFromScratch({
   }, [workspace.data, selectedCourse, year]);
 
   const teamOptions = useMemo(() => {
-    const teams = new Set<string>();
+    const teams = new Map<string, string>();
     directoryPeople.forEach((p) => {
-      if (p.team_code) teams.add(p.team_code);
+      if (p.team_code) teams.set(p.team_code, p.team_name || 'Team senza nome');
     });
-    return Array.from(teams).sort();
+    return Array.from(teams, ([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'it'));
   }, [directoryPeople]);
 
   const displayedPeople = useMemo(() => {
@@ -689,7 +694,7 @@ function CreateFromScratch({
       onClose={onClose}
       size="xl"
       title="Nuova iscrizione"
-      subtitle={<span className={styles.subtitle}>Piano {year}{team ? ` · ${team}` : ''}</span>}
+      subtitle={<span className={styles.subtitle}>Piano {year}{teamLabel ? ` · ${teamLabel}` : ''}</span>}
       footer={
         <div className={styles.footer}>
           <div className={styles.summaryFooter}>
@@ -849,7 +854,7 @@ function CreateFromScratch({
                   <SingleSelect
                     options={[
                       { value: 'all', label: 'Tutti i team' },
-                      ...teamOptions.map((t) => ({ value: t, label: t })),
+                      ...teamOptions,
                     ]}
                     selected={filterTeam}
                     onChange={(value) => setFilterTeam(value ?? 'all')}
@@ -927,7 +932,7 @@ function CreateFromScratch({
                     <span className={styles.personBody}>
                       <span className={styles.personHeader}>
                         <span className={styles.personName}>{member.name}</span>
-                        {member.team_code && <span className={styles.personTeam}>{member.team_code}</span>}
+                        {member.team_name && <span className={styles.personTeam}>{member.team_name}</span>}
                       </span>
                       <span className={styles.personMeta}>{member.email}</span>
                     </span>
@@ -1046,7 +1051,7 @@ function PersonOption({
         <span className={styles.personBody}>
           <span className={styles.personHeader}>
             <span className={styles.personName}>{person.name}</span>
-            {person.team_code && <span className={styles.personTeam}>{person.team_code}</span>}
+            {person.team_name && <span className={styles.personTeam}>{person.team_name}</span>}
           </span>
           <span className={styles.personMeta}>{person.email}</span>
           {badges.length > 0 && <span className={styles.personBadges}>{badges}</span>}

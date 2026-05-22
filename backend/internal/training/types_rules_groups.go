@@ -67,6 +67,7 @@ type GroupMember struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	TeamCode string `json:"team_code,omitempty"`
+	TeamName string `json:"team_name,omitempty"`
 }
 
 type CustomGroupUsage struct {

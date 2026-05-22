@@ -107,7 +107,7 @@ export function PersonPage({ isPeopleAdmin }: PersonPageProps) {
           <div className={styles.heroText}>
             <h1>{data.identity_min.name}</h1>
             <p className={styles.heroMeta}>
-              {data.identity_min.email} · {data.identity_min.team_code || 'Senza team'}
+              {data.identity_min.email} · {data.identity_min.team_name || 'Senza team'}
             </p>
             <p className={styles.heroState}>
               {data.compliance.open_gaps.length > 0 && (
