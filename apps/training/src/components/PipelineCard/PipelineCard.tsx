@@ -1,6 +1,11 @@
 import { Icon } from '@mrsmith/ui';
 import type { PlanEnrollment } from '../../api/types';
 import { ALERT_LEVEL_LABEL, classifyAlertLevel, type AlertLevel } from '../../lib/alertLevel';
+import {
+  enrollmentStatusLabel,
+  enrollmentStatusTone,
+  isActiveEnrollmentStatus,
+} from '../../lib/enrollmentStatus.js';
 import { formatBudget } from '../../lib/formatBudget';
 import { daysUntilPipelineReference } from '../../lib/pipelineTiming';
 import { formatTeamLabel, type TeamLabelMap } from '../../lib/teamLabels';
@@ -49,6 +54,9 @@ export function PipelineCard({
   const delay = formatDelay(enrollment, now);
   const budget = formatBudget(enrollment.costPlanned);
   const teamLabel = formatTeamLabel(enrollment.teamCode, teamLabels);
+  const showStatusPill = isActiveEnrollmentStatus(enrollment.status);
+  const statusTone = showStatusPill ? enrollmentStatusTone(enrollment.status) : null;
+  const statusLabel = showStatusPill ? enrollmentStatusLabel(enrollment.status) : '';
 
   function handleKeyDown(event: React.KeyboardEvent) {
     if (event.key === 'Enter') {
@@ -87,6 +95,12 @@ export function PipelineCard({
           <span className={styles.person}>{enrollment.employeeName}</span>
           {teamLabel && <span className={styles.team}>{teamLabel}</span>}
           {enrollment.mandatory && <span className={styles.tag}>Obbligatoria</span>}
+          {showStatusPill && statusTone && (
+            <span className={`${styles.statusPill} ${styles[`status_${statusTone}`] ?? ''}`}>
+              <span className={styles.statusDot} aria-hidden="true">●</span>
+              {statusLabel}
+            </span>
+          )}
         </div>
         {(enrollment.vendorName || enrollment.hoursPlanned !== undefined) && (
           <div className={styles.subline}>

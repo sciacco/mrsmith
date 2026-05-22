@@ -17,6 +17,7 @@ import {
   isDirty as draftIsDirty,
   type EnrollmentDraft,
 } from '../../lib/enrollmentDerived';
+import { enrollmentStatusLabel, enrollmentStatusTone } from '../../lib/enrollmentStatus.js';
 import styles from './EnrollmentDrawer.module.css';
 
 interface EnrollmentDrawerProps {
@@ -24,26 +25,6 @@ interface EnrollmentDrawerProps {
   isPeopleAdmin: boolean;
   onClose: () => void;
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  proposed: 'Proposta',
-  approved: 'Approvata',
-  in_progress: 'In corso',
-  completed: 'Completata',
-  failed: 'Non superata',
-  cancelled: 'Annullata',
-  expired: 'Scaduta',
-};
-
-const STATUS_CLASS: Record<string, string | undefined> = {
-  proposed: styles.status_proposed,
-  approved: styles.status_approved,
-  in_progress: styles.status_in_progress,
-  completed: styles.status_completed,
-  failed: styles.status_failed,
-  cancelled: styles.status_cancelled,
-  expired: styles.status_expired,
-};
 
 const ALERT_LABEL: Record<string, string> = {
   critical: 'Critico',
@@ -307,8 +288,9 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
   }
 
   const pending = transition.isPending || update.isPending || uploadDoc.isPending || validateDoc.isPending;
-  const statusLabel = STATUS_LABELS[enrollment.status] ?? enrollment.status;
-  const statusClass = STATUS_CLASS[enrollment.status] ?? '';
+  const statusLabel = enrollmentStatusLabel(enrollment.status);
+  const tone = enrollmentStatusTone(enrollment.status);
+  const statusClass = tone ? styles[`status_${tone}`] ?? '' : '';
 
   const subtitle = (
     <div className={styles.subtitle}>

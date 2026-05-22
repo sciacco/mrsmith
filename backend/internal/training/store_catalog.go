@@ -62,8 +62,10 @@ SELECT
   COALESCE(c.course_url, ''),
   COALESCE(c.description, ''),
   c.is_mandatory,
-  (EXTRACT(YEAR FROM AGE(c.recurrence_interval))::int * 12
-    + EXTRACT(MONTH FROM AGE(c.recurrence_interval))::int) AS recurrence_months,
+  CASE
+    WHEN c.recurrence_interval IS NULL THEN NULL
+    ELSE EXTRACT(YEAR FROM c.recurrence_interval)::int * 12 + EXTRACT(MONTH FROM c.recurrence_interval)::int
+  END AS recurrence_months,
   COALESCE(c.compliance_framework, ''),
   c.is_active,
   COALESCE((SELECT COUNT(*) FROM training.enrollment en
