@@ -13,6 +13,18 @@ type appError struct {
 	message string
 }
 
+type anotherPlanOpenError struct {
+	existing TrainingPlanListRow
+	message  string
+}
+
+func (e anotherPlanOpenError) Error() string {
+	if e.message != "" {
+		return e.message
+	}
+	return "esiste gia un piano aperto"
+}
+
 func (e appError) Error() string {
 	if e.message != "" {
 		return e.message
@@ -46,6 +58,14 @@ func asAppError(err error) (appError, bool) {
 		return appErr, true
 	}
 	return appError{}, false
+}
+
+func asAnotherPlanOpenError(err error) (anotherPlanOpenError, bool) {
+	var openErr anotherPlanOpenError
+	if errors.As(err, &openErr) {
+		return openErr, true
+	}
+	return anotherPlanOpenError{}, false
 }
 
 func isUniqueViolation(err error, constraint string) bool {

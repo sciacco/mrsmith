@@ -17,7 +17,7 @@ type Source = 'empty' | 'duplicate';
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     const body = error.body as { message?: string; error?: string } | undefined;
-    return body?.message ?? body?.error ?? error.statusText;
+    return body?.message ?? 'Creazione non completata';
   }
   return error instanceof Error ? error.message : 'Errore nella creazione del piano';
 }

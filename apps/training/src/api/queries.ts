@@ -17,10 +17,14 @@ import type {
   OverviewResponse,
   PersonProfile,
   PersonSummary,
+  PlanAuditResponse,
   PlanningResponse,
   PlanTransition,
+  TrainingPlansResponse,
   TrainingPlanRow,
   TransitionPlanResponse,
+  UpdatePlanInput,
+  UpdatePlanResponse,
   WorkspaceResponse,
 } from './types';
 
@@ -548,6 +552,51 @@ export function useCreatePlan() {
       api.post<TrainingPlanRow>('/training/v1/people/plans', body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'plans'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'overview'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'lookups'] });
+    },
+  });
+}
+
+export function useTrainingPlans(enabled: boolean, status?: string) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'plans', status ?? 'all'],
+    enabled,
+    queryFn: async (): Promise<TrainingPlansResponse> => {
+      const params = new URLSearchParams();
+      if (status) params.set('status', status);
+      const suffix = params.toString();
+      return api.get<TrainingPlansResponse>(`/training/v1/people/plans${suffix ? `?${suffix}` : ''}`);
+    },
+  });
+}
+
+export function useUpdatePlan() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ planId, body }: { planId: string; body: UpdatePlanInput }): Promise<UpdatePlanResponse> =>
+      api.patch<UpdatePlanResponse>(`/training/v1/people/plans/${planId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'plans'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'overview'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'plan-audit'] });
+    },
+  });
+}
+
+export function useDeletePlan() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (planId: string): Promise<{ ok: boolean }> =>
+      api.delete<{ ok: boolean }>(`/training/v1/people/plans/${planId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'plans'] });
       queryClient.invalidateQueries({ queryKey: ['training', 'overview'] });
       queryClient.invalidateQueries({ queryKey: ['training', 'lookups'] });
     },
@@ -563,6 +612,8 @@ export function useTransitionPlan() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
       queryClient.invalidateQueries({ queryKey: ['training', 'overview'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'plans'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'plan-audit'] });
     },
   });
 }
@@ -578,6 +629,8 @@ export function useBulkPlanFromSuggestion() {
       queryClient.invalidateQueries({ queryKey: ['training', 'workspace'] });
       queryClient.invalidateQueries({ queryKey: ['training', 'overview'] });
       queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'plans'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'plan-audit'] });
     },
   });
 }
@@ -586,11 +639,33 @@ export function useBulkReviewEmployeeRequests() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: BulkReviewEmployeeRequestsInput): Promise<BulkReviewEmployeeRequestsResponse> =>
-      api.post<BulkReviewEmployeeRequestsResponse>('/training/v1/people/enrollments/bulk-review', body),
+    mutationFn: (body: BulkReviewEmployeeRequestsInput): Promise<BulkReviewEmployeeRequestsResponse> => {
+      const params = new URLSearchParams();
+      if (body.year) params.set('year', String(body.year));
+      const suffix = params.toString();
+      return api.post<BulkReviewEmployeeRequestsResponse>(
+        `/training/v1/people/enrollments/bulk-review${suffix ? `?${suffix}` : ''}`,
+        body,
+      );
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
       queryClient.invalidateQueries({ queryKey: ['training', 'workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'plan-audit'] });
+    },
+  });
+}
+
+export function usePlanAudit(planId: string | undefined, before: string | undefined, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'plan-audit', planId, before ?? 'first'],
+    enabled: enabled && !!planId,
+    queryFn: async (): Promise<PlanAuditResponse> => {
+      const params = new URLSearchParams();
+      params.set('limit', '50');
+      if (before) params.set('before', before);
+      return api.get<PlanAuditResponse>(`/training/v1/people/plans/${planId}/audit?${params.toString()}`);
     },
   });
 }
@@ -654,6 +729,9 @@ export function useDismissSuggestion() {
   return useMutation({
     mutationFn: ({ suggestionId, planId }: { suggestionId: string; planId: string }) =>
       api.post<{ ok: boolean }>(`/training/v1/people/planning/suggestions/${suggestionId}/dismiss`, { plan_id: planId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['training', 'planning'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'plan-audit'] });
+    },
   });
 }

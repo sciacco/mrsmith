@@ -1,5 +1,6 @@
-import { Button } from '@mrsmith/ui';
+import { Button, Icon } from '@mrsmith/ui';
 import type { PlanningSummary } from '../../api/types';
+import { PlanKebabMenu } from '../PlanKebabMenu';
 import styles from './PlanHero.module.css';
 
 interface PlanHeroProps {
@@ -7,6 +8,10 @@ interface PlanHeroProps {
   pending: boolean;
   onLifecycleClick: () => void;
   onNewPlan: () => void;
+  onNewEnrollment: () => void;
+  onEditPlan: () => void;
+  onShowHistory: () => void;
+  onDeletePlan: () => void;
 }
 
 const STATUS_LABEL: Record<PlanningSummary['status'], string> = {
@@ -46,10 +51,22 @@ function formatEuro(value: number): string {
   }).format(value);
 }
 
-export function PlanHero({ summary, pending, onLifecycleClick, onNewPlan }: PlanHeroProps) {
+export function PlanHero({
+  summary,
+  pending,
+  onLifecycleClick,
+  onNewPlan,
+  onNewEnrollment,
+  onEditPlan,
+  onShowHistory,
+  onDeletePlan,
+}: PlanHeroProps) {
   const isMissing = summary.status === 'missing';
   const lifecycle = lifecycleLabel(summary.status);
   const pct = Math.min(100, Math.max(0, summary.budget_pct));
+  const canDelete = summary.status === 'draft' && summary.enrollments_planned === 0;
+  const canCreateEnrollment = summary.status === 'draft' || summary.status === 'open';
+  const showMenu = summary.status === 'draft' || summary.status === 'open';
 
   if (isMissing) {
     return (
@@ -60,7 +77,9 @@ export function PlanHero({ summary, pending, onLifecycleClick, onNewPlan }: Plan
           <p className={styles.subtitle}>Crea un nuovo piano per iniziare la pianificazione.</p>
         </div>
         <div className={styles.actions}>
-          <Button variant="primary" size="md" onClick={onNewPlan}>+ Nuovo piano</Button>
+          <Button variant="primary" size="md" leftIcon={<Icon name="plus" size={16} />} onClick={onNewPlan}>
+            Nuovo piano
+          </Button>
         </div>
       </section>
     );
@@ -89,7 +108,24 @@ export function PlanHero({ summary, pending, onLifecycleClick, onNewPlan }: Plan
               {lifecycle}
             </Button>
           )}
-          <Button variant="primary" size="sm" onClick={onNewPlan}>+ Nuovo piano</Button>
+          {canCreateEnrollment && (
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={<Icon name="plus" size={15} />}
+              onClick={onNewEnrollment}
+            >
+              Nuova iscrizione
+            </Button>
+          )}
+          {showMenu && (
+            <PlanKebabMenu
+              canDelete={canDelete}
+              onEdit={onEditPlan}
+              onHistory={onShowHistory}
+              onDelete={onDeletePlan}
+            />
+          )}
         </div>
       </div>
       <div className={styles.heroBody}>

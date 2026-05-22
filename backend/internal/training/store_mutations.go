@@ -264,6 +264,10 @@ func (s *SQLStore) UpdateEnrollment(ctx context.Context, principal Principal, id
 	}
 	var response ActionResponse
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
+		planID, err := s.enrollmentPlanID(ctx, tx, id)
+		if err != nil {
+			return err
+		}
 		before, err := entitySnapshot(ctx, tx, "enrollment", id)
 		if err != nil {
 			return err
@@ -307,10 +311,28 @@ RETURNING id::text, status::text`
 		if err := s.audit(ctx, tx, principal, "enrollment", id, "update", before, after); err != nil {
 			return err
 		}
+		if err := emitPlanAuditEvent(ctx, tx, principal, planID, PlanAuditEnrollmentChanged, map[string]any{
+			"enrollment_id": id,
+			"status":        response.Status,
+		}); err != nil {
+			return err
+		}
 		response.OK = true
 		return nil
 	})
 	return response, err
+}
+
+func (s *SQLStore) enrollmentPlanID(ctx context.Context, q sqlRunner, id string) (string, error) {
+	var planID string
+	err := q.QueryRowContext(ctx, `SELECT training_plan_id::text FROM training.enrollment WHERE id = $1::uuid`, id).Scan(&planID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", notFoundError("enrollment_not_found", "iscrizione non trovata")
+	}
+	if err != nil {
+		return "", fmt.Errorf("load training enrollment plan: %w", err)
+	}
+	return planID, nil
 }
 
 func (s *SQLStore) enrollmentGuard(ctx context.Context, q sqlRunner, principal Principal, id string, lock bool) (enrollmentGuard, error) {
@@ -361,6 +383,10 @@ func (s *SQLStore) TransitionEnrollment(ctx context.Context, principal Principal
 		if err != nil {
 			return err
 		}
+		planID, err := s.enrollmentPlanID(ctx, tx, id)
+		if err != nil {
+			return err
+		}
 		before, err := entitySnapshot(ctx, tx, "enrollment", id)
 		if err != nil {
 			return err
@@ -399,6 +425,16 @@ func (s *SQLStore) TransitionEnrollment(ctx context.Context, principal Principal
 		}
 		if err := s.audit(ctx, tx, principal, "enrollment", id, "transition:"+input.Transition, before, after); err != nil {
 			return err
+		}
+		if status == string(EnrollmentCancelled) {
+			if err := emitPlanAuditEvent(ctx, tx, principal, planID, PlanAuditEnrollmentCancel, map[string]any{
+				"enrollment_id": id,
+				"from":          guard.Status,
+				"to":            status,
+				"reason":        strings.TrimSpace(input.Reason),
+			}); err != nil {
+				return err
+			}
 		}
 		response = ActionResponse{OK: true, ID: id, Status: status}
 		return nil
@@ -746,6 +782,20 @@ func (s *SQLStore) UpsertCourse(ctx context.Context, principal Principal, id str
 func (s *SQLStore) UpsertTrainingPlan(ctx context.Context, principal Principal, id string, input TrainingPlanInput) (ActionResponse, error) {
 	if !principal.IsPeopleAdmin {
 		return ActionResponse{}, forbiddenError("people_role_required", "azione riservata a People")
+	}
+	if strings.TrimSpace(id) != "" {
+		update := UpdatePlanInput{BudgetTotal: input.BudgetTotal}
+		if strings.TrimSpace(input.Notes) != "" {
+			notes := input.Notes
+			update.Notes = &notes
+		}
+		if update.BudgetTotal == nil && update.Notes == nil {
+			return ActionResponse{OK: true, ID: id}, nil
+		}
+		if _, err := s.UpdatePlan(ctx, principal, id, update); err != nil {
+			return ActionResponse{}, err
+		}
+		return ActionResponse{OK: true, ID: id}, nil
 	}
 	if input.Year < 2020 || input.Year > 2100 {
 		return ActionResponse{}, validationError("invalid_year", "anno non valido")

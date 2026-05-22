@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { ApiError } from '@mrsmith/api-client';
 import { Skeleton, useToast } from '@mrsmith/ui';
 import {
   useBulkPlanFromSuggestion,
+  useDeletePlan,
   useDismissSuggestion,
   usePlanningSuggestions,
   useTransitionPlan,
 } from '../api/queries';
 import type { PlanningSuggestion, SuggestionSeverity } from '../api/types';
 import { NewPlanModal } from '../components/NewPlanModal';
+import { PlanEditModal } from '../components/PlanEditModal';
 import { PlanHero } from '../components/PlanHero';
+import { PlanClosedSummary, PlanHistoryDrawer } from '../components/PlanHistoryDrawer';
 import { ReviewActionDrawer } from '../components/ReviewActionDrawer';
 import { SuggestionCard } from '../components/SuggestionCard';
 import styles from './PlanningPage.module.css';
@@ -28,11 +32,23 @@ const SEVERITY_LABEL: Record<SuggestionSeverity, string> = {
 
 type DrawerState =
   | { kind: 'none' }
+  | { kind: 'create_from_scratch' }
   | { kind: 'create_from_suggestion'; suggestion: PlanningSuggestion }
   | { kind: 'review_requests'; suggestion: PlanningSuggestion };
 
+function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    const body = error.body as { message?: string; error?: string; existing_plan?: { year?: number } } | undefined;
+    if (body?.error === 'another_plan_open' && body.existing_plan?.year) {
+      return `Esiste gia un piano aperto per il ${body.existing_plan.year}`;
+    }
+    return body?.message ?? 'Operazione non completata';
+  }
+  return error instanceof Error ? error.message : 'Errore';
+}
+
 export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const { toast } = useToast();
   const year = params.get('year') ?? String(new Date().getFullYear());
   const team = params.get('team') ?? '';
@@ -40,10 +56,13 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
   const dismiss = useDismissSuggestion();
   const bulkPlan = useBulkPlanFromSuggestion();
   const transition = useTransitionPlan();
+  const deletePlan = useDeletePlan();
 
   const [severityFilter, setSeverityFilter] = useState<'all' | SuggestionSeverity>('all');
   const [drawer, setDrawer] = useState<DrawerState>({ kind: 'none' });
   const [newPlanOpen, setNewPlanOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const suggestions = useMemo(() => {
     if (!planning.data) return [];
@@ -95,7 +114,7 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
       },
       {
         onSuccess: (res) => toast(`Pianificate ${res.created} iscrizioni`),
-        onError: (err) => toast(err instanceof Error ? err.message : 'Errore', 'error'),
+        onError: (err) => toast(errorMessage(err), 'error'),
       },
     );
   }
@@ -114,7 +133,7 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
       { suggestionId: suggestion.id, planId: plan.plan_id },
       {
         onSuccess: () => toast('Suggerimento rimosso dalla coda'),
-        onError: (err) => toast(err instanceof Error ? err.message : 'Errore', 'error'),
+        onError: (err) => toast(errorMessage(err), 'error'),
       },
     );
   }
@@ -146,9 +165,18 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
             toast(`Piano ${res.status === 'open' ? 'aperto' : res.status === 'closed' ? 'chiuso' : 'aggiornato'}`);
           }
         },
-        onError: (err) => toast(err instanceof Error ? err.message : 'Errore', 'error'),
+        onError: (err) => toast(errorMessage(err), 'error'),
       },
     );
+  }
+
+  function handleDeletePlan() {
+    if (!plan || plan.status !== 'draft' || plan.enrollments_planned > 0) return;
+    if (!window.confirm(`Eliminare il piano ${plan.year}?`)) return;
+    deletePlan.mutate(plan.plan_id, {
+      onSuccess: () => toast(`Piano ${plan.year} eliminato`),
+      onError: (err) => toast(errorMessage(err), 'error'),
+    });
   }
 
   const hasSuggestions = total > 0;
@@ -168,6 +196,10 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
           pending={transition.isPending}
           onLifecycleClick={handleLifecycle}
           onNewPlan={() => setNewPlanOpen(true)}
+          onNewEnrollment={() => setDrawer({ kind: 'create_from_scratch' })}
+          onEditPlan={() => setEditOpen(true)}
+          onShowHistory={() => setHistoryOpen(true)}
+          onDeletePlan={handleDeletePlan}
         />
       )}
 
@@ -181,6 +213,10 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
         <div className={`${styles.banner} ${styles.bannerClosed}`}>
           Piano chiuso · Sola lettura. Per riaprirlo usa il pulsante in alto.
         </div>
+      )}
+
+      {showClosedBanner && plan && (
+        <PlanClosedSummary plan={plan} onOpenHistory={() => setHistoryOpen(true)} />
       )}
 
       {!showClosedBanner && plan && plan.status !== 'missing' && (
@@ -245,8 +281,28 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
         defaultYear={newPlanDefaultYear}
         prevYearAvailable={newPlanPrevYearAvailable}
         onClose={() => setNewPlanOpen(false)}
+        onCreated={(createdYear) => {
+          setParams((previous) => {
+            const next = new URLSearchParams(previous);
+            next.set('year', String(createdYear));
+            return next;
+          }, { replace: true });
+        }}
       />
 
+      <PlanEditModal open={editOpen} plan={plan} onClose={() => setEditOpen(false)} />
+      <PlanHistoryDrawer open={historyOpen} plan={plan} onClose={() => setHistoryOpen(false)} />
+
+      {plan && drawer.kind === 'create_from_scratch' && (
+        <ReviewActionDrawer
+          open
+          mode="create_from_scratch"
+          year={plan.year}
+          team={team}
+          budgetResidual={plan.budget_residual}
+          onClose={() => setDrawer({ kind: 'none' })}
+        />
+      )}
       {plan && drawer.kind === 'create_from_suggestion' && (
         <ReviewActionDrawer
           open

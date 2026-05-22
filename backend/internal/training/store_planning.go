@@ -14,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+var errAnotherPlanOpenRace = errors.New("another training plan opened concurrently")
+
 // PlanningOverview returns the current-year plan summary + ranked suggestion queue.
 func (s *SQLStore) PlanningOverview(ctx context.Context, principal Principal, year int, team string) (PlanningResponse, error) {
 	if !principal.IsPeopleAdmin {
@@ -39,6 +41,46 @@ func (s *SQLStore) PlanningOverview(ctx context.Context, principal Principal, ye
 	return resp, nil
 }
 
+func (s *SQLStore) ListTrainingPlansForPlanning(ctx context.Context, principal Principal, status string) (TrainingPlansResponse, error) {
+	if !principal.IsPeopleAdmin {
+		return TrainingPlansResponse{}, forbiddenError("people_role_required", "azione riservata a People")
+	}
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status != "" && !isPlanStatus(status) {
+		return TrainingPlansResponse{}, validationError("invalid_status", "stato piano non valido")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id::text, year, status::text, COALESCE(budget_total, 0)::float8, created_at
+FROM training.training_plan
+WHERE ($1 = '' OR status::text = $1)
+ORDER BY created_at DESC, year DESC`, status)
+	if err != nil {
+		return TrainingPlansResponse{}, fmt.Errorf("list training plans: %w", err)
+	}
+	defer rows.Close()
+
+	resp := TrainingPlansResponse{Plans: []TrainingPlanListRow{}}
+	for rows.Next() {
+		var row TrainingPlanListRow
+		var createdAt time.Time
+		if err := rows.Scan(&row.ID, &row.Year, &row.Status, &row.BudgetTotal, &createdAt); err != nil {
+			return TrainingPlansResponse{}, fmt.Errorf("scan training plan list row: %w", err)
+		}
+		row.CreatedAt = createdAt.UTC().Format(time.RFC3339Nano)
+		resp.Plans = append(resp.Plans, row)
+	}
+	return resp, rows.Err()
+}
+
+func isPlanStatus(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "draft", "open", "frozen", "closed":
+		return true
+	default:
+		return false
+	}
+}
+
 // planSummary loads the plan for `year`, the budget consumption and prev-year flag.
 func (s *SQLStore) planSummary(ctx context.Context, year int) (*PlanningSummary, error) {
 	const q = `
@@ -47,13 +89,14 @@ SELECT
   tp.year,
   tp.status::text,
   COALESCE(tp.budget_total, 0)::float8 AS budget_total,
+  COALESCE(tp.notes, '') AS notes,
   COALESCE(SUM(COALESCE(en.cost_actual, en.cost_planned, c.default_cost, 0)), 0)::float8 AS budget_spent,
   COUNT(en.id) AS enrollments_planned
 FROM training.training_plan tp
 LEFT JOIN training.enrollment en ON en.training_plan_id = tp.id AND en.status NOT IN ('cancelled')
 LEFT JOIN training.course c ON c.id = en.course_id
 WHERE tp.year = $1
-GROUP BY tp.id, tp.year, tp.status, tp.budget_total`
+GROUP BY tp.id, tp.year, tp.status, tp.budget_total, tp.notes`
 
 	var summary PlanningSummary
 	err := s.db.QueryRowContext(ctx, q, year).Scan(
@@ -61,6 +104,7 @@ GROUP BY tp.id, tp.year, tp.status, tp.budget_total`
 		&summary.Year,
 		&summary.Status,
 		&summary.BudgetTotal,
+		&summary.Notes,
 		&summary.BudgetSpent,
 		&summary.EnrollmentsPlanned,
 	)
@@ -463,7 +507,9 @@ ON CONFLICT (plan_id, signature) DO NOTHING`, planID, signature, nullableUUIDPtr
 		if err != nil {
 			return fmt.Errorf("dismiss suggestion: %w", err)
 		}
-		return nil
+		return emitPlanAuditEvent(ctx, tx, principal, planID, PlanAuditSuggestionDismiss, map[string]any{
+			"suggestion_id": signature,
+		})
 	})
 }
 
@@ -507,9 +553,215 @@ RETURNING id::text, year, status::text, budget_total::float8`,
 		if err != nil {
 			return err
 		}
-		return s.audit(ctx, tx, principal, "training_plan", row.ID, "create", nil, afterSnap)
+		if err := s.audit(ctx, tx, principal, "training_plan", row.ID, "create", nil, afterSnap); err != nil {
+			return err
+		}
+		return emitPlanAuditEvent(ctx, tx, principal, row.ID, PlanAuditPlanCreated, map[string]any{
+			"year":         row.Year,
+			"status":       row.Status,
+			"budget_total": row.BudgetTotal,
+		})
 	})
 	return row, err
+}
+
+func validateUpdatePlanInput(input UpdatePlanInput) error {
+	if input.BudgetTotal == nil && input.Notes == nil {
+		return validationError("empty_update", "nessuna modifica indicata")
+	}
+	if input.BudgetTotal != nil && *input.BudgetTotal < 0 {
+		return validationError("invalid_budget", "budget non valido")
+	}
+	return nil
+}
+
+func (s *SQLStore) UpdatePlan(ctx context.Context, principal Principal, planID string, input UpdatePlanInput) (UpdatePlanResponse, error) {
+	if !principal.IsPeopleAdmin {
+		return UpdatePlanResponse{}, forbiddenError("people_role_required", "azione riservata a People")
+	}
+	if strings.TrimSpace(planID) == "" {
+		return UpdatePlanResponse{}, validationError("missing_plan_id", "id piano obbligatorio")
+	}
+	if err := validateUpdatePlanInput(input); err != nil {
+		return UpdatePlanResponse{}, err
+	}
+	response := UpdatePlanResponse{OK: true, PlanID: planID}
+	err := s.withTx(ctx, func(tx *sql.Tx) error {
+		var year int
+		var status string
+		var beforeBudget sql.NullFloat64
+		var beforeNotes string
+		var spent float64
+		err := tx.QueryRowContext(ctx, `
+SELECT year, status::text, budget_total::float8, COALESCE(notes, '')
+FROM training.training_plan
+WHERE id = $1::uuid
+FOR UPDATE`, planID).Scan(&year, &status, &beforeBudget, &beforeNotes)
+		if errors.Is(err, sql.ErrNoRows) {
+			return notFoundError("plan_not_found", "piano non trovato")
+		}
+		if err != nil {
+			return fmt.Errorf("load training plan for update: %w", err)
+		}
+		if err := tx.QueryRowContext(ctx, `
+SELECT COALESCE(SUM(COALESCE(en.cost_actual, en.cost_planned, c.default_cost, 0)), 0)::float8
+FROM training.enrollment en
+LEFT JOIN training.course c ON c.id = en.course_id
+WHERE en.training_plan_id = $1::uuid
+  AND en.status <> 'cancelled'`, planID).Scan(&spent); err != nil {
+			return fmt.Errorf("load training plan spent: %w", err)
+		}
+		if status != "draft" && status != "open" {
+			return conflictError("plan_not_editable", "piano non modificabile")
+		}
+		if input.BudgetTotal != nil && *input.BudgetTotal < spent {
+			response.Warnings = append(response.Warnings, "budget_below_spent")
+		}
+
+		before, err := entitySnapshot(ctx, tx, "training_plan", planID)
+		if err != nil {
+			return err
+		}
+		var budgetValue any
+		if input.BudgetTotal != nil {
+			budgetValue = *input.BudgetTotal
+		}
+		notesValue := ""
+		if input.Notes != nil {
+			notesValue = strings.TrimSpace(*input.Notes)
+		}
+		if _, err := tx.ExecContext(ctx, `
+UPDATE training.training_plan
+SET budget_total = CASE WHEN $2::boolean THEN $3::numeric ELSE budget_total END,
+    notes = CASE WHEN $4::boolean THEN NULLIF($5, '') ELSE notes END,
+    updated_at = now()
+WHERE id = $1::uuid`,
+			planID,
+			input.BudgetTotal != nil,
+			budgetValue,
+			input.Notes != nil,
+			notesValue,
+		); err != nil {
+			return fmt.Errorf("update training plan: %w", err)
+		}
+		after, err := entitySnapshot(ctx, tx, "training_plan", planID)
+		if err != nil {
+			return err
+		}
+		if err := s.audit(ctx, tx, principal, "training_plan", planID, "update", before, after); err != nil {
+			return err
+		}
+		if input.BudgetTotal != nil {
+			var beforeValue any
+			if beforeBudget.Valid {
+				beforeValue = beforeBudget.Float64
+			}
+			if err := emitPlanAuditEvent(ctx, tx, principal, planID, PlanAuditBudgetChanged, map[string]any{
+				"year":   year,
+				"from":   beforeValue,
+				"to":     *input.BudgetTotal,
+				"spent":  spent,
+				"status": status,
+			}); err != nil {
+				return err
+			}
+		}
+		if input.Notes != nil && strings.TrimSpace(beforeNotes) != notesValue {
+			if err := emitPlanAuditEvent(ctx, tx, principal, planID, PlanAuditNotesChanged, map[string]any{
+				"year":   year,
+				"status": status,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return response, err
+}
+
+func canDeletePlan(status string, enrollments int) bool {
+	return status == "draft" && enrollments == 0
+}
+
+func (s *SQLStore) DeletePlan(ctx context.Context, principal Principal, planID string) error {
+	if !principal.IsPeopleAdmin {
+		return forbiddenError("people_role_required", "azione riservata a People")
+	}
+	if strings.TrimSpace(planID) == "" {
+		return validationError("missing_plan_id", "id piano obbligatorio")
+	}
+	return s.withTx(ctx, func(tx *sql.Tx) error {
+		var year int
+		var status string
+		var budget sql.NullFloat64
+		var enrollments int
+		err := tx.QueryRowContext(ctx, `
+SELECT year, status::text, budget_total::float8
+FROM training.training_plan
+WHERE id = $1::uuid
+FOR UPDATE`, planID).Scan(&year, &status, &budget)
+		if errors.Is(err, sql.ErrNoRows) {
+			return notFoundError("plan_not_found", "piano non trovato")
+		}
+		if err != nil {
+			return fmt.Errorf("load training plan for delete: %w", err)
+		}
+		if err := tx.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM training.enrollment
+WHERE training_plan_id = $1::uuid`, planID).Scan(&enrollments); err != nil {
+			return fmt.Errorf("count training plan enrollments: %w", err)
+		}
+		if !canDeletePlan(status, enrollments) {
+			return conflictError("plan_delete_not_allowed", "puoi eliminare solo bozze senza iscrizioni")
+		}
+		before, err := entitySnapshot(ctx, tx, "training_plan", planID)
+		if err != nil {
+			return err
+		}
+		if err := s.audit(ctx, tx, principal, "training_plan", planID, "delete", before, nil); err != nil {
+			return err
+		}
+		var budgetValue any
+		if budget.Valid {
+			budgetValue = budget.Float64
+		}
+		if err := emitPlanAuditEvent(ctx, tx, principal, planID, PlanAuditPlanDeleted, map[string]any{
+			"year":         year,
+			"status":       status,
+			"budget_total": budgetValue,
+		}); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM training.training_plan WHERE id = $1::uuid`, planID); err != nil {
+			return fmt.Errorf("delete training plan: %w", err)
+		}
+		return nil
+	})
+}
+
+func (s *SQLStore) anotherOpenPlanError(ctx context.Context, q sqlRunner, currentPlanID string) error {
+	var row TrainingPlanListRow
+	var createdAt time.Time
+	err := q.QueryRowContext(ctx, `
+SELECT id::text, year, status::text, COALESCE(budget_total, 0)::float8, created_at
+FROM training.training_plan
+WHERE status = 'open'::training.plan_status
+  AND id <> $1::uuid
+ORDER BY created_at DESC
+LIMIT 1`, currentPlanID).Scan(&row.ID, &row.Year, &row.Status, &row.BudgetTotal, &createdAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return conflictError("another_plan_open", "esiste gia un piano aperto")
+	}
+	if err != nil {
+		return fmt.Errorf("load open training plan conflict: %w", err)
+	}
+	row.CreatedAt = createdAt.UTC().Format(time.RFC3339Nano)
+	return anotherPlanOpenError{existing: row, message: fmt.Sprintf("esiste gia un piano aperto per il %d", row.Year)}
+}
+
+func isOneOpenPlanUniqueViolation(err error) bool {
+	return isUniqueViolation(err, "idx_training_one_open_plan")
 }
 
 // TransitionPlan: draft → open, open → closed (expires enrollments), closed → reopened (back to open).
@@ -525,7 +777,7 @@ func (s *SQLStore) TransitionPlan(ctx context.Context, principal Principal, plan
 	response.PlanID = planID
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		var current string
-		if err := tx.QueryRowContext(ctx, `SELECT status::text FROM training.training_plan WHERE id = $1::uuid`, planID).Scan(&current); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT status::text FROM training.training_plan WHERE id = $1::uuid FOR UPDATE`, planID).Scan(&current); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return notFoundError("plan_not_found", "piano non trovato")
 			}
@@ -535,6 +787,18 @@ func (s *SQLStore) TransitionPlan(ctx context.Context, principal Principal, plan
 		newStatus, expireEnrollments, err := planNextStatus(current, target)
 		if err != nil {
 			return err
+		}
+		if newStatus == "open" && current != "open" {
+			if err := s.anotherOpenPlanError(ctx, tx, planID); err != nil {
+				if _, ok := asAppError(err); ok {
+					// No existing open plan was found. Continue and let the unique index
+					// cover the race between this check and the status update.
+				} else if _, ok := asAnotherPlanOpenError(err); ok {
+					return err
+				} else {
+					return err
+				}
+			}
 		}
 
 		if expireEnrollments {
@@ -572,6 +836,9 @@ WHERE training_plan_id = $1::uuid
 		stmt := fmt.Sprintf(`UPDATE training.training_plan SET status = $2::training.plan_status, updated_at = now()%s%s WHERE id = $1::uuid RETURNING status::text`,
 			setOpenedAt, setClosedAt)
 		if err := tx.QueryRowContext(ctx, stmt, planID, newStatus).Scan(&response.Status); err != nil {
+			if isOneOpenPlanUniqueViolation(err) {
+				return errAnotherPlanOpenRace
+			}
 			return fmt.Errorf("update plan status: %w", err)
 		}
 		after, err := entitySnapshot(ctx, tx, "training_plan", planID)
@@ -581,9 +848,22 @@ WHERE training_plan_id = $1::uuid
 		if err := s.audit(ctx, tx, principal, "training_plan", planID, "transition:"+target, before, after); err != nil {
 			return err
 		}
+		if current != response.Status {
+			if err := emitPlanAuditEvent(ctx, tx, principal, planID, PlanAuditStatusChanged, map[string]any{
+				"from":                      current,
+				"to":                        response.Status,
+				"target":                    target,
+				"expired_enrollments_count": response.ExpiredEnrollmentsCount,
+			}); err != nil {
+				return err
+			}
+		}
 		response.OK = true
 		return nil
 	})
+	if errors.Is(err, errAnotherPlanOpenRace) {
+		return response, s.anotherOpenPlanError(ctx, s.db, planID)
+	}
 	return response, err
 }
 
@@ -675,6 +955,22 @@ func (s *SQLStore) BulkPlanFromSuggestion(ctx context.Context, principal Princip
 		}
 		response.Created++
 	}
+	eventType := bulkPlanAuditEventType(input.SuggestionID)
+	payload := map[string]any{
+		"suggestion_id":  normalizeSuggestionID(input.SuggestionID),
+		"course_id":      input.CourseID,
+		"employee_count": len(input.EmployeeIDs),
+		"created":        response.Created,
+		"failed":         response.Failed,
+	}
+	if normalizeSuggestionID(input.SuggestionID) == "" {
+		delete(payload, "suggestion_id")
+	}
+	if err := s.withTx(ctx, func(tx *sql.Tx) error {
+		return emitPlanAuditEvent(ctx, tx, principal, planID, eventType, payload)
+	}); err != nil {
+		return response, err
+	}
 	return response, nil
 }
 
@@ -738,6 +1034,18 @@ func (s *SQLStore) BulkReviewEmployeeRequests(ctx context.Context, principal Pri
 			}
 		}
 		resp.Succeeded++
+	}
+	if planID, err := s.TrainingPlanIDByYear(ctx, year); err == nil {
+		if auditErr := s.withTx(ctx, func(tx *sql.Tx) error {
+			return emitPlanAuditEvent(ctx, tx, principal, planID, PlanAuditBulkReviewApplied, map[string]any{
+				"request_count": len(input.RequestIDs),
+				"target":        target,
+				"succeeded":     resp.Succeeded,
+				"failed":        resp.Failed,
+			})
+		}); auditErr != nil {
+			return resp, auditErr
+		}
 	}
 	return resp, nil
 }

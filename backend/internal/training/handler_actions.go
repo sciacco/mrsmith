@@ -15,6 +15,14 @@ import (
 )
 
 func (h *handler) writeActionError(w http.ResponseWriter, r *http.Request, err error, operation string) {
+	if openErr, ok := asAnotherPlanOpenError(err); ok {
+		httputil.JSON(w, http.StatusConflict, map[string]any{
+			"error":         "another_plan_open",
+			"message":       openErr.Error(),
+			"existing_plan": openErr.existing,
+		})
+		return
+	}
 	if appErr, ok := asAppError(err); ok {
 		httputil.JSON(w, appErr.status, map[string]string{
 			"error":   appErr.code,

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ApiError } from '@mrsmith/api-client';
 import { Button, Drawer, SingleSelect, useToast } from '@mrsmith/ui';
 import {
   useBulkPlanFromSuggestion,
   useBulkReviewEmployeeRequests,
+  usePeopleDirectory,
   useTrainingLookups,
   useTrainingWorkspace,
 } from '../../api/queries';
-import type { PlanningSuggestion, TrainingRequest } from '../../api/types';
+import type { CatalogCourse, PersonSummary, PlanningSuggestion, TrainingRequest } from '../../api/types';
 import styles from './ReviewActionDrawer.module.css';
 
 export interface CreateFromSuggestionConfig {
@@ -25,11 +27,18 @@ export interface ReviewEmployeeRequestsConfig {
   requestIds?: string[];
 }
 
+export interface CreateFromScratchConfig {
+  mode: 'create_from_scratch';
+  year: number;
+  team?: string;
+  budgetResidual: number;
+}
+
 export type ReviewActionDrawerProps = {
   open: boolean;
   onClose: () => void;
   onCompleted?: (created: number) => void;
-} & (CreateFromSuggestionConfig | ReviewEmployeeRequestsConfig);
+} & (CreateFromSuggestionConfig | ReviewEmployeeRequestsConfig | CreateFromScratchConfig);
 
 function formatEuro(value: number): string {
   return new Intl.NumberFormat('it-IT', {
@@ -37,6 +46,16 @@ function formatEuro(value: number): string {
     currency: 'EUR',
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    const body = error.body as { message?: string } | undefined;
+    return body?.message ?? fallback;
+  }
+  return error instanceof Error && !error.message.startsWith('API ')
+    ? error.message
+    : fallback;
 }
 
 export function ReviewActionDrawer(props: ReviewActionDrawerProps) {
@@ -49,6 +68,9 @@ export function ReviewActionDrawer(props: ReviewActionDrawerProps) {
   }
   if (props.mode === 'create_from_suggestion') {
     return <CreateFromSuggestion {...props} />;
+  }
+  if (props.mode === 'create_from_scratch') {
+    return <CreateFromScratch {...props} />;
   }
   return <ReviewRequests {...props} />;
 }
@@ -144,7 +166,7 @@ function CreateFromSuggestion({
       onCompleted?.(res.created);
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Errore nella pianificazione';
+      const message = errorMessage(err, 'Errore nella pianificazione');
       toast(message, 'error');
     }
   }
@@ -308,12 +330,13 @@ function ReviewRequests({
       const res = await bulkReview.mutateAsync({
         request_ids: Array.from(selectedIds),
         target: 'approved',
+        year,
       });
       toast(`Approvate ${res.succeeded} richieste`);
       onCompleted?.(res.succeeded);
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Errore nella revisione';
+      const message = errorMessage(err, 'Errore nella revisione');
       toast(message, 'error');
     }
   }
@@ -329,12 +352,13 @@ function ReviewRequests({
         request_ids: Array.from(selectedIds),
         target: 'rejected',
         motivation: motivation.trim(),
+        year,
       });
       toast(`Rifiutate ${res.succeeded} richieste`);
       onCompleted?.(res.succeeded);
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Errore nella revisione';
+      const message = errorMessage(err, 'Errore nella revisione');
       toast(message, 'error');
     }
   }
@@ -420,5 +444,236 @@ function ReviewRequests({
       </div>
       <input type="hidden" value={year} readOnly />
     </Drawer>
+  );
+}
+
+function CreateFromScratch({
+  open,
+  onClose,
+  onCompleted,
+  year,
+  team,
+  budgetResidual,
+}: { open: boolean; onClose: () => void; onCompleted?: (created: number) => void } & CreateFromScratchConfig) {
+  const { toast } = useToast();
+  const workspace = useTrainingWorkspace(true);
+  const bulkPlan = useBulkPlanFromSuggestion();
+  const [search, setSearch] = useState('');
+  const people = usePeopleDirectory({ year: String(year), team, q: search }, open);
+  const [courseId, setCourseId] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [plannedStart, setPlannedStart] = useState('');
+  const [plannedEnd, setPlannedEnd] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setSearch('');
+    setCourseId('');
+    setSelectedIds(new Set());
+    const now = new Date();
+    const end = new Date(now);
+    end.setDate(end.getDate() + 90);
+    setPlannedStart(now.toISOString().slice(0, 10));
+    setPlannedEnd(end.toISOString().slice(0, 10));
+  }, [open, year, team]);
+
+  const activeCourses = useMemo(
+    () => (workspace.data?.catalog ?? []).filter((course) => course.active),
+    [workspace.data],
+  );
+
+  const courseOptions = useMemo(
+    () => activeCourses.map((course) => ({ value: course.id, label: course.title })),
+    [activeCourses],
+  );
+
+  const selectedCourse = activeCourses.find((course) => course.id === courseId);
+  const selectedPeople = people.data ?? [];
+  const courseCost = selectedCourse?.defaultCost ?? 0;
+  const courseHours = selectedCourse?.defaultHours ?? 0;
+  const totalCost = courseCost * selectedIds.size;
+  const totalHours = courseHours * selectedIds.size;
+  const residualAfter = budgetResidual - totalCost;
+  const canSubmit = courseId !== '' && selectedIds.size > 0 && !bulkPlan.isPending;
+
+  function toggle(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleVisible() {
+    const visibleIds = selectedPeople.map((person) => person.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      visibleIds.forEach((id) => {
+        if (allVisibleSelected) next.delete(id);
+        else next.add(id);
+      });
+      return next;
+    });
+  }
+
+  async function handleSubmit() {
+    if (!canSubmit || !selectedCourse) return;
+    try {
+      const res = await bulkPlan.mutateAsync({
+        suggestion_id: null,
+        employee_ids: Array.from(selectedIds),
+        course_id: courseId,
+        plan_params: {
+          year,
+          planned_start: plannedStart || undefined,
+          planned_end: plannedEnd || undefined,
+          hours_planned: selectedCourse.defaultHours,
+          cost_planned: selectedCourse.defaultCost,
+          mandatory: selectedCourse.mandatory,
+        },
+      });
+      toast(`Create ${res.created} iscrizioni`);
+      onCompleted?.(res.created);
+      onClose();
+    } catch (err) {
+      const message = errorMessage(err, 'Errore nella pianificazione');
+      toast(message, 'error');
+    }
+  }
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title="Nuova iscrizione"
+      subtitle={<span className={styles.subtitle}>Piano {year}{team ? ` · ${team}` : ''}</span>}
+      footer={
+        <div className={styles.footer}>
+          <div className={styles.totals}>
+            <span className={styles.totalsValue}>{formatEuro(totalCost)}</span>
+            <span className={`${styles.totalsLabel} ${residualAfter < 0 ? styles.totalsWarning : ''}`}>
+              Residuo dopo iscrizione {formatEuro(residualAfter)}
+            </span>
+            {totalHours > 0 && <span className={styles.totalsHours}>{totalHours} ore totali</span>}
+          </div>
+          <div className={styles.footerActions}>
+            <Button variant="ghost" size="md" onClick={onClose}>Annulla</Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleSubmit}
+              loading={bulkPlan.isPending}
+              disabled={!canSubmit}
+            >
+              Pianifica {selectedIds.size} selezionati
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <div className={styles.body}>
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Corso</h3>
+          <SingleSelect
+            options={courseOptions}
+            selected={courseId}
+            onChange={(value) => setCourseId(value ?? '')}
+            placeholder="Seleziona corso"
+          />
+          {selectedCourse && <CourseHint course={selectedCourse} />}
+        </section>
+
+        <section className={styles.section}>
+          <header className={styles.sectionHeader}>
+            <h3 className={styles.sectionTitle}>Persone</h3>
+            <button type="button" className={styles.linkBtn} onClick={toggleVisible}>
+              Seleziona visibili
+            </button>
+          </header>
+          <input
+            className={styles.searchInput}
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Cerca per nome o email"
+          />
+          {people.isLoading ? (
+            <p className={styles.empty}>Caricamento persone...</p>
+          ) : selectedPeople.length === 0 ? (
+            <p className={styles.empty}>Nessuna persona trovata.</p>
+          ) : (
+            <ul className={styles.personList}>
+              {selectedPeople.map((person) => (
+                <PersonOption
+                  key={person.id}
+                  person={person}
+                  checked={selectedIds.has(person.id)}
+                  onToggle={() => toggle(person.id)}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Tempistica</h3>
+          <div className={styles.dateRow}>
+            <label className={styles.dateField}>
+              <span className={styles.dateLabel}>Inizio</span>
+              <input
+                type="date"
+                value={plannedStart}
+                onChange={(e) => setPlannedStart(e.target.value)}
+                className={styles.dateInput}
+              />
+            </label>
+            <label className={styles.dateField}>
+              <span className={styles.dateLabel}>Fine</span>
+              <input
+                type="date"
+                value={plannedEnd}
+                onChange={(e) => setPlannedEnd(e.target.value)}
+                className={styles.dateInput}
+              />
+            </label>
+          </div>
+        </section>
+      </div>
+    </Drawer>
+  );
+}
+
+function CourseHint({ course }: { course: CatalogCourse }) {
+  const parts = [
+    course.defaultHours ? `${course.defaultHours}h` : null,
+    course.defaultCost !== undefined ? `${formatEuro(course.defaultCost)}/persona` : null,
+    course.vendorName || null,
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  return <p className={styles.sectionHint}>{parts.join(' · ')}</p>;
+}
+
+function PersonOption({
+  person,
+  checked,
+  onToggle,
+}: {
+  person: PersonSummary;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <li className={styles.personRow}>
+      <label className={styles.personLabel}>
+        <input type="checkbox" checked={checked} onChange={onToggle} />
+        <span className={styles.personBody}>
+          <span>{person.name}</span>
+          <span className={styles.personMeta}>{person.email}{person.team_code ? ` · ${person.team_code}` : ''}</span>
+        </span>
+      </label>
+    </li>
   );
 }

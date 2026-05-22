@@ -1,9 +1,15 @@
 package training
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 )
+
+func TestRegisterRoutesDoesNotConflict(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, Deps{})
+}
 
 func TestReadPDFUploadAcceptsOnlyPDFContent(t *testing.T) {
 	content, mimeType, err := readPDFUpload(strings.NewReader("%PDF-1.4\nbody"), "application/pdf", 64)

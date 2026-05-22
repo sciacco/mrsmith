@@ -7,6 +7,7 @@
 }
 
 .group {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -17,4 +18,116 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-muted);
+}
+
+.yearSelector {
+  position: relative;
+}
+
+.yearTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 152px;
+  height: 38px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  justify-content: space-between;
+}
+
+.yearTrigger:hover {
+  background: var(--color-surface-hover);
+}
+
+.yearMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  min-width: 184px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+
+.yearOption {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
+}
+
+.yearOption:hover,
+.yearOptionActive {
+  background: var(--color-surface);
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+
+.status_draft {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
+.status_open {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.status_frozen {
+  background: var(--color-info-subtle);
+  color: var(--color-info-strong);
+}
+
+.status_closed,
+.status_missing {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.multiPlan {
+  height: 30px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-accent-muted);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.multiPlan:hover {
+  background: var(--color-accent-muted);
 }

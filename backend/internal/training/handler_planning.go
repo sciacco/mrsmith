@@ -5,8 +5,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/keycloak"
 )
+
+func (h *handler) handleListPlans(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	resp, err := h.store.ListTrainingPlansForPlanning(r.Context(), principal, status)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.list_plans")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, resp)
+}
 
 func (h *handler) handlePlanningSuggestions(w http.ResponseWriter, r *http.Request) {
 	principal, ok := h.principalOrUnauthorized(w, r)
@@ -45,6 +61,35 @@ func (h *handler) handleCreatePlan(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusCreated, row)
 }
 
+func (h *handler) handleUpdatePlan(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	input, ok := decodeJSONBody[UpdatePlanInput](w, r)
+	if !ok {
+		return
+	}
+	resp, err := h.store.UpdatePlan(r.Context(), principal, r.PathValue("id"), input)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.update_plan")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, resp)
+}
+
+func (h *handler) handleDeletePlan(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	if err := h.store.DeletePlan(r.Context(), principal, r.PathValue("id")); err != nil {
+		h.writeActionError(w, r, err, "training.delete_plan")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, OKResponse{OK: true})
+}
+
 func (h *handler) handleTransitionPlan(w http.ResponseWriter, r *http.Request) {
 	principal, ok := h.principalOrUnauthorized(w, r)
 	if !ok {
@@ -60,6 +105,74 @@ func (h *handler) handleTransitionPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.JSON(w, http.StatusOK, resp)
+}
+
+func (h *handler) handlePlanAudit(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	limit := 50
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		if parsed, err := strconvAtoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+	page, err := h.store.ListPlanAuditEvents(r.Context(), principal, r.PathValue("id"), limit, r.URL.Query().Get("before"))
+	if err != nil {
+		h.writeActionError(w, r, err, "training.plan_audit")
+		return
+	}
+	h.resolvePlanAuditActors(r, page.events)
+	httputil.JSON(w, http.StatusOK, PlanAuditResponse{
+		Events:     page.events,
+		NextCursor: page.nextCursor,
+	})
+}
+
+func (h *handler) resolvePlanAuditActors(r *http.Request, events []PlanAuditEvent) {
+	if h.roleResolver == nil || len(events) == 0 {
+		return
+	}
+	wanted := make(map[string]struct{})
+	for _, event := range events {
+		if strings.TrimSpace(event.Actor.ID) != "" {
+			wanted[event.Actor.ID] = struct{}{}
+		}
+	}
+	if len(wanted) == 0 {
+		return
+	}
+
+	names := make(map[string]string, len(wanted))
+	for _, role := range applaunch.TrainingPeopleAdminRoles() {
+		users, err := h.roleResolver.UsersByRealmRole(r.Context(), role, keycloak.UsersByRealmRoleOptions{PageSize: 100})
+		if err != nil {
+			return
+		}
+		for _, user := range users {
+			id := strings.TrimSpace(user.ID)
+			if _, ok := wanted[id]; !ok {
+				continue
+			}
+			name := strings.TrimSpace(user.Name)
+			if name == "" {
+				name = strings.TrimSpace(strings.Join([]string{user.FirstName, user.LastName}, " "))
+			}
+			if name == "" {
+				name = strings.TrimSpace(user.Username)
+			}
+			if name == "" {
+				name = id
+			}
+			names[id] = name
+		}
+	}
+	for i := range events {
+		if name := names[events[i].Actor.ID]; name != "" {
+			events[i].Actor.DisplayName = name
+		}
+	}
 }
 
 func (h *handler) handleBulkPlanFromSuggestion(w http.ResponseWriter, r *http.Request) {

@@ -1,6 +1,7 @@
 package training
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"net/http"
@@ -12,12 +13,18 @@ import (
 	"github.com/sciacco/mrsmith/internal/notifications"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/keycloak"
 )
+
+type RoleUserResolver interface {
+	UsersByRealmRole(ctx context.Context, roleName string, opts keycloak.UsersByRealmRoleOptions) ([]keycloak.User, error)
+}
 
 type Deps struct {
 	DB              *sql.DB
 	Notifier        notifications.Notifier
 	Logger          *slog.Logger
+	RoleResolver    RoleUserResolver
 	StorageDir      string
 	StorageMaxBytes int64
 	TrainingAppURL  string
@@ -28,6 +35,7 @@ type handler struct {
 	store           *SQLStore
 	notifier        notifications.Notifier
 	logger          *slog.Logger
+	roleResolver    RoleUserResolver
 	storage         StorageAdapter
 	storageMaxBytes int64
 	trainingAppURL  string
@@ -51,6 +59,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		store:           NewSQLStore(deps.DB),
 		notifier:        deps.Notifier,
 		logger:          logger.With("component", "training"),
+		roleResolver:    deps.RoleResolver,
 		storage:         storage,
 		storageMaxBytes: deps.StorageMaxBytes,
 		trainingAppURL:  deps.TrainingAppURL,
@@ -108,6 +117,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("POST /training/v1/people/courses/{id}/archive", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleArchiveCourse)))))
 	mux.Handle("POST /training/v1/people/mandatory-rules", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertMandatoryRule)))))
 	mux.Handle("PUT /training/v1/people/mandatory-rules/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertMandatoryRule)))))
+	mux.Handle("GET /training/v1/people/plans", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleListPlans)))))
+	mux.Handle("PATCH /training/v1/people/plans/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdatePlan)))))
+	mux.Handle("DELETE /training/v1/people/plans/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleDeletePlan)))))
+	mux.Handle("GET /training/v1/people/plans/{id}/audit", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handlePlanAudit)))))
 }
 
 func (h *handler) requireStore(next http.Handler) http.Handler {

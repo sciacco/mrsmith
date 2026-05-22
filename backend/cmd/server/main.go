@@ -524,6 +524,7 @@ func main() {
 		DB:              anisettaDB,
 		Notifier:        notificationNotifier,
 		Logger:          logger,
+		RoleResolver:    keycloakRoleResolver,
 		StorageDir:      cfg.TrainingStorageDir,
 		StorageMaxBytes: cfg.TrainingStorageMaxBytes,
 		TrainingAppURL:  cfg.TrainingAppURL,

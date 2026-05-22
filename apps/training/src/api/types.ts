@@ -396,6 +396,7 @@ export interface PlanningSummary {
   calendar_alignment: 'in_linea' | 'in_ritardo' | 'in_anticipo';
   enrollments_planned: number;
   has_prev_year_plan: boolean;
+  notes?: string;
 }
 
 export interface PlanningResponse {
@@ -411,6 +412,29 @@ export interface CreatePlanInput {
   duplicate_from?: number;
 }
 
+export interface UpdatePlanInput {
+  budget_total?: number;
+  notes?: string;
+}
+
+export interface UpdatePlanResponse {
+  ok: boolean;
+  plan_id: string;
+  warnings?: string[];
+}
+
+export interface TrainingPlanListRow {
+  id: string;
+  year: number;
+  status: Exclude<PlanStatus, 'missing'>;
+  budget_total: number;
+  created_at: string;
+}
+
+export interface TrainingPlansResponse {
+  plans: TrainingPlanListRow[];
+}
+
 export type PlanTransition = 'open' | 'closed' | 'reopened' | 'frozen';
 
 export interface TransitionPlanResponse {
@@ -421,7 +445,7 @@ export interface TransitionPlanResponse {
 }
 
 export interface BulkPlanFromSuggestionInput {
-  suggestion_id: string;
+  suggestion_id: string | null;
   employee_ids: string[];
   course_id: string;
   plan_params: {
@@ -439,6 +463,7 @@ export interface BulkReviewEmployeeRequestsInput {
   target: 'approved' | 'rejected';
   motivation?: string;
   course_id?: string;
+  year?: number;
 }
 
 export interface BulkReviewEmployeeRequestsResponse {
@@ -491,4 +516,34 @@ export interface CatalogCourseWithCounts extends CatalogCourse {
 
 export interface CatalogListResponse {
   courses: CatalogCourseWithCounts[];
+}
+
+export interface PlanAuditActor {
+  id: string;
+  display_name: string;
+}
+
+export interface PlanAuditEvent {
+  id: number;
+  plan_id: string;
+  event_type:
+    | 'plan_created'
+    | 'plan_status_changed'
+    | 'plan_budget_changed'
+    | 'plan_notes_changed'
+    | 'plan_deleted'
+    | 'bulk_plan_applied'
+    | 'suggestion_dismissed'
+    | 'adhoc_created'
+    | 'enrollment_modified'
+    | 'enrollment_cancelled'
+    | 'bulk_review_applied';
+  actor: PlanAuditActor;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface PlanAuditResponse {
+  events: PlanAuditEvent[];
+  next_cursor?: string;
 }
