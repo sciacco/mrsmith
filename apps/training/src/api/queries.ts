@@ -20,6 +20,7 @@ import type {
   MandatoryRuleInput,
   MandatoryRuleMutationResponse,
   MandatoryRulesResponse,
+  PersonCreateInput,
   PersonUpdateInput,
   OverviewResponse,
   PersonProfile,
@@ -208,6 +209,32 @@ export function useUpdatePerson() {
     mutationFn: ({ id, body }: { id: string; body: PersonUpdateInput }): Promise<ActionResponse> => {
       if (useMocks) return Promise.resolve({ ok: true, id, status: body.status } satisfies ActionResponse);
       return api.patch<ActionResponse>(`/training/v1/people/${id}`, body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'person-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'overview'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'compliance'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'lookups'] });
+    },
+  });
+}
+
+export function useCreatePerson() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: PersonCreateInput): Promise<ActionResponse> => {
+      if (useMocks) {
+        const slug = `${body.lastName}-${body.firstName}`
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+        return Promise.resolve({ ok: true, id: `employee-${slug || 'new'}`, status: body.status } satisfies ActionResponse);
+      }
+      return api.post<ActionResponse>('/training/v1/people', body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['training', 'person-profile'] });

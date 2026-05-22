@@ -175,6 +175,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  padding: var(--space-5) var(--space-6) var(--space-4);
 }
 
 .drawerFooter {
@@ -266,5 +267,9 @@
 
   .drawerActions {
     flex-wrap: wrap;
+  }
+
+  .drawerBody {
+    padding: var(--space-4) var(--space-5);
   }
 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Modal, SearchInput, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, SearchInput, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import {
   useBulkAssignEnrollment,
   useCustomGroups,
@@ -10,6 +10,7 @@ import {
 } from '../api/queries';
 import type { PersonSummary } from '../api/types';
 import { BulkActionBar } from '../components/BulkActionBar';
+import { PersonCreateModal } from '../components/PersonCreateModal';
 import { PersonRow } from '../components/PersonRow';
 import styles from './PeoplePage.module.css';
 
@@ -44,6 +45,7 @@ function apiErrorMessage(error: unknown, fallback: string): string {
 
 export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   const year = params.get('year') ?? String(new Date().getFullYear());
@@ -61,6 +63,7 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignDraft, setAssignDraft] = useState({ courseId: '', plannedStart: '', plannedEnd: '' });
 
@@ -182,6 +185,9 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
             Gestisci gruppi
           </Link>
           <SearchInput value={q} onChange={(value) => updateParam('q', value)} placeholder="Cerca per nome o email" />
+          <Button variant="primary" onClick={() => setCreateOpen(true)} leftIcon={<Icon name="plus" size={16} />}>
+            Nuova persona
+          </Button>
         </div>
       </header>
 
@@ -263,6 +269,13 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
           Assegna corso obbligatorio
         </Button>
       </BulkActionBar>
+
+      <PersonCreateModal
+        open={createOpen}
+        teams={lookups.data?.teams ?? []}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(id) => navigate(`/persone/${id}`)}
+      />
 
       <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title="Assegna corso obbligatorio" size="md">
         <form

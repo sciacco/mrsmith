@@ -426,6 +426,15 @@ type PersonUpdateInput struct {
 	Notes     string  `json:"notes,omitempty"`
 }
 
+type PersonCreateInput struct {
+	FirstName string  `json:"firstName"`
+	LastName  string  `json:"lastName"`
+	Email     string  `json:"email"`
+	Status    string  `json:"status"`
+	TeamID    *string `json:"teamId"`
+	Notes     string  `json:"notes,omitempty"`
+}
+
 type BulkEnrollmentTransitionInput struct {
 	EnrollmentIDs []string `json:"enrollment_ids"`
 	TargetState   string   `json:"target_state"`

@@ -385,6 +385,15 @@ export interface PersonUpdateInput {
   notes?: string;
 }
 
+export interface PersonCreateInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  status: PersonStatus;
+  teamId: string | null;
+  notes?: string;
+}
+
 export interface JobRunResponse {
   ok: boolean;
   expiredEnrollments: number;

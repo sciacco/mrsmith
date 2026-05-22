@@ -127,6 +127,15 @@ Alyante ERP ID
 - Used by: `apps/training` `/compliance/regole`, `/persone/gruppi`, `/persone`, and `/pianificazione`.
 - Open questions: none.
 
+### Training People Admin Can Create Local Employees
+
+- Context: `apps/training` People directory (`/persone`) and backend `POST /api/training/v1/people`.
+- Discovery: `training.employee` remains primarily a local read model, but People admins need a manual escape hatch to add people immediately for training planning.
+- Practical rule: only People-admin flows may create local employee rows. Creation must be audited, enforce unique email and active team selection, and must not be available from login or employee self-service workflows.
+- Evidence: approved Persone page create-person implementation in `backend/internal/training/store_mutations.go`, `backend/internal/training/handler.go`, and `apps/training/src/components/PersonCreateModal/PersonCreateModal.tsx`.
+- Used by: `apps/training` `/persone` manual create flow.
+- Open questions: none.
+
 ### CP Backoffice Active Biometric Users Are Balance-Based
 
 - Context: `apps/cp-backoffice` Accessi biometrici PDF export and any future biometric active-user report.

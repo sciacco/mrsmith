@@ -270,6 +270,23 @@ func (h *handler) handleUpdatePerson(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, response)
 }
 
+func (h *handler) handleCreatePerson(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	input, ok := decodeJSONBody[PersonCreateInput](w, r)
+	if !ok {
+		return
+	}
+	response, err := h.store.CreatePerson(r.Context(), principal, input)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.create_person")
+		return
+	}
+	httputil.JSON(w, http.StatusCreated, response)
+}
+
 func (h *handler) handlePeopleDirectory(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.principalOrUnauthorized(w, r)
 	if !ok {

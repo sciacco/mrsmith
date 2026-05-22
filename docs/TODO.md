@@ -20,7 +20,7 @@ Final go-live still requires staging resources: Anisetta migration application a
 Training v1 has a local filesystem `StorageAdapter` for dev and controlled deployments. Before production go-live, confirm whether the target storage is S3-compatible and add explicit endpoint/bucket/region/credential/path-prefix/TLS env contracts if object storage is required instead of a mounted private volume.
 
 ### Training Employee Connectors
-Training treats `training.employee` as a local read model. Initial cutover may bootstrap active employees from the one-shot import CLI, while ongoing population and synchronization are delegated to external connectors outside the Training mini-app scope. Login and ordinary app workflows must not create employee records.
+Training treats `training.employee` primarily as a local read model. Initial cutover may bootstrap active employees from the one-shot import CLI, while ongoing population and synchronization are delegated to external connectors outside the Training mini-app scope. The approved exception is People-admin manual creation from the Training Persone page: it creates local, audited employee rows for immediate training planning needs. Login and employee self-service workflows must not create employee records.
 
 ## Listini e Sconti App
 

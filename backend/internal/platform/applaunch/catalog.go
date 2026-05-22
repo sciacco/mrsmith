@@ -313,7 +313,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			Description:   "Piano formativo, richieste, certificazioni e attestati.",
 			Icon:          "clipboard",
 			Href:          TrainingAppHref,
-			Status:        "dev",
+			Status:        "test",
 			CategoryID:    "backoffice",
 			CategoryTitle: "Backoffice",
 			AccessRoles:   TrainingAppAccessRoles(),

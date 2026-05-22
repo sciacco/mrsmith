@@ -288,6 +288,10 @@ Matrix theme uses `box-shadow` glow effects with green tints instead of traditio
 - **Max width:** 480px (default), 860px with `wide` prop. Responsive to `100vw - 48px`
 - **Close button:** 32x32px circle, rotates 90deg on hover
 
+### Drawer
+- **Body spacing:** The shared Drawer body is intentionally unpadded so full-bleed tables, sidebars, and sticky ribbons can own their layout. Standard form/detail drawers must wrap their children in a local body class with `padding: var(--space-5) var(--space-6) var(--space-4)` and a smaller mobile padding.
+- **Regression rule:** Do not add global body padding to the shared Drawer without auditing every existing consumer and adding explicit opt-outs for full-bleed layouts.
+
 ### Toast (via ToastProvider)
 - **Types:** `success` | `error`
 - **Auto-dismiss:** 4 seconds

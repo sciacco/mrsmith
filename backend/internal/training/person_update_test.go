@@ -68,6 +68,160 @@ func TestNormalizePersonUpdateInputValidation(t *testing.T) {
 	}
 }
 
+func TestNormalizePersonCreateInputValidation(t *testing.T) {
+	teamID := "team-cloud"
+	valid := PersonCreateInput{
+		FirstName: " Ada ",
+		LastName:  " Lovelace ",
+		Email:     " ADA@example.COM ",
+		Status:    "active",
+		TeamID:    &teamID,
+	}
+
+	normalized, err := normalizePersonCreateInput(valid)
+	if err != nil {
+		t.Fatalf("normalize valid input: %v", err)
+	}
+	if normalized.FirstName != "Ada" || normalized.LastName != "Lovelace" || normalized.Email != "ada@example.com" || normalized.TeamID != "team-cloud" {
+		t.Fatalf("unexpected normalization: %+v", normalized)
+	}
+
+	_, err = normalizePersonCreateInput(PersonCreateInput{
+		FirstName: "Ada",
+		LastName:  "Lovelace",
+		Email:     "invalid",
+		Status:    "active",
+	})
+	appErr, ok := asAppError(err)
+	if !ok {
+		t.Fatalf("expected appError, got %T %v", err, err)
+	}
+	if appErr.code != "person_email_invalid" {
+		t.Fatalf("error code = %q, want person_email_invalid", appErr.code)
+	}
+}
+
+func TestCreatePersonCreatesEmployeeMembershipAndAudit(t *testing.T) {
+	state := newPersonUpdateTestState()
+	store := NewSQLStore(openPersonUpdateTestDB(t, state))
+
+	teamID := "team-app"
+	response, err := store.CreatePerson(context.Background(), Principal{IsPeopleAdmin: true, Email: state.actorEmail}, PersonCreateInput{
+		FirstName: "Laura",
+		LastName:  "Bianchi",
+		Email:     "laura.bianchi@example.com",
+		Status:    "active",
+		TeamID:    &teamID,
+		Notes:     "Inserita dal team People",
+	})
+	if err != nil {
+		t.Fatalf("CreatePerson returned error: %v", err)
+	}
+	if !response.OK || response.ID != state.nextEmployeeID || response.Status != "active" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+	if !state.committed || state.rolledBack {
+		t.Fatalf("transaction state committed=%v rolledBack=%v, want commit only", state.committed, state.rolledBack)
+	}
+	if state.createdEmployee == nil {
+		t.Fatal("employee was not created")
+	}
+	if state.createdEmployee.FirstName != "Laura" || state.createdEmployee.LastName != "Bianchi" || state.createdEmployee.Email != "laura.bianchi@example.com" || state.createdEmployee.Notes != "Inserita dal team People" {
+		t.Fatalf("employee not created correctly: %+v", state.createdEmployee)
+	}
+	active := state.activeMemberships()
+	wantActive := []personUpdateMembership{{ID: "membership-new", EmployeeID: state.nextEmployeeID, TeamID: "team-app"}}
+	if !reflect.DeepEqual(active, wantActive) {
+		t.Fatalf("active memberships = %+v, want %+v", active, wantActive)
+	}
+	if got := state.auditActions(); !reflect.DeepEqual(got, []string{
+		"employee:create",
+		"team_membership:create",
+	}) {
+		t.Fatalf("audit actions = %#v", got)
+	}
+}
+
+func TestCreatePersonRejectsDuplicateEmailBeforeInsert(t *testing.T) {
+	state := newPersonUpdateTestState()
+	store := NewSQLStore(openPersonUpdateTestDB(t, state))
+
+	_, err := store.CreatePerson(context.Background(), Principal{IsPeopleAdmin: true, Email: state.actorEmail}, PersonCreateInput{
+		FirstName: "Mario",
+		LastName:  "Rossi",
+		Email:     state.employee.Email,
+		Status:    "active",
+	})
+	appErr, ok := asAppError(err)
+	if !ok {
+		t.Fatalf("expected appError, got %T %v", err, err)
+	}
+	if appErr.code != "person_email_duplicate" {
+		t.Fatalf("error code = %q, want person_email_duplicate", appErr.code)
+	}
+	if state.employeeCreated {
+		t.Fatal("employee was inserted after duplicate email validation failed")
+	}
+	if !state.rolledBack || state.committed {
+		t.Fatalf("transaction state committed=%v rolledBack=%v, want rollback only", state.committed, state.rolledBack)
+	}
+}
+
+func TestCreatePersonRejectsInactiveTeamBeforeInsert(t *testing.T) {
+	state := newPersonUpdateTestState()
+	state.teams["team-app"] = false
+	store := NewSQLStore(openPersonUpdateTestDB(t, state))
+
+	teamID := "team-app"
+	_, err := store.CreatePerson(context.Background(), Principal{IsPeopleAdmin: true, Email: state.actorEmail}, PersonCreateInput{
+		FirstName: "Laura",
+		LastName:  "Bianchi",
+		Email:     "laura.bianchi@example.com",
+		Status:    "active",
+		TeamID:    &teamID,
+	})
+	appErr, ok := asAppError(err)
+	if !ok {
+		t.Fatalf("expected appError, got %T %v", err, err)
+	}
+	if appErr.code != "team_inactive" {
+		t.Fatalf("error code = %q, want team_inactive", appErr.code)
+	}
+	if state.employeeCreated {
+		t.Fatal("employee was inserted after inactive team validation failed")
+	}
+	if !state.rolledBack || state.committed {
+		t.Fatalf("transaction state committed=%v rolledBack=%v, want rollback only", state.committed, state.rolledBack)
+	}
+}
+
+func TestCreatePersonRejectsUnknownTeamBeforeInsert(t *testing.T) {
+	state := newPersonUpdateTestState()
+	store := NewSQLStore(openPersonUpdateTestDB(t, state))
+
+	teamID := "team-missing"
+	_, err := store.CreatePerson(context.Background(), Principal{IsPeopleAdmin: true, Email: state.actorEmail}, PersonCreateInput{
+		FirstName: "Laura",
+		LastName:  "Bianchi",
+		Email:     "laura.bianchi@example.com",
+		Status:    "active",
+		TeamID:    &teamID,
+	})
+	appErr, ok := asAppError(err)
+	if !ok {
+		t.Fatalf("expected appError, got %T %v", err, err)
+	}
+	if appErr.code != "team_not_found" {
+		t.Fatalf("error code = %q, want team_not_found", appErr.code)
+	}
+	if state.employeeCreated {
+		t.Fatal("employee was inserted after unknown team validation failed")
+	}
+	if !state.rolledBack || state.committed {
+		t.Fatalf("transaction state committed=%v rolledBack=%v, want rollback only", state.committed, state.rolledBack)
+	}
+}
+
 func TestUpdatePersonRejectsDuplicateEmailBeforeUpdate(t *testing.T) {
 	state := newPersonUpdateTestState()
 	state.duplicateEmailID = "employee-duplicate"
@@ -166,13 +320,16 @@ type personUpdateAudit struct {
 type personUpdateTestState struct {
 	mu               sync.Mutex
 	employee         personUpdateEmployee
+	createdEmployee  *personUpdateEmployee
 	actorEmail       string
 	actorID          string
 	teams            map[string]bool
 	memberships      map[string]*personUpdateMembership
 	membershipOrder  []string
+	nextEmployeeID   string
 	nextMembershipID string
 	duplicateEmailID string
+	employeeCreated  bool
 	employeeUpdated  bool
 	committed        bool
 	rolledBack       bool
@@ -192,6 +349,7 @@ func newPersonUpdateTestState() *personUpdateTestState {
 		actorID:          "actor-1",
 		teams:            map[string]bool{"team-cloud": true, "team-sec": true, "team-app": true},
 		memberships:      map[string]*personUpdateMembership{},
+		nextEmployeeID:   "employee-created",
 		nextMembershipID: "membership-new",
 	}
 }
@@ -289,10 +447,14 @@ func (c *personUpdateTestConn) QueryContext(_ context.Context, query string, arg
 	switch {
 	case strings.Contains(query, "SELECT to_jsonb(row)") && strings.Contains(query, "FROM training.employee"):
 		id := namedString(args, 0)
-		if id != c.state.employee.ID {
+		switch {
+		case id == c.state.employee.ID:
+			return newPersonUpdateJSONRows(c.state.employee)
+		case c.state.createdEmployee != nil && id == c.state.createdEmployee.ID:
+			return newPersonUpdateJSONRows(c.state.createdEmployee)
+		default:
 			return newPersonUpdateRows([]string{"to_jsonb"}, nil), nil
 		}
-		return newPersonUpdateJSONRows(c.state.employee)
 
 	case strings.Contains(query, "SELECT to_jsonb(row)") && strings.Contains(query, "FROM training.team_membership"):
 		id := namedString(args, 0)
@@ -340,6 +502,19 @@ func (c *personUpdateTestConn) QueryContext(_ context.Context, query string, arg
 		c.state.employeeUpdated = true
 		return newPersonUpdateRows([]string{"id", "status"}, [][]driver.Value{{c.state.employee.ID, c.state.employee.Status}}), nil
 
+	case strings.Contains(query, "INSERT INTO training.employee"):
+		employee := &personUpdateEmployee{
+			ID:        c.state.nextEmployeeID,
+			FirstName: namedString(args, 0),
+			LastName:  namedString(args, 1),
+			Email:     namedString(args, 2),
+			Status:    namedString(args, 3),
+			Notes:     namedString(args, 4),
+		}
+		c.state.createdEmployee = employee
+		c.state.employeeCreated = true
+		return newPersonUpdateRows([]string{"id", "status"}, [][]driver.Value{{employee.ID, employee.Status}}), nil
+
 	case strings.Contains(query, "INSERT INTO training.team_membership"):
 		employeeID := namedString(args, 0)
 		teamID := namedString(args, 1)
@@ -348,13 +523,20 @@ func (c *personUpdateTestConn) QueryContext(_ context.Context, query string, arg
 		c.state.membershipOrder = append(c.state.membershipOrder, id)
 		return newPersonUpdateRows([]string{"id"}, [][]driver.Value{{id}}), nil
 
-	case strings.Contains(query, "SELECT id::text FROM training.employee WHERE email = $1 LIMIT 1"):
+	case strings.Contains(query, "FROM training.employee") && strings.Contains(query, "WHERE email = $1") && strings.Contains(query, "LIMIT 1"):
 		email := namedString(args, 0)
 		switch email {
 		case c.state.actorEmail:
 			return newPersonUpdateRows([]string{"id"}, [][]driver.Value{{c.state.actorID}}), nil
 		case c.state.employee.Email:
 			return newPersonUpdateRows([]string{"id"}, [][]driver.Value{{c.state.employee.ID}}), nil
+		case func() string {
+			if c.state.createdEmployee == nil {
+				return ""
+			}
+			return c.state.createdEmployee.Email
+		}():
+			return newPersonUpdateRows([]string{"id"}, [][]driver.Value{{c.state.createdEmployee.ID}}), nil
 		default:
 			return newPersonUpdateRows([]string{"id"}, nil), nil
 		}
