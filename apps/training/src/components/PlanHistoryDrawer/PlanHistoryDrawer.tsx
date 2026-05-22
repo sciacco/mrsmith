@@ -55,27 +55,29 @@ export function PlanHistoryDrawer({ open, plan, onClose }: PlanHistoryDrawerProp
         </div>
       }
     >
-      {audit.isLoading && events.length === 0 ? (
-        <Skeleton rows={5} />
-      ) : events.length === 0 ? (
-        <p className={styles.empty}>Nessun evento disponibile.</p>
-      ) : (
-        <ol className={styles.timeline}>
-          {events.map((event) => (
-            <li key={event.id} className={styles.item}>
-              <div className={styles.dot} aria-hidden="true" />
-              <div className={styles.itemBody}>
-                <div className={styles.itemHead}>
-                  <span className={styles.itemTitle}>{eventLabel(event)}</span>
-                  <time className={styles.time}>{formatDateTime(event.created_at)}</time>
+      <div className={styles.body}>
+        {audit.isLoading && events.length === 0 ? (
+          <Skeleton rows={5} />
+        ) : events.length === 0 ? (
+          <p className={styles.empty}>Nessun evento disponibile.</p>
+        ) : (
+          <ol className={styles.timeline}>
+            {events.map((event) => (
+              <li key={event.id} className={styles.item}>
+                <div className={styles.dot} aria-hidden="true" />
+                <div className={styles.itemBody}>
+                  <div className={styles.itemHead}>
+                    <span className={styles.itemTitle}>{eventLabel(event)}</span>
+                    <time className={styles.time}>{formatDateTime(event.created_at)}</time>
+                  </div>
+                  <p className={styles.meta}>{event.actor.display_name}</p>
+                  <EventDetail event={event} />
                 </div>
-                <p className={styles.meta}>{event.actor.display_name}</p>
-                <EventDetail event={event} />
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
     </Drawer>
   );
 }

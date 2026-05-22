@@ -3,6 +3,12 @@
   color: var(--color-text-muted);
 }
 
+.body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5) var(--space-6) var(--space-4);
+}
+
 .timeline {
   list-style: none;
   margin: 0;

@@ -74,6 +74,7 @@
 .body {
   display: flex;
   flex-direction: column;
+  padding: var(--space-5) var(--space-6) var(--space-4);
 }
 
 .metaChips {
