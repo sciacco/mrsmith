@@ -35,6 +35,34 @@ const emptyDraft = {
   complianceFramework: '',
 };
 
+function parseOptionalHours(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (trimmed === '') return undefined;
+  return Number(trimmed);
+}
+
+function parseOptionalCost(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (trimmed === '') return undefined;
+  return Number(trimmed.replace(',', '.'));
+}
+
+function validateOptionalHours(value: string): string {
+  const parsed = parseOptionalHours(value);
+  if (parsed === undefined) return '';
+  return Number.isInteger(parsed) && parsed > 0
+    ? ''
+    : 'Inserisci un numero intero maggiore di 0.';
+}
+
+function validateOptionalCost(value: string): string {
+  const parsed = parseOptionalCost(value);
+  if (parsed === undefined) return '';
+  return Number.isFinite(parsed) && parsed >= 0
+    ? ''
+    : 'Inserisci un costo valido maggiore o uguale a 0.';
+}
+
 export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewCourseModalProps) {
   const { toast } = useToast();
   const lookups = useTrainingLookups(isPeopleAdmin && open);
@@ -47,18 +75,22 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
 
   const vendorOptions = (lookups.data?.vendors ?? []).filter((v) => v.active).map((v) => ({ value: v.id, label: v.label }));
   const skillOptions = (lookups.data?.skillAreas ?? []).filter((s) => s.active).map((s) => ({ value: s.id, label: s.label }));
+  const hoursError = validateOptionalHours(draft.defaultHours);
+  const costError = validateOptionalCost(draft.defaultCost);
 
   const canSubmit =
     draft.title.trim().length > 0 &&
     draft.vendorId.length > 0 &&
     draft.skillAreaId.length > 0 &&
-    draft.defaultHours.length > 0 &&
-    draft.defaultCost.length > 0 &&
+    !hoursError &&
+    !costError &&
     !create.isPending;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
+    const defaultHours = parseOptionalHours(draft.defaultHours);
+    const defaultCost = parseOptionalCost(draft.defaultCost);
     try {
       await create.mutateAsync({
         title: draft.title.trim(),
@@ -66,8 +98,8 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
         skillAreaId: draft.skillAreaId,
         deliveryMode: draft.deliveryMode,
         providerKind: draft.providerKind,
-        defaultHours: draft.defaultHours ? Number(draft.defaultHours) : undefined,
-        defaultCost: draft.defaultCost ? Number(draft.defaultCost.replace(',', '.')) : undefined,
+        defaultHours,
+        defaultCost,
         description: draft.description.trim() || undefined,
         complianceFramework: draft.complianceFramework.trim() || undefined,
         mandatory: draft.complianceFramework.trim().length > 0,
@@ -145,31 +177,35 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
         <div className={styles.gridTwo}>
           <div className={styles.field}>
             <label htmlFor="nc-hours" className={styles.label}>
-              Durata (h) <span className={styles.req} aria-hidden="true" />
+              Durata stimata (h)
             </label>
             <input
               id="nc-hours"
               type="number"
               min={1}
               className={styles.input}
+              placeholder="Da definire"
               value={draft.defaultHours}
               onChange={(e) => setDraft((d) => ({ ...d, defaultHours: e.target.value }))}
-              required
+              aria-invalid={Boolean(hoursError)}
             />
+            {hoursError && <p className={styles.errorText}>{hoursError}</p>}
           </div>
           <div className={styles.field}>
             <label htmlFor="nc-cost" className={styles.label}>
-              Costo standard (€) <span className={styles.req} aria-hidden="true" />
+              Costo standard (€)
             </label>
             <input
               id="nc-cost"
               type="text"
               inputMode="decimal"
               className={styles.input}
+              placeholder="Da definire"
               value={draft.defaultCost}
               onChange={(e) => setDraft((d) => ({ ...d, defaultCost: e.target.value }))}
-              required
+              aria-invalid={Boolean(costError)}
             />
+            {costError && <p className={styles.errorText}>{costError}</p>}
           </div>
         </div>
 

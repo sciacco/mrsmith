@@ -71,6 +71,12 @@
   color: var(--color-text-muted);
 }
 
+.errorText {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-danger);
+}
+
 .footer {
   display: flex;
   justify-content: flex-end;

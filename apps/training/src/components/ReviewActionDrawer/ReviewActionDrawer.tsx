@@ -56,6 +56,24 @@ function formatEuro(value: number): string {
   }).format(value);
 }
 
+function formatCourseEstimate(hours: number | undefined, cost: number | undefined, vendorName?: string): string {
+  return [
+    hours !== undefined ? `${hours}h` : 'ore da definire',
+    cost !== undefined ? `${formatEuro(cost)}/persona` : 'costo da definire',
+    vendorName || null,
+  ].filter(Boolean).join(' · ');
+}
+
+function formatTotalHours(hoursPerPerson: number | undefined, peopleCount: number): string {
+  if (hoursPerPerson === undefined) return 'ore da definire';
+  return `${hoursPerPerson * peopleCount}h`;
+}
+
+function formatTotalCost(costPerPerson: number | undefined, peopleCount: number): string {
+  if (costPerPerson === undefined) return 'costo da definire';
+  return formatEuro(costPerPerson * peopleCount);
+}
+
 function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     const body = error.body as { message?: string } | undefined;
@@ -136,9 +154,7 @@ function CreateFromSuggestion({
     }
   }, [open, suggestion.id, employeeIds, overrideCourseId, suggestion.suggested_course_id]);
 
-  const courseCost = suggestion.suggested_course_cost ?? 0;
-  const totalCost = courseCost * selectedIds.size;
-  const totalHours = (suggestion.suggested_course_hours ?? 0) * selectedIds.size;
+  const courseCost = suggestion.suggested_course_cost;
   const canSubmit = courseId !== '' && selectedIds.size > 0 && !bulkPlan.isPending;
 
   function toggle(id: string) {
@@ -202,12 +218,20 @@ function CreateFromSuggestion({
         <div className={styles.footer}>
           <div className={styles.totals}>
             <span className={styles.totalsValue}>
-              {formatEuro(totalCost)}{' '}
-              <span className={styles.totalsLabel}>
-                ({selectedIds.size} × {formatEuro(courseCost)})
-              </span>
+              {selectedIds.size > 0
+                ? formatTotalCost(courseCost, selectedIds.size)
+                : 'Nessuna persona selezionata'}
+              {selectedIds.size > 0 && courseCost !== undefined && (
+                <span className={styles.totalsLabel}>
+                  {' '}({selectedIds.size} × {formatEuro(courseCost)})
+                </span>
+              )}
             </span>
-            {totalHours > 0 && <span className={styles.totalsHours}>{totalHours} ore totali</span>}
+            {selectedIds.size > 0 && (
+              <span className={styles.totalsHours}>
+                {formatTotalHours(suggestion.suggested_course_hours, selectedIds.size)}
+              </span>
+            )}
           </div>
           <div className={styles.footerActions}>
             <Button variant="ghost" size="md" onClick={onClose}>Annulla</Button>
@@ -233,10 +257,9 @@ function CreateFromSuggestion({
             onChange={(value) => setCourseId(value ?? '')}
             placeholder="Seleziona corso"
           />
-          {suggestion.suggested_course_hours !== undefined && (
+          {courseId && (
             <p className={styles.sectionHint}>
-              Default: {suggestion.suggested_course_hours}h ·{' '}
-              {suggestion.suggested_course_cost !== undefined && formatEuro(suggestion.suggested_course_cost)}/persona
+              Stima: {formatCourseEstimate(suggestion.suggested_course_hours, suggestion.suggested_course_cost)}
             </p>
           )}
         </section>
@@ -577,12 +600,14 @@ function CreateFromScratch({
     [directoryPeople, selectedIds],
   );
 
-  const courseCost = selectedCourse?.defaultCost ?? 0;
-  const courseHours = selectedCourse?.defaultHours ?? 0;
-  const totalCost = courseCost * selectedIds.size;
-  const totalHours = courseHours * selectedIds.size;
-  const residualAfter = budgetResidual - totalCost;
-  const residualPct = budgetResidual > 0 ? Math.round((residualAfter / budgetResidual) * 100) : null;
+  const courseCost = selectedCourse?.defaultCost;
+  const courseHours = selectedCourse?.defaultHours;
+  const totalCost = courseCost !== undefined ? courseCost * selectedIds.size : undefined;
+  const totalHours = courseHours !== undefined ? courseHours * selectedIds.size : undefined;
+  const residualAfter = totalCost !== undefined ? budgetResidual - totalCost : undefined;
+  const residualPct = residualAfter !== undefined && budgetResidual > 0
+    ? Math.round((residualAfter / budgetResidual) * 100)
+    : null;
   const canSubmit = courseId !== '' && selectedIds.size > 0 && !bulkPlan.isPending;
 
   function toggle(id: string) {
@@ -670,13 +695,18 @@ function CreateFromScratch({
           <div className={styles.summaryFooter}>
             <span className={styles.summaryHeadline}>
               {selectedIds.size > 0
-                ? `${selectedIds.size} ${selectedIds.size === 1 ? 'persona' : 'persone'} · ${totalHours}h · ${formatEuro(totalCost)}`
+                ? [
+                    `${selectedIds.size} ${selectedIds.size === 1 ? 'persona' : 'persone'}`,
+                    totalHours !== undefined ? `${totalHours}h` : 'ore da definire',
+                    totalCost !== undefined ? formatEuro(totalCost) : 'costo da definire',
+                  ].join(' · ')
                 : 'Nessuna persona selezionata'}
             </span>
             {selectedCourse && (
-              <span className={`${styles.summaryLine} ${residualAfter < 0 ? styles.totalsWarning : ''}`}>
-                Residuo dopo: {formatEuro(residualAfter)}
-                {residualPct !== null && ` (${residualPct}%)`}
+              <span className={`${styles.summaryLine} ${residualAfter !== undefined && residualAfter < 0 ? styles.totalsWarning : ''}`}>
+                {residualAfter !== undefined
+                  ? `Residuo dopo: ${formatEuro(residualAfter)}${residualPct !== null ? ` (${residualPct}%)` : ''}`
+                  : 'Residuo dopo: costo da definire'}
               </span>
             )}
           </div>
@@ -934,13 +964,7 @@ function CreateFromScratch({
 }
 
 function CourseHint({ course }: { course: CatalogCourse }) {
-  const parts = [
-    course.defaultHours ? `${course.defaultHours}h` : null,
-    course.defaultCost !== undefined ? `${formatEuro(course.defaultCost)}/persona` : null,
-    course.vendorName || null,
-  ].filter(Boolean);
-  if (parts.length === 0) return null;
-  return <p className={styles.sectionHint}>{parts.join(' · ')}</p>;
+  return <p className={styles.sectionHint}>{formatCourseEstimate(course.defaultHours, course.defaultCost, course.vendorName)}</p>;
 }
 
 function PersonOption({
