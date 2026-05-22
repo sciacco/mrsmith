@@ -22,7 +22,12 @@ const navItems: TabNavItem[] = [
   { label: 'Catalogo', path: '/catalogo' },
 ];
 
-const ROUTES_WITHOUT_GLOBAL_HEADER = new Set(['/pipeline']);
+const peopleAdminNavItems: TabNavItem[] = [
+  ...navItems,
+  { label: 'Impostazioni', path: '/impostazioni' },
+];
+
+const ROUTES_WITHOUT_GLOBAL_HEADER = new Set(['/pipeline', '/impostazioni']);
 
 function AppRoutes({ isPeopleAdmin }: { isPeopleAdmin: boolean }) {
   const element = useRoutes(routes(isPeopleAdmin));
@@ -65,7 +70,7 @@ export function App() {
     <AppShell appName="Formazione" userName={user?.name ?? 'Utente'} onLogout={logout} support={auth}>
       <AppShell.Nav>
         <div className={styles.navRow}>
-          <TabNav items={navItems} />
+          <TabNav items={isPeopleAdmin ? peopleAdminNavItems : navItems} />
         </div>
       </AppShell.Nav>
       <AppShell.Content>
