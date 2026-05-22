@@ -32,4 +32,10 @@ export const afcToolsNavSections: NavSection[] = [
       { label: 'DDT per cespiti', path: '/report-ddt-cespiti' },
     ],
   },
+  {
+    label: 'Aziende',
+    items: [
+      { label: 'Stato Aziende', path: '/stato-aziende' },
+    ],
+  },
 ];

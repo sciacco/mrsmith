@@ -88,9 +88,6 @@
   justify-content: center;
   min-width: 0;
   height: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
 }
 
 .nav::-webkit-scrollbar {
