@@ -14,15 +14,6 @@ interface UpdateStateModalProps {
   statesError: unknown;
 }
 
-/**
- * UpdateStateModal is the only mutation surface for Stato Aziende.
- * - Single select backed by the prefetched customer-states list.
- * - Confirm label is EXACTLY `Conferma` (locked by FINAL.md §S5a).
- * - On success: close modal, refetch customers (invalidation wired in the
- *   hook).
- * - On error: toast format `{HTTP status} \u2014 {upstream message}` with
- *   `Qualcosa e' andato storto` as the fallback.
- */
 export function UpdateStateModal({
   open,
   onClose,
@@ -99,7 +90,7 @@ export function UpdateStateModal({
           onClick={handleConfirm}
           disabled={!canConfirm}
         >
-          {updateState.isPending ? 'Invio...' : 'Conferma'}
+          Conferma
         </button>
       </div>
     </Modal>

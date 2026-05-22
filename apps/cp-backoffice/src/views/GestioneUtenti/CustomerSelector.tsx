@@ -1,5 +1,5 @@
 import { SingleSelect } from '@mrsmith/ui';
-import type { Customer } from '../../api/customers';
+import type { Customer } from '@mrsmith/features';
 
 interface CustomerSelectorProps {
   customers: Customer[] | undefined;

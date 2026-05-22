@@ -203,16 +203,10 @@ function filterCustomers(
   );
 }
 
-// isUpstreamUnavailable treats both 503 (dependency missing) and any other
-// structured API failure as a condition the operator should see as
-// "service not available". We intentionally do NOT surface the upstream
-// hostname or the word "upstream" to the operator (forbidden copy lock).
 function isUpstreamUnavailable(error: unknown): boolean {
   if (!(error instanceof ApiError)) return false;
   if (error.status === 503) return true;
   if (error.status >= 500) return true;
-  // Backend-forwarded business errors on list endpoints also imply the data
-  // cannot be trusted; show the unavailable state rather than a stale table.
   const body = error.body;
   if (typeof body === 'object' && body !== null && 'error' in body) {
     return (body as { error: unknown }).error === 'upstream_error';

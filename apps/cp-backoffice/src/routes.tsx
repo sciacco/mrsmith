@@ -1,5 +1,5 @@
 import { Navigate, type RouteObject } from 'react-router-dom';
-import { StatoAziendePage } from './views/StatoAziende/StatoAziendePage';
+import { StatoAziendePage } from '@mrsmith/features';
 import { GestioneUtentiPage } from './views/GestioneUtenti/GestioneUtentiPage';
 import { AccessiBiometricoPage } from './views/AccessiBiometrico/AccessiBiometricoPage';
 

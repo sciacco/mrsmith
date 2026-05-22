@@ -2,7 +2,7 @@ import { useDeferredValue, useState } from 'react';
 import { Button, Icon, SearchInput, Tooltip } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import type { User } from '../../api/users';
-import { useCustomers } from '../../hooks/useCustomers';
+import { useCustomers } from '@mrsmith/features';
 import { useUsersByCustomer } from '../../hooks/useUsersByCustomer';
 import { CustomerSelector } from './CustomerSelector';
 import { NuovoAdminModal } from './NuovoAdminModal';

@@ -186,6 +186,9 @@ importers:
       '@mrsmith/auth-client':
         specifier: workspace:*
         version: link:../../packages/auth-client
+      '@mrsmith/features':
+        specifier: workspace:*
+        version: link:../../packages/features
       '@mrsmith/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -856,6 +859,40 @@ importers:
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
+      typescript:
+        specifier: ~5.6.3
+        version: 5.6.3
+
+  packages/features:
+    dependencies:
+      '@mrsmith/api-client':
+        specifier: workspace:*
+        version: link:../api-client
+      '@mrsmith/auth-client':
+        specifier: workspace:*
+        version: link:../auth-client
+      '@mrsmith/ui':
+        specifier: workspace:*
+        version: link:../ui
+      '@tanstack/react-query':
+        specifier: ^5.62.0
+        version: 5.96.2(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@mrsmith/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.28)
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
