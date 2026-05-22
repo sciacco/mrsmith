@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ApiError } from '@mrsmith/api-client';
 import { Button, Modal, useToast } from '@mrsmith/ui';
 import { useCreatePlan } from '../../api/queries';
 import styles from './NewPlanModal.module.css';
@@ -12,6 +13,14 @@ interface NewPlanModalProps {
 }
 
 type Source = 'empty' | 'duplicate';
+
+function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    const body = error.body as { message?: string; error?: string } | undefined;
+    return body?.message ?? body?.error ?? error.statusText;
+  }
+  return error instanceof Error ? error.message : 'Errore nella creazione del piano';
+}
 
 export function NewPlanModal({ open, defaultYear, prevYearAvailable, onClose, onCreated }: NewPlanModalProps) {
   const { toast } = useToast();
@@ -47,8 +56,7 @@ export function NewPlanModal({ open, defaultYear, prevYearAvailable, onClose, on
       onCreated?.(parsedYear);
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Errore nella creazione del piano';
-      toast(message, 'error');
+      toast(errorMessage(err), 'error');
     }
   }
 

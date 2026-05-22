@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Modal, SearchInput, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Modal, SearchInput, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import {
   useBulkAssignEnrollment,
   usePeopleDirectory,
@@ -40,7 +40,7 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
   const team = params.get('team') ?? '';
   const filter = params.get('filter') ?? '';
   const q = params.get('q') ?? '';
-  const sort = params.get('sort') ?? 'priority';
+  const sort = params.get('sort') ?? 'alpha';
 
   const directory = usePeopleDirectory({ year, team, filter, q }, isPeopleAdmin);
   const lookups = useTrainingLookups(isPeopleAdmin);
@@ -68,10 +68,10 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
       const needle = q.trim().toLowerCase();
       result = result.filter((p) => `${p.name} ${p.email}`.toLowerCase().includes(needle));
     }
-    if (sort === 'alpha') {
-      result = [...result].sort((a, b) => a.name.localeCompare(b.name));
-    } else {
+    if (sort === 'priority') {
       result = [...result].sort((a, b) => b.priority_score - a.priority_score || a.name.localeCompare(b.name));
+    } else {
+      result = [...result].sort((a, b) => a.name.localeCompare(b.name));
     }
     return result;
   }, [people, q, sort]);
@@ -135,6 +135,10 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
   }
 
   const courses = lookups.data?.courses ?? [];
+  const courseOptions = useMemo(
+    () => courses.filter((c) => c.active).map((c) => ({ value: c.id, label: c.label })),
+    [courses],
+  );
 
   if (directory.isLoading) {
     return (
@@ -171,17 +175,17 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
           <span className={styles.sortLabel}>Ordina</span>
           <button
             type="button"
-            className={`${styles.sortBtn} ${sort === 'priority' ? styles.sortActive : ''}`}
-            onClick={() => updateParam('sort', sort === 'priority' ? null : 'priority')}
+            className={`${styles.sortBtn} ${sort === 'alpha' ? styles.sortActive : ''}`}
+            onClick={() => updateParam('sort', null)}
           >
-            Priorità
+            A-Z
           </button>
           <button
             type="button"
-            className={`${styles.sortBtn} ${sort === 'alpha' ? styles.sortActive : ''}`}
-            onClick={() => updateParam('sort', 'alpha')}
+            className={`${styles.sortBtn} ${sort === 'priority' ? styles.sortActive : ''}`}
+            onClick={() => updateParam('sort', 'priority')}
           >
-            A-Z
+            Priorità
           </button>
         </div>
       </div>
@@ -222,12 +226,13 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
           <p className={styles.modalText}>{selected.size} persone selezionate · anno {year}</p>
           <label>
             <span>Corso</span>
-            <select value={assignDraft.courseId} onChange={(e) => setAssignDraft((d) => ({ ...d, courseId: e.target.value }))} required>
-              <option value="">Seleziona</option>
-              {courses.filter((c) => c.active).map((c) => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
-            </select>
+            <SingleSelect
+              options={courseOptions}
+              selected={assignDraft.courseId || null}
+              onChange={(v) => setAssignDraft((d) => ({ ...d, courseId: v ? String(v) : '' }))}
+              placeholder="Seleziona"
+              searchable
+            />
           </label>
           <div className={styles.modalGrid}>
             <label>

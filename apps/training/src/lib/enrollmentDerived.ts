@@ -13,16 +13,6 @@ export interface EnrollmentDraft {
   notes: string;
 }
 
-export function durationDays(start: string, end: string): number | undefined {
-  if (!start || !end) return undefined;
-  const s = new Date(start);
-  const e = new Date(end);
-  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return undefined;
-  const ms = e.getTime() - s.getTime();
-  if (ms < 0) return undefined;
-  return Math.round(ms / 86_400_000) + 1;
-}
-
 export function costPerHour(cost: string, hours: string): number | undefined {
   const c = Number(cost);
   const h = Number(hours);

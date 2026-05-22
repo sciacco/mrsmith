@@ -2,6 +2,7 @@ import { Icon } from '@mrsmith/ui';
 import type { PlanEnrollment } from '../../api/types';
 import { ALERT_LEVEL_LABEL, classifyAlertLevel, type AlertLevel } from '../../lib/alertLevel';
 import { formatBudget } from '../../lib/formatBudget';
+import { daysUntilPipelineReference } from '../../lib/pipelineTiming';
 import { formatTeamLabel, type TeamLabelMap } from '../../lib/teamLabels';
 import styles from './PipelineCard.module.css';
 
@@ -14,22 +15,16 @@ interface PipelineCardProps {
   now?: Date;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 interface DelayInfo {
   text: string;
   isPast: boolean;
 }
 
 function formatDelay(enrollment: PlanEnrollment, now: Date): DelayInfo | null {
-  const ref = enrollment.plannedStart ?? enrollment.plannedEnd;
-  if (!ref) return null;
-  const stamped = ref.length > 10 ? ref : `${ref}T00:00:00`;
-  const date = new Date(stamped);
-  if (!Number.isFinite(date.getTime())) return null;
-  const diff = Math.floor((date.getTime() - now.getTime()) / DAY_MS);
-  if (diff >= 0) return { text: `in ${diff}gg`, isPast: false };
-  return { text: `${-diff}gg in ritardo`, isPast: true };
+  const daysUntil = daysUntilPipelineReference(enrollment, now);
+  if (daysUntil === null) return null;
+  if (daysUntil >= 0) return { text: `in ${daysUntil}gg`, isPast: false };
+  return { text: `${-daysUntil}gg in ritardo`, isPast: true };
 }
 
 function alertClass(level: AlertLevel) {
@@ -107,7 +102,7 @@ export function PipelineCard({
       </div>
       <div className={styles.meta}>
         {delay && <span className={`${styles.delay} ${delayClass(level, delay.isPast)}`}>{delay.text}</span>}
-        {budget && <span className={styles.budget}>{budget}</span>}
+        <span className={styles.budget}>{budget ?? ''}</span>
       </div>
       <Icon name="chevron-right" size={14} className={styles.chev} />
     </article>

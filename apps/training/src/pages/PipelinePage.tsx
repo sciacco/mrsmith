@@ -8,6 +8,7 @@ import { BulkActionBar } from '../components/BulkActionBar';
 import { EnrollmentDrawer } from '../components/EnrollmentDrawer';
 import { PipelineCard } from '../components/PipelineCard';
 import { formatBudget } from '../lib/formatBudget';
+import { pipelineOverdueDays } from '../lib/pipelineTiming';
 import { priorityScore } from '../lib/priorityScore';
 import {
   SEVERITY_BUCKET_DESCRIPTION,
@@ -41,27 +42,12 @@ const RITARDO_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '>30', label: '> 30 giorni' },
 ];
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 function apiErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     const body = error.body;
     if (body && typeof body === 'object' && 'message' in body && typeof body.message === 'string') return body.message;
   }
   return fallback;
-}
-
-function parseDate(value: string | undefined): Date | null {
-  if (!value) return null;
-  const stamped = value.length > 10 ? value : `${value}T00:00:00`;
-  const date = new Date(stamped);
-  return Number.isFinite(date.getTime()) ? date : null;
-}
-
-function delayDays(enrollment: PlanEnrollment, now: Date): number {
-  const planned = parseDate(enrollment.plannedEnd) ?? parseDate(enrollment.plannedStart);
-  if (!planned) return 0;
-  return Math.floor((now.getTime() - planned.getTime()) / DAY_MS);
 }
 
 function buildYearOptions(enrollments: PlanEnrollment[]): Array<{ value: string; label: string }> {
@@ -130,7 +116,7 @@ export function PipelinePage({ isPeopleAdmin }: PipelinePageProps) {
           if (preset?.status && enrollment.status !== preset.status) return false;
         }
         if (ritardoFilter) {
-          const days = delayDays(enrollment, now);
+          const days = pipelineOverdueDays(enrollment, now);
           if (ritardoFilter === '>0' && days <= 0) return false;
           if (ritardoFilter === '>30' && days <= 30) return false;
         }

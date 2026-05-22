@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // PlanningOverview returns the current-year plan summary + ranked suggestion queue.
@@ -190,6 +192,10 @@ func suggestionSignature(parts ...string) string {
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
+func scanTextArray(value *pgtype.FlatArray[string]) sql.Scanner {
+	return pgtype.NewMap().SQLScanner(value)
+}
+
 // suggestionsCompliance — aggregate missing mandatory rule coverage by course (rule).
 func (s *SQLStore) suggestionsCompliance(ctx context.Context, team string) ([]PlanningSuggestion, error) {
 	const q = `
@@ -221,10 +227,10 @@ ORDER BY affected DESC`
 	for rows.Next() {
 		var courseID, title, framework string
 		var affected int
-		var empIDs []string
+		var empIDs pgtype.FlatArray[string]
 		var cost sql.NullFloat64
 		var hours sql.NullInt32
-		if err := rows.Scan(&courseID, &title, &framework, &affected, &empIDs, &cost, &hours); err != nil {
+		if err := rows.Scan(&courseID, &title, &framework, &affected, scanTextArray(&empIDs), &cost, &hours); err != nil {
 			return nil, fmt.Errorf("scan compliance suggestion: %w", err)
 		}
 		costVal := 0.0
@@ -244,7 +250,7 @@ ORDER BY affected DESC`
 			Title:                title2,
 			Description:          desc,
 			AffectedCount:        affected,
-			AffectedEmployeeIDs:  empIDs,
+			AffectedEmployeeIDs:  []string(empIDs),
 			SuggestedCourseID:    courseID,
 			SuggestedCourseName:  title,
 			EstimatedCost:        costVal * float64(affected),
@@ -296,11 +302,11 @@ GROUP BY vec.cert_code, vec.cert_name, c.id, course.id, course.title, course.def
 	for rows.Next() {
 		var certCode, certName, certID string
 		var affected int
-		var empIDs []string
+		var empIDs pgtype.FlatArray[string]
 		var courseID, courseTitle sql.NullString
 		var courseCost sql.NullFloat64
 		var courseHours sql.NullInt32
-		if err := rows.Scan(&certCode, &certName, &certID, &affected, &empIDs, &courseID, &courseTitle, &courseCost, &courseHours); err != nil {
+		if err := rows.Scan(&certCode, &certName, &certID, &affected, scanTextArray(&empIDs), &courseID, &courseTitle, &courseCost, &courseHours); err != nil {
 			return nil, fmt.Errorf("scan expiring suggestion: %w", err)
 		}
 		sig := suggestionSignature("expiring", certID)
@@ -311,7 +317,7 @@ GROUP BY vec.cert_code, vec.cert_name, c.id, course.id, course.title, course.def
 			Title:               fmt.Sprintf("%d certificazioni %s in scadenza", affected, certName),
 			Description:         "Rinnovo entro 90 giorni",
 			AffectedCount:       affected,
-			AffectedEmployeeIDs: empIDs,
+			AffectedEmployeeIDs: []string(empIDs),
 		}
 		if courseID.Valid {
 			sug.SuggestedCourseID = courseID.String
@@ -375,8 +381,8 @@ HAVING COUNT(DISTINCT g.employee_id) > 0`
 	for rows.Next() {
 		var skillID, skillName string
 		var affected int
-		var empIDs []string
-		if err := rows.Scan(&skillID, &skillName, &affected, &empIDs); err != nil {
+		var empIDs pgtype.FlatArray[string]
+		if err := rows.Scan(&skillID, &skillName, &affected, scanTextArray(&empIDs)); err != nil {
 			return nil, fmt.Errorf("scan skill gap suggestion: %w", err)
 		}
 		sig := suggestionSignature("skill_gap", skillID)
@@ -387,7 +393,7 @@ HAVING COUNT(DISTINCT g.employee_id) > 0`
 			Title:               fmt.Sprintf("%d dipendenti con gap dichiarato su %s", affected, skillName),
 			Description:         "Target di livello non raggiunto",
 			AffectedCount:       affected,
-			AffectedEmployeeIDs: empIDs,
+			AffectedEmployeeIDs: []string(empIDs),
 		}
 		result = append(result, sug)
 	}
@@ -397,12 +403,12 @@ HAVING COUNT(DISTINCT g.employee_id) > 0`
 // suggestionsEmployeeRequests — pending requests aggregated as single item.
 func (s *SQLStore) suggestionsEmployeeRequests(ctx context.Context) ([]PlanningSuggestion, error) {
 	const q = `
-SELECT COUNT(*), array_agg(id::text)
+SELECT COUNT(*), COALESCE(array_agg(id::text ORDER BY created_at DESC), ARRAY[]::text[])
 FROM training.training_request
 WHERE status IN ('submitted', 'under_review')`
 	var affected int
-	var ids []string
-	if err := s.db.QueryRowContext(ctx, q).Scan(&affected, &ids); err != nil {
+	var ids pgtype.FlatArray[string]
+	if err := s.db.QueryRowContext(ctx, q).Scan(&affected, scanTextArray(&ids)); err != nil {
 		return nil, fmt.Errorf("planning: employee request suggestions: %w", err)
 	}
 	if affected == 0 {
@@ -416,7 +422,7 @@ WHERE status IN ('submitted', 'under_review')`
 		Title:               fmt.Sprintf("%d richieste employee in attesa", affected),
 		Description:         "Da approvare o rifiutare",
 		AffectedCount:       affected,
-		AffectedEmployeeIDs: ids,
+		AffectedEmployeeIDs: []string(ids),
 	}}, nil
 }
 
@@ -492,6 +498,9 @@ RETURNING id::text, year, status::text, budget_total::float8`,
 			input.Year, budget,
 		).Scan(&row.ID, &row.Year, &row.Status, &row.BudgetTotal)
 		if err != nil {
+			if isUniqueViolation(err, "training_plan_year_key") {
+				return conflictError("plan_year_exists", fmt.Sprintf("esiste gia un piano per il %d", input.Year))
+			}
 			return fmt.Errorf("planning: insert plan: %w", err)
 		}
 		afterSnap, err := entitySnapshot(ctx, tx, "training_plan", row.ID)

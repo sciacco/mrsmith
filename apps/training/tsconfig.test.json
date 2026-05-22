@@ -15,6 +15,8 @@
     "src/api/types.ts",
     "src/lib/alertLevel.ts",
     "src/lib/alertLevel.test.ts",
+    "src/lib/pipelineTiming.ts",
+    "src/lib/pipelineTiming.test.ts",
     "src/lib/priorityScore.ts",
     "src/lib/priorityScore.test.ts",
     "src/lib/temporalGrouping.ts",

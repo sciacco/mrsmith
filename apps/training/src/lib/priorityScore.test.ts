@@ -53,4 +53,13 @@ test('mandatory boosts score over non-mandatory at same severity', () => {
   assert(mandatory > optional, `mandatory (${mandatory}) should be > optional (${optional})`);
 });
 
+test('in_progress score ignores old plannedStart when plannedEnd is far in future', () => {
+  const withOldStart = priorityScore(
+    base({ status: 'in_progress', plannedStart: '2026-03-01', plannedEnd: '2026-12-15' }),
+    { now },
+  );
+  const withoutDates = priorityScore(base({ status: 'in_progress' }), { now });
+  assert(withOldStart === withoutDates, `old start (${withOldStart}) should not score above no dates (${withoutDates})`);
+});
+
 console.log('priorityScore tests passed');

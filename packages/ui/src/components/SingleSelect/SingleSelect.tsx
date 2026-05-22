@@ -71,7 +71,12 @@ export function SingleSelect<V extends string | number = string | number>({
       const top = placeTop
         ? rect.top - DROPDOWN_GAP
         : rect.bottom + DROPDOWN_GAP;
-      setCoords({ top, left: rect.left, width: rect.width, placeTop });
+      const dropdownEl = dropdownRef.current;
+      const renderedWidth = dropdownEl ? dropdownEl.offsetWidth : rect.width;
+      const dropdownWidth = Math.max(rect.width, renderedWidth);
+      const maxLeft = window.innerWidth - dropdownWidth - VIEWPORT_PAD;
+      const left = Math.max(VIEWPORT_PAD, Math.min(rect.left, maxLeft));
+      setCoords({ top, left, width: rect.width, placeTop });
     };
 
     update();
@@ -127,7 +132,7 @@ export function SingleSelect<V extends string | number = string | number>({
           : {
               top: coords.top,
               left: coords.left,
-              width: coords.width,
+              minWidth: coords.width,
               transform: coords.placeTop ? 'translateY(-100%)' : undefined,
             }
       }

@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "tsc --noEmit",
-    "test": "tsc -p tsconfig.test.json && node ../../artifacts/claude/training-tests/lib/alertLevel.test.js && node ../../artifacts/claude/training-tests/lib/priorityScore.test.js && node ../../artifacts/claude/training-tests/lib/temporalGrouping.test.js",
+    "test": "tsc -p tsconfig.test.json && node ../../artifacts/claude/training-tests/lib/alertLevel.test.js && node ../../artifacts/claude/training-tests/lib/pipelineTiming.test.js && node ../../artifacts/claude/training-tests/lib/priorityScore.test.js && node ../../artifacts/claude/training-tests/lib/temporalGrouping.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

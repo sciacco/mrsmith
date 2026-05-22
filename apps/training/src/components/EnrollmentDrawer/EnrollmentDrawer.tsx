@@ -12,7 +12,6 @@ import type { PlanEnrollment } from '../../api/types';
 import { classifyAlertLevel } from '../../lib/alertLevel';
 import {
   costPerHour,
-  durationDays,
   formatEuro2,
   formatEuroCompact,
   isDirty as draftIsDirty,
@@ -226,7 +225,6 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
   const requiresReason = (t: TransitionDef) =>
     t.transition === 'revert_to_proposed' || t.transition === 'reopen' || t.transition === 'cancel';
 
-  const days = durationDays(draft.plannedStart, draft.plannedEnd);
   const perHour = costPerHour(draft.costPlanned, draft.hoursPlanned);
 
   function runTransition(t: TransitionDef, reasonText?: string) {
@@ -507,11 +505,6 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
                   />
                 </label>
               </div>
-              {days !== undefined && (
-                <div className={styles.derivedRow}>
-                  Durata <strong>{days} {days === 1 ? 'giorno' : 'giorni'}</strong>
-                </div>
-              )}
             </div>
 
             {/* Impegno & Budget */}

@@ -3,6 +3,8 @@ package training
 import (
 	"errors"
 	"net/http"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type appError struct {
@@ -44,4 +46,12 @@ func asAppError(err error) (appError, bool) {
 		return appErr, true
 	}
 	return appError{}, false
+}
+
+func isUniqueViolation(err error, constraint string) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	return pgErr.Code == "23505" && (constraint == "" || pgErr.ConstraintName == constraint)
 }

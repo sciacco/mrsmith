@@ -114,6 +114,7 @@
   animation: dropdownOpen 0.18s var(--ease-out, ease-out) both;
   overflow: hidden;
   max-height: 320px;
+  max-width: min(420px, calc(100vw - 16px));
   display: flex;
   flex-direction: column;
 }

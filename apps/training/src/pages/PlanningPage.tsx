@@ -155,6 +155,10 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
   const showEmpty = !hasSuggestions && plan?.status === 'open';
   const showClosedBanner = plan?.status === 'closed';
   const showDraftBanner = plan?.status === 'draft';
+  const newPlanDefaultYear = plan && plan.status !== 'missing' ? plan.year + 1 : Number(year);
+  const newPlanPrevYearAvailable = plan
+    ? plan.status !== 'missing' || plan.has_prev_year_plan
+    : false;
 
   return (
     <main className={styles.page}>
@@ -238,8 +242,8 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
 
       <NewPlanModal
         open={newPlanOpen}
-        defaultYear={Number(year)}
-        prevYearAvailable={plan?.has_prev_year_plan ?? false}
+        defaultYear={newPlanDefaultYear}
+        prevYearAvailable={newPlanPrevYearAvailable}
         onClose={() => setNewPlanOpen(false)}
       />
 
