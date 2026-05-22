@@ -14,6 +14,7 @@ import type {
   CreatePlanInput,
   JobRunResponse,
   LookupResponse,
+  PersonUpdateInput,
   OverviewResponse,
   PersonProfile,
   PersonSummary,
@@ -188,6 +189,26 @@ export function usePersonProfile(id: string | undefined, year: string, enabled: 
       const suffix = params.toString();
       const path = `/training/v1/people/${id}/profile${suffix ? `?${suffix}` : ''}`;
       return api.get<PersonProfile>(path);
+    },
+  });
+}
+
+export function useUpdatePerson() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: PersonUpdateInput }): Promise<ActionResponse> => {
+      if (useMocks) return Promise.resolve({ ok: true, id, status: body.status } satisfies ActionResponse);
+      return api.patch<ActionResponse>(`/training/v1/people/${id}`, body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training', 'person-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'people-directory'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'overview'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'planning'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'compliance'] });
+      queryClient.invalidateQueries({ queryKey: ['training', 'lookups'] });
     },
   });
 }

@@ -357,8 +357,14 @@ export interface PersonProfile {
   identity_min: {
     id: string;
     name: string;
+    first_name: string;
+    last_name: string;
     email: string;
+    status: PersonStatus;
+    team_id?: string;
+    team_name?: string;
     team_code: string;
+    notes?: string;
   };
   compliance: PersonComplianceSection;
   enrollments_current_year: PlanEnrollment[];
@@ -366,6 +372,17 @@ export interface PersonProfile {
   history_by_year: PersonHistoryYearRow[];
   skill_areas: PersonSkillArea[];
   suggestions: PersonSuggestion[];
+}
+
+export type PersonStatus = 'active' | 'on_leave' | 'terminated';
+
+export interface PersonUpdateInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  status: PersonStatus;
+  teamId: string | null;
+  notes?: string;
 }
 
 export interface JobRunResponse {

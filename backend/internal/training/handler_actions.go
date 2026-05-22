@@ -238,6 +238,28 @@ func (h *handler) handlePersonProfile(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, profile)
 }
 
+func (h *handler) handleUpdatePerson(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	id := r.PathValue("id")
+	if strings.TrimSpace(id) == "" {
+		h.writeActionError(w, r, validationError("missing_id", "id persona obbligatorio"), "training.update_person")
+		return
+	}
+	input, ok := decodeJSONBody[PersonUpdateInput](w, r)
+	if !ok {
+		return
+	}
+	response, err := h.store.UpdatePerson(r.Context(), principal, id, input)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.update_person")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, response)
+}
+
 func (h *handler) handlePeopleDirectory(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.principalOrUnauthorized(w, r)
 	if !ok {

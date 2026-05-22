@@ -12,6 +12,7 @@ import type {
   PlanEnrollment,
 } from '../api/types';
 import { EnrollmentDrawer } from '../components/EnrollmentDrawer';
+import { PersonEditModal } from '../components/PersonEditModal';
 import { classifyAlertLevel } from '../lib/alertLevel';
 import styles from './PersonPage.module.css';
 
@@ -55,6 +56,7 @@ export function PersonPage({ isPeopleAdmin }: PersonPageProps) {
   const createEnrollment = useCreateEnrollment(isPeopleAdmin);
   const { toast } = useToast();
   const [openEnrollmentId, setOpenEnrollmentId] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const data = profile.data;
 
@@ -120,7 +122,12 @@ export function PersonPage({ isPeopleAdmin }: PersonPageProps) {
             </p>
           </div>
         </div>
-        <Link to="/persone" className={styles.backLink}>← Directory</Link>
+        <div className={styles.heroActions}>
+          <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
+            Modifica
+          </Button>
+          <Link to="/persone" className={styles.backLink}>← Directory</Link>
+        </div>
       </header>
 
       <div className={styles.grid}>
@@ -133,6 +140,12 @@ export function PersonPage({ isPeopleAdmin }: PersonPageProps) {
       </div>
 
       <EnrollmentDrawer enrollment={openEnrollment} isPeopleAdmin={isPeopleAdmin} onClose={() => setOpenEnrollmentId(null)} />
+      <PersonEditModal
+        open={editOpen}
+        profile={data}
+        teams={lookups.data?.teams ?? []}
+        onClose={() => setEditOpen(false)}
+      />
     </main>
   );
 }

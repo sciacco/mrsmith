@@ -90,6 +90,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("POST /training/v1/people/enrollments/bulk-transition", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleBulkTransitionEnrollment)))))
 	mux.Handle("POST /training/v1/people/enrollments/bulk-assign", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleBulkAssignEnrollment)))))
 	mux.Handle("GET /training/v1/people/directory", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handlePeopleDirectory)))))
+	mux.Handle("PATCH /training/v1/people/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdatePerson)))))
 	mux.Handle("GET /training/v1/people/{id}/profile", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handlePersonProfile)))))
 	mux.Handle("GET /training/v1/people/overview", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleOverview)))))
 	mux.Handle("POST /training/v1/people/documents/{id}/validate", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleValidateDocument)))))

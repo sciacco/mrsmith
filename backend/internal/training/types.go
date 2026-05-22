@@ -315,10 +315,16 @@ type BulkAssignResponse struct {
 }
 
 type PersonIdentityMin struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	TeamCode string `json:"team_code"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Email     string `json:"email"`
+	Status    string `json:"status"`
+	TeamID    string `json:"team_id,omitempty"`
+	TeamName  string `json:"team_name,omitempty"`
+	TeamCode  string `json:"team_code"`
+	Notes     string `json:"notes,omitempty"`
 }
 
 type PersonComplianceMandatoryRule struct {
@@ -404,6 +410,15 @@ type PersonProfile struct {
 	HistoryByYear          []PersonHistoryYearRow  `json:"history_by_year"`
 	SkillAreas             []PersonSkillArea       `json:"skill_areas"`
 	Suggestions            []PersonSuggestion      `json:"suggestions"`
+}
+
+type PersonUpdateInput struct {
+	FirstName string  `json:"firstName"`
+	LastName  string  `json:"lastName"`
+	Email     string  `json:"email"`
+	Status    string  `json:"status"`
+	TeamID    *string `json:"teamId"`
+	Notes     string  `json:"notes,omitempty"`
 }
 
 type BulkEnrollmentTransitionInput struct {

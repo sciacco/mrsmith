@@ -58,6 +58,13 @@
 
 .heroCritical { color: #b91c1c; font-weight: 600; }
 
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
 .backLink {
   color: var(--color-text-muted);
   text-decoration: none;
@@ -285,4 +292,39 @@
 .suggestionCourse {
   color: var(--color-text-muted);
   font-size: 0.8125rem;
+}
+
+@media (max-width: 720px) {
+  .hero {
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .heroLeft {
+    min-width: 0;
+  }
+
+  .heroActions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .hero {
+    position: static;
+    flex-direction: column;
+  }
+
+  .heroActions {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .heroState {
+    gap: 0.5rem;
+  }
 }

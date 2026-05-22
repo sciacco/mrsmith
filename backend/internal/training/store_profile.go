@@ -52,8 +52,14 @@ func (s *SQLStore) personIdentity(ctx context.Context, employeeID string) (Perso
 SELECT
   e.id::text,
   e.last_name || ' ' || e.first_name,
+  e.first_name,
+  e.last_name,
   e.email::text,
-  COALESCE(t.code, '')
+  e.status::text,
+  COALESCE(t.id::text, ''),
+  COALESCE(t.name, ''),
+  COALESCE(t.code, ''),
+  COALESCE(e.notes, '')
 FROM training.employee e
 LEFT JOIN training.team_membership tm
   ON tm.employee_id = e.id
@@ -61,9 +67,21 @@ LEFT JOIN training.team_membership tm
   AND (tm.end_date IS NULL OR tm.end_date >= now())
 LEFT JOIN training.team t ON t.id = tm.team_id
 WHERE e.id = $1::uuid
+ORDER BY tm.start_date DESC NULLS LAST, tm.created_at DESC NULLS LAST
 LIMIT 1`
 	var identity PersonIdentityMin
-	err := s.db.QueryRowContext(ctx, q, employeeID).Scan(&identity.ID, &identity.Name, &identity.Email, &identity.TeamCode)
+	err := s.db.QueryRowContext(ctx, q, employeeID).Scan(
+		&identity.ID,
+		&identity.Name,
+		&identity.FirstName,
+		&identity.LastName,
+		&identity.Email,
+		&identity.Status,
+		&identity.TeamID,
+		&identity.TeamName,
+		&identity.TeamCode,
+		&identity.Notes,
+	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return identity, notFoundError("employee_not_found", "persona non trovata")
 	}

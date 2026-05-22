@@ -179,6 +179,240 @@ func boolValue(value *bool, fallback bool) bool {
 	return *value
 }
 
+type normalizedPersonUpdate struct {
+	FirstName string
+	LastName  string
+	Email     string
+	Status    string
+	TeamID    string
+	Notes     string
+}
+
+type activeTeamMembership struct {
+	ID     string
+	TeamID string
+}
+
+func normalizePersonUpdateInput(input PersonUpdateInput) (normalizedPersonUpdate, error) {
+	teamID := ""
+	if input.TeamID != nil {
+		teamID = strings.TrimSpace(*input.TeamID)
+	}
+	normalized := normalizedPersonUpdate{
+		FirstName: strings.Join(strings.Fields(strings.TrimSpace(input.FirstName)), " "),
+		LastName:  strings.Join(strings.Fields(strings.TrimSpace(input.LastName)), " "),
+		Email:     normalizeEmail(input.Email),
+		Status:    strings.TrimSpace(input.Status),
+		TeamID:    teamID,
+		Notes:     strings.TrimSpace(input.Notes),
+	}
+	if normalized.FirstName == "" || normalized.LastName == "" || normalized.Email == "" || normalized.Status == "" {
+		return normalized, validationError("person_required_fields_missing", "nome, cognome, email e stato sono obbligatori")
+	}
+	if !validImportEmail(normalized.Email) {
+		return normalized, validationError("person_email_invalid", "email persona non valida")
+	}
+	if !validPersonStatus(normalized.Status) {
+		return normalized, validationError("person_status_invalid", "stato persona non supportato")
+	}
+	return normalized, nil
+}
+
+func validPersonStatus(status string) bool {
+	switch status {
+	case "active", "on_leave", "terminated":
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *SQLStore) ensurePersonEmailAvailable(ctx context.Context, q sqlRunner, employeeID string, email string) error {
+	var duplicateID string
+	err := q.QueryRowContext(ctx, `
+SELECT id::text
+FROM training.employee
+WHERE email = $1
+  AND id <> $2::uuid
+LIMIT 1`, email, employeeID).Scan(&duplicateID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("check training employee email: %w", err)
+	}
+	return validationError("person_email_duplicate", "email gia assegnata a un'altra persona")
+}
+
+func (s *SQLStore) ensureTeamSelectable(ctx context.Context, q sqlRunner, teamID string) error {
+	if teamID == "" {
+		return nil
+	}
+	var active bool
+	err := q.QueryRowContext(ctx, `
+SELECT is_active
+FROM training.team
+WHERE id = $1::uuid`, teamID).Scan(&active)
+	if errors.Is(err, sql.ErrNoRows) {
+		return validationError("team_not_found", "team non trovato")
+	}
+	if err != nil {
+		return fmt.Errorf("check training team: %w", err)
+	}
+	if !active {
+		return validationError("team_inactive", "team non attivo")
+	}
+	return nil
+}
+
+func (s *SQLStore) activeTeamMemberships(ctx context.Context, q sqlRunner, employeeID string) ([]activeTeamMembership, error) {
+	rows, err := q.QueryContext(ctx, `
+SELECT id::text, team_id::text
+FROM training.team_membership
+WHERE employee_id = $1::uuid
+  AND start_date <= now()
+  AND (end_date IS NULL OR end_date >= now())
+ORDER BY start_date DESC, created_at DESC, id`, employeeID)
+	if err != nil {
+		return nil, fmt.Errorf("list active training team memberships: %w", err)
+	}
+	defer rows.Close()
+
+	memberships := make([]activeTeamMembership, 0)
+	for rows.Next() {
+		var membership activeTeamMembership
+		if err := rows.Scan(&membership.ID, &membership.TeamID); err != nil {
+			return nil, fmt.Errorf("scan active training team membership: %w", err)
+		}
+		memberships = append(memberships, membership)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return memberships, nil
+}
+
+func membershipReplacementNeeded(active []activeTeamMembership, selectedTeamID string) bool {
+	if selectedTeamID == "" {
+		return len(active) > 0
+	}
+	return len(active) != 1 || active[0].TeamID != selectedTeamID
+}
+
+func (s *SQLStore) UpdatePerson(ctx context.Context, principal Principal, employeeID string, input PersonUpdateInput) (ActionResponse, error) {
+	if !principal.IsPeopleAdmin {
+		return ActionResponse{}, forbiddenError("people_role_required", "azione riservata a People")
+	}
+	employeeID = strings.TrimSpace(employeeID)
+	if employeeID == "" {
+		return ActionResponse{}, validationError("missing_id", "id persona obbligatorio")
+	}
+	normalized, err := normalizePersonUpdateInput(input)
+	if err != nil {
+		return ActionResponse{}, err
+	}
+
+	var response ActionResponse
+	err = s.withTx(ctx, func(tx *sql.Tx) error {
+		beforeEmployee, err := entitySnapshot(ctx, tx, "employee", employeeID)
+		if appErr, ok := asAppError(err); ok && appErr.code == "entity_not_found" {
+			return notFoundError("employee_not_found", "persona non trovata")
+		}
+		if err != nil {
+			return err
+		}
+		if err := s.ensurePersonEmailAvailable(ctx, tx, employeeID, normalized.Email); err != nil {
+			return err
+		}
+		if err := s.ensureTeamSelectable(ctx, tx, normalized.TeamID); err != nil {
+			return err
+		}
+
+		activeMemberships, err := s.activeTeamMemberships(ctx, tx, employeeID)
+		if err != nil {
+			return err
+		}
+		replaceMembership := membershipReplacementNeeded(activeMemberships, normalized.TeamID)
+
+		const updateEmployee = `
+UPDATE training.employee
+SET first_name = $2,
+    last_name = $3,
+    email = $4,
+    status = $5::training.employee_status,
+    notes = NULLIF($6, ''),
+    updated_at = now()
+WHERE id = $1::uuid
+RETURNING id::text, status::text`
+		if err := tx.QueryRowContext(
+			ctx,
+			updateEmployee,
+			employeeID,
+			normalized.FirstName,
+			normalized.LastName,
+			normalized.Email,
+			normalized.Status,
+			normalized.Notes,
+		).Scan(&response.ID, &response.Status); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return notFoundError("employee_not_found", "persona non trovata")
+			}
+			if isUniqueViolation(err, "") {
+				return validationError("person_email_duplicate", "email gia assegnata a un'altra persona")
+			}
+			return fmt.Errorf("update training employee: %w", err)
+		}
+		afterEmployee, err := entitySnapshot(ctx, tx, "employee", employeeID)
+		if err != nil {
+			return err
+		}
+		if err := s.audit(ctx, tx, principal, "employee", employeeID, "update", beforeEmployee, afterEmployee); err != nil {
+			return err
+		}
+
+		if replaceMembership {
+			for _, membership := range activeMemberships {
+				beforeMembership, err := entitySnapshot(ctx, tx, "team_membership", membership.ID)
+				if err != nil {
+					return err
+				}
+				if _, err := tx.ExecContext(ctx, `
+UPDATE training.team_membership
+SET end_date = now()
+WHERE id = $1::uuid`, membership.ID); err != nil {
+					return fmt.Errorf("close training team membership: %w", err)
+				}
+				afterMembership, err := entitySnapshot(ctx, tx, "team_membership", membership.ID)
+				if err != nil {
+					return err
+				}
+				if err := s.audit(ctx, tx, principal, "team_membership", membership.ID, "close", beforeMembership, afterMembership); err != nil {
+					return err
+				}
+			}
+			if normalized.TeamID != "" {
+				var membershipID string
+				if err := tx.QueryRowContext(ctx, `
+INSERT INTO training.team_membership (employee_id, team_id, start_date)
+VALUES ($1::uuid, $2::uuid, now())
+RETURNING id::text`, employeeID, normalized.TeamID).Scan(&membershipID); err != nil {
+					return fmt.Errorf("create training team membership: %w", err)
+				}
+				afterMembership, err := entitySnapshot(ctx, tx, "team_membership", membershipID)
+				if err != nil {
+					return err
+				}
+				if err := s.audit(ctx, tx, principal, "team_membership", membershipID, "create", nil, afterMembership); err != nil {
+					return err
+				}
+			}
+		}
+		response.OK = true
+		return nil
+	})
+	return response, err
+}
+
 func (s *SQLStore) CreateEnrollment(ctx context.Context, principal Principal, input EnrollmentInput) (ActionResponse, error) {
 	if !principal.IsPeopleAdmin {
 		return ActionResponse{}, forbiddenError("people_role_required", "azione riservata a People")
