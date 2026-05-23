@@ -47,6 +47,9 @@ const (
 	QuotesAppID   = "proposte"
 	QuotesAppHref = "/apps/quotes/"
 
+	OrdiniAppID   = "ordini"
+	OrdiniAppHref = "/apps/ordini/"
+
 	SimulatoriVenditaAppID   = "simulatori-vendita"
 	SimulatoriVenditaAppHref = "/apps/simulatori-vendita/"
 
@@ -84,6 +87,8 @@ var (
 	panoramicaAccessRoles            = []string{"app_panoramica_access"}
 	quotesAccessRoles                = []string{"app_quotes_access"}
 	quotesDeleteRoles                = []string{"app_quotes_delete"}
+	ordiniAccessRoles                = []string{"app_ordini_access"}
+	customerRelationsRoles           = []string{"app_customer_relations"}
 	simulatoriVenditaAccessRoles     = []string{"app_simulatorivendita_access"}
 	richiesteFattibilitaAccessRoles  = []string{"app_rdf_access", "app_rdf_manager"}
 	richiesteFattibilitaManagerRoles = []string{"app_rdf_manager"}
@@ -205,6 +210,17 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryID:    "mkt-sales",
 			CategoryTitle: "MKT&Sales",
 			AccessRoles:   QuotesAccessRoles(),
+		},
+		{
+			ID:            OrdiniAppID,
+			Name:          "Ordini",
+			Description:   "Gestione ordini cliente, righe e documenti.",
+			Icon:          "document",
+			Href:          OrdiniAppHref,
+			Status:        "test",
+			CategoryID:    "mkt-sales",
+			CategoryTitle: "MKT&Sales",
+			AccessRoles:   OrdiniAccessRoles(),
 		},
 		{
 			ID:            SimulatoriVenditaAppID,
@@ -509,6 +525,14 @@ func QuotesDeleteRoles() []string {
 	return slices.Clone(quotesDeleteRoles)
 }
 
+func OrdiniAccessRoles() []string {
+	return slices.Clone(ordiniAccessRoles)
+}
+
+func CustomerRelationsRoles() []string {
+	return slices.Clone(customerRelationsRoles)
+}
+
 func SimulatoriVenditaAccessRoles() []string {
 	return slices.Clone(simulatoriVenditaAccessRoles)
 }
@@ -563,6 +587,8 @@ func AllRoles() []string {
 		panoramicaAccessRoles,
 		quotesAccessRoles,
 		quotesDeleteRoles,
+		ordiniAccessRoles,
+		customerRelationsRoles,
 		simulatoriVenditaAccessRoles,
 		richiesteFattibilitaAccessRoles,
 		richiesteFattibilitaManagerRoles,

@@ -16,6 +16,7 @@
     "dev:training": "pnpm --filter mrsmith-training dev",
     "dev:panoramica": "pnpm --filter mrsmith-panoramica-cliente dev",
     "dev:quotes": "pnpm --filter mrsmith-quotes dev",
+    "dev:ordini": "pnpm --filter mrsmith-ordini dev",
     "dev:richieste-fattibilita": "pnpm --filter mrsmith-richieste-fattibilita dev",
     "dev:rdf-backend": "pnpm --filter mrsmith-rdf-backend dev",
     "dev:reports": "pnpm --filter mrsmith-reports dev",

@@ -39,6 +39,7 @@ type Config struct {
 	TrainingAppURL             string
 	PanoramicaAppURL           string
 	QuotesAppURL               string
+	OrdiniAppURL               string
 	RichiesteFattibilitaAppURL string
 	RDFBackendAppURL           string
 	ReportsAppURL              string
@@ -162,7 +163,7 @@ func Load() Config {
 		Port:                         envOr("PORT", "8080"),
 		LogLevel:                     envOr("LOG_LEVEL", "info"),
 		KeycloakIssuerURL:            keycloakIssuerURL,
-		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185,http://localhost:5186,http://localhost:5187,http://localhost:5188,http://localhost:5189,http://localhost:5190,http://localhost:5191"),
+		CORSOrigins:                  envOr("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183,http://localhost:5184,http://localhost:5185,http://localhost:5186,http://localhost:5187,http://localhost:5188,http://localhost:5189,http://localhost:5190,http://localhost:5191,http://localhost:5192"),
 		StaticDir:                    envOr("STATIC_DIR", ""),
 		IncludeDevApps:               boolEnvOr("INCLUDE_DEV_APPS", false),
 		BudgetAppURL:                 envOr("BUDGET_APP_URL", ""),
@@ -178,6 +179,7 @@ func Load() Config {
 		TrainingAppURL:               envOr("TRAINING_APP_URL", ""),
 		PanoramicaAppURL:             envOr("PANORAMICA_APP_URL", ""),
 		QuotesAppURL:                 envOr("QUOTES_APP_URL", ""),
+		OrdiniAppURL:                 envOr("ORDINI_APP_URL", ""),
 		RichiesteFattibilitaAppURL:   envOr("RICHIESTE_FATTIBILITA_APP_URL", ""),
 		RDFBackendAppURL:             envOr("RDF_BACKEND_APP_URL", ""),
 		ReportsAppURL:                envOr("REPORTS_APP_URL", ""),
@@ -224,10 +226,10 @@ func Load() Config {
 			90,
 		),
 		DiagnosticEventsQueueSize: positiveIntEnvOr("DIAGNOSTIC_EVENTS_QUEUE_SIZE", 1000),
-		TrainingStorageDir:       envOr("TRAINING_STORAGE_DIR", ""),
-		TrainingStorageMaxBytes:  int64(positiveIntEnvOr("TRAINING_STORAGE_MAX_BYTES", 20*1024*1024)),
-		TrainingJobsEnabled:      boolEnvOr("TRAINING_JOBS_ENABLED", false),
-		TrainingJobsInterval:     durationEnvOr("TRAINING_JOBS_INTERVAL", 6*time.Hour),
+		TrainingStorageDir:        envOr("TRAINING_STORAGE_DIR", ""),
+		TrainingStorageMaxBytes:   int64(positiveIntEnvOr("TRAINING_STORAGE_MAX_BYTES", 20*1024*1024)),
+		TrainingJobsEnabled:       boolEnvOr("TRAINING_JOBS_ENABLED", false),
+		TrainingJobsInterval:      durationEnvOr("TRAINING_JOBS_INTERVAL", 6*time.Hour),
 
 		KeycloakFrontendURL:      keycloakFrontendURL,
 		KeycloakFrontendRealm:    keycloakFrontendRealm,

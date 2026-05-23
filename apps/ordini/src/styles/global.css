@@ -1,0 +1,103 @@
+@import '@mrsmith/ui/src/themes/clean.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  color-scheme: light;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--color-text);
+  background:
+    radial-gradient(circle at top left, rgba(99, 91, 255, 0.06), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+::selection {
+  color: var(--color-text);
+  background: var(--color-accent-muted);
+}
+
+.navRow {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+
+.fatal {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--space-8);
+}
+
+.fatal section {
+  max-width: 40rem;
+  border: 1px solid var(--color-danger-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  color: var(--color-danger-hover);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes rowEnter {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes sectionEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -282,14 +282,19 @@ Non assumere copy automatica `apps/*/dist`: il Dockerfile attuale copia ogni app
 
 ### Env/config fit
 
-Nessun nuovo env URL per la mini-app.
+Ordini è una SPA interna servita dal backend come Quotes/RDA in produzione, con override env opzionale allineato alla convenzione delle altre 19 mini-app:
 
-Ordini è una SPA interna servita dal backend come Quotes/RDA in produzione:
+- catalog href prod/static: `/apps/ordini/` (default da `applaunch.OrdiniAppHref`);
+- override esplicito: `ORDINI_APP_URL` (vuoto in produzione, valorizzabile per scenari custom);
+- split-server dev (`cfg.StaticDir == ""`) e `ORDINI_APP_URL` vuoto: `backend/cmd/server/main.go` imposta href launcher a `http://localhost:5192`.
 
-- catalog href prod/static: `/apps/ordini/`;
-- split-server dev: `backend/cmd/server/main.go` imposta direttamente l'href launcher a `http://localhost:5192` quando `cfg.StaticDir == ""`.
+Il pattern segue lo stesso `if/else if` usato per Budget/Fornitori/RDA/.../AFCTools in `main.go:339-429`. Verificato in `backend/internal/platform/config/config.go:29-46` + `168-185` che tutte e 19 le mini-app interne dichiarano il proprio `*AppURL` field + env loader; Ordini si allinea per coerenza ops/devops.
 
-Non aggiungere `ORDINI_APP_URL` in v1: sarebbe solo un override non necessario per un'app interna con mount e porta decisi. Se in futuro Ordini venisse hostata fuori dal backend, si aggiungerà allora un override esplicito.
+Nuovo env:
+
+```bash
+ORDINI_APP_URL=
+```
 
 Env riusati:
 
@@ -975,26 +980,43 @@ Save gated CR + `BOZZA/INVIATO`.
 ### Backend
 
 1. `backend/internal/platform/applaunch/catalog.go`
-   - `OrdiniAppID`
-   - `OrdiniAppHref`
-   - `ordiniAccessRoles`
-   - eventuale helper `CustomerRelationsRoles()` se non esiste posizione migliore
-   - catalog entry MKT&Sales
-   - `AllRoles()` include `app_ordini_access` e `app_customer_relations`
+   - costanti: `OrdiniAppID = "ordini"`, `OrdiniAppHref = "/apps/ordini/"`
+   - due slice package-level **separate**:
+     ```go
+     ordiniAccessRoles      = []string{"app_ordini_access"}
+     customerRelationsRoles = []string{"app_customer_relations"}
+     ```
+   - due getter pubblici seguendo il pattern di `QuotesAccessRoles()` / `QuotesDeleteRoles()`:
+     ```go
+     func OrdiniAccessRoles() []string      { return ordiniAccessRoles }
+     func CustomerRelationsRoles() []string { return customerRelationsRoles }
+     ```
+   - catalog entry in categoria MKT&Sales, `AccessRoles: OrdiniAccessRoles()` (solo l'access role; CR è capability orthogonal, non un access role)
+   - `AllRoles()` `groups`: aggiungere `ordiniAccessRoles` **e** `customerRelationsRoles` come gruppi separati. Motivo: convenzione esistente per ruoli capability (es. `quotesDeleteRoles`, `trainingPeopleAdminRoles`, `manutenzioniManagerRoles`) che vivono fianco a fianco con i propri access roles in `groups`.
+   - **Non** accorpare CR dentro `ordiniAccessRoles`: rompe la semantica del campo `AccessRoles` nel catalogo e rende il ruolo non riusabile da future app.
 
 2. `backend/internal/platform/config/config.go`
+   - aggiungere campo `OrdiniAppURL string` (allineato alfabeticamente/per-app con gli altri `*AppURL`)
+   - aggiungere loader `OrdiniAppURL: envOr("ORDINI_APP_URL", "")`
    - CORS default include `http://localhost:5192`
-   - nessun `OrdiniAppURL`/`ORDINI_APP_URL` in v1
+   - Motivazione: tutte e 19 le mini-app interne attuali hanno il proprio `*_APP_URL` env override (verificato in `config.go:29-46` + `168-185`). Ordini si allinea alla convenzione per coerenza ops/devops.
 
 3. `backend/cmd/server/main.go`
    - import `ordini`
-   - split-server dev: se `cfg.StaticDir == ""`, href launcher `http://localhost:5192`
-   - prod/static: catalog href resta `applaunch.OrdiniAppHref` (`/apps/ordini/`)
-   - catalog filter per Vodka missing
+   - aggiungere il blocco standard allineato agli altri 19 app (vedi `main.go:339-429`):
+     ```go
+     if cfg.OrdiniAppURL != "" {
+         hrefOverrides[applaunch.OrdiniAppID] = cfg.OrdiniAppURL
+     } else if cfg.StaticDir == "" {
+         hrefOverrides[applaunch.OrdiniAppID] = "http://localhost:5192"
+     }
+     ```
+   - catalog filter per Vodka missing (`cfg.VodkaDSN == ""` → skip definition)
    - `ordini.RegisterRoutes(api, ordini.Deps{...})`
 
 4. Env examples
-   - non aggiungere `ORDINI_APP_URL`
+   - `backend/.env.example`: aggiungere `ORDINI_APP_URL=` (stile esistente, commentato o vuoto come gli altri)
+   - `.env.preprod.example`: aggiungere `ORDINI_APP_URL=`
    - verificare che gli env riusati (`VODKA_DSN`, `ALYANTE_DSN`, `MISTRA_DSN`, `ARAK_*`) siano documentati dove necessario
 
 5. `deploy/Dockerfile`
@@ -1002,11 +1024,19 @@ Save gated CR + `BOZZA/INVIATO`.
 
 ### Frontend/workspace
 
-1. `apps/ordini/package.json`.
+1. `apps/ordini/package.json` con `"name": "mrsmith-ordini"` (allineato a `mrsmith-quotes`, `mrsmith-rda`, `mrsmith-training`).
 2. `apps/ordini/vite.config.ts`.
-3. `packages/auth-client/src/roles.ts`.
+3. `packages/auth-client/src/roles.ts`: aggiungere `ordini: ['app_ordini_access']` in `APP_ACCESS_ROLES`. **Non** includere `app_customer_relations`: l'app gate frontend deve restare solo sull'access role, altrimenti un futuro utente solo-CR senza access role passerebbe il gate e vedrebbe un'app vuota perché ogni read base richiede `app_ordini_access`. CR resta enforced dai singoli action handler backend.
 4. Root `package.json` script `dev:ordini`.
 5. `Makefile` target `dev-ordini`.
+
+### Impatto collaterale di `customerRelationsRoles` in `AllRoles()`
+
+Verificato che `AllRoles()` ha un solo caller in tutto il backend: `backend/internal/auth/middleware.go:87`, dentro `resolveNoopRoles()`, attivo solo in dev (NoopMiddleware).
+
+Effetto osservabile: in `make dev` il fake user `john.doe@acme.com` ottiene automaticamente `app_customer_relations` e quindi esercita anche le UI/endpoint elevati senza setup extra. È il comportamento già usato per ruoli analoghi come `app_training_people_admin`, `app_rdf_manager`, `app_cpbackoffice_biometric_access`.
+
+Nessun impatto in prod (`AllRoles()` non viene chiamato lì; il ruolo `app_customer_relations` va comunque creato lato Keycloak per gli ambienti reali, come per qualunque nuovo `app_*` ruolo). `catalog_test.go` continua a passare perché itera `definition.AccessRoles`, che NON contiene CR.
 
 ---
 

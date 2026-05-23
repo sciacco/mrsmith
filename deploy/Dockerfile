@@ -31,6 +31,7 @@ COPY --from=frontend /app/apps/manutenzioni/dist /static/apps/manutenzioni
 COPY --from=frontend /app/apps/training/dist /static/apps/training
 COPY --from=frontend /app/apps/panoramica-cliente/dist /static/apps/panoramica-cliente
 COPY --from=frontend /app/apps/quotes/dist /static/apps/quotes
+COPY --from=frontend /app/apps/ordini/dist /static/apps/ordini
 COPY --from=frontend /app/apps/richieste-fattibilita/dist /static/apps/richieste-fattibilita
 COPY --from=frontend /app/apps/rdf-backend/dist /static/apps/rdf-backend
 COPY --from=frontend /app/apps/reports/dist /static/apps/reports

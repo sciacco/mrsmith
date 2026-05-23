@@ -1,0 +1,246 @@
+.page {
+  display: grid;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: var(--space-6);
+  animation: pageEnter 0.5s var(--ease-out) both;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.pageHeader h1 {
+  color: var(--color-text);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.18;
+}
+
+.pageHeader p {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.surface {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, var(--color-surface) 12%);
+}
+
+.search {
+  flex: 1 1 24rem;
+  min-width: 16rem;
+}
+
+.selectWrap {
+  flex: 0 0 12.5rem;
+  min-width: 0;
+}
+
+.resetButton {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-accent-hover);
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.resetButton:hover,
+.resetButton:focus-visible {
+  background: var(--color-accent-subtle);
+  outline: none;
+}
+
+.tableMeta {
+  padding: var(--space-3) var(--space-4) 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tableScroll {
+  min-width: 0;
+  overflow: auto;
+  padding-top: var(--space-3);
+}
+
+.ordersTable {
+  width: 100%;
+  min-width: 92rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+.ordersTable th {
+  padding: var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ordersTable td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  vertical-align: middle;
+}
+
+.ordersTable tbody tr {
+  animation: rowEnter 0.4s var(--ease-out) both;
+  cursor: default;
+}
+
+.ordersTable tbody tr:hover {
+  background: color-mix(in srgb, var(--color-accent-subtle) 74%, #fff 26%);
+}
+
+.ordersTable small {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.codeCell {
+  color: var(--color-accent-hover);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.customerCell {
+  max-width: 18rem;
+  color: var(--color-text);
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.sortButton:hover,
+.sortButton:focus-visible,
+.sortButtonActive {
+  color: var(--color-text);
+  outline: none;
+}
+
+.sortButton span {
+  color: var(--color-text-muted);
+  font-size: 0.625rem;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.stateBox {
+  display: grid;
+  place-items: center;
+  gap: var(--space-2);
+  min-height: 18rem;
+  padding: var(--space-12) var(--space-8);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.stateBox strong {
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.stateBox p {
+  max-width: 28rem;
+  font-size: 0.8125rem;
+}
+
+.emptyIcon,
+.errorIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-xl);
+  color: var(--color-text-faint);
+  background: var(--color-surface);
+}
+
+.errorIcon {
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding: var(--space-4);
+  }
+
+  .pageHeader,
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .search,
+  .selectWrap {
+    flex-basis: auto;
+    width: 100%;
+    min-width: 0;
+  }
+}

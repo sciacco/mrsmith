@@ -29,6 +29,7 @@ export const APP_ACCESS_ROLES = {
   manutenzioni: ['app_manutenzioni_access'],
   'panoramica-cliente': ['app_panoramica_access'],
   quotes: ['app_quotes_access'],
+  ordini: ['app_ordini_access'],
   'simulatori-vendita': ['app_simulatorivendita_access'],
   'richieste-fattibilita': ['app_rdf_access', 'app_rdf_manager'],
   'rdf-backend': ['app_rdf_backend_access'],

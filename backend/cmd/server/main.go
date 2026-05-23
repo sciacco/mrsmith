@@ -28,6 +28,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/listini"
 	"github.com/sciacco/mrsmith/internal/manutenzioni"
 	"github.com/sciacco/mrsmith/internal/notifications"
+	"github.com/sciacco/mrsmith/internal/ordini"
 	"github.com/sciacco/mrsmith/internal/panoramica"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
@@ -402,6 +403,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.QuotesAppID] = "http://localhost:5179"
 	}
+	if cfg.OrdiniAppURL != "" {
+		hrefOverrides[applaunch.OrdiniAppID] = cfg.OrdiniAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.OrdiniAppID] = "http://localhost:5192"
+	}
 	if cfg.RichiesteFattibilitaAppURL != "" {
 		hrefOverrides[applaunch.RichiesteFattibilitaAppID] = cfg.RichiesteFattibilitaAppURL
 	} else if cfg.StaticDir == "" {
@@ -465,6 +471,9 @@ func main() {
 				continue
 			}
 			if definition.ID == applaunch.QuotesAppID && cfg.MistraDSN == "" {
+				continue
+			}
+			if definition.ID == applaunch.OrdiniAppID && cfg.VodkaDSN == "" {
 				continue
 			}
 			if definition.ID == applaunch.RichiesteFattibilitaAppID && (cfg.AnisettaDSN == "" || cfg.MistraDSN == "") {
@@ -536,6 +545,13 @@ func main() {
 		Vodka:   vodkaDB,
 		Alyante: alyanteDB,
 		HubSpot: hubspotCli,
+		Arak:    arakCli,
+		Logger:  logger,
+	})
+	ordini.RegisterRoutes(api, ordini.Deps{
+		Vodka:   vodkaDB,
+		Alyante: alyanteDB,
+		Mistra:  mistraDB,
 		Arak:    arakCli,
 		Logger:  logger,
 	})
