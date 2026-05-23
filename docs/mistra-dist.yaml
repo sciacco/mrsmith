@@ -1,12 +1,12 @@
 openapi: 3.0.9
 info:
-  version: 2.10.6
+  version: 2.10.7
   title: Mistra NG Internal API
   license:
     name: CDLAN
     url: https://www.cdlan.it
   description: |
-    # Mistra NG Internal API Reference Build: 2.10.6
+    # Mistra NG Internal API Reference Build: 2.10.7
 servers:
   - url: /
 security:
@@ -6095,11 +6095,11 @@ components:
       type: object
       required:
         - resource
-        - access_type
+        - action
       properties:
         resource:
           type: string
-        access_type:
+        action:
           type: string
     customer-group:
       type: object
@@ -9803,8 +9803,8 @@ components:
             required:
               - message
             properties:
-                type: string
               message:
+                type: string
                 description: text description
           example:
             message: Internal server error

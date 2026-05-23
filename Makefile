@@ -135,8 +135,11 @@ clean:                ## Pulisci artefatti
 tidy:                 ## go mod tidy
 	cd backend && go mod tidy
 
+update-mistra-api:    ## Scarica e aggiorna la specifica Mistra API da remoto
+	./scripts/update-mistra-dist.sh
+
 help:                 ## Mostra questo help
 	@grep -h -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget dev-fornitori dev-rda dev-compliance dev-kit-products dev-listini dev-manutenzioni dev-training dev-panoramica dev-quotes dev-richieste-fattibilita dev-rdf-backend dev-reports dev-coperture dev-energia-dc dev-simulatori-vendita dev-afc-tools dev-cp-backoffice build build-frontend build-backend docker-build docker-build-amd64 package-prod-amd64 deploy-prod rollback-prod test test-backend test-frontend lint lint-backend lint-frontend clean tidy help
+.PHONY: install bootstrap dev dev-docker dev-backend dev-portal dev-budget dev-fornitori dev-rda dev-compliance dev-kit-products dev-listini dev-manutenzioni dev-training dev-panoramica dev-quotes dev-richieste-fattibilita dev-rdf-backend dev-reports dev-coperture dev-energia-dc dev-simulatori-vendita dev-afc-tools dev-cp-backoffice build build-frontend build-backend docker-build docker-build-amd64 package-prod-amd64 deploy-prod rollback-prod test test-backend test-frontend lint lint-backend lint-frontend clean tidy update-mistra-api help
 .DEFAULT_GOAL := help
