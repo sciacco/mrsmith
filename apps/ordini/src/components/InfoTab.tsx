@@ -62,7 +62,7 @@ export function InfoTab({
         <div className={styles.factGrid}>
           <Field label="Tipo documento" value={formatTipoDoc(order.cdlan_tipodoc)} />
           <Field label="Tipo proposta" value={formatTipoProposta(order.cdlan_tipo_ord)} />
-          <Field label="System ODV" value={order.cdlan_systemodv} mono />
+          <Field label="ODV" value={order.cdlan_systemodv} mono />
           <Field label="Commerciale" value={order.cdlan_commerciale} />
           <Field label="Durata rinnovo" value={formatDurRin(order.cdlan_dur_rin)} />
           <Field label="Fatturazione canoni" value={formatFatturazione(order.cdlan_int_fatturazione)} />

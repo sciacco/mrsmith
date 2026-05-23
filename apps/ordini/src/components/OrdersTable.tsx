@@ -1,6 +1,6 @@
 import { Button, Icon } from '@mrsmith/ui';
 import type { OrderSummary } from '../api/types';
-import { formatDate, formatServiceTypes, formatSiNo, formatTipoDoc, formatTipoProposta, orderCode } from '../lib/formatters';
+import { formatDate, formatEmpty, formatServiceTypes, formatSiNo, formatTipoDoc, formatTipoProposta, orderCode } from '../lib/formatters';
 import { StatusBadge } from './StatusBadge';
 import styles from '../pages/OrderListPage.module.css';
 
@@ -21,17 +21,24 @@ export function OrdersTable({ rows, sortKey, sortDirection, onSort, onOpen }: Or
       <table className={styles.ordersTable}>
         <thead>
           <tr>
-            <th>{header('code', 'Codice ordine', sortKey, sortDirection, onSort)}</th>
-            <th>{header('customer', 'Ragione sociale', sortKey, sortDirection, onSort)}</th>
+            <th>{header('code', 'Codice', sortKey, sortDirection, onSort, 'Ordine')}</th>
+            <th className={styles.tabletOptional}>ODV</th>
+            <th>{header('customer', 'Cliente', sortKey, sortDirection, onSort)}</th>
             <th>{header('state', 'Stato', sortKey, sortDirection, onSort)}</th>
-            <th>{header('date', 'Data proposta', sortKey, sortDirection, onSort)}</th>
-            <th>Tipo documento</th>
-            <th>Tipo proposta</th>
-            <th>Tipo servizi</th>
-            <th>Conferma</th>
-            <th>Evaso</th>
-            <th>Dal CP</th>
-            <th>Azioni</th>
+            <th className={styles.tabletOptional}>{header('date', 'Data prop.', sortKey, sortDirection, onSort)}</th>
+            <th className={styles.narrowOptional}>Tipo doc.</th>
+            <th className={styles.narrowOptional}>Proposta</th>
+            <th className={styles.narrowOptional}>Servizi</th>
+            <th className={styles.narrowOptional}>Conf.</th>
+            <th className={styles.narrowOptional}>Evaso</th>
+            <th className={styles.narrowOptional}>CP</th>
+            <th className={styles.narrowOptional}>Sost.</th>
+            <th className={styles.narrowOptional}>Lingua</th>
+            <th className={styles.narrowOptional}>Doc.</th>
+            <th>
+              <span className={styles.headerFull}>Azioni</span>
+              <span className={styles.headerCompact}>Apri</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -39,20 +46,23 @@ export function OrdersTable({ rows, sortKey, sortDirection, onSort, onOpen }: Or
             <tr key={order.id} style={{ animationDelay: `${Math.min(index * 16, 260)}ms` }} onDoubleClick={() => onOpen(order.id)}>
               <td>
                 <span className={styles.codeCell}>{orderCode(order.cdlan_ndoc, order.cdlan_anno)}</span>
-                <small>{order.cdlan_systemodv ? `System ODV ${order.cdlan_systemodv}` : '—'}</small>
               </td>
+              <td className={`${styles.monoCell} ${styles.tabletOptional}`}>{formatEmpty(order.cdlan_systemodv)}</td>
               <td className={styles.customerCell}>{order.cdlan_cliente ?? '—'}</td>
-              <td><StatusBadge state={order.cdlan_stato} /></td>
-              <td>{formatDate(order.cdlan_datadoc)}</td>
-              <td>{formatTipoDoc(order.cdlan_tipodoc)}</td>
-              <td>{formatTipoProposta(order.cdlan_tipo_ord)}</td>
-              <td>{formatServiceTypes(order.service_type, order.is_colo)}</td>
-              <td>{formatDate(order.cdlan_dataconferma)}</td>
-              <td>{formatSiNo(order.cdlan_evaso)}</td>
-              <td>{formatSiNo(order.from_cp)}</td>
+              <td><StatusBadge state={order.cdlan_stato} className={styles.compactStatus} /></td>
+              <td className={styles.tabletOptional}>{formatDate(order.cdlan_datadoc)}</td>
+              <td className={styles.narrowOptional}>{formatTipoDoc(order.cdlan_tipodoc)}</td>
+              <td className={styles.narrowOptional}>{formatTipoProposta(order.cdlan_tipo_ord)}</td>
+              <td className={styles.narrowOptional}>{formatServiceTypes(order.service_type, order.is_colo)}</td>
+              <td className={styles.narrowOptional}>{formatDate(order.cdlan_dataconferma)}</td>
+              <td className={styles.narrowOptional}>{formatSiNo(order.cdlan_evaso)}</td>
+              <td className={styles.narrowOptional}>{formatSiNo(order.from_cp)}</td>
+              <td className={`${styles.monoCell} ${styles.narrowOptional}`}>{formatEmpty(order.cdlan_sost_ord)}</td>
+              <td className={styles.narrowOptional}>{formatEmpty(order.profile_lang)}</td>
+              <td className={`${styles.monoCell} ${styles.narrowOptional}`}>{formatEmpty(order.arx_doc_number)}</td>
               <td>
-                <Button variant="secondary" size="sm" rightIcon={<Icon name="arrow-right" size={14} />} onClick={() => onOpen(order.id)}>
-                  Visualizza
+                <Button variant="secondary" size="sm" aria-label={`Apri ordine ${orderCode(order.cdlan_ndoc, order.cdlan_anno)}`} rightIcon={<Icon name="arrow-right" size={14} />} onClick={() => onOpen(order.id)}>
+                  <span className={styles.actionText}>Apri</span>
                 </Button>
               </td>
             </tr>
@@ -63,12 +73,13 @@ export function OrdersTable({ rows, sortKey, sortDirection, onSort, onOpen }: Or
   );
 }
 
-function header(key: OrderSortKey, label: string, active: OrderSortKey, direction: SortDirection, onSort: (key: OrderSortKey) => void) {
+function header(key: OrderSortKey, label: string, active: OrderSortKey, direction: SortDirection, onSort: (key: OrderSortKey) => void, compactLabel = label) {
   const isActive = key === active;
   return (
     <button type="button" className={`${styles.sortButton} ${isActive ? styles.sortButtonActive : ''}`} onClick={() => onSort(key)}>
-      {label}
-      <span aria-hidden="true">{isActive ? (direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+      <span className={styles.headerFull}>{label}</span>
+      <span className={styles.headerCompact}>{compactLabel}</span>
+      <span className={styles.sortGlyph} aria-hidden="true">{isActive ? (direction === 'asc' ? '▲' : '▼') : '↕'}</span>
     </button>
   );
 }

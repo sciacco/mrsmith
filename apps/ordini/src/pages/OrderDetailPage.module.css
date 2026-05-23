@@ -75,7 +75,7 @@
   color: var(--color-text);
   font-size: 1.75rem;
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   line-height: 1.18;
 }
 
@@ -404,7 +404,7 @@
 }
 
 .resultPanelSuccess {
-  border-color: rgba(16, 185, 129, 0.25);
+  border-color: color-mix(in srgb, var(--color-success) 32%, transparent);
   background: var(--color-success-bg);
 }
 
@@ -497,14 +497,35 @@
   border-bottom: 1px solid var(--color-border-subtle);
   color: var(--color-text-secondary);
   vertical-align: middle;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .dataTable tbody tr {
   animation: rowEnter 0.4s var(--ease-out) both;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
-.dataTable tbody tr:hover {
+.dataTable tbody tr td:first-child {
+  border-left: 4px solid transparent;
+}
+
+.dataTable tbody tr:hover,
+.dataTable tbody tr:focus-within {
   background: color-mix(in srgb, var(--color-accent-subtle) 74%, var(--color-bg-elevated) 26%);
+}
+
+.dataTable tbody tr:hover td:first-child,
+.dataTable tbody tr:focus-within td:first-child {
+  border-left-color: var(--color-accent);
+  box-shadow: inset 4px 0 0 var(--color-accent-glow);
+}
+
+.dataTable tbody tr:active {
+  transform: scale(0.995);
 }
 
 .rowDescription,

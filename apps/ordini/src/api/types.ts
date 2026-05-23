@@ -135,5 +135,5 @@ export interface SendToERPResponse {
   rows: SendToERPRowOutcome[];
   stateTransitioned: boolean;
   arxivarUploaded: boolean;
-  warning?: string;
+  warning?: 'arxivar_upload_failed' | string;
 }

@@ -17,7 +17,7 @@ export function SendToErpResultPanel({ result }: { result: SendToERPResponse | n
           <p>{success} righe inviate, {errors} righe da verificare.</p>
         </div>
       </div>
-      {result.warning ? <p className={styles.resultWarningText}>Ordine inviato, ma il documento firmato richiede una verifica.</p> : null}
+      {result.warning ? <p className={styles.resultWarningText}>{warningText(result.warning)}</p> : null}
       <div className={styles.resultRows}>
         {result.rows.map((row) => (
           <div key={row.rowId} className={styles.resultRow}>
@@ -28,4 +28,13 @@ export function SendToErpResultPanel({ result }: { result: SendToERPResponse | n
       </div>
     </section>
   );
+}
+
+function warningText(code: string): string {
+  switch (code) {
+    case 'arxivar_upload_failed':
+      return 'Ordine inviato, ma il documento firmato richiede una verifica.';
+    default:
+      return 'Ordine inviato, ma una verifica resta in sospeso.';
+  }
 }

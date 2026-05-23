@@ -85,7 +85,7 @@ export function OrderListPage() {
 
       <section className={styles.surface}>
         <div className={styles.toolbar}>
-          <SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1); }} placeholder="Cerca per codice, cliente, System ODV..." className={styles.search} />
+          <SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1); }} placeholder="Cerca ordine, cliente, ODV" className={styles.search} />
           <div className={styles.selectWrap}>
             <SingleSelect options={stateOptions} selected={stateFilter} onChange={(value) => { setStateFilter(value); setPage(1); }} placeholder="Stato" allowClear clearLabel="Tutti gli stati" />
           </div>

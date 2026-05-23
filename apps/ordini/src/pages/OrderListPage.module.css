@@ -19,7 +19,7 @@
   color: var(--color-text);
   font-size: 1.75rem;
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   line-height: 1.18;
 }
 
@@ -92,39 +92,60 @@
 
 .ordersTable {
   width: 100%;
-  min-width: 92rem;
+  min-width: 76rem;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 .ordersTable th {
-  padding: var(--space-3) var(--space-3);
+  padding: var(--space-2);
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-muted);
   background: var(--color-surface);
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .ordersTable td {
-  padding: var(--space-3);
+  padding: var(--space-2);
   border-bottom: 1px solid var(--color-border-subtle);
   color: var(--color-text-secondary);
   vertical-align: middle;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .ordersTable tbody tr {
   animation: rowEnter 0.4s var(--ease-out) both;
   cursor: default;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
-.ordersTable tbody tr:hover {
-  background: color-mix(in srgb, var(--color-accent-subtle) 74%, #fff 26%);
+.ordersTable tbody tr td:first-child {
+  border-left: 4px solid transparent;
+}
+
+.ordersTable tbody tr:hover,
+.ordersTable tbody tr:focus-within {
+  background: color-mix(in srgb, var(--color-accent-subtle) 74%, var(--color-bg-elevated) 26%);
+}
+
+.ordersTable tbody tr:hover td:first-child,
+.ordersTable tbody tr:focus-within td:first-child {
+  border-left-color: var(--color-accent);
+  box-shadow: inset 4px 0 0 var(--color-accent-glow);
+}
+
+.ordersTable tbody tr:active {
+  transform: scale(0.995);
 }
 
 .ordersTable small {
@@ -137,12 +158,34 @@
 .codeCell {
   color: var(--color-accent-hover);
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
+.monoCell {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.compactStatus {
+  max-width: none;
+}
+
+.actionText {
+  display: inline;
+}
+
+.headerCompact {
+  display: none;
+}
+
+.narrowOptional,
+.tabletOptional {
+  display: table-cell;
+}
+
 .customerCell {
-  max-width: 18rem;
+  max-width: 11rem;
   color: var(--color-text);
   font-weight: 650;
   overflow: hidden;
@@ -171,7 +214,7 @@
   outline: none;
 }
 
-.sortButton span {
+.sortGlyph {
   color: var(--color-text-muted);
   font-size: 0.625rem;
 }
@@ -231,6 +274,14 @@
     padding: var(--space-4);
   }
 
+  .ordersTable {
+    min-width: 58rem;
+  }
+
+  .narrowOptional {
+    display: none;
+  }
+
   .pageHeader,
   .toolbar {
     align-items: stretch;
@@ -242,5 +293,82 @@
     flex-basis: auto;
     width: 100%;
     min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .ordersTable {
+    min-width: 100%;
+    table-layout: fixed;
+    font-size: 0.75rem;
+  }
+
+  .tabletOptional {
+    display: none;
+  }
+
+  .ordersTable th,
+  .ordersTable td {
+    padding: var(--space-2);
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+
+  .ordersTable th:nth-child(1),
+  .ordersTable td:nth-child(1) {
+    width: 5.75rem;
+  }
+
+  .ordersTable th:nth-child(3),
+  .ordersTable td:nth-child(3) {
+    width: 5.75rem;
+  }
+
+  .ordersTable th:nth-child(4),
+  .ordersTable td:nth-child(4) {
+    width: 5.15rem;
+  }
+
+  .ordersTable th:nth-child(15),
+  .ordersTable td:nth-child(15) {
+    width: 2.75rem;
+  }
+
+  .codeCell,
+  .monoCell {
+    font-size: 0.75rem;
+  }
+
+  .customerCell {
+    max-width: none;
+  }
+
+  .headerFull {
+    display: none;
+  }
+
+  .headerCompact {
+    display: inline;
+  }
+
+  .compactStatus {
+    max-width: none;
+  }
+
+  .ordersTable td:last-child button {
+    width: 2.25rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    padding: 0;
+    font-size: 0.75rem;
+  }
+
+  .ordersTable td:last-child button span {
+    margin: 0;
+  }
+
+  .actionText {
+    display: none;
   }
 }

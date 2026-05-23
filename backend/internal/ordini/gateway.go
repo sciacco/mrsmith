@@ -3,6 +3,7 @@ package ordini
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -12,16 +13,22 @@ import (
 	"strings"
 )
 
+var errGatewayPreconditionMissing = errors.New("gateway precondition missing")
+
 type gatewayHTTPError struct {
 	Status int
 	Body   string
 }
 
 func (e *gatewayHTTPError) Error() string {
-	if e.Body == "" {
-		return fmt.Sprintf("gateway returned HTTP %d", e.Status)
+	return fmt.Sprintf("gateway returned HTTP %d", e.Status)
+}
+
+func (e *gatewayHTTPError) Is(target error) bool {
+	if target != errGatewayPreconditionMissing {
+		return false
 	}
-	return fmt.Sprintf("gateway returned HTTP %d: %s", e.Status, e.Body)
+	return gatewayBodyHasCode(e.Body, "precondition_missing")
 }
 
 func (h *Handler) gatewayPostJSON(path string, payload any) error {
@@ -53,7 +60,7 @@ func (h *Handler) gatewaySendToERP(order *OrderDetail, row OrderRow) error {
 func (h *Handler) gatewaySetActivationDate(order *OrderDetail, row OrderRow, activationDate string) error {
 	systemODV, ok := parseRequiredInt(ptrStringValue(order.CdlanSystemODV))
 	if !ok || row.CdlanSystemODVRow == nil {
-		return fmt.Errorf("precondition_missing")
+		return errGatewayPreconditionMissing
 	}
 	payload := map[string]any{
 		"cdlan_systemodv":        systemODV,
@@ -104,7 +111,7 @@ func (h *Handler) gatewayUploadToArxivar(order *OrderDetail, pdf []byte, filenam
 func buildSendToERPPayload(order *OrderDetail, row OrderRow) (map[string]any, error) {
 	systemODV, ok := parseRequiredInt(ptrStringValue(order.CdlanSystemODV))
 	if !ok || row.CdlanSystemODVRow == nil {
-		return nil, fmt.Errorf("precondition_missing")
+		return nil, errGatewayPreconditionMissing
 	}
 	payload := map[string]any{
 		"order_id":                   order.ID,
@@ -198,4 +205,70 @@ func compactGatewayBody(body []byte) string {
 		return text[:256] + "..."
 	}
 	return text
+}
+
+func gatewayBodyHasCode(body, code string) bool {
+	text := strings.TrimSpace(body)
+	if text == "" {
+		return false
+	}
+	var payload map[string]any
+	if json.Unmarshal([]byte(text), &payload) == nil {
+		for _, key := range []string{"error", "code", "message"} {
+			if value, ok := payload[key].(string); ok && value == code {
+				return true
+			}
+		}
+	}
+	return text == code
+}
+
+func gatewayBodyCode(body string) string {
+	text := strings.TrimSpace(body)
+	if text == "" {
+		return ""
+	}
+	if isSafeGatewayCode(text) {
+		return text
+	}
+	var payload map[string]any
+	if json.Unmarshal([]byte(text), &payload) == nil {
+		for _, key := range []string{"error", "code"} {
+			if value, ok := payload[key].(string); ok && isSafeGatewayCode(value) {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func isSafeGatewayCode(value string) bool {
+	if value == "" || len(value) > 80 {
+		return false
+	}
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '_' || r == '-' || r == '.':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func gatewayFailureAttrs(path string, err error, attrs ...any) []any {
+	args := []any{"gw_path", path}
+	var httpErr *gatewayHTTPError
+	if errors.As(err, &httpErr) {
+		args = append(args, "upstream_status", httpErr.Status)
+		if code := gatewayBodyCode(httpErr.Body); code != "" {
+			args = append(args, "upstream_code", code)
+		}
+	}
+	args = append(args, attrs...)
+	args = append(args, "error", err)
+	return args
 }

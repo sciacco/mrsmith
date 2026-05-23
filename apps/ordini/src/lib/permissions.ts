@@ -27,12 +27,8 @@ export function canEditSerialNumber(order: OrderDetail | null | undefined): bool
   return state(order) === 'BOZZA';
 }
 
-export function canEditTechnicalNotes(): boolean {
-  return true;
-}
-
 export function canOpenActivationModal(order: OrderDetail | null | undefined, roles: readonly string[] | undefined, row: OrderRow): boolean {
-  return state(order) === 'INVIATO' && hasCustomerRelations(roles) && row.data_annullamento == null;
+  return state(order) === 'INVIATO' && hasCustomerRelations(roles) && row.data_annullamento == null && row.cdlan_qta !== 0;
 }
 
 export function canShowArxivarFilePicker(order: OrderDetail | null | undefined, roles: readonly string[] | undefined): boolean {

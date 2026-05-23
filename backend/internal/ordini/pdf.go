@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
@@ -79,10 +81,10 @@ type pdfGate struct {
 }
 
 func (h *Handler) handleGatedPDF(w http.ResponseWriter, r *http.Request, gate pdfGate) {
-	if !h.requireVodka(w) || !h.requireGateway(w) {
+	if gate.RequiresCR && !h.requireCustomerRelations(w, r) {
 		return
 	}
-	if gate.RequiresCR && !h.requireCustomerRelations(w, r) {
+	if !h.requireVodka(w) || !h.requireGateway(w) {
 		return
 	}
 	id, ok := h.parseOrderID(w, r)
@@ -118,26 +120,32 @@ func (h *Handler) writeOrderLoadError(w http.ResponseWriter, r *http.Request, op
 }
 
 func (h *Handler) proxyNormalizedPDF(w http.ResponseWriter, r *http.Request, path, query, filename, operation string) {
+	start := time.Now()
 	resp, err := h.deps.Arak.Do(http.MethodGet, path, query, nil)
 	if err != nil {
-		h.logger.Error("gateway pdf request failed", "operation", operation, "gw_path", path, "error", err)
+		h.logFailure(r, slog.LevelError, "gateway pdf request failed", operation, start, "gw_path", path, "error", err)
 		httputil.Error(w, http.StatusBadGateway, "gateway_error")
 		return
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		httputil.InternalError(w, r, err, "gateway pdf read failed", "component", component, "operation", operation, "gw_path", path)
+		h.logFailure(r, slog.LevelError, "gateway pdf read failed", operation, start, "gw_path", path, "error", err)
+		httputil.Error(w, http.StatusBadGateway, "gateway_error")
 		return
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		h.logger.Warn("gateway pdf upstream error", "operation", operation, "gw_path", path, "upstream_status", resp.StatusCode, "upstream_body", compactGatewayBody(body))
+		args := []any{"gw_path", path, "upstream_status", resp.StatusCode}
+		if code := gatewayBodyCode(compactGatewayBody(body)); code != "" {
+			args = append(args, "upstream_code", code)
+		}
+		h.logFailure(r, slog.LevelWarn, "gateway pdf upstream error", operation, start, args...)
 		httputil.Error(w, http.StatusBadGateway, "gateway_error")
 		return
 	}
 	pdf, err := normalizePDFBody(body)
 	if err != nil {
-		h.logger.Warn("gateway pdf malformed", "operation", operation, "gw_path", path, "error", err)
+		h.logFailure(r, slog.LevelWarn, "gateway pdf malformed", operation, start, "gw_path", path, "error", err)
 		httputil.Error(w, http.StatusBadGateway, "gw_pdf_malformed")
 		return
 	}

@@ -18,6 +18,6 @@ function variantForState(state: OrderState | null | undefined): StatusBadgeVaria
   }
 }
 
-export function StatusBadge({ state }: { state: OrderState | null | undefined }) {
-  return <SharedStatusBadge value={formatStato(state)} variant={variantForState(state)} />;
+export function StatusBadge({ state, className }: { state: OrderState | null | undefined; className?: string }) {
+  return <SharedStatusBadge value={formatStato(state)} variant={variantForState(state)} className={className} />;
 }

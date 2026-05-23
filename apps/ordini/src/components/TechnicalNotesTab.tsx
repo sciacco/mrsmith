@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Button, Icon, Skeleton } from '@mrsmith/ui';
 import type { TechnicalRow } from '../api/types';
 import { formatDate, formatEmpty } from '../lib/formatters';
-import { canEditTechnicalNotes } from '../lib/permissions';
 import styles from '../pages/OrderDetailPage.module.css';
 
 interface TechnicalNotesTabProps {
@@ -15,7 +14,6 @@ interface TechnicalNotesTabProps {
 export function TechnicalNotesTab({ rows, loading, savingRowId, onSaveNotes }: TechnicalNotesTabProps) {
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [notesDraft, setNotesDraft] = useState('');
-  const editable = canEditTechnicalNotes();
 
   function startEdit(row: TechnicalRow) {
     setEditingRow(row.id);
@@ -79,7 +77,7 @@ export function TechnicalNotesTab({ rows, loading, savingRowId, onSaveNotes }: T
                         <Button variant="secondary" size="sm" onClick={cancelEdit}>Annulla</Button>
                       </div>
                     ) : (
-                      <Button variant="secondary" size="sm" disabled={!editable} onClick={() => startEdit(row)}>
+                      <Button variant="secondary" size="sm" onClick={() => startEdit(row)}>
                         Note
                       </Button>
                     )}

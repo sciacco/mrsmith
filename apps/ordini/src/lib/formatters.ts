@@ -100,8 +100,22 @@ export function formatFatturazioneAtt(value: string | null | undefined): string 
 }
 
 export function formatDurRin(value: string | null | undefined): string {
-  const label = formatFatturazione(value);
-  return label === '—' ? label : label;
+  switch (String(value ?? '').trim()) {
+    case '1':
+      return 'Mensile';
+    case '2':
+      return 'Bimestrale';
+    case '3':
+      return 'Trimestrale';
+    case '4':
+      return 'Quadrimestrale';
+    case '6':
+      return 'Semestrale';
+    case '12':
+      return 'Annuale';
+    default:
+      return formatEmpty(value);
+  }
 }
 
 export function formatIsColo(value: string | null | undefined): string {

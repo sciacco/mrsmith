@@ -175,7 +175,7 @@ export function OrderDetailPage() {
         return;
       }
       if (result.warning) {
-        toast('Ordine inviato, ma il documento firmato richiede una verifica.', 'warning');
+        toast(sendWarningToast(result.warning), 'warning');
       } else if (hasErrors) {
         toast('Invio parziale: verifica le righe segnalate', 'error');
       }
@@ -272,4 +272,13 @@ export function OrderDetailPage() {
       />
     </main>
   );
+}
+
+function sendWarningToast(code: string): string {
+  switch (code) {
+    case 'arxivar_upload_failed':
+      return 'Ordine inviato, ma il documento firmato richiede una verifica.';
+    default:
+      return 'Ordine inviato, ma una verifica resta in sospeso.';
+  }
 }

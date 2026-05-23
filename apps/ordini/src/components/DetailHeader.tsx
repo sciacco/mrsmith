@@ -34,7 +34,7 @@ export function DetailHeader({
         </button>
         <div className={styles.pdfActions}>
           <Button variant="secondary" size="sm" disabled={!canKickoff} loading={downloading === 'kickoff'} onClick={() => onDownload('kickoff')}>
-            Kickoff
+            Documento di avvio
           </Button>
           <Button variant="secondary" size="sm" disabled={!canActivationForm} loading={downloading === 'activation'} onClick={() => onDownload('activation')}>
             Modulo di attivazione

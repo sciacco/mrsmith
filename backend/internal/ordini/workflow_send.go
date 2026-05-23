@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
@@ -14,7 +16,8 @@ import (
 const maxSendToERPPDFBytes = 32 << 20
 
 func (h *Handler) handleSendToERP(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVodka(w) || !h.requireGateway(w) || !h.requireCustomerRelations(w, r) {
+	start := time.Now()
+	if !h.requireCustomerRelations(w, r) || !h.requireVodka(w) || !h.requireGateway(w) {
 		return
 	}
 	orderID, ok := h.parseOrderID(w, r)
@@ -64,7 +67,7 @@ func (h *Handler) handleSendToERP(w http.ResponseWriter, r *http.Request) {
 			outcome.Status = "error"
 			code := sanitizeGatewayError(err)
 			outcome.Error = &code
-			h.logger.Warn("send to ERP row failed", "operation", "send_to_erp", "order_id", orderID, "row_id", row.ID, "error", err)
+			h.logFailure(r, slog.LevelWarn, "send to ERP row failed", "send_to_erp", start, gatewayFailureAttrs("/orders/v1/erp", err, "order_id", orderID, "row_id", row.ID)...)
 		}
 		response.Rows = append(response.Rows, outcome)
 	}
@@ -90,7 +93,7 @@ WHERE id = ? AND cdlan_stato = 'BOZZA'`, orderID)
 	filename := orderCodeForFilename(order) + "_firmato.pdf"
 	if err := h.gatewayUploadToArxivar(order, pdf, filename); err != nil {
 		response.Warning = "arxivar_upload_failed"
-		h.logger.Warn("arxivar upload failed after send state transition", "operation", "send_to_erp_arxivar", "order_id", orderID, "error", err)
+		h.logFailure(r, slog.LevelWarn, "arxivar upload failed after send state transition", "send_to_erp_arxivar", start, gatewayFailureAttrs("/orders/v1/send-to-arxivar", err, "order_id", orderID)...)
 		httputil.JSON(w, http.StatusOK, response)
 		return
 	}
@@ -126,7 +129,7 @@ func sanitizeGatewayError(err error) string {
 	if err == nil {
 		return ""
 	}
-	if strings.Contains(err.Error(), "precondition_missing") {
+	if errors.Is(err, errGatewayPreconditionMissing) {
 		return "precondition_missing"
 	}
 	return "gateway_error"

@@ -39,7 +39,7 @@ func (d *NullDate) Scan(value any) error {
 
 func (d *NullDate) scanString(value string) error {
 	value = strings.TrimSpace(value)
-	if value == "" || value == "0000-00-00" {
+	if value == "" || value == "0000-00-00" || value == "0000-00-00 00:00:00" {
 		d.Valid = false
 		return nil
 	}
@@ -149,22 +149,6 @@ func ptrIntValue(value *int64) any {
 }
 
 func nullIfBlank(value string) any {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return nil
-	}
-	return trimmed
-}
-
-func ptrStringOrNil(value string) *string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return nil
-	}
-	return &trimmed
-}
-
-func dateOrNil(value string) any {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return nil

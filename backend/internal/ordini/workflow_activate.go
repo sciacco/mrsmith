@@ -3,6 +3,7 @@ package ordini
 import (
 	"database/sql"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -10,7 +11,8 @@ import (
 )
 
 func (h *Handler) handleActivateRow(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVodka(w) || !h.requireGateway(w) || !h.requireCustomerRelations(w, r) {
+	start := time.Now()
+	if !h.requireCustomerRelations(w, r) || !h.requireVodka(w) || !h.requireGateway(w) {
 		return
 	}
 	orderID, ok := h.parseOrderID(w, r)
@@ -54,6 +56,10 @@ func (h *Handler) handleActivateRow(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusUnprocessableEntity, "precondition_missing")
 		return
 	}
+	if !canActivateOrderRow(*row) {
+		httputil.Error(w, http.StatusUnprocessableEntity, "precondition_missing")
+		return
+	}
 
 	tx, err := h.deps.Vodka.BeginTx(r.Context(), nil)
 	if err != nil {
@@ -75,7 +81,7 @@ WHERE id = ? AND orders_id = ?`, payload.ActivationDate, rowID, orderID); err !=
 		return
 	}
 	if err := h.gatewaySetActivationDate(order, *row, payload.ActivationDate); err != nil {
-		h.logger.Warn("activation gateway failed", "operation", "activate_row", "order_id", orderID, "row_id", rowID, "error", err)
+		h.logFailure(r, slog.LevelWarn, "activation gateway failed", "activate_row", start, gatewayFailureAttrs("/orders/v1/set-order-activation", err, "order_id", orderID, "row_id", rowID)...)
 		httputil.Error(w, http.StatusBadGateway, "gateway_error")
 		return
 	}
@@ -105,7 +111,7 @@ WHERE id = ? AND cdlan_stato = 'INVIATO'`, orderID); err != nil {
 		newState = string(OrderStateAttivo)
 	}
 	if err := tx.Commit(); err != nil {
-		h.logger.Error("activation commit failed after gateway success", "operation", "activate_row", "order_id", orderID, "row_id", rowID, "error", err)
+		h.logFailure(r, slog.LevelError, "activation commit failed after gateway success", "activate_row", start, "order_id", orderID, "row_id", rowID, "error", err)
 		httputil.Error(w, http.StatusInternalServerError, "db_commit_failed")
 		return
 	}
@@ -117,4 +123,14 @@ WHERE id = ? AND cdlan_stato = 'INVIATO'`, orderID); err != nil {
 		return
 	}
 	httputil.JSON(w, http.StatusOK, ActivationResponse{OrderState: newState, Row: *updated})
+}
+
+func canActivateOrderRow(row OrderRow) bool {
+	if row.DataAnnullamento.Valid {
+		return false
+	}
+	if row.CdlanQta.Valid && row.CdlanQta.Float64 == 0 {
+		return false
+	}
+	return true
 }

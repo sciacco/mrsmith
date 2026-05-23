@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Modal } from '@mrsmith/ui';
 import type { OrderRow } from '../api/types';
 import styles from '../pages/OrderDetailPage.module.css';
@@ -13,6 +13,10 @@ interface ActivationModalProps {
 
 export function ActivationModal({ row, open, loading, onClose, onConfirm }: ActivationModalProps) {
   const [activationDate, setActivationDate] = useState('');
+
+  useEffect(() => {
+    setActivationDate('');
+  }, [row?.id]);
 
   function close() {
     setActivationDate('');

@@ -3,7 +3,10 @@ package ordini
 import (
 	"database/sql"
 	"errors"
+	"log/slog"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
@@ -79,9 +82,10 @@ func (h *Handler) getOrder(r *http.Request, id int64) (*OrderDetail, error) {
 	if err != nil {
 		return nil, err
 	}
-	origin, err := h.loadOrigin(r.Context(), id)
+	start := time.Now()
+	origin, err := h.loadOrigin(r, id)
 	if err != nil {
-		h.logger.Warn("origin lookup failed", "operation", "origin_lookup", "order_id", id, "error", err)
+		h.logFailure(r, slog.LevelWarn, "origin lookup failed", "origin_lookup", start, "order_id", id, "error", err)
 	} else {
 		order.Origin = origin
 	}
@@ -220,7 +224,7 @@ func (h *Handler) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handlePatchOrderHeader(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVodka(w) || !h.requireAlyante(w) || !h.requireCustomerRelations(w, r) {
+	if !h.requireCustomerRelations(w, r) || !h.requireVodka(w) || !h.requireAlyante(w) {
 		return
 	}
 	id, ok := h.parseOrderID(w, r)
@@ -233,6 +237,11 @@ func (h *Handler) handlePatchOrderHeader(w http.ResponseWriter, r *http.Request)
 	}
 	if payload.CustomerID <= 0 {
 		httputil.Error(w, http.StatusUnprocessableEntity, "missing_customer")
+		return
+	}
+	confirmationDate, ok := confirmationDateOrNil(payload.ConfirmationDate)
+	if !ok {
+		httputil.Error(w, http.StatusUnprocessableEntity, "invalid_confirmation_date")
 		return
 	}
 	order, err := h.getOrderWithoutOrigin(r, id)
@@ -262,7 +271,7 @@ SET cdlan_rif_ordcli = ?,
     cdlan_dataconferma = ?,
     cdlan_cliente_id = ?,
     cdlan_cliente = ?
-WHERE id = ? AND cdlan_stato = 'BOZZA'`, nullIfBlank(payload.CustomerPO), dateOrNil(payload.ConfirmationDate), customer.ID, customer.Name, id)
+WHERE id = ? AND cdlan_stato = 'BOZZA'`, nullIfBlank(payload.CustomerPO), confirmationDate, customer.ID, customer.Name, id)
 	if err != nil {
 		h.dbFailure(w, r, "patch_order_header", err, "order_id", id)
 		return
@@ -275,7 +284,7 @@ WHERE id = ? AND cdlan_stato = 'BOZZA'`, nullIfBlank(payload.CustomerPO), dateOr
 }
 
 func (h *Handler) handlePatchReferents(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVodka(w) || !h.requireCustomerRelations(w, r) {
+	if !h.requireCustomerRelations(w, r) || !h.requireVodka(w) {
 		return
 	}
 	id, ok := h.parseOrderID(w, r)
@@ -298,7 +307,7 @@ func (h *Handler) handlePatchReferents(w http.ResponseWriter, r *http.Request) {
 	if !requireState(w, stateOf(order), OrderStateBozza, OrderStateInviato) {
 		return
 	}
-	_, err = h.deps.Vodka.ExecContext(r.Context(), `
+	res, err := h.deps.Vodka.ExecContext(r.Context(), `
 UPDATE orders
 SET cdlan_rif_tech_nom = ?,
     cdlan_rif_tech_tel = ?,
@@ -309,10 +318,27 @@ SET cdlan_rif_tech_nom = ?,
     cdlan_rif_adm_nom = ?,
     cdlan_rif_adm_tech_tel = ?,
     cdlan_rif_adm_tech_email = ?
-WHERE id = ?`, nullIfBlank(payload.TechnicalName), nullIfBlank(payload.TechnicalPhone), nullIfBlank(payload.TechnicalEmail), nullIfBlank(payload.OtherTechnicalName), nullIfBlank(payload.OtherTechnicalPhone), nullIfBlank(payload.OtherTechnicalEmail), nullIfBlank(payload.AdminName), nullIfBlank(payload.AdminPhone), nullIfBlank(payload.AdminEmail), id)
+WHERE id = ?
+  AND cdlan_stato IN ('BOZZA', 'INVIATO')`, nullIfBlank(payload.TechnicalName), nullIfBlank(payload.TechnicalPhone), nullIfBlank(payload.TechnicalEmail), nullIfBlank(payload.OtherTechnicalName), nullIfBlank(payload.OtherTechnicalPhone), nullIfBlank(payload.OtherTechnicalEmail), nullIfBlank(payload.AdminName), nullIfBlank(payload.AdminPhone), nullIfBlank(payload.AdminEmail), id)
 	if err != nil {
 		h.dbFailure(w, r, "patch_order_referents", err, "order_id", id)
 		return
 	}
+	if affected, err := res.RowsAffected(); err == nil && affected == 0 {
+		httputil.Error(w, http.StatusConflict, "wrong_state")
+		return
+	}
 	h.writeOrderOrNotFound(w, r, id)
+}
+
+func confirmationDateOrNil(value string) (any, bool) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil, true
+	}
+	parsed, err := time.Parse("2006-01-02", trimmed)
+	if err != nil {
+		return nil, false
+	}
+	return parsed.Format("2006-01-02"), true
 }

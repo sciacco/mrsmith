@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 type Deps struct {
@@ -82,9 +84,27 @@ func (h *Handler) requireGateway(w http.ResponseWriter) bool {
 }
 
 func (h *Handler) dbFailure(w http.ResponseWriter, r *http.Request, operation string, err error, attrs ...any) {
-	args := []any{"component", component, "operation", operation}
+	h.logFailure(r, slog.LevelError, "ordini database operation failed", operation, time.Now(), append(attrs, "error", err)...)
+	httputil.Error(w, http.StatusInternalServerError, "db_failed")
+}
+
+func (h *Handler) logFailure(r *http.Request, level slog.Level, message, operation string, start time.Time, attrs ...any) {
+	durationMS := int64(0)
+	if !start.IsZero() {
+		durationMS = time.Since(start).Milliseconds()
+	}
+	requestID := logging.RequestID(r.Context())
+	if requestID == "" {
+		requestID = strings.TrimSpace(r.Header.Get("X-Request-ID"))
+	}
+	args := []any{
+		"component", component,
+		"operation", operation,
+		"request_id", requestID,
+		"duration_ms", durationMS,
+	}
 	args = append(args, attrs...)
-	httputil.InternalError(w, r, err, "ordini database operation failed", args...)
+	h.logger.Log(r.Context(), level, message, args...)
 }
 
 func (h *Handler) parseOrderID(w http.ResponseWriter, r *http.Request) (int64, bool) {
