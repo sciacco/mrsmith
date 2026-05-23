@@ -12,7 +12,7 @@ Dropped JSObjects (`Home.JSObject1`, `Ordini_semplificati.utils`, `Dettaglio.JSO
 
 **Classification.** Domain (state transition) + orchestration (three-system fan-out) + security-critical (role/state enforcement).
 
-**Placement.** **Backend.** Single endpoint `POST /api/ordini/:id/send-to-erp` (multipart: the Arxivar PDF). Auth: `app_customer_relations` + `stato == 'BOZZA'` + preconditions (dataconferma set, cliente set) enforced server-side, not trusted from the client.
+**Placement.** **Backend.** Single endpoint `POST /api/ordini/v1/orders/:id/send-to-erp` (multipart: the Arxivar PDF). Auth: `app_customer_relations` + `stato == 'BOZZA'` + preconditions (dataconferma set, cliente set) enforced server-side, not trusted from the client.
 
 **Behaviour per Q8 (revised).**
 - Per-row push, no transaction, no compensation — GW is called one line at a time as in the source. Each row's outcome is recorded.
@@ -46,7 +46,7 @@ Dropped JSObjects (`Home.JSObject1`, `Ordini_semplificati.utils`, `Dettaglio.JSO
 
 **Classification.** Domain (row state + implicit order state transition) + orchestration (vodka + GW).
 
-**Placement.** **Backend.** Endpoint `PATCH /api/ordini/:id/rows/:rowId/activate` with body `{activation_date}`. Auth: `app_customer_relations` + order state must be `INVIATO`.
+**Placement.** **Backend.** Endpoint `PATCH /api/ordini/v1/orders/:id/rows/:rowId/activate` with body `{activation_date}`. Auth: `app_customer_relations` + order state must be `INVIATO`.
 
 **Behaviour.**
 - In one transaction: UPDATE `orders_rows` (set `cdlan_data_attivazione` and `confirm_data_attivazione = 1`), call `GW_SetActivationDate`, run `CheckConfirmRows` with the Q2 fix (`data_annullamento IS NOT NULL`), and if the count matches `SELECT COUNT(id) FROM orders_rows WHERE orders_id = :id`, flip `orders.cdlan_stato` to `ATTIVO` — all before commit.
@@ -73,10 +73,10 @@ Dropped JSObjects (`Home.JSObject1`, `Ordini_semplificati.utils`, `Dettaglio.JSO
 
 | Endpoint | GW target | Filename | Auth |
 |---|---|---|---|
-| `GET /api/ordini/:id/kickoff.pdf` | `GET /orders/v1/kick-off/:id` | `kick off_<ndoc>_<anno>.pdf` | `app_customer_relations` + `stato == 'INVIATO'` |
-| `GET /api/ordini/:id/activation-form.pdf` | `GET /orders/v1/activation-form/:id` | `Modulo di Attivazione_<ndoc>_<anno>.pdf` or `Activation Form_<ndoc>_<anno>.pdf` based on `order.profile_lang` | `app_customer_relations` + `stato ∈ {INVIATO, ATTIVO}` |
-| `GET /api/ordini/:id/pdf` | `GET /orders/v1/order/pdf/:id/generate` | `<ndoc>_<anno>.pdf` | `app_ordini_access` + `arx_doc_number IS NULL` |
-| `GET /api/ordini/:id/signed-pdf` | `GET /orders/v1/order/pdf/:id?from=vodka` | `<ndoc>_<anno>_firmato.pdf` | `app_ordini_access` + `arx_doc_number IS NOT NULL` |
+| `GET /api/ordini/v1/orders/:id/kickoff.pdf` | `GET /orders/v1/kick-off/:id` | `kick off_<ndoc>_<anno>.pdf` | `app_customer_relations` + `stato == 'INVIATO'` |
+| `GET /api/ordini/v1/orders/:id/activation-form.pdf` | `GET /orders/v1/activation-form/:id` | `Modulo di Attivazione_<ndoc>_<anno>.pdf` or `Activation Form_<ndoc>_<anno>.pdf` based on `order.profile_lang` | `app_customer_relations` + `stato ∈ {INVIATO, ATTIVO}` |
+| `GET /api/ordini/v1/orders/:id/pdf` | `GET /orders/v1/order/pdf/:id/generate` | `<ndoc>_<anno>.pdf` | `app_ordini_access` + `arx_doc_number IS NULL` |
+| `GET /api/ordini/v1/orders/:id/signed-pdf` | `GET /orders/v1/order/pdf/:id?from=vodka` | `<ndoc>_<anno>_firmato.pdf` | `app_ordini_access` + `arx_doc_number IS NOT NULL` |
 
 **Logic that does NOT port.**
 - The base64-or-raw client-side heuristic — backend always returns `application/pdf` bytes with `Content-Disposition: attachment; filename="…"`.
@@ -95,8 +95,8 @@ Both read params through fragile widget aliases (e.g. the `idRiga` that maps to 
 **Classification.** Domain (data persistence) + trivial orchestration.
 
 **Placement.** **Backend.**
-- `PATCH /api/ordini/:id/rows/:rowId/serial-number` body `{serial_number}`. Auth: `app_ordini_access` + `stato == 'BOZZA'` (matches the current widget gate).
-- `PATCH /api/ordini/:id/rows/:rowId/technical-notes` body `{technical_notes}`. Auth: `app_ordini_access` (no state/role gate beyond the app baseline — matches today).
+- `PATCH /api/ordini/v1/orders/:id/rows/:rowId/serial-number` body `{serial_number}`. Auth: `app_ordini_access` + `stato == 'BOZZA'` (matches the current widget gate).
+- `PATCH /api/ordini/v1/orders/:id/rows/:rowId/technical-notes` body `{technical_notes}`. Auth: `app_ordini_access` (no state/role gate beyond the app baseline — matches today).
 
 The UTF8 conversion on read (`convert(note_tecnici using UTF8)`) stays in the read query exactly as-is. Writes go through parameterized queries (no raw-string interpolation).
 
@@ -113,8 +113,8 @@ The UTF8 conversion on read (`convert(note_tecnici using UTF8)`) stays in the re
 **Classification.** Domain.
 
 **Placement.** **Backend.**
-- `PATCH /api/ordini/:id` body `{customer_po, confirmation_date, customer_id}` (three fields only — the other readonly Info-tab fields are immutable here). Auth: `app_customer_relations` + `stato == 'BOZZA'`. `customer_id` is the dropdown value from `erp_an_cli.selectedOptionValue` — i.e. `NUMERO_AZIENDA` from Alyante. **Per C2 (resolved):** the UPDATE writes **both** `orders.cdlan_cliente = <RAGIONE_SOCIALE>` (string, as today) and `orders.cdlan_cliente_id = <NUMERO_AZIENDA>`. No schema change — `cdlan_cliente_id` already exists in vodka and is already in the read SELECT (datasource-catalog.md:188). This strengthens the cross-DB linkage (Alyante ID ↔ Mistra `customers.customer.id` ↔ Grappa `cli_fatturazione.codice_aggancio_gest`, per `docs/IMPLEMENTATION-KNOWLEDGE.md`) at zero cost.
-- `PATCH /api/ordini/:id/referents` body `{technical:{name,phone,email}, technical_alt:{…}, administrative:{…}}`. Auth: `app_customer_relations` + `stato ∈ {BOZZA, INVIATO}`.
+- `PATCH /api/ordini/v1/orders/:id` body `{customer_po, confirmation_date, customer_id}` (three fields only — the other readonly Info-tab fields are immutable here). Auth: `app_customer_relations` + `stato == 'BOZZA'`. `customer_id` is the dropdown value from `erp_an_cli.selectedOptionValue` — i.e. `NUMERO_AZIENDA` from Alyante. **Per C2 (resolved):** the UPDATE writes **both** `orders.cdlan_cliente = <RAGIONE_SOCIALE>` (string, as today) and `orders.cdlan_cliente_id = <NUMERO_AZIENDA>`. No schema change — `cdlan_cliente_id` already exists in vodka and is already in the read SELECT (datasource-catalog.md:188). This strengthens the cross-DB linkage (Alyante ID ↔ Mistra `customers.customer.id` ↔ Grappa `cli_fatturazione.codice_aggancio_gest`, per `docs/IMPLEMENTATION-KNOWLEDGE.md`) at zero cost.
+- `PATCH /api/ordini/v1/orders/:id/referents` body `{technical:{name,phone,email}, technical_alt:{…}, administrative:{…}}`. Auth: `app_customer_relations` + `stato ∈ {BOZZA, INVIATO}`.
 
 All writes are parameterized.
 
@@ -126,7 +126,7 @@ All writes are parameterized.
 
 **Classification.** Reference read.
 
-**Placement.** **Backend.** `GET /api/ordini/ref/customers` — runs the exact filter from the audit (`DATA_DISMISSIONE IS NULL AND RAGGRUPPAMENTO_3 <> 'Ecommerce' AND TIPOLOGIA_AZIENDA <> 'DIPENDENTE'`, grouped by both returned columns). Returns `[{id: NUMERO_AZIENDA, name: RAGIONE_SOCIALE}]`. Auth: `app_ordini_access`.
+**Placement.** **Backend.** `GET /api/ordini/v1/ref/customers` — runs the exact filter from the audit (`DATA_DISMISSIONE IS NULL AND RAGGRUPPAMENTO_3 <> 'Ecommerce' AND TIPOLOGIA_AZIENDA <> 'DIPENDENTE'`, grouped by both returned columns). Returns `[{id: NUMERO_AZIENDA, name: RAGIONE_SOCIALE}]`. Auth: `app_ordini_access`.
 
 Dropped references (HubSpot potentials, payment methods) are not exposed.
 

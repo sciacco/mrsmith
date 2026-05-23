@@ -214,7 +214,7 @@ Since cancel-order is out of v1 scope, the `from_cp` re-imposition decision move
 
 ### Q8. Partial-success on ERP push — **RESOLVED: per-row semantics preserved, structured per-row feedback**
 
-v1 semantics for `POST /api/ordini/:id/send-to-erp` (matches current Appsmith behaviour, upgrades the UX):
+v1 semantics for `POST /api/ordini/v1/orders/:id/send-to-erp` (matches current Appsmith behaviour, upgrades the UX):
 - Backend loops rows and calls `GW_SendToErp` for each one (no batch, no transactional rollback — GW is called one line at a time as today).
 - Each row's outcome (success / failure + reason) is recorded.
 - **State transition rule:** `cdlan_stato → INVIATO` + `cdlan_evaso → 1` + Arxivar PDF upload happen **only if every row succeeded**. On any row failure, vodka state is not flipped and the Arxivar upload is not performed — identical to the source's `err == 0` guard.

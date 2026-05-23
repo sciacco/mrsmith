@@ -25,9 +25,9 @@ Legend — **Target layer** recommendation for the rewrite:
 - **Rewrite recommendation:** the Go backend owns all orders mutations. No direct connection from the React app. Parameterized queries required (today everything is string-interpolated).
 
 ### `GW internal CDLAN` — REST
-- Base URL `https://gw-int.cdlan.net`, no default headers/auth in the export.
+- Base URL `https://gw-int.cdlan.net`; the Appsmith export has no default headers/auth, but the MrSmith backend must use the existing shared `arak.Client` service-account transport configured by `ARAK_BASE_URL`, `ARAK_SERVICE_TOKEN_URL`, `ARAK_SERVICE_CLIENT_ID`, and `ARAK_SERVICE_CLIENT_SECRET`.
 - The gateway is already the sanctioned bridge between apps and ERP / PDF / Arxivar. Most of its endpoints are under `/orders/v1/…`.
-- **Rewrite recommendation:** call the GW from the Go backend, not from the browser. Keep the endpoints; move credentials server-side; add timeouts and retry policy; log request IDs.
+- **Rewrite recommendation:** call the GW from the Go backend through `arak.Client`, not from the browser. Keep the endpoints; do not introduce Ordini-specific `GW_INT_*` credentials; add timeouts and retry policy; log request IDs.
 
 ---
 
@@ -66,7 +66,7 @@ Legend — **Target layer** recommendation for the rewrite:
   IF(from_cp != 0, "Sì", "No") AS "Dal CP?"
   FROM orders ORDER BY id DESC;
   ```
-- **Target layer:** **BE** — `GET /api/ordini` returning paginated rows. Drop the embedded label mapping (`Tipo di proposta`, `Tipo di documento`, `Dal CP?`) and move it to the frontend formatter or a shared enum map.
+- **Target layer:** **BE** — `GET /api/ordini/v1/orders` returning paginated rows. Drop the embedded label mapping (`Tipo di proposta`, `Tipo di documento`, `Dal CP?`) and move it to the frontend formatter or a shared enum map.
 
 #### `Dettaglio_ordine_vero` (Home instance) — vodka, onLoad
 - **Purpose:** back the legacy Home modal with the full order record.
@@ -148,11 +148,11 @@ Legend — **Target layer** recommendation for the rewrite:
 
 #### `Dettaglio_ordine_vero` (Form ordine instance) — vodka, onLoad
 - **SQL:** `SELECT * FROM orders WHERE id = {{ appsmith.URL.queryParams.id }};`
-- **Target layer:** **BE** — `GET /api/ordini/:id` returning the full record. Page itself is likely not ported; the query is the only useful artifact.
+- **Target layer:** **BE** — `GET /api/ordini/v1/orders/:id` returning the full record. Page itself is likely not ported; the query is the only useful artifact.
 
 #### `Lista_righe_d_ordine` (Form ordine instance) — vodka, onLoad
 - **SQL:** same body as the Home instance, but keyed off `appsmith.URL.queryParams.id`.
-- **Target layer:** **BE** — `GET /api/ordini/:id/rows`.
+- **Target layer:** **BE** — `GET /api/ordini/v1/orders/:id/rows`.
 
 ---
 
@@ -191,7 +191,7 @@ Legend — **Target layer** recommendation for the rewrite:
   FROM orders WHERE id = {{ appsmith.URL.queryParams.id }} LIMIT 1;
   ```
 - **Bug note:** the `cdlan_int_fatturazione` CASE maps `'5'` to `Quadrimestrale`, but the `Form ordine` dropdown uses `'4'` for Quadrimestrale. Either the display mapping is wrong, or the dropdown values are wrong. Verify before porting.
-- **Target layer:** **BE** — `GET /api/ordini/:id`. The `*_desc` fields are presentation, move to the frontend formatter.
+- **Target layer:** **BE** — `GET /api/ordini/v1/orders/:id`. The `*_desc` fields are presentation, move to the frontend formatter.
 
 #### `RigheOrdine` — vodka, onLoad
 - **SQL:**
@@ -213,7 +213,7 @@ Legend — **Target layer** recommendation for the rewrite:
   FROM orders_rows WHERE orders_id = {{ appsmith.URL.queryParams.id }} ;
   ```
 - Note the column alias `'Attivazione'` (Dettaglio ordine) vs `'Prezzo attivazione'` (Home/Form ordine) — SendToErp refers to both `item["Attivazione"]` in `cdlanPrezzoAttivazione` and `item["Prezzo attivazione"]` in commented-out code. Follow `'Attivazione'` on Dettaglio ordine.
-- **Target layer:** **BE** — `GET /api/ordini/:id/rows`.
+- **Target layer:** **BE** — `GET /api/ordini/v1/orders/:id/rows`.
 
 #### `RigheOrdineTecnici` — vodka, onLoad
 - **SQL:**
@@ -246,15 +246,15 @@ Legend — **Target layer** recommendation for the rewrite:
 
 #### `SaveDataConfermaRifOrderCli`
 - **SQL:** `UPDATE orders SET cdlan_dataconferma = '{{cdlan_dataconferma.formattedDate}}', cdlan_rif_ordcli = '{{cdlan_rif_ordcli.text}}', cdlan_cliente = '{{erp_an_cli.selectedOptionValue}}' WHERE id = '{{order_id.text}}';`
-- **Target layer:** **BE** — `PATCH /api/ordini/:id` with fields `{cdlan_dataconferma, cdlan_rif_ordcli, cdlan_cliente (or customer_id)}`. Enforce BOZZA state + CustomerRelations role server-side.
+- **Target layer:** **BE** — `PATCH /api/ordini/v1/orders/:id` with fields `{cdlan_dataconferma, cdlan_rif_ordcli, cdlan_cliente (or customer_id)}`. Enforce BOZZA state + CustomerRelations role server-side.
 
 #### `SaveActivationDate`
 - **SQL:** `UPDATE orders_rows SET cdlan_data_attivazione = '{{this.params.cdlanDataAttivazione}}', confirm_data_attivazione = 1 WHERE cdlan_systemodv_row = '{{this.params.cdlanSystemodvRow}}';`
-- **Target layer:** **BE** — `PATCH /api/ordini/:id/rows/:rowId/activate` with body `{activation_date}`. The endpoint must atomically set `confirm_data_attivazione=1` as a side-effect.
+- **Target layer:** **BE** — `PATCH /api/ordini/v1/orders/:id/rows/:rowId/activate` with body `{activation_date}`. The endpoint must atomically set `confirm_data_attivazione=1` as a side-effect.
 
 #### `UpdateOrderState`
 - **SQL:** `UPDATE orders SET cdlan_stato = 'INVIATO', cdlan_evaso = 1 WHERE id = '{{this.params.OrderId}}';`
-- **Target layer:** **BE** — this is an internal side-effect of the `POST /api/ordini/:id/send-to-erp` endpoint; no separate HTTP call from the client.
+- **Target layer:** **BE** — this is an internal side-effect of the `POST /api/ordini/v1/orders/:id/send-to-erp` endpoint; no separate HTTP call from the client.
 
 #### `SetOrderStateAttivo`
 - **SQL:** `UPDATE orders SET cdlan_stato = 'ATTIVO' WHERE id = '{{this.params.OrderId}}';`
@@ -267,7 +267,7 @@ Legend — **Target layer** recommendation for the rewrite:
 
 #### `SaveOrderReferents`
 - **SQL:** `UPDATE orders SET cdlan_rif_tech_nom/tel/email = …, cdlan_rif_altro_tech_* = …, cdlan_rif_adm_* = … WHERE id = '{{ref_order_id.text}}';`
-- **Target layer:** **BE** — `PATCH /api/ordini/:id/referents`. Enforce state/role server-side.
+- **Target layer:** **BE** — `PATCH /api/ordini/v1/orders/:id/referents`. Enforce state/role server-side.
 
 #### `order_perso`
 - **SQL:** `UPDATE orders SET cdlan_stato = 'PERSO' WHERE id = '{{order_id.text}}';`
@@ -275,11 +275,11 @@ Legend — **Target layer** recommendation for the rewrite:
 
 #### `upd_row_serNum`
 - **SQL:** `UPDATE orders_rows SET cdlan_serialnumber = '{{this.params.cdlanSerialNumber}}' WHERE cdlan_systemodv_row = '{{this.params.cdlanSystemodv}}';`
-- **Target layer:** **BE** — `PATCH /api/ordini/:id/rows/:rowId/serial-number` (BOZZA state guard).
+- **Target layer:** **BE** — `PATCH /api/ordini/v1/orders/:id/rows/:rowId/serial-number` (BOZZA state guard).
 
 #### `upd_row_note_tecnici`
 - **SQL:** `UPDATE orders_rows SET note_tecnici = '{{this.params.noteTecnici}}' WHERE cdlan_systemodv_row = '{{this.params.idRiga}}';`
-- **Target layer:** **BE** — `PATCH /api/ordini/:id/rows/:rowId/technical-notes`.
+- **Target layer:** **BE** — `PATCH /api/ordini/v1/orders/:id/rows/:rowId/technical-notes`.
 
 ---
 
@@ -287,15 +287,15 @@ Legend — **Target layer** recommendation for the rewrite:
 
 #### `GW_Kickoff`
 - `GET /orders/v1/kick-off/{{OrderId}}` on `gw-int.cdlan.net`. Returns a PDF body consumed by `download()`.
-- **Target layer:** **BE** — proxy endpoint `GET /api/ordini/:id/kickoff.pdf`. The client downloads from the backend, not GW.
+- **Target layer:** **BE** — proxy endpoint `GET /api/ordini/v1/orders/:id/kickoff.pdf`. The client downloads from the backend, not GW.
 
 #### `GW_ActivationForm`
 - `GET /orders/v1/activation-form/{{OrderId}}`. PDF with language-aware filename.
-- **Target layer:** **BE** — `GET /api/ordini/:id/activation-form.pdf?lang={it|en}`.
+- **Target layer:** **BE** — `GET /api/ordini/v1/orders/:id/activation-form.pdf?lang={it|en}`.
 
 #### `GW_SendToErp`
 - `POST /orders/v1/erp`. JSON body with ~40 fields per row (`cdlan_systemodv`, `cdlan_systemodv_row`, header fields repeated, plus per-row `cdlan_codart`, `cdlan_descart`, `cdlan_qta`, `cdlan_serialnumber`, `cdlan_prezzo`, `cdlan_prezzo_attivazione`, `cdlan_prezzo_cessazione`, `cdlan_ragg_fatturazione`, `cdlan_codice_kit`, …). Hard-codes `"cdlan_stato": "CREATO"`.
-- **Target layer:** **BE** — orchestrate the whole "send to ERP" flow in a single backend call: loop rows, call GW, write `UpdateOrderState`, optionally push Arxivar file. One endpoint: `POST /api/ordini/:id/send-to-erp` with multipart body containing the Arxivar PDF. Returns a per-row outcome.
+- **Target layer:** **BE** — orchestrate the whole "send to ERP" flow in a single backend call: loop rows, call GW, write `UpdateOrderState`, optionally push Arxivar file. One endpoint: `POST /api/ordini/v1/orders/:id/send-to-erp` with multipart body containing the Arxivar PDF. Returns a per-row outcome.
 
 #### `GW_SetActivationDate`
 - `POST /orders/v1/set-order-activation`. Body `{cdlan_systemodv, cdlan_systemodv_row, cdlan_data_attivazione}` (numeric coercion on the two IDs).
@@ -307,16 +307,16 @@ Legend — **Target layer** recommendation for the rewrite:
 
 #### `GW_GetPDFArxivarOrder`
 - `GET /orders/v1/order/pdf/{{orderId}}?from=vodka`. Returns base64 or raw PDF bytes.
-- **Target layer:** **BE** — `GET /api/ordini/:id/signed-pdf`. The backend normalizes the payload to `application/pdf`.
+- **Target layer:** **BE** — `GET /api/ordini/v1/orders/:id/signed-pdf`. The backend normalizes the payload to `application/pdf`.
 
 #### `DownloadOrderPDFintGW`
 - `GET /orders/v1/order/pdf/{{orderId}}/generate`. Returns PDF.
-- **Target layer:** **BE** — `GET /api/ordini/:id/pdf`. Same normalization rules.
+- **Target layer:** **BE** — `GET /api/ordini/v1/orders/:id/pdf`. Same normalization rules.
 
 #### `GW_CancelOrder`
 - `POST /orders/v2/order/{{order_Id}}/cancel`.
 - **Bug note:** `butt_annullato` passes the wrong parameter name (`order_number` vs `order_Id`). Verify in production before porting the payload contract.
-- **Target layer:** **BE** — `POST /api/ordini/:id/cancel-request`. The backend translates to the GW call.
+- **Target layer:** **BE** — `POST /api/ordini/v1/orders/:id/cancel-request`. The backend translates to the GW call.
 
 #### `GW_SendRequestAnnullaOdv`
 - `GET /{{OrderId}}` — bare path, clearly broken.

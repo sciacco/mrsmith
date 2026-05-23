@@ -24,15 +24,15 @@ The sanctioned bridge between this app and ERP / PDF generation / Arxivar. The r
 
 | Endpoint | Purpose | Called from |
 |---|---|---|
-| `POST /orders/v1/erp` | Push one order row to the ERP. Payload hard-codes `cdlan_stato = "CREATO"` (intentional ERP-vs-vodka state divergence — keep). | `POST /api/ordini/:id/send-to-erp` (per-row loop). |
-| `POST /orders/v1/set-order-activation` | Sync the per-row activation date to the ERP. Body `{cdlan_systemodv, cdlan_systemodv_row, cdlan_data_attivazione}`. | `PATCH /api/ordini/:id/rows/:rowId/activate` (after vodka UPDATE). |
-| `POST /orders/v1/send-to-arxivar` | Multipart upload of the signed-order PDF. Form fields: `file`, `orderId`, `filename`, `multipart` (mime). | `POST /api/ordini/:id/send-to-erp` (terminal step on full success). |
-| `GET /orders/v1/kick-off/:id` | Kickoff PDF. | `GET /api/ordini/:id/kickoff.pdf`. |
-| `GET /orders/v1/activation-form/:id` | Activation form PDF (filename derived server-side from `orders.profile_lang`). | `GET /api/ordini/:id/activation-form.pdf`. |
-| `GET /orders/v1/order/pdf/:id/generate` | Generate the order PDF (pre-Arxivar). Returns base64-or-raw. | `GET /api/ordini/:id/pdf`. |
-| `GET /orders/v1/order/pdf/:id?from=vodka` | Fetch the signed-order PDF from Arxivar. Returns base64-or-raw. | `GET /api/ordini/:id/signed-pdf`. |
+| `POST /orders/v1/erp` | Push one order row to the ERP. Payload hard-codes `cdlan_stato = "CREATO"` (intentional ERP-vs-vodka state divergence — keep). | `POST /api/ordini/v1/orders/:id/send-to-erp` (per-row loop). |
+| `POST /orders/v1/set-order-activation` | Sync the per-row activation date to the ERP. Body `{cdlan_systemodv, cdlan_systemodv_row, cdlan_data_attivazione}`. | `PATCH /api/ordini/v1/orders/:id/rows/:rowId/activate` (after vodka UPDATE). |
+| `POST /orders/v1/send-to-arxivar` | Multipart upload of the signed-order PDF. Form fields: `file`, `orderId`, `filename`, `multipart` (mime). | `POST /api/ordini/v1/orders/:id/send-to-erp` (terminal step on full success). |
+| `GET /orders/v1/kick-off/:id` | Kickoff PDF. | `GET /api/ordini/v1/orders/:id/kickoff.pdf`. |
+| `GET /orders/v1/activation-form/:id` | Activation form PDF (filename derived server-side from `orders.profile_lang`). | `GET /api/ordini/v1/orders/:id/activation-form.pdf`. |
+| `GET /orders/v1/order/pdf/:id/generate` | Generate the order PDF (pre-Arxivar). Returns base64-or-raw. | `GET /api/ordini/v1/orders/:id/pdf`. |
+| `GET /orders/v1/order/pdf/:id?from=vodka` | Fetch the signed-order PDF from Arxivar. Returns base64-or-raw. | `GET /api/ordini/v1/orders/:id/signed-pdf`. |
 
-**Auth.** The exported datasource has no declared auth. Production likely uses an Authorization header or IP allowlist; the rewrite must move whatever credential is required server-side and add timeouts + structured logging (with request IDs).
+**Auth.** The exported datasource has no declared auth, but the approved MrSmith integration uses the existing shared `arak.Client` service-account transport against `https://gw-int.cdlan.net`. The backend is configured through `ARAK_BASE_URL`, `ARAK_SERVICE_TOKEN_URL`, `ARAK_SERVICE_CLIENT_ID`, and `ARAK_SERVICE_CLIENT_SECRET`; do not add Ordini-specific `GW_INT_*` credentials. Add timeouts and structured logging with request IDs around every GW call.
 
 **Payload normalization.** All PDF endpoints return base64-or-raw; the Appsmith app duplicates the heuristic in two JSObjects. The rewrite normalizes server-side and returns clean `application/pdf` to the browser.
 
@@ -89,7 +89,7 @@ Order rows in `vodka.orders` and `vodka.orders_rows` reach Ordini already popula
 Mistra owns `orders.legacy_orders(quote_id, vodka_id, jdata)`, written by the quotes converter on every successful order creation. The unique writer in the monorepo is `backend/internal/quotes/order_conversion.go:insertLegacyOrder`. Ordini can rely on it as a read-only back-pointer.
 
 **Endpoint contract.**
-- `GET /api/ordini/:id` includes an optional `origin` field when the order has a quote ancestor:
+- `GET /api/ordini/v1/orders/:id` includes an optional `origin` field when the order has a quote ancestor:
   ```json
   "origin": {
     "type": "quote",
@@ -101,7 +101,7 @@ Mistra owns `orders.legacy_orders(quote_id, vodka_id, jdata)`, written by the qu
 - When no row in `legacy_orders` matches `vodka_id = :order_id`, `origin` is omitted. Ex-novo orders from the customer portal will not have a quote ancestor.
 
 **Backend wiring.**
-- Ordini Go module opens a Mistra Postgres connection scoped to `SELECT` on `orders.legacy_orders` only. The connection is reused for the entire request lifecycle of `GET /api/ordini/:id`; no other Mistra schemas are touched.
+- Ordini Go module opens a Mistra Postgres connection scoped to `SELECT` on `orders.legacy_orders` only. The connection is reused for the entire request lifecycle of `GET /api/ordini/v1/orders/:id`; no other Mistra schemas are touched.
 - The lookup is a single `SELECT quote_id FROM orders.legacy_orders WHERE vodka_id = $1` keyed by `vodka.orders.id`. Joined `quote_code` is resolved by querying `quotes.quote` via the **quotes module's existing API**, not directly — Ordini stays out of the quotes schema.
 
 **UI affordance.**
@@ -116,24 +116,24 @@ Mistra owns `orders.legacy_orders(quote_id, vodka_id, jdata)`, written by the qu
 ### 3.1 Open and inspect an order
 ```
 User → Portal sidebar → /ordini
-  └─ GET /api/ordini  (vodka SELECT_Orders_Table-equivalent)
+  └─ GET /api/ordini/v1/orders  (vodka SELECT_Orders_Table-equivalent)
 User → click "Visualizza" on a row → /ordini/:id
-  └─ GET /api/ordini/:id          (vodka Order-equivalent + cdlan_cliente_id surfaced)
-  └─ GET /api/ordini/:id/rows     (vodka RigheOrdine — header line for §5.4 + §5.5)
-  └─ GET /api/ordini/:id/technical-rows (vodka RigheOrdineTecnici — header line for §5.6)
-  └─ GET /api/ordini/ref/customers (Alyante erp_anagrafiche_cli — only when state == BOZZA)
+  └─ GET /api/ordini/v1/orders/:id          (vodka Order-equivalent + cdlan_cliente_id surfaced)
+  └─ GET /api/ordini/v1/orders/:id/rows     (vodka RigheOrdine — header line for §5.4 + §5.5)
+  └─ GET /api/ordini/v1/orders/:id/technical-rows (vodka RigheOrdineTecnici — header line for §5.6)
+  └─ GET /api/ordini/v1/ref/customers (Alyante erp_anagrafiche_cli — only when state == BOZZA)
 ```
 The Alyante customer call is gated to BOZZA on the backend so non-editable detail loads stay quick and don't hit Alyante for nothing.
 
 ### 3.2 Finalize BOZZA → INVIATO (Send to ERP)
 ```
 User edits Info tab → SALVA
-  └─ PATCH /api/ordini/:id
+  └─ PATCH /api/ordini/v1/orders/:id
        writes: cdlan_rif_ordcli, cdlan_dataconferma, cdlan_cliente, cdlan_cliente_id (C2)
-       refresh: GET /api/ordini/:id
+       refresh: GET /api/ordini/v1/orders/:id
 
 User attaches Arxivar PDF + clicks INVIA in ERP
-  └─ POST /api/ordini/:id/send-to-erp  (multipart: signed PDF)
+  └─ POST /api/ordini/v1/orders/:id/send-to-erp  (multipart: signed PDF)
        backend loop, per row:
          POST gw /orders/v1/erp        (cdlan_stato="CREATO" hard-coded)
          on row failure: record { rowId, error }
@@ -149,22 +149,22 @@ UI:
 
 ### 3.3 Edit Referenti (BOZZA or INVIATO)
 ```
-PATCH /api/ordini/:id/referents
+PATCH /api/ordini/v1/orders/:id/referents
   writes: 9 cdlan_rif_* fields
-  refresh: GET /api/ordini/:id
+  refresh: GET /api/ordini/v1/orders/:id
 ```
 
 ### 3.4 Edit serial number on a Riga (BOZZA only)
 ```
-PATCH /api/ordini/:id/rows/:rowId/serial-number
+PATCH /api/ordini/v1/orders/:id/rows/:rowId/serial-number
   writes: orders_rows.cdlan_serialnumber WHERE id = :rowId AND orders_id = :id
-  refresh: GET /api/ordini/:id/rows
+  refresh: GET /api/ordini/v1/orders/:id/rows
 ```
 
 ### 3.5 Per-row activation date → auto-ATTIVO
 ```
 User opens Modifica modal on a row → CONFERMA
-  └─ PATCH /api/ordini/:id/rows/:rowId/activate  (body: { activation_date })
+  └─ PATCH /api/ordini/v1/orders/:id/rows/:rowId/activate  (body: { activation_date })
        backend (single transaction for the vodka writes):
          UPDATE orders_rows SET cdlan_data_attivazione=:date, confirm_data_attivazione=1
          POST gw /orders/v1/set-order-activation
@@ -172,14 +172,14 @@ User opens Modifica modal on a row → CONFERMA
                 (confirm_data_attivazione=1 OR data_annullamento IS NOT NULL OR cdlan_qta=0)   -- Q2 fix
          if count == total rows:
             UPDATE orders SET cdlan_stato='ATTIVO'
-       refresh: GET /api/ordini/:id, GET /api/ordini/:id/rows
+       refresh: GET /api/ordini/v1/orders/:id, GET /api/ordini/v1/orders/:id/rows
 ```
 
 ### 3.6 Edit technical notes (any state, any user with `app_ordini_access`)
 ```
-PATCH /api/ordini/:id/rows/:rowId/technical-notes
+PATCH /api/ordini/v1/orders/:id/rows/:rowId/technical-notes
   writes: orders_rows.note_tecnici WHERE id = :rowId AND orders_id = :id
-  refresh: GET /api/ordini/:id/technical-rows
+  refresh: GET /api/ordini/v1/orders/:id/technical-rows
 ```
 
 ### 3.7 PDF downloads
@@ -195,10 +195,10 @@ The Appsmith app has no timers, schedules, or webhook listeners. All effects are
 
 | Side-effect | When | Owner |
 |---|---|---|
-| `cdlan_stato → INVIATO` and `cdlan_evaso → 1` | terminal step of `POST /api/ordini/:id/send-to-erp` on full success | backend handler |
-| Arxivar PDF upload (`POST gw /orders/v1/send-to-arxivar`) | terminal step of `POST /api/ordini/:id/send-to-erp` on full success | backend handler |
-| `confirm_data_attivazione → 1` | side-effect of every `PATCH /api/ordini/:id/rows/:rowId/activate` | backend handler |
-| `cdlan_stato → ATTIVO` | conditional on the row count match inside `PATCH /api/ordini/:id/rows/:rowId/activate` | backend handler |
+| `cdlan_stato → INVIATO` and `cdlan_evaso → 1` | terminal step of `POST /api/ordini/v1/orders/:id/send-to-erp` on full success | backend handler |
+| Arxivar PDF upload (`POST gw /orders/v1/send-to-arxivar`) | terminal step of `POST /api/ordini/v1/orders/:id/send-to-erp` on full success | backend handler |
+| `confirm_data_attivazione → 1` | side-effect of every `PATCH /api/ordini/v1/orders/:id/rows/:rowId/activate` | backend handler |
+| `cdlan_stato → ATTIVO` | conditional on the row count match inside `PATCH /api/ordini/v1/orders/:id/rows/:rowId/activate` | backend handler |
 | `cdlan_stato → ANNULLATO` | external — Mistra NG `cancel` endpoint flips the ERP-side state; **vodka is not updated by this flow**. Today this is silent divergence. Out of v1 scope but flagged. | external |
 | `arx_doc_number → <value>` (write) | **not visible in the Appsmith export.** The app only reads it. See §7 — preserved as-is under 1:1. | external (out of this app's scope) |
 

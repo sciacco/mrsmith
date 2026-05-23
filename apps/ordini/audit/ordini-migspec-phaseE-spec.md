@@ -51,7 +51,7 @@
   - `Order` 1:N `OrderRow` via `orders_rows.orders_id = orders.id`.
   - `Order.cdlan_cliente_id` → `Customer.NUMERO_AZIENDA` (writeable per C2; `Order.cdlan_cliente` continues to hold the RAGIONE_SOCIALE string for display).
   - `Order.arx_doc_number` → external Arxivar document.
-  - `Order ↔ Quote` via `mistra.orders.legacy_orders.vodka_id = orders.id` (left join, optional). When present, surfaces as `origin.type == "quote"` on `GET /api/ordini/:id`. See Phase D §4 Traceability.
+  - `Order ↔ Quote` via `mistra.orders.legacy_orders.vodka_id = orders.id` (left join, optional). When present, surfaces as `origin.type == "quote"` on `GET /api/ordini/v1/orders/:id`. See Phase D §4 Traceability.
 - **Constraints and business rules.**
   - State machine: `BOZZA → INVIATO` (sendToErp full success); `INVIATO → ATTIVO` (every row confirmed); `INVIATO → ANNULLATO` is server-side via Mistra NG (not driven from v1 of this app).
   - `confirm_data_attivazione = 1` is set unconditionally as a side-effect of every per-row activation save.
@@ -141,7 +141,7 @@ Not a local entity. Referenced only by `orders.arx_doc_number` and the deep-link
 - **External systems and purpose.**
   - **vodka (MySQL)** — primary store; owns `orders`, `orders_rows`. Backend-only access, parameterized.
   - **Alyante (MSSQL)** — read-only customer master. Backend-only.
-  - **GW internal CDLAN (REST, `https://gw-int.cdlan.net`)** — bridge to ERP, PDF generation, Arxivar upload/retrieval. Seven endpoints in active use (see Phase D §1.3); credentials/auth move server-side.
+  - **GW internal CDLAN (REST, `https://gw-int.cdlan.net`)** — bridge to ERP, PDF generation, Arxivar upload/retrieval. Seven endpoints in active use (see Phase D §1.3); backend calls use the existing shared `arak.Client` service-account transport configured by `ARAK_*` env vars.
   - **Keycloak** — OAuth2/OIDC; `app_ordini_access` and `app_customer_relations` claims drive authorization.
   - **Mistra NG Internal API** — used **only for the deferred cancel flow** (not in v1).
   - **Arxivar (web UI)** — anchor target only; no API integration.
@@ -152,35 +152,35 @@ Not a local entity. Referenced only by `orders.arx_doc_number` and the deep-link
 ---
 
 ## API Contract Summary
-All endpoints are namespaced under `/api/ordini`. Every handler validates state + role server-side; the frontend gates are advisory.
+All browser-facing endpoints are namespaced under `/api/ordini/v1`; Go handlers are registered under `/ordini/v1/...` because `backend/cmd/server/main.go` strips the `/api` prefix before dispatch. Every handler validates state + role server-side; the frontend gates are advisory.
 
 ### Read endpoints
 | Method | Path | Purpose | Auth |
 |---|---|---|---|
-| GET | `/api/ordini` | Home list (paginated/searchable; client-side in v1). | `app_ordini_access` |
-| GET | `/api/ordini/:id` | Full order header; may include optional `origin: {type:"quote", quote_id, quote_code, quote_url}` field when a row exists in `mistra.orders.legacy_orders` (Phase D §4 Traceability). | `app_ordini_access` |
-| GET | `/api/ordini/:id/rows` | Order rows for the Righe tab. | `app_ordini_access` |
-| GET | `/api/ordini/:id/technical-rows` | Order rows projected for the Informazioni dai tecnici tab (UTF8 conversion preserved). | `app_ordini_access` |
-| GET | `/api/ordini/ref/customers` | Alyante customer list (filtered as in §Customer entity). | `app_ordini_access`; backend may load lazily only when state == BOZZA. |
-| GET | `/api/ordini/:id/kickoff.pdf` | Backend proxy to `GW /orders/v1/kick-off/:id`; returns `application/pdf`. Filename `kick off_<ndoc>_<anno>.pdf`. | `app_customer_relations` + state `INVIATO` |
-| GET | `/api/ordini/:id/activation-form.pdf` | Backend proxy to `GW /orders/v1/activation-form/:id`; filename localized per `orders.profile_lang`. | `app_customer_relations` + state ∈ {INVIATO, ATTIVO} |
-| GET | `/api/ordini/:id/pdf` | Backend proxy to `GW /orders/v1/order/pdf/:id/generate`. | `app_ordini_access` + `arx_doc_number IS NULL` |
-| GET | `/api/ordini/:id/signed-pdf` | Backend proxy to `GW /orders/v1/order/pdf/:id?from=vodka`. | `app_ordini_access` + `arx_doc_number IS NOT NULL` |
+| GET | `/api/ordini/v1/orders` | Home list (paginated/searchable; client-side in v1). | `app_ordini_access` |
+| GET | `/api/ordini/v1/orders/:id` | Full order header; may include optional `origin: {type:"quote", quote_id, quote_code, quote_url}` field when a row exists in `mistra.orders.legacy_orders` (Phase D §4 Traceability). | `app_ordini_access` |
+| GET | `/api/ordini/v1/orders/:id/rows` | Order rows for the Righe tab. | `app_ordini_access` |
+| GET | `/api/ordini/v1/orders/:id/technical-rows` | Order rows projected for the Informazioni dai tecnici tab (UTF8 conversion preserved). | `app_ordini_access` |
+| GET | `/api/ordini/v1/ref/customers` | Alyante customer list (filtered as in §Customer entity). | `app_ordini_access`; backend may load lazily only when state == BOZZA. |
+| GET | `/api/ordini/v1/orders/:id/kickoff.pdf` | Backend proxy to `GW /orders/v1/kick-off/:id`; returns `application/pdf`. Filename `kick off_<ndoc>_<anno>.pdf`. | `app_customer_relations` + state `INVIATO` |
+| GET | `/api/ordini/v1/orders/:id/activation-form.pdf` | Backend proxy to `GW /orders/v1/activation-form/:id`; filename localized per `orders.profile_lang`. | `app_customer_relations` + state ∈ {INVIATO, ATTIVO} |
+| GET | `/api/ordini/v1/orders/:id/pdf` | Backend proxy to `GW /orders/v1/order/pdf/:id/generate`. | `app_ordini_access` + `arx_doc_number IS NULL` |
+| GET | `/api/ordini/v1/orders/:id/signed-pdf` | Backend proxy to `GW /orders/v1/order/pdf/:id?from=vodka`. | `app_ordini_access` + `arx_doc_number IS NOT NULL` |
 
 ### Write endpoints
 | Method | Path | Purpose | Auth + state gate |
 |---|---|---|---|
-| PATCH | `/api/ordini/:id` | BOZZA header update; writes both `cdlan_cliente` and `cdlan_cliente_id` (C2). | `app_customer_relations` + state `BOZZA` |
-| PATCH | `/api/ordini/:id/referents` | 9 contact fields. | `app_customer_relations` + state ∈ {BOZZA, INVIATO} |
-| POST | `/api/ordini/:id/send-to-erp` | Multipart with the signed Arxivar PDF; per-row GW push, terminal vodka state flip + Arxivar upload only on full success; structured per-row response (C1). | `app_customer_relations` + state `BOZZA` + preconditions (dataconferma, customer, PDF) |
-| PATCH | `/api/ordini/:id/rows/:rowId/serial-number` | Inline serial-number write. | `app_ordini_access` + state `BOZZA` |
-| PATCH | `/api/ordini/:id/rows/:rowId/technical-notes` | Inline technical-note write. | `app_ordini_access` + any state |
-| PATCH | `/api/ordini/:id/rows/:rowId/activate` | Per-row activation date; sets `confirm_data_attivazione=1`, calls GW, recounts confirmed rows, auto-flips to ATTIVO when count matches (Q2 fix). | `app_customer_relations` + state `INVIATO` |
+| PATCH | `/api/ordini/v1/orders/:id` | BOZZA header update; writes both `cdlan_cliente` and `cdlan_cliente_id` (C2). | `app_customer_relations` + state `BOZZA` |
+| PATCH | `/api/ordini/v1/orders/:id/referents` | 9 contact fields. | `app_customer_relations` + state ∈ {BOZZA, INVIATO} |
+| POST | `/api/ordini/v1/orders/:id/send-to-erp` | Multipart with the signed Arxivar PDF; per-row GW push, terminal vodka state flip + Arxivar upload only on full success; structured per-row response (C1). | `app_customer_relations` + state `BOZZA` + preconditions (dataconferma, customer, PDF) |
+| PATCH | `/api/ordini/v1/orders/:id/rows/:rowId/serial-number` | Inline serial-number write. | `app_ordini_access` + state `BOZZA` |
+| PATCH | `/api/ordini/v1/orders/:id/rows/:rowId/technical-notes` | Inline technical-note write. | `app_ordini_access` + any state |
+| PATCH | `/api/ordini/v1/orders/:id/rows/:rowId/activate` | Per-row activation date; sets `confirm_data_attivazione=1`, calls GW, recounts confirmed rows, auto-flips to ATTIVO when count matches (Q2 fix). | `app_customer_relations` + state `INVIATO` |
 
 ### Derived / workflow-specific operations
 - `sendToErp` returns `{ rows: [{ rowId, cdlan_systemodv_row, status: 'ok'|'error', error? }], stateTransitioned: bool, arxivarUploaded: bool }` on every call. UI renders this on partial failure.
 - The auto-ATTIVO promotion is internal to `setActivationDate`; there is no explicit "mark active" endpoint.
-- **Excluded in v1 (post-v1 follow-ups in `docs/TODO.md`):** `POST /api/ordini/:id/cancel-request`; partial-failure retry endpoint.
+- **Excluded in v1 (post-v1 follow-ups in `docs/TODO.md`):** `POST /api/ordini/v1/orders/:id/cancel-request`; partial-failure retry endpoint.
 
 ---
 
@@ -193,7 +193,7 @@ All endpoints are namespaced under `/api/ordini`. Every handler validates state 
 - **Performance or scale.** Home list is client-side in v1 (matches source); server-side pagination tracked as a follow-up if/when the dataset grows. No known hot path beyond the GW PDF endpoints which can return multi-megabyte payloads — backend should stream where possible.
 - **Operational constraints.**
   - No DB migrations. Legacy `cdlan_int_fatturazione = '5'` is tolerated by the read-time enum mapper (Q3).
-  - GW credentials/auth model must be moved server-side and timeouts + structured logging added (the export carries no auth declaration).
+  - GW calls must use the existing backend `arak.Client` service-account transport (`ARAK_BASE_URL`, `ARAK_SERVICE_TOKEN_URL`, `ARAK_SERVICE_CLIENT_ID`, `ARAK_SERVICE_CLIENT_SECRET`); do not introduce Ordini-specific `GW_INT_*` credentials. Add timeouts + structured logging around every GW operation.
 - **UX or accessibility expectations.** Standard mrsmith design system; no special accessibility requirements documented in the audit.
 
 ---
@@ -230,10 +230,10 @@ All endpoints are namespaced under `/api/ordini`. Every handler validates state 
 - `arxivar.isDisabled` rule fixed to `state NOT IN {ANNULLATO, PERSO, ATTIVO} AND user IN app_customer_relations` (Q6).
 - Per-row send-to-ERP with structured per-row UI feedback; no transactional rollback (C1).
 - BOZZA header save dual-writes `cdlan_cliente` (string) and `cdlan_cliente_id` (NUMERO_AZIENDA) (C2).
+- GW auth model resolved: use the existing backend `arak.Client` service-account transport and `ARAK_*` env vars for `gw-int.cdlan.net`; no Ordini-specific `GW_INT_*` configuration.
 - Home list: render `cdlan_evaso` as Sì/No (B2); collapse the Arxivar tab into the Info tab (B3); render `cdlan_cliente_id` on the Info tab under Ragione sociale (B1).
 
 ### What still needs validation
-- GW auth model (the export carries no auth declaration — production credentials must be recovered or re-provisioned during implementation).
 - Volume of legacy `cdlan_int_fatturazione = '5'` rows (drives whether the dual-accept mapper is a long-term tolerance or a transient one).
 - Per-row outcome UX rendering (final visual designed in implementation, not in this spec).
 

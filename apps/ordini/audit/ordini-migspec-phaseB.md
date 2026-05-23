@@ -94,7 +94,7 @@ Primary workspace for header-level edits and state transitions.
 | Sub-section | Widgets | Notes |
 |---|---|---|
 | Readonly header metadata | ~20 TEXT widgets showing raw fields from `Order` | e.g. Proposta, System ODV, Tipo doc, Tipo proposta (A/N/R → label), Dur. rinnovo/tacito rinnovo (1/0 → Sì/No), Intervallo fatturazione (CASE → label), etc. All presentation-layer mappings move to the frontend formatter. |
-| Editable block (`Container1`) | `cdlan_rif_ordcli` INPUT, `cdlan_dataconferma` DATEPICKER, `erp_an_cli` SINGLE_SELECT_TREE (Ragione sociale), SALVA button (`Button3`) | Editable only when `stato == 'BOZZA'` + `app_customer_relations`. Click → `PATCH /api/ordini/:id` with the three fields, then refetch. |
+| Editable block (`Container1`) | `cdlan_rif_ordcli` INPUT, `cdlan_dataconferma` DATEPICKER, `erp_an_cli` SINGLE_SELECT_TREE (Ragione sociale), SALVA button (`Button3`) | Editable only when `stato == 'BOZZA'` + `app_customer_relations`. Click → `PATCH /api/ordini/v1/orders/:id` with the three fields, then refetch. |
 | Action bar (`cont_bottoni`) | `RICHIEDI ANNULLAMENTO`, `INVIA in ERP` (`invia`), `ORDINE PERSO` (dropped — hidden today), Arxivar file picker (`arxivar`) | See §Action bar rules below. |
 
 **Action bar rules (Q6 applied).**
@@ -121,7 +121,7 @@ Editable customer contacts.
 
 Widgets: three 3-field groups (Tecnico / Altro tecnico / Amministrativo — `nom`, `tel`, `email` each; note the asymmetric `cdlan_rif_adm_tech_*` column names on the ADM group), SALVA button (`Button6`).
 
-**Rule:** SALVA enabled when `stato ∈ {'BOZZA','INVIATO'}` AND `app_customer_relations`. Click → `PATCH /api/ordini/:id/referents`, refetch.
+**Rule:** SALVA enabled when `stato ∈ {'BOZZA','INVIATO'}` AND `app_customer_relations`. Click → `PATCH /api/ordini/v1/orders/:id/referents`, refetch.
 
 ### 2.5 — Tab "Righe"
 Order lines table; inline editing for `Numero seriale` + per-row action to open activation-date modal.
@@ -130,7 +130,7 @@ Order lines table; inline editing for `Numero seriale` + per-row action to open 
 |---|---|
 | `Lista_righe` (TABLE_V2) bound to `RigheOrdine.data` | 12 columns: ID Riga, System ODV Riga, Codice articolo bundle, Codice articolo, Descrizione articolo, Canone, **Attivazione** (standardized DTO field `activation_price`, per Q4), Quantità, Prezzo cessazione, Codice raggruppamento fatturazione, Data attivazione (formatted DD/MM/YYYY or "-"), **Numero seriale** (editable inline when `stato == 'BOZZA'`). |
 | `customColumn1` (row iconButton "Modifica") | Visible only when `stato == 'INVIATO'` + `app_customer_relations`. Click → opens `ModificaRiga` modal (see §2.7). |
-| Inline editActions (EditActions1) | `onSave` → `PATCH /api/ordini/:id/rows/:rowId/serial-number`, then refetch. |
+| Inline editActions (EditActions1) | `onSave` → `PATCH /api/ordini/v1/orders/:id/rows/:rowId/serial-number`, then refetch. |
 
 ### 2.6 — Tab "Informazioni dai tecnici"
 Technical-notes editor for each row.
@@ -138,7 +138,7 @@ Technical-notes editor for each row.
 | Widget | Notes |
 |---|---|
 | `Lista_righe_tecnici` (TABLE_V2) bound to `RigheOrdineTecnici.data` | 5 columns: ID riga, codice articolo bundle, codice articolo, **note tecnici** (editable inline; UTF8-converted on read), data annullamento (readonly). |
-| Inline editActions | `onSave` → `PATCH /api/ordini/:id/rows/:rowId/technical-notes`, then refetch. |
+| Inline editActions | `onSave` → `PATCH /api/ordini/v1/orders/:id/rows/:rowId/technical-notes`, then refetch. |
 
 **Role gate.** Not gated on `app_customer_relations` — anyone with `app_ordini_access` edits technical notes. Parity with today.
 
@@ -148,7 +148,7 @@ Attached to the Righe tab, opened from `customColumn1.onClick`.
 
 Widgets: `cdlan_data_attivazione` DATEPICKER (required), `cdlan_serialnumber` INPUT (readonly here — the serial is edited inline on the Righe row), CONFERMA button (`BTN_confirm_act_modal`), CHIUDI button.
 
-**Rule:** CONFERMA enabled when `cdlan_data_attivazione` is set. On confirm → `PATCH /api/ordini/:id/rows/:rowId/activate` with `{activation_date}`; backend writes `orders_rows.cdlan_data_attivazione`, sets `confirm_data_attivazione = 1`, calls `GW_SetActivationDate`, re-counts confirmed rows (`CheckConfirmRows` with the Q2 fix — `IS NOT NULL`), and if every row is now confirmed, flips `orders.cdlan_stato` to `ATTIVO` in the same transaction. Returns the updated order; UI refetches and closes modal.
+**Rule:** CONFERMA enabled when `cdlan_data_attivazione` is set. On confirm → `PATCH /api/ordini/v1/orders/:id/rows/:rowId/activate` with `{activation_date}`; backend writes `orders_rows.cdlan_data_attivazione`, sets `confirm_data_attivazione = 1`, calls `GW_SetActivationDate`, re-counts confirmed rows (`CheckConfirmRows` with the Q2 fix — `IS NOT NULL`), and if every row is now confirmed, flips `orders.cdlan_stato` to `ATTIVO` in the same transaction. Returns the updated order; UI refetches and closes modal.
 
 ### 2.8 — (was: "Arxivar link" tab) — **dropped per B3**
 

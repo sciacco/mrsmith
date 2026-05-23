@@ -499,6 +499,15 @@ Alyante ERP ID
 - Used by: contextual support requests.
 - Open questions: none.
 
+### GW Internal CDLAN Calls Use The Shared Arak Client
+
+- Context: backend handlers that call `https://gw-int.cdlan.net` for ERP, PDF, Arxivar, or Mistra-NG style bridge operations.
+- Discovery: MrSmith already wires a service-account HTTP client for this host through `backend/internal/platform/arak.Client` and the `ARAK_BASE_URL`, `ARAK_SERVICE_TOKEN_URL`, `ARAK_SERVICE_CLIENT_ID`, and `ARAK_SERVICE_CLIENT_SECRET` env vars.
+- Practical rule: new mini-app BFF modules should inject and use the shared `*arak.Client` for `gw-int` calls. Do not add app-specific gateway credentials such as `GW_INT_*` unless the shared client is proven insufficient for a different upstream.
+- Evidence: existing `arak.Client` wiring in `backend/cmd/server/main.go`; Ordini migration decision for ERP/PDF/Arxivar calls.
+- Used by: `apps/ordini` implementation planning; `apps/rda`, `apps/fornitori`, and `apps/afc-tools` gateway/API proxy patterns.
+- Open questions: none.
+
 ### New DSN-Backed Mini-Apps Must Update Both Dev and Preprod Env Templates
 
 - Context: introducing a new launcher-backed mini-app that needs backend DSNs and optional split-server frontend URL overrides.
