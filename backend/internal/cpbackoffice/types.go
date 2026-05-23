@@ -104,3 +104,15 @@ func (r *CompletionRequest) UnmarshalJSON(data []byte) error {
 type CompletionResponse struct {
 	Ok bool `json:"ok"`
 }
+
+// Variable represents a single variable item on a customer.
+type Variable struct {
+	Resource string `json:"resource"`
+	Action   string `json:"action"`
+}
+
+// UpdateVariablesRequest is the body accepted by
+// PUT /cp-backoffice/v1/customers/{id}/variables.
+type UpdateVariablesRequest struct {
+	Variables *[]Variable `json:"variables"`
+}

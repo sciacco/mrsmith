@@ -251,6 +251,76 @@ func handleUpdateCustomerState(deps Deps) http.HandlerFunc {
 	}
 }
 
+// ═══ PUT /cp-backoffice/v1/customers/{id}/variables ═══
+// Upstream: PUT /customers/v2/customer/{customerId} con body { variables: []variable | null }.
+
+func handleUpdateCustomerVariables(deps Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireArak(deps) {
+			writeUpstreamUnavailable(w)
+			return
+		}
+		const op = "update_customer_variables"
+
+		rawID := strings.TrimSpace(r.PathValue("id"))
+		if rawID == "" {
+			httputil.Error(w, http.StatusBadRequest, "customer_id_required")
+			return
+		}
+		customerID, err := strconv.ParseInt(rawID, 10, 64)
+		if err != nil || customerID <= 0 {
+			httputil.Error(w, http.StatusBadRequest, "customer_id_invalid")
+			return
+		}
+
+		var in UpdateVariablesRequest
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			httputil.Error(w, http.StatusBadRequest, "invalid_request_body")
+			return
+		}
+
+		// Se le variabili sono nulle o la lunghezza è zero, inviamo un array vuoto []
+		// per evitare l'errore "Value is not nullable" generato dal validatore dello schema Mistra NG.
+		variablesPayload := []Variable{}
+		if in.Variables != nil && len(*in.Variables) > 0 {
+			variablesPayload = *in.Variables
+		}
+
+		payload, err := json.Marshal(map[string]any{"variables": variablesPayload})
+		if err != nil {
+			upstreamFailure(w, r, err, op)
+			return
+		}
+
+		path := upstreamCustomersPath + "/" + strconv.FormatInt(customerID, 10)
+		resp, err := deps.Arak.Do(http.MethodPut, path, "", bytes.NewReader(payload))
+		if err != nil {
+			upstreamFailure(w, r, err, op)
+			return
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			upstreamFailure(w, r, err, op)
+			return
+		}
+
+		if resp.StatusCode >= http.StatusBadRequest {
+			forwardUpstreamError(w, r, op, resp.StatusCode, body)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		if len(bytes.TrimSpace(body)) == 0 {
+			_, _ = w.Write([]byte(`{"ok":true}`))
+			return
+		}
+		_, _ = w.Write(body)
+	}
+}
+
 // ═══ GET /cp-backoffice/v1/users?customer_id=... ═══
 // Upstream: GET /users/v2/user?customer_id={id}&page_number=1&disable_pagination=true.
 // Hard backend guard: missing or empty customer_id rejected with 400 and never

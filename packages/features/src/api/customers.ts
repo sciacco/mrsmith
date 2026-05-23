@@ -5,12 +5,18 @@ export interface CustomerGroup {
   name: string;
 }
 
+export interface CustomerVariable {
+  resource: string;
+  action: string;
+}
+
 export interface Customer {
   id: number;
   name: string;
   group: CustomerGroup;
   state: CustomerState;
   language: string;
+  variables: CustomerVariable[] | null;
 }
 
 export interface UpdateStateRequest {

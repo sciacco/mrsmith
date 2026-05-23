@@ -392,3 +392,56 @@ func TestCreateAdminForwardsUpstreamBusinessMessage(t *testing.T) {
 		t.Errorf("expected message passed through, got %#v", body)
 	}
 }
+
+func TestUpdateCustomerVariables(t *testing.T) {
+	fu := newFakeUpstream(t)
+
+	rec := serveWithRole(t, Deps{Arak: fu.client()},
+		http.MethodPut, "/cp-backoffice/v1/customers/42/variables",
+		strings.NewReader(`{"variables":[{"resource":"servizi_gestiti","action":"hide_pages"}]}`))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	got := fu.lastRequest(t)
+	if got.Method != http.MethodPut {
+		t.Errorf("expected PUT, got %s", got.Method)
+	}
+	if got.Path != "/customers/v2/customer/42" {
+		t.Errorf("expected path /customers/v2/customer/42, got %s", got.Path)
+	}
+
+	var sent map[string]any
+	if err := json.Unmarshal([]byte(got.Body), &sent); err != nil {
+		t.Fatalf("outgoing body is not JSON: %v (%q)", err, got.Body)
+	}
+	vars, ok := sent["variables"].([]any)
+	if !ok || len(vars) != 1 {
+		t.Fatalf("expected variables array of len 1, got %#v", sent["variables"])
+	}
+	item := vars[0].(map[string]any)
+	if item["resource"] != "servizi_gestiti" || item["action"] != "hide_pages" {
+		t.Errorf("expected variables item to match, got %#v", item)
+	}
+}
+
+func TestUpdateCustomerVariablesNull(t *testing.T) {
+	fu := newFakeUpstream(t)
+
+	rec := serveWithRole(t, Deps{Arak: fu.client()},
+		http.MethodPut, "/cp-backoffice/v1/customers/42/variables",
+		strings.NewReader(`{"variables":null}`))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	got := fu.lastRequest(t)
+	var sent map[string]any
+	if err := json.Unmarshal([]byte(got.Body), &sent); err != nil {
+		t.Fatalf("outgoing body is not JSON: %v (%q)", err, got.Body)
+	}
+	vars, ok := sent["variables"].([]any)
+	if !ok || len(vars) != 0 {
+		t.Errorf("expected empty variables array [], got %#v", sent["variables"])
+	}
+}

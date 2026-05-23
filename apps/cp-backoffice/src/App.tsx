@@ -11,6 +11,7 @@ import { useOptionalAuth } from './hooks/useOptionalAuth';
 
 const fullNavItems = [
   { label: 'Stato Aziende', path: '/stato-aziende' },
+  { label: 'Sezioni CP', path: '/sezioni-cp' },
   { label: 'Gestione Utenti', path: '/gestione-utenti' },
   { label: 'Accessi Biometrico', path: '/accessi-biometrico' },
 ];
