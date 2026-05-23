@@ -674,6 +674,13 @@ Precondizioni:
 - user ha `app_customer_relations`;
 - ordine `INVIATO`;
 - riga appartiene all'ordine (`orders_rows.orders_id = :id`).
+- riga non annullata e con quantità diversa da zero. Le righe annullate o a quantità zero sono già considerate soddisfatte dalla regola Q2 e non devono aprire una nuova attivazione.
+
+Decisione v1 su righe già confermate:
+
+- le righe con `confirm_data_attivazione = 1` restano modificabili in v1 quando l'ordine è `INVIATO` e l'utente è `app_customer_relations`;
+- questa è una conservazione intenzionale del comportamento Appsmith del pulsante `Modifica`, che consente correggere la data di attivazione;
+- non aggiungere un blocco server-side sulle righe già confermate senza una nuova conferma di dominio, perché cambierebbe un flusso operativo esistente.
 
 Flusso consigliato:
 
