@@ -59,52 +59,57 @@ export function InfoTab({
         <div className={styles.infoGroups}>
           <div className={styles.infoGroup}>
             <h3 className={styles.infoGroupTitle}>Dettagli Ordine</h3>
-            <div className={styles.badgeRow}>
-              <div className={styles.metaBadge}>
-                <span className={styles.metaBadgeLabel}>Lingua</span>
-                <span className={styles.metaBadgeValue}>{formatEmpty(order.profile_lang)}</span>
+            <div className={styles.factGrid8}>
+              <Field label="Tipo documento" value={formatTipoDoc(order.cdlan_tipodoc)} span={2} />
+              
+              <div className={`${styles.factItem} ${styles.span2}`}>
+                <div className={styles.proposalCell}>
+                  {order.cdlan_tipo_ord === 'A' ? (
+                    <span className={`${styles.proposalBadge} ${styles.proposalBadgeSostituzione}`}>
+                      Sostituzione
+                    </span>
+                  ) : order.cdlan_tipo_ord === 'N' ? (
+                    <span className={`${styles.proposalBadge} ${styles.proposalBadgeNuovo}`}>
+                      Nuovo
+                    </span>
+                  ) : order.cdlan_tipo_ord === 'R' ? (
+                    <span className={`${styles.proposalBadge} ${styles.proposalBadgeRinnovo}`}>
+                      Rinnovo
+                    </span>
+                  ) : (
+                    <span className={styles.proposalBadge}>
+                      {formatTipoProposta(order.cdlan_tipo_ord)}
+                    </span>
+                  )}
+                  {order.cdlan_tipo_ord === 'A' && order.cdlan_sost_ord ? (
+                    <span className={styles.sostituisceSubText}>
+                      {order.cdlan_sost_ord.replace(/^Sostituisce:\s*/i, '')}
+                    </span>
+                  ) : null}
+                </div>
               </div>
-            </div>
-            <div className={styles.factGrid}>
-              <Field label="Tipo documento" value={formatTipoDoc(order.cdlan_tipodoc)} />
-              <Field label="Tipo proposta" value={formatTipoProposta(order.cdlan_tipo_ord)} />
-              <Field label="Redatto da" value={order.written_by} />
-              <Field label="Sostituisce" value={order.cdlan_sost_ord} mono />
+
+              <Field label="Redatto da" value={order.written_by} span={3} />
+              <Field label="Lingua" value={order.profile_lang} span={1} />
             </div>
           </div>
 
           <div className={styles.infoGroup}>
             <h3 className={styles.infoGroupTitle}>Condizioni & Fatturazione</h3>
-            <div className={styles.badgeRow}>
-              <div className={styles.metaBadge}>
-                <span className={styles.metaBadgeLabel}>Tacito Rinnovo</span>
-                <span className={styles.metaBadgeValue}>{formatSiNo(order.cdlan_tacito_rin)}</span>
-              </div>
-            </div>
-            <div className={styles.factGrid}>
-              <Field label="Condizioni pagamento" value={order.cdlan_cod_termini_pag} mono />
-              <Field label="Fatturazione canoni" value={formatFatturazione(order.cdlan_int_fatturazione)} />
-              <Field label="Fatturazione attivazione" value={formatFatturazioneAtt(order.cdlan_int_fatturazione_att)} />
-              <Field label="Durata rinnovo" value={formatDurRin(order.cdlan_dur_rin)} />
-              <Field label="Note legali" value={order.cdlan_note} wide collapsible />
-            </div>
-          </div>
-
-          <div className={styles.infoGroup}>
-            <h3 className={styles.infoGroupTitle}>Tempistiche & Consegna</h3>
-            <div className={styles.factGrid}>
-              <Field label="Data decorrenza" value={formatDate(order.data_decorrenza)} />
-              <Field label="Tempi rilascio" value={order.cdlan_tempi_ril} />
-              <Field label="Durata servizio (Mesi)" value={order.cdlan_durata_servizio} />
+            <div className={styles.factGrid8}>
+              <Field label="Condizioni pagamento" value={order.cdlan_cod_termini_pag} mono span={2} />
+              <Field label="Fatturazione canoni" value={formatFatturazione(order.cdlan_int_fatturazione)} span={2} />
+              <Field label="Fatturazione attivazione" value={formatFatturazioneAtt(order.cdlan_int_fatturazione_att)} span={2} />
+              <Field label="Durata servizio (Mesi)" value={order.cdlan_durata_servizio} span={2} />
+              <Field label="Tacito rinnovo" value={formatSiNo(order.cdlan_tacito_rin)} span={1} />
+              <Field label="Durata rinnovo" value={formatDurRin(order.cdlan_dur_rin)} span={2} />
+              <Field label="Giorni rilascio" value={order.cdlan_tempi_ril} span={1} />
+              <Field label="Data decorrenza" value={formatDate(order.data_decorrenza)} span={2} />
+              <Field label="Note legali" value={order.cdlan_note} span={8} collapsible />
             </div>
           </div>
         </div>
-        {order.arx_doc_number ? (
-          <a className={styles.arxivarLink} href={`https://arxivar.cdlan.it/#!/view/${encodeURIComponent(order.arx_doc_number)}`} target="_blank" rel="noreferrer">
-            <Icon name="external-link" size={15} />
-            Apri documento in Arxivar
-          </a>
-        ) : null}
+
       </section>
 
       <section className={styles.cardSection}>
@@ -124,7 +129,6 @@ export function InfoTab({
           <div className={styles.customerField}>
             <span className={styles.formLabel}>Ragione sociale</span>
             <CustomerSelect customers={customers} value={customerID} currentName={order.cdlan_cliente} disabled={!canEdit || customersLoading} onChange={setCustomerID} />
-            <small>ID cliente: {customerID ?? '—'}</small>
           </div>
         </div>
         <div className={styles.actionRow}>
@@ -196,12 +200,14 @@ function Field({
   mono,
   wide,
   collapsible,
+  span,
 }: {
   label: string;
   value: string | number | null | undefined;
   mono?: boolean;
   wide?: boolean;
   collapsible?: boolean;
+  span?: 1 | 2 | 3 | 4 | 8;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCollapsible, setIsCollapsible] = useState(false);
@@ -229,8 +235,10 @@ function Field({
     };
   }, [text, collapsible, isExpanded, hasText]);
 
+  const spanClass = span ? styles[`span${span}`] : (wide ? styles.span8 : styles.span2);
+
   return (
-    <div className={`${styles.factItem} ${wide ? styles.factItemWide : ''}`}>
+    <div className={`${styles.factItem} ${spanClass}`}>
       <span>{label}</span>
       {collapsible && hasText ? (
         <div>

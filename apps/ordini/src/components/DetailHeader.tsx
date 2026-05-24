@@ -50,78 +50,97 @@ export function DetailHeader({
   return (
     <section className={styles.detailHeader}>
       <div className={styles.detailHeaderTop}>
-        <button type="button" className={styles.backButton} onClick={onBack}>
-          <Icon name="arrow-left" size={16} />
-          Torna agli ordini
-        </button>
-        <div className={styles.dropdownContainer} ref={dropdownRef}>
-          <Button variant="secondary" size="sm" rightIcon={<Icon name="chevron-down" size={14} />} onClick={() => setIsOpen(!isOpen)}>
-            Documenti
-          </Button>
-          {isOpen && (
-            <div className={styles.dropdownMenu}>
-              <button
-                type="button"
-                className={styles.dropdownItem}
-                disabled={!canKickoff || downloading != null}
-                onClick={() => handleDownload('kickoff')}
-              >
-                {downloading === 'kickoff' ? (
-                  <Icon name="loader" size={16} className={styles.dropdownLoader} />
-                ) : (
-                  <Icon name="file-plus" size={16} className={styles.dropdownItemIcon} />
-                )}
-                <span>Kickoff</span>
-              </button>
-              <button
-                type="button"
-                className={styles.dropdownItem}
-                disabled={!canActivationForm || downloading != null}
-                onClick={() => handleDownload('activation')}
-              >
-                {downloading === 'activation' ? (
-                  <Icon name="loader" size={16} className={styles.dropdownLoader} />
-                ) : (
-                  <Icon name="clipboard-check" size={16} className={styles.dropdownItemIcon} />
-                )}
-                <span>Modulo di attivazione</span>
-              </button>
-              <button
-                type="button"
-                className={styles.dropdownItem}
-                disabled={!canOrderPdf || downloading != null}
-                onClick={() => handleDownload('order')}
-              >
-                {downloading === 'order' ? (
-                  <Icon name="loader" size={16} className={styles.dropdownLoader} />
-                ) : (
-                  <Icon name="file-text" size={16} className={styles.dropdownItemIcon} />
-                )}
-                <span>PDF ordine</span>
-              </button>
-              <button
-                type="button"
-                className={styles.dropdownItem}
-                disabled={!canSignedPdf || downloading != null}
-                onClick={() => handleDownload('signed')}
-              >
-                {downloading === 'signed' ? (
-                  <Icon name="loader" size={16} className={styles.dropdownLoader} />
-                ) : (
-                  <Icon name="file-check" size={16} className={styles.dropdownItemIcon} />
-                )}
-                <span>Ordine firmato</span>
-              </button>
-            </div>
-          )}
+        <div className={styles.detailHeaderLeft}>
+          <button type="button" className={styles.backButton} onClick={onBack}>
+            <Icon name="arrow-left" size={16} />
+            Torna agli ordini
+          </button>
+          <div className={styles.headerMetaGroup}>
+            <span className={styles.headerOrderCode}>
+              Codice ordine: <strong className={styles.codeCell}>{orderCode(order.cdlan_ndoc, order.cdlan_anno)}</strong>
+            </span>
+            <StatusBadge state={order.cdlan_stato} />
+          </div>
+        </div>
+        <div className={styles.detailHeaderRight}>
+          {order.arx_doc_number ? (
+            <a
+              className={styles.arxivarHeaderLink}
+              href={`https://arxivar.cdlan.it/#!/view/${encodeURIComponent(order.arx_doc_number)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Icon name="external-link" size={14} />
+              Arxivar
+            </a>
+          ) : null}
+          <div className={styles.dropdownContainer} ref={dropdownRef}>
+            <Button variant="secondary" size="sm" rightIcon={<Icon name="chevron-down" size={14} />} onClick={() => setIsOpen(!isOpen)}>
+              Documenti
+            </Button>
+            {isOpen && (
+              <div className={styles.dropdownMenu}>
+                <button
+                  type="button"
+                  className={styles.dropdownItem}
+                  disabled={!canKickoff || downloading != null}
+                  onClick={() => handleDownload('kickoff')}
+                >
+                  {downloading === 'kickoff' ? (
+                    <Icon name="loader" size={16} className={styles.dropdownLoader} />
+                  ) : (
+                    <Icon name="file-plus" size={16} className={styles.dropdownItemIcon} />
+                  )}
+                  <span>Kickoff</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.dropdownItem}
+                  disabled={!canActivationForm || downloading != null}
+                  onClick={() => handleDownload('activation')}
+                >
+                  {downloading === 'activation' ? (
+                    <Icon name="loader" size={16} className={styles.dropdownLoader} />
+                  ) : (
+                    <Icon name="clipboard-check" size={16} className={styles.dropdownItemIcon} />
+                  )}
+                  <span>Modulo di attivazione</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.dropdownItem}
+                  disabled={!canOrderPdf || downloading != null}
+                  onClick={() => handleDownload('order')}
+                >
+                  {downloading === 'order' ? (
+                    <Icon name="loader" size={16} className={styles.dropdownLoader} />
+                  ) : (
+                    <Icon name="file-text" size={16} className={styles.dropdownItemIcon} />
+                  )}
+                  <span>PDF ordine</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.dropdownItem}
+                  disabled={!canSignedPdf || downloading != null}
+                  onClick={() => handleDownload('signed')}
+                >
+                  {downloading === 'signed' ? (
+                    <Icon name="loader" size={16} className={styles.dropdownLoader} />
+                  ) : (
+                    <Icon name="file-check" size={16} className={styles.dropdownItemIcon} />
+                  )}
+                  <span>Ordine firmato</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div className={styles.detailTitleRow}>
         <div className={styles.detailTitleCopy}>
-          <h1>Codice ordine: {orderCode(order.cdlan_ndoc, order.cdlan_anno)}</h1>
-          <p>{order.cdlan_cliente ?? 'Ragione sociale non indicata'}</p>
+          <h1>{order.cdlan_cliente ?? 'Ragione sociale non indicata'}</h1>
         </div>
-        <StatusBadge state={order.cdlan_stato} />
       </div>
 
       <OrderTimeline state={order.cdlan_stato} hasArxDoc={Boolean(order.arx_doc_number)} />

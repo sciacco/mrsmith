@@ -155,7 +155,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		{
 			ID:            RDAAppID,
 			Name:          "RDA",
-			Description:   "Richieste di acquisto e approvazioni.",
+			Description:   "Richieste di acquisto.",
 			Icon:          "cart",
 			Href:          RDAAppHref,
 			Status:        "ready",
@@ -214,10 +214,10 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		{
 			ID:            OrdiniAppID,
 			Name:          "Ordini",
-			Description:   "Gestione ordini cliente, righe e documenti.",
+			Description:   "Gestione ordini cliente",
 			Icon:          "document",
 			Href:          OrdiniAppHref,
-			Status:        "test",
+			Status:        "ready",
 			CategoryID:    "mkt-sales",
 			CategoryTitle: "MKT&Sales",
 			AccessRoles:   OrdiniAccessRoles(),
@@ -337,7 +337,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		{
 			ID:            CPBackofficeAppID,
 			Name:          "CP Backoffice",
-			Description:   "Gestione aziende, utenti e accessi biometrico per il back-office clienti.",
+			Description:   "Aziende, utenti e accessi biometrico per il customer portal.",
 			Icon:          "users",
 			Href:          CPBackofficeAppHref,
 			Status:        "ready",

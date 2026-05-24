@@ -1,6 +1,7 @@
 import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
 import { useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import type { SendToERPResponse, UpdateHeaderPayload, UpdateReferentsPayload } from '../api/types';
 import {
   useActivateRow,
   useCustomers,
@@ -20,8 +21,6 @@ import {
   orderPdfFilename,
   signedPdfFilename,
 } from '../api/pdf';
-import type { OrderRow, SendToERPResponse, UpdateHeaderPayload, UpdateReferentsPayload } from '../api/types';
-import { ActivationModal } from '../components/ActivationModal';
 import { AziendaTab } from '../components/AziendaTab';
 import { DetailHeader } from '../components/DetailHeader';
 import { InfoTab } from '../components/InfoTab';
@@ -64,7 +63,6 @@ export function OrderDetailPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [sendResult, setSendResult] = useState<SendToERPResponse | null>(null);
-  const [activationTarget, setActivationTarget] = useState<OrderRow | null>(null);
   const [savingSerialRow, setSavingSerialRow] = useState<number | null>(null);
   const [savingNotesRow, setSavingNotesRow] = useState<number | null>(null);
   const [downloading, setDownloading] = useState<DownloadKind | null>(null);
@@ -155,12 +153,10 @@ export function OrderDetailPage() {
     }
   }
 
-  async function confirmActivation(date: string) {
-    if (!activationTarget) return;
+  async function confirmActivation(rowId: number, date: string) {
     try {
-      await activateRow.mutateAsync({ rowId: activationTarget.id, activationDate: date });
+      await activateRow.mutateAsync({ rowId, activationDate: date });
       toast('Attivazione confermata');
-      setActivationTarget(null);
     } catch (error) {
       toast(apiErrorMessage(error, 'Conferma attivazione non riuscita'), 'error');
     }
@@ -255,8 +251,9 @@ export function OrderDetailPage() {
               loading={rows.isLoading}
               roles={roles}
               savingRowId={savingSerialRow}
+              activationLoading={activateRow.isPending}
               onSaveSerial={(rowId, serialNumber) => void saveSerial(rowId, serialNumber)}
-              onActivate={setActivationTarget}
+              onActivate={(rowId, date) => void confirmActivation(rowId, date)}
             />
           ) : null}
           {activeTab === 'tecnici' ? (
@@ -265,14 +262,6 @@ export function OrderDetailPage() {
           {activeTab === 'altri' ? <AltriDatiTab order={detail} /> : null}
         </div>
       </section>
-
-      <ActivationModal
-        row={activationTarget}
-        open={activationTarget != null}
-        loading={activateRow.isPending}
-        onClose={() => setActivationTarget(null)}
-        onConfirm={(date) => void confirmActivation(date)}
-      />
     </main>
   );
 }

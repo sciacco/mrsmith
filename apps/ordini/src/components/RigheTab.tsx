@@ -1,9 +1,32 @@
 import { useState } from 'react';
-import { Button, Icon, Skeleton } from '@mrsmith/ui';
+import { Button, Drawer, Icon, Skeleton } from '@mrsmith/ui';
 import type { OrderDetail, OrderRow } from '../api/types';
 import { formatDate, formatEmpty, formatMoney } from '../lib/formatters';
 import { canEditSerialNumber, canOpenActivationModal } from '../lib/permissions';
 import styles from '../pages/OrderDetailPage.module.css';
+
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return '';
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&agrave;/gi, 'à')
+    .replace(/&egrave;/gi, 'è')
+    .replace(/&igrave;/gi, 'ì')
+    .replace(/&ograve;/gi, 'ò')
+    .replace(/&ugrave;/gi, 'ù')
+    .replace(/&aacute;/gi, 'á')
+    .replace(/&eacute;/gi, 'é')
+    .replace(/&iacute;/gi, 'í')
+    .replace(/&oacute;/gi, 'ó')
+    .replace(/&uacute;/gi, 'ú')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .trim();
+}
 
 interface RigheTabProps {
   order: OrderDetail;
@@ -11,29 +34,39 @@ interface RigheTabProps {
   loading: boolean;
   roles: readonly string[] | undefined;
   savingRowId: number | null;
+  activationLoading: boolean;
   onSaveSerial: (rowId: number, serialNumber: string) => void;
-  onActivate: (row: OrderRow) => void;
+  onActivate: (rowId: number, date: string) => void;
 }
 
-export function RigheTab({ order, rows, loading, roles, savingRowId, onSaveSerial, onActivate }: RigheTabProps) {
-  const [editingRow, setEditingRow] = useState<number | null>(null);
+export function RigheTab({ order, rows, loading, roles, savingRowId, activationLoading, onSaveSerial, onActivate }: RigheTabProps) {
+  const [selectedRow, setSelectedRow] = useState<OrderRow | null>(null);
   const [serialDraft, setSerialDraft] = useState('');
+  const [activationDate, setActivationDate] = useState('');
   const serialEditable = canEditSerialNumber(order);
 
-  function startEdit(row: OrderRow) {
-    setEditingRow(row.id);
+  const handleRowClick = (row: OrderRow) => {
+    setSelectedRow(row);
     setSerialDraft(row.cdlan_serialnumber ?? '');
-  }
+  };
 
-  function cancelEdit() {
-    setEditingRow(null);
+  const handleCloseDrawer = () => {
+    setSelectedRow(null);
     setSerialDraft('');
-  }
+    setActivationDate('');
+  };
 
-  function save(row: OrderRow) {
-    onSaveSerial(row.id, serialDraft);
-    cancelEdit();
-  }
+  const handleSaveSerial = () => {
+    if (!selectedRow) return;
+    onSaveSerial(selectedRow.id, serialDraft);
+    handleCloseDrawer();
+  };
+
+  const handleActivate = () => {
+    if (!selectedRow) return;
+    onActivate(selectedRow.id, activationDate);
+    handleCloseDrawer();
+  };
 
   if (loading) return <section className={styles.cardSection}><Skeleton rows={8} /></section>;
 
@@ -62,50 +95,203 @@ export function RigheTab({ order, rows, loading, roles, savingRowId, onSaveSeria
                 <th>Prezzo attivazione</th>
                 <th>Seriale</th>
                 <th>Data attivazione</th>
-                <th>Azioni</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => (
-                <tr key={row.id} style={{ animationDelay: `${Math.min(index * 20, 260)}ms` }}>
-                  <td className={styles.mono}>{formatEmpty(row.bundle_code)}</td>
-                  <td className={styles.mono}>{formatEmpty(row.cdlan_codart)}</td>
-                  <td><span className={styles.rowDescription}>{formatEmpty(row.cdlan_descart)}</span></td>
-                  <td className={styles.numCell}>{row.cdlan_qta ?? '—'}</td>
-                  <td className={styles.numCell}>{formatMoney(row.canone, order.cdlan_valuta ?? 'EUR')}</td>
-                  <td className={styles.numCell}>{formatMoney(row.activation_price, order.cdlan_valuta ?? 'EUR')}</td>
-                  <td>
-                    {editingRow === row.id ? (
-                      <div className={styles.inlineEdit}>
-                        <input className={styles.inputCompact} value={serialDraft} onChange={(event) => setSerialDraft(event.target.value)} />
-                        <button type="button" className={styles.iconButton} onClick={() => save(row)} aria-label="Salva seriale">
-                          <Icon name="check" size={15} />
-                        </button>
-                        <button type="button" className={styles.iconButton} onClick={cancelEdit} aria-label="Annulla modifica seriale">
-                          <Icon name="x" size={15} />
-                        </button>
-                      </div>
-                    ) : (
+              {rows.map((row, index) => {
+                const isCanceled = row.data_annullamento != null;
+                const trClass = [
+                  selectedRow?.id === row.id ? styles.rowActive : '',
+                  isCanceled ? styles.rowCanceled : '',
+                ].filter(Boolean).join(' ');
+
+                return (
+                  <tr
+                    key={row.id}
+                    style={{ animationDelay: `${Math.min(index * 20, 260)}ms` }}
+                    className={trClass || undefined}
+                    onClick={() => handleRowClick(row)}
+                  >
+                    <td className={styles.mono}>{formatEmpty(row.bundle_code)}</td>
+                    <td className={styles.mono}>{formatEmpty(row.cdlan_codart)}</td>
+                    <td>
+                      {row.cdlan_descart ? (
+                        <div
+                          className={styles.rowDescription}
+                          dangerouslySetInnerHTML={{ __html: row.cdlan_descart }}
+                        />
+                      ) : (
+                        <span className={styles.rowDescription}>—</span>
+                      )}
+                    </td>
+                    <td className={styles.numCell}>{row.cdlan_qta ?? '—'}</td>
+                    <td className={styles.numCell}>{formatMoney(row.canone, order.cdlan_valuta ?? 'EUR')}</td>
+                    <td className={styles.numCell}>{formatMoney(row.activation_price, order.cdlan_valuta ?? 'EUR')}</td>
+                    <td>
                       <span className={styles.serialValue}>{formatEmpty(row.cdlan_serialnumber)}</span>
-                    )}
-                  </td>
-                  <td>{formatDate(row.cdlan_data_attivazione)}</td>
-                  <td>
-                    <div className={styles.rowActions}>
-                      <Button variant="secondary" size="sm" disabled={!serialEditable || savingRowId === row.id} loading={savingRowId === row.id} onClick={() => startEdit(row)}>
-                        Seriale
-                      </Button>
-                      <Button variant="secondary" size="sm" disabled={!canOpenActivationModal(order, roles, row)} onClick={() => onActivate(row)}>
-                        Modifica
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      {isCanceled ? (
+                        <span className={styles.canceledLabel}>Annullata</span>
+                      ) : (
+                        formatDate(row.cdlan_data_attivazione)
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
+
+      <Drawer
+        open={selectedRow != null}
+        onClose={handleCloseDrawer}
+        title="Gestione Riga Ordine"
+        subtitle={selectedRow ? `${selectedRow.cdlan_codart} - ${stripHtml(selectedRow.cdlan_descart)}` : ''}
+        size="md"
+        footer={
+          selectedRow && (
+            <div className={styles.drawerActions}>
+              <Button variant="secondary" onClick={handleCloseDrawer}>
+                Chiudi
+              </Button>
+              {serialEditable && (
+                <Button
+                  variant="primary"
+                  disabled={savingRowId === selectedRow.id}
+                  loading={savingRowId === selectedRow.id}
+                  onClick={handleSaveSerial}
+                >
+                  Salva seriale
+                </Button>
+              )}
+              {canOpenActivationModal(order, roles, selectedRow) && (
+                <Button
+                  variant="primary"
+                  disabled={!activationDate || activationLoading}
+                  loading={activationLoading}
+                  onClick={handleActivate}
+                  leftIcon={<Icon name="check" size={14} />}
+                >
+                  Conferma attivazione
+                </Button>
+              )}
+            </div>
+          )
+        }
+      >
+        {selectedRow && (
+          <div className={styles.drawerContent}>
+            {/* Sezione 1: Dati Articolo */}
+            <div className={styles.drawerSection}>
+              <h3 className={styles.drawerSectionTitle}>Dati Articolo</h3>
+              <div className={styles.drawerGrid}>
+                <div className={styles.drawerFactItem}>
+                  <span>Bundle</span>
+                  <strong className={styles.mono}>{formatEmpty(selectedRow.bundle_code)}</strong>
+                </div>
+                <div className={styles.drawerFactItem}>
+                  <span>Codice articolo</span>
+                  <strong className={styles.mono}>{formatEmpty(selectedRow.cdlan_codart)}</strong>
+                </div>
+                <div className={styles.drawerFactItem}>
+                  <span>Quantità</span>
+                  <strong>{selectedRow.cdlan_qta ?? '—'}</strong>
+                </div>
+                <div className={styles.drawerFactItem}>
+                  <span>Canone</span>
+                  <strong>{formatMoney(selectedRow.canone, order.cdlan_valuta ?? 'EUR')}</strong>
+                </div>
+                <div className={styles.drawerFactItem}>
+                  <span>Prezzo attivazione</span>
+                  <strong>{formatMoney(selectedRow.activation_price, order.cdlan_valuta ?? 'EUR')}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Sezione 1.5: Descrizione Articolo */}
+            {selectedRow.cdlan_descart && (
+              <div className={styles.drawerSection}>
+                <h3 className={styles.drawerSectionTitle}>Descrizione Articolo</h3>
+                <div
+                  className={styles.drawerDescriptionHtml}
+                  dangerouslySetInnerHTML={{ __html: selectedRow.cdlan_descart }}
+                />
+              </div>
+            )}
+
+            {/* Sezione 2: Seriale e Stato */}
+            <div className={styles.drawerSection}>
+              <h3 className={styles.drawerSectionTitle}>Seriale & Attivazione</h3>
+              <div className={styles.drawerMetaList}>
+                {selectedRow.data_annullamento ? (
+                  <div className={`${styles.drawerStatusCard} ${styles.drawerStatusCardCanceled}`}>
+                    <Icon name="x-circle" size={20} />
+                    <div>
+                      <strong>Riga Annullata</strong>
+                      <span>Servizio annullato il {formatDate(selectedRow.data_annullamento)}</span>
+                    </div>
+                  </div>
+                ) : selectedRow.confirm_data_attivazione === 1 || selectedRow.cdlan_data_attivazione ? (
+                  <div className={`${styles.drawerStatusCard} ${styles.drawerStatusCardActive}`}>
+                    <Icon name="check-circle" size={20} />
+                    <div>
+                      <strong>Servizio Attivo</strong>
+                      <span>Attivato il {formatDate(selectedRow.cdlan_data_attivazione)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`${styles.drawerStatusCard} ${styles.drawerStatusCardPending}`}>
+                    <Icon name="clock" size={20} />
+                    <div>
+                      <strong>In attesa di attivazione</strong>
+                      <span>Riga d'ordine pronta per l'attivazione.</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Form Seriale */}
+                {serialEditable ? (
+                  <label className={styles.drawerFieldLabel}>
+                    <span>Numero seriale</span>
+                    <input
+                      className={styles.drawerInput}
+                      value={serialDraft}
+                      placeholder="Inserisci il numero di serie..."
+                      onChange={(e) => setSerialDraft(e.target.value)}
+                    />
+                  </label>
+                ) : selectedRow.cdlan_serialnumber ? (
+                  <div className={styles.drawerFactItem}>
+                    <span>Numero seriale</span>
+                    <strong className={styles.mono}>{selectedRow.cdlan_serialnumber}</strong>
+                  </div>
+                ) : null}
+
+                {/* Sezione Attivazione se abilitata */}
+                {canOpenActivationModal(order, roles, selectedRow) && (
+                  <div className={styles.drawerActivationAction}>
+                    <h4>Attivazione Servizio</h4>
+                    <p>Conferma la data in cui il servizio è stato effettivamente attivato su questa riga.</p>
+                    <label className={styles.drawerFieldLabel} style={{ width: '100%' }}>
+                      <span>Data attivazione</span>
+                      <input
+                        type="date"
+                        required
+                        className={styles.drawerInput}
+                        value={activationDate}
+                        onChange={(e) => setActivationDate(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </Drawer>
     </section>
   );
 }
