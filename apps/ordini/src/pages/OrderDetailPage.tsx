@@ -28,6 +28,7 @@ import { InfoTab } from '../components/InfoTab';
 import { ReferentiTab } from '../components/ReferentiTab';
 import { RigheTab } from '../components/RigheTab';
 import { TechnicalNotesTab } from '../components/TechnicalNotesTab';
+import { AltriDatiTab } from '../components/AltriDatiTab';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { downloadBlob } from '../lib/downloads';
 import { apiErrorMessage } from '../lib/errors';
@@ -42,7 +43,7 @@ import {
 } from '../lib/permissions';
 import styles from './OrderDetailPage.module.css';
 
-type DetailTab = 'info' | 'azienda' | 'referenti' | 'righe' | 'tecnici';
+type DetailTab = 'info' | 'azienda' | 'referenti' | 'righe' | 'tecnici' | 'altri';
 type DownloadKind = 'kickoff' | 'activation' | 'order' | 'signed';
 
 const tabLabels: Record<DetailTab, string> = {
@@ -51,6 +52,7 @@ const tabLabels: Record<DetailTab, string> = {
   referenti: 'Referenti',
   righe: 'Righe',
   tecnici: 'Informazioni dai tecnici',
+  altri: 'Altri dati',
 };
 
 export function OrderDetailPage() {
@@ -260,6 +262,7 @@ export function OrderDetailPage() {
           {activeTab === 'tecnici' ? (
             <TechnicalNotesTab rows={technicalRows.data ?? []} loading={technicalRows.isLoading} savingRowId={savingNotesRow} onSaveNotes={(rowId, notes) => void saveNotes(rowId, notes)} />
           ) : null}
+          {activeTab === 'altri' ? <AltriDatiTab order={detail} /> : null}
         </div>
       </section>
 

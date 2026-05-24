@@ -1,0 +1,210 @@
+.timelineContainer {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  margin: var(--space-4) 0 var(--space-1);
+  padding: 0 var(--space-2);
+}
+
+/* Background connecting line */
+.progressTrack {
+  position: absolute;
+  top: 18px; /* half of indicator size */
+  left: 5%;
+  right: 5%;
+  height: 3px;
+  background: var(--color-border-subtle, #f0f3f7);
+  border-radius: var(--radius-full);
+  z-index: 1;
+}
+
+/* Filled active progress bar */
+.progressBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-success, #10b981) 0%, var(--color-accent, #635bff) 100%);
+  border-radius: var(--radius-full);
+  transition: width var(--duration-slow) var(--ease-out);
+  box-shadow: 0 0 8px var(--color-accent-glow);
+}
+
+/* When the path contains error/cancelled states */
+.progressBarDanger {
+  background: var(--color-danger, #ef4444);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+}
+
+.stepNode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  text-align: center;
+  z-index: 2;
+  cursor: default;
+}
+
+/* Indicator Circle */
+.indicator {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated, #ffffff);
+  border: 2px solid var(--color-border, #e2e8f0);
+  color: var(--color-text-muted, #94a3b8);
+  font-weight: 700;
+  font-size: 0.875rem;
+  transition:
+    background-color var(--duration-normal) var(--ease-out),
+    border-color var(--duration-normal) var(--ease-out),
+    color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-spring);
+}
+
+.stepNode:hover .indicator {
+  transform: scale(1.05);
+}
+
+/* COMPLETED State styling */
+.stepCompleted .indicator {
+  border-color: var(--color-success, #10b981);
+  background: var(--color-success, #10b981);
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ACTIVE State styling */
+.stepActive .indicator {
+  border-color: var(--color-accent, #635bff);
+  background: var(--color-bg-elevated, #ffffff);
+  color: var(--color-accent, #635bff);
+  box-shadow: 0 0 0 4px var(--color-accent-glow, rgba(99, 91, 255, 0.15)), var(--shadow-sm);
+}
+
+/* Active Step Pulse Ring */
+.stepActive .indicator::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: var(--radius-full);
+  border: 2.5px solid var(--color-accent, #635bff);
+  opacity: 0.4;
+  animation: pulseActive 2s infinite var(--ease-out);
+}
+
+/* PENDING State styling */
+.stepPending .indicator {
+  background: var(--color-bg-elevated, #ffffff);
+  border-color: var(--color-border, #e2e8f0);
+  color: var(--color-text-muted, #94a3b8);
+}
+
+/* DANGER State (Annulato / Perso) */
+.stepDanger .indicator {
+  border-color: var(--color-danger, #ef4444);
+  background: var(--color-danger, #ef4444);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px var(--color-danger-subtle, rgba(239, 68, 68, 0.15));
+}
+
+/* Text Container */
+.textGroup {
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 140px;
+  transition: opacity var(--duration-normal) var(--ease-out);
+}
+
+.label {
+  color: var(--color-text-secondary, #334155);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition: color var(--duration-normal) var(--ease-out);
+}
+
+.stepActive .label {
+  color: var(--color-accent-hover, #5046e5);
+}
+
+.stepCompleted .label {
+  color: var(--color-text, #0f172a);
+}
+
+.stepDanger .label {
+  color: var(--color-danger, #ef4444);
+}
+
+.description {
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 0.6875rem;
+  line-height: 1.3;
+}
+
+.stepActive .description {
+  color: var(--color-text-secondary, #334155);
+  font-weight: 550;
+}
+
+/* Animations */
+@keyframes pulseActive {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  70% {
+    transform: scale(1.18);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.18);
+    opacity: 0;
+  }
+}
+
+/* Responsive constraints */
+@media (max-width: 720px) {
+  .timelineContainer {
+    margin-top: var(--space-3);
+  }
+
+  .progressTrack {
+    top: 14px;
+    height: 2px;
+  }
+
+  .indicator {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+
+  .stepActive .indicator::after {
+    inset: -4px;
+    border-width: 1.5px;
+  }
+
+  .textGroup {
+    max-width: 90px;
+    margin-top: var(--space-1.5);
+  }
+
+  .label {
+    font-size: 0.75rem;
+  }
+
+  .description {
+    display: none; /* Hide descriptions on mobile to stay extremely clean */
+  }
+}

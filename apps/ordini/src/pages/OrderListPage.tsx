@@ -53,14 +53,12 @@ export function OrderListPage() {
   const hasFilters = Boolean(search || stateFilter || docFilter || proposalFilter);
 
   function updateSort(key: OrderSortKey) {
-    setSortKey((current) => {
-      if (current === key) {
-        setSortDirection((direction) => (direction === 'asc' ? 'desc' : 'asc'));
-        return current;
-      }
+    if (sortKey === key) {
+      setSortDirection((direction) => (direction === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
       setSortDirection(key === 'id' || key === 'date' ? 'desc' : 'asc');
-      return key;
-    });
+    }
   }
 
   function clearFilters() {
@@ -76,7 +74,6 @@ export function OrderListPage() {
       <header className={styles.pageHeader}>
         <div>
           <h1>Ordini</h1>
-          <p>Lista ordini cliente e avanzamento operativo.</p>
         </div>
         <Button variant="secondary" leftIcon={<Icon name="loader" />} loading={orders.isFetching && !orders.isLoading} onClick={() => void orders.refetch()}>
           Aggiorna

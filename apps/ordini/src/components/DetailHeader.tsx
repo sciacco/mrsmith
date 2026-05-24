@@ -1,7 +1,9 @@
+import { useEffect, useRef, useState } from 'react';
 import { Button, Icon } from '@mrsmith/ui';
 import type { OrderDetail } from '../api/types';
 import { formatDate, formatServiceTypes, orderCode } from '../lib/formatters';
 import { StatusBadge } from './StatusBadge';
+import { OrderTimeline } from './OrderTimeline';
 import styles from '../pages/OrderDetailPage.module.css';
 
 interface DetailHeaderProps {
@@ -25,6 +27,26 @@ export function DetailHeader({
   onBack,
   onDownload,
 }: DetailHeaderProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleDownload = (kind: 'kickoff' | 'activation' | 'order' | 'signed') => {
+    setIsOpen(false);
+    onDownload(kind);
+  };
+
   return (
     <section className={styles.detailHeader}>
       <div className={styles.detailHeaderTop}>
@@ -32,19 +54,66 @@ export function DetailHeader({
           <Icon name="arrow-left" size={16} />
           Torna agli ordini
         </button>
-        <div className={styles.pdfActions}>
-          <Button variant="secondary" size="sm" disabled={!canKickoff} loading={downloading === 'kickoff'} onClick={() => onDownload('kickoff')}>
-            Documento di avvio
+        <div className={styles.dropdownContainer} ref={dropdownRef}>
+          <Button variant="secondary" size="sm" rightIcon={<Icon name="chevron-down" size={14} />} onClick={() => setIsOpen(!isOpen)}>
+            Documenti
           </Button>
-          <Button variant="secondary" size="sm" disabled={!canActivationForm} loading={downloading === 'activation'} onClick={() => onDownload('activation')}>
-            Modulo di attivazione
-          </Button>
-          <Button variant="secondary" size="sm" disabled={!canOrderPdf} loading={downloading === 'order'} onClick={() => onDownload('order')}>
-            PDF ordine
-          </Button>
-          <Button variant="secondary" size="sm" disabled={!canSignedPdf} loading={downloading === 'signed'} onClick={() => onDownload('signed')}>
-            Ordine firmato
-          </Button>
+          {isOpen && (
+            <div className={styles.dropdownMenu}>
+              <button
+                type="button"
+                className={styles.dropdownItem}
+                disabled={!canKickoff || downloading != null}
+                onClick={() => handleDownload('kickoff')}
+              >
+                {downloading === 'kickoff' ? (
+                  <Icon name="loader" size={16} className={styles.dropdownLoader} />
+                ) : (
+                  <Icon name="file-plus" size={16} className={styles.dropdownItemIcon} />
+                )}
+                <span>Kickoff</span>
+              </button>
+              <button
+                type="button"
+                className={styles.dropdownItem}
+                disabled={!canActivationForm || downloading != null}
+                onClick={() => handleDownload('activation')}
+              >
+                {downloading === 'activation' ? (
+                  <Icon name="loader" size={16} className={styles.dropdownLoader} />
+                ) : (
+                  <Icon name="clipboard-check" size={16} className={styles.dropdownItemIcon} />
+                )}
+                <span>Modulo di attivazione</span>
+              </button>
+              <button
+                type="button"
+                className={styles.dropdownItem}
+                disabled={!canOrderPdf || downloading != null}
+                onClick={() => handleDownload('order')}
+              >
+                {downloading === 'order' ? (
+                  <Icon name="loader" size={16} className={styles.dropdownLoader} />
+                ) : (
+                  <Icon name="file-text" size={16} className={styles.dropdownItemIcon} />
+                )}
+                <span>PDF ordine</span>
+              </button>
+              <button
+                type="button"
+                className={styles.dropdownItem}
+                disabled={!canSignedPdf || downloading != null}
+                onClick={() => handleDownload('signed')}
+              >
+                {downloading === 'signed' ? (
+                  <Icon name="loader" size={16} className={styles.dropdownLoader} />
+                ) : (
+                  <Icon name="file-check" size={16} className={styles.dropdownItemIcon} />
+                )}
+                <span>Ordine firmato</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <div className={styles.detailTitleRow}>
@@ -54,6 +123,9 @@ export function DetailHeader({
         </div>
         <StatusBadge state={order.cdlan_stato} />
       </div>
+
+      <OrderTimeline state={order.cdlan_stato} hasArxDoc={Boolean(order.arx_doc_number)} />
+
       <div className={styles.headerFacts}>
         <span><strong>Data proposta</strong>{formatDate(order.cdlan_datadoc)}</span>
         <span><strong>Data conferma</strong>{formatDate(order.cdlan_dataconferma)}</span>

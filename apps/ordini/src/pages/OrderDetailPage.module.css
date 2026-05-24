@@ -214,6 +214,78 @@
   gap: var(--space-3);
 }
 
+.infoGroups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.infoGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.infoGroupTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.infoGroupTitle::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border-subtle);
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  margin-bottom: var(--space-2);
+  padding: 0 var(--space-1);
+}
+
+.metaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1.5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-2.5);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 650;
+  transition: background-color var(--duration-fast) var(--ease-out);
+  cursor: default;
+}
+
+.metaBadge:hover {
+  background: var(--color-surface-hover);
+}
+
+.metaBadgeLabel {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.metaBadgeValue {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
 .factItem {
   display: grid;
   gap: var(--space-1);
@@ -249,6 +321,37 @@
   font-size: 0.9375rem;
   font-weight: 650;
   overflow-wrap: anywhere;
+}
+
+.expandableText {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.textClamped {
+  -webkit-line-clamp: 2;
+}
+
+.expandToggle {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  margin-top: var(--space-2);
+  color: var(--color-accent);
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.expandToggle:hover {
+  color: var(--color-accent-hover);
 }
 
 .mono {
@@ -699,3 +802,194 @@
     padding: var(--space-4);
   }
 }
+
+/* Action Hub Dropdown Menu */
+.dropdownContainer {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--space-2);
+  min-width: 15rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  animation: dropdownOpen 0.25s var(--ease-spring) both;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+.dropdownItem:hover:not(:disabled) {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+}
+
+.dropdownItem:disabled {
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+.dropdownItemIcon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.dropdownItem:hover:not(:disabled) .dropdownItemIcon {
+  color: var(--color-accent);
+}
+
+.dropdownLoader {
+  color: var(--color-accent);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes dropdownOpen {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* File Preview Card & Interactive Dropzone */
+.fileCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4) var(--space-5);
+  background: color-mix(in srgb, var(--color-bg-elevated) 95%, var(--color-surface) 5%);
+  box-shadow: var(--shadow-sm);
+  animation: dropdownOpen 0.3s var(--ease-spring) both;
+}
+
+.fileCardLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  flex: 1;
+}
+
+.fileCardIconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
+  flex-shrink: 0;
+}
+
+.fileCardDetails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.fileCardName {
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileCardMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.fileCardStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+.fileCardRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.fileCardRemove:hover {
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
+  transform: scale(1.08);
+}
+
+/* Enhancing Dropzone Hover states */
+.fileDrop {
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.fileDrop:hover:not(.fileDropDisabled) {
+  border-color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--color-accent-subtle) 50%, var(--color-bg-elevated) 50%);
+  box-shadow: 0 0 0 4px var(--color-accent-glow);
+}
+
+

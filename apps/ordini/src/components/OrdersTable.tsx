@@ -22,7 +22,6 @@ export function OrdersTable({ rows, sortKey, sortDirection, onSort, onOpen }: Or
         <thead>
           <tr>
             <th>{header('code', 'Codice', sortKey, sortDirection, onSort, 'Ordine')}</th>
-            <th className={styles.tabletOptional}>ODV</th>
             <th>{header('customer', 'Cliente', sortKey, sortDirection, onSort)}</th>
             <th>{header('state', 'Stato', sortKey, sortDirection, onSort)}</th>
             <th className={styles.tabletOptional}>{header('date', 'Data prop.', sortKey, sortDirection, onSort)}</th>
@@ -34,7 +33,7 @@ export function OrdersTable({ rows, sortKey, sortDirection, onSort, onOpen }: Or
             <th className={styles.narrowOptional}>CP</th>
             <th className={styles.narrowOptional}>Sost.</th>
             <th className={styles.narrowOptional}>Lingua</th>
-            <th className={styles.narrowOptional}>Doc.</th>
+            <th className={styles.narrowOptional}>ARX</th>
             <th>
               <span className={styles.headerFull}>Azioni</span>
               <span className={styles.headerCompact}>Apri</span>
@@ -47,8 +46,7 @@ export function OrdersTable({ rows, sortKey, sortDirection, onSort, onOpen }: Or
               <td>
                 <span className={styles.codeCell}>{orderCode(order.cdlan_ndoc, order.cdlan_anno)}</span>
               </td>
-              <td className={`${styles.monoCell} ${styles.tabletOptional}`}>{formatEmpty(order.cdlan_systemodv)}</td>
-              <td className={styles.customerCell}>{order.cdlan_cliente ?? '—'}</td>
+              <td className={styles.customerCell} title={order.cdlan_cliente ?? undefined}>{order.cdlan_cliente ?? '—'}</td>
               <td><StatusBadge state={order.cdlan_stato} className={styles.compactStatus} /></td>
               <td className={styles.tabletOptional}>{formatDate(order.cdlan_datadoc)}</td>
               <td className={styles.narrowOptional}>{formatTipoDoc(order.cdlan_tipodoc)}</td>
@@ -59,7 +57,21 @@ export function OrdersTable({ rows, sortKey, sortDirection, onSort, onOpen }: Or
               <td className={styles.narrowOptional}>{formatSiNo(order.from_cp)}</td>
               <td className={`${styles.monoCell} ${styles.narrowOptional}`}>{formatEmpty(order.cdlan_sost_ord)}</td>
               <td className={styles.narrowOptional}>{formatEmpty(order.profile_lang)}</td>
-              <td className={`${styles.monoCell} ${styles.narrowOptional}`}>{formatEmpty(order.arx_doc_number)}</td>
+              <td className={`${styles.monoCell} ${styles.narrowOptional}`}>
+                {order.arx_doc_number ? (
+                  <a
+                    href={`https://arxivar.cdlan.it/#!/view/${order.arx_doc_number}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Apri in Arxivar: ${order.arx_doc_number}`}
+                    className={styles.arxLink}
+                  >
+                    <Icon name="file-text" size={16} className={styles.pdfIcon} />
+                  </a>
+                ) : (
+                  '—'
+                )}
+              </td>
               <td>
                 <Button variant="secondary" size="sm" aria-label={`Apri ordine ${orderCode(order.cdlan_ndoc, order.cdlan_anno)}`} rightIcon={<Icon name="arrow-right" size={14} />} onClick={() => onOpen(order.id)}>
                   <span className={styles.actionText}>Apri</span>
