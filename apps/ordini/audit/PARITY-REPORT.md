@@ -9,12 +9,12 @@ Plan / deviation register: `apps/ordini/docs/IMPL-ORDINI.md` §1 (scope), §8 (r
 ## Summary
 
 - Total Appsmith items audited: **103** (5 pages, 5 datasources, 55 actions/JS handlers, 38 interactive/data widgets with semantic gates)
-- parity_confirmed: **78**
+- parity_confirmed: **82**
 - intentional_deviation: **17**
 - gap_blocking: **0**
-- gap_minor: **7**
+- gap_minor: **3**
 - cannot_verify: **1**
-- **Go/no-go recommendation:** **GO** — no blocking gap; the 7 minor gaps are display-only readonly fields whose underlying data is already exposed by `/api/ordini/v1/orders/{id}`, so they can be surfaced as a follow-up without backend changes.
+- **Go/no-go recommendation:** **GO** — no blocking gap; the remaining minor gaps are secondary display/UX parity items. The Info metadata gaps G1-G4 have been reclassified as essential order information and restored in MrSmith.
 
 ---
 
@@ -24,33 +24,33 @@ None.
 
 ---
 
-## Gaps — minor
+## Essential Info gaps — resolved
 
-### G1. `cdlan_note` (Note legali) not rendered
+### G1. `cdlan_note` (Note legali) restored
 
 - **Appsmith location:** `Dettaglio ordine` text widget `cdlan_note` — `<b>Note Legali: </b>{{Order.data[0].cdlan_note == null ? "—" : Order.data[0].cdlan_note}}`.
-- **MrSmith location:** field exists at `backend/internal/ordini/types.go:43` and `apps/ordini/src/api/types.ts:35` but is not displayed in any tab (`apps/ordini/src/components/InfoTab.tsx:62-75`, `AziendaTab.tsx`).
-- **Drift:** operators reading note legali on the legacy detail page see "—" / no field on MrSmith.
-- **Suggested resolution:** add a `Field label="Note legali"` in `InfoTab` (or a dedicated Note tab) using `order.cdlan_note`.
+- **MrSmith location:** `InfoTab` renders `order.cdlan_note` as `Note legali` in the essential order metadata block.
+- **Resolution:** restored as readonly essential order information.
 
-### G2. `cdlan_tacito_rin` (Tacito rinnovo) not rendered
+### G2. `cdlan_tacito_rin` (Tacito rinnovo) restored
 
 - **Appsmith location:** `Dettaglio ordine` text widget `cdlan_tacito_rin` — `<b>Tacito rinnovo: </b>{{Order.data[0].cdlan_tacito_rin}}`.
-- **MrSmith location:** field in `types.go:45` / `types.ts:37`, no UI surface in `InfoTab.tsx:62-75`.
-- **Drift:** "Durata rinnovo" is shown, but the separate Tacito rinnovo flag is missing.
-- **Suggested resolution:** add a `Field` in InfoTab (formatter probably `formatSiNo` if value is 0/1, else raw). The legacy text rendered the raw value — verify in DB whether `cdlan_tacito_rin` holds `0/1`, `S/N`, or months count before picking the format.
+- **MrSmith location:** `InfoTab` renders `order.cdlan_tacito_rin` as `Tacito rinnovo`.
+- **Resolution:** restored as readonly essential order information, formatted through the existing `formatSiNo` helper.
 
-### G3. `cdlan_cod_termini_pag` (Condizioni di pagamento) not rendered
+### G3. `cdlan_cod_termini_pag` (Condizioni di pagamento) restored
 
 - **Appsmith location:** `Dettaglio ordine` text widgets `cdlan_cod_termini_pag` and `Text4Copy1CopyCopy` (Home modal) — `<b>Condizioni di pagamento:</b> {{Order.data[0].cdlan_cod_termini_pag}}`.
-- **MrSmith location:** field in `types.go:42` / `types.ts:34`, no UI surface.
-- **Suggested resolution:** add a `Field` in `InfoTab`. Note that `origin_cod_termini_pag` is also exposed by the backend — clarify with operators whether they want one or both.
+- **MrSmith location:** `InfoTab` renders `order.cdlan_cod_termini_pag` as `Condizioni pagamento`.
+- **Resolution:** restored as readonly essential order information. `origin_cod_termini_pag` remains intentionally hidden because Appsmith showed the current condition only.
 
-### G4. `written_by` (Redatto da) not rendered
+### G4. `written_by` (Redatto da) restored
 
 - **Appsmith location:** `Dettaglio ordine` text widget `written_by` — `<b>Redatto da:</b> {{Order.data[0].written_by}}`.
-- **MrSmith location:** field in `types.go:62` / `types.ts:54`, no UI surface.
-- **Suggested resolution:** add a `Field` in `InfoTab` (or `AziendaTab`) using `order.written_by`.
+- **MrSmith location:** `InfoTab` renders `order.written_by` as `Redatto da`.
+- **Resolution:** restored as readonly essential order information.
+
+## Gaps — minor
 
 ### G5. `cdlan_ragg_fatturazione` (Codice raggruppamento fatturazione) not in righe table
 
@@ -285,10 +285,10 @@ MrSmith counterpart: `apps/ordini/src/pages/OrderDetailPage.tsx` + tab component
 | `cdlan_datadoc` "Data ordine" | `cdlan_datadoc` | `DetailHeader.tsx:58` | OK |
 | `cdlan_stato` "Stato" | `cdlan_stato` | `DetailHeader.tsx:55` `StatusBadge` | OK |
 | `cdlan_cliente` (Ragione sociale, multiple instances) | `cdlan_cliente` | `DetailHeader.tsx:53` + `InfoTab.tsx:100` (in editable block) + `AziendaTab.tsx:12` | OK |
-| `cdlan_cod_termini_pag` "Condizioni di pagamento" | `cdlan_cod_termini_pag` | **not rendered** (data exposed in DTO) | **GAPm (G3)** |
-| `cdlan_tacito_rin` "Tacito rinnovo" | `cdlan_tacito_rin` | **not rendered** (data exposed in DTO) | **GAPm (G2)** |
-| `cdlan_note` "Note Legali" | `cdlan_note` | **not rendered** (data exposed in DTO) | **GAPm (G1)** |
-| `written_by` "Redatto da" | `written_by` | **not rendered** (data exposed in DTO) | **GAPm (G4)** |
+| `cdlan_cod_termini_pag` "Condizioni di pagamento" | `cdlan_cod_termini_pag` | `InfoTab` label "Condizioni pagamento" | OK |
+| `cdlan_tacito_rin` "Tacito rinnovo" | `cdlan_tacito_rin` | `InfoTab` label "Tacito rinnovo" + `formatSiNo` | OK |
+| `cdlan_note` "Note Legali" | `cdlan_note` | `InfoTab` label "Note legali" | OK |
+| `written_by` "Redatto da" | `written_by` | `InfoTab` label "Redatto da" | OK |
 | `Text6` "Consulta ordine in arxivar" + `Text8` static link | static `<a href=arxivar.cdlan.it/#!/view/27ad1a56…>` | `InfoTab.tsx:76-81` **dynamic** link `https://arxivar.cdlan.it/#!/view/${arx_doc_number}` shown only when `arx_doc_number` present | OK (improvement) |
 
 **Info tab — editable block (BOZZA save):**

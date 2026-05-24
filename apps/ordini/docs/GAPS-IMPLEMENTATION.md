@@ -1,20 +1,23 @@
-# Ordini gap remediation plan
+# Ordini gap remediation status
 
 Date: 2026-05-23
-Status: detailed remediation plan
+Last updated: 2026-05-24
+Status: code/test remediation mostly complete; runtime, manual verification, and UI post-gate still open
 Source implementation: `b1df0ff` (`feat(ordini): add new order management application`)
-Primary gap source: `apps/ordini/docs/SCORE-REVIEWER.md`
+Code remediation commit: `7c116d3` (`refactor(ordini): improve order workflow and UI consistency`)
+Status audit base: current workspace after `c607e6c` (`docs(ordini): add parity audit and gap remediation plan`)
+Historical primary gap source: `apps/ordini/docs/SCORE-REVIEWER.md` (not present in the current checkout)
 
 ## Goal
 
 Close the confirmed Ordini implementation gaps before considering the app for UI post-gate and a later catalog status change from `test` to `ready`.
 
-This plan addresses only confirmed implementation, contract, verification, and UI consistency gaps. It does not expand v1 scope.
+This document now tracks both the original remediation plan and the current implementation status. It addresses only confirmed implementation, contract, verification, and UI consistency gaps. It does not expand v1 scope.
 
 ## Inputs used
 
 - `apps/ordini/docs/IMPL-ORDINI.md`
-- `apps/ordini/docs/SCORE-REVIEWER.md`
+- `apps/ordini/docs/SCORE-REVIEWER.md` (historical source referenced by the plan; not present in the current checkout)
 - `docs/UI-UX.md`
 - `docs/IMPLEMENTATION-PLANNING.md`
 - `docs/IMPLEMENTATION-KNOWLEDGE.md`
@@ -33,16 +36,51 @@ This plan addresses only confirmed implementation, contract, verification, and U
 
 ## Current verified baseline
 
-The following checks passed during review:
+The original review baseline was recorded against `b1df0ff`. The current workspace has since added Ordini remediation code and tests in `7c116d3`.
+
+Latest status-audit checks run on 2026-05-24:
 
 ```bash
-docker run --rm --network host --user 1000:1000 -e HOME=/tmp -e COREPACK_HOME=/tmp/corepack -v /home/sciacco/devel/mrsmith:/repo -w /repo node:20-slim corepack pnpm --filter mrsmith-ordini lint
-docker run --rm --network host --user 1000:1000 -e HOME=/tmp -e COREPACK_HOME=/tmp/corepack -v /home/sciacco/devel/mrsmith:/repo -w /repo node:20-slim corepack pnpm --filter mrsmith-ordini build
-docker run --rm --network host --user 1000:1000 -e GOCACHE=/tmp/go-build -e GOMODCACHE=/tmp/gomod -e GOPATH=/tmp/go -v /home/sciacco/devel/mrsmith:/repo -w /repo/backend golang:1.26.1 go test ./internal/ordini ./internal/platform/applaunch ./internal/platform/config ./internal/platform/staticspa
-docker run --rm --network host --user 1000:1000 -e GOCACHE=/tmp/go-build -e GOMODCACHE=/tmp/gomod -e GOPATH=/tmp/go -v /home/sciacco/devel/mrsmith:/repo -w /repo/backend golang:1.26.1 go test ./...
+cd backend && go test ./internal/ordini
+pnpm --filter mrsmith-ordini lint
+pnpm --filter mrsmith-ordini build
+rg "#fff|rgba\(16, 185, 129" apps/ordini/src
 ```
 
-Important baseline note: `backend/internal/ordini` currently reports `[no test files]`.
+Results:
+
+- `go test ./internal/ordini` passed.
+- `pnpm --filter mrsmith-ordini lint` passed.
+- `pnpm --filter mrsmith-ordini build` passed.
+- Raw-color check returned no matches for the targeted literals.
+
+The old baseline note that `backend/internal/ordini` reported `[no test files]` is obsolete. The current package has contract coverage in `backend/internal/ordini/ordini_test.go`.
+
+Full backend `go test ./...`, Docker-based parity commands, live gateway checks, browser screenshots, and UI post-gate were not rerun as part of this status refresh.
+
+## Current remediation status
+
+Most code and automated-test gaps from the remediation plan are implemented in the current branch.
+
+Implemented:
+
+- Backend contract and safety fixes: `GAP-BE-01`, `GAP-BE-03`, `GAP-BE-04`, `GAP-BE-05`, `GAP-BE-06`, `GAP-BE-08`.
+- Activation hardening minimum safe path: `GAP-BE-07` blocks canceled and zero-quantity rows in frontend and backend.
+- Approved backend contract-test categories: `GAP-TEST-01` through `GAP-TEST-09`.
+- Frontend error mapping, 15-column list, row interaction polish, token cleanup, warning handling, renewal-duration formatting, activation modal reset, and minor cleanup: `GAP-FE-01` through `GAP-FE-08`.
+- Essential Info metadata restored after audit reclassification: `GAP-FE-09` covers Note legali, Tacito rinnovo, Condizioni pagamento, and Redatto da.
+
+Partially implemented or intentionally constrained:
+
+- `GAP-BE-02`: the shared `logFailure` helper adds `component`, `operation`, `request_id`, and `duration_ms`; gateway/PDF logs include path/status when available. One caveat remains: `dbFailure` currently starts timing inside the helper call, so DB-failure `duration_ms` is a correlation field but not a precise operation duration.
+- `GAP-BE-07`: already-confirmed activation rows remain permissive by design until Appsmith/live business behavior confirms they must be final.
+- `GAP-FE-08`: `useOptionalAuth` remains present as a fail-closed fallback. It is not currently misleading because the fallback reports unauthenticated, not authenticated.
+
+Still open:
+
+- `GAP-RUN-01`: live/runtime verification of Alyante/MSSQL behavior, Arak gateway error payloads, and PDF payload shapes.
+- `GAP-UX-01`: manual checklist, screenshots, and blocking UI post-gate.
+- Final broad verification if required for signoff: full backend test suite and/or Docker-based commands from Phase 6.
 
 ## Comparable apps audit
 
@@ -899,53 +937,56 @@ docker run --rm --network host --user 1000:1000 -e HOME=/tmp -e COREPACK_HOME=/t
 
 ## Detailed task matrix
 
-| ID | Priority | Area | Files | Action | Acceptance criteria |
-| --- | --- | --- | --- | --- | --- |
-| GAP-BE-01 | P0 | Backend error contract | `handler.go`, `errors.ts` | Return `db_failed` for Ordini DB failures | DB failures no longer return `internal_server_error` |
-| GAP-BE-02 | P0 | Observability | `handler.go`, workflows, PDF | Add request ID and duration to failure logs | Failure logs match plan fields |
-| GAP-BE-03 | P1 | Legacy data | `scanners.go` | Treat zero datetime as null | `0000-00-00 00:00:00` scans as invalid/null |
-| GAP-BE-04 | P0 | Backend validation | `store_orders.go`, `errors.ts` | Validate confirmation date | Bad dates return stable 422 code |
-| GAP-BE-05 | P0 | Race safety | `store_orders.go` | Add referents SQL state guard | Concurrent state change cannot bypass state rule |
-| GAP-BE-06 | P1 | Gateway errors | `gateway.go`, `workflow_send.go` | Replace substring matching | Known business errors use typed mapping |
-| GAP-BE-07 | P1 | Activation safety | `workflow_activate.go`, `permissions.ts` | Block canceled/zero-quantity activation; decide confirmed behavior | UI/backend agree on non-actionable rows |
-| GAP-BE-08 | P2 | Cleanup | `scanners.go` | Remove unused helper | No unused helper remains |
-| GAP-TEST-01 | P0 | Tests | `workflow_activate_test.go` | Test Q2 confirm count | Canceled and zero-qty rows count as satisfied |
-| GAP-TEST-02 | P0 | Tests | `workflow_send_test.go` | Test partial failure | Vodka state does not transition |
-| GAP-TEST-03 | P0 | Tests | `workflow_send_test.go` | Test full success | Vodka transitions and Arxivar attempted |
-| GAP-TEST-04 | P0 | Tests | `workflow_send_test.go` | Test Arxivar warning | Warning returned after state flip |
-| GAP-TEST-05 | P0 | Tests | `store_orders_test.go` | Test C2 dual-write | Customer name and ID both written |
-| GAP-TEST-06 | P0 | Tests | row/workflow tests | Test row ownership | Cross-order row mutation blocked |
-| GAP-TEST-07 | P0 | Tests | `pdf_test.go` | Test PDF normalization | Raw/base64 PDF accepted; malformed rejected |
-| GAP-TEST-08 | P0 | Tests | `permissions_test.go` | Test backend role/state gates | Backend is authoritative |
-| GAP-TEST-09 | P1 | Tests | `store_origin_test.go` | Test origin resolver | Legacy quote origin mapping preserved |
-| GAP-FE-01 | P0 | Frontend error UX | `errors.ts` | Add missing mappings | Backend codes show business messages |
-| GAP-FE-02 | P1 | List UI | `OrdersTable.tsx`, CSS | Restore 15 columns or document exception | Desktop list meets plan or has explicit exception |
-| GAP-FE-03 | P1 | UI style | CSS, table components | Add row accent/active states | Tables match mini-app family |
-| GAP-FE-04 | P1 | UI tokens | CSS | Replace avoidable raw colors | Token discipline improves without visual drift |
-| GAP-FE-05 | P2 | Warning UX | `SendToErpResultPanel.tsx` | Switch on warning code | Known/unknown warnings handled safely |
-| GAP-FE-06 | P2 | Formatting | `formatters.ts` | Split renewal duration formatter | Renewal and billing labels do not share accidental semantics |
-| GAP-FE-07 | P2 | Modal state | `ActivationModal.tsx` | Reset on row change | No stale activation form state |
-| GAP-FE-08 | P2 | Cleanup | `permissions.ts`, `useOptionalAuth.ts` | Remove misleading helpers if not intentional | No misleading unused abstractions |
-| GAP-RUN-01 | P1 | Runtime | gateway/DB paths | Verify Alyante/GW/PDF assumptions | Runtime assumptions are verified or documented |
-| GAP-UX-01 | P0 | Signoff | app screens | Run manual checklist and UI post-gate | App remains `test` until gates pass |
+| ID | Priority | Status | Area | Files | Action | Acceptance criteria |
+| --- | --- | --- | --- | --- | --- | --- |
+| GAP-BE-01 | P0 | Done | Backend error contract | `handler.go`, `errors.ts` | Return `db_failed` for Ordini DB failures | DB failures no longer return `internal_server_error` |
+| GAP-BE-02 | P0 | Partial | Observability | `handler.go`, workflows, PDF | Add request ID and duration to failure logs | Failure logs carry required correlation fields; DB failure duration is not yet an operation-duration measurement |
+| GAP-BE-03 | P1 | Done | Legacy data | `scanners.go` | Treat zero datetime as null | `0000-00-00 00:00:00` scans as invalid/null |
+| GAP-BE-04 | P0 | Done | Backend validation | `store_orders.go`, `errors.ts` | Validate confirmation date | Bad dates return stable 422 code |
+| GAP-BE-05 | P0 | Done | Race safety | `store_orders.go` | Add referents SQL state guard | Concurrent state change cannot bypass state rule |
+| GAP-BE-06 | P1 | Done | Gateway errors | `gateway.go`, `workflow_send.go` | Replace substring matching | Known business errors use typed mapping |
+| GAP-BE-07 | P1 | Done with exception | Activation safety | `workflow_activate.go`, `permissions.ts` | Block canceled/zero-quantity activation; decide confirmed behavior | Canceled/zero-quantity rows are blocked; already-confirmed rows remain permissive pending business confirmation |
+| GAP-BE-08 | P2 | Done | Cleanup | `scanners.go` | Remove unused helper | No unused helper remains |
+| GAP-TEST-01 | P0 | Done | Tests | `ordini_test.go` | Test Q2 confirm count | Canceled and zero-qty rows count as satisfied |
+| GAP-TEST-02 | P0 | Done | Tests | `ordini_test.go` | Test partial failure | Vodka state does not transition |
+| GAP-TEST-03 | P0 | Done | Tests | `ordini_test.go` | Test full success | Vodka transitions and Arxivar attempted |
+| GAP-TEST-04 | P0 | Done | Tests | `ordini_test.go` | Test Arxivar warning | Warning returned after state flip |
+| GAP-TEST-05 | P0 | Done | Tests | `ordini_test.go` | Test C2 dual-write | Customer name and ID both written |
+| GAP-TEST-06 | P0 | Done | Tests | `ordini_test.go` | Test row ownership | Cross-order row mutation blocked |
+| GAP-TEST-07 | P0 | Done | Tests | `ordini_test.go` | Test PDF normalization | Raw/base64 PDF accepted; malformed rejected |
+| GAP-TEST-08 | P0 | Done | Tests | `ordini_test.go` | Test backend role/state gates | Backend is authoritative |
+| GAP-TEST-09 | P1 | Done | Tests | `ordini_test.go` | Test origin resolver | Legacy quote origin mapping preserved |
+| GAP-FE-01 | P0 | Done | Frontend error UX | `errors.ts` | Add missing mappings | Backend codes show business messages |
+| GAP-FE-02 | P1 | Done | List UI | `OrdersTable.tsx`, CSS | Restore 15 columns or document exception | Desktop list renders 15 business columns |
+| GAP-FE-03 | P1 | Done | UI style | CSS, table components | Add row accent/active states | Tables match mini-app interaction family |
+| GAP-FE-04 | P1 | Done | UI tokens | CSS | Replace avoidable raw colors | Targeted raw-color check returns no matches |
+| GAP-FE-05 | P2 | Done | Warning UX | `SendToErpResultPanel.tsx` | Switch on warning code | Known/unknown warnings handled safely |
+| GAP-FE-06 | P2 | Done | Formatting | `formatters.ts` | Split renewal duration formatter | Renewal and billing labels no longer share accidental semantics |
+| GAP-FE-07 | P2 | Done | Modal state | `ActivationModal.tsx` | Reset on row change | No stale activation form state |
+| GAP-FE-08 | P2 | Done with note | Cleanup | `permissions.ts`, `useOptionalAuth.ts` | Remove misleading helpers if not intentional | Technical-notes helper removed; optional-auth fallback remains fail-closed |
+| GAP-FE-09 | P0 | Done | Essential Info metadata | `InfoTab.tsx`, audit docs | Restore order-essential readonly Info fields G1-G4 | Note legali, Tacito rinnovo, Condizioni pagamento, and Redatto da are visible in Info |
+| GAP-RUN-01 | P1 | Open | Runtime | gateway/DB paths | Verify Alyante/GW/PDF assumptions | Runtime assumptions are verified or documented |
+| GAP-UX-01 | P0 | Open | Signoff | app screens | Run manual checklist and UI post-gate | App remains `test` until gates pass |
 
-## Suggested implementation order
+## Remaining execution order
 
-1. Backend error/date/race fixes: GAP-BE-01, GAP-BE-03, GAP-BE-04, GAP-BE-05.
-2. Test scaffolding and approved contract tests: GAP-TEST-01 through GAP-TEST-09.
-3. Gateway/logging hardening: GAP-BE-02 and GAP-BE-06.
-4. Activation row hardening: GAP-BE-07 after confirmed behavior for already-confirmed rows.
-5. Frontend contract fixes: GAP-FE-01, GAP-FE-05, GAP-FE-07.
-6. UI consistency fixes: GAP-FE-02, GAP-FE-03, GAP-FE-04, GAP-FE-06.
-7. Cleanup: GAP-BE-08 and GAP-FE-08.
-8. Runtime/manual verification and UI post-gate.
+1. Keep the implemented code/test remediation stable unless runtime or UI-gate findings require focused follow-up changes.
+2. Run `GAP-RUN-01` against a suitable live or staging environment:
+   - Alyante/MSSQL named parameter behavior.
+   - Arak gateway business-error payloads.
+   - PDF payload shapes for kickoff, activation form, order PDF, and signed PDF.
+3. Run the manual checklist from Phase 5 with real or representative data.
+4. Capture UI post-gate screenshots for populated, empty, error, modal, send-to-ERP partial failure, and narrow states.
+5. Run broader final verification if required for signoff:
+   - `cd backend && go test ./...`
+   - Docker-based commands in Phase 6 when host tooling parity matters.
+6. Keep catalog status `test` until runtime verification, manual checklist, and UI post-gate are complete.
 
 Rationale:
 
-- Error/date/race fixes are low-level contracts that tests should lock in.
-- Approved contract tests should land before or with workflow changes so they protect business behavior.
-- UI changes should follow backend error-code stabilization to avoid repeated copy/mapping churn.
-- Visual post-gate should happen after all UI-affecting fixes are in place.
+- Code and focused contract-test remediation are already in place in the current branch.
+- The remaining risk is no longer ordinary implementation drift; it is runtime integration behavior and signoff evidence.
+- Visual post-gate should happen before any catalog status change to `ready`.
 
 ## Risk notes
 
@@ -957,10 +998,11 @@ Rationale:
 
 ## Definition of done
 
-- All P0 and P1 gaps in the task matrix are resolved or explicitly documented as accepted exceptions.
-- All nine approved Ordini contract-test categories exist and pass.
-- Frontend lint and build pass.
-- Targeted and full backend Go tests pass.
-- Manual verification checklist is completed against a suitable environment.
-- UI post-gate passes with screenshots for populated, empty, error, modal, and narrow states.
-- Catalog status remains `test` unless a separate final signoff explicitly approves `ready`.
+- All P0 and P1 implementation/test gaps in the task matrix are resolved or explicitly documented as accepted exceptions. Current status: satisfied except `GAP-BE-02` precision caveat and open signoff/runtime gates.
+- All nine approved Ordini contract-test categories exist and pass. Current status: satisfied by `go test ./internal/ordini`.
+- Frontend lint and build pass. Current status: satisfied by `pnpm --filter mrsmith-ordini lint` and `pnpm --filter mrsmith-ordini build`.
+- Full backend Go tests pass when final signoff requires them. Current status: not rerun in the 2026-05-24 status refresh.
+- Runtime assumptions are verified or explicitly documented as unresolved deployment/manual verification items. Current status: open.
+- Manual verification checklist is completed against a suitable environment. Current status: open.
+- UI post-gate passes with screenshots for populated, empty, error, modal, and narrow states. Current status: open.
+- Catalog status remains `test` unless a separate final signoff explicitly approves `ready`. Current status: satisfied.
