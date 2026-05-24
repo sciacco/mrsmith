@@ -9,11 +9,11 @@ Plan / deviation register: `apps/ordini/docs/IMPL-ORDINI.md` §1 (scope), §8 (r
 ## Summary
 
 - Total Appsmith items audited: **103** (5 pages, 5 datasources, 55 actions/JS handlers, 38 interactive/data widgets with semantic gates)
-- parity_confirmed: **82**
+- parity_confirmed: **84**
 - intentional_deviation: **17**
 - gap_blocking: **0**
-- gap_minor: **3**
-- cannot_verify: **1**
+- gap_minor: **2**
+- cannot_verify: **0**
 - **Go/no-go recommendation:** **GO** — no blocking gap; the remaining minor gaps are secondary display/UX parity items. The Info metadata gaps G1-G4 have been reclassified as essential order information and restored in MrSmith.
 
 ---
@@ -50,6 +50,12 @@ None.
 - **MrSmith location:** `InfoTab` renders `order.written_by` as `Redatto da`.
 - **Resolution:** restored as readonly essential order information.
 
+### G6. Existing activation date prefilled in activation drawer
+
+- **Appsmith location:** `Dettaglio ordine` modal `ModificaRiga`, text widget `TXT_data_atti_tech` — `Data indicata dai tecnici: {{Lista_righe.selectedRow.Data attivazione}}` (the tech-provided date already on the row).
+- **MrSmith location:** `RigheTab` pre-fills the activation form input from `row.cdlan_data_attivazione` when the row can be activated and the existing value is a valid date.
+- **Resolution:** the operator no longer has to retype the technician-provided date; the drawer opens with the existing activation date already selected.
+
 ## Gaps — minor
 
 ### G5. `cdlan_ragg_fatturazione` (Codice raggruppamento fatturazione) not in righe table
@@ -58,13 +64,6 @@ None.
 - **MrSmith location:** column not rendered in `apps/ordini/src/components/RigheTab.tsx:55-67`; field present in `OrderRow.cdlan_ragg_fatturazione` (`types.go:97` / `types.ts:82`).
 - **Drift:** since the column was hidden on the Appsmith Dettaglio ordine but visible on the Home modal, the bar of legacy behaviour is low. Operators relying on the Home modal would lose it; operators using only the Detail page already could not see it.
 - **Suggested resolution:** optional — add a hideable column to `RigheTab` if the field is operationally useful.
-
-### G6. Existing activation date not shown in activation modal
-
-- **Appsmith location:** `Dettaglio ordine` modal `ModificaRiga`, text widget `TXT_data_atti_tech` — `Data indicata dai tecnici: {{Lista_righe.selectedRow.Data attivazione}}` (the tech-provided date already on the row).
-- **MrSmith location:** `apps/ordini/src/components/ActivationModal.tsx:30-46` shows row code + descrizione but does NOT show the current `row.cdlan_data_attivazione` for reference. The same value is visible in the row of `RigheTab` behind the modal, so it is not lost.
-- **Drift:** small UX convenience — operators no longer see "this is what the techs wrote" inside the modal; they have to glance at the row.
-- **Suggested resolution:** add a read-only line in `ActivationModal` showing `formatDate(row.cdlan_data_attivazione)` above the date input.
 
 ### G7. `cdlan_int_fatturazione` catch-all label changed
 
@@ -75,13 +74,14 @@ None.
 
 ---
 
-## Cannot verify
+## External verification — resolved
 
 ### CV1. Arxivar upload payload contract
 
-- **Appsmith call:** `GW_SavePdfToArxivar` (`actionList` entry, `Dettaglio ordine` page) — `POST /orders/v1/send-to-arxivar` with JSON body `{ "file": "<base64>", "orderId": <id> }` (the Appsmith file picker emits base64; the body header was JSON, not multipart).
+- **Appsmith call:** `GW_SavePdfToArxivar` (`Dettaglio ordine` page; see `datasource-catalog.md` and `page-audit.md`) — `POST /orders/v1/send-to-arxivar` as **multipart/form-data** with fields `file`, `orderId`, `filename`, `multipart` (mime type).
 - **MrSmith call:** `backend/internal/ordini/gateway.go:73-109` `gatewayUploadToArxivar` — `POST /orders/v1/send-to-arxivar` as **multipart/form-data** with parts `file` (raw bytes, not base64), `orderId`, `filename`, `multipart=application/pdf`.
-- **What's needed to resolve:** confirm the GW endpoint accepts multipart (and the extra `filename` / `multipart` fields are ignored or required). This cannot be checked from the repo alone — the GW spec lives outside this audit's scope. The full GW request can be exercised end-to-end in staging; the rest of the workflow is wired correctly.
+- **External verification:** `artifacts/search_results.md` identifies the IntGw OpenAPI/client contract for `POST /orders/v1/send-to-arxivar` as multipart-only with `file`, `orderId`, `filename` and optional metadata. MrSmith intentionally retains Appsmith's legacy `multipart=application/pdf` field for parity; live Appsmith compatibility indicates the extra field is accepted by the gateway.
+- **Resolution:** payload mode is not a V1 parity gap. Remaining validation is a normal staging smoke test of the full send-to-ERP + Arxivar workflow, not an unresolved contract question.
 
 ---
 
@@ -230,7 +230,7 @@ MrSmith counterpart: `apps/ordini/src/pages/OrderDetailPage.tsx` + tab component
 | `GW_ActivationForm` | `GET /orders/v1/activation-form/{id}` | `pdf.go:29-42` `handleActivationFormPDF` → `/activation-form.pdf`; IT/EN filename driven by `profile_lang`. | OK |
 | `GW_SendToErp` | `POST /orders/v1/erp` (per-row JSON) | `gateway.go:52-58,111-185` `gatewaySendToERP` + `buildSendToERPPayload`. Payload preserves header+row keys; `cdlan_stato` is overridden to `"CREATO"`. | OK + DEV (D8) |
 | `GW_SetActivationDate` | `POST /orders/v1/set-order-activation` | `gateway.go:60-71` `gatewaySetActivationDate`. | OK |
-| `GW_SavePdfToArxivar` | `POST /orders/v1/send-to-arxivar` JSON `{file, orderId}` | `gateway.go:73-109` `gatewayUploadToArxivar` — **multipart** with parts `file`/`orderId`/`filename`/`multipart`. | CV (CV1) |
+| `GW_SavePdfToArxivar` | `POST /orders/v1/send-to-arxivar` multipart with `file`/`orderId`/`filename`/`multipart` | `gateway.go:73-109` `gatewayUploadToArxivar` — **multipart** with parts `file`/`orderId`/`filename`/`multipart`. | OK |
 | `GW_GetPDFArxivarOrder` | `GET /orders/v1/order/pdf/{id}?from=vodka` header `from=vodka` | `pdf.go:58-71` `handleSignedPDF` with `Query: "from=vodka"`. | OK |
 | `DownloadOrderPDFintGW` | `GET /orders/v1/order/pdf/{id}/generate` | `pdf.go:44-56` `handleOrderPDF`. | OK |
 | `GW_CancelOrder` | `POST /orders/v2/order/{id}/cancel` | n/a | DEV (D10) |
@@ -333,20 +333,20 @@ MrSmith counterpart: `apps/ordini/src/pages/OrderDetailPage.tsx` + tab component
 | `Attivazione` aliased "Setup" | readonly | `RigheTab.tsx:76` label "Prezzo attivazione" + `formatMoney(activation_price, cdlan_valuta)` | OK + DEV (D3) |
 | `Numero seriale` `isCellEditable={{stato=='BOZZA' && CR==true}}` | BOZZA + CR (Appsmith) | `RigheTab.tsx:77-92` inline edit; gate `canEditSerialNumber(order)` = `BOZZA` only (no CR); backend `store_rows.go:176-226` likewise | DEV (D16) |
 | `Data attivazione` | readonly | `RigheTab.tsx:92` | OK |
-| `customColumn1` "Modifica" iconButton `isCellVisible={{stato=='INVIATO' && CR==true}}` → `showModal('ModificaRiga')` | INVIATO + CR | `RigheTab.tsx:98-100` `Modifica` button + `canOpenActivationModal` (also requires `data_annullamento==null && cdlan_qta!==0` per IMPL §11) → opens `ActivationModal` | OK |
+| `customColumn1` "Modifica" iconButton `isCellVisible={{stato=='INVIATO' && CR==true}}` → `showModal('ModificaRiga')` | INVIATO + CR | Row click opens the `RigheTab` drawer; `canOpenActivationModal` also requires `data_annullamento==null && cdlan_qta!==0` per IMPL §11 before showing activation controls. | OK |
 | `EditActions1` Save/Discard | implicit | `RigheTab.tsx:78-91` inline check/x icons | OK |
 | `ID Riga` (hidden), `Prezzo cessazione` (hidden), `confirm_data_attivazione` (hidden), `System ODV Riga` (hidden), `Codice raggruppamento fatturazione` (hidden) | n/a | `id`, `termination_price`, `confirm_data_attivazione`, `cdlan_systemodv_row`, `cdlan_ragg_fatturazione` all present in DTO (`types.go:84-102`) | OK (data); GAPm G5 if surfaced is wanted |
 
-**Activation modal (`ModificaRiga`):**
+**Activation drawer (`ModificaRiga`):**
 
 | Appsmith widget | Gate | MrSmith counterpart | Class |
 |---|---|---|---|
-| `Text5` "Riga numero {{Lista_righe.triggeredRow[…]}}" | readonly | `ActivationModal.tsx:30-35` shows codart / descart of selected row | OK |
-| `cdlan_data_attivazione` DATE_PICKER `DIS={{stato=='ATTIVO'}}` | not ATTIVO | `ActivationModal.tsx:36-46` date input; modal only opens for INVIATO so the gate is enforced upstream by `canOpenActivationModal` | OK |
-| `TXT_data_atti_tech` "Data indicata dai tecnici: …" | readonly preview of existing date | **not shown in modal** (visible on the row itself) | **GAPm (G6)** |
+| `Text5` "Riga numero {{Lista_righe.triggeredRow[…]}}" | readonly | `RigheTab` drawer title/subtitle and article section show the selected row code/description. | OK |
+| `cdlan_data_attivazione` DATE_PICKER `DIS={{stato=='ATTIVO'}}` | not ATTIVO | `RigheTab` date input is shown only when the selected row can be activated; the gate is enforced upstream by `canOpenActivationModal`. | OK |
+| `TXT_data_atti_tech` "Data indicata dai tecnici: …" | readonly preview of existing date | `RigheTab` pre-fills the date input from `row.cdlan_data_attivazione` when the value is a valid date. | OK |
 | `cdlan_serialnumber` INPUT inside modal `DIS={{stato!='BOZZA'}}` | BOZZA | not duplicated in modal (only the per-row inline edit exists in `RigheTab`) | OK (function preserved at column level) |
-| `BTN_confirm_act_modal` "CONFERMA" `VIS={{stato!='ATTIVO'}}`, `DIS={{cdlan_data_attivazione==null}}` → `SetActivationDate.run()` | not ATTIVO + date required | `ActivationModal.tsx:49-51` Confirm button disabled until `activationDate` set; `OrderDetailPage.tsx:156-165 confirmActivation` → `PATCH /ordini/v1/orders/{id}/rows/{rowId}/activate` | OK |
-| `BTN_close_act_modal` / `IconButton1` close handlers | always | `ActivationModal.tsx:21-24,47-48` Cancel + Modal close | OK |
+| `BTN_confirm_act_modal` "CONFERMA" `VIS={{stato!='ATTIVO'}}`, `DIS={{cdlan_data_attivazione==null}}` → `SetActivationDate.run()` | not ATTIVO + date required | `RigheTab` Confirm button is disabled until `activationDate` is set; `OrderDetailPage` `confirmActivation` → `PATCH /ordini/v1/orders/{id}/rows/{rowId}/activate`. | OK |
+| `BTN_close_act_modal` / `IconButton1` close handlers | always | `RigheTab` drawer close action; close is disabled while the save/activation request is in flight. | OK |
 
 **Tecnici table (`Lista_righe_tecnici`):**
 

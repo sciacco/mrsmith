@@ -5,7 +5,7 @@ import { useRoutes } from 'react-router-dom';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 
-const navItems = [{ label: 'Lista ordini', path: '/ordini' }];
+const navItems = [{ label: 'Tutti gli ordini', path: '/ordini' }];
 
 function AppRoutes() {
   const element = useRoutes(routes);
