@@ -224,6 +224,15 @@
   background: color-mix(in srgb, var(--color-bg-elevated) 86%, var(--color-surface) 14%);
 }
 
+.factItemWide {
+  grid-column: 1 / -1;
+}
+
+.factItemWide strong {
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .factItem span,
 .formLabel,
 .fieldLabel > span:first-child {

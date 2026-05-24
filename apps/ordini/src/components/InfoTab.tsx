@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Icon } from '@mrsmith/ui';
 import type { CustomerRef, OrderDetail, SendToERPResponse, UpdateHeaderPayload } from '../api/types';
-import { dateInputValue, formatDate, formatDurRin, formatEmpty, formatFatturazione, formatFatturazioneAtt, formatTipoDoc, formatTipoProposta } from '../lib/formatters';
+import { dateInputValue, formatDate, formatDurRin, formatEmpty, formatFatturazione, formatFatturazioneAtt, formatSiNo, formatTipoDoc, formatTipoProposta } from '../lib/formatters';
 import { CustomerSelect } from './CustomerSelect';
 import { SendToErpResultPanel } from './SendToErpResultPanel';
 import styles from '../pages/OrderDetailPage.module.css';
@@ -64,7 +64,10 @@ export function InfoTab({
           <Field label="Tipo proposta" value={formatTipoProposta(order.cdlan_tipo_ord)} />
           <Field label="ODV" value={order.cdlan_systemodv} mono />
           <Field label="Commerciale" value={order.cdlan_commerciale} />
+          <Field label="Redatto da" value={order.written_by} />
+          <Field label="Condizioni pagamento" value={order.cdlan_cod_termini_pag} mono />
           <Field label="Durata rinnovo" value={formatDurRin(order.cdlan_dur_rin)} />
+          <Field label="Tacito rinnovo" value={formatSiNo(order.cdlan_tacito_rin)} />
           <Field label="Fatturazione canoni" value={formatFatturazione(order.cdlan_int_fatturazione)} />
           <Field label="Fatturazione attivazione" value={formatFatturazioneAtt(order.cdlan_int_fatturazione_att)} />
           <Field label="Data decorrenza" value={formatDate(order.data_decorrenza)} />
@@ -72,6 +75,7 @@ export function InfoTab({
           <Field label="Durata servizio" value={order.cdlan_durata_servizio} />
           <Field label="Sostituisce" value={order.cdlan_sost_ord} mono />
           <Field label="Lingua" value={order.profile_lang} />
+          <Field label="Note legali" value={order.cdlan_note} wide />
         </div>
         {order.arx_doc_number ? (
           <a className={styles.arxivarLink} href={`https://arxivar.cdlan.it/#!/view/${encodeURIComponent(order.arx_doc_number)}`} target="_blank" rel="noreferrer">
@@ -127,9 +131,9 @@ export function InfoTab({
   );
 }
 
-function Field({ label, value, mono }: { label: string; value: string | number | null | undefined; mono?: boolean }) {
+function Field({ label, value, mono, wide }: { label: string; value: string | number | null | undefined; mono?: boolean; wide?: boolean }) {
   return (
-    <div className={styles.factItem}>
+    <div className={`${styles.factItem} ${wide ? styles.factItemWide : ''}`}>
       <span>{label}</span>
       <strong className={mono ? styles.mono : undefined}>{formatEmpty(value)}</strong>
     </div>
