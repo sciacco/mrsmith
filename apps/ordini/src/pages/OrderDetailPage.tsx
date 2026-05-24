@@ -136,6 +136,7 @@ export function OrderDetailPage() {
       toast('Seriale salvato');
     } catch (error) {
       toast(apiErrorMessage(error, 'Salvataggio seriale non riuscito'), 'error');
+      throw error;
     } finally {
       setSavingSerialRow(null);
     }
@@ -159,6 +160,7 @@ export function OrderDetailPage() {
       toast('Attivazione confermata');
     } catch (error) {
       toast(apiErrorMessage(error, 'Conferma attivazione non riuscita'), 'error');
+      throw error;
     }
   }
 
@@ -252,8 +254,8 @@ export function OrderDetailPage() {
               roles={roles}
               savingRowId={savingSerialRow}
               activationLoading={activateRow.isPending}
-              onSaveSerial={(rowId, serialNumber) => void saveSerial(rowId, serialNumber)}
-              onActivate={(rowId, date) => void confirmActivation(rowId, date)}
+              onSaveSerial={(rowId, serialNumber) => saveSerial(rowId, serialNumber)}
+              onActivate={(rowId, date) => confirmActivation(rowId, date)}
             />
           ) : null}
           {activeTab === 'tecnici' ? (

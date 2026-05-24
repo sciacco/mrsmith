@@ -386,6 +386,52 @@ func TestActivationFinalSatisfiedRowSetsOrderAttivo(t *testing.T) {
 	}
 }
 
+func TestActivationAttivoStateRaceReturnsConflict(t *testing.T) {
+	state := ordiniActivationDBState(t, 1, 1, orderRowValues(11, 1, 101, 1, "", 1))
+	state.exec = func(query string, args []driver.NamedValue) (int64, error) {
+		if strings.Contains(query, "SET cdlan_stato = 'ATTIVO'") {
+			return 0, nil
+		}
+		return 1, nil
+	}
+	gw := newOrdiniGateway(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, Deps{Vodka: openOrdiniTestDB(t, state), Arak: gw.client, Logger: logging.NewWithWriter(io.Discard, "debug")})
+
+	req := requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1/rows/11/activate", strings.NewReader(`{"activation_date":"2026-05-23"}`), true)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict || errorCode(t, rec.Body.Bytes()) != "wrong_state" {
+		t.Fatalf("status/body=%d %s", rec.Code, rec.Body.String())
+	}
+	if state.commits != 0 {
+		t.Fatalf("expected no commit after ATTIVO race, got %d", state.commits)
+	}
+}
+
+func TestActivationGatewayFailureRollsBackLocalUpdate(t *testing.T) {
+	state := ordiniActivationDBState(t, 1, 1, orderRowValues(11, 1, 101, 1, "", 1))
+	gw := newOrdiniGateway(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	})
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, Deps{Vodka: openOrdiniTestDB(t, state), Arak: gw.client, Logger: logging.NewWithWriter(io.Discard, "debug")})
+
+	req := requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1/rows/11/activate", strings.NewReader(`{"activation_date":"2026-05-23"}`), true)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway || errorCode(t, rec.Body.Bytes()) != "gateway_error" {
+		t.Fatalf("status/body=%d %s", rec.Code, rec.Body.String())
+	}
+	if state.commits != 0 {
+		t.Fatalf("expected no commit after gateway failure, got %d", state.commits)
+	}
+}
+
 func TestActivationRejectsCanceledOrZeroQuantityRows(t *testing.T) {
 	for _, tc := range []struct {
 		name string

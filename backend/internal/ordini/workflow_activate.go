@@ -101,11 +101,22 @@ WHERE orders_id = ?
 	}
 	newState := string(OrderStateInviato)
 	if total > 0 && confirmed == total {
-		if _, err := tx.ExecContext(r.Context(), `
-UPDATE orders
-SET cdlan_stato = 'ATTIVO'
-WHERE id = ? AND cdlan_stato = 'INVIATO'`, orderID); err != nil {
+		res, err := tx.ExecContext(r.Context(), `
+	UPDATE orders
+	SET cdlan_stato = 'ATTIVO'
+	WHERE id = ? AND cdlan_stato = 'INVIATO'`, orderID)
+		if err != nil {
 			h.dbFailure(w, r, "activation_set_order_attivo", err, "order_id", orderID, "row_id", rowID)
+			return
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			h.dbFailure(w, r, "activation_set_order_attivo_rows_affected", err, "order_id", orderID, "row_id", rowID)
+			return
+		}
+		if affected == 0 {
+			h.logFailure(r, slog.LevelWarn, "activation state transition affected no rows after gateway success", "activation_set_order_attivo_conflict", start, "order_id", orderID, "row_id", rowID)
+			httputil.Error(w, http.StatusConflict, "wrong_state")
 			return
 		}
 		newState = string(OrderStateAttivo)

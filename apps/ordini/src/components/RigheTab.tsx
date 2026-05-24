@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Drawer, Icon, Skeleton } from '@mrsmith/ui';
 import type { OrderDetail, OrderRow } from '../api/types';
-import { formatDate, formatEmpty, formatMoney } from '../lib/formatters';
+import { dateInputValue, formatDate, formatEmpty, formatMoney } from '../lib/formatters';
 import { canEditSerialNumber, canOpenActivationModal } from '../lib/permissions';
 import styles from '../pages/OrderDetailPage.module.css';
 
@@ -28,6 +28,18 @@ function stripHtml(html: string | null | undefined): string {
     .trim();
 }
 
+function validDateInputValue(value: string | null | undefined): string {
+  const input = dateInputValue(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) return '';
+  const parsed = new Date(`${input}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const [year, month, day] = input.split('-').map(Number);
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() + 1 !== month || parsed.getUTCDate() !== day) {
+    return '';
+  }
+  return input;
+}
+
 interface RigheTabProps {
   order: OrderDetail;
   rows: OrderRow[];
@@ -35,8 +47,8 @@ interface RigheTabProps {
   roles: readonly string[] | undefined;
   savingRowId: number | null;
   activationLoading: boolean;
-  onSaveSerial: (rowId: number, serialNumber: string) => void;
-  onActivate: (rowId: number, date: string) => void;
+  onSaveSerial: (rowId: number, serialNumber: string) => Promise<void>;
+  onActivate: (rowId: number, date: string) => Promise<void>;
 }
 
 export function RigheTab({ order, rows, loading, roles, savingRowId, activationLoading, onSaveSerial, onActivate }: RigheTabProps) {
@@ -44,28 +56,44 @@ export function RigheTab({ order, rows, loading, roles, savingRowId, activationL
   const [serialDraft, setSerialDraft] = useState('');
   const [activationDate, setActivationDate] = useState('');
   const serialEditable = canEditSerialNumber(order);
+  const selectedRowSaving = selectedRow != null && savingRowId === selectedRow.id;
+  const drawerBusy = selectedRowSaving || activationLoading;
 
   const handleRowClick = (row: OrderRow) => {
     setSelectedRow(row);
     setSerialDraft(row.cdlan_serialnumber ?? '');
+    setActivationDate(canOpenActivationModal(order, roles, row) ? validDateInputValue(row.cdlan_data_attivazione) : '');
   };
 
   const handleCloseDrawer = () => {
+    if (drawerBusy) return;
     setSelectedRow(null);
     setSerialDraft('');
     setActivationDate('');
   };
 
-  const handleSaveSerial = () => {
+  const handleSaveSerial = async () => {
     if (!selectedRow) return;
-    onSaveSerial(selectedRow.id, serialDraft);
-    handleCloseDrawer();
+    try {
+      await onSaveSerial(selectedRow.id, serialDraft);
+      setSelectedRow(null);
+      setSerialDraft('');
+      setActivationDate('');
+    } catch {
+      // The parent page owns the user-facing error toast; keep the drawer open.
+    }
   };
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     if (!selectedRow) return;
-    onActivate(selectedRow.id, activationDate);
-    handleCloseDrawer();
+    try {
+      await onActivate(selectedRow.id, activationDate);
+      setSelectedRow(null);
+      setSerialDraft('');
+      setActivationDate('');
+    } catch {
+      // The parent page owns the user-facing error toast; keep the drawer open.
+    }
   };
 
   if (loading) return <section className={styles.cardSection}><Skeleton rows={8} /></section>;
@@ -154,15 +182,15 @@ export function RigheTab({ order, rows, loading, roles, savingRowId, activationL
         footer={
           selectedRow && (
             <div className={styles.drawerActions}>
-              <Button variant="secondary" onClick={handleCloseDrawer}>
+              <Button variant="secondary" onClick={handleCloseDrawer} disabled={drawerBusy}>
                 Chiudi
               </Button>
               {serialEditable && (
                 <Button
                   variant="primary"
-                  disabled={savingRowId === selectedRow.id}
-                  loading={savingRowId === selectedRow.id}
-                  onClick={handleSaveSerial}
+                  disabled={drawerBusy}
+                  loading={selectedRowSaving}
+                  onClick={() => void handleSaveSerial()}
                 >
                   Salva seriale
                 </Button>
@@ -170,9 +198,9 @@ export function RigheTab({ order, rows, loading, roles, savingRowId, activationL
               {canOpenActivationModal(order, roles, selectedRow) && (
                 <Button
                   variant="primary"
-                  disabled={!activationDate || activationLoading}
+                  disabled={!activationDate || drawerBusy}
                   loading={activationLoading}
-                  onClick={handleActivate}
+                  onClick={() => void handleActivate()}
                   leftIcon={<Icon name="check" size={14} />}
                 >
                   Conferma attivazione
