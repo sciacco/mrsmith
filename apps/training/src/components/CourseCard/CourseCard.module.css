@@ -61,7 +61,7 @@
 
 .meta,
 .vendor,
-.mandatory,
+.compliance,
 .foot {
   margin: 0;
   font-size: 0.8125rem;
@@ -85,7 +85,7 @@
   color: var(--color-text);
 }
 
-.mandatory {
+.compliance {
   font-size: 0.75rem;
   color: var(--color-text-muted);
 }

@@ -661,9 +661,9 @@ func (h *handler) handleExport(w http.ResponseWriter, r *http.Request) {
 			h.writeActionError(w, r, err, "training.export_plan")
 			return
 		}
-		headers = []string{"Persona", "Email", "Team", "Corso", "Fornitore", "Area", "Stato", "Anno", "Inizio", "Fine", "Ore", "Costo", "Obbligatoria", "Documento", "Validato"}
+		headers = []string{"Persona", "Email", "Team", "Corso", "Fornitore", "Area", "Stato", "Anno", "Inizio", "Fine", "Ore", "Costo", "Obbligatoria", "Framework compliance", "Documento", "Validato"}
 		for _, item := range filterPlanRows(items, query) {
-			rows = append(rows, []string{item.EmployeeName, item.EmployeeEmail, item.TeamCode, item.CourseTitle, item.VendorName, item.SkillAreaName, item.Status, fmt.Sprint(item.Year), item.PlannedStart, item.PlannedEnd, intString(item.HoursPlanned), floatString(item.CostPlanned), fmt.Sprint(item.Mandatory), item.DocumentFilename, fmt.Sprint(item.DocumentValidated)})
+			rows = append(rows, []string{item.EmployeeName, item.EmployeeEmail, item.TeamCode, item.CourseTitle, item.VendorName, item.SkillAreaName, item.Status, fmt.Sprint(item.Year), item.PlannedStart, item.PlannedEnd, intString(item.HoursPlanned), floatString(item.CostPlanned), fmt.Sprint(item.RequiredByRule), item.ComplianceFramework, item.DocumentFilename, fmt.Sprint(item.DocumentValidated)})
 		}
 	case "requests":
 		items, err := h.store.ListRequests(r.Context(), principal)
@@ -681,9 +681,9 @@ func (h *handler) handleExport(w http.ResponseWriter, r *http.Request) {
 			h.writeActionError(w, r, err, "training.export_catalog")
 			return
 		}
-		headers = []string{"Corso", "Fornitore", "Area", "Certificazione", "Modalita", "Origine", "Ore", "Costo", "URL", "Descrizione", "Obbligatoria", "Ricorrenza mesi", "Ambito", "Attiva"}
+		headers = []string{"Corso", "Fornitore", "Area", "Certificazione", "Modalita", "Origine", "Ore", "Costo", "URL", "Descrizione", "Compliance", "Ricorrenza mesi", "Framework", "Attiva"}
 		for _, item := range filterCatalogRows(items, query) {
-			rows = append(rows, []string{item.Title, item.VendorName, item.SkillAreaName, item.CertificationName, item.DeliveryMode, item.ProviderKind, intString(item.DefaultHours), floatString(item.DefaultCost), item.CourseURL, item.Description, fmt.Sprint(item.Mandatory), intString(item.RecurrenceMonths), item.ComplianceFramework, fmt.Sprint(item.Active)})
+			rows = append(rows, []string{item.Title, item.VendorName, item.SkillAreaName, item.CertificationName, item.DeliveryMode, item.ProviderKind, intString(item.DefaultHours), floatString(item.DefaultCost), item.CourseURL, item.Description, fmt.Sprint(item.ComplianceRelated), intString(item.RecurrenceMonths), item.ComplianceFramework, fmt.Sprint(item.Active)})
 		}
 	case "certifications":
 		items, err := h.store.ListCertifications(r.Context(), principal)

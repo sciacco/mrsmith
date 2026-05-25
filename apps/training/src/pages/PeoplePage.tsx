@@ -133,7 +133,6 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
           year: Number(year),
           plannedStart: assignDraft.plannedStart || undefined,
           plannedEnd: assignDraft.plannedEnd || undefined,
-          mandatory: true,
         },
       },
       {
@@ -266,7 +265,7 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
 
       <BulkActionBar selectedCount={selected.size} onClear={clearSelection}>
         <Button variant="primary" size="sm" onClick={openAssign}>
-          Assegna corso obbligatorio
+          Pianifica corso
         </Button>
       </BulkActionBar>
 
@@ -277,7 +276,7 @@ export function PeoplePage({ isPeopleAdmin }: PeoplePageProps) {
         onCreated={(id) => navigate(`/persone/${id}`)}
       />
 
-      <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title="Assegna corso obbligatorio" size="md">
+      <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title="Pianifica corso" size="md">
         <form
           className={styles.modalForm}
           onSubmit={(event) => {

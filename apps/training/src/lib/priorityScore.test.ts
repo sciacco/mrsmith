@@ -22,7 +22,8 @@ function base(overrides: Partial<PlanEnrollment> = {}): PlanEnrollment {
     status: 'approved',
     year: 2026,
     documentValidated: false,
-    mandatory: false,
+    complianceRelated: false,
+    requiredByRule: false,
     ...overrides,
   };
 }
@@ -47,10 +48,10 @@ test('older proposed scores higher than newer proposed (same severity)', () => {
   assert(older > newer, `older (${older}) should be > newer (${newer})`);
 });
 
-test('mandatory boosts score over non-mandatory at same severity', () => {
-  const mandatory = priorityScore(base({ status: 'proposed', mandatory: true }), { now });
-  const optional = priorityScore(base({ status: 'proposed', mandatory: false }), { now });
-  assert(mandatory > optional, `mandatory (${mandatory}) should be > optional (${optional})`);
+test('required by rule boosts score over optional at same severity', () => {
+  const required = priorityScore(base({ status: 'proposed', requiredByRule: true }), { now });
+  const optional = priorityScore(base({ status: 'proposed', requiredByRule: false }), { now });
+  assert(required > optional, `required (${required}) should be > optional (${optional})`);
 });
 
 test('in_progress score ignores old plannedStart when plannedEnd is far in future', () => {

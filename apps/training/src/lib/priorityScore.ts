@@ -23,7 +23,7 @@ export function priorityScore(enrollment: PlanEnrollment, options: PriorityOptio
     if (daysUntil > 0) score += Math.max(0, 30 - daysUntil);
   }
 
-  if (enrollment.mandatory) score += 50;
+  if (enrollment.requiredByRule) score += 50;
   if (enrollment.priority && enrollment.priority > 0) score += (10 - Math.min(enrollment.priority, 10)) * 2;
 
   return score;

@@ -572,18 +572,18 @@ WHERE id = $1::uuid`, strings.TrimSpace(courseID)).Scan(&title)
 
 func (s *SQLStore) ensureComplianceRuleCourse(ctx context.Context, q sqlRunner, courseID string) error {
 	var framework string
-	var active, mandatory bool
+	var active, complianceRelated bool
 	err := q.QueryRowContext(ctx, `
-SELECT is_active, is_mandatory, COALESCE(compliance_framework, '')
+SELECT is_active, is_compliance_course, COALESCE(compliance_framework, '')
 FROM training.course
-WHERE id = $1::uuid`, strings.TrimSpace(courseID)).Scan(&active, &mandatory, &framework)
+WHERE id = $1::uuid`, strings.TrimSpace(courseID)).Scan(&active, &complianceRelated, &framework)
 	if errors.Is(err, sql.ErrNoRows) {
 		return validationError("course_not_found", "corso non trovato")
 	}
 	if err != nil {
 		return fmt.Errorf("load training course: %w", err)
 	}
-	if !active || !mandatory || strings.TrimSpace(framework) == "" {
+	if !active || !complianceRelated || strings.TrimSpace(framework) == "" {
 		return validationError("course_not_compliance", "seleziona un corso compliance attivo")
 	}
 	return nil

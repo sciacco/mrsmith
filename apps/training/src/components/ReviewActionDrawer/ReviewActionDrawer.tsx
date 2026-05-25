@@ -183,7 +183,6 @@ function CreateFromSuggestion({
           planned_end: plannedEnd || undefined,
           hours_planned: suggestion.suggested_course_hours,
           cost_planned: suggestion.suggested_course_cost,
-          mandatory: suggestion.origin === 'compliance',
         },
         mandatory_rule_id: suggestion.rule_id,
         source_custom_group_id: suggestion.source_custom_group_id,
@@ -675,7 +674,6 @@ function CreateFromScratch({
           planned_end: plannedEnd || undefined,
           hours_planned: selectedCourse.defaultHours,
           cost_planned: selectedCourse.defaultCost,
-          mandatory: selectedCourse.mandatory,
         },
         source_custom_group_id: selectionMode === 'group' ? selectedGroupId || undefined : undefined,
       });
@@ -744,8 +742,8 @@ function CreateFromScratch({
             {selectedCourse ? (
               <>
                 <div className={styles.courseBadges}>
-                  {selectedCourse.mandatory && (
-                    <StatusBadge value="" label="Obbligatorio" variant="warning" dot />
+                  {selectedCourse.complianceRelated && (
+                    <StatusBadge value="" label="Compliance" variant="neutral" dot={false} />
                   )}
                   {selectedCourse.complianceFramework && (
                     <StatusBadge

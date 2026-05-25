@@ -15,11 +15,11 @@ interface RuleFormProps {
 export function RuleForm({ value, courses, teams, skillAreas, groups, onChange }: RuleFormProps) {
   const selectedCourse = courses.find((course) => course.id === value.course_id);
   const selectedCourseValid = selectedCourse
-    ? selectedCourse.active && selectedCourse.mandatory && Boolean(selectedCourse.complianceFramework?.trim())
+    ? selectedCourse.active && Boolean(selectedCourse.complianceRelated) && Boolean(selectedCourse.complianceFramework?.trim())
     : !value.course_id;
   const courseOptions = courses
     .filter((course) =>
-      (course.active && course.mandatory && Boolean(course.complianceFramework?.trim()))
+      (course.active && course.complianceRelated && Boolean(course.complianceFramework?.trim()))
       || course.id === value.course_id
     )
     .map((course) => ({

@@ -528,6 +528,9 @@ func (s *SQLStore) CreateEnrollment(ctx context.Context, principal Principal, in
 		if strings.TrimSpace(input.EmployeeID) == "" || strings.TrimSpace(input.CourseID) == "" || strings.TrimSpace(input.TrainingPlanID) == "" {
 			return validationError("missing_required_fields", "dipendente, corso e piano sono obbligatori")
 		}
+		if err := ensureEnrollmentRuleApplies(ctx, tx, input.EmployeeID, input.CourseID, input.MandatoryRuleID); err != nil {
+			return err
+		}
 		const stmt = `
 INSERT INTO training.enrollment (
   employee_id,
@@ -602,6 +605,32 @@ RETURNING id::text, status::text`
 		return nil
 	})
 	return response, err
+}
+
+func ensureEnrollmentRuleApplies(ctx context.Context, q sqlRunner, employeeID, courseID, ruleID string) error {
+	ruleID = strings.TrimSpace(ruleID)
+	if ruleID == "" {
+		return nil
+	}
+	var applies bool
+	err := q.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM training.mandatory_rules rule
+  JOIN training.v_mandatory_rule_population population
+    ON population.rule_id = rule.id
+   AND population.employee_id = $2::uuid
+  WHERE rule.id = $1::uuid
+    AND rule.course_id = $3::uuid
+    AND rule.is_active
+)`, ruleID, strings.TrimSpace(employeeID), strings.TrimSpace(courseID)).Scan(&applies)
+	if err != nil {
+		return fmt.Errorf("validate mandatory rule for enrollment: %w", err)
+	}
+	if !applies {
+		return validationError("mandatory_rule_not_applicable", "regola obbligatoria non applicabile a persona e corso")
+	}
+	return nil
 }
 
 func (s *SQLStore) UpdateEnrollment(ctx context.Context, principal Principal, id string, input EnrollmentInput) (ActionResponse, error) {
@@ -1113,11 +1142,12 @@ func (s *SQLStore) UpsertCourse(ctx context.Context, principal Principal, id str
 	if providerKind == "external" && strings.TrimSpace(input.VendorID) == "" {
 		return ActionResponse{}, validationError("vendor_required", "fornitore obbligatorio per corsi a erogazione esterna")
 	}
+	complianceRelated := input.ComplianceRelated || input.Mandatory
 	complianceFramework := strings.TrimSpace(input.ComplianceFramework)
-	if input.Mandatory && complianceFramework == "" {
+	if complianceRelated && complianceFramework == "" {
 		return ActionResponse{}, validationError("compliance_framework_required", "framework compliance obbligatorio per corsi compliance")
 	}
-	if !input.Mandatory {
+	if !complianceRelated {
 		complianceFramework = ""
 	}
 	return s.upsertSimple(ctx, principal, "course", id, []upsertField{
@@ -1131,7 +1161,7 @@ func (s *SQLStore) UpsertCourse(ctx context.Context, principal Principal, id str
 		field("default_cost", input.DefaultCost),
 		field("course_url", nullableText(input.CourseURL)),
 		field("description", nullableText(input.Description)),
-		field("is_mandatory", input.Mandatory),
+		field("is_compliance_course", complianceRelated),
 		typedField("recurrence_interval", monthsInterval(input.RecurrenceMonths), "::interval"),
 		field("compliance_framework", nullableText(complianceFramework)),
 		field("is_active", boolValue(input.Active, true)),

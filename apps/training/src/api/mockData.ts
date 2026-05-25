@@ -275,7 +275,8 @@ export function mockWorkspace(isPeopleAdmin: boolean): WorkspaceResponse {
       documentId: 'enr-doc-1',
       documentFilename: 'iscrizione-cka.pdf',
       documentValidated: true,
-      mandatory: false,
+      complianceRelated: false,
+      requiredByRule: false,
     },
     {
       id: 'enr-2',
@@ -295,7 +296,11 @@ export function mockWorkspace(isPeopleAdmin: boolean): WorkspaceResponse {
       costPlanned: 0,
       motivation: 'Percorso obbligatorio per il presidio sicurezza.',
       documentValidated: false,
-      mandatory: true,
+      complianceRelated: true,
+      complianceFramework: 'ISO 27001',
+      requiredByRule: true,
+      mandatoryRuleId: 'rule-sec',
+      mandatoryRuleName: 'Sicurezza applicativa',
     },
     {
       id: 'enr-3',
@@ -315,7 +320,8 @@ export function mockWorkspace(isPeopleAdmin: boolean): WorkspaceResponse {
       costPlanned: 780,
       notes: 'Da confermare con il responsabile People.',
       documentValidated: false,
-      mandatory: false,
+      complianceRelated: false,
+      requiredByRule: false,
     },
   ];
 
@@ -365,7 +371,7 @@ export function mockWorkspace(isPeopleAdmin: boolean): WorkspaceResponse {
         defaultCost: 1290,
         courseUrl: 'https://training.linuxfoundation.org/',
         description: 'Percorso certificazione Kubernetes per amministratori.',
-        mandatory: false,
+        complianceRelated: false,
         active: true,
       },
       {
@@ -383,7 +389,7 @@ export function mockWorkspace(isPeopleAdmin: boolean): WorkspaceResponse {
         defaultCost: 70,
         courseUrl: 'https://developer.hashicorp.com/terraform',
         description: 'Preparazione alla certificazione Terraform Associate.',
-        mandatory: false,
+        complianceRelated: false,
         active: true,
       },
       {
@@ -398,7 +404,7 @@ export function mockWorkspace(isPeopleAdmin: boolean): WorkspaceResponse {
         defaultHours: 12,
         defaultCost: 0,
         description: 'Formazione ricorrente per sviluppo sicuro.',
-        mandatory: true,
+        complianceRelated: true,
         recurrenceMonths: 12,
         complianceFramework: 'ISO 27001',
         active: true,

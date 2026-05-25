@@ -94,7 +94,12 @@ export function PipelineCard({
           <span className={styles.separator}>·</span>
           <span className={styles.person}>{enrollment.employeeName}</span>
           {teamLabel && <span className={styles.team}>{teamLabel}</span>}
-          {enrollment.mandatory && <span className={styles.tag}>Obbligatoria</span>}
+          {enrollment.complianceRelated && (
+            <span className={styles.complianceTag}>
+              {enrollment.complianceFramework ? `Compliance ${enrollment.complianceFramework}` : 'Compliance'}
+            </span>
+          )}
+          {enrollment.requiredByRule && <span className={styles.tag}>Obbligatoria</span>}
           {showStatusPill && statusTone && (
             <span className={`${styles.statusPill} ${styles[`status_${statusTone}`] ?? ''}`}>
               <span className={styles.statusDot} aria-hidden="true">●</span>

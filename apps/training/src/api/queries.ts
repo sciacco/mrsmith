@@ -58,7 +58,7 @@ export interface TrainingCoursePayload {
   defaultCost?: number;
   courseUrl?: string;
   description?: string;
-  mandatory: boolean;
+  complianceRelated: boolean;
   recurrenceMonths?: number;
   complianceFramework?: string;
   active?: boolean;
@@ -107,7 +107,7 @@ export function useTrainingLookups(enabled: boolean) {
             id: course.id,
             label: course.title,
             active: course.active,
-            mandatory: course.mandatory,
+            complianceRelated: course.complianceRelated,
             complianceFramework: course.complianceFramework,
           })),
           certifications: [
@@ -267,7 +267,6 @@ export function useBulkAssignEnrollment(isPeopleAdmin: boolean) {
         plannedEnd?: string;
         hoursPlanned?: number;
         costPlanned?: number;
-        mandatory: boolean;
       };
       mandatoryRuleId?: string;
       sourceCustomGroupId?: string;
@@ -282,7 +281,6 @@ export function useBulkAssignEnrollment(isPeopleAdmin: boolean) {
           planned_end: body.planParams.plannedEnd,
           hours_planned: body.planParams.hoursPlanned,
           cost_planned: body.planParams.costPlanned,
-          mandatory: body.planParams.mandatory,
         },
         mandatory_rule_id: body.mandatoryRuleId,
         source_custom_group_id: body.sourceCustomGroupId,

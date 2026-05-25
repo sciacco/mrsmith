@@ -61,7 +61,7 @@ SELECT
   c.default_cost,
   COALESCE(c.course_url, ''),
   COALESCE(c.description, ''),
-  c.is_mandatory,
+  c.is_compliance_course,
   CASE
     WHEN c.recurrence_interval IS NULL THEN NULL
     ELSE EXTRACT(YEAR FROM c.recurrence_interval)::int * 12 + EXTRACT(MONTH FROM c.recurrence_interval)::int
@@ -108,7 +108,7 @@ LIMIT 500`, yearArg, strings.Join(conds, " AND "))
 			&defaultCost,
 			&row.CourseURL,
 			&row.Description,
-			&row.Mandatory,
+			&row.ComplianceRelated,
 			&recurrenceMonths,
 			&row.ComplianceFramework,
 			&row.Active,

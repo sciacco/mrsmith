@@ -45,7 +45,7 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
   const [providerKind, setProviderKind] = useState('external');
   const [defaultHours, setDefaultHours] = useState('');
   const [defaultCost, setDefaultCost] = useState('');
-  const [mandatory, setMandatory] = useState(false);
+  const [complianceRelated, setComplianceRelated] = useState(false);
   const [complianceFramework, setComplianceFramework] = useState('');
   const [description, setDescription] = useState('');
 
@@ -58,7 +58,7 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
     setProviderKind(course.providerKind);
     setDefaultHours(course.defaultHours !== undefined ? String(course.defaultHours) : '');
     setDefaultCost(course.defaultCost !== undefined ? String(course.defaultCost) : '');
-    setMandatory(course.mandatory);
+    setComplianceRelated(course.complianceRelated);
     setComplianceFramework(course.complianceFramework ?? '');
     setDescription(course.description ?? '');
   }, [course]);
@@ -74,7 +74,7 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
   const vendorOptions = (lookups.data?.vendors ?? []).filter((v) => v.active).map((v) => ({ value: v.id, label: v.label }));
   const skillOptions = (lookups.data?.skillAreas ?? []).filter((s) => s.active).map((s) => ({ value: s.id, label: s.label }));
   const vendorRequired = providerKind === 'external';
-  const frameworkRequired = mandatory;
+  const frameworkRequired = complianceRelated;
   const canSave =
     isPeopleAdmin &&
     title.trim().length > 0 &&
@@ -100,8 +100,8 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
           defaultHours: defaultHours ? Number(defaultHours) : undefined,
           defaultCost: defaultCost ? Number(defaultCost.replace(',', '.')) : undefined,
           description: description.trim() || undefined,
-          mandatory,
-          complianceFramework: mandatory ? complianceFramework.trim() : undefined,
+          complianceRelated,
+          complianceFramework: complianceRelated ? complianceFramework.trim() : undefined,
           active: course.active,
         },
       });
@@ -244,8 +244,8 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
             <label className={styles.toggle}>
               <input
                 type="checkbox"
-                checked={mandatory}
-                onChange={(e) => setMandatory(e.target.checked)}
+                checked={complianceRelated}
+                onChange={(e) => setComplianceRelated(e.target.checked)}
                 disabled={!isPeopleAdmin}
               />
               <span>Corso compliance</span>
@@ -260,7 +260,7 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
                 placeholder="es. GDPR, ISO 27001"
                 value={complianceFramework}
                 onChange={(e) => setComplianceFramework(e.target.value)}
-                disabled={!isPeopleAdmin || !mandatory}
+                disabled={!isPeopleAdmin || !complianceRelated}
                 required={frameworkRequired}
               />
             </div>

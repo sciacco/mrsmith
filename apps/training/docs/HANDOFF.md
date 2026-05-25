@@ -83,7 +83,7 @@ Riferimento autoritativo: `schema-v2.sql`. Qui un riepilogo per orientarsi.
 - `team` + `team_membership` — appartenenza storicizzata via `tstzrange` con exclusion constraint anti-overlap.
 - `vendor` — fornitori di formazione (dedup via `name_normalized citext`).
 - `skill_area` — aree formative gerarchiche (self-referencing `parent_id`).
-- `course` — catalogo corsi (ripetibile); contiene `is_mandatory`, `recurrence_interval`, `compliance_framework` per la formazione obbligatoria.
+- `course` — catalogo corsi (ripetibile); contiene `is_compliance_course`, `recurrence_interval`, `compliance_framework` per i corsi collegati a framework compliance; l'obbligatorietà per persona deriva dalle regole.
 - `certification` — catalogo certificazioni (separato da `course`).
 - `training_plan` — piano annuale (unità di budget e reporting).
 - `enrollment` — istanza di corso per un dipendente in un piano (entità "calda").

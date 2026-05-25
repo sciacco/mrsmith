@@ -32,7 +32,7 @@ const emptyDraft = {
   defaultHours: '',
   defaultCost: '',
   description: '',
-  mandatory: false,
+  complianceRelated: false,
   complianceFramework: '',
 };
 
@@ -79,7 +79,7 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
   const hoursError = validateOptionalHours(draft.defaultHours);
   const costError = validateOptionalCost(draft.defaultCost);
   const vendorRequired = draft.providerKind === 'external';
-  const frameworkRequired = draft.mandatory;
+  const frameworkRequired = draft.complianceRelated;
 
   const canSubmit =
     draft.title.trim().length > 0 &&
@@ -105,8 +105,8 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
         defaultHours,
         defaultCost,
         description: draft.description.trim() || undefined,
-        complianceFramework: draft.mandatory ? draft.complianceFramework.trim() : undefined,
-        mandatory: draft.mandatory,
+        complianceFramework: draft.complianceRelated ? draft.complianceFramework.trim() : undefined,
+        complianceRelated: draft.complianceRelated,
         active: true,
       });
       toast('Corso creato');
@@ -219,8 +219,8 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
             <label className={styles.toggle}>
               <input
                 type="checkbox"
-                checked={draft.mandatory}
-                onChange={(e) => setDraft((d) => ({ ...d, mandatory: e.target.checked }))}
+                checked={draft.complianceRelated}
+                onChange={(e) => setDraft((d) => ({ ...d, complianceRelated: e.target.checked }))}
               />
               <span>Corso compliance</span>
             </label>
@@ -234,7 +234,7 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
                 placeholder="es. GDPR, ISO 27001"
                 value={draft.complianceFramework}
                 onChange={(e) => setDraft((d) => ({ ...d, complianceFramework: e.target.value }))}
-                disabled={!draft.mandatory}
+                disabled={!draft.complianceRelated}
                 required={frameworkRequired}
               />
             </div>
