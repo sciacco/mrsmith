@@ -19,19 +19,20 @@ import (
 // Every registered route and the HTTP method used to exercise it, kept in one
 // table so auth-gating and dep-guard tests stay in lockstep with handler.go.
 type routeCase struct {
-	name        string
-	method      string
-	path        string
-	body        string
-	needsArak   bool
-	needsMistra bool
-	biometric   bool
+	name              string
+	method            string
+	path              string
+	body              string
+	needsArak         bool
+	needsMistra       bool
+	customerStateOnly bool
+	biometric         bool
 }
 
 var registeredRoutes = []routeCase{
-	{name: "list_customers", method: http.MethodGet, path: "/cp-backoffice/v1/customers", needsArak: true},
-	{name: "list_customer_states", method: http.MethodGet, path: "/cp-backoffice/v1/customer-states", needsArak: true},
-	{name: "update_customer_state", method: http.MethodPut, path: "/cp-backoffice/v1/customers/42/state", body: `{"state_id":7}`, needsArak: true},
+	{name: "list_customers", method: http.MethodGet, path: "/cp-backoffice/v1/customers", needsArak: true, customerStateOnly: true},
+	{name: "list_customer_states", method: http.MethodGet, path: "/cp-backoffice/v1/customer-states", needsArak: true, customerStateOnly: true},
+	{name: "update_customer_state", method: http.MethodPut, path: "/cp-backoffice/v1/customers/42/state", body: `{"state_id":7}`, needsArak: true, customerStateOnly: true},
 	{name: "update_customer_variables", method: http.MethodPut, path: "/cp-backoffice/v1/customers/42/variables", body: `{"variables":[{"resource":"servizi_gestiti","action":"hide_pages"}]}`, needsArak: true},
 	{name: "list_users", method: http.MethodGet, path: "/cp-backoffice/v1/users?customer_id=7", needsArak: true},
 	{name: "create_admin", method: http.MethodPost, path: "/cp-backoffice/v1/admins", body: `{"customer_id":1,"nome":"Jane","cognome":"Doe","email":"jane@example.com","telefono":"0000","maintenance_on_primary_email":false,"marketing_on_primary_email":false}`, needsArak: true},
@@ -148,6 +149,27 @@ func TestBiometricRoleOnlyReachesBiometricHandlers(t *testing.T) {
 			want := http.StatusForbidden
 			if rc.biometric {
 				want = http.StatusInternalServerError
+			}
+			if rec.Code != want {
+				t.Fatalf("expected %d, got %d: %s", want, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestAFCToolsRoleOnlyReachesCustomerStateHandlers(t *testing.T) {
+	mux := newMux(newTestDeps(t, true, true))
+
+	for _, rc := range registeredRoutes {
+		t.Run(rc.name, func(t *testing.T) {
+			req := newRouteRequest(rc)
+			req = withRoleClaims(req, "app_afctools_access")
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+
+			want := http.StatusForbidden
+			if rc.customerStateOnly {
+				want = http.StatusNotImplemented
 			}
 			if rec.Code != want {
 				t.Fatalf("expected %d, got %d: %s", want, rec.Code, rec.Body.String())
