@@ -94,7 +94,7 @@ export function RulesPage({ isPeopleAdmin }: { isPeopleAdmin: boolean }) {
     : null;
   const selectedCourseValid = Boolean(
     selectedCourse?.active &&
-    selectedCourse.mandatory &&
+    selectedCourse.complianceRelated &&
     selectedCourse.complianceFramework?.trim(),
   );
   const canSubmit = Boolean(

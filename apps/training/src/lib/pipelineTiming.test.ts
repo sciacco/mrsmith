@@ -22,7 +22,8 @@ function base(overrides: Partial<PlanEnrollment> = {}): PlanEnrollment {
     status: 'approved',
     year: 2026,
     documentValidated: false,
-    mandatory: false,
+    complianceRelated: false,
+    requiredByRule: false,
     ...overrides,
   };
 }

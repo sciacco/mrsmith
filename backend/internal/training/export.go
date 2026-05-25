@@ -76,7 +76,7 @@ func filterCatalogRows(rows []CatalogCourse, query map[string]string) []CatalogC
 	out := make([]CatalogCourse, 0, len(rows))
 	q := strings.ToLower(strings.TrimSpace(query["q"]))
 	for _, row := range rows {
-		if query["status"] == "mandatory" && !row.Mandatory {
+		if query["status"] == "mandatory" && !row.ComplianceRelated {
 			continue
 		}
 		if query["status"] == "active" && !row.Active {

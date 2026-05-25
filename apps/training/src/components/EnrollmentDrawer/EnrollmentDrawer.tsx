@@ -344,7 +344,12 @@ export function EnrollmentDrawer({ enrollment, isPeopleAdmin, onClose }: Enrollm
           {enrollment.skillAreaName && (
             <span className={styles.chip}><span className={styles.chipKey}>Area</span> {enrollment.skillAreaName}</span>
           )}
-          {enrollment.mandatory && (
+          {enrollment.complianceRelated && (
+            <span className={styles.chip}>
+              {enrollment.complianceFramework ? `Compliance ${enrollment.complianceFramework}` : 'Compliance'}
+            </span>
+          )}
+          {enrollment.requiredByRule && (
             <span className={`${styles.chip} ${styles.chipMandatory}`}>Obbligatoria</span>
           )}
           <span className={`${styles.alertChip} ${styles[`alert_${alertLevel}`]}`}>

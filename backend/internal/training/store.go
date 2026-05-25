@@ -135,7 +135,11 @@ SELECT
   COALESCE(doc.id, ''),
   COALESCE(doc.filename, ''),
   COALESCE(doc.is_validated, false),
-  c.is_mandatory
+  c.is_compliance_course,
+  COALESCE(c.compliance_framework, ''),
+  COALESCE(applicable_rule.id, '') <> '',
+  COALESCE(applicable_rule.id, ''),
+  COALESCE(applicable_rule.name, '')
 FROM training.enrollment en
 JOIN training.employee e ON e.id = en.employee_id
 JOIN training.course c ON c.id = en.course_id
@@ -154,6 +158,17 @@ LEFT JOIN LATERAL (
   ORDER BY d.uploaded_at DESC, d.id DESC
   LIMIT 1
 ) doc ON true
+LEFT JOIN LATERAL (
+  SELECT rule.id::text, rule.name
+  FROM training.mandatory_rules rule
+  JOIN training.v_mandatory_rule_population population
+    ON population.rule_id = rule.id
+   AND population.employee_id = en.employee_id
+  WHERE rule.is_active
+    AND rule.course_id = en.course_id
+  ORDER BY CASE WHEN rule.id = en.mandatory_rule_id THEN 0 ELSE 1 END, rule.name
+  LIMIT 1
+) applicable_rule ON true
 WHERE ($1::boolean OR e.email = $2)
 ORDER BY tp.year DESC, e.last_name, e.first_name, c.title
 LIMIT 500`
@@ -195,7 +210,11 @@ LIMIT 500`
 			&row.DocumentID,
 			&row.DocumentFilename,
 			&row.DocumentValidated,
-			&row.Mandatory,
+			&row.ComplianceRelated,
+			&row.ComplianceFramework,
+			&row.RequiredByRule,
+			&row.MandatoryRuleID,
+			&row.MandatoryRuleName,
 		); err != nil {
 			return nil, fmt.Errorf("scan training enrollment: %w", err)
 		}
@@ -278,7 +297,7 @@ SELECT
   c.default_cost::float8,
   COALESCE(c.course_url, ''),
   COALESCE(c.description, ''),
-  c.is_mandatory,
+  c.is_compliance_course,
   CASE
     WHEN c.recurrence_interval IS NULL THEN NULL
     ELSE EXTRACT(YEAR FROM c.recurrence_interval)::int * 12 + EXTRACT(MONTH FROM c.recurrence_interval)::int
@@ -318,7 +337,7 @@ LIMIT 500`
 			&cost,
 			&row.CourseURL,
 			&row.Description,
-			&row.Mandatory,
+			&row.ComplianceRelated,
 			&recurrenceMonths,
 			&row.ComplianceFramework,
 			&row.Active,
@@ -797,7 +816,7 @@ LIMIT 1000`
 
 func (s *SQLStore) courseLookup(ctx context.Context) ([]LookupItem, error) {
 	const q = `
-SELECT id::text, title, is_active, is_mandatory, COALESCE(compliance_framework, '')
+SELECT id::text, title, is_active, is_compliance_course, COALESCE(compliance_framework, '')
 FROM training.course
 ORDER BY is_active DESC, title
 LIMIT 500`
@@ -810,7 +829,7 @@ LIMIT 500`
 	items := make([]LookupItem, 0)
 	for rows.Next() {
 		var item LookupItem
-		if err := rows.Scan(&item.ID, &item.Label, &item.Active, &item.Mandatory, &item.ComplianceFramework); err != nil {
+		if err := rows.Scan(&item.ID, &item.Label, &item.Active, &item.ComplianceRelated, &item.ComplianceFramework); err != nil {
 			return nil, fmt.Errorf("scan training course lookup: %w", err)
 		}
 		items = append(items, item)

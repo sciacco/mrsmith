@@ -28,7 +28,7 @@ export function classifyAlertLevel(enrollment: PlanEnrollment, options: Classify
   if (status === 'proposed') {
     if (daysUntil !== null && daysUntil < 0) return 'critical';
     if (daysUntil !== null && daysUntil <= 7) return 'warning';
-    if (enrollment.mandatory) return 'warning';
+    if (enrollment.requiredByRule) return 'warning';
     return 'info';
   }
 

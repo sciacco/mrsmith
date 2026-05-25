@@ -127,13 +127,13 @@ Alyante ERP ID
 - Used by: `apps/training` `/compliance/regole`, `/persone/gruppi`, `/persone`, and `/pianificazione`.
 - Open questions: none.
 
-### Training Mandatory Rules Use Compliance Courses
+### Training Compliance Courses Become Mandatory Through Rules
 
 - Context: `apps/training` catalog course metadata and compliance rule CRUD.
-- Discovery: a Training mandatory rule is meaningful only when it targets an active course marked as compliance, with `course.is_mandatory = true` and a non-empty `course.compliance_framework`.
-- Practical rule: rule creation/editing must filter and validate against active compliance courses only. Ordinary catalog courses can still exist for planning, but they must not be selectable in `/compliance/regole` until their compliance metadata is completed.
-- Evidence: course metadata fields in `training.course`, compliance-rule validation in `backend/internal/training/store_rules_groups.go`, and course lookup metadata from `backend/internal/training/store.go`.
-- Used by: `apps/training` `/catalogo` course drawer, `/compliance/regole`, and planning suggestions from mandatory gaps.
+- Discovery: a Training course can be linked to a compliance framework without being mandatory for anyone. Per-person obbligatorietà exists only when an active `training.mandatory_rules` row applies to that person and course.
+- Practical rule: catalog and course UI should describe `course.is_compliance_course` + `course.compliance_framework` as compliance metadata. Pipeline badges, alert priority, and enrollment exports must use rule-derived `requiredByRule`, not course metadata.
+- Evidence: migration `deploy/migrations/017_training_compliance_course_semantics.sql`, enrollment rule resolution in `backend/internal/training/store.go`, rule validation in `backend/internal/training/store_rules_groups.go`, and frontend badge logic in `apps/training/src/components/PipelineCard/PipelineCard.tsx`.
+- Used by: `apps/training` `/catalogo`, `/compliance/regole`, `/pipeline`, `/persone`, and planning suggestions from mandatory gaps.
 - Open questions: none.
 
 ### Training People Admin Can Create Local Employees

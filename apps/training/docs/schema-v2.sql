@@ -4,7 +4,7 @@
 -- Version: v2
 --
 -- Changelog v1 -> v2:
---   - Q3 (mandatory training): course.is_mandatory, recurrence_interval,
+--   - Q3 (mandatory training): course.is_compliance_course, recurrence_interval,
 --     compliance_framework + tabella mandatory_assignment_rule
 --   - Q4 (learning paths): tabelle learning_path, learning_path_step,
 --     employee_learning_path (opzionali, non bloccanti per il go-live)
@@ -165,7 +165,7 @@ CREATE TABLE course (
     course_url          text,
     description         text,
     -- Q3: formazione obbligatoria
-    is_mandatory        boolean NOT NULL DEFAULT false,
+    is_compliance_course boolean NOT NULL DEFAULT false,
     recurrence_interval interval,                              -- es. '3 years' (antincendio), '1 year' (GDPR)
     compliance_framework text,                                 -- 'D.Lgs. 81/08', 'GDPR', 'ISO 27001', ...
     is_active           boolean NOT NULL DEFAULT true,
@@ -174,7 +174,7 @@ CREATE TABLE course (
 );
 COMMENT ON COLUMN course.default_hours IS 'Ore di default; sovrascrivibili sulla singola enrollment.';
 COMMENT ON COLUMN course.default_cost  IS 'Costo di listino; il consuntivo va su enrollment.cost_actual.';
-COMMENT ON COLUMN course.is_mandatory  IS 'Se TRUE, il corso è obbligatorio e genera enrollment automatiche tramite mandatory_assignment_rule.';
+COMMENT ON COLUMN course.is_compliance_course IS 'Se TRUE, il corso è collegato a un framework compliance. L''obbligatorietà per persona deriva dalle regole.';
 COMMENT ON COLUMN course.recurrence_interval IS 'Frequenza con cui va ripetuto (es. 3 anni per antincendio). NULL = una tantum.';
 
 -- -----------------------------------------------------------------------------
@@ -556,7 +556,7 @@ required AS (
          c.id AS course_id, c.title AS course_title,
          c.leads_to_cert_id, c.compliance_framework, c.recurrence_interval
   FROM mandatory_assignment_rule r
-  JOIN course c ON c.id = r.course_id AND c.is_active AND c.is_mandatory
+  JOIN course c ON c.id = r.course_id AND c.is_active AND c.is_compliance_course
   JOIN active_employees ae
     ON (r.team_id IS NULL OR r.team_id = ae.team_id)
   WHERE r.is_active

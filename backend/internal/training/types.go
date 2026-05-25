@@ -23,30 +23,34 @@ type MeResponse struct {
 }
 
 type PlanEnrollment struct {
-	ID                string   `json:"id"`
-	EmployeeName      string   `json:"employeeName"`
-	EmployeeEmail     string   `json:"employeeEmail"`
-	TeamCode          string   `json:"teamCode,omitempty"`
-	TeamName          string   `json:"teamName,omitempty"`
-	CourseTitle       string   `json:"courseTitle"`
-	VendorName        string   `json:"vendorName,omitempty"`
-	SkillAreaName     string   `json:"skillAreaName,omitempty"`
-	Status            string   `json:"status"`
-	Year              int      `json:"year"`
-	Priority          *int     `json:"priority,omitempty"`
-	LevelAsIs         *int     `json:"levelAsIs,omitempty"`
-	LevelToBe         *int     `json:"levelToBe,omitempty"`
-	PlannedStart      string   `json:"plannedStart,omitempty"`
-	PlannedEnd        string   `json:"plannedEnd,omitempty"`
-	HoursPlanned      *int     `json:"hoursPlanned,omitempty"`
-	CostPlanned       *float64 `json:"costPlanned,omitempty"`
-	Motivation        string   `json:"motivation,omitempty"`
-	Objective         string   `json:"objective,omitempty"`
-	Notes             string   `json:"notes,omitempty"`
-	DocumentID        string   `json:"documentId,omitempty"`
-	DocumentFilename  string   `json:"documentFilename,omitempty"`
-	DocumentValidated bool     `json:"documentValidated"`
-	Mandatory         bool     `json:"mandatory"`
+	ID                  string   `json:"id"`
+	EmployeeName        string   `json:"employeeName"`
+	EmployeeEmail       string   `json:"employeeEmail"`
+	TeamCode            string   `json:"teamCode,omitempty"`
+	TeamName            string   `json:"teamName,omitempty"`
+	CourseTitle         string   `json:"courseTitle"`
+	VendorName          string   `json:"vendorName,omitempty"`
+	SkillAreaName       string   `json:"skillAreaName,omitempty"`
+	Status              string   `json:"status"`
+	Year                int      `json:"year"`
+	Priority            *int     `json:"priority,omitempty"`
+	LevelAsIs           *int     `json:"levelAsIs,omitempty"`
+	LevelToBe           *int     `json:"levelToBe,omitempty"`
+	PlannedStart        string   `json:"plannedStart,omitempty"`
+	PlannedEnd          string   `json:"plannedEnd,omitempty"`
+	HoursPlanned        *int     `json:"hoursPlanned,omitempty"`
+	CostPlanned         *float64 `json:"costPlanned,omitempty"`
+	Motivation          string   `json:"motivation,omitempty"`
+	Objective           string   `json:"objective,omitempty"`
+	Notes               string   `json:"notes,omitempty"`
+	DocumentID          string   `json:"documentId,omitempty"`
+	DocumentFilename    string   `json:"documentFilename,omitempty"`
+	DocumentValidated   bool     `json:"documentValidated"`
+	ComplianceRelated   bool     `json:"complianceRelated"`
+	ComplianceFramework string   `json:"complianceFramework,omitempty"`
+	RequiredByRule      bool     `json:"requiredByRule"`
+	MandatoryRuleID     string   `json:"mandatoryRuleId,omitempty"`
+	MandatoryRuleName   string   `json:"mandatoryRuleName,omitempty"`
 }
 
 type TrainingRequest struct {
@@ -78,7 +82,7 @@ type CatalogCourse struct {
 	DefaultCost         *float64 `json:"defaultCost,omitempty"`
 	CourseURL           string   `json:"courseUrl,omitempty"`
 	Description         string   `json:"description,omitempty"`
-	Mandatory           bool     `json:"mandatory"`
+	ComplianceRelated   bool     `json:"complianceRelated"`
 	RecurrenceMonths    *int     `json:"recurrenceMonths,omitempty"`
 	ComplianceFramework string   `json:"complianceFramework,omitempty"`
 	Active              bool     `json:"active"`
@@ -196,7 +200,7 @@ type LookupItem struct {
 	ID                  string `json:"id"`
 	Label               string `json:"label"`
 	Active              bool   `json:"active"`
-	Mandatory           bool   `json:"mandatory,omitempty"`
+	ComplianceRelated   bool   `json:"complianceRelated,omitempty"`
 	ComplianceFramework string `json:"complianceFramework,omitempty"`
 }
 
@@ -300,7 +304,6 @@ type BulkAssignPlanParams struct {
 	PlannedEnd   string   `json:"planned_end,omitempty"`
 	HoursPlanned *int     `json:"hours_planned,omitempty"`
 	CostPlanned  *float64 `json:"cost_planned,omitempty"`
-	Mandatory    bool     `json:"mandatory"`
 }
 
 type BulkAssignInput struct {
@@ -394,13 +397,13 @@ type OverviewTrend struct {
 }
 
 type OverviewFamily struct {
-	Value             string              `json:"value"`
-	Trend             OverviewTrend       `json:"trend"`
-	Exceptions        []OverviewException `json:"exceptions"`
-	SpentPct          *float64            `json:"spent_pct,omitempty"`
-	CalendarAlignment string              `json:"calendar_alignment,omitempty"`
-	MinCoursesPerPerson *int `json:"min_courses_per_person,omitempty"`
-	MaxCoursesPerPerson *int `json:"max_courses_per_person,omitempty"`
+	Value               string              `json:"value"`
+	Trend               OverviewTrend       `json:"trend"`
+	Exceptions          []OverviewException `json:"exceptions"`
+	SpentPct            *float64            `json:"spent_pct,omitempty"`
+	CalendarAlignment   string              `json:"calendar_alignment,omitempty"`
+	MinCoursesPerPerson *int                `json:"min_courses_per_person,omitempty"`
+	MaxCoursesPerPerson *int                `json:"max_courses_per_person,omitempty"`
 }
 
 type OverviewResponse struct {
@@ -515,6 +518,7 @@ type CourseInput struct {
 	DefaultCost         *float64 `json:"defaultCost,omitempty"`
 	CourseURL           string   `json:"courseUrl,omitempty"`
 	Description         string   `json:"description,omitempty"`
+	ComplianceRelated   bool     `json:"complianceRelated"`
 	Mandatory           bool     `json:"mandatory"`
 	RecurrenceMonths    *int     `json:"recurrenceMonths,omitempty"`
 	ComplianceFramework string   `json:"complianceFramework,omitempty"`

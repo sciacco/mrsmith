@@ -44,7 +44,11 @@ export interface PlanEnrollment {
   documentId?: string;
   documentFilename?: string;
   documentValidated: boolean;
-  mandatory: boolean;
+  complianceRelated: boolean;
+  complianceFramework?: string;
+  requiredByRule: boolean;
+  mandatoryRuleId?: string;
+  mandatoryRuleName?: string;
 }
 
 export interface TrainingRequest {
@@ -76,7 +80,7 @@ export interface CatalogCourse {
   defaultCost?: number;
   courseUrl?: string;
   description?: string;
-  mandatory: boolean;
+  complianceRelated: boolean;
   recurrenceMonths?: number;
   complianceFramework?: string;
   active: boolean;
@@ -206,7 +210,7 @@ export interface LookupItem {
   id: string;
   label: string;
   active: boolean;
-  mandatory?: boolean;
+  complianceRelated?: boolean;
   complianceFramework?: string;
 }
 
@@ -499,7 +503,6 @@ export interface BulkPlanFromSuggestionInput {
     planned_end?: string;
     hours_planned?: number;
     cost_planned?: number;
-    mandatory: boolean;
   };
   mandatory_rule_id?: string;
   source_custom_group_id?: string;

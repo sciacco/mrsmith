@@ -183,7 +183,11 @@ SELECT
   COALESCE(en.motivation, ''),
   COALESCE(en.objective, ''),
   COALESCE(en.notes, ''),
-  c.is_mandatory
+  c.is_compliance_course,
+  COALESCE(c.compliance_framework, ''),
+  COALESCE(applicable_rule.id, '') <> '',
+  COALESCE(applicable_rule.id, ''),
+  COALESCE(applicable_rule.name, '')
 FROM training.enrollment en
 JOIN training.employee e ON e.id = en.employee_id
 JOIN training.training_plan tp ON tp.id = en.training_plan_id
@@ -195,6 +199,17 @@ LEFT JOIN training.team_membership tm
   AND tm.start_date <= now()
   AND (tm.end_date IS NULL OR tm.end_date >= now())
 LEFT JOIN training.team t ON t.id = tm.team_id
+LEFT JOIN LATERAL (
+  SELECT rule.id::text, rule.name
+  FROM training.mandatory_rules rule
+  JOIN training.v_mandatory_rule_population population
+    ON population.rule_id = rule.id
+   AND population.employee_id = en.employee_id
+  WHERE rule.is_active
+    AND rule.course_id = en.course_id
+  ORDER BY CASE WHEN rule.id = en.mandatory_rule_id THEN 0 ELSE 1 END, rule.name
+  LIMIT 1
+) applicable_rule ON true
 WHERE en.employee_id = $1::uuid
   AND tp.year = $2
 ORDER BY en.created_at DESC`
@@ -233,7 +248,11 @@ ORDER BY en.created_at DESC`
 			&row.Motivation,
 			&row.Objective,
 			&row.Notes,
-			&row.Mandatory,
+			&row.ComplianceRelated,
+			&row.ComplianceFramework,
+			&row.RequiredByRule,
+			&row.MandatoryRuleID,
+			&row.MandatoryRuleName,
 		); err != nil {
 			return nil, fmt.Errorf("scan person enrollment: %w", err)
 		}
@@ -426,7 +445,7 @@ SELECT
   c.default_cost::float8,
   COALESCE(c.course_url, ''),
   COALESCE(c.description, ''),
-  c.is_mandatory,
+  c.is_compliance_course,
   COALESCE(c.recurrence_interval::text, ''),
   COALESCE(c.compliance_framework, ''),
   c.is_active
@@ -467,7 +486,7 @@ ORDER BY g.course_title`
 			&defaultCost,
 			&course.CourseURL,
 			&course.Description,
-			&course.Mandatory,
+			&course.ComplianceRelated,
 			&recurrenceString,
 			&course.ComplianceFramework,
 			&course.Active,

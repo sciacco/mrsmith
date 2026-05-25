@@ -22,7 +22,8 @@ function base(overrides: Partial<PlanEnrollment> = {}): PlanEnrollment {
     status: 'approved',
     year: 2026,
     documentValidated: false,
-    mandatory: false,
+    complianceRelated: false,
+    requiredByRule: false,
     ...overrides,
   };
 }
@@ -85,17 +86,17 @@ test('approved with plannedStart far in future is info', () => {
   );
 });
 
-test('proposed mandatory is warning', () => {
+test('proposed required by rule is warning', () => {
   assertEqual(
-    classifyAlertLevel(base({ status: 'proposed', mandatory: true }), { now }),
+    classifyAlertLevel(base({ status: 'proposed', requiredByRule: true }), { now }),
     'warning',
-    'proposed mandatory',
+    'proposed required',
   );
 });
 
 test('proposed optional is info', () => {
   assertEqual(
-    classifyAlertLevel(base({ status: 'proposed', mandatory: false }), { now }),
+    classifyAlertLevel(base({ status: 'proposed', requiredByRule: false }), { now }),
     'info',
     'proposed optional',
   );

@@ -109,8 +109,9 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
           year: plan.year,
           hours_planned: suggestion.suggested_course_hours,
           cost_planned: suggestion.suggested_course_cost,
-          mandatory: suggestion.origin === 'compliance',
         },
+        mandatory_rule_id: suggestion.rule_id,
+        source_custom_group_id: suggestion.source_custom_group_id,
       },
       {
         onSuccess: (res) => toast(`Pianificate ${res.created} iscrizioni`),
