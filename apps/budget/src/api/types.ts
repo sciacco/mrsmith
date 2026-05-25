@@ -45,6 +45,22 @@ export interface ArakIntUser {
   role: ArakIntRole;
 }
 
+/** schema: arak-int-user-new */
+export interface ArakIntUserNew {
+  email: string;
+  first_name: string;
+  last_name: string;
+  role_name: string;
+}
+
+/** schema: arak-int-user-edit — MUTABLE FIELDS ONLY */
+export interface ArakIntUserEdit {
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  role_name?: string;
+}
+
 /** schema: group */
 export interface Group {
   name: string;

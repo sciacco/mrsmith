@@ -9,6 +9,7 @@ const navItems = [
   { label: 'Gruppi', path: '/groups' },
   { label: 'Centri di costo', path: '/cost-centers' },
   { label: 'Voci di costo', path: '/budgets' },
+  { label: 'Utenti', path: '/users' },
 ];
 
 function AppRoutes() {

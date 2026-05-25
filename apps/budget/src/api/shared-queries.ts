@@ -4,6 +4,8 @@ import type { PaginatedResponse, ArakIntUser, Group, CostCenter } from './types'
 
 export const sharedKeys = {
   users: ['budget', 'users'] as const,
+  allUsers: ['budget', 'users', 'all'] as const,
+  roles: ['budget', 'roles'] as const,
   groups: ['budget', 'groups'] as const,
   costCenters: ['budget', 'cost-centers'] as const,
 };

@@ -39,6 +39,11 @@ func RegisterRoutes(mux *http.ServeMux, client ...*arak.Client) {
 	}
 	// Users
 	handle("GET /users-int/v1/user", handleGetAllUsers)
+	handle("POST /users-int/v1/user", handleNewUser)
+	handle("PUT /users-int/v1/user/{user_id}", handleEditUser)
+	handle("DELETE /users-int/v1/user/{user_id}", handleDeleteUser)
+	// Roles
+	handle("GET /users-int/v1/role", handleGetAllRoles)
 	// Groups
 	handle("GET /budget/v1/group", handleGetAllGroups)
 	handle("GET /budget/v1/group/{group_id}", handleGetGroupDetails)
@@ -143,6 +148,51 @@ func handleGetAllUsers(w http.ResponseWriter, r *http.Request) {
 		CurrentPage: 1,
 		TotalPages:  1,
 		Items:       users,
+	})
+}
+
+func handleNewUser(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/users-int/v1/user")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]string{"message": "user created (fixture)"})
+}
+
+func handleEditUser(w http.ResponseWriter, r *http.Request) {
+	userID, _ := url.PathUnescape(r.PathValue("user_id"))
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/users-int/v1/user/"+url.PathEscape(userID))
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]string{"message": "user updated (fixture)"})
+}
+
+func handleDeleteUser(w http.ResponseWriter, r *http.Request) {
+	userID, _ := url.PathUnescape(r.PathValue("user_id"))
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/users-int/v1/user/"+url.PathEscape(userID))
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]string{"message": "user deleted (fixture)"})
+}
+
+// ═══ Roles ═══
+
+func handleGetAllRoles(w http.ResponseWriter, r *http.Request) {
+	if arakClient != nil {
+		proxyToArak(w, r, "/arak/users-int/v1/role")
+		return
+	}
+	if r.URL.Query().Get("page_number") == "" {
+		httputil.Error(w, http.StatusBadRequest, "page_number is required")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, paginatedResponse{
+		TotalNumber: 0,
+		CurrentPage: 1,
+		TotalPages:  1,
+		Items:       []any{},
 	})
 }
 
