@@ -80,10 +80,12 @@
 .tableTools {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-3, 12px);
   padding: var(--space-4, 16px) var(--space-5, 20px);
   border-bottom: 1px solid var(--color-border, #e2e8f0);
 }
+
 
 .search {
   width: min(100%, 32rem);
@@ -257,3 +259,22 @@
   color: var(--color-text-muted, #94a3b8);
   margin-top: var(--space-1, 4px);
 }
+
+.filterWrapper {
+  width: 200px;
+  position: relative;
+  z-index: 10;
+}
+
+.btnIcon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-muted, #94a3b8);
+  transition: color var(--duration-fast, 150ms) var(--ease-out);
+}
+
+.btnSecondary:hover .btnIcon {
+  color: var(--color-text-secondary, #334155);
+}
+

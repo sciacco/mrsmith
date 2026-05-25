@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { SearchInput, Skeleton } from '@mrsmith/ui';
+import { SearchInput, Skeleton, SingleSelect, useToast } from '@mrsmith/ui';
+import { useApiClient } from '../../api/client';
 import { ApiError } from '@mrsmith/api-client';
 import type { Customer } from '../../api/customers';
 import { useCustomers } from '../../hooks/useCustomers';
@@ -27,6 +28,11 @@ export function StatoAziendePage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearch = useDeferredValue(searchQuery);
+  const [selectedStateId, setSelectedStateId] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const api = useApiClient();
+  const { toast } = useToast();
 
   const customers = customersQuery.data;
 
@@ -35,10 +41,52 @@ export function StatoAziendePage() {
     [customers, selectedCustomerId],
   );
 
-  const filteredCustomers = useMemo(
-    () => filterCustomers(customers, deferredSearch),
-    [customers, deferredSearch],
-  );
+  const filteredCustomers = useMemo(() => {
+    let result = filterCustomers(customers, deferredSearch);
+    if (selectedStateId !== null) {
+      result = result.filter((c) => c.state?.id === selectedStateId);
+    }
+    return result;
+  }, [customers, deferredSearch, selectedStateId]);
+
+  const stateOptions = useMemo(() => {
+    if (!customerStatesQuery.data) return [];
+    return customerStatesQuery.data.map((s) => ({
+      value: s.id,
+      label: s.name,
+    }));
+  }, [customerStatesQuery.data]);
+
+  const handleExportXlsx = async () => {
+    setExporting(true);
+    try {
+      const headers = ['ID', 'Ragione sociale', 'Tipologia', 'Stato', 'Lingua'];
+      const rows = filteredCustomers.map((c) => [
+        String(c.id),
+        c.name,
+        c.group?.name ?? '',
+        c.state?.name ?? '',
+        c.language ?? '',
+      ]);
+
+      const blob = await api.postBlob('/cp-backoffice/v1/customers/export', {
+        headers,
+        rows,
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const date = new Date().toISOString().split('T')[0];
+      a.download = `stato-aziende-${date}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast("Errore durante l'esportazione", 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
   const hasSearch = deferredSearch.trim().length > 0;
 
   const ctaDisabled = selectedCustomer == null;
@@ -123,6 +171,29 @@ export function StatoAziendePage() {
                 placeholder="Cerca per ID, ragione sociale, tipologia, stato, lingua..."
                 className={styles.search}
               />
+              <div className={styles.filterWrapper}>
+                <SingleSelect
+                  options={stateOptions}
+                  selected={selectedStateId}
+                  onChange={(v) => setSelectedStateId(v as number | null)}
+                  placeholder="Filtra per stato"
+                  allowClear={true}
+                  clearLabel="Tutti gli stati"
+                />
+              </div>
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                onClick={handleExportXlsx}
+                disabled={exporting || filteredCustomers.length === 0}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={styles.btnIcon}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                {exporting ? 'Esportazione...' : 'Esporta XLSX'}
+              </button>
             </div>
             {filteredCustomers.length === 0 ? (
               <div className={styles.stateBox}>

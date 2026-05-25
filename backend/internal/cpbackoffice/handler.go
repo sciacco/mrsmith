@@ -44,6 +44,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	}
 
 	handleCustomerState("GET /cp-backoffice/v1/customers", handleListCustomers(deps))
+	handleCustomerState("POST /cp-backoffice/v1/customers/export", handleExportCustomers(deps))
 	handleCustomerState("GET /cp-backoffice/v1/customer-states", handleListCustomerStates(deps))
 	handleCustomerState("PUT /cp-backoffice/v1/customers/{id}/state", handleUpdateCustomerState(deps))
 	handleFull("PUT /cp-backoffice/v1/customers/{id}/variables", handleUpdateCustomerVariables(deps))
