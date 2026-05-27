@@ -89,13 +89,12 @@ export function BuildingsPage() {
         <div className={styles.titleBlock}>
           <span className={styles.eyebrow}>Infrastruttura</span>
           <h1 className={styles.title}>Edifici</h1>
-          <p className={styles.subtitle}>Registro delle sedi tecniche e della loro esposizione verso il portale clienti.</p>
         </div>
         {canOperate ? (
           <Button onClick={() => setEditing('new')} leftIcon={<Icon name="plus" size={16} />}>Nuovo edificio</Button>
         ) : null}
       </div>
-      <div className={styles.toolbar}>
+      <div className={styles.inlineToolbar}>
         <SearchInput value={q} onChange={setQ} placeholder="Cerca edificio..." />
         <SingleSelect
           options={[
@@ -142,8 +141,26 @@ export function BuildingsPage() {
                   <td>
                     <div className={styles.actions}>
                       {canOperate ? <Button size="sm" variant="secondary" onClick={() => setEditing(item)}>Modifica</Button> : null}
-                      {canOperate ? <Button size="sm" variant="danger" onClick={() => setCeasing(item)}>Cessa</Button> : null}
-                      {canOperate ? <Button size="sm" variant="danger" onClick={() => setDeleting(item)}>Elimina</Button> : null}
+                      {canOperate ? (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => setCeasing(item)}
+                          disabled={item.status === 'Cessato' || item.datacenterCount > 0 || item.rackCount > 0}
+                        >
+                          Cessa
+                        </Button>
+                      ) : null}
+                      {canOperate ? (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => setDeleting(item)}
+                          disabled={item.datacenterCount > 0 || item.rackCount > 0}
+                        >
+                          Elimina
+                        </Button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -182,12 +199,38 @@ export function DatacentersPage() {
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<'all' | 'room' | 'mmr'>('all');
   const [status, setStatus] = useState<'active' | 'all'>('active');
+  const [buildingFilter, setBuildingFilter] = useState<string | number>('all');
   const [editing, setEditing] = useState<Datacenter | null | 'new'>(null);
   const [ceasing, setCeasing] = useState<Datacenter | null>(null);
   const [deleting, setDeleting] = useState<Datacenter | null>(null);
   const selectedId = params.datacenterId ? Number(params.datacenterId) : null;
+  
   const query = useDatacenters({ q, kind, status });
-  const selected = query.data?.find((item) => item.id === selectedId) ?? query.data?.[0] ?? null;
+  const buildingsQuery = useBuildings({ status: 'all' });
+
+  const buildingOptions = useMemo(() => {
+    const list = [
+      { value: 'all', label: 'Tutti' },
+      { value: 'third', label: 'Edifici terzi' },
+    ];
+    if (buildingsQuery.data) {
+      buildingsQuery.data.forEach((b) => {
+        list.push({ value: b.id, label: b.name });
+      });
+    }
+    return list;
+  }, [buildingsQuery.data]);
+
+  const filteredDatacenters = useMemo(() => {
+    if (!query.data) return [];
+    return query.data.filter((item) => {
+      if (buildingFilter === 'all') return true;
+      if (buildingFilter === 'third') return !item.buildingId;
+      return item.buildingId === buildingFilter;
+    });
+  }, [query.data, buildingFilter]);
+
+  const selected = filteredDatacenters.find((item) => item.id === selectedId) ?? filteredDatacenters[0] ?? null;
   const map = useDatacenterMap(selected?.id ?? null);
   const mutations = useFacilitiesMutations();
 
@@ -229,12 +272,18 @@ export function DatacentersPage() {
         <div className={styles.titleBlock}>
           <span className={styles.eyebrow}>Infrastruttura</span>
           <h1 className={styles.title}>Sale e MMR</h1>
-          <p className={styles.subtitle}>Sale, cage e MMR con mappa fisica di isole, posizioni e rack.</p>
         </div>
         {canOperate ? <Button onClick={() => setEditing('new')} leftIcon={<Icon name="plus" size={16} />}>Nuova sala</Button> : null}
       </div>
-      <div className={styles.toolbar}>
+      <div className={styles.inlineToolbar}>
         <SearchInput value={q} onChange={setQ} placeholder="Cerca sala o MMR..." />
+        <SingleSelect
+          options={buildingOptions}
+          selected={buildingFilter}
+          onChange={(value) => setBuildingFilter(value ?? 'all')}
+          placeholder="Seleziona edificio"
+          searchable={buildingOptions.length > 5}
+        />
         <SingleSelect
           options={[{ value: 'all', label: 'Sale e MMR' }, { value: 'room', label: 'Sale' }, { value: 'mmr', label: 'MMR' }]}
           selected={kind}
@@ -252,7 +301,7 @@ export function DatacentersPage() {
         <div className={styles.panel}><Skeleton rows={8} /></div>
       ) : query.error ? (
         <ViewState title="Sale non disponibili" message="Non e stato possibile caricare sale e MMR." tone="error" />
-      ) : (query.data?.length ?? 0) === 0 ? (
+      ) : filteredDatacenters.length === 0 ? (
         <div className={styles.emptyPanel}><h3 className={styles.emptyTitle}>Nessuna sala trovata</h3><p className={styles.emptyText}>Modifica i filtri o aggiungi una nuova sala.</p></div>
       ) : (
         <div className={styles.split}>
@@ -262,7 +311,7 @@ export function DatacentersPage() {
                 <tr><th>Nome</th><th>Tipo</th><th>Edificio</th><th>Stato</th><th>Rack</th><th>Azioni</th></tr>
               </thead>
               <tbody>
-                {query.data?.map((item) => (
+                {filteredDatacenters.map((item) => (
                   <tr key={item.id} className={`${styles.clickable} ${selected?.id === item.id ? styles.selectedRow : ''}`} onClick={() => navigate(`/sale-mmr/${item.id}`)}>
                     <td><strong>{item.name}</strong><br /><span className={styles.muted}>{item.floor ? `Piano ${item.floor}` : item.address}</span></td>
                     <td>{item.isMmr ? <span className={styles.badge}>MMR {item.mmrType ?? ''}</span> : <span className={styles.badgeMuted}>Sala</span>}</td>
@@ -774,12 +823,20 @@ function BuildingModal({ open, value, onClose, onSave, loading }: { open: boolea
     setDraft(value ? { name: value.name, address: value.address, status: value.status, portalEnabled: value.portalEnabled, rackCapacity: value.rackCapacity } : { name: '', address: '', status: 'Attivo', portalEnabled: false, rackCapacity: 0 });
   }, [value, open]);
 
+  const isCeaseDisabled = value !== null && value.status === 'Attivo' && (value.datacenterCount > 0 || value.rackCount > 0);
+
   return (
     <Modal open={open} onClose={onClose} title={value ? 'Modifica edificio' : 'Nuovo edificio'} size="lg">
       <div className={styles.formGrid}>
         <TextField label="Nome" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} />
         <TextField label="Indirizzo" value={draft.address} onChange={(address) => setDraft({ ...draft, address })} />
-        <SelectField label="Stato" value={draft.status} onChange={(status) => setDraft({ ...draft, status })} options={['Attivo', 'Cessato']} />
+        <SelectField
+          label="Stato"
+          value={draft.status}
+          onChange={(status) => setDraft({ ...draft, status })}
+          options={['Attivo', 'Cessato']}
+          disabledOptions={isCeaseDisabled ? ['Cessato'] : undefined}
+        />
         <NumberField label="Capienza rack" value={draft.rackCapacity} onChange={(rackCapacity) => setDraft({ ...draft, rackCapacity })} />
         <label className={styles.checkboxLine}><input type="checkbox" checked={draft.portalEnabled} onChange={(event) => setDraft({ ...draft, portalEnabled: event.target.checked })} /> Portale clienti</label>
       </div>
@@ -939,8 +996,31 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
   return <div className={styles.field}><label>{label}</label><input type="number" value={value} onChange={(event) => onChange(Number(event.target.value))} /></div>;
 }
 
-function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
-  return <div className={styles.field}><label>{label}</label><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></div>;
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  disabledOptions,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+  disabledOptions?: string[];
+}) {
+  return (
+    <div className={styles.field}>
+      <label>{label}</label>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option} value={option} disabled={disabledOptions?.includes(option)}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 function positionStatusLabel(status: string) {

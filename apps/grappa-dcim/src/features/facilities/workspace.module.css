@@ -50,6 +50,24 @@
   min-width: 180px;
 }
 
+.inlineToolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.inlineToolbar > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.inlineToolbar > :not(:first-child) {
+  flex-shrink: 0;
+  width: auto;
+  min-width: max-content;
+}
+
 .stack {
   display: grid;
   gap: var(--space-3);

@@ -139,11 +139,10 @@ export function RacksPage() {
         <div className={styles.titleBlock}>
           <span className={styles.eyebrow}>Infrastruttura</span>
           <h1 className={styles.title}>Rack</h1>
-          <p className={styles.subtitle}>Inventario rack, occupazione unita, socket e storico potenza.</p>
         </div>
         {canOperate ? <Button onClick={() => setEditing('new')} leftIcon={<Icon name="plus" size={16} />}>Nuovo rack</Button> : null}
       </div>
-      <div className={styles.toolbar}>
+      <div className={styles.inlineToolbar}>
         <SearchInput value={q} onChange={setQ} placeholder="Cerca rack..." />
         <SingleSelect
           options={[{ value: 'active', label: 'Solo attivi' }, { value: 'all', label: 'Tutti' }]}
