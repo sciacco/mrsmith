@@ -647,6 +647,15 @@ Alyante ERP ID
 
 ## Legacy Data Model Constraints
 
+### Grappa DCIM Grid Layouts Are Visual Blocks, Not One Layout Per Islet
+
+- Context: `apps/grappa-dcim` rack/island map parity from the previous Yii2 PHP implementation and `artifacts/mappe/totali.json`.
+- Discovery: the map shape is a collection of visual blocks. Classical DCs usually map one islet to one block, but MMRs can split the same logical islet into multiple blocks: `MMRB` and `MMRA` both use `islet_name = side` twice, and `MMRA` duplicates the visible title `Fila D`.
+- Practical rule: persisted Step 1 layouts must be keyed per visual block, not uniquely per `islets.id`. Use neutral current-model names such as `dcim_layout_blocks` and `layout-grid-v1`, not user-facing or schema names with `legacy`. Bind rack cells by `datacenter_id + islet_id + cell.pos -> positions.num`; never treat the JSON `pos` value as `positions.id`. Occupancy and rack details must stay live from `positions`/`racks`, not copied into layout JSON. Import is a CLI flow; plenum cells are linked to `plenums` through a dedicated binding table.
+- Evidence: `artifacts/mappe/handoff.md`, `artifacts/mappe/schema.json`, `artifacts/mappe/totali.json`, and Step 1 spec `apps/grappa-dcim/docs/LAYOUT-STEP1.md`.
+- Used by: `apps/grappa-dcim` layout transition planning.
+- Open questions: none.
+
 ### Alyante Product Translation Write Contract
 
 - Context: server-side sync of product short descriptions from kit-products into Alyante ERP table `MG87_ARTDESC`.
