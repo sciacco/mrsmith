@@ -13,6 +13,7 @@ import type {
   DatacenterInput,
   DatacenterMap,
   DestructiveActionRequest,
+  LayoutGridResponse,
   EquipmentInput,
   EquipmentItem,
   Fiber,
@@ -64,6 +65,7 @@ export const grappaDCIMQueryKeys = {
   buildings: (filters: Record<string, unknown>) => [...grappaDCIMQueryKeys.all, 'buildings', filters] as const,
   datacenters: (filters: Record<string, unknown>) => [...grappaDCIMQueryKeys.all, 'datacenters', filters] as const,
   datacenterMap: (id: number | null) => [...grappaDCIMQueryKeys.all, 'datacenter-map', id] as const,
+  datacenterLayoutGrid: (id: number | null) => [...grappaDCIMQueryKeys.all, 'datacenter-layout-grid', id] as const,
   islets: (datacenterId: number | null) => [...grappaDCIMQueryKeys.all, 'islets', datacenterId] as const,
   positions: (isletId: number | null) => [...grappaDCIMQueryKeys.all, 'positions', isletId] as const,
   racks: (filters: Record<string, unknown>) => [...grappaDCIMQueryKeys.all, 'racks', filters] as const,
@@ -382,6 +384,16 @@ export function useDatacenterMap(datacenterId: number | null) {
   return useQuery({
     queryKey: grappaDCIMQueryKeys.datacenterMap(datacenterId),
     queryFn: () => api.get<DatacenterMap>(`/grappa-dcim/v1/facilities/datacenters/${datacenterId}/map`),
+    enabled: datacenterId !== null,
+    retry: shouldRetry,
+  });
+}
+
+export function useDatacenterLayoutGrid(datacenterId: number | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: grappaDCIMQueryKeys.datacenterLayoutGrid(datacenterId),
+    queryFn: () => api.get<LayoutGridResponse>(`/grappa-dcim/v1/facilities/datacenters/${datacenterId}/layout-grid`),
     enabled: datacenterId !== null,
     retry: shouldRetry,
   });

@@ -132,6 +132,44 @@ export interface DatacenterMap {
   incomplete: boolean;
 }
 
+export interface LayoutGridResponse {
+  datacenter: Datacenter;
+  blocks: LayoutGridBlock[];
+  positions: Position[];
+  racks: RackListItem[];
+  incomplete: boolean;
+  warnings: string[];
+}
+
+export interface LayoutGridBlock {
+  id: number;
+  datacenterId: number;
+  isletId?: number;
+  isletName: string;
+  title: string;
+  layoutWidth?: string;
+  displayOrder: number;
+  schemaVersion: 'layout-grid-v1';
+  grid: LayoutGridCell[][];
+}
+
+export interface LayoutGridCell {
+  type: 'position' | 'empty' | 'label' | 'plenum';
+  pos?: number;
+  text?: string;
+  plenumType?: string;
+  positionId?: number;
+  positionStatus?: string;
+  positionType?: string;
+  rackId?: number;
+  rackName?: string;
+  rackType?: string;
+  rackPos?: string;
+  plenumId?: number;
+  plenumName?: string;
+  plenumStatus?: string;
+}
+
 export interface RackListItem {
   id: number;
   name: string;

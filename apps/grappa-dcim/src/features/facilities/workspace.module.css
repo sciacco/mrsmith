@@ -385,7 +385,7 @@
 
 .layoutCommandBar {
   display: grid;
-  grid-template-columns: minmax(280px, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 0.42fr) auto minmax(0, 1fr);
   gap: var(--space-3);
   align-items: end;
 }
@@ -528,6 +528,252 @@
   text-align: center;
 }
 
+.layoutViewSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow-xs);
+}
+
+.layoutViewButton {
+  min-height: 2.25rem;
+  border: 0;
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-3);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.layoutViewButton:hover:not(:disabled) {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.layoutViewButton:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.layoutViewButtonActive {
+  background: var(--color-accent);
+  color: var(--color-bg-elevated);
+  box-shadow: var(--shadow-accent);
+}
+
+.layoutWarningPanel {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: var(--radius-lg);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+  font-size: 0.8125rem;
+}
+
+.layoutWarningPanel strong {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.layoutWarningPanel ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.layoutGridScene {
+  position: relative;
+  min-height: 580px;
+  overflow: auto;
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(238, 242, 255, 0.52)),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.8));
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.72), var(--shadow-sm);
+  padding: var(--space-5);
+}
+
+.layoutGridBlocks {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-4);
+  min-width: 42rem;
+  padding-bottom: var(--space-12);
+}
+
+.layoutGridBlock {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-xs);
+}
+
+.layoutGridBlockFull {
+  grid-column: span 12;
+}
+
+.layoutGridBlockWide {
+  grid-column: span 6;
+}
+
+.layoutGridBlockMedium {
+  grid-column: span 4;
+}
+
+.layoutGridBlockNarrow {
+  grid-column: span 3;
+}
+
+.layoutGridBlockHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.layoutGridBlockHeader h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.layoutGridBlockHeader span {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.layoutGridTable {
+  display: grid;
+  gap: var(--space-2);
+  overflow-x: auto;
+}
+
+.layoutGridRow {
+  display: grid;
+  gap: var(--space-2);
+  min-width: max-content;
+}
+
+.layoutGridCell {
+  min-width: 4.75rem;
+  min-height: 4.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  text-align: left;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.layoutGridCell strong {
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.layoutGridCell small {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+}
+
+.layoutGridCellPosition {
+  cursor: pointer;
+}
+
+.layoutGridCellPosition:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--color-accent-muted);
+}
+
+.layoutGridCellPosition:disabled {
+  cursor: not-allowed;
+}
+
+.layoutGridCellSelected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle), var(--shadow-sm);
+}
+
+.layoutGridCellEmpty {
+  border-color: transparent;
+  background: rgba(241, 245, 249, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.36);
+}
+
+.layoutGridCellLabel {
+  justify-items: center;
+  text-align: center;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.layoutGridLabelText {
+  color: var(--color-text-secondary);
+}
+
+.layoutGridCellPlenum {
+  background: var(--color-info-subtle);
+  border-color: rgba(14, 116, 144, 0.18);
+}
+
+.layoutGridCellUnknown,
+.layoutGridCellIncomplete {
+  background: var(--color-warning-subtle);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.layoutGridPositionTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.layoutGridPositionTopline em {
+  min-width: 1.25rem;
+  min-height: 1.25rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--color-accent);
+  font-size: 0.6875rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
 .layoutQuickPanel {
   display: grid;
   gap: var(--space-3);
@@ -656,8 +902,21 @@
   }
 
   .layoutScene,
-  .layoutSceneFallback {
+  .layoutSceneFallback,
+  .layoutGridScene {
     min-height: 430px;
+  }
+
+  .layoutGridBlocks {
+    grid-template-columns: 1fr;
+    min-width: 34rem;
+  }
+
+  .layoutGridBlockFull,
+  .layoutGridBlockWide,
+  .layoutGridBlockMedium,
+  .layoutGridBlockNarrow {
+    grid-column: 1;
   }
 
   .layoutInspector {

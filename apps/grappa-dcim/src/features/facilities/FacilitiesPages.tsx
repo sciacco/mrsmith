@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useBuildings,
+  useDatacenterLayoutGrid,
   useDatacenterMap,
   useDatacenters,
   useFacilitiesMutations,
@@ -12,11 +13,13 @@ import {
 } from '../../api/queries';
 import type { Building, BuildingInput, Datacenter, DatacenterInput, DatacenterMap, Islet, Position } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
+import { LayoutGrid } from './LayoutGrid';
 import type { LayoutSelection } from './LayoutScene';
 import styles from './workspace.module.css';
 
 const destructiveBody = { confirmPrimary: true, confirmSecondary: true };
 const LayoutSceneView = lazy(() => import('./LayoutScene').then((module) => ({ default: module.LayoutScene })));
+type LayoutViewMode = '2d' | '3d';
 
 function valueOrDash(value: unknown) {
   if (value === undefined || value === null || value === '') return '-';
@@ -209,7 +212,7 @@ export function DatacentersPage() {
   const buildingsQuery = useBuildings({ status: 'all' });
 
   const buildingOptions = useMemo(() => {
-    const list = [
+    const list: Array<{ value: string | number; label: string }> = [
       { value: 'all', label: 'Tutti' },
       { value: 'third', label: 'Edifici terzi' },
     ];
@@ -348,6 +351,7 @@ export function LayoutPage() {
   const datacenters = useDatacenters({ kind: 'all', status: 'active' });
   const [datacenterId, setDatacenterId] = useState<number | null>(null);
   const [selection, setSelection] = useState<LayoutSelection>(null);
+  const [viewMode, setViewMode] = useState<LayoutViewMode | null>(null);
   const [editingIslet, setEditingIslet] = useState<Islet | null | 'new'>(null);
   const [deletingIslet, setDeletingIslet] = useState<Islet | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
@@ -356,11 +360,15 @@ export function LayoutPage() {
   const [batchType, setBatchType] = useState('full');
   const islets = useIslets(datacenterId);
   const map = useDatacenterMap(datacenterId);
+  const layoutGrid = useDatacenterLayoutGrid(datacenterId);
   const mutations = useLayoutMutations();
 
   const selectedDatacenter = datacenters.data?.find((item) => item.id === datacenterId) ?? null;
+  const hasLayoutGridBlocks = (layoutGrid.data?.blocks.length ?? 0) > 0;
+  const effectiveViewMode: LayoutViewMode = viewMode ?? (hasLayoutGridBlocks ? '2d' : '3d');
+  const waitingForDefaultView = datacenterId !== null && viewMode === null && layoutGrid.isLoading;
   const sceneIslets = useMemo(() => map.data?.islets ?? islets.data ?? [], [islets.data, map.data?.islets]);
-  const scenePositions = useMemo(() => map.data?.positions ?? [], [map.data?.positions]);
+  const scenePositions = useMemo(() => layoutGrid.data?.positions ?? map.data?.positions ?? [], [layoutGrid.data?.positions, map.data?.positions]);
   const selectedPosition = selection?.type === 'position' ? scenePositions.find((item) => item.id === selection.id) ?? null : null;
   const selectedIslet = selection?.type === 'islet'
     ? sceneIslets.find((item) => item.id === selection.id) ?? null
@@ -383,6 +391,11 @@ export function LayoutPage() {
     if (datacenterId !== null || !firstDatacenter) return;
     setDatacenterId(firstDatacenter.id);
   }, [datacenterId, datacenters.data]);
+
+  useEffect(() => {
+    if (datacenterId === null || viewMode !== null || layoutGrid.isLoading) return;
+    setViewMode(hasLayoutGridBlocks ? '2d' : '3d');
+  }, [datacenterId, hasLayoutGridBlocks, layoutGrid.isLoading, viewMode]);
 
   useEffect(() => {
     if (!selection) return;
@@ -469,9 +482,27 @@ export function LayoutPage() {
             onChange={(value) => {
               setDatacenterId(value);
               setSelection(null);
+              setViewMode(null);
             }}
             placeholder="Seleziona sala"
           />
+        </div>
+        <div className={styles.layoutViewSwitch} role="group" aria-label="Selezione vista layout">
+          <button
+            type="button"
+            className={`${styles.layoutViewButton} ${effectiveViewMode === '2d' ? styles.layoutViewButtonActive : ''}`}
+            onClick={() => setViewMode('2d')}
+            disabled={!hasLayoutGridBlocks && !layoutGrid.isLoading}
+          >
+            Vista 2D
+          </button>
+          <button
+            type="button"
+            className={`${styles.layoutViewButton} ${effectiveViewMode === '3d' ? styles.layoutViewButtonActive : ''}`}
+            onClick={() => setViewMode('3d')}
+          >
+            Vista 3D
+          </button>
         </div>
         <div className={styles.layoutStatusStrip} aria-label="Occupazione posizioni">
           <span><strong>{occupancy.total}</strong> posizioni</span>
@@ -488,8 +519,16 @@ export function LayoutPage() {
               <h3 className={styles.emptyTitle}>Seleziona una sala</h3>
               <p className={styles.emptyText}>La vista fisica si aggiorna con isole, posizioni e rack disponibili.</p>
             </div>
-          ) : map.isLoading || islets.isLoading ? (
+          ) : waitingForDefaultView || (effectiveViewMode === '2d' && layoutGrid.isLoading) || (effectiveViewMode === '3d' && (map.isLoading || islets.isLoading)) ? (
             <div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>
+          ) : effectiveViewMode === '2d' && layoutGrid.error ? (
+            <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la vista 2D della sala." tone="error" />
+          ) : effectiveViewMode === '2d' ? (
+            <LayoutGrid
+              blocks={layoutGrid.data?.blocks ?? []}
+              selected={selection}
+              onSelect={setSelection}
+            />
           ) : map.error ? (
             <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la mappa fisica della sala." tone="error" />
           ) : (
@@ -502,6 +541,14 @@ export function LayoutPage() {
               />
             </Suspense>
           )}
+          {effectiveViewMode === '2d' && (layoutGrid.data?.warnings.length ?? 0) > 0 ? (
+            <div className={styles.layoutWarningPanel} role="status">
+              <strong>Da verificare</strong>
+              <ul>
+                {layoutGrid.data?.warnings.slice(0, 4).map((warning) => <li key={warning}>{warning}</li>)}
+              </ul>
+            </div>
+          ) : null}
           <LayoutQuickSelect
             islets={sceneIslets}
             positions={scenePositions}
