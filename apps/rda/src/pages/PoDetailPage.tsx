@@ -1,9 +1,10 @@
 import { Skeleton, useToast } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { getRdaQuoteThreshold } from '../runtime-config';
 import {
   useBudgets,
+  useInbox,
   usePatchPaymentMethod,
   usePatchPO,
   usePaymentMethodDefault,
@@ -18,6 +19,7 @@ import {
   type TransitionAction,
 } from '../api/queries';
 import type { ClonePOResponse, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
+import { BudgetIncrementApproveDialog } from '../components/BudgetIncrementApproveDialog';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ClonePoModal } from '../components/ClonePoModal';
 import { CommentsPanel } from '../components/CommentsPanel';
@@ -63,7 +65,6 @@ function providerRefs(provider?: ProviderSummary): ProviderReference[] {
 export function PoDetailPage() {
   const { poId: rawPoId } = useParams();
   const poId = coerceID(rawPoId);
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useOptionalAuth();
   const { toast } = useToast();
@@ -77,6 +78,7 @@ export function PoDetailPage() {
   const [headerModalOpen, setHeaderModalOpen] = useState(false);
   const [cloneModalOpen, setCloneModalOpen] = useState(false);
   const [editHeader, setEditHeader] = useState<HeaderFormState | null>(null);
+  const [budgetIncrementOpen, setBudgetIncrementOpen] = useState(false);
 
   const po = usePODetail(poId);
   const comments = usePOComments(poId);
@@ -93,6 +95,11 @@ export function PoDetailPage() {
   const updateRecipients = useUpdatePORecipients(poId);
   const transition = useTransitionMutation();
   const downloads = useRdaDownloads();
+  const canApproveBudgetIncrement =
+    po.data?.state === PO_STATES.PENDING_BUDGET_INCREMENT &&
+    (po.data?.action_model?.actions ?? []).some((action) => action.id === 'budget-increment/approve' && !action.disabled);
+  const budgetIncrementInbox = useInbox('budget-increment', Boolean(canApproveBudgetIncrement));
+  const budgetIncrementNeeded = budgetIncrementInbox.data?.find((row) => row.id === po.data?.id)?.budget_increment_needed;
   const providerOptions = useMemo(() => {
     const byID = new Map<number, ProviderSummary>();
     for (const providerItem of providers.data ?? []) byID.set(providerItem.id, providerItem);
@@ -299,12 +306,30 @@ export function PoDetailPage() {
   }
 
   async function runTransition(action: TransitionAction) {
+    if (action === 'budget-increment/approve') {
+      setBudgetIncrementOpen(true);
+      return;
+    }
     try {
-      const incrementPromise = searchParams.get('increment_promise') ?? detail.budget_increment_needed;
-      const body = action.startsWith('budget-increment/') && incrementPromise ? { increment_promise: incrementPromise } : undefined;
-      await transition.mutateAsync({ id: detail.id, action, body });
+      await transition.mutateAsync({ id: detail.id, action });
       toast('Operazione completata');
       const next = afterTransitionRoute(detail, action);
+      if (next) navigate(next);
+    } catch {
+      toast('Operazione non riuscita', 'error');
+    }
+  }
+
+  async function confirmBudgetIncrement(incrementPromise: string) {
+    try {
+      await transition.mutateAsync({
+        id: detail.id,
+        action: 'budget-increment/approve',
+        body: { increment_promise: incrementPromise },
+      });
+      setBudgetIncrementOpen(false);
+      toast('Operazione completata');
+      const next = afterTransitionRoute(detail, 'budget-increment/approve');
       if (next) navigate(next);
     } catch {
       toast('Operazione non riuscita', 'error');
@@ -397,6 +422,15 @@ export function PoDetailPage() {
         loading={patchPO.isPending || updateRecipients.isPending || transition.isPending}
         onClose={() => setSubmitConfirm(false)}
         onConfirm={() => void submitPO()}
+      />
+      <BudgetIncrementApproveDialog
+        open={budgetIncrementOpen}
+        poLabel={detail.code ?? detail.object?.trim() ?? `PO ${detail.id}`}
+        neededAmount={budgetIncrementNeeded}
+        currency={detail.currency}
+        loading={transition.isPending}
+        onConfirm={(incrementPromise) => void confirmBudgetIncrement(incrementPromise)}
+        onClose={() => setBudgetIncrementOpen(false)}
       />
       <PoHeaderEditModal
         open={headerModalOpen}
