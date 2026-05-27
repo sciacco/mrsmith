@@ -95,6 +95,46 @@ type DatacenterMap struct {
 	Incomplete bool           `json:"incomplete"`
 }
 
+type LayoutGridResponse struct {
+	Datacenter Datacenter        `json:"datacenter"`
+	Blocks     []LayoutGridBlock `json:"blocks"`
+	Positions  []Position        `json:"positions"`
+	Racks      []RackListItem    `json:"racks"`
+	Incomplete bool              `json:"incomplete"`
+	Warnings   []string          `json:"warnings"`
+}
+
+type LayoutGridBlock struct {
+	ID            int                `json:"id"`
+	DatacenterID  int                `json:"datacenterId"`
+	IsletID       *int               `json:"isletId,omitempty"`
+	IsletName     string             `json:"isletName"`
+	Title         string             `json:"title"`
+	LayoutWidth   *string            `json:"layoutWidth,omitempty"`
+	DisplayOrder  int                `json:"displayOrder"`
+	SchemaVersion string             `json:"schemaVersion"`
+	Grid          [][]LayoutGridCell `json:"grid"`
+}
+
+type LayoutGridCell struct {
+	Type       string  `json:"type"`
+	Pos        *int    `json:"pos,omitempty"`
+	Text       *string `json:"text,omitempty"`
+	PlenumType *string `json:"plenumType,omitempty"`
+
+	PositionID     *int    `json:"positionId,omitempty"`
+	PositionStatus *string `json:"positionStatus,omitempty"`
+	PositionType   *string `json:"positionType,omitempty"`
+	RackID         *int    `json:"rackId,omitempty"`
+	RackName       *string `json:"rackName,omitempty"`
+	RackType       *string `json:"rackType,omitempty"`
+	RackPos        *string `json:"rackPos,omitempty"`
+
+	PlenumID     *int    `json:"plenumId,omitempty"`
+	PlenumName   *string `json:"plenumName,omitempty"`
+	PlenumStatus *string `json:"plenumStatus,omitempty"`
+}
+
 type DatacenterPort struct {
 	ID         int     `json:"id"`
 	RackID     *int    `json:"rackId,omitempty"`

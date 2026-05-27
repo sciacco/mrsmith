@@ -53,6 +53,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handleRead("GET /grappa-dcim/v1/facilities/datacenters", h.handleListDatacenters)
 	handleRead("GET /grappa-dcim/v1/facilities/datacenters/{id}", h.handleGetDatacenter)
 	handleRead("GET /grappa-dcim/v1/facilities/datacenters/{id}/map", h.handleGetDatacenterMap)
+	handleRead("GET /grappa-dcim/v1/facilities/datacenters/{id}/layout-grid", h.handleGetDatacenterLayoutGrid)
 	handleRead("GET /grappa-dcim/v1/facilities/datacenters/{id}/ports", h.handleListDatacenterPorts)
 	handleRead("GET /grappa-dcim/v1/layout/islets", h.handleListIslets)
 	handleRead("GET /grappa-dcim/v1/layout/islets/{id}/positions", h.handleListPositions)
