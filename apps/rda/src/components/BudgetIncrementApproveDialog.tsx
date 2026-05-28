@@ -12,9 +12,19 @@ interface BudgetIncrementApproveDialogProps {
   onClose: () => void;
 }
 
+// Show the prefill as a whole Euro amount. Mistra serializes the upstream
+// numeric(20,5) as a 3-decimal string (e.g. "1250.000"); if any fractional digit
+// is non-zero, round UP to the next integer so the promise never falls below the
+// live needed amount (rda.trigger_subtract_budget enforces
+// increment_promise >= compute_budget_increment_needed and raises T0WZ3 otherwise).
+// Integer arithmetic keeps this exact for any value (no float artifacts).
 function initialAmount(neededAmount?: number | string): string {
   if (neededAmount == null || neededAmount === '') return '';
-  return String(neededAmount);
+  const raw = String(neededAmount).trim().replace(',', '.');
+  if (!raw) return '';
+  const [intPart = '0', fracPart = ''] = raw.split('.');
+  const intN = parseInt(intPart, 10) || 0;
+  return /[1-9]/.test(fracPart) ? String(intN + 1) : String(intN);
 }
 
 export function BudgetIncrementApproveDialog({
