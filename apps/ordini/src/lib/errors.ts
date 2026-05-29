@@ -24,6 +24,8 @@ const messages: Record<string, string> = {
   order_has_erp_rows: 'L\'ordine risulta già presente in ERP e non può essere rimosso.',
   order_has_signed_pdf: 'L\'ordine ha già un documento firmato e non può essere rimosso.',
   bridge_delete_failed: 'Conversione annullata, ma il collegamento con la proposta richiede una verifica.',
+  hubspot_cleanup_failed: 'Conversione annullata, ma PDF o nota HubSpot richiedono una verifica.',
+  hubspot_not_configured: 'Conversione annullata, ma HubSpot non era disponibile per rimuovere PDF e nota.',
   db_failed: 'Operazione non riuscita.',
   db_commit_failed: 'Salvataggio non completato.',
   gw_pdf_malformed: 'Documento non disponibile in questo momento.',

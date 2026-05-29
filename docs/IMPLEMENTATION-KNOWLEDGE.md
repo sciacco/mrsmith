@@ -402,10 +402,10 @@ Alyante ERP ID
 
 - Context: `apps/quotes` conversion from proposal to legacy Vodka/daiquiri sales order.
 - Discovery: the active Appsmith conversion flow creates the Vodka `orders` header and `orders_rows`, records `orders.legacy_orders`, generates the order PDF through `GET /orders/v1/order/pdf/{orderId}/generate`, uploads it to HubSpot Files under `/deal-documents`, then creates a HubSpot note associated to the deal with association type `214`. The dormant `AssociateFileToDeal` query is not part of the active flow and contains a bad field reference. The conversion page also blocks every proposal status except `APPROVED`.
-- Practical rule: retry and status logic should use `orders.legacy_orders.quote_id -> vodka_id` as the canonical bridge, but only when the source quote is still `APPROVED`. Do not recreate Vodka orders when the bridge exists. If a matching Vodka order exists by `cdlan_ndoc` + `cdlan_anno` without the bridge, stop with a conflict instead of creating a duplicate. Attach the PDF through the note association, not the dormant file-to-deal endpoint.
+- Practical rule: retry and status logic should use `orders.legacy_orders.quote_id -> vodka_id` as the canonical bridge, but only when the source quote is still `APPROVED`. Do not recreate Vodka orders when the bridge exists. If a matching Vodka order exists by `cdlan_ndoc` + `cdlan_anno` without the bridge, stop with a conflict instead of creating a duplicate. Attach the PDF through the note association, not the dormant file-to-deal endpoint. Persist HubSpot conversion metadata in `orders.legacy_orders.jdata.hubspot` (`deal_id`, `file_id`, `note_id`, etc.) so retries skip already-completed HubSpot steps and Ordini revert can best-effort delete the note and file.
 - Evidence: `apps/quotes/quotes-main.tar.gz` `Converti in ordine/jsobjects/utilsCopy/utilsCopy.js`; recovered `artifacts/Ordini-gestione-portale.json` `gpUtils.newOrderFromQuote` and `gpUtils.rowsFromQuote`; implementation in `backend/internal/quotes/order_conversion.go`.
 - Used by: `apps/quotes` `POST /api/quotes/v1/quotes/{id}/convert-order` and `GET /api/quotes/v1/quotes/{id}/order-conversion`.
-- Open questions: whether HubSpot file/note IDs should be persisted for exact retry de-duplication after a note creation failure.
+- Open questions: none.
 
 ### Vodka Orders Match Alyante Extended Rows By Document
 

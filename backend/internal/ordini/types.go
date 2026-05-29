@@ -166,13 +166,24 @@ type SendToERPResponse struct {
 }
 
 type RevertConversionResponse struct {
-	Reverted      bool    `json:"reverted"`
-	OrderID       int64   `json:"order_id"`
-	QuoteID       int64   `json:"quote_id"`
-	OrderCode     *string `json:"order_code,omitempty"`
-	DeletedRows   int64   `json:"deleted_rows"`
-	BridgeDeleted bool    `json:"bridge_deleted"`
-	Warning       string  `json:"warning,omitempty"`
+	Reverted      bool                           `json:"reverted"`
+	OrderID       int64                          `json:"order_id"`
+	QuoteID       int64                          `json:"quote_id"`
+	OrderCode     *string                        `json:"order_code,omitempty"`
+	DeletedRows   int64                          `json:"deleted_rows"`
+	BridgeDeleted bool                           `json:"bridge_deleted"`
+	HubSpot       RevertConversionHubSpotCleanup `json:"hubspot"`
+	Warnings      []string                       `json:"warnings,omitempty"`
+	Warning       string                         `json:"warning,omitempty"`
+}
+
+type RevertConversionHubSpotCleanup struct {
+	Attempted   bool     `json:"attempted"`
+	NoteID      *int64   `json:"note_id,omitempty"`
+	FileID      *string  `json:"file_id,omitempty"`
+	NoteDeleted bool     `json:"note_deleted"`
+	FileDeleted bool     `json:"file_deleted"`
+	Warnings    []string `json:"warnings,omitempty"`
 }
 
 func stateOf(order *OrderDetail) OrderState {

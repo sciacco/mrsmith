@@ -145,5 +145,14 @@ export interface RevertConversionResponse {
   order_code?: string;
   deleted_rows: number;
   bridge_deleted: boolean;
-  warning?: 'bridge_delete_failed' | string;
+  hubspot: {
+    attempted: boolean;
+    note_id?: number;
+    file_id?: string;
+    note_deleted: boolean;
+    file_deleted: boolean;
+    warnings?: string[];
+  };
+  warnings?: string[];
+  warning?: 'bridge_delete_failed' | 'hubspot_cleanup_failed' | 'hubspot_not_configured' | string;
 }

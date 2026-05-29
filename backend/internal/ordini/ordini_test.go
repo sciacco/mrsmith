@@ -21,6 +21,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
@@ -440,7 +441,7 @@ func TestRevertConversionBlocksWhenAlyanteRowsExist(t *testing.T) {
 	mistraState := &ordiniTestDBState{
 		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
 			if strings.Contains(query, "FROM orders.legacy_orders") {
-				return []string{"quote_id"}, [][]driver.Value{{int64(77)}}, nil
+				return []string{"quote_id", "jdata"}, [][]driver.Value{{int64(77), nil}}, nil
 			}
 			return nil, nil, errors.New("unexpected mistra query: " + query)
 		},
@@ -509,7 +510,7 @@ func TestRevertConversionDeletesVodkaOrderAndMistraBridge(t *testing.T) {
 	mistraState := &ordiniTestDBState{
 		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
 			if strings.Contains(query, "FROM orders.legacy_orders") {
-				return []string{"quote_id"}, [][]driver.Value{{int64(77)}}, nil
+				return []string{"quote_id", "jdata"}, [][]driver.Value{{int64(77), nil}}, nil
 			}
 			return nil, nil, errors.New("unexpected mistra query: " + query)
 		},
@@ -556,6 +557,150 @@ func TestRevertConversionDeletesVodkaOrderAndMistraBridge(t *testing.T) {
 	}
 	if !vodkaState.execContains("DELETE FROM orders_rows") || !vodkaState.execContains("DELETE FROM orders WHERE id = ? AND cdlan_stato = 'BOZZA'") || !mistraState.execContains("DELETE FROM orders.legacy_orders") {
 		t.Fatalf("missing deletes vodka=%v mistra=%v", vodkaState.execs, mistraState.execs)
+	}
+}
+
+func TestRevertConversionDeletesTrackedHubSpotArtifacts(t *testing.T) {
+	vodkaState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders") && strings.Contains(query, "WHERE id = ?") {
+				return nil, [][]driver.Value{orderDetailValues("BOZZA", "2026-05-22")}, nil
+			}
+			return nil, nil, errors.New("unexpected vodka query: " + query)
+		},
+		exec: func(query string, args []driver.NamedValue) (int64, error) {
+			switch {
+			case strings.Contains(query, "DELETE FROM orders_rows"):
+				return 2, nil
+			case strings.Contains(query, "DELETE FROM orders WHERE id = ? AND cdlan_stato = 'BOZZA'"):
+				return 1, nil
+			default:
+				t.Fatalf("unexpected vodka exec: %s", query)
+				return 0, nil
+			}
+		},
+	}
+	mistraState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders.legacy_orders") {
+				return []string{"quote_id", "jdata"}, [][]driver.Value{{int64(77), `{"hubspot":{"file_id":"file-123","note_id":456}}`}}, nil
+			}
+			return nil, nil, errors.New("unexpected mistra query: " + query)
+		},
+		exec: func(query string, args []driver.NamedValue) (int64, error) {
+			if !strings.Contains(query, "DELETE FROM orders.legacy_orders") {
+				t.Fatalf("unexpected mistra exec: %s", query)
+			}
+			return 1, nil
+		},
+	}
+	alyanteState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM Tsmi_Ordini_Esteso") {
+				return []string{"count"}, [][]driver.Value{{int64(0)}}, nil
+			}
+			return nil, nil, errors.New("unexpected alyante query: " + query)
+		},
+	}
+	hs, hsState := newOrdiniHubSpotDeleteServer(t, false)
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, Deps{
+		Vodka:   openOrdiniTestDB(t, vodkaState),
+		Mistra:  openOrdiniTestDB(t, mistraState),
+		Alyante: openOrdiniTestDB(t, alyanteState),
+		HubSpot: hs,
+		Logger:  logging.NewWithWriter(io.Discard, "debug"),
+	})
+
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status/body=%d %s", rec.Code, rec.Body.String())
+	}
+	var resp RevertConversionResponse
+	decodeJSONBody(t, rec.Body.Bytes(), &resp)
+	if resp.Warning != "" || !resp.HubSpot.Attempted || !resp.HubSpot.NoteDeleted || !resp.HubSpot.FileDeleted {
+		t.Fatalf("response = %#v", resp)
+	}
+	if got, want := strings.Join(hsState.paths, ","), "/crm/v3/objects/notes/456,/files/v3/files/file-123"; got != want {
+		t.Fatalf("hubspot deletes = %s, want %s", got, want)
+	}
+}
+
+func TestRevertConversionWarnsWhenTrackedHubSpotCleanupFails(t *testing.T) {
+	vodkaState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders") && strings.Contains(query, "WHERE id = ?") {
+				return nil, [][]driver.Value{orderDetailValues("BOZZA", "2026-05-22")}, nil
+			}
+			return nil, nil, errors.New("unexpected vodka query: " + query)
+		},
+		exec: func(query string, args []driver.NamedValue) (int64, error) {
+			switch {
+			case strings.Contains(query, "DELETE FROM orders_rows"):
+				return 2, nil
+			case strings.Contains(query, "DELETE FROM orders WHERE id = ? AND cdlan_stato = 'BOZZA'"):
+				return 1, nil
+			default:
+				t.Fatalf("unexpected vodka exec: %s", query)
+				return 0, nil
+			}
+		},
+	}
+	mistraState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders.legacy_orders") {
+				return []string{"quote_id", "jdata"}, [][]driver.Value{{int64(77), `{"hubspot":{"file_id":"file-123","note_id":456}}`}}, nil
+			}
+			return nil, nil, errors.New("unexpected mistra query: " + query)
+		},
+		exec: func(query string, args []driver.NamedValue) (int64, error) {
+			if !strings.Contains(query, "DELETE FROM orders.legacy_orders") {
+				t.Fatalf("unexpected mistra exec: %s", query)
+			}
+			return 1, nil
+		},
+	}
+	alyanteState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM Tsmi_Ordini_Esteso") {
+				return []string{"count"}, [][]driver.Value{{int64(0)}}, nil
+			}
+			return nil, nil, errors.New("unexpected alyante query: " + query)
+		},
+	}
+	hs, _ := newOrdiniHubSpotDeleteServer(t, true)
+	var log bytes.Buffer
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, Deps{
+		Vodka:   openOrdiniTestDB(t, vodkaState),
+		Mistra:  openOrdiniTestDB(t, mistraState),
+		Alyante: openOrdiniTestDB(t, alyanteState),
+		HubSpot: hs,
+		Logger:  logging.NewWithWriter(&log, "debug"),
+	})
+
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status/body=%d %s", rec.Code, rec.Body.String())
+	}
+	var resp RevertConversionResponse
+	decodeJSONBody(t, rec.Body.Bytes(), &resp)
+	if resp.Warning != "hubspot_cleanup_failed" || len(resp.Warnings) != 1 || resp.Warnings[0] != "hubspot_cleanup_failed" || !resp.BridgeDeleted {
+		t.Fatalf("response = %#v", resp)
+	}
+	if !vodkaState.execContains("DELETE FROM orders_rows") || !mistraState.execContains("DELETE FROM orders.legacy_orders") {
+		t.Fatalf("local cleanup did not complete vodka=%v mistra=%v", vodkaState.execs, mistraState.execs)
+	}
+	firstLogLine := strings.Split(strings.TrimSpace(log.String()), "\n")[0]
+	entry := decodeLogEntry(t, firstLogLine)
+	if entry["operation"] != "revert_conversion_hubspot_note" || entry["hubspot_note_id"] != float64(456) {
+		t.Fatalf("missing hubspot cleanup log fields: %#v", entry)
 	}
 }
 
@@ -964,6 +1109,28 @@ func TestOriginFailureIsLoggedWithoutBreakingOrderDetail(t *testing.T) {
 	if entry["operation"] != "origin_lookup" || entry["order_id"] != float64(1) || entry["request_id"] != "req-test" {
 		t.Fatalf("missing origin failure log fields: %#v", entry)
 	}
+}
+
+type ordiniHubSpotDeleteState struct {
+	paths []string
+}
+
+func newOrdiniHubSpotDeleteServer(t *testing.T, fail bool) (*hubspot.Client, *ordiniHubSpotDeleteState) {
+	t.Helper()
+	state := &ordiniHubSpotDeleteState{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Fatalf("unexpected HubSpot method/path: %s %s", r.Method, r.URL.Path)
+		}
+		state.paths = append(state.paths, r.URL.Path)
+		if fail {
+			http.Error(w, "delete failed", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(server.Close)
+	return hubspot.NewWithBaseURL("test-token", server.URL, server.Client()), state
 }
 
 const ordiniTestDriverName = "ordini_test_driver"

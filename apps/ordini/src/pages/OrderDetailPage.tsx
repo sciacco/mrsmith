@@ -301,7 +301,7 @@ export function OrderDetailPage() {
       >
         <div className={styles.modalBody}>
           <p className={styles.modalText}>
-            L&apos;ordine verrà rimosso da Ordini. La proposta collegata potrà essere convertita di nuovo.
+            L&apos;ordine verrà rimosso da Ordini. Se tracciati, verranno rimossi anche PDF e nota HubSpot. La proposta collegata potrà essere convertita di nuovo.
           </p>
           <div className={styles.modalSummary}>
             <span>Proposta collegata</span>
@@ -332,7 +332,11 @@ function sendWarningToast(code: string): string {
       return 'Ordine inviato, ma il documento firmato richiede una verifica.';
     case 'bridge_delete_failed':
       return 'Conversione annullata, ma il collegamento con la proposta richiede una verifica.';
+    case 'hubspot_cleanup_failed':
+      return 'Conversione annullata, ma PDF o nota HubSpot richiedono una verifica.';
+    case 'hubspot_not_configured':
+      return 'Conversione annullata, ma HubSpot non era disponibile per rimuovere PDF e nota.';
     default:
-      return 'Ordine inviato, ma una verifica resta in sospeso.';
+      return 'Operazione completata, ma una verifica resta in sospeso.';
   }
 }

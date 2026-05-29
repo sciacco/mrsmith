@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,6 +52,11 @@ type APIError struct {
 
 func (e *APIError) Error() string {
 	return fmt.Sprintf("hubspot: HTTP %d: %s", e.StatusCode, e.Body)
+}
+
+func IsNotFound(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
 // Get performs a GET request to the HubSpot API.

@@ -14,6 +14,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
@@ -22,6 +23,7 @@ type Deps struct {
 	Alyante *sql.DB
 	Mistra  *sql.DB
 	Arak    *arak.Client
+	HubSpot *hubspot.Client
 	Logger  *slog.Logger
 }
 

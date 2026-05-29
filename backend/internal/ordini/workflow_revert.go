@@ -2,6 +2,7 @@ package ordini
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 )
 
 const alyanteOrderRowsCountQuery = `
@@ -54,7 +56,7 @@ func (h *Handler) handleRevertConversion(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	quoteID, err := h.loadConvertedQuoteID(r, orderID)
+	bridge, err := h.loadConvertedQuoteBridge(r, orderID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			httputil.Error(w, http.StatusConflict, "not_converted_from_quote")
@@ -63,6 +65,7 @@ func (h *Handler) handleRevertConversion(w http.ResponseWriter, r *http.Request)
 		h.dbFailure(w, r, "revert_conversion_load_bridge", err, "order_id", orderID)
 		return
 	}
+	quoteID := bridge.QuoteID
 
 	erpRows, err := h.countAlyanteOrderRows(r, order)
 	if err != nil {
@@ -88,11 +91,13 @@ func (h *Handler) handleRevertConversion(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	hubSpotCleanup := h.cleanupConvertedOrderHubSpot(r, bridge, orderID, start)
+
 	bridgeDeleted := true
-	warning := ""
+	warnings := append([]string(nil), hubSpotCleanup.Warnings...)
 	if err := h.deleteLegacyOrderBridge(r, quoteID, orderID); err != nil {
 		bridgeDeleted = false
-		warning = "bridge_delete_failed"
+		warnings = appendWarning(warnings, "bridge_delete_failed")
 		h.logFailure(r, slog.LevelWarn, "legacy bridge cleanup failed after conversion revert", "revert_conversion_delete_bridge", start, "order_id", orderID, "quote_id", quoteID, "error", err)
 	}
 
@@ -103,19 +108,112 @@ func (h *Handler) handleRevertConversion(w http.ResponseWriter, r *http.Request)
 		OrderCode:     order.CodiceOrdine,
 		DeletedRows:   deletedRows,
 		BridgeDeleted: bridgeDeleted,
-		Warning:       warning,
+		HubSpot:       hubSpotCleanup,
+		Warnings:      warnings,
+		Warning:       firstWarning(warnings),
 	}
 	httputil.JSON(w, http.StatusOK, response)
 }
 
-func (h *Handler) loadConvertedQuoteID(r *http.Request, orderID int64) (int64, error) {
-	var quoteID int64
+type convertedOrderBridge struct {
+	QuoteID int64
+	JData   sql.NullString
+}
+
+type convertedOrderHubSpotMetadata struct {
+	DealID     string `json:"deal_id,omitempty"`
+	DealURL    string `json:"deal_url,omitempty"`
+	FileID     string `json:"file_id,omitempty"`
+	NoteID     int64  `json:"note_id,omitempty"`
+	Filename   string `json:"filename,omitempty"`
+	FolderPath string `json:"folder_path,omitempty"`
+}
+
+func (b *convertedOrderBridge) hubSpotMetadata() *convertedOrderHubSpotMetadata {
+	if b == nil || !b.JData.Valid || strings.TrimSpace(b.JData.String) == "" {
+		return nil
+	}
+	var payload struct {
+		HubSpot *convertedOrderHubSpotMetadata `json:"hubspot"`
+	}
+	if err := json.Unmarshal([]byte(b.JData.String), &payload); err != nil || payload.HubSpot == nil {
+		return nil
+	}
+	payload.HubSpot.DealID = strings.TrimSpace(payload.HubSpot.DealID)
+	payload.HubSpot.DealURL = strings.TrimSpace(payload.HubSpot.DealURL)
+	payload.HubSpot.FileID = strings.TrimSpace(payload.HubSpot.FileID)
+	payload.HubSpot.Filename = strings.TrimSpace(payload.HubSpot.Filename)
+	payload.HubSpot.FolderPath = strings.TrimSpace(payload.HubSpot.FolderPath)
+	return payload.HubSpot
+}
+
+func (h *Handler) loadConvertedQuoteBridge(r *http.Request, orderID int64) (*convertedOrderBridge, error) {
+	var bridge convertedOrderBridge
 	err := h.deps.Mistra.QueryRowContext(r.Context(), `
-SELECT quote_id
-FROM orders.legacy_orders
-WHERE vodka_id = $1
-LIMIT 1`, orderID).Scan(&quoteID)
-	return quoteID, err
+	SELECT quote_id, jdata::text
+	FROM orders.legacy_orders
+	WHERE vodka_id = $1
+	LIMIT 1`, orderID).Scan(&bridge.QuoteID, &bridge.JData)
+	return &bridge, err
+}
+
+func (h *Handler) cleanupConvertedOrderHubSpot(r *http.Request, bridge *convertedOrderBridge, orderID int64, start time.Time) RevertConversionHubSpotCleanup {
+	metadata := bridge.hubSpotMetadata()
+	cleanup := RevertConversionHubSpotCleanup{}
+	if metadata == nil || (metadata.FileID == "" && metadata.NoteID == 0) {
+		return cleanup
+	}
+
+	cleanup.Attempted = true
+	if metadata.FileID != "" {
+		cleanup.FileID = &metadata.FileID
+	}
+	if metadata.NoteID > 0 {
+		cleanup.NoteID = &metadata.NoteID
+	}
+	if h.deps.HubSpot == nil {
+		cleanup.Warnings = appendWarning(cleanup.Warnings, "hubspot_not_configured")
+		h.logFailure(r, slog.LevelWarn, "hubspot cleanup skipped without client", "revert_conversion_hubspot_cleanup", start, "order_id", orderID, "quote_id", bridge.QuoteID, "hubspot_file_id", metadata.FileID, "hubspot_note_id", metadata.NoteID)
+		return cleanup
+	}
+
+	if metadata.NoteID > 0 {
+		err := h.deps.HubSpot.DeleteNote(r.Context(), metadata.NoteID)
+		if err != nil && !hubspot.IsNotFound(err) {
+			cleanup.Warnings = appendWarning(cleanup.Warnings, "hubspot_cleanup_failed")
+			h.logFailure(r, slog.LevelWarn, "hubspot note cleanup failed after conversion revert", "revert_conversion_hubspot_note", start, "order_id", orderID, "quote_id", bridge.QuoteID, "hubspot_note_id", metadata.NoteID, "error", err)
+		} else {
+			cleanup.NoteDeleted = true
+		}
+	}
+
+	if metadata.FileID != "" {
+		err := h.deps.HubSpot.DeleteFile(r.Context(), metadata.FileID)
+		if err != nil && !hubspot.IsNotFound(err) {
+			cleanup.Warnings = appendWarning(cleanup.Warnings, "hubspot_cleanup_failed")
+			h.logFailure(r, slog.LevelWarn, "hubspot file cleanup failed after conversion revert", "revert_conversion_hubspot_file", start, "order_id", orderID, "quote_id", bridge.QuoteID, "hubspot_file_id", metadata.FileID, "error", err)
+		} else {
+			cleanup.FileDeleted = true
+		}
+	}
+
+	return cleanup
+}
+
+func appendWarning(warnings []string, code string) []string {
+	for _, warning := range warnings {
+		if warning == code {
+			return warnings
+		}
+	}
+	return append(warnings, code)
+}
+
+func firstWarning(warnings []string) string {
+	if len(warnings) == 0 {
+		return ""
+	}
+	return warnings[0]
 }
 
 func (h *Handler) countAlyanteOrderRows(r *http.Request, order *OrderDetail) (int64, error) {

@@ -553,6 +553,7 @@ func main() {
 		Alyante: alyanteDB,
 		Mistra:  mistraDB,
 		Arak:    arakCli,
+		HubSpot: hubspotCli,
 		Logger:  logger,
 	})
 	rdf.RegisterRoutes(api, rdf.Deps{

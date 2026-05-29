@@ -52,6 +52,18 @@ type orderConversionResponse struct {
 	Steps          []orderConversionStep `json:"steps"`
 }
 
+type orderConversionHubSpotMetadata struct {
+	DealID         string `json:"deal_id,omitempty"`
+	DealURL        string `json:"deal_url,omitempty"`
+	FileID         string `json:"file_id,omitempty"`
+	NoteID         int64  `json:"note_id,omitempty"`
+	Filename       string `json:"filename,omitempty"`
+	FolderPath     string `json:"folder_path,omitempty"`
+	FileUploadedAt string `json:"file_uploaded_at,omitempty"`
+	NoteCreatedAt  string `json:"note_created_at,omitempty"`
+	UpdatedAt      string `json:"updated_at,omitempty"`
+}
+
 type conversionRequestError struct {
 	status int
 	code   string
@@ -222,6 +234,7 @@ func (h *Handler) convertQuoteToOrder(ctx context.Context, quoteID int) (*orderC
 	if err != nil {
 		return nil, nil, err
 	}
+	metadata := bridge.hubSpotMetadata()
 
 	var orderID int64
 	var orderCodeValue = orderCode(cdlanNdoc, cdlanAnno)
@@ -265,34 +278,76 @@ func (h *Handler) convertQuoteToOrder(ctx context.Context, quoteID int) (*orderC
 		addStep("bridge", "completed", "Ordine collegato alla proposta")
 	}
 
-	pdf, err := h.generateOrderPDF(ctx, orderID)
-	if err != nil {
-		return failStep("pdf", err), nil, nil
-	}
-	addStep("pdf", "completed", "PDF ordine generato")
-
-	filename := orderPDFFilename(orderCodeValue, time.Now())
-	upload, err := h.hs.UploadFile(ctx, filename, pdf, orderConversionFolder, map[string]any{"access": "PRIVATE"})
-	if err != nil {
-		return failStep("hubspot_file", err), nil, nil
-	}
-	addStep("hubspot_file", "completed", "PDF caricato su HubSpot")
-
-	noteID, err := h.hs.CreateNoteWithAttachment(ctx, dealID, upload.ID, orderID)
-	if err != nil {
-		return failStep("hubspot_note", err), nil, nil
-	}
-	addStep("hubspot_note", "completed", "Nota creata sul deal")
-
 	dealURL := hubspotDealURL(dealID)
+	if metadata == nil {
+		metadata = &orderConversionHubSpotMetadata{}
+	}
+	if metadata.DealID == "" {
+		metadata.DealID = dealID
+	}
+	if metadata.DealURL == "" {
+		metadata.DealURL = dealURL
+	}
+
+	fileID := metadata.FileID
+	if fileID != "" {
+		addStep("pdf", "skipped", "PDF ordine gia presente su HubSpot")
+		addStep("hubspot_file", "skipped", "PDF HubSpot gia presente")
+	} else {
+		pdf, err := h.generateOrderPDF(ctx, orderID)
+		if err != nil {
+			return failStep("pdf", err), nil, nil
+		}
+		addStep("pdf", "completed", "PDF ordine generato")
+
+		filename := orderPDFFilename(orderCodeValue, time.Now())
+		upload, err := h.hs.UploadFile(ctx, filename, pdf, orderConversionFolder, map[string]any{"access": "PRIVATE"})
+		if err != nil {
+			return failStep("hubspot_file", err), nil, nil
+		}
+		fileID = upload.ID
+		metadata.FileID = upload.ID
+		metadata.Filename = filename
+		metadata.FolderPath = orderConversionFolder
+		metadata.FileUploadedAt = time.Now().UTC().Format(time.RFC3339)
+		if err := h.updateLegacyOrderHubSpotMetadata(ctx, quoteID, orderID, metadata); err != nil {
+			return failStep("hubspot_file", fmt.Errorf("persist HubSpot file metadata: %w", err)), nil, nil
+		}
+		addStep("hubspot_file", "completed", "PDF caricato su HubSpot")
+	}
+
+	noteID := metadata.NoteID
+	if noteID > 0 {
+		addStep("hubspot_note", "skipped", "Nota HubSpot gia presente")
+	} else {
+		noteID, err = h.hs.CreateNoteWithAttachment(ctx, dealID, fileID, orderID)
+		if err != nil {
+			return failStep("hubspot_note", err), nil, nil
+		}
+		metadata.NoteID = noteID
+		metadata.NoteCreatedAt = time.Now().UTC().Format(time.RFC3339)
+		if err := h.updateLegacyOrderHubSpotMetadata(ctx, quoteID, orderID, metadata); err != nil {
+			return failStep("hubspot_note", fmt.Errorf("persist HubSpot note metadata: %w", err)), nil, nil
+		}
+		addStep("hubspot_note", "completed", "Nota creata sul deal")
+	}
+
+	var responseFileID *string
+	if fileID != "" {
+		responseFileID = &fileID
+	}
+	var responseNoteID *int64
+	if noteID > 0 {
+		responseNoteID = &noteID
+	}
 	return &orderConversionResponse{
 		Success:        true,
 		OrderID:        &orderID,
 		OrderCode:      &orderCodeValue,
 		HubSpotDealID:  &dealID,
 		HubSpotDealURL: &dealURL,
-		FileID:         &upload.ID,
-		NoteID:         &noteID,
+		FileID:         responseFileID,
+		NoteID:         responseNoteID,
 		Steps:          steps,
 	}, nil, nil
 }
@@ -392,6 +447,31 @@ WHERE q.id = $1`, quoteID)
 type legacyOrderBridge struct {
 	VodkaID int64
 	JData   sql.NullString
+}
+
+func (b *legacyOrderBridge) hubSpotMetadata() *orderConversionHubSpotMetadata {
+	if b == nil || !b.JData.Valid || strings.TrimSpace(b.JData.String) == "" {
+		return nil
+	}
+	var payload struct {
+		HubSpot *orderConversionHubSpotMetadata `json:"hubspot"`
+	}
+	if err := json.Unmarshal([]byte(b.JData.String), &payload); err != nil || payload.HubSpot == nil {
+		return nil
+	}
+	return payload.HubSpot.normalized()
+}
+
+func (m *orderConversionHubSpotMetadata) normalized() *orderConversionHubSpotMetadata {
+	if m == nil {
+		return nil
+	}
+	m.DealID = strings.TrimSpace(m.DealID)
+	m.DealURL = strings.TrimSpace(m.DealURL)
+	m.FileID = strings.TrimSpace(m.FileID)
+	m.Filename = strings.TrimSpace(m.Filename)
+	m.FolderPath = strings.TrimSpace(m.FolderPath)
+	return m
 }
 
 func (h *Handler) findLegacyOrder(ctx context.Context, quoteID int) (*legacyOrderBridge, error) {
@@ -566,52 +646,53 @@ ORDER BY qr.position, qr.id, qrp.position`, quoteID)
 }
 
 type vodkaOrderHeader struct {
-	CdlanSystemODV        int64   `json:"cdlan_systemodv"`
-	CdlanTipodoc          string  `json:"cdlan_tipodoc"`
-	CdlanNdoc             string  `json:"cdlan_ndoc"`
-	CdlanDatadoc          string  `json:"cdlan_datadoc"`
-	CdlanCliente          *string `json:"cdlan_cliente"`
-	CdlanCommerciale      *string `json:"cdlan_commerciale"`
-	CdlanCodTerminiPag    string  `json:"cdlan_cod_termini_pag"`
-	CdlanNote             *string `json:"cdlan_note"`
-	CdlanTipoOrd          string  `json:"cdlan_tipo_ord"`
-	CdlanDurRin           string  `json:"cdlan_dur_rin"`
-	CdlanTacitoRin        string  `json:"cdlan_tacito_rin"`
-	CdlanSostOrd          *string `json:"cdlan_sost_ord"`
-	CdlanTempiRil         string  `json:"cdlan_tempi_ril"`
-	CdlanDurataServizio   string  `json:"cdlan_durata_servizio"`
-	CdlanDataconferma     *string `json:"cdlan_dataconferma"`
-	CdlanRifOrdcli        *string `json:"cdlan_rif_ordcli"`
-	CdlanRifTechNom       *string `json:"cdlan_rif_tech_nom"`
-	CdlanRifTechTel       *string `json:"cdlan_rif_tech_tel"`
-	CdlanRifTechEmail     *string `json:"cdlan_rif_tech_email"`
-	CdlanRifAltroTechNom  *string `json:"cdlan_rif_altro_tech_nom"`
-	CdlanRifAltroTechTel  *string `json:"cdlan_rif_altro_tech_tel"`
-	CdlanRifAltroTechMail *string `json:"cdlan_rif_altro_tech_email"`
-	CdlanRifAdmNom        *string `json:"cdlan_rif_adm_nom"`
-	CdlanRifAdmTechTel    *string `json:"cdlan_rif_adm_tech_tel"`
-	CdlanRifAdmTechEmail  *string `json:"cdlan_rif_adm_tech_email"`
-	CdlanIntFatturazione  string  `json:"cdlan_int_fatturazione"`
-	CdlanIntFattAtt       string  `json:"cdlan_int_fatturazione_att"`
-	CdlanStato            string  `json:"cdlan_stato"`
-	CdlanEvaso            int     `json:"cdlan_evaso"`
-	CdlanChiuso           int     `json:"cdlan_chiuso"`
-	CdlanAnno             string  `json:"cdlan_anno"`
-	CdlanValuta           string  `json:"cdlan_valuta"`
-	WrittenBy             *string `json:"written_by"`
-	ProfileIVA            *string `json:"profile_iva"`
-	ProfileCF             *string `json:"profile_cf"`
-	ProfileAddress        *string `json:"profile_address"`
-	ProfileCity           *string `json:"profile_city"`
-	ProfileCAP            *string `json:"profile_cap"`
-	ProfilePV             *string `json:"profile_pv"`
-	ProfileSDI            *string `json:"profile_sdi"`
-	ProfileLang           string  `json:"profile_lang"`
-	CdlanClienteID        *int64  `json:"cdlan_cliente_id"`
-	ServiceType           string  `json:"service_type"`
-	DataDecorrenza        string  `json:"data_decorrenza"`
-	CdlanTacitoRinInPDF   string  `json:"cdlan_tacito_rin_in_pdf"`
-	IsColo                string  `json:"is_colo"`
+	CdlanSystemODV        int64                           `json:"cdlan_systemodv"`
+	CdlanTipodoc          string                          `json:"cdlan_tipodoc"`
+	CdlanNdoc             string                          `json:"cdlan_ndoc"`
+	CdlanDatadoc          string                          `json:"cdlan_datadoc"`
+	CdlanCliente          *string                         `json:"cdlan_cliente"`
+	CdlanCommerciale      *string                         `json:"cdlan_commerciale"`
+	CdlanCodTerminiPag    string                          `json:"cdlan_cod_termini_pag"`
+	CdlanNote             *string                         `json:"cdlan_note"`
+	CdlanTipoOrd          string                          `json:"cdlan_tipo_ord"`
+	CdlanDurRin           string                          `json:"cdlan_dur_rin"`
+	CdlanTacitoRin        string                          `json:"cdlan_tacito_rin"`
+	CdlanSostOrd          *string                         `json:"cdlan_sost_ord"`
+	CdlanTempiRil         string                          `json:"cdlan_tempi_ril"`
+	CdlanDurataServizio   string                          `json:"cdlan_durata_servizio"`
+	CdlanDataconferma     *string                         `json:"cdlan_dataconferma"`
+	CdlanRifOrdcli        *string                         `json:"cdlan_rif_ordcli"`
+	CdlanRifTechNom       *string                         `json:"cdlan_rif_tech_nom"`
+	CdlanRifTechTel       *string                         `json:"cdlan_rif_tech_tel"`
+	CdlanRifTechEmail     *string                         `json:"cdlan_rif_tech_email"`
+	CdlanRifAltroTechNom  *string                         `json:"cdlan_rif_altro_tech_nom"`
+	CdlanRifAltroTechTel  *string                         `json:"cdlan_rif_altro_tech_tel"`
+	CdlanRifAltroTechMail *string                         `json:"cdlan_rif_altro_tech_email"`
+	CdlanRifAdmNom        *string                         `json:"cdlan_rif_adm_nom"`
+	CdlanRifAdmTechTel    *string                         `json:"cdlan_rif_adm_tech_tel"`
+	CdlanRifAdmTechEmail  *string                         `json:"cdlan_rif_adm_tech_email"`
+	CdlanIntFatturazione  string                          `json:"cdlan_int_fatturazione"`
+	CdlanIntFattAtt       string                          `json:"cdlan_int_fatturazione_att"`
+	CdlanStato            string                          `json:"cdlan_stato"`
+	CdlanEvaso            int                             `json:"cdlan_evaso"`
+	CdlanChiuso           int                             `json:"cdlan_chiuso"`
+	CdlanAnno             string                          `json:"cdlan_anno"`
+	CdlanValuta           string                          `json:"cdlan_valuta"`
+	WrittenBy             *string                         `json:"written_by"`
+	ProfileIVA            *string                         `json:"profile_iva"`
+	ProfileCF             *string                         `json:"profile_cf"`
+	ProfileAddress        *string                         `json:"profile_address"`
+	ProfileCity           *string                         `json:"profile_city"`
+	ProfileCAP            *string                         `json:"profile_cap"`
+	ProfilePV             *string                         `json:"profile_pv"`
+	ProfileSDI            *string                         `json:"profile_sdi"`
+	ProfileLang           string                          `json:"profile_lang"`
+	CdlanClienteID        *int64                          `json:"cdlan_cliente_id"`
+	ServiceType           string                          `json:"service_type"`
+	DataDecorrenza        string                          `json:"data_decorrenza"`
+	CdlanTacitoRinInPDF   string                          `json:"cdlan_tacito_rin_in_pdf"`
+	IsColo                string                          `json:"is_colo"`
+	HubSpot               *orderConversionHubSpotMetadata `json:"hubspot,omitempty"`
 }
 
 func (h *Handler) buildVodkaOrderHeader(ctx context.Context, source *quoteOrderSource, categoryNames map[int]string) (*vodkaOrderHeader, *conversionRequestError, error) {
@@ -731,8 +812,30 @@ func (h *Handler) insertLegacyOrder(ctx context.Context, quoteID int, orderID in
 INSERT INTO orders.legacy_orders (quote_id, vodka_id, jdata)
 VALUES ($1, $2, $3::jsonb)
 ON CONFLICT (quote_id, vodka_id)
-DO UPDATE SET jdata = EXCLUDED.jdata`, quoteID, orderID, string(jdata))
+	DO UPDATE SET jdata = EXCLUDED.jdata`, quoteID, orderID, string(jdata))
 	return err
+}
+
+func (h *Handler) updateLegacyOrderHubSpotMetadata(ctx context.Context, quoteID int, orderID int64, metadata *orderConversionHubSpotMetadata) error {
+	if metadata == nil {
+		return nil
+	}
+	metadata.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	jdata, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+	res, err := h.db.ExecContext(ctx, `
+	UPDATE orders.legacy_orders
+	SET jdata = jsonb_set(COALESCE(jdata, '{}'::jsonb), '{hubspot}', $3::jsonb, true)
+	WHERE quote_id = $1 AND vodka_id = $2`, quoteID, orderID, string(jdata))
+	if err != nil {
+		return err
+	}
+	if affected, err := res.RowsAffected(); err == nil && affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 type vodkaOrderRow struct {

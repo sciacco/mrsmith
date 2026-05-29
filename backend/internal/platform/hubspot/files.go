@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -113,6 +114,14 @@ func (c *Client) CreateNoteWithAttachment(ctx context.Context, dealID, fileID st
 	}
 	id, _ := strconv.ParseInt(result.ID, 10, 64)
 	return id, nil
+}
+
+func (c *Client) DeleteNote(ctx context.Context, noteID int64) error {
+	return c.Delete(ctx, fmt.Sprintf("/crm/v3/objects/notes/%d", noteID))
+}
+
+func (c *Client) DeleteFile(ctx context.Context, fileID string) error {
+	return c.Delete(ctx, "/files/v3/files/"+url.PathEscape(fileID))
 }
 
 func rawJSONID(raw json.RawMessage) string {
