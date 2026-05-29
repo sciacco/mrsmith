@@ -96,7 +96,7 @@ func (h *Handler) getOrderWithoutOrigin(r *http.Request, id int64) (*OrderDetail
 	row := h.deps.Vodka.QueryRowContext(r.Context(), orderSummarySelect+`,
        cdlan_commerciale,
        cdlan_cod_termini_pag,
-       cdlan_note,
+       COALESCE(cdlan_note, '') AS cdlan_note,
        cdlan_dur_rin,
        cdlan_tacito_rin,
        cdlan_tempi_ril,

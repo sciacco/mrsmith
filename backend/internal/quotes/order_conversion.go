@@ -729,7 +729,7 @@ func buildVodkaOrderHeader(source *quoteOrderSource, categoryNames map[int]strin
 		CdlanCliente:          nullStringPtr(source.CustomerName),
 		CdlanCommerciale:      nil,
 		CdlanCodTerminiPag:    legacyPaymentMethod(source.PaymentMethod),
-		CdlanNote:             emptyStringPtr(note),
+		CdlanNote:             stringPtr(note),
 		CdlanTipoOrd:          cdlanTipoOrd,
 		CdlanDurRin:           strconv.Itoa(source.NextTermMonths),
 		CdlanTacitoRin:        cdlanTacitoRin,
@@ -895,6 +895,10 @@ func buildVodkaOrderRow(orderID int64, language string, source quoteOrderRowSour
 }
 
 func (h *Handler) generateOrderPDF(ctx context.Context, orderID int64) ([]byte, error) {
+	if err := h.ensureVodkaOrderPDFNullableTextFields(ctx, orderID); err != nil {
+		return nil, err
+	}
+
 	path := "/orders/v1/order/pdf/" + url.PathEscape(strconv.FormatInt(orderID, 10)) + "/generate"
 	resp, err := h.arak.Do(http.MethodGet, path, "", nil)
 	if err != nil {
@@ -913,6 +917,20 @@ func (h *Handler) generateOrderPDF(ctx context.Context, orderID int64) ([]byte, 
 		return nil, fmt.Errorf("gateway PDF response empty")
 	}
 	return body, nil
+}
+
+// ensureVodkaOrderPDFNullableTextFields normalizes legacy nullable text
+// before calling gw-int PDF generation, which expects cdlan_note to scan as a string.
+func (h *Handler) ensureVodkaOrderPDFNullableTextFields(ctx context.Context, orderID int64) error {
+	if h.vodkaDB == nil {
+		return nil
+	}
+	_, err := h.vodkaDB.ExecContext(ctx, `
+UPDATE orders
+SET cdlan_note = COALESCE(cdlan_note, '')
+WHERE id = ?
+  AND cdlan_note IS NULL`, orderID)
+	return err
 }
 
 const insertVodkaOrderQuery = `
@@ -1120,10 +1138,7 @@ func provincePrefix(raw string) *string {
 	return &raw
 }
 
-func emptyStringPtr(value string) *string {
-	if value == "" {
-		return nil
-	}
+func stringPtr(value string) *string {
 	return &value
 }
 

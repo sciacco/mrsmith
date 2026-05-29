@@ -2,6 +2,7 @@ package ordini
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -105,7 +106,22 @@ func (h *Handler) handleGatedPDF(w http.ResponseWriter, r *http.Request, gate pd
 			return
 		}
 	}
+	if err := h.ensureGatewayPDFNullableTextFields(r.Context(), id); err != nil {
+		h.dbFailure(w, r, gate.Operation+"_normalize_order", err, "order_id", id)
+		return
+	}
 	h.proxyNormalizedPDF(w, r, gate.GatewayPath(id), gate.Query, gate.Filename(order), gate.Operation)
+}
+
+// ensureGatewayPDFNullableTextFields normalizes legacy nullable text before
+// proxying gw-int PDFs, which expect cdlan_note to scan as a string.
+func (h *Handler) ensureGatewayPDFNullableTextFields(ctx context.Context, orderID int64) error {
+	_, err := h.deps.Vodka.ExecContext(ctx, `
+UPDATE orders
+SET cdlan_note = COALESCE(cdlan_note, '')
+WHERE id = ?
+  AND cdlan_note IS NULL`, orderID)
+	return err
 }
 
 func (h *Handler) writeOrderLoadError(w http.ResponseWriter, r *http.Request, operation string, orderID int64, err error) {
