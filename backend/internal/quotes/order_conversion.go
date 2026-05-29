@@ -755,13 +755,13 @@ func buildVodkaOrderHeader(source *quoteOrderSource, categoryNames map[int]strin
 		CdlanAnno:             source.CdlanAnno,
 		CdlanValuta:           "EURO",
 		WrittenBy:             nullStringPtr(source.OwnerName),
-		ProfileIVA:            nullStringPtr(source.PartitaIVA),
-		ProfileCF:             nullStringPtr(source.CodiceFiscale),
-		ProfileAddress:        nullStringPtr(source.Address),
-		ProfileCity:           nullStringPtr(source.City),
-		ProfileCAP:            nullStringPtr(source.ZIP),
+		ProfileIVA:            stringPtr(nullStringValue(source.PartitaIVA)),
+		ProfileCF:             stringPtr(nullStringValue(source.CodiceFiscale)),
+		ProfileAddress:        stringPtr(nullStringValue(source.Address)),
+		ProfileCity:           stringPtr(nullStringValue(source.City)),
+		ProfileCAP:            stringPtr(nullStringValue(source.ZIP)),
 		ProfilePV:             provincePrefix(nullStringValue(source.ProvinciaDiFatturazione)),
-		ProfileSDI:            nil,
+		ProfileSDI:            stringPtr(""),
 		ProfileLang:           normalizeLegacyQuoteLanguage(nullStringValue(source.Lingua)),
 		CdlanClienteID:        nil,
 		ServiceType:           serviceNamesForLegacy(source.Services, categoryNames),
@@ -920,16 +920,23 @@ func (h *Handler) generateOrderPDF(ctx context.Context, orderID int64) ([]byte, 
 }
 
 // ensureVodkaOrderPDFNullableTextFields normalizes legacy nullable text
-// before calling gw-int PDF generation, which expects cdlan_note to scan as a string.
+// before calling gw-int PDF generation, which expects selected text fields to scan as strings.
 func (h *Handler) ensureVodkaOrderPDFNullableTextFields(ctx context.Context, orderID int64) error {
 	if h.vodkaDB == nil {
 		return nil
 	}
 	_, err := h.vodkaDB.ExecContext(ctx, `
 UPDATE orders
-SET cdlan_note = COALESCE(cdlan_note, '')
+SET cdlan_note = COALESCE(cdlan_note, ''),
+    profile_iva = COALESCE(profile_iva, ''),
+    profile_cf = COALESCE(profile_cf, ''),
+    profile_address = COALESCE(profile_address, ''),
+    profile_city = COALESCE(profile_city, ''),
+    profile_cap = COALESCE(profile_cap, ''),
+    profile_pv = COALESCE(profile_pv, ''),
+    profile_sdi = COALESCE(profile_sdi, '')
 WHERE id = ?
-  AND cdlan_note IS NULL`, orderID)
+  AND (cdlan_note IS NULL OR profile_iva IS NULL OR profile_cf IS NULL OR profile_address IS NULL OR profile_city IS NULL OR profile_cap IS NULL OR profile_pv IS NULL OR profile_sdi IS NULL)`, orderID)
 	return err
 }
 
@@ -1129,9 +1136,6 @@ func formatLegacyPlainDecimal(value float64) string {
 
 func provincePrefix(raw string) *string {
 	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil
-	}
 	if len(raw) > 2 {
 		raw = raw[:2]
 	}

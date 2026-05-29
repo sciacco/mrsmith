@@ -58,7 +58,7 @@ For each rule the Appsmith source is in `gpUtils.newOrderFromQuote` / `rowsFromQ
 | 7 | `cdlan_descart` shape | `translations.find(t→t.language==lang).short + (extended_description ? "\r\n" + extended : "")` | `legacyRowDescription` + `translationShort` | ✅ preserved |
 | 8 | `cdlan_prezzo` storage format | `(row.mrc + '').replace(".", ",")` → Italian-locale string `"1234,56"` | `formatLegacyCommaDecimal(value) = strings.ReplaceAll(formatLegacyPlainDecimal(value), ".", ",")` | ✅ preserved |
 | 9 | `cdlan_prezzo_attivazione` storage format | `row.nrc` raw (no comma conversion) — asymmetric vs `cdlan_prezzo` | `formatLegacyPlainDecimal` | ✅ preserved as-is (asymmetry intentional or latent — see Q-new-8) |
-| 10 | `profile_pv` truncation | `provincia_di_fatturazione.slice(0, 2)` | `provincePrefix` (returns `nil` for empty string instead of `""`) | ✅ preserved (slightly safer) |
+| 10 | `profile_pv` truncation | `provincia_di_fatturazione.slice(0, 2)` | `provincePrefix` (returns `""` for empty/missing province to keep gw-int PDF scans safe) | ✅ preserved |
 | 11 | `cdlan_note` concat | `trial == null ? notes : trial + notes` (no separator) | `quoteOrderNote(trial, notes)` | ✅ preserved |
 | 12 | `cdlan_ragg_fatturazione = "A"` for every row | hardcoded in `rowData` | hardcoded in `buildVodkaOrderRow` | ✅ preserved |
 | 13 | `cdlan_prezzo_cessazione = "0"` for every row | hardcoded | hardcoded | ✅ preserved |

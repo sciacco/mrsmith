@@ -114,13 +114,20 @@ func (h *Handler) handleGatedPDF(w http.ResponseWriter, r *http.Request, gate pd
 }
 
 // ensureGatewayPDFNullableTextFields normalizes legacy nullable text before
-// proxying gw-int PDFs, which expect cdlan_note to scan as a string.
+// proxying gw-int PDFs, which expect selected text fields to scan as strings.
 func (h *Handler) ensureGatewayPDFNullableTextFields(ctx context.Context, orderID int64) error {
 	_, err := h.deps.Vodka.ExecContext(ctx, `
 UPDATE orders
-SET cdlan_note = COALESCE(cdlan_note, '')
+SET cdlan_note = COALESCE(cdlan_note, ''),
+    profile_iva = COALESCE(profile_iva, ''),
+    profile_cf = COALESCE(profile_cf, ''),
+    profile_address = COALESCE(profile_address, ''),
+    profile_city = COALESCE(profile_city, ''),
+    profile_cap = COALESCE(profile_cap, ''),
+    profile_pv = COALESCE(profile_pv, ''),
+    profile_sdi = COALESCE(profile_sdi, '')
 WHERE id = ?
-  AND cdlan_note IS NULL`, orderID)
+  AND (cdlan_note IS NULL OR profile_iva IS NULL OR profile_cf IS NULL OR profile_address IS NULL OR profile_city IS NULL OR profile_cap IS NULL OR profile_pv IS NULL OR profile_sdi IS NULL)`, orderID)
 	return err
 }
 
