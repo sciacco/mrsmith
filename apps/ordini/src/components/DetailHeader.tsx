@@ -12,9 +12,12 @@ interface DetailHeaderProps {
   canActivationForm: boolean;
   canOrderPdf: boolean;
   canSignedPdf: boolean;
+  canRevertConversion: boolean;
+  revertingConversion: boolean;
   downloading: string | null;
   onBack: () => void;
   onDownload: (kind: 'kickoff' | 'activation' | 'order' | 'signed') => void;
+  onRevertConversion: () => void;
 }
 
 export function DetailHeader({
@@ -23,9 +26,12 @@ export function DetailHeader({
   canActivationForm,
   canOrderPdf,
   canSignedPdf,
+  canRevertConversion,
+  revertingConversion,
   downloading,
   onBack,
   onDownload,
+  onRevertConversion,
 }: DetailHeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -63,6 +69,17 @@ export function DetailHeader({
           </div>
         </div>
         <div className={styles.detailHeaderRight}>
+          {canRevertConversion ? (
+            <Button
+              variant="danger"
+              size="sm"
+              leftIcon={<Icon name="trash" size={14} />}
+              loading={revertingConversion}
+              onClick={onRevertConversion}
+            >
+              Annulla conversione
+            </Button>
+          ) : null}
           {order.arx_doc_number ? (
             <a
               className={styles.arxivarHeaderLink}

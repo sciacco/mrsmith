@@ -395,20 +395,53 @@ type legacyOrderBridge struct {
 }
 
 func (h *Handler) findLegacyOrder(ctx context.Context, quoteID int) (*legacyOrderBridge, error) {
-	var bridge legacyOrderBridge
-	err := h.db.QueryRowContext(ctx, `
+	rows, err := h.db.QueryContext(ctx, `
 SELECT vodka_id, jdata::text
 FROM orders.legacy_orders
 WHERE quote_id = $1
 ORDER BY vodka_id DESC
-LIMIT 1`, quoteID).Scan(&bridge.VodkaID, &bridge.JData)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
+`, quoteID)
 	if err != nil {
 		return nil, err
 	}
-	return &bridge, nil
+	defer rows.Close()
+
+	for rows.Next() {
+		var bridge legacyOrderBridge
+		if err := rows.Scan(&bridge.VodkaID, &bridge.JData); err != nil {
+			return nil, err
+		}
+		if h.vodkaDB == nil {
+			return &bridge, nil
+		}
+		exists, err := h.vodkaOrderExists(ctx, bridge.VodkaID)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			return &bridge, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func (h *Handler) vodkaOrderExists(ctx context.Context, orderID int64) (bool, error) {
+	var id int64
+	err := h.vodkaDB.QueryRowContext(ctx, `
+SELECT id
+FROM orders
+WHERE id = ?
+LIMIT 1`, orderID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (h *Handler) resolveHubSpotDealID(ctx context.Context, source *quoteOrderSource) (string, error) {

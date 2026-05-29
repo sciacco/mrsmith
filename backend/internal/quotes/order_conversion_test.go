@@ -184,6 +184,42 @@ func TestConvertQuoteToOrderRejectsNonApprovedBeforeSideEffects(t *testing.T) {
 	}
 }
 
+func TestFindLegacyOrderSkipsStaleBridgeRows(t *testing.T) {
+	mistra := openOrderBridgeTestDB(t, &orderBridgeTestState{
+		bridges: []int64{200, 100},
+	})
+	vodka := openOrderBridgeTestDB(t, &orderBridgeTestState{
+		existingVodka: map[int64]bool{100: true},
+	})
+	h := &Handler{db: mistra, vodkaDB: vodka}
+
+	bridge, err := h.findLegacyOrder(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("findLegacyOrder() error = %v", err)
+	}
+	if bridge == nil || bridge.VodkaID != 100 {
+		t.Fatalf("bridge = %#v, want vodka 100", bridge)
+	}
+}
+
+func TestFindLegacyOrderReturnsNilWhenAllBridgeRowsAreStale(t *testing.T) {
+	mistra := openOrderBridgeTestDB(t, &orderBridgeTestState{
+		bridges: []int64{200},
+	})
+	vodka := openOrderBridgeTestDB(t, &orderBridgeTestState{
+		existingVodka: map[int64]bool{},
+	})
+	h := &Handler{db: mistra, vodkaDB: vodka}
+
+	bridge, err := h.findLegacyOrder(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("findLegacyOrder() error = %v", err)
+	}
+	if bridge != nil {
+		t.Fatalf("bridge = %#v, want nil", bridge)
+	}
+}
+
 func ns(value string) sql.NullString {
 	return sql.NullString{String: value, Valid: true}
 }
@@ -276,3 +312,85 @@ func (c *orderConversionStatusTestConn) QueryContext(_ context.Context, query st
 
 var _ driver.QueryerContext = (*orderConversionStatusTestConn)(nil)
 var _ driver.Pinger = (*orderConversionStatusTestConn)(nil)
+
+const orderBridgeTestDriverName = "quotes_order_bridge_test_driver"
+
+var (
+	registerOrderBridgeTestDriverOnce sync.Once
+	orderBridgeStatesMu               sync.Mutex
+	orderBridgeStates                 = map[string]*orderBridgeTestState{}
+)
+
+type orderBridgeTestState struct {
+	bridges       []int64
+	existingVodka map[int64]bool
+}
+
+func openOrderBridgeTestDB(t *testing.T, state *orderBridgeTestState) *sql.DB {
+	t.Helper()
+	registerOrderBridgeTestDriverOnce.Do(func() {
+		sql.Register(orderBridgeTestDriverName, orderBridgeTestDriver{})
+	})
+	dsn := t.Name() + time.Now().Format(time.RFC3339Nano)
+	orderBridgeStatesMu.Lock()
+	orderBridgeStates[dsn] = state
+	orderBridgeStatesMu.Unlock()
+	db, err := sql.Open(orderBridgeTestDriverName, dsn)
+	if err != nil {
+		t.Fatalf("sql.Open() error = %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+		orderBridgeStatesMu.Lock()
+		delete(orderBridgeStates, dsn)
+		orderBridgeStatesMu.Unlock()
+	})
+	return db
+}
+
+type orderBridgeTestDriver struct{}
+
+func (orderBridgeTestDriver) Open(name string) (driver.Conn, error) {
+	orderBridgeStatesMu.Lock()
+	state := orderBridgeStates[name]
+	orderBridgeStatesMu.Unlock()
+	if state == nil {
+		return nil, errors.New("missing order bridge test state")
+	}
+	return &orderBridgeTestConn{state: state}, nil
+}
+
+type orderBridgeTestConn struct {
+	state *orderBridgeTestState
+}
+
+func (c *orderBridgeTestConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c *orderBridgeTestConn) Close() error { return nil }
+
+func (c *orderBridgeTestConn) Begin() (driver.Tx, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c *orderBridgeTestConn) QueryContext(_ context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	switch {
+	case strings.Contains(query, "FROM orders.legacy_orders"):
+		values := make([][]driver.Value, 0, len(c.state.bridges))
+		for _, id := range c.state.bridges {
+			values = append(values, []driver.Value{id, nil})
+		}
+		return &publishHandlerTestRows{columns: []string{"vodka_id", "jdata"}, values: values}, nil
+	case strings.Contains(query, "FROM orders") && strings.Contains(query, "WHERE id = ?"):
+		orderID, _ := args[0].Value.(int64)
+		if c.state.existingVodka[orderID] {
+			return &publishHandlerTestRows{columns: []string{"id"}, values: [][]driver.Value{{orderID}}}, nil
+		}
+		return &publishHandlerTestRows{columns: []string{"id"}}, nil
+	default:
+		return nil, errors.New("unexpected order bridge query: " + query)
+	}
+}
+
+var _ driver.QueryerContext = (*orderBridgeTestConn)(nil)

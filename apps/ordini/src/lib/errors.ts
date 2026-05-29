@@ -20,10 +20,15 @@ const messages: Record<string, string> = {
   gateway_not_configured: 'Non è possibile completare l\'operazione in questo momento.',
   gateway_error: 'Non è possibile completare l\'operazione in questo momento.',
   arxivar_upload_failed: 'Ordine inviato, ma caricamento documento non completato.',
+  not_converted_from_quote: 'Questo ordine non è collegato a una proposta.',
+  order_has_erp_rows: 'L\'ordine risulta già presente in ERP e non può essere rimosso.',
+  order_has_signed_pdf: 'L\'ordine ha già un documento firmato e non può essere rimosso.',
+  bridge_delete_failed: 'Conversione annullata, ma il collegamento con la proposta richiede una verifica.',
   db_failed: 'Operazione non riuscita.',
   db_commit_failed: 'Salvataggio non completato.',
   gw_pdf_malformed: 'Documento non disponibile in questo momento.',
-  alyante_database_not_configured: 'Elenco clienti non disponibile in questo momento.',
+  alyante_database_not_configured: 'Dati ERP non disponibili in questo momento.',
+  mistra_database_not_configured: 'Collegamento proposta non disponibile in questo momento.',
   vodka_database_not_configured: 'Ordini non disponibili in questo momento.',
 };
 

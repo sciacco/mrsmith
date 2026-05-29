@@ -6,6 +6,7 @@ import type {
   OrderDetail,
   OrderRow,
   OrderSummary,
+  RevertConversionResponse,
   SendToERPResponse,
   TechnicalRow,
   UpdateHeaderPayload,
@@ -136,6 +137,20 @@ export function useSendToERP(orderId: number) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['ordini', 'orders', orderId] });
       void queryClient.invalidateQueries({ queryKey: ['ordini', 'orders'] });
+    },
+  });
+}
+
+export function useRevertConversion(orderId: number) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<RevertConversionResponse>(`/ordini/v1/orders/${orderId}/revert-conversion`, {}),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['ordini', 'orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['ordini', 'orders', orderId] });
+      void queryClient.invalidateQueries({ queryKey: ['ordini', 'orders', orderId, 'rows'] });
+      void queryClient.invalidateQueries({ queryKey: ['ordini', 'orders', orderId, 'technical-rows'] });
     },
   });
 }

@@ -52,3 +52,7 @@ export function canDownloadOrderPdf(order: OrderDetail | null | undefined): bool
 export function canDownloadSignedPdf(order: OrderDetail | null | undefined): boolean {
   return Boolean(order?.arx_doc_number);
 }
+
+export function canRevertConversion(order: OrderDetail | null | undefined, roles: readonly string[] | undefined): boolean {
+  return state(order) === 'BOZZA' && hasCustomerRelations(roles) && Boolean(order?.origin) && !order?.arx_doc_number;
+}

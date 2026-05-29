@@ -165,6 +165,16 @@ type SendToERPResponse struct {
 	Warning           string                `json:"warning,omitempty"`
 }
 
+type RevertConversionResponse struct {
+	Reverted      bool    `json:"reverted"`
+	OrderID       int64   `json:"order_id"`
+	QuoteID       int64   `json:"quote_id"`
+	OrderCode     *string `json:"order_code,omitempty"`
+	DeletedRows   int64   `json:"deleted_rows"`
+	BridgeDeleted bool    `json:"bridge_deleted"`
+	Warning       string  `json:"warning,omitempty"`
+}
+
 func stateOf(order *OrderDetail) OrderState {
 	if order == nil || order.CdlanStato == nil {
 		return ""

@@ -407,6 +407,15 @@ Alyante ERP ID
 - Used by: `apps/quotes` `POST /api/quotes/v1/quotes/{id}/convert-order` and `GET /api/quotes/v1/quotes/{id}/order-conversion`.
 - Open questions: whether HubSpot file/note IDs should be persisted for exact retry de-duplication after a note creation failure.
 
+### Vodka Orders Match Alyante Extended Rows By Document
+
+- Context: `apps/ordini` quote-converted order reverts and any future guard that must prove whether a Vodka order has reached Alyante ERP.
+- Discovery: Alyante exposes `Tsmi_Ordini_Esteso` with document-level fields `NUM_DOC_GAMMA`, `ANNO_DOCUMENTO`, `NUM_DOCUMENTO` and row-level fields such as `ARTICOLO`, `QTA`, `SERIALNUMBER`, and `STATO_DOCUMENTO`. A Vodka order can be checked against that view by matching `orders.cdlan_ndoc` to `NUM_DOC_GAMMA` when numeric, `orders.cdlan_anno` to `ANNO_DOCUMENTO`, and falling back to trimmed `NUM_DOCUMENTO` for string document numbers.
+- Practical rule: do not treat Vodka `cdlan_stato = 'BOZZA'` as proof that no ERP row exists. Before deleting or reverting a quote-created order, query `Tsmi_Ordini_Esteso` by document number/year and block the action if any row is returned. Use `orders_rows.cdlan_codart`, `cdlan_serialnumber`, and `cdlan_qta` only as diagnostics or future stricter matching; document/year presence is already enough to prove ERP push.
+- Evidence: `docs/vodka-tables.sql`, Alyante view contract provided during Ordini revert planning, and `backend/internal/ordini/workflow_revert.go`.
+- Used by: `apps/ordini` `POST /api/ordini/v1/orders/{id}/revert-conversion`.
+- Open questions: whether `NUM_DOCUMENTO` stores any alternate formatting that should be normalized beyond trimming if non-numeric document numbers appear in production.
+
 ### Panoramica Orders Summary Text Columns Can Be NULL
 
 - Context: `GET /api/panoramica/v1/orders/summary` backed by `loader.v_ordini_sintesi`.

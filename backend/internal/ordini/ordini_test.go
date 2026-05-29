@@ -356,6 +356,209 @@ func TestSendToERPArxivarFailureReturnsWarningAfterStateFlip(t *testing.T) {
 	}
 }
 
+func TestRevertConversionBlocksNonQuoteOrigin(t *testing.T) {
+	vodka := openOrdiniTestDB(t, &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders") && strings.Contains(query, "WHERE id = ?") {
+				return nil, [][]driver.Value{orderDetailValues("BOZZA", "2026-05-22")}, nil
+			}
+			return nil, nil, errors.New("unexpected vodka query: " + query)
+		},
+	})
+	mistra := openOrdiniTestDB(t, &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders.legacy_orders") {
+				return nil, nil, sql.ErrNoRows
+			}
+			return nil, nil, errors.New("unexpected mistra query: " + query)
+		},
+	})
+	alyante := openOrdiniTestDB(t, &ordiniTestDBState{})
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, Deps{Vodka: vodka, Mistra: mistra, Alyante: alyante, Logger: logging.NewWithWriter(io.Discard, "debug")})
+
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict || errorCode(t, rec.Body.Bytes()) != "not_converted_from_quote" {
+		t.Fatalf("status/body=%d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRevertConversionBlocksWrongStateBeforeExternalChecks(t *testing.T) {
+	vodkaState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders") && strings.Contains(query, "WHERE id = ?") {
+				return nil, [][]driver.Value{orderDetailValues("INVIATO", "2026-05-22")}, nil
+			}
+			return nil, nil, errors.New("unexpected vodka query: " + query)
+		},
+	}
+	mistraState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			t.Fatalf("mistra should not be queried after wrong state: %s", query)
+			return nil, nil, nil
+		},
+	}
+	alyanteState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			t.Fatalf("alyante should not be queried after wrong state: %s", query)
+			return nil, nil, nil
+		},
+	}
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, Deps{
+		Vodka:   openOrdiniTestDB(t, vodkaState),
+		Mistra:  openOrdiniTestDB(t, mistraState),
+		Alyante: openOrdiniTestDB(t, alyanteState),
+		Logger:  logging.NewWithWriter(io.Discard, "debug"),
+	})
+
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict || errorCode(t, rec.Body.Bytes()) != "wrong_state" {
+		t.Fatalf("status/body=%d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRevertConversionBlocksWhenAlyanteRowsExist(t *testing.T) {
+	vodkaState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders") && strings.Contains(query, "WHERE id = ?") {
+				return nil, [][]driver.Value{orderDetailValues("BOZZA", "2026-05-22")}, nil
+			}
+			return nil, nil, errors.New("unexpected vodka query: " + query)
+		},
+		exec: func(query string, args []driver.NamedValue) (int64, error) {
+			t.Fatalf("vodka delete should not run when Alyante rows exist: %s", query)
+			return 0, nil
+		},
+	}
+	mistraState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders.legacy_orders") {
+				return []string{"quote_id"}, [][]driver.Value{{int64(77)}}, nil
+			}
+			return nil, nil, errors.New("unexpected mistra query: " + query)
+		},
+		exec: func(query string, args []driver.NamedValue) (int64, error) {
+			t.Fatalf("bridge delete should not run when Alyante rows exist: %s", query)
+			return 0, nil
+		},
+	}
+	alyanteState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if !strings.Contains(query, "FROM Tsmi_Ordini_Esteso") || !strings.Contains(query, "NUM_DOC_GAMMA") || !strings.Contains(query, "NUM_DOCUMENTO") {
+				t.Fatalf("unexpected Alyante query: %s", query)
+			}
+			if args[0].Value != int64(12) || args[1].Value != int64(2026) || args[2].Value != "12" {
+				t.Fatalf("unexpected Alyante args: %#v", args)
+			}
+			return []string{"count"}, [][]driver.Value{{int64(2)}}, nil
+		},
+	}
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, Deps{
+		Vodka:   openOrdiniTestDB(t, vodkaState),
+		Mistra:  openOrdiniTestDB(t, mistraState),
+		Alyante: openOrdiniTestDB(t, alyanteState),
+		Logger:  logging.NewWithWriter(io.Discard, "debug"),
+	})
+
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict || errorCode(t, rec.Body.Bytes()) != "order_has_erp_rows" {
+		t.Fatalf("status/body=%d %s", rec.Code, rec.Body.String())
+	}
+	if len(vodkaState.execs) != 0 || len(mistraState.execs) != 0 {
+		t.Fatalf("unexpected deletes vodka=%v mistra=%v", vodkaState.execs, mistraState.execs)
+	}
+}
+
+func TestRevertConversionDeletesVodkaOrderAndMistraBridge(t *testing.T) {
+	vodkaState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders") && strings.Contains(query, "WHERE id = ?") {
+				return nil, [][]driver.Value{orderDetailValues("BOZZA", "2026-05-22")}, nil
+			}
+			return nil, nil, errors.New("unexpected vodka query: " + query)
+		},
+		exec: func(query string, args []driver.NamedValue) (int64, error) {
+			switch {
+			case strings.Contains(query, "DELETE FROM orders_rows"):
+				if args[0].Value != int64(1) {
+					t.Fatalf("row delete order arg = %#v", args[0].Value)
+				}
+				return 3, nil
+			case strings.Contains(query, "DELETE FROM orders WHERE id = ? AND cdlan_stato = 'BOZZA'"):
+				if args[0].Value != int64(1) {
+					t.Fatalf("order delete arg = %#v", args[0].Value)
+				}
+				return 1, nil
+			default:
+				t.Fatalf("unexpected vodka exec: %s", query)
+				return 0, nil
+			}
+		},
+	}
+	mistraState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM orders.legacy_orders") {
+				return []string{"quote_id"}, [][]driver.Value{{int64(77)}}, nil
+			}
+			return nil, nil, errors.New("unexpected mistra query: " + query)
+		},
+		exec: func(query string, args []driver.NamedValue) (int64, error) {
+			if !strings.Contains(query, "DELETE FROM orders.legacy_orders") {
+				t.Fatalf("unexpected mistra exec: %s", query)
+			}
+			if args[0].Value != int64(77) || args[1].Value != int64(1) {
+				t.Fatalf("bridge delete args = %#v", args)
+			}
+			return 1, nil
+		},
+	}
+	alyanteState := &ordiniTestDBState{
+		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "FROM Tsmi_Ordini_Esteso") {
+				return []string{"count"}, [][]driver.Value{{int64(0)}}, nil
+			}
+			return nil, nil, errors.New("unexpected alyante query: " + query)
+		},
+	}
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, Deps{
+		Vodka:   openOrdiniTestDB(t, vodkaState),
+		Mistra:  openOrdiniTestDB(t, mistraState),
+		Alyante: openOrdiniTestDB(t, alyanteState),
+		Logger:  logging.NewWithWriter(io.Discard, "debug"),
+	})
+
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status/body=%d %s", rec.Code, rec.Body.String())
+	}
+	var resp RevertConversionResponse
+	decodeJSONBody(t, rec.Body.Bytes(), &resp)
+	if !resp.Reverted || resp.OrderID != 1 || resp.QuoteID != 77 || resp.DeletedRows != 3 || !resp.BridgeDeleted || resp.Warning != "" {
+		t.Fatalf("response = %#v", resp)
+	}
+	if vodkaState.commits != 1 {
+		t.Fatalf("vodka commits = %d, want 1", vodkaState.commits)
+	}
+	if !vodkaState.execContains("DELETE FROM orders_rows") || !vodkaState.execContains("DELETE FROM orders WHERE id = ? AND cdlan_stato = 'BOZZA'") || !mistraState.execContains("DELETE FROM orders.legacy_orders") {
+		t.Fatalf("missing deletes vodka=%v mistra=%v", vodkaState.execs, mistraState.execs)
+	}
+}
+
 func TestActivationFinalSatisfiedRowSetsOrderAttivo(t *testing.T) {
 	state := ordiniActivationDBState(t, 3, 3, orderRowValues(11, 1, 101, 1, "", 1))
 	gw := newOrdiniGateway(t, func(w http.ResponseWriter, r *http.Request) {
@@ -629,6 +832,7 @@ func TestElevatedHandlersRequireCustomerRelations(t *testing.T) {
 		{name: "header", method: http.MethodPatch, path: "/ordini/v1/orders/1", body: strings.NewReader(`{"customer_po":"","confirmation_date":"","customer_id":1}`)},
 		{name: "referents", method: http.MethodPatch, path: "/ordini/v1/orders/1/referents", body: strings.NewReader(`{"technical_name":"","technical_phone":"","technical_email":"","other_technical_name":"","other_technical_phone":"","other_technical_email":"","admin_name":"","admin_phone":"","admin_email":""}`)},
 		{name: "send", method: http.MethodPost, path: "/ordini/v1/orders/1/send-to-erp"},
+		{name: "revert", method: http.MethodPost, path: "/ordini/v1/orders/1/revert-conversion"},
 		{name: "activate", method: http.MethodPatch, path: "/ordini/v1/orders/1/rows/1/activate", body: strings.NewReader(`{"activation_date":"2026-05-23"}`)},
 		{name: "kickoff", method: http.MethodGet, path: "/ordini/v1/orders/1/kickoff.pdf"},
 		{name: "activation form", method: http.MethodGet, path: "/ordini/v1/orders/1/activation-form.pdf"},
@@ -657,6 +861,7 @@ func TestElevatedHandlersCheckRoleBeforeMissingDependencies(t *testing.T) {
 	}{
 		{name: "header", method: http.MethodPatch, path: "/ordini/v1/orders/1", body: strings.NewReader(`{"customer_po":"","confirmation_date":"","customer_id":1}`)},
 		{name: "send", method: http.MethodPost, path: "/ordini/v1/orders/1/send-to-erp"},
+		{name: "revert", method: http.MethodPost, path: "/ordini/v1/orders/1/revert-conversion"},
 		{name: "activate", method: http.MethodPatch, path: "/ordini/v1/orders/1/rows/1/activate", body: strings.NewReader(`{"activation_date":"2026-05-23"}`)},
 		{name: "kickoff", method: http.MethodGet, path: "/ordini/v1/orders/1/kickoff.pdf"},
 		{name: "activation form", method: http.MethodGet, path: "/ordini/v1/orders/1/activation-form.pdf"},

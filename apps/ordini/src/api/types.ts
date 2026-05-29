@@ -137,3 +137,13 @@ export interface SendToERPResponse {
   arxivarUploaded: boolean;
   warning?: 'arxivar_upload_failed' | string;
 }
+
+export interface RevertConversionResponse {
+  reverted: boolean;
+  order_id: number;
+  quote_id: number;
+  order_code?: string;
+  deleted_rows: number;
+  bridge_deleted: boolean;
+  warning?: 'bridge_delete_failed' | string;
+}

@@ -54,6 +54,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handle("PATCH /ordini/v1/orders/{id}", h.handlePatchOrderHeader)
 	handle("PATCH /ordini/v1/orders/{id}/referents", h.handlePatchReferents)
 	handle("POST /ordini/v1/orders/{id}/send-to-erp", h.handleSendToERP)
+	handle("POST /ordini/v1/orders/{id}/revert-conversion", h.handleRevertConversion)
 	handle("PATCH /ordini/v1/orders/{id}/rows/{rowId}/serial-number", h.handlePatchSerialNumber)
 	handle("PATCH /ordini/v1/orders/{id}/rows/{rowId}/technical-notes", h.handlePatchTechnicalNotes)
 	handle("PATCH /ordini/v1/orders/{id}/rows/{rowId}/activate", h.handleActivateRow)
@@ -70,6 +71,14 @@ func (h *Handler) requireVodka(w http.ResponseWriter) bool {
 func (h *Handler) requireAlyante(w http.ResponseWriter) bool {
 	if h.deps.Alyante == nil {
 		httputil.Error(w, http.StatusServiceUnavailable, "alyante_database_not_configured")
+		return false
+	}
+	return true
+}
+
+func (h *Handler) requireMistra(w http.ResponseWriter) bool {
+	if h.deps.Mistra == nil {
+		httputil.Error(w, http.StatusServiceUnavailable, "mistra_database_not_configured")
 		return false
 	}
 	return true

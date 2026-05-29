@@ -1,4 +1,4 @@
-import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
 import { useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import type { SendToERPResponse, UpdateHeaderPayload, UpdateReferentsPayload } from '../api/types';
@@ -12,6 +12,7 @@ import {
   usePatchReferents,
   usePatchSerialNumber,
   usePatchTechnicalNotes,
+  useRevertConversion,
   useSendToERP,
   useTechnicalRows,
 } from '../api/queries';
@@ -38,6 +39,7 @@ import {
   canDownloadSignedPdf,
   canEditBozzaHeader,
   canEditReferents,
+  canRevertConversion,
   canShowArxivarFilePicker,
 } from '../lib/permissions';
 import styles from './OrderDetailPage.module.css';
@@ -66,6 +68,7 @@ export function OrderDetailPage() {
   const [savingSerialRow, setSavingSerialRow] = useState<number | null>(null);
   const [savingNotesRow, setSavingNotesRow] = useState<number | null>(null);
   const [downloading, setDownloading] = useState<DownloadKind | null>(null);
+  const [revertOpen, setRevertOpen] = useState(false);
 
   const order = useOrder(Number.isFinite(id) ? id : null);
   const rows = useOrderRows(Number.isFinite(id) ? id : null);
@@ -78,6 +81,7 @@ export function OrderDetailPage() {
   const patchNotes = usePatchTechnicalNotes(id);
   const activateRow = useActivateRow(id);
   const sendToERP = useSendToERP(id);
+  const revertConversion = useRevertConversion(id);
   const downloads = useOrdiniDownloads();
 
   const tabBadges = useMemo(
@@ -110,6 +114,7 @@ export function OrderDetailPage() {
 
   const detail = order.data;
   const canEditRefs = canEditReferents(detail, roles);
+  const canRevert = canRevertConversion(detail, roles);
 
   async function saveHeader(payload: UpdateHeaderPayload) {
     try {
@@ -207,6 +212,25 @@ export function OrderDetailPage() {
     }
   }
 
+  async function revertConvertedOrder() {
+    try {
+      const result = await revertConversion.mutateAsync();
+      setRevertOpen(false);
+      if (result.warning) {
+        toast(sendWarningToast(result.warning), 'warning');
+      } else {
+        toast('Conversione annullata');
+      }
+      if (detail.origin?.quote_url) {
+        window.location.assign(detail.origin.quote_url);
+      } else {
+        navigate('/ordini', { replace: true });
+      }
+    } catch (error) {
+      toast(apiErrorMessage(error, 'Annullamento conversione non riuscito'), 'error');
+    }
+  }
+
   return (
     <main className={styles.page}>
       <DetailHeader
@@ -215,9 +239,12 @@ export function OrderDetailPage() {
         canActivationForm={canDownloadActivationFormPdf(detail, roles)}
         canOrderPdf={canDownloadOrderPdf(detail)}
         canSignedPdf={canDownloadSignedPdf(detail)}
+        canRevertConversion={canRevert}
+        revertingConversion={revertConversion.isPending}
         downloading={downloading}
         onBack={() => navigate('/ordini')}
         onDownload={(kind) => void download(kind)}
+        onRevertConversion={() => setRevertOpen(true)}
       />
 
       <section className={styles.detailSurface}>
@@ -264,6 +291,37 @@ export function OrderDetailPage() {
           {activeTab === 'altri' ? <AltriDatiTab order={detail} /> : null}
         </div>
       </section>
+
+      <Modal
+        open={revertOpen}
+        onClose={() => setRevertOpen(false)}
+        title="Annulla conversione"
+        size="sm"
+        dismissible={!revertConversion.isPending}
+      >
+        <div className={styles.modalBody}>
+          <p className={styles.modalText}>
+            L&apos;ordine verrà rimosso da Ordini. La proposta collegata potrà essere convertita di nuovo.
+          </p>
+          <div className={styles.modalSummary}>
+            <span>Proposta collegata</span>
+            <strong>{detail.origin?.quote_code ?? detail.origin?.quote_id ?? '—'}</strong>
+          </div>
+          <div className={styles.modalActions}>
+            <Button variant="secondary" disabled={revertConversion.isPending} onClick={() => setRevertOpen(false)}>
+              Annulla
+            </Button>
+            <Button
+              variant="danger"
+              loading={revertConversion.isPending}
+              leftIcon={<Icon name="trash" size={16} />}
+              onClick={() => void revertConvertedOrder()}
+            >
+              Rimuovi ordine
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </main>
   );
 }
@@ -272,6 +330,8 @@ function sendWarningToast(code: string): string {
   switch (code) {
     case 'arxivar_upload_failed':
       return 'Ordine inviato, ma il documento firmato richiede una verifica.';
+    case 'bridge_delete_failed':
+      return 'Conversione annullata, ma il collegamento con la proposta richiede una verifica.';
     default:
       return 'Ordine inviato, ma una verifica resta in sospeso.';
   }
