@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 const (
@@ -94,6 +95,7 @@ func (h *Handler) handleConvertOrder(w http.ResponseWriter, r *http.Request) {
 
 	result, reqErr, err := h.convertQuoteToOrder(r.Context(), quoteID)
 	if reqErr != nil {
+		logging.AddAccessLogAttrs(r.Context(), "conversion_reject", reqErr.code)
 		httputil.Error(w, reqErr.status, reqErr.code)
 		return
 	}
@@ -101,7 +103,33 @@ func (h *Handler) handleConvertOrder(w http.ResponseWriter, r *http.Request) {
 		h.dbFailure(w, r, "convert_order", err, "quote_id", quoteID)
 		return
 	}
+	if !result.Success {
+		failed := lastErrorStep(result.Steps)
+		logging.FromContext(r.Context()).Error("order conversion failed",
+			"component", "quotes",
+			"operation", "convert_order",
+			"quote_id", quoteID,
+			"order_id", result.OrderID,
+			"failed_step", failed.Name,
+			"error", failed.Error,
+		)
+		logging.AddAccessLogAttrs(r.Context(),
+			"conversion_success", false,
+			"conversion_failed_step", failed.Name,
+		)
+	}
 	httputil.JSON(w, http.StatusOK, result)
+}
+
+// lastErrorStep returns the conversion step that failed (the one with status
+// "error"). failStep always appends it last, so iterate from the end.
+func lastErrorStep(steps []orderConversionStep) orderConversionStep {
+	for i := len(steps) - 1; i >= 0; i-- {
+		if steps[i].Status == "error" {
+			return steps[i]
+		}
+	}
+	return orderConversionStep{}
 }
 
 func (h *Handler) getOrderConversionStatus(ctx context.Context, quoteID int) (*orderConversionStatus, error) {
