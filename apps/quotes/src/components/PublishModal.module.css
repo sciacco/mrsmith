@@ -250,3 +250,13 @@
   justify-content: flex-end;
   margin-top: var(--space-2);
 }
+
+.orderLink {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.orderLink:hover {
+  text-decoration: underline;
+}

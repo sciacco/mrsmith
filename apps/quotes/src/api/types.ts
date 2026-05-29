@@ -208,6 +208,7 @@ export interface OrderConversionStatus {
   converted: boolean;
   order_id: number | null;
   order_code: string | null;
+  order_number: string | null;
   hubspot_deal_id: string | null;
   hubspot_deal_url: string | null;
   conflict?: boolean;
@@ -218,6 +219,7 @@ export interface OrderConversionResult {
   success: boolean;
   order_id?: number;
   order_code?: string;
+  order_number?: string;
   hubspot_deal_id?: string;
   hubspot_deal_url?: string;
   file_id?: string;

@@ -148,10 +148,11 @@ export function QuoteDetailPage() {
   const existingOrderId = orderConversion?.converted
     ? orderConversion.order_id
     : orderConversion?.conflict_order_id ?? null;
-  const existingOrderLabel = existingOrderId
-    ? `Ordine ${existingOrderId}`
+  const existingOrderNumber = orderConversion?.order_number || null;
+  const existingOrderLabel = existingOrderNumber
+    ? `Ordine ${existingOrderNumber}`
     : orderConversion?.order_code
-      ? `Ordine ${orderConversion.order_code}`
+      ? `Ordine ${orderConversion.order_code.split('/')[0]}`
       : 'Ordine esistente';
   const orderConversionTooltip = useMemo(() => {
     if (isDirty) return 'Salva le modifiche prima di convertire.';
@@ -226,13 +227,24 @@ export function QuoteDetailPage() {
           <div className={styles.actionBarSpacer} />
 
           {hasExistingOrder && (
-            <span
-              className={`${styles.orderBadge} ${orderConversion?.conflict ? styles.orderBadgeWarning : ''}`}
-              title={orderConversion?.conflict ? 'Ordine presente in Vodka senza collegamento alla proposta' : undefined}
-            >
-              <Icon name="shopping-cart" size={14} />
-              {existingOrderLabel}
-            </span>
+            existingOrderId ? (
+              <a
+                href={`/ordini/${existingOrderId}`}
+                className={`${styles.orderBadge} ${orderConversion?.conflict ? styles.orderBadgeWarning : ''}`}
+                title={orderConversion?.conflict ? 'Ordine presente in Vodka senza collegamento alla proposta. Clicca per visualizzare.' : 'Visualizza l\'ordine'}
+              >
+                <Icon name="shopping-cart" size={14} />
+                {existingOrderLabel}
+              </a>
+            ) : (
+              <span
+                className={`${styles.orderBadge} ${orderConversion?.conflict ? styles.orderBadgeWarning : ''}`}
+                title={orderConversion?.conflict ? 'Ordine presente in Vodka senza collegamento alla proposta' : undefined}
+              >
+                <Icon name="shopping-cart" size={14} />
+                {existingOrderLabel}
+              </span>
+            )
           )}
 
           {!hasExistingOrder && (

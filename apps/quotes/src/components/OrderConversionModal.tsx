@@ -129,7 +129,10 @@ export function OrderConversionModal({ open, quoteId, status, onClose }: OrderCo
           ? 'Ordine convertito'
           : 'Conversione non completata';
 
+  const orderNumber = result?.order_number ?? status?.order_number ?? null;
   const orderCode = result?.order_code ?? status?.order_code ?? null;
+  const orderId = result?.order_id ?? status?.order_id ?? null;
+  const displayedOrder = orderNumber ?? (orderCode ? orderCode.split('/')[0] : (orderId ?? '—'));
   const hubspotURL = result?.hubspot_deal_url ?? status?.hubspot_deal_url ?? null;
 
   return (
@@ -158,7 +161,20 @@ export function OrderConversionModal({ open, quoteId, status, onClose }: OrderCo
             {status?.converted && (
               <div className={styles.summaryRow}>
                 <span className={styles.summaryLabel}>Ordine</span>
-                <span className={styles.summaryValueMono}>{orderCode ?? status.order_id ?? '—'}</span>
+                <span className={styles.summaryValueMono}>
+                  {status.order_id ? (
+                    <a
+                      href={`/ordini/${status.order_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.orderLink}
+                    >
+                      {displayedOrder}
+                    </a>
+                  ) : (
+                    displayedOrder
+                  )}
+                </span>
               </div>
             )}
             <div className={styles.totalsRow}>
@@ -214,7 +230,20 @@ export function OrderConversionModal({ open, quoteId, status, onClose }: OrderCo
           <div className={styles.successTitle}>Ordine pronto</div>
           <div className={styles.successMeta}>
             <span>Ordine</span>
-            <span className={styles.successQuoteNumber}>{orderCode ?? result?.order_id ?? '—'}</span>
+            <span className={styles.successQuoteNumber}>
+              {orderId ? (
+                <a
+                  href={`/ordini/${orderId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.orderLink}
+                >
+                  {displayedOrder}
+                </a>
+              ) : (
+                displayedOrder
+              )}
+            </span>
           </div>
           <div className={styles.stepList}>
             {visibleStepNames.map((name, index) => {

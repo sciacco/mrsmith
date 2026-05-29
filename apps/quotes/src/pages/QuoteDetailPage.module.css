@@ -75,12 +75,30 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.orderBadge:hover {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--color-bg-elevated);
 }
 
 .orderBadgeWarning {
   border-color: var(--color-warning);
   background: var(--color-warning-subtle);
   color: var(--color-warning-strong);
+}
+
+.orderBadgeWarning:hover {
+  background: var(--color-warning-strong);
+  border-color: var(--color-warning-strong);
+  color: var(--color-bg-elevated);
 }
 
 .dirtyHint {

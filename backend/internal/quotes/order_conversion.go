@@ -35,6 +35,7 @@ type orderConversionStatus struct {
 	Converted      bool    `json:"converted"`
 	OrderID        *int64  `json:"order_id"`
 	OrderCode      *string `json:"order_code"`
+	OrderNumber    *string `json:"order_number"`
 	HubSpotDealID  *string `json:"hubspot_deal_id"`
 	HubSpotDealURL *string `json:"hubspot_deal_url"`
 	Conflict       bool    `json:"conflict,omitempty"`
@@ -45,6 +46,7 @@ type orderConversionResponse struct {
 	Success        bool                  `json:"success"`
 	OrderID        *int64                `json:"order_id,omitempty"`
 	OrderCode      *string               `json:"order_code,omitempty"`
+	OrderNumber    *string               `json:"order_number,omitempty"`
 	HubSpotDealID  *string               `json:"hubspot_deal_id,omitempty"`
 	HubSpotDealURL *string               `json:"hubspot_deal_url,omitempty"`
 	FileID         *string               `json:"file_id,omitempty"`
@@ -165,8 +167,26 @@ func (h *Handler) getOrderConversionStatus(ctx context.Context, quoteID int) (*o
 	if bridge != nil {
 		status.Converted = true
 		status.OrderID = &bridge.VodkaID
-		if code := orderCode(source.CdlanNdoc, source.CdlanAnno); code != "" {
-			status.OrderCode = &code
+		if h.vodkaDB != nil {
+			var cdlanNdoc, cdlanAnno string
+			err := h.vodkaDB.QueryRowContext(ctx, `
+				SELECT cdlan_ndoc, cdlan_anno
+				FROM orders
+				WHERE id = ?
+				LIMIT 1`, bridge.VodkaID).Scan(&cdlanNdoc, &cdlanAnno)
+			if err == nil {
+				status.OrderNumber = &cdlanNdoc
+				code := orderCode(cdlanNdoc, cdlanAnno)
+				status.OrderCode = &code
+			}
+		}
+		if status.OrderNumber == nil && source.DealNumber.Valid {
+			cdlanNdoc, cdlanAnno, err := parseDealOrderCode(source.DealNumber.String)
+			if err == nil {
+				status.OrderNumber = &cdlanNdoc
+				code := orderCode(cdlanNdoc, cdlanAnno)
+				status.OrderCode = &code
+			}
 		}
 		return status, nil
 	}
@@ -181,6 +201,9 @@ func (h *Handler) getOrderConversionStatus(ctx context.Context, quoteID int) (*o
 			if existingID.Valid {
 				status.Conflict = true
 				status.ConflictOrder = &existingID.Int64
+				status.OrderNumber = &cdlanNdoc
+				code := orderCode(cdlanNdoc, cdlanAnno)
+				status.OrderCode = &code
 			}
 		}
 	}
@@ -340,10 +363,12 @@ func (h *Handler) convertQuoteToOrder(ctx context.Context, quoteID int) (*orderC
 	if noteID > 0 {
 		responseNoteID = &noteID
 	}
+	orderNumberValue := cdlanNdoc
 	return &orderConversionResponse{
 		Success:        true,
 		OrderID:        &orderID,
 		OrderCode:      &orderCodeValue,
+		OrderNumber:    &orderNumberValue,
 		HubSpotDealID:  &dealID,
 		HubSpotDealURL: &dealURL,
 		FileID:         responseFileID,
