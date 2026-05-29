@@ -271,6 +271,59 @@ func TestHandleUpdateProductAcceptsBooleanProcResult(t *testing.T) {
 	}
 }
 
+// extended_description is NOT NULL in quote_rows_products and upd_quote_row_product
+// assigns it verbatim, so a null/absent value would raise SQLSTATE 23502. The handler
+// must coalesce it to "" before calling the procedure.
+func TestHandleUpdateProductCoalescesNullExtendedDescription(t *testing.T) {
+	const mode = "update-product-null-desc"
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "explicit null", body: `{"included":true,"quantity":2,"mrc":50,"extended_description":null}`},
+		{name: "absent field", body: `{"included":true,"quantity":2,"mrc":50}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetQuotesHandlerTracker(mode)
+
+			h := &Handler{db: openQuotesHandlerTestDB(t, mode)}
+
+			req := httptest.NewRequest(http.MethodPut, "/quotes/v1/quotes/1494/rows/3934/products/43206", strings.NewReader(tc.body))
+			req.SetPathValue("id", "1494")
+			req.SetPathValue("rowId", "3934")
+			req.SetPathValue("productId", "43206")
+			rec := httptest.NewRecorder()
+
+			h.handleUpdateProduct(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+			}
+
+			tracker := quotesHandlerTrackerForMode(mode)
+			if tracker.procPayload == "" {
+				t.Fatal("expected procedure payload to be captured")
+			}
+
+			var payload map[string]any
+			if err := json.Unmarshal([]byte(tracker.procPayload), &payload); err != nil {
+				t.Fatalf("failed to decode procedure payload: %v", err)
+			}
+
+			desc, ok := payload["extended_description"]
+			if !ok {
+				t.Fatal("expected extended_description in payload")
+			}
+			if desc != "" {
+				t.Fatalf("extended_description = %#v, want empty string", desc)
+			}
+		})
+	}
+}
+
 func openQuotesHandlerTestDB(t *testing.T, mode string) *sql.DB {
 	t.Helper()
 
@@ -431,6 +484,22 @@ func (c *quotesHandlerTestConn) QueryContext(_ context.Context, query string, ar
 			values:  [][]driver.Value{{"TSC-ORDINE"}},
 		}, nil
 	case c.mode == "update-product-success" && strings.Contains(query, "SELECT quotes.upd_quote_row_product($1::json)"):
+		tracker.procPayload = namedString(args[0])
+		return &quotesHandlerTestRows{
+			columns: []string{"upd_quote_row_product"},
+			values:  [][]driver.Value{{true}},
+		}, nil
+	case c.mode == "update-product-null-desc" && strings.Contains(query, "SELECT qr.quote_id FROM quotes.quote_rows_products qrp"):
+		return &quotesHandlerTestRows{
+			columns: []string{"quote_id"},
+			values:  [][]driver.Value{{int64(1494)}},
+		}, nil
+	case c.mode == "update-product-null-desc" && strings.Contains(query, "SELECT COALESCE(q.document_type, '') FROM quotes.quote q"):
+		return &quotesHandlerTestRows{
+			columns: []string{"document_type"},
+			values:  [][]driver.Value{{""}},
+		}, nil
+	case c.mode == "update-product-null-desc" && strings.Contains(query, "SELECT quotes.upd_quote_row_product($1::json)"):
 		tracker.procPayload = namedString(args[0])
 		return &quotesHandlerTestRows{
 			columns: []string{"upd_quote_row_product"},

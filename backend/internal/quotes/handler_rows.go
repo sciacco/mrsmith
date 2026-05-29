@@ -504,6 +504,14 @@ func (h *Handler) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// extended_description is NOT NULL in the DB; the client represents an empty
+	// rich-text field as null. upd_quote_row_product assigns the field verbatim,
+	// so a null/absent value would violate the NOT NULL constraint. Coalesce to ""
+	// (the column's own default).
+	if desc, ok := body["extended_description"]; !ok || desc == nil {
+		body["extended_description"] = ""
+	}
+
 	body["id"] = productID
 
 	payload, err := json.Marshal(body)
