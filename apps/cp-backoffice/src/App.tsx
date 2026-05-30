@@ -2,30 +2,21 @@ import { useRoutes } from 'react-router-dom';
 import {
   APP_ACCESS_ROLES,
   CP_BACKOFFICE_FULL_ACCESS_ROLES,
+  CP_BACKOFFICE_BIOMETRIC_ACCESS_ROLES,
   getAppAccessState,
   hasAnyRole,
 } from '@mrsmith/auth-client';
-import { AccessNotice, AppShell, TabNav } from '@mrsmith/ui';
+import { AccessNotice, AppShell, TabNav, type TabNavItem } from '@mrsmith/ui';
 import { createRoutes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 
-const fullNavItems = [
-  { label: 'Stato Aziende', path: '/stato-aziende' },
-  { label: 'Sezioni CP', path: '/sezioni-cp' },
-  { label: 'Gestione Utenti', path: '/gestione-utenti' },
-  { label: 'Accessi Biometrico', path: '/accessi-biometrico' },
-];
-
-const biometricNavItems = [
-  { label: 'Accessi Biometrico', path: '/accessi-biometrico' },
-];
-
 interface AppRoutesProps {
   canAccessFullBackoffice: boolean;
+  canAccessBiometrics: boolean;
 }
 
-function AppRoutes({ canAccessFullBackoffice }: AppRoutesProps) {
-  const routes = createRoutes(canAccessFullBackoffice);
+function AppRoutes({ canAccessFullBackoffice, canAccessBiometrics }: AppRoutesProps) {
+  const routes = createRoutes(canAccessFullBackoffice, canAccessBiometrics);
   const element = useRoutes(routes);
   return <>{element}</>;
 }
@@ -35,6 +26,7 @@ export function App() {
   const { user, logout } = auth;
   const accessState = getAppAccessState(auth, APP_ACCESS_ROLES['cp-backoffice']);
   const canAccessFullBackoffice = hasAnyRole(user?.roles, CP_BACKOFFICE_FULL_ACCESS_ROLES);
+  const canAccessBiometrics = hasAnyRole(user?.roles, CP_BACKOFFICE_BIOMETRIC_ACCESS_ROLES);
 
   if (accessState !== 'allowed') {
     return (
@@ -46,7 +38,19 @@ export function App() {
     );
   }
 
-  const navItems = canAccessFullBackoffice ? fullNavItems : biometricNavItems;
+  const navItems: TabNavItem[] = [];
+  if (canAccessFullBackoffice) {
+    navItems.push(
+      { label: 'Stato Aziende', path: '/stato-aziende' },
+      { label: 'Sezioni CP', path: '/sezioni-cp' },
+      { label: 'Gestione Utenti', path: '/gestione-utenti' },
+    );
+  }
+  if (canAccessBiometrics) {
+    navItems.push(
+      { label: 'Accessi Biometrico', path: '/accessi-biometrico' },
+    );
+  }
 
   return (
     <AppShell appName="CP Backoffice" userName={user?.name ?? 'John Doe'} onLogout={logout} support={auth}>
@@ -54,7 +58,10 @@ export function App() {
         <TabNav items={navItems} />
       </AppShell.Nav>
       <AppShell.Content>
-        <AppRoutes canAccessFullBackoffice={canAccessFullBackoffice} />
+        <AppRoutes
+          canAccessFullBackoffice={canAccessFullBackoffice}
+          canAccessBiometrics={canAccessBiometrics}
+        />
       </AppShell.Content>
     </AppShell>
   );

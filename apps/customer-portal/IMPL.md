@@ -160,7 +160,7 @@ Checked against:
   - Href: `/apps/cp-backoffice/`
   - Icon: `users`
   - Status: `ready`
-  - Access roles: `CPBackofficeAccessRoles()`
+  - Access roles: `CPBackofficeAppAccessRoles()` for launcher/app visibility; route-specific helpers for full backoffice and biometric workflows.
   - Remove the superseded commented `customer-portal` placeholder entry.
   - Leave the commented `customer-portal-settings` placeholder untouched until a separate spec exists for that distinct app.
   - Add split-server href override in `backend/cmd/server/main.go` to `http://localhost:5187` when `StaticDir == ""`
@@ -350,7 +350,7 @@ Checked against:
 - Runtime and auth checks:
   - `GET /config` bootstrap works in split-server dev on port `5187`.
   - Deep-link refresh works at `/apps/cp-backoffice/` and at nested routes.
-  - All `/api/cp-backoffice/v1/*` routes require `app_cpbackoffice_access`.
+  - Customer/user/admin routes require `app_cpbackoffice_access`; biometric routes require `app_cpbackoffice_biometric_access`.
   - The launcher tile is hidden when Arak or Mistra DB configuration is missing.
   - Browser network traffic shows only local `/api` calls, never direct gateway or DB access.
   - `createAdmin` request assembly sends `skip_keycloak: false` in v1.

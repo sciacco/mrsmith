@@ -640,7 +640,7 @@ Alyante ERP ID
 
 - Context: a user should open an existing mini-app but only operate one route/tab inside it.
 - Discovery: a single `APP_ACCESS_ROLES[app]` value is both the mini-app shell gate and the frontend mirror of launcher visibility, while backend ACL is the real authorization boundary for each API route.
-- Practical rule: put every role that may enter the app in the launcher/app access union, then enforce narrower route/API permissions separately. The frontend should hide or redirect unavailable tabs for UX, but backend handlers must use the precise role helper for each operation.
+- Practical rule: put every role that may enter the app in the launcher/app access union, then enforce narrower route/API permissions separately. The frontend should hide or redirect unavailable tabs for UX, but backend handlers must use the precise role helper for each operation. Do not treat a broad app role as implicitly allowed on a route-scoped workflow when product has split that workflow into a dedicated role; users who need both surfaces should receive both roles.
 - Evidence: CP Backoffice full role `app_cpbackoffice_access`, biometric-only role `app_cpbackoffice_biometric_access`, `backend/internal/cpbackoffice/handler.go`, `backend/internal/platform/applaunch/catalog.go`, `packages/auth-client/src/roles.ts`, and `apps/cp-backoffice/src/App.tsx`.
 - Used by: CP Backoffice biometric-only access.
 - Open questions: none.

@@ -109,13 +109,12 @@ func TestRoutesReturn403WithoutRole(t *testing.T) {
 	}
 }
 
-func TestRoutesReachHandlerWithRole(t *testing.T) {
+func TestFullBackofficeRoleReachesOnlyBackofficeHandlers(t *testing.T) {
 	// With all deps configured, each route is reached past auth gating. The
 	// stub gateway returns 501 for every non-token path; S3 forwards that as
 	// a business error (status 501, error "upstream_error"). The biometric
-	// routes (S4) are wired to the database: with the bare stub driver they
-	// reach dbFailure and surface as 500. Either way, the auth-gating
-	// contract is identical.
+	// routes are intentionally outside the full backoffice role and remain
+	// forbidden unless the caller has app_cpbackoffice_biometric_access.
 	mux := newMux(newTestDeps(t, true, true))
 
 	for _, rc := range registeredRoutes {
@@ -128,6 +127,9 @@ func TestRoutesReachHandlerWithRole(t *testing.T) {
 			want := http.StatusNotImplemented
 			if rc.needsMistra {
 				want = http.StatusInternalServerError
+			}
+			if rc.biometric {
+				want = http.StatusForbidden
 			}
 			if rec.Code != want {
 				t.Fatalf("expected %d, got %d: %s", want, rec.Code, rec.Body.String())
@@ -212,7 +214,11 @@ func TestMissingMistraReturns503ForDatabaseRoutes(t *testing.T) {
 		}
 		t.Run(rc.name, func(t *testing.T) {
 			req := newRouteRequest(rc)
-			req = withRoleClaims(req, "app_cpbackoffice_access")
+			if rc.biometric {
+				req = withRoleClaims(req, "app_cpbackoffice_biometric_access")
+			} else {
+				req = withRoleClaims(req, "app_cpbackoffice_access")
+			}
 			rec := httptest.NewRecorder()
 			mux.ServeHTTP(rec, req)
 

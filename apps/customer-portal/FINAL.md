@@ -154,7 +154,7 @@ Each slice specifies: Objective · Boundary rationale · Owned files · Inputs/d
 - `backend/internal/platform/config/config.go` — add `CPBackofficeAppURL` field + `CP_BACKOFFICE_APP_URL` env; add `http://localhost:5187` to default CORS origins.
 - `backend/.env.example` — add `CP_BACKOFFICE_APP_URL`.
 - `.env.preprod.example` — add `CP_BACKOFFICE_APP_URL`.
-- `backend/internal/platform/applaunch/catalog.go` — add SMART APPS entry: `ID: "cp-backoffice"`, `Href: "/apps/cp-backoffice/"`, `Icon: "users"`, `Status: "ready"`, `AccessRoles: CPBackofficeAccessRoles()`; add id/href constants `CPBackofficeAppID`, `CPBackofficeAppHref`, role helper `CPBackofficeAccessRoles()`; **remove** the superseded commented `customer-portal` placeholder (catalog.go:242-250); **leave the commented `customer-portal-settings` placeholder untouched** (catalog.go:280-288).
+- `backend/internal/platform/applaunch/catalog.go` — add SMART APPS entry: `ID: "cp-backoffice"`, `Href: "/apps/cp-backoffice/"`, `Icon: "users"`, `Status: "ready"`, `AccessRoles: CPBackofficeAppAccessRoles()`; add id/href constants `CPBackofficeAppID`, `CPBackofficeAppHref`, route-specific role helpers, and app access role helper; **remove** the superseded commented `customer-portal` placeholder (catalog.go:242-250); **leave the commented `customer-portal-settings` placeholder untouched** (catalog.go:280-288).
 - `backend/cmd/server/main.go` — split-server href override to `http://localhost:5187` when `StaticDir == ""`; reserve the `cpbackoffice.RegisterRoutes(...)` mount call for S2; launcher visibility gate: include only when `arakCli != nil` and `cfg.MistraDSN != ""`.
 - `deploy/Dockerfile` — `COPY --from=frontend /app/apps/cp-backoffice/dist /static/apps/cp-backoffice`.
 
@@ -283,7 +283,7 @@ type Deps struct {
 ```
 Helpers `requireArak(d Deps) bool`, `requireMistra(d Deps) bool`, `dbFailure(w, r, err, op string)` — no package-global state.
 
-**Endpoints registered** (bodies stubbed; real behavior lands in S3/S4). All gated by `app_cpbackoffice_access`:
+**Endpoints registered** (bodies stubbed; real behavior lands in S3/S4). Customer/user/admin routes are gated by `app_cpbackoffice_access`; biometric routes are gated by `app_cpbackoffice_biometric_access`:
 - `GET    /api/cp-backoffice/v1/customers`
 - `GET    /api/cp-backoffice/v1/customer-states`
 - `PUT    /api/cp-backoffice/v1/customers/{id}/state`
@@ -302,7 +302,7 @@ Helpers `requireArak(d Deps) bool`, `requireMistra(d Deps) bool`, `dbFailure(w, 
 5. Ensure no browser-facing endpoint bypasses auth middleware.
 
 **Acceptance criteria**:
-- All seven routes return `401` without auth and `403` without `app_cpbackoffice_access`.
+- All routes return `401` without auth and `403` without the route-specific required role.
 - Missing Arak → `503` for Arak routes; missing Mistra → `503` for DB routes. Launcher tile hidden via S0 gate under these conditions.
 - Internal 5xx responses use `httputil.InternalError` (signature: `func InternalError(w, r, err, message, attrs...)`); server logs keep the real cause.
 
@@ -318,7 +318,7 @@ Helpers `requireArak(d Deps) bool`, `requireMistra(d Deps) bool`, `dbFailure(w, 
 - [ ] Package path `backend/internal/cpbackoffice/`.
 - [ ] `Deps` carries `Arak *arak.Client` and `Mistra *sql.DB`.
 - [ ] Helpers named exactly `requireArak`, `requireMistra`, `dbFailure`; no package globals.
-- [ ] All routes under `/api/cp-backoffice/v1/` and require `app_cpbackoffice_access`.
+- [ ] All routes under `/api/cp-backoffice/v1/` require the correct route-specific role.
 - [ ] Stubs use `httputil.InternalError` with `component="cpbackoffice"` and `operation`.
 - [ ] `BiometricRequestRow` keys/types match the lock exactly.
 - [ ] No anonymous pass-through maps where a typed struct applies.
@@ -677,12 +677,12 @@ Confirm each has survived intact — both the locked value and the rationale.
 - [ ] API prefix `/api/cp-backoffice/v1/`.
 - [ ] Backend package `backend/internal/cpbackoffice/`; mounted via `cpbackoffice.RegisterRoutes(...)` from `backend/cmd/server/main.go`.
 - [ ] `Deps{Arak *arak.Client; Mistra *sql.DB}`; helpers `requireArak`, `requireMistra`, `dbFailure`.
-- [ ] Role `app_cpbackoffice_access`.
+- [ ] Roles `app_cpbackoffice_access` for full backoffice routes and `app_cpbackoffice_biometric_access` for biometric routes.
 - [ ] Vite port `5187`; proxy `/api` + `/config` to `process.env.VITE_DEV_BACKEND_URL || http://localhost:8080`.
 - [ ] CORS default origins include `http://localhost:5187`.
 - [ ] Root `package.json` adds `dev:cp-backoffice`; concurrently `--names`, `--prefix-colors`, filter list grew in lockstep.
 - [ ] `Makefile` has `dev-cp-backoffice` in `.PHONY`.
-- [ ] Catalog entry: id `cp-backoffice`, href `/apps/cp-backoffice/`, icon `users`, status `ready`, access roles `CPBackofficeAccessRoles()`.
+- [ ] Catalog entry: id `cp-backoffice`, href `/apps/cp-backoffice/`, icon `users`, status `ready`, access roles `CPBackofficeAppAccessRoles()`.
 - [ ] Superseded `customer-portal` placeholder removed; `customer-portal-settings` placeholder **left untouched**.
 - [ ] Split-server href override to `http://localhost:5187` when `StaticDir == ""`.
 - [ ] `deploy/Dockerfile` contains `COPY --from=frontend /app/apps/cp-backoffice/dist /static/apps/cp-backoffice`.
@@ -718,7 +718,7 @@ Confirm each has survived intact — both the locked value and the rationale.
 - [ ] Backend biometric completion mutation test with `bigint + boolean`.
 - [ ] No broad snapshot or copy-only tests added.
 - [ ] Manual review artifacts delivered: populated state for all three routes, empty and no-selection state, upstream error state, modal-open state, inline row-edit state for biometric requests, narrow viewport state.
-- [ ] Runtime/auth checks: `/config` bootstrap works in split-server dev on `5187`; deep-link refresh at `/apps/cp-backoffice/` and nested routes; all `/api/cp-backoffice/v1/*` require `app_cpbackoffice_access`; launcher tile hidden when Arak or Mistra DB config missing; browser traffic stays on local `/api`; `createAdmin` sends `skip_keycloak: false`; internal failures use `httputil.InternalError` with `component="cpbackoffice"` in server logs.
+- [ ] Runtime/auth checks: `/config` bootstrap works in split-server dev on `5187`; deep-link refresh at `/apps/cp-backoffice/` and nested routes; all `/api/cp-backoffice/v1/*` require their route-specific role; launcher tile hidden when Arak or Mistra DB config missing; browser traffic stays on local `/api`; `createAdmin` sends `skip_keycloak: false`; internal failures use `httputil.InternalError` with `component="cpbackoffice"` in server logs.
 
 ### 10.7 Rationale Survived Decomposition
 - [ ] Comparable-app anchors cited at review time (budget, listini, compliance) with rejected pattern (reports/OrdiniPage) acknowledged.
@@ -749,7 +749,7 @@ How to verify the integrated work before signoff:
    - `make dev-cp-backoffice` serves the app on `5187`; `make dev` runs it alongside backend + other apps.
    - Browser hits `/apps/cp-backoffice/` via the backend; `/config` bootstrap returns the launcher entry; deep-link refresh works at root and on all three nested routes.
 2. **Auth**:
-   - Without `app_cpbackoffice_access`, all `/api/cp-backoffice/v1/*` routes return `403`. With the role, `200/400/503` as expected per dep availability.
+   - Without the required route-specific role, `/api/cp-backoffice/v1/*` routes return `403`. With the route role, `200/400/503` as expected per dep availability.
 3. **Launcher visibility**:
    - Remove either `ARAK_BASE_URL` or `MISTRA_DSN` → launcher tile disappears. Routes still return `503` if called directly.
 4. **Contract checks (via browser devtools)**:

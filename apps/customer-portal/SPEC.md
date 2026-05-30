@@ -211,7 +211,7 @@ Following `docs/API-CONVENTIONS.md` §"Namespacing": `/api/<app-prefix>/v1/...`.
 | GET | `/api/cp-backoffice/v1/biometric-requests` | Mistra PostgreSQL (same SELECT as source) | — → `{ items: BiometricRequestRow[] }` |
 | POST | `/api/cp-backoffice/v1/biometric-requests/{id}/completion` | Mistra PostgreSQL direct `UPDATE customers.biometric_request` | `{ completed: bool|null }` → `{ ok: true }` |
 
-Customer/user/admin routes are gated by `app_cpbackoffice_access`; biometric routes accept either `app_cpbackoffice_access` or `app_cpbackoffice_biometric_access`. Frontend calls go through `@mrsmith/api-client` with `baseUrl: '/api'` (same-origin); auth bootstrap from `GET /config`; Vite proxies both `/api` and `/config` during dev.
+Customer/user/admin routes are gated by `app_cpbackoffice_access`; biometric routes are gated by the separate `app_cpbackoffice_biometric_access` role. The launcher/app access role set includes both roles, but route-level access remains split. Frontend calls go through `@mrsmith/api-client` with `baseUrl: '/api'` (same-origin); auth bootstrap from `GET /config`; Vite proxies both `/api` and `/config` during dev.
 
 Non-negotiable shapes under 1:1:
 - `BiometricRequestRow` keys and types exactly as in Phase A.
@@ -229,10 +229,10 @@ Non-negotiable shapes under 1:1:
   - New app must follow the New App Checklist in `CLAUDE.md`. With slug `cp-backoffice`, that expands to:
     - `package.json` (root): add `dev:cp-backoffice` script and a `cp-backoffice` entry in the `dev` concurrently command (name + color + filter).
     - `Makefile`: add `dev-cp-backoffice` target and append it to `.PHONY`.
-    - `backend/internal/platform/applaunch/catalog.go`: add `CPBackofficeAppID`, `CPBackofficeAppHref`, `CPBackofficeAccessRoles()`, and the catalog entry (category `SMART APPS` — matches the commented placeholder at line 243). Remove the superseded commented `customer-portal` placeholder; leave the distinct commented `customer-portal-settings` placeholder untouched until a separate spec exists for that app.
+    - `backend/internal/platform/applaunch/catalog.go`: add `CPBackofficeAppID`, `CPBackofficeAppHref`, route-specific role helpers, `CPBackofficeAppAccessRoles()`, and the catalog entry (category `SMART APPS` — matches the commented placeholder at line 243). Remove the superseded commented `customer-portal` placeholder; leave the distinct commented `customer-portal-settings` placeholder untouched until a separate spec exists for that app.
     - `backend/cmd/server/main.go`: add the package import, a `hrefOverrides["cp-backoffice"]` dev-port mapping, the catalog filter condition, and a `RegisterRoutes` call for the new handler.
     - `backend/internal/platform/config/config.go`: add `CPBackofficeAppURL` field + `CP_BACKOFFICE_APP_URL` env var.
-  - Keycloak access role: `app_cpbackoffice_access`.
+  - Keycloak access roles: `app_cpbackoffice_access` for full backoffice routes; `app_cpbackoffice_biometric_access` for biometric routes.
 - **UX or accessibility expectations**:
   - Italian copy preserved verbatim, including weak column labels on Accessi Biometrico (`nome`, `cognome`, …) — relabeling is a deliberate post-migration decision.
   - Date rendering is `toLocaleString()` (browser locale) — preserved.
@@ -252,6 +252,6 @@ None that block implementation planning.
   - Reuse the existing `platform/arak` client for Mistra NG auth.
   - `Nuovo Admin` button is disabled until a customer is selected.
   - Hidden `skip_keycloak` switch omitted in v1; `createAdmin` requests pin `skip_keycloak=false`.
-  - Slug `cp-backoffice`, Keycloak role `app_cpbackoffice_access`.
+  - Slug `cp-backoffice`, Keycloak roles `app_cpbackoffice_access` and `app_cpbackoffice_biometric_access`.
 - **What still needs validation**:
   - None for spec purposes. Implementation-time details (backend package layout, frontend routing library, shared UI components from `@mrsmith/ui`) are handed to `portal-miniapp-generator`.
