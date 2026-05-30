@@ -114,6 +114,13 @@
   align-items: start;
 }
 
+.split > :last-child {
+  position: sticky;
+  top: 92px;
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+}
+
 .tableWrap {
   overflow-x: auto;
   border: 1px solid var(--color-border);
@@ -134,6 +141,14 @@
   border-bottom: 1px solid var(--color-border-subtle);
   text-align: left;
   vertical-align: top;
+}
+
+.table th:last-child,
+.table td:last-child {
+  text-align: right;
+  width: 140px;
+  min-width: 140px;
+  padding-right: var(--space-5) !important;
 }
 
 .table th {
@@ -158,11 +173,71 @@
   cursor: pointer;
 }
 
+.accentHeader {
+  width: 4px;
+  padding: 0 !important;
+}
+
+.accentCell {
+  width: 4px;
+  padding: 0 !important;
+  vertical-align: middle !important;
+  position: relative;
+}
+
+.accentBar {
+  width: 4px;
+  height: 0;
+  border-radius: 4px;
+  background: var(--color-accent);
+  margin: 0 auto;
+  transition:
+    height var(--duration-normal) var(--ease-spring),
+    box-shadow var(--duration-normal) var(--ease-spring);
+}
+
+.table tbody tr:hover .accentBar {
+  height: 20px;
+}
+
+.selectedRow .accentBar {
+  height: 28px !important;
+  box-shadow: 0 0 8px var(--color-accent-glow);
+}
+
 .actions {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
+  gap: var(--space-1);
+  justify-content: flex-end;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.actions button {
+  width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: var(--radius-full) !important;
+}
+
+.table tbody tr:hover .actions,
+.selectedRow .actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.deleteBtn {
+  color: var(--color-danger);
+}
+
+.deleteBtn:hover {
+  background: var(--color-danger-subtle) !important;
 }
 
 .cellActions {
@@ -305,6 +380,172 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
   gap: var(--space-2);
+}
+
+.mapGridCompact {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.mapTile {
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-md);
+  position: relative;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) var(--ease-spring), border-color var(--duration-fast) var(--ease-out);
+  border: 1.5px solid transparent;
+}
+
+.mapTile:hover {
+  transform: scale(1.12);
+  z-index: 10;
+  box-shadow: var(--shadow-md);
+}
+
+/* Status colors for tiles */
+.mapTile.free {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+}
+
+.mapTile.occupied {
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-hover) 100%);
+  box-shadow: 0 2px 6px rgba(99, 91, 255, 0.2);
+}
+
+.mapTile.reserved {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.2);
+}
+
+/* Hover effects */
+.mapTile.free:hover {
+  border-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4), 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.mapTile.occupied:hover {
+  border-color: rgba(99, 91, 255, 0.6);
+  box-shadow: 0 4px 12px rgba(99, 91, 255, 0.4), 0 0 0 3px rgba(99, 91, 255, 0.15);
+}
+
+.mapTile.reserved:hover {
+  border-color: rgba(245, 158, 11, 0.6);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4), 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+/* Telemetry Info Bar (Mini Inspector) Loro Stripe-Level */
+.telemetryBar {
+  min-height: 4.8rem;
+  height: 4.8rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  position: relative;
+  overflow: hidden;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+  margin-top: var(--space-3);
+}
+
+.telemetryActive {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.telemetryStatus {
+  width: 4px;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.telemetryStatus.free {
+  background: var(--color-success);
+}
+
+.telemetryStatus.occupied {
+  background: var(--color-accent);
+}
+
+.telemetryStatus.reserved {
+  background: var(--color-warning);
+}
+
+.telemetryContent {
+  flex: 1;
+  display: grid;
+  gap: 1px;
+}
+
+.telemetryHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.telemetryLabel {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.telemetryBadge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.telemetryBadge.free {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.telemetryBadge.occupied {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.telemetryBadge.reserved {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
+.telemetryTitle {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+  text-align: left;
+}
+
+.telemetrySubtitle {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-align: left;
+}
+
+.telemetryPlaceholder {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  width: 100%;
 }
 
 .mapCell,

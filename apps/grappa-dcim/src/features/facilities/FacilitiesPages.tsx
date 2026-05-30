@@ -123,6 +123,7 @@ export function BuildingsPage() {
           <table className={styles.table}>
             <thead>
               <tr>
+                <th className={styles.accentHeader}></th>
                 <th>Edificio</th>
                 <th>Indirizzo</th>
                 <th>Stato</th>
@@ -135,6 +136,9 @@ export function BuildingsPage() {
             <tbody>
               {query.data?.map((item) => (
                 <tr key={item.id}>
+                  <td className={styles.accentCell}>
+                    <div className={styles.accentBar} />
+                  </td>
                   <td><strong>{item.name}</strong></td>
                   <td>{item.address}</td>
                   <td><StatusBadge value={item.status} /></td>
@@ -143,25 +147,33 @@ export function BuildingsPage() {
                   <td>{item.rackCount} / {item.rackCapacity}</td>
                   <td>
                     <div className={styles.actions}>
-                      {canOperate ? <Button size="sm" variant="secondary" onClick={() => setEditing(item)}>Modifica</Button> : null}
                       {canOperate ? (
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => setCeasing(item)}
-                          disabled={item.status === 'Cessato' || item.datacenterCount > 0 || item.rackCount > 0}
-                        >
-                          Cessa
+                        <Button size="sm" variant="ghost" onClick={() => setEditing(item)} title="Modifica">
+                          <Icon name="pencil" size={16} />
                         </Button>
                       ) : null}
                       {canOperate ? (
                         <Button
                           size="sm"
-                          variant="danger"
+                          variant="ghost"
+                          onClick={() => setCeasing(item)}
+                          disabled={item.status === 'Cessato' || item.datacenterCount > 0 || item.rackCount > 0}
+                          title="Cessa"
+                          style={{ color: 'var(--color-warning-strong)' }}
+                        >
+                          <Icon name="archive" size={16} />
+                        </Button>
+                      ) : null}
+                      {canOperate ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className={styles.deleteBtn}
                           onClick={() => setDeleting(item)}
                           disabled={item.datacenterCount > 0 || item.rackCount > 0}
+                          title="Elimina"
                         >
-                          Elimina
+                          <Icon name="trash" size={16} />
                         </Button>
                       ) : null}
                     </div>
@@ -311,11 +323,22 @@ export function DatacentersPage() {
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr><th>Nome</th><th>Tipo</th><th>Edificio</th><th>Stato</th><th>Rack</th><th>Azioni</th></tr>
+                <tr>
+                  <th className={styles.accentHeader}></th>
+                  <th>Nome</th>
+                  <th>Tipo</th>
+                  <th>Edificio</th>
+                  <th>Stato</th>
+                  <th>Rack</th>
+                  <th>Azioni</th>
+                </tr>
               </thead>
               <tbody>
                 {filteredDatacenters.map((item) => (
                   <tr key={item.id} className={`${styles.clickable} ${selected?.id === item.id ? styles.selectedRow : ''}`} onClick={() => navigate(`/sale-mmr/${item.id}`)}>
+                    <td className={styles.accentCell}>
+                      <div className={styles.accentBar} />
+                    </td>
                     <td><strong>{item.name}</strong><br /><span className={styles.muted}>{item.floor ? `Piano ${item.floor}` : item.address}</span></td>
                     <td>{item.isMmr ? <span className={styles.badge}>MMR {item.mmrType ?? ''}</span> : <span className={styles.badgeMuted}>Sala</span>}</td>
                     <td>{item.buildingName ?? '-'}</td>
@@ -323,9 +346,47 @@ export function DatacentersPage() {
                     <td>{item.rackCount} / {item.rackCapacity}</td>
                     <td>
                       <div className={styles.actions}>
-                        {canOperate ? <Button size="sm" variant="secondary" onClick={(event) => { event.stopPropagation(); setEditing(item); }}>Modifica</Button> : null}
-                        {canOperate ? <Button size="sm" variant="danger" onClick={(event) => { event.stopPropagation(); setCeasing(item); }}>Cessa</Button> : null}
-                        {canOperate ? <Button size="sm" variant="danger" onClick={(event) => { event.stopPropagation(); setDeleting(item); }}>Elimina</Button> : null}
+                        {canOperate ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setEditing(item);
+                            }}
+                            title="Modifica"
+                          >
+                            <Icon name="pencil" size={16} />
+                          </Button>
+                        ) : null}
+                        {canOperate ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setCeasing(item);
+                            }}
+                            title="Cessa"
+                            style={{ color: 'var(--color-warning-strong)' }}
+                          >
+                            <Icon name="archive" size={16} />
+                          </Button>
+                        ) : null}
+                        {canOperate ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className={styles.deleteBtn}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setDeleting(item);
+                            }}
+                            title="Elimina"
+                          >
+                            <Icon name="trash" size={16} />
+                          </Button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -837,8 +898,13 @@ function normalizePositionStatusClass(status: string) {
 }
 
 function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; loading: boolean; error: unknown }) {
+  const [hovered, setHovered] = useState<Position | null>(null);
+
   if (loading) return <div className={styles.panel}><Skeleton rows={8} /></div>;
   if (error || !data) return <div className={styles.emptyPanel}><h3 className={styles.emptyTitle}>Mappa non disponibile</h3><p className={styles.emptyText}>Seleziona una sala per visualizzare il layout.</p></div>;
+
+  const hasHovered = hovered !== null;
+
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
@@ -848,15 +914,48 @@ function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; lo
         </div>
         <span className={styles.badgeMuted}>{data.racks.length} rack</span>
       </div>
-      <div className={styles.mapGrid}>
+
+      <div className={`${styles.telemetryBar} ${hasHovered ? styles.telemetryActive : ''}`}>
+        {hasHovered ? (
+          <>
+            <div className={`${styles.telemetryStatus} ${styles[hovered.status] || ''}`} />
+            <div className={styles.telemetryContent}>
+              <div className={styles.telemetryHeaderRow}>
+                <span className={styles.telemetryLabel}>Posizione {String(hovered.num).padStart(2, '0')}</span>
+                <span className={`${styles.telemetryBadge} ${styles[hovered.status] || ''}`}>
+                  {positionStatusLabel(hovered.status)}
+                </span>
+              </div>
+              <strong className={styles.telemetryTitle}>
+                {hovered.rackName ?? 'Posizione vuota'}
+              </strong>
+              <span className={styles.telemetrySubtitle}>
+                {hovered.rackType === 'Half' && hovered.rackPos === 'A'
+                  ? 'Posizione alta (Half)'
+                  : hovered.rackType === 'Half' && hovered.rackPos === 'B'
+                  ? 'Posizione bassa (Half)'
+                  : hovered.type}
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className={styles.telemetryPlaceholder}>
+            <Icon name="info" size={16} />
+            <span>Passa il mouse su una posizione per ispezionare il rack</span>
+          </div>
+        )}
+      </div>
+
+      <div className={styles.mapGridCompact}>
         {data.positions.length === 0 ? (
           <p className={styles.emptyText}>Nessuna posizione configurata.</p>
         ) : data.positions.map((position) => (
-          <div key={position.id} className={`${styles.mapCell} ${position.status === 'occupied' ? styles.occupied : position.status === 'reserved' ? styles.reserved : styles.free}`}>
-            <strong>{position.num}</strong>
-            <span>{position.rackName ?? positionStatusLabel(position.status)}</span>
-            <small>{position.rackType === 'Half' && position.rackPos === 'A' ? 'posizione alta' : position.rackType === 'Half' && position.rackPos === 'B' ? 'posizione bassa' : position.type}</small>
-          </div>
+          <div
+            key={position.id}
+            className={`${styles.mapTile} ${styles[position.status] || ''}`}
+            onMouseEnter={() => setHovered(position)}
+            onMouseLeave={() => setHovered(null)}
+          />
         ))}
       </div>
     </div>
