@@ -25,6 +25,7 @@ type Deps struct {
 	Arak    *arak.Client
 	HubSpot *hubspot.Client
 	Logger  *slog.Logger
+	AppURLs *applaunch.URLResolver
 }
 
 type Handler struct {

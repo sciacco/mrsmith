@@ -145,9 +145,9 @@ export function QuoteDetailPage() {
   const conversionBlocked = isDirty || conversionStatusBlocked || !!orderConversion?.conflict;
   const isRepublish = !!hsStatus?.hs_quote_id;
   const hasExistingOrder = !!orderConversion?.converted || !!orderConversion?.conflict;
-  const existingOrderId = orderConversion?.converted
-    ? orderConversion.order_id
-    : orderConversion?.conflict_order_id ?? null;
+  const existingOrderUrl = orderConversion?.converted
+    ? orderConversion.order_url
+    : orderConversion?.conflict_order_url ?? null;
   const existingOrderNumber = orderConversion?.order_number || null;
   const existingOrderLabel = existingOrderNumber
     ? `Ordine ${existingOrderNumber}`
@@ -227,9 +227,9 @@ export function QuoteDetailPage() {
           <div className={styles.actionBarSpacer} />
 
           {hasExistingOrder && (
-            existingOrderId ? (
+            existingOrderUrl ? (
               <a
-                href={`/ordini/${existingOrderId}`}
+                href={existingOrderUrl}
                 className={`${styles.orderBadge} ${orderConversion?.conflict ? styles.orderBadgeWarning : ''}`}
                 title={orderConversion?.conflict ? 'Ordine presente in Vodka senza collegamento alla proposta. Clicca per visualizzare.' : 'Visualizza l\'ordine'}
               >

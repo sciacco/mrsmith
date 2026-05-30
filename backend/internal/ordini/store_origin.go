@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 )
 
 func (h *Handler) loadOrigin(r *http.Request, orderID int64) (*OrderOrigin, error) {
@@ -30,7 +32,7 @@ LIMIT 1`, orderID).Scan(&quoteID)
 	origin := &OrderOrigin{
 		Type:     "quote",
 		QuoteID:  quoteID,
-		QuoteURL: "/apps/quotes/quotes/" + strconv.FormatInt(quoteID, 10),
+		QuoteURL: h.deps.AppURLs.Link(applaunch.QuotesAppID, "quotes/"+strconv.FormatInt(quoteID, 10)),
 	}
 	var quoteCode sql.NullString
 	err = h.deps.Mistra.QueryRowContext(r.Context(), `

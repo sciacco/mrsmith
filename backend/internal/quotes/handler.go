@@ -20,6 +20,7 @@ type Deps struct {
 	HubSpot *hubspot.Client
 	Arak    *arak.Client
 	Logger  *slog.Logger
+	AppURLs *applaunch.URLResolver
 }
 
 // Handler holds dependencies for all quotes endpoints.
@@ -30,6 +31,7 @@ type Handler struct {
 	hs        *hubspot.Client // HubSpot API client (optional)
 	arak      *arak.Client    // Mistra NG/gw-int API client (optional)
 	logger    *slog.Logger
+	appURLs   *applaunch.URLResolver // cross-app deep-link builder
 }
 
 // RegisterRoutes mounts all quotes endpoints on the given mux.
@@ -41,6 +43,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		hs:        deps.HubSpot,
 		arak:      deps.Arak,
 		logger:    deps.Logger,
+		appURLs:   deps.AppURLs,
 	}
 	protect := acl.RequireRole(applaunch.QuotesAccessRoles()...)
 	handle := func(pattern string, handler http.HandlerFunc) {

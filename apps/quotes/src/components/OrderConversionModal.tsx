@@ -132,6 +132,7 @@ export function OrderConversionModal({ open, quoteId, status, onClose }: OrderCo
   const orderNumber = result?.order_number ?? status?.order_number ?? null;
   const orderCode = result?.order_code ?? status?.order_code ?? null;
   const orderId = result?.order_id ?? status?.order_id ?? null;
+  const orderUrl = result?.order_url ?? status?.order_url ?? null;
   const displayedOrder = orderNumber ?? (orderCode ? orderCode.split('/')[0] : (orderId ?? '—'));
   const hubspotURL = result?.hubspot_deal_url ?? status?.hubspot_deal_url ?? null;
 
@@ -162,9 +163,9 @@ export function OrderConversionModal({ open, quoteId, status, onClose }: OrderCo
               <div className={styles.summaryRow}>
                 <span className={styles.summaryLabel}>Ordine</span>
                 <span className={styles.summaryValueMono}>
-                  {status.order_id ? (
+                  {orderUrl ? (
                     <a
-                      href={`/ordini/${status.order_id}`}
+                      href={orderUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={styles.orderLink}
@@ -231,9 +232,9 @@ export function OrderConversionModal({ open, quoteId, status, onClose }: OrderCo
           <div className={styles.successMeta}>
             <span>Ordine</span>
             <span className={styles.successQuoteNumber}>
-              {orderId ? (
+              {orderUrl ? (
                 <a
-                  href={`/ordini/${orderId}`}
+                  href={orderUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.orderLink}

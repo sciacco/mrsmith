@@ -1036,7 +1036,7 @@ func TestOriginResolver(t *testing.T) {
 			}
 		},
 	}
-	h := &Handler{deps: Deps{Mistra: openOrdiniTestDB(t, state)}, logger: logging.NewWithWriter(io.Discard, "debug")}
+	h := &Handler{deps: Deps{Mistra: openOrdiniTestDB(t, state), AppURLs: applaunch.NewURLResolver(nil)}, logger: logging.NewWithWriter(io.Discard, "debug")}
 	origin, err := h.loadOrigin(requestWithRoles(http.MethodGet, "/ordini/v1/orders/1", nil, false), 1)
 	if err != nil {
 		t.Fatalf("loadOrigin() error = %v", err)

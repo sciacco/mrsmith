@@ -434,6 +434,9 @@ func main() {
 		hrefOverrides[applaunch.AFCToolsAppID] = "http://localhost:5186"
 	}
 	appCatalog := applaunch.Catalog(hrefOverrides)
+	// Single source of truth for cross-app deep links (dev port / prod /apps path
+	// already resolved via hrefOverrides). Injected into modules that link out.
+	appURLs := applaunch.NewURLResolver(hrefOverrides)
 	{
 		filtered := make([]applaunch.Definition, 0, len(appCatalog))
 		for _, definition := range appCatalog {
@@ -547,6 +550,7 @@ func main() {
 		HubSpot: hubspotCli,
 		Arak:    arakCli,
 		Logger:  logger,
+		AppURLs: appURLs,
 	})
 	ordini.RegisterRoutes(api, ordini.Deps{
 		Vodka:   vodkaDB,
@@ -555,16 +559,16 @@ func main() {
 		Arak:    arakCli,
 		HubSpot: hubspotCli,
 		Logger:  logger,
+		AppURLs: appURLs,
 	})
 	rdf.RegisterRoutes(api, rdf.Deps{
-		AnisettaDB:                 anisettaDB,
-		MistraDB:                   mistraDB,
-		AI:                         openrouterCli,
-		Logger:                     logger,
-		Notifier:                   notificationNotifier,
-		RoleResolver:               keycloakRoleResolver,
-		RichiesteFattibilitaAppURL: cfg.RichiesteFattibilitaAppURL,
-		StaticDir:                  cfg.StaticDir,
+		AnisettaDB:   anisettaDB,
+		MistraDB:     mistraDB,
+		AI:           openrouterCli,
+		Logger:       logger,
+		Notifier:     notificationNotifier,
+		RoleResolver: keycloakRoleResolver,
+		AppURLs:      appURLs,
 	})
 	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)

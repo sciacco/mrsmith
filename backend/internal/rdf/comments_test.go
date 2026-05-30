@@ -13,6 +13,7 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/notifications"
+	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/keycloak"
 )
 
@@ -157,8 +158,10 @@ func TestNotifyRDFRichiestaCreatedNotifiesManagersWithEmailPolicy(t *testing.T) 
 	dealID := int64(12345)
 	notifier := &fakeRDFNotifier{}
 	h := &Handler{
-		notifier:                   notifier,
-		richiesteFattibilitaAppURL: "https://portal.example/apps/richieste-fattibilita/",
+		notifier: notifier,
+		appURLs: applaunch.NewURLResolver(map[string]string{
+			applaunch.RichiesteFattibilitaAppID: "https://portal.example/apps/richieste-fattibilita/",
+		}),
 		roleResolver: &fakeRDFRoleResolver{usersByRole: map[string][]keycloak.User{
 			"app_rdf_manager": {
 				{ID: "creator-subject", Email: "creator@example.com", Name: "Creator Manager"},

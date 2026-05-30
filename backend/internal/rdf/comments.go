@@ -721,14 +721,7 @@ func truncateForNotificationMetadata(value string, limit int) string {
 
 func (h *Handler) rdfRichiestaDeepLink(id int) string {
 	escapedID := url.PathEscape(strconv.Itoa(id))
-	appURL := strings.TrimRight(strings.TrimSpace(h.richiesteFattibilitaAppURL), "/")
-	if appURL != "" {
-		return appURL + "/richieste/" + escapedID + "/view"
-	}
-	if strings.TrimSpace(h.staticDir) == "" {
-		return "http://localhost:5182/richieste/" + escapedID + "/view"
-	}
-	return "/apps/richieste-fattibilita/richieste/" + escapedID + "/view"
+	return h.appURLs.Link(applaunch.RichiesteFattibilitaAppID, "richieste/"+escapedID+"/view")
 }
 
 func rdfAuthorFromContext(ctx context.Context) rdfUserRef {

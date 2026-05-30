@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
@@ -32,19 +33,22 @@ type orderConversionStep struct {
 }
 
 type orderConversionStatus struct {
-	Converted      bool    `json:"converted"`
-	OrderID        *int64  `json:"order_id"`
-	OrderCode      *string `json:"order_code"`
-	OrderNumber    *string `json:"order_number"`
-	HubSpotDealID  *string `json:"hubspot_deal_id"`
-	HubSpotDealURL *string `json:"hubspot_deal_url"`
-	Conflict       bool    `json:"conflict,omitempty"`
-	ConflictOrder  *int64  `json:"conflict_order_id,omitempty"`
+	Converted        bool    `json:"converted"`
+	OrderID          *int64  `json:"order_id"`
+	OrderURL         *string `json:"order_url"`
+	OrderCode        *string `json:"order_code"`
+	OrderNumber      *string `json:"order_number"`
+	HubSpotDealID    *string `json:"hubspot_deal_id"`
+	HubSpotDealURL   *string `json:"hubspot_deal_url"`
+	Conflict         bool    `json:"conflict,omitempty"`
+	ConflictOrder    *int64  `json:"conflict_order_id,omitempty"`
+	ConflictOrderURL *string `json:"conflict_order_url,omitempty"`
 }
 
 type orderConversionResponse struct {
 	Success        bool                  `json:"success"`
 	OrderID        *int64                `json:"order_id,omitempty"`
+	OrderURL       *string               `json:"order_url,omitempty"`
 	OrderCode      *string               `json:"order_code,omitempty"`
 	OrderNumber    *string               `json:"order_number,omitempty"`
 	HubSpotDealID  *string               `json:"hubspot_deal_id,omitempty"`
@@ -72,6 +76,13 @@ type conversionRequestError struct {
 }
 
 func (e *conversionRequestError) Error() string { return e.code }
+
+// orderDetailURL builds an environment-aware deep link to the order's detail
+// page in the Ordini app (e.g. /apps/ordini/ordini/123 in prod,
+// http://localhost:5192/ordini/123 in split-server dev).
+func (h *Handler) orderDetailURL(orderID int64) string {
+	return h.appURLs.Link(applaunch.OrdiniAppID, "ordini/"+strconv.FormatInt(orderID, 10))
+}
 
 func (h *Handler) handleGetOrderConversion(w http.ResponseWriter, r *http.Request) {
 	if !h.requireDB(w) {
@@ -167,6 +178,8 @@ func (h *Handler) getOrderConversionStatus(ctx context.Context, quoteID int) (*o
 	if bridge != nil {
 		status.Converted = true
 		status.OrderID = &bridge.VodkaID
+		u := h.orderDetailURL(bridge.VodkaID)
+		status.OrderURL = &u
 		if h.vodkaDB != nil {
 			var cdlanNdoc, cdlanAnno string
 			err := h.vodkaDB.QueryRowContext(ctx, `
@@ -201,6 +214,8 @@ func (h *Handler) getOrderConversionStatus(ctx context.Context, quoteID int) (*o
 			if existingID.Valid {
 				status.Conflict = true
 				status.ConflictOrder = &existingID.Int64
+				u := h.orderDetailURL(existingID.Int64)
+				status.ConflictOrderURL = &u
 				status.OrderNumber = &cdlanNdoc
 				code := orderCode(cdlanNdoc, cdlanAnno)
 				status.OrderCode = &code
@@ -364,9 +379,11 @@ func (h *Handler) convertQuoteToOrder(ctx context.Context, quoteID int) (*orderC
 		responseNoteID = &noteID
 	}
 	orderNumberValue := cdlanNdoc
+	orderURLValue := h.orderDetailURL(orderID)
 	return &orderConversionResponse{
 		Success:        true,
 		OrderID:        &orderID,
+		OrderURL:       &orderURLValue,
 		OrderCode:      &orderCodeValue,
 		OrderNumber:    &orderNumberValue,
 		HubSpotDealID:  &dealID,

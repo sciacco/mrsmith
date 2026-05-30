@@ -207,17 +207,20 @@ export interface OrderConversionStep {
 export interface OrderConversionStatus {
   converted: boolean;
   order_id: number | null;
+  order_url: string | null;
   order_code: string | null;
   order_number: string | null;
   hubspot_deal_id: string | null;
   hubspot_deal_url: string | null;
   conflict?: boolean;
   conflict_order_id?: number | null;
+  conflict_order_url?: string | null;
 }
 
 export interface OrderConversionResult {
   success: boolean;
   order_id?: number;
+  order_url?: string;
   order_code?: string;
   order_number?: string;
   hubspot_deal_id?: string;

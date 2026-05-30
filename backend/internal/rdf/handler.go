@@ -47,14 +47,13 @@ var (
 )
 
 type Handler struct {
-	anisettaDB                 *sql.DB
-	mistraDB                   *sql.DB
-	ai                         *openrouter.Client
-	logger                     *slog.Logger
-	notifier                   notifications.Notifier
-	roleResolver               RoleUserResolver
-	richiesteFattibilitaAppURL string
-	staticDir                  string
+	anisettaDB   *sql.DB
+	mistraDB     *sql.DB
+	ai           *openrouter.Client
+	logger       *slog.Logger
+	notifier     notifications.Notifier
+	roleResolver RoleUserResolver
+	appURLs      *applaunch.URLResolver
 }
 
 type RoleUserResolver interface {
@@ -62,14 +61,13 @@ type RoleUserResolver interface {
 }
 
 type Deps struct {
-	AnisettaDB                 *sql.DB
-	MistraDB                   *sql.DB
-	AI                         *openrouter.Client
-	Logger                     *slog.Logger
-	Notifier                   notifications.Notifier
-	RoleResolver               RoleUserResolver
-	RichiesteFattibilitaAppURL string
-	StaticDir                  string
+	AnisettaDB   *sql.DB
+	MistraDB     *sql.DB
+	AI           *openrouter.Client
+	Logger       *slog.Logger
+	Notifier     notifications.Notifier
+	RoleResolver RoleUserResolver
+	AppURLs      *applaunch.URLResolver
 }
 
 type createRichiestaRequest struct {
@@ -137,14 +135,13 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		logger = slog.Default()
 	}
 	h := &Handler{
-		anisettaDB:                 deps.AnisettaDB,
-		mistraDB:                   deps.MistraDB,
-		ai:                         deps.AI,
-		logger:                     logger.With("component", "rdf"),
-		notifier:                   deps.Notifier,
-		roleResolver:               deps.RoleResolver,
-		richiesteFattibilitaAppURL: strings.TrimSpace(deps.RichiesteFattibilitaAppURL),
-		staticDir:                  strings.TrimSpace(deps.StaticDir),
+		anisettaDB:   deps.AnisettaDB,
+		mistraDB:     deps.MistraDB,
+		ai:           deps.AI,
+		logger:       logger.With("component", "rdf"),
+		notifier:     deps.Notifier,
+		roleResolver: deps.RoleResolver,
+		appURLs:      deps.AppURLs,
 	}
 
 	accessProtect := acl.RequireRole(applaunch.RichiesteFattibilitaAccessRoles()...)
