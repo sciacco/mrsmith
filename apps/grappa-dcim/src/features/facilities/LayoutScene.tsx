@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { Islet, Position } from '../../api/types';
-import { isHalfPosition } from './positions';
+import { fullSlotStatus, isHalfPosition } from './positions';
 import styles from './workspace.module.css';
 
 export type LayoutSelection =
@@ -34,6 +34,7 @@ const EMPTY_BOUNDS: Bounds = {
 const STATUS_COLORS = {
   free: 0x10b981,
   occupied: 0x4f46e5,
+  shared: 0xc026d3,
   reserved: 0xf59e0b,
   unknown: 0x64748b,
   selected: 0x0ea5e9,
@@ -119,7 +120,7 @@ function addRack(
     const half = (rack.type ?? '').toLowerCase() === 'half' || isHalfPosition(position.type);
     const height = half ? 1.15 : 2.1;
     const y = half ? ((rack.pos ?? '').toUpperCase() === 'A' ? 1.72 : 0.695) : height / 2 + 0.12;
-    const color = selected ? STATUS_COLORS.selected : STATUS_COLORS.occupied;
+    const color = selected ? STATUS_COLORS.selected : rack.shared ? STATUS_COLORS.shared : STATUS_COLORS.occupied;
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.82, height, 0.82), makeMaterial(color, selected));
     mesh.position.set(x, y, z);
     mesh.userData = { type: 'position', id: position.id };
@@ -145,11 +146,12 @@ function addPositionTile(
   selected: boolean,
   selectable: THREE.Object3D[],
 ) {
-  // Full tile floor follows the position status (operator truth); a Half tile reads
-  // occupied when any half rack is present, the per-half meshes show the detail.
+  // Full tile floor follows the position status (operator truth), but a shared
+  // cabinet is condiviso (never free); a Half tile reads condiviso/occupied when a
+  // half rack is present, the per-half meshes show the detail.
   const status = isHalfPosition(position.type)
-    ? (position.racks.length > 0 ? 'occupied' : normalizeStatus(position.status))
-    : normalizeStatus(position.status);
+    ? (position.racks.some((rack) => rack.shared) ? 'shared' : position.racks.length > 0 ? 'occupied' : normalizeStatus(position.status))
+    : fullSlotStatus(position);
   const color = selected ? STATUS_COLORS.selected : STATUS_COLORS[status];
   const tile = new THREE.Mesh(new THREE.BoxGeometry(1, 0.14, 1), makeMaterial(color, selected));
   tile.position.set(x, 0.04, z);

@@ -15,7 +15,7 @@ import type { Building, BuildingInput, Datacenter, DatacenterInput, DatacenterMa
 import { ViewState } from '../../components/ViewState';
 import { LayoutGrid } from './LayoutGrid';
 import type { LayoutSelection } from './LayoutScene';
-import { fullRack, fullSlotStatus, isHalfPosition, rackAt, slotStatus, summarizeSlots, type HalfSide } from './positions';
+import { fullRack, fullSlotStatus, isHalfPosition, rackAt, slotStatus, summarizeSlots, type HalfSide, type SlotStatus } from './positions';
 import styles from './workspace.module.css';
 
 const destructiveBody = { confirmPrimary: true, confirmSecondary: true };
@@ -239,10 +239,38 @@ export function DatacentersPage() {
 
   const filteredDatacenters = useMemo(() => {
     if (!query.data) return [];
-    return query.data.filter((item) => {
+    const filtered = query.data.filter((item) => {
       if (buildingFilter === 'all') return true;
       if (buildingFilter === 'third') return !item.buildingId;
       return item.buildingId === buildingFilter;
+    });
+
+    return [...filtered].sort((a, b) => {
+      const hasBuildingA = !!a.buildingName;
+      const hasBuildingB = !!b.buildingName;
+
+      // 1) & 3) Sale con un edificio prima di quelle senza edificio
+      if (hasBuildingA && !hasBuildingB) return -1;
+      if (!hasBuildingA && hasBuildingB) return 1;
+
+      if (hasBuildingA && hasBuildingB) {
+        // Entrambi hanno un edificio: in ordine alfabetico dell'edificio
+        const bNameA = a.buildingName || '';
+        const bNameB = b.buildingName || '';
+        const bComp = bNameA.localeCompare(bNameB);
+        if (bComp !== 0) return bComp;
+
+        // 2) Nello stesso edificio: prima le sale (isMmr === false), poi le MMR (isMmr === true)
+        if (a.isMmr !== b.isMmr) {
+          return a.isMmr ? 1 : -1;
+        }
+
+        // Nello stesso edificio e stesso tipo: in ordine alfabetico di nome
+        return a.name.localeCompare(b.name);
+      }
+
+      // Entrambi senza edificio: in ordine alfabetico di nome
+      return a.name.localeCompare(b.name);
     });
   }, [query.data, buildingFilter]);
 
@@ -567,6 +595,7 @@ export function LayoutPage() {
           <span><strong>{occupancy.total}</strong> posti</span>
           <span><strong>{occupancy.free}</strong> liberi</span>
           <span><strong>{occupancy.occupied}</strong> occupati</span>
+          {occupancy.shared > 0 ? <span><strong>{occupancy.shared}</strong> condivisi</span> : null}
           <span><strong>{occupancy.reserved}</strong> riservati</span>
         </div>
       </div>
@@ -722,11 +751,11 @@ function LayoutQuickSelect({
             <button
               type="button"
               key={item.id}
-              className={`${styles.positionRailButton} ${styles[normalizePositionStatusClass(item.status)]} ${selected?.type === 'position' && selected.id === item.id ? styles.positionRailButtonActive : ''}`}
+              className={`${styles.positionRailButton} ${styles[normalizePositionStatusClass(positionEffectiveStatus(item))]} ${selected?.type === 'position' && selected.id === item.id ? styles.positionRailButtonActive : ''}`}
               onClick={() => onSelect({ type: 'position', id: item.id })}
             >
               <strong>{item.num}</strong>
-              <span>{positionStatusLabel(item.status)}</span>
+              <span>{positionStatusLabel(positionEffectiveStatus(item))}</span>
             </button>
           ))}
         </div>
@@ -762,7 +791,7 @@ function LayoutInspector({
   positions: Position[];
   selectedIslet: Islet | null;
   selectedPosition: Position | null;
-  occupancy: { free: number; occupied: number; reserved: number; total: number };
+  occupancy: { free: number; occupied: number; reserved: number; shared: number; total: number };
   batchCount: number;
   batchType: string;
   setBatchCount: (value: number) => void;
@@ -792,7 +821,7 @@ function LayoutInspector({
         <span className={styles.eyebrow}>Posizione</span>
         <div className={styles.inspectorTitleRow}>
           <h2 className={styles.inspectorTitle}>Posizione {selectedPosition.num}</h2>
-          <span className={`${styles.badgeMuted} ${styles[normalizePositionStatusClass(selectedPosition.status)]}`}>{positionStatusLabel(selectedPosition.status)}</span>
+          <span className={`${styles.badgeMuted} ${styles[normalizePositionStatusClass(positionEffectiveStatus(selectedPosition))]}`}>{positionStatusLabel(positionEffectiveStatus(selectedPosition))}</span>
         </div>
         <div className={styles.detailGrid}>
           <DetailItem label="Isola" value={selectedIslet?.name} />
@@ -822,8 +851,11 @@ function LayoutInspector({
 
   if (selectedIslet) {
     const isletPositions = positions.filter((item) => item.isletId === selectedIslet.id);
-    const free = isletPositions.filter((item) => item.status === 'free').length;
-    const occupied = isletPositions.filter((item) => item.status === 'occupied').length;
+    const free = isletPositions.filter((item) => positionEffectiveStatus(item) === 'free').length;
+    const occupied = isletPositions.filter((item) => {
+      const status = positionEffectiveStatus(item);
+      return status === 'occupied' || status === 'shared';
+    }).length;
 
     return (
       <aside className={styles.layoutInspector} aria-label="Inspector layout">
@@ -879,6 +911,7 @@ function LayoutInspector({
         <DetailItem label="Posti" value={occupancy.total} />
         <DetailItem label="Liberi" value={occupancy.free} />
         <DetailItem label="Occupati" value={occupancy.occupied} />
+        {occupancy.shared > 0 ? <DetailItem label="Condivisi" value={occupancy.shared} /> : null}
         <DetailItem label="Riservati" value={occupancy.reserved} />
       </div>
       <div className={styles.inspectorActions}>
@@ -900,8 +933,20 @@ function DetailItem({ label, value }: { label: string; value: unknown }) {
 function normalizePositionStatusClass(status: string) {
   if (status === 'occupied') return 'occupied';
   if (status === 'reserved') return 'reserved';
+  if (status === 'shared') return 'shared';
   if (status === 'free') return 'free';
   return 'badgeMuted';
+}
+
+// Effective per-position status for badges/rails: a shared cabinet is condiviso
+// (never free), otherwise Full follows position.status and Half takes the most
+// occupied of its two sides (shared > occupied > reserved > free).
+function positionEffectiveStatus(position: Position): SlotStatus {
+  if (!isHalfPosition(position.type)) return fullSlotStatus(position);
+  const rank = (s: SlotStatus) => (s === 'shared' ? 3 : s === 'occupied' ? 2 : s === 'reserved' ? 1 : 0);
+  const a = slotStatus(position.status, rackAt(position.racks, 'A'));
+  const b = slotStatus(position.status, rackAt(position.racks, 'B'));
+  return rank(a) >= rank(b) ? a : b;
 }
 
 type HoveredSlot = { position: Position; rack?: PositionRack; side?: HalfSide };
@@ -915,7 +960,9 @@ function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; lo
   // Occupancy is counted per rack slot (posto: Full = 1, Half = 2) and driven by
   // active rack presence, so the numbers match the coloured regions exactly.
   const slots = summarizeSlots(data.positions);
-  const subtitle = `${slots.occupied} occupati / ${slots.total} posti${slots.reserved > 0 ? ` · ${slots.reserved} riservati` : ''}`;
+  const subtitle = `${slots.occupied} occupati / ${slots.total} posti`
+    + (slots.shared > 0 ? ` · ${slots.shared} condivisi` : '')
+    + (slots.reserved > 0 ? ` · ${slots.reserved} riservati` : '');
   const hoveredStatus = hovered ? (hovered.side ? slotStatus(hovered.position.status, hovered.rack) : fullSlotStatus(hovered.position)) : 'free';
 
   return (
@@ -1208,6 +1255,7 @@ function positionStatusLabel(status: string) {
   if (status === 'free') return 'libera';
   if (status === 'occupied') return 'occupata';
   if (status === 'reserved') return 'riservata';
+  if (status === 'shared') return 'condivisa';
   return valueOrDash(status);
 }
 

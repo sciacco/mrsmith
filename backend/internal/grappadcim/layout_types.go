@@ -48,10 +48,11 @@ type Position struct {
 // A Full position holds at most one rack (pos "F"); a Half position holds
 // up to two (pos "A" = mezzo alto, pos "B" = mezzo basso).
 type PositionRack struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-	Type string `json:"type"`
-	Pos  string `json:"pos"`
+	ID     int    `json:"id"`
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	Pos    string `json:"pos"`
+	Shared bool   `json:"shared"` // condiviso: cabinet hosts equipment from multiple customers — never free
 }
 
 type PositionPatch struct {

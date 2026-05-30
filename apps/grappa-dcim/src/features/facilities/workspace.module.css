@@ -420,6 +420,12 @@
   box-shadow: 0 2px 6px rgba(245, 158, 11, 0.2);
 }
 
+/* Condiviso: cabinet shared by multiple customers — occupied, never free */
+.mapTile.shared {
+  background: linear-gradient(135deg, #c026d3 0%, #a21caf 100%);
+  box-shadow: 0 2px 6px rgba(192, 38, 211, 0.2);
+}
+
 /* Hover effects */
 .mapTile.free:hover {
   border-color: rgba(16, 185, 129, 0.6);
@@ -434,6 +440,11 @@
 .mapTile.reserved:hover {
   border-color: rgba(245, 158, 11, 0.6);
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4), 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+.mapTile.shared:hover {
+  border-color: rgba(192, 38, 211, 0.6);
+  box-shadow: 0 4px 12px rgba(192, 38, 211, 0.4), 0 0 0 3px rgba(192, 38, 211, 0.15);
 }
 
 /* Half tile: one mattonella split into two stacked slots (A = mezzo alto, B = mezzo basso) */
@@ -468,6 +479,10 @@
 
 .mapTileHalfSlot.reserved {
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.mapTileHalfSlot.shared {
+  background: linear-gradient(135deg, #c026d3 0%, #a21caf 100%);
 }
 
 .mapTileHalfSlot:hover {
@@ -519,6 +534,10 @@
   background: var(--color-warning);
 }
 
+.telemetryStatus.shared {
+  background: #c026d3;
+}
+
 .telemetryContent {
   flex: 1;
   display: grid;
@@ -562,6 +581,11 @@
 .telemetryBadge.reserved {
   background: var(--color-warning-subtle);
   color: var(--color-warning-strong);
+}
+
+.telemetryBadge.shared {
+  background: rgba(192, 38, 211, 0.12);
+  color: #a21caf;
 }
 
 .telemetryTitle {
@@ -614,6 +638,11 @@
 .reserved {
   background: rgba(245, 158, 11, 0.1);
   border-color: rgba(245, 158, 11, 0.28);
+}
+
+.shared {
+  background: rgba(192, 38, 211, 0.1);
+  border-color: rgba(192, 38, 211, 0.3);
 }
 
 .tabs {
@@ -794,6 +823,10 @@
 
 .legendReserved {
   background: var(--color-warning);
+}
+
+.legendShared {
+  background: #c026d3;
 }
 
 .layoutSceneFallback {

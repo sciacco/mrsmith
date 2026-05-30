@@ -1,6 +1,6 @@
 import type { LayoutGridBlock, LayoutGridCell } from '../../api/types';
 import type { LayoutSelection } from './LayoutScene';
-import { fullRack, isHalfPosition, rackAt, slotStatus, type HalfSide } from './positions';
+import { fullRack, fullSlotStatus, isHalfPosition, rackAt, slotStatus, type HalfSide } from './positions';
 import styles from './workspace.module.css';
 
 interface LayoutGridProps {
@@ -14,17 +14,20 @@ function statusClass(cell: LayoutGridCell) {
   if (!cell.positionId) return styles.layoutGridCellIncomplete;
   if (isHalfPosition(cell.positionType)) return styles.layoutGridCellHalf;
   // Full tile occupancy is the operator-maintained position status (a rack record
-  // can exist on a free position); half slots still colour by rack presence.
-  const status = (cell.positionStatus ?? '').toLowerCase();
+  // can exist on a free position) — except a shared cabinet, which is condiviso
+  // (occupied by multiple customers) and can never be free. Half slots colour by side.
+  const status = fullSlotStatus({ status: cell.positionStatus ?? '', racks: cell.racks });
   if (status === 'occupied') return styles.occupied;
+  if (status === 'shared') return styles.shared;
   if (status === 'reserved') return styles.reserved;
   return styles.free;
 }
 
 function positionStatusText(cell: LayoutGridCell) {
   if (!cell.positionId) return 'Posizione non trovata nei dati Grappa';
-  const status = (cell.positionStatus ?? '').toLowerCase();
+  const status = fullSlotStatus({ status: cell.positionStatus ?? '', racks: cell.racks });
   if (status === 'occupied') return fullRack(cell.racks)?.name ?? 'Occupata';
+  if (status === 'shared') return fullRack(cell.racks)?.name ?? 'Condivisa';
   if (status === 'reserved') return 'Riservata';
   if (status === 'free') return 'Libera';
   return cell.positionStatus ?? 'Stato non indicato';
@@ -167,6 +170,7 @@ export function LayoutGrid({ blocks, selected, onSelect }: LayoutGridProps) {
       <div className={styles.layoutLegend}>
         <span><i className={styles.legendFree} />Libera</span>
         <span><i className={styles.legendOccupied} />Occupata</span>
+        <span><i className={styles.legendShared} />Condivisa</span>
         <span><i className={styles.legendReserved} />Riservata</span>
       </div>
     </div>

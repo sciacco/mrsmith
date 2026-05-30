@@ -337,7 +337,7 @@ func (h *Handler) listPositionsForDatacenter(r *http.Request, datacenterID int) 
 func positionsSelectSQL() string {
 	return `
 		SELECT p.id, p.status, p.type, p.num, p.islets_id,
-		       r.id_rack, r.name, r.type, r.pos
+		       r.id_rack, r.name, r.type, r.pos, r.shared
 		FROM positions p
 		LEFT JOIN racks r ON r.positions_id = p.id AND ` + activeStateSQL("r.stato")
 }
@@ -370,8 +370,8 @@ func scanPositions(rows *sql.Rows) ([]Position, error) {
 		var id, num, isletID int
 		var status, ptype string
 		var rackID sql.NullInt64
-		var rackName, rackType, rackPos sql.NullString
-		if err := rows.Scan(&id, &status, &ptype, &num, &isletID, &rackID, &rackName, &rackType, &rackPos); err != nil {
+		var rackName, rackType, rackPos, rackShared sql.NullString
+		if err := rows.Scan(&id, &status, &ptype, &num, &isletID, &rackID, &rackName, &rackType, &rackPos, &rackShared); err != nil {
 			return nil, err
 		}
 		idx, ok := byID[id]
@@ -382,10 +382,11 @@ func scanPositions(rows *sql.Rows) ([]Position, error) {
 		}
 		if rackID.Valid {
 			items[idx].Racks = append(items[idx].Racks, PositionRack{
-				ID:   int(rackID.Int64),
-				Name: strings.TrimSpace(rackName.String),
-				Type: strings.TrimSpace(rackType.String),
-				Pos:  strings.TrimSpace(rackPos.String),
+				ID:     int(rackID.Int64),
+				Name:   strings.TrimSpace(rackName.String),
+				Type:   strings.TrimSpace(rackType.String),
+				Pos:    strings.TrimSpace(rackPos.String),
+				Shared: strings.EqualFold(strings.TrimSpace(rackShared.String), "Si"),
 			})
 		}
 	}

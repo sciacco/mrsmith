@@ -117,6 +117,7 @@ export interface PositionRack {
   name: string;
   type: string; // 'Full' | 'Half'
   pos: string; // 'F' | 'A' | 'B'
+  shared: boolean; // condiviso: cabinet shared by multiple customers — never free
 }
 
 export interface Position {
