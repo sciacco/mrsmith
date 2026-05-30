@@ -1,4 +1,4 @@
-import { Button, Icon, Modal, SearchInput, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Drawer, Icon, Modal, SearchInput, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -11,7 +11,7 @@ import {
   useIslets,
   useLayoutMutations,
 } from '../../api/queries';
-import type { Building, BuildingInput, Datacenter, DatacenterInput, DatacenterMap, Islet, Position, PositionRack } from '../../api/types';
+import type { Building, BuildingInput, Datacenter, DatacenterInput, Islet, Position, PositionRack, LayoutGridResponse, LayoutGridBlock, LayoutGridCell } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
 import { LayoutGrid } from './LayoutGrid';
 import type { LayoutSelection } from './LayoutScene';
@@ -275,7 +275,7 @@ export function DatacentersPage() {
   }, [query.data, buildingFilter]);
 
   const selected = filteredDatacenters.find((item) => item.id === selectedId) ?? filteredDatacenters[0] ?? null;
-  const map = useDatacenterMap(selected?.id ?? null);
+  const layoutGrid = useDatacenterLayoutGrid(selected?.id ?? null);
   const mutations = useFacilitiesMutations();
 
   async function saveDatacenter(input: DatacenterInput & { id?: number }) {
@@ -349,84 +349,58 @@ export function DatacentersPage() {
         <div className={styles.emptyPanel}><h3 className={styles.emptyTitle}>Nessuna sala trovata</h3><p className={styles.emptyText}>Modifica i filtri o aggiungi una nuova sala.</p></div>
       ) : (
         <div className={styles.split}>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.accentHeader}></th>
-                  <th>Nome</th>
-                  <th>Tipo</th>
-                  <th>Edificio</th>
-                  <th>Stato</th>
-                  <th>Rack</th>
-                  <th>Azioni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDatacenters.map((item) => (
-                  <tr key={item.id} className={`${styles.clickable} ${selected?.id === item.id ? styles.selectedRow : ''}`} onClick={() => navigate(`/sale-mmr/${item.id}`)}>
-                    <td className={styles.accentCell}>
-                      <div className={styles.accentBar} />
-                    </td>
-                    <td><strong>{item.name}</strong><br /><span className={styles.muted}>{item.floor ? `Piano ${item.floor}` : item.address}</span></td>
-                    <td>{item.isMmr ? <span className={styles.badge}>MMR {item.mmrType ?? ''}</span> : <span className={styles.badgeMuted}>Sala</span>}</td>
-                    <td>{item.buildingName ?? '-'}</td>
-                    <td><StatusBadge value={item.status} /></td>
-                    <td>{item.rackCount} / {item.rackCapacity}</td>
-                    <td>
-                      <div className={styles.actions}>
-                        {canOperate ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setEditing(item);
-                            }}
-                            title="Modifica"
-                          >
-                            <Icon name="pencil" size={16} />
-                          </Button>
-                        ) : null}
-                        {canOperate ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setCeasing(item);
-                            }}
-                            title="Cessa"
-                            style={{ color: 'var(--color-warning-strong)' }}
-                          >
-                            <Icon name="archive" size={16} />
-                          </Button>
-                        ) : null}
-                        {canOperate ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className={styles.deleteBtn}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setDeleting(item);
-                            }}
-                            title="Elimina"
-                          >
-                            <Icon name="trash" size={16} />
-                          </Button>
-                        ) : null}
+          <div className={styles.sidebarList}>
+            {filteredDatacenters.map((item) => {
+              const isSelected = selected?.id === item.id;
+              return (
+                <div
+                  key={item.id}
+                  className={`${styles.sidebarItem} ${isSelected ? styles.sidebarItemActive : ''}`}
+                  onClick={() => navigate(`/sale-mmr/${item.id}`)}
+                >
+                  <div className={styles.accentBar} />
+                  <div className={styles.sidebarItemContent}>
+                    <div className={styles.sidebarItemHeader}>
+                      <strong className={styles.sidebarItemName}>{item.name}</strong>
+                    </div>
+                    <div className={styles.sidebarItemMeta}>
+                      <span className={styles.sidebarItemBuilding}>
+                        {item.buildingName ?? 'Edifici terzi'}
+                      </span>
+                      <div className={styles.sidebarItemBadges}>
+                        {item.isMmr ? (
+                          <span className={styles.compactBadge}>MMR</span>
+                        ) : (
+                          <span className={styles.compactBadgeMuted}>Sala</span>
+                        )}
+                        {item.status !== 'Attivo' && (
+                          <span className={styles.compactBadgeWarning}>Cessata</span>
+                        )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <DatacenterMapPanel data={map.data} loading={map.isLoading} error={map.error} />
+          <DatacenterMapPanel 
+            data={layoutGrid.data} 
+            loading={layoutGrid.isLoading} 
+            error={layoutGrid.error} 
+            canOperate={canOperate}
+            onEdit={() => setEditing(selected)}
+          />
         </div>
       )}
-      <DatacenterModal open={editing !== null} value={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSave={saveDatacenter} loading={mutations.saveDatacenter.isPending} />
+      <DatacenterDrawer 
+        open={editing !== null} 
+        value={editing === 'new' ? null : editing} 
+        onClose={() => setEditing(null)} 
+        onSave={saveDatacenter} 
+        loading={mutations.saveDatacenter.isPending}
+        onCease={(item) => setCeasing(item)}
+        onDelete={(item) => setDeleting(item)}
+      />
       <ConfirmModal open={ceasing !== null} title="Cessa sala" message={`Confermi la cessazione di ${ceasing?.name ?? 'questa sala'}?`} onClose={() => setCeasing(null)} onConfirm={ceaseDatacenter} loading={mutations.ceaseDatacenter.isPending} />
       <ConfirmModal open={deleting !== null} title="Elimina sala" message={`Confermi l'eliminazione definitiva di ${deleting?.name ?? 'questa sala'}?`} onClose={() => setDeleting(null)} onConfirm={deleteDatacenter} loading={mutations.deleteDatacenter.isPending} />
     </section>
@@ -951,11 +925,25 @@ function positionEffectiveStatus(position: Position): SlotStatus {
 
 type HoveredSlot = { position: Position; rack?: PositionRack; side?: HalfSide };
 
-function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; loading: boolean; error: unknown }) {
+function DatacenterMapPanel({
+  data,
+  loading,
+  error,
+  canOperate,
+  onEdit,
+}: {
+  data?: LayoutGridResponse;
+  loading: boolean;
+  error: unknown;
+  canOperate: boolean;
+  onEdit: () => void;
+}) {
   const [hovered, setHovered] = useState<HoveredSlot | null>(null);
 
   if (loading) return <div className={styles.panel}><Skeleton rows={8} /></div>;
   if (error || !data) return <div className={styles.emptyPanel}><h3 className={styles.emptyTitle}>Mappa non disponibile</h3><p className={styles.emptyText}>Seleziona una sala per visualizzare il layout.</p></div>;
+
+  const isSpacious = data.blocks.length <= 2;
 
   // Occupancy is counted per rack slot (posto: Full = 1, Half = 2) and driven by
   // active rack presence, so the numbers match the coloured regions exactly.
@@ -969,9 +957,23 @@ function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; lo
     <div className={styles.panel}>
       <div className={styles.header}>
         <div>
-          <h2 className={styles.emptyTitle}>{data.datacenter.name}</h2>
-          <p className={styles.emptyText}>{data.incomplete ? 'Configurazione incompleta: mancano posizioni per le isole presenti.' : subtitle}</p>
+          <h2 className={styles.panelTitle}>{data.datacenter.name}</h2>
+          <p className={styles.panelSubtitle}>
+            {data.datacenter.floor ? `Piano ${data.datacenter.floor}` : ''}
+            {data.datacenter.floor && data.datacenter.buildingName ? ' · ' : ''}
+            {data.datacenter.buildingName ? `${data.datacenter.buildingName}` : 'Edifici terzi'}
+            {data.datacenter.address ? ` (${data.datacenter.address})` : ''}
+          </p>
         </div>
+        {canOperate ? (
+          <Button size="sm" variant="secondary" onClick={onEdit} leftIcon={<Icon name="pencil" size={14} />}>
+            Modifica
+          </Button>
+        ) : null}
+      </div>
+
+      <div className={styles.emptyText} style={{ fontSize: '0.8125rem', marginBottom: 'var(--space-4)' }}>
+        {data.incomplete ? 'Configurazione incompleta: mancano posizioni per le isole presenti.' : subtitle}
       </div>
 
       <div className={`${styles.telemetryBar} ${hovered ? styles.telemetryActive : ''}`}>
@@ -1007,38 +1009,137 @@ function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; lo
         )}
       </div>
 
-      <div className={styles.mapGridCompact}>
-        {data.positions.length === 0 ? (
-          <p className={styles.emptyText}>Nessuna posizione configurata.</p>
-        ) : data.positions.map((position) => {
-          if (isHalfPosition(position.type)) {
-            const rackA = rackAt(position.racks, 'A');
-            const rackB = rackAt(position.racks, 'B');
-            return (
-              <div key={position.id} className={`${styles.mapTile} ${styles.mapTileHalf}`}>
-                <div
-                  className={`${styles.mapTileHalfSlot} ${styles[slotStatus(position.status, rackA)] || ''}`}
-                  onMouseEnter={() => setHovered({ position, rack: rackA, side: 'A' })}
-                  onMouseLeave={() => setHovered(null)}
-                />
-                <div
-                  className={`${styles.mapTileHalfSlot} ${styles[slotStatus(position.status, rackB)] || ''}`}
-                  onMouseEnter={() => setHovered({ position, rack: rackB, side: 'B' })}
-                  onMouseLeave={() => setHovered(null)}
-                />
+      <div className={`${styles.mapGridBlocks} ${isSpacious ? styles.mapGridBlocksSpacious : ''}`}>
+        {data.blocks.length === 0 ? (
+          <div className={styles.emptyPanel} style={{ padding: 'var(--space-8) 0' }}>
+            <h3 className={styles.emptyTitle}>Mappa non configurata</h3>
+            <p className={styles.emptyText} style={{ fontSize: '0.8125rem' }}>
+              Questa sala non ha una disposizione spaziale di corridoi o posizioni configurata.
+            </p>
+          </div>
+        ) : (
+          data.blocks.map((block: LayoutGridBlock) => (
+            <section key={block.id} className={styles.mapGridBlock}>
+              <div className={styles.mapGridBlockHeader}>
+                <strong>{block.title}</strong>
               </div>
-            );
-          }
-          const rack = fullRack(position.racks);
-          return (
-            <div
-              key={position.id}
-              className={`${styles.mapTile} ${styles[fullSlotStatus(position)] || ''}`}
-              onMouseEnter={() => setHovered({ position, rack })}
-              onMouseLeave={() => setHovered(null)}
-            />
-          );
-        })}
+              <div className={styles.mapGridTable}>
+                {block.grid.map((row: LayoutGridCell[], rowIndex: number) => (
+                  <div
+                    key={rowIndex}
+                    className={styles.mapGridRow}
+                    style={{ gridTemplateColumns: `repeat(${row.length}, 1fr)` }}
+                  >
+                    {row.map((cell: LayoutGridCell, colIndex: number) => {
+                      const isCellHalf = cell.positionId && isHalfPosition(cell.positionType);
+                      const fullStatus = cell.positionId ? fullSlotStatus({ status: cell.positionStatus ?? '', racks: cell.racks }) : 'free';
+
+                      const cellClassName = [
+                        styles.mapGridCell,
+                        cell.type === 'empty' ? styles.mapGridCellEmpty : '',
+                        cell.type === 'label' ? styles.mapGridCellLabel : '',
+                        cell.type === 'plenum' ? styles.mapGridCellPlenum : '',
+                        cell.type === 'position' ? styles.mapGridCellPosition : '',
+                        cell.type === 'position' && !isCellHalf ? styles[fullStatus] : '',
+                        cell.type === 'position' && isCellHalf ? styles.mapGridCellHalf : '',
+                      ].filter(Boolean).join(' ');
+
+                      if (cell.type === 'empty') {
+                        return <div key={colIndex} className={cellClassName} />;
+                      }
+
+                      if (cell.type === 'label') {
+                        return (
+                          <div key={colIndex} className={cellClassName} title={cell.text}>
+                            <strong>L</strong>
+                          </div>
+                        );
+                      }
+
+                      if (cell.type === 'plenum') {
+                        return (
+                          <div key={colIndex} className={cellClassName} title={cell.plenumName ?? 'Plenum'}>
+                            <strong>P</strong>
+                          </div>
+                        );
+                      }
+
+                      // Position cell
+                      if (cell.type === 'position' && !cell.positionId) {
+                        return (
+                          <div
+                            key={colIndex}
+                            className={`${styles.mapGridCell} ${styles.incomplete}`}
+                            title={`Posizione ${cell.pos} non configurata nel database Grappa (Isola ID: ${block.isletId ?? 'N/D'})`}
+                          >
+                            <strong>{cell.pos}</strong>
+                          </div>
+                        );
+                      }
+
+                      if (isCellHalf) {
+                        const rackA = rackAt(cell.racks, 'A');
+                        const rackB = rackAt(cell.racks, 'B');
+                        const posObj: Position = {
+                          id: cell.positionId!,
+                          status: cell.positionStatus ?? 'Libera',
+                          type: 'Half',
+                          num: cell.pos ?? 0,
+                          isletId: block.isletId ?? 0,
+                          racks: cell.racks ?? [],
+                        };
+
+                        return (
+                          <div key={colIndex} className={cellClassName} title={`Posizione ${cell.pos} (Divisa)`}>
+                            <div className={styles.mapGridHalfStack}>
+                              <div
+                                className={`${styles.mapGridHalfSlot} ${styles[slotStatus(cell.positionStatus, rackA)] || ''}`}
+                                onMouseEnter={() => setHovered({ position: posObj, rack: rackA, side: 'A' })}
+                                onMouseLeave={() => setHovered(null)}
+                              />
+                              <div
+                                className={`${styles.mapGridHalfSlot} ${styles[slotStatus(cell.positionStatus, rackB)] || ''}`}
+                                onMouseEnter={() => setHovered({ position: posObj, rack: rackB, side: 'B' })}
+                                onMouseLeave={() => setHovered(null)}
+                              />
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Full position
+                      const rack = fullRack(cell.racks);
+                      const posObj: Position = {
+                        id: cell.positionId!,
+                        status: cell.positionStatus ?? 'Libera',
+                        type: 'Full',
+                        num: cell.pos ?? 0,
+                        isletId: block.isletId ?? 0,
+                        racks: cell.racks ?? [],
+                      };
+
+                      return (
+                        <div
+                          key={colIndex}
+                          className={cellClassName}
+                          onMouseEnter={() => setHovered({ position: posObj, rack })}
+                          onMouseLeave={() => setHovered(null)}
+                        >
+                          <strong>{cell.pos}</strong>
+                          {isSpacious && rack?.name && (
+                            <span className={styles.mapGridCellStatus}>
+                              {rack.name}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))
+        )}
       </div>
     </div>
   );
@@ -1076,34 +1177,118 @@ function BuildingModal({ open, value, onClose, onSave, loading }: { open: boolea
   );
 }
 
-function DatacenterModal({ open, value, onClose, onSave, loading }: { open: boolean; value: Datacenter | null; onClose: () => void; onSave: (value: DatacenterInput & { id?: number }) => void; loading: boolean }) {
-  const [draft, setDraft] = useState<DatacenterInput>({ name: '', address: '', rackCapacity: 0, status: 'Attivo', portalEnabled: false, isMmr: false });
+function DatacenterDrawer({
+  open,
+  value,
+  onClose,
+  onSave,
+  loading,
+  onCease,
+  onDelete,
+}: {
+  open: boolean;
+  value: Datacenter | null;
+  onClose: () => void;
+  onSave: (value: DatacenterInput & { id?: number }) => void;
+  loading: boolean;
+  onCease: (item: Datacenter) => void;
+  onDelete: (item: Datacenter) => void;
+}) {
+  const [draft, setDraft] = useState<DatacenterInput>({
+    name: '',
+    address: '',
+    rackCapacity: 0,
+    status: 'Attivo',
+    portalEnabled: false,
+    isMmr: false,
+  });
 
   useEffect(() => {
-    setDraft(value ? { name: value.name, address: value.address, note: value.note, rackCapacity: value.rackCapacity, status: value.status ?? 'Attivo', customerId: value.customerId, portalEnabled: value.portalEnabled, orderCode: value.orderCode, buildingId: value.buildingId, isMmr: value.isMmr, setOrder: value.setOrder, mmrType: value.mmrType, serialNumber: value.serialNumber, floor: value.floor } : { name: '', address: '', rackCapacity: 0, status: 'Attivo', portalEnabled: false, isMmr: false });
+    setDraft(
+      value
+        ? {
+            name: value.name,
+            address: value.address,
+            note: value.note,
+            rackCapacity: value.rackCapacity,
+            status: value.status ?? 'Attivo',
+            customerId: value.customerId,
+            portalEnabled: value.portalEnabled,
+            orderCode: value.orderCode,
+            buildingId: value.buildingId,
+            isMmr: value.isMmr,
+            setOrder: value.setOrder,
+            mmrType: value.mmrType,
+            serialNumber: value.serialNumber,
+            floor: value.floor,
+          }
+        : { name: '', address: '', rackCapacity: 0, status: 'Attivo', portalEnabled: false, isMmr: false }
+    );
   }, [value, open]);
 
   return (
-    <Modal open={open} onClose={onClose} title={value ? 'Modifica sala' : 'Nuova sala'} size="wide">
-      <div className={styles.formGrid}>
-        <TextField label="Nome" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} />
-        <TextField label="Indirizzo" value={draft.address} onChange={(address) => setDraft({ ...draft, address })} />
-        <NumberField label="Capienza rack" value={draft.rackCapacity} onChange={(rackCapacity) => setDraft({ ...draft, rackCapacity })} />
-        <SelectField label="Stato" value={draft.status ?? 'Attivo'} onChange={(status) => setDraft({ ...draft, status })} options={['Attivo', 'Cessato']} />
-        <TextField label="Piano" value={draft.floor ?? ''} onChange={(floor) => setDraft({ ...draft, floor })} />
-        <TextField label="MMR type" value={draft.mmrType ?? ''} onChange={(mmrType) => setDraft({ ...draft, mmrType })} />
-        <label className={styles.checkboxLine}><input type="checkbox" checked={draft.isMmr} onChange={(event) => setDraft({ ...draft, isMmr: event.target.checked })} /> MMR</label>
-        <label className={styles.checkboxLine}><input type="checkbox" checked={draft.portalEnabled} onChange={(event) => setDraft({ ...draft, portalEnabled: event.target.checked })} /> Portale clienti</label>
-        <div className={`${styles.field} ${styles.fieldFull}`}>
-          <label>Note</label>
-          <textarea value={draft.note ?? ''} onChange={(event) => setDraft({ ...draft, note: event.target.value })} />
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title={value ? 'Modifica sala' : 'Nuova sala'}
+      size="md"
+      footer={
+        <div className={styles.modalActions}>
+          <Button variant="secondary" onClick={onClose}>
+            Annulla
+          </Button>
+          <Button loading={loading} onClick={() => onSave({ ...draft, id: value?.id })}>
+            Salva
+          </Button>
         </div>
+      }
+    >
+      <div className={styles.drawerFormWrap}>
+        <div className={styles.formGrid}>
+          <TextField label="Nome" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} />
+          <TextField label="Indirizzo" value={draft.address} onChange={(address) => setDraft({ ...draft, address })} />
+          <NumberField label="Capienza rack" value={draft.rackCapacity} onChange={(rackCapacity) => setDraft({ ...draft, rackCapacity })} />
+          <SelectField label="Stato" value={draft.status ?? 'Attivo'} onChange={(status) => setDraft({ ...draft, status })} options={['Attivo', 'Cessato']} />
+          <TextField label="Piano" value={draft.floor ?? ''} onChange={(floor) => setDraft({ ...draft, floor })} />
+          <TextField label="MMR type" value={draft.mmrType ?? ''} onChange={(mmrType) => setDraft({ ...draft, mmrType })} />
+          <label className={styles.checkboxLine}>
+            <input type="checkbox" checked={draft.isMmr} onChange={(event) => setDraft({ ...draft, isMmr: event.target.checked })} /> MMR
+          </label>
+          <label className={styles.checkboxLine}>
+            <input
+              type="checkbox"
+              checked={draft.portalEnabled}
+              onChange={(event) => setDraft({ ...draft, portalEnabled: event.target.checked })}
+            />{' '}
+            Portale clienti
+          </label>
+          <div className={`${styles.field} ${styles.fieldFull}`}>
+            <label>Note</label>
+            <textarea value={draft.note ?? ''} onChange={(event) => setDraft({ ...draft, note: event.target.value })} />
+          </div>
+        </div>
+
+        {value && (
+          <div className={styles.dangerZone}>
+            <h3 className={styles.dangerZoneTitle}>Zona di Pericolo</h3>
+            <p className={styles.dangerZoneText}>Operazioni distruttive ad alto impatto operativo.</p>
+            <div className={styles.dangerZoneActions}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => onCease(value)}
+                style={{ borderColor: 'var(--color-warning-strong)', color: 'var(--color-warning-strong)' }}
+              >
+                Cessa sala
+              </Button>
+              <Button size="sm" variant="danger" onClick={() => onDelete(value)}>
+                Elimina definitivamente
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
-      <div className={styles.modalActions}>
-        <Button variant="secondary" onClick={onClose}>Annulla</Button>
-        <Button loading={loading} onClick={() => onSave({ ...draft, id: value?.id })}>Salva</Button>
-      </div>
-    </Modal>
+    </Drawer>
   );
 }
 

@@ -109,8 +109,8 @@
 
 .split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.72fr);
-  gap: var(--space-4);
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--space-6);
   align-items: start;
 }
 
@@ -1280,4 +1280,427 @@
   .toolbar > * {
     min-width: 100%;
   }
+}
+
+/* REDESIGN SALE E MMR: OPZIONE 1 (FOCUS MAPPA) STYLES */
+
+.sidebarList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.sidebarItem {
+  display: flex;
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.96);
+  cursor: pointer;
+  padding: var(--space-3);
+  transition: 
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+.sidebarItem:hover {
+  border-color: var(--color-accent-muted);
+  background: rgba(99, 91, 255, 0.02);
+  transform: translateY(-1px);
+}
+
+.sidebarItemActive {
+  border-color: var(--color-accent);
+  background: rgba(99, 91, 255, 0.05);
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebarItemContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.sidebarItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.sidebarItemName {
+  font-size: 0.875rem;
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.sidebarItemRackCount {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.sidebarItemMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sidebarItemBuilding {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebarItemBadges {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* Master-detail accent bar on the left edge */
+.sidebarItem .accentBar {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--color-accent);
+  transition: height var(--duration-normal) var(--ease-spring);
+}
+
+.sidebarItem:hover .accentBar {
+  height: 20px;
+}
+
+.sidebarItemActive .accentBar {
+  height: 28px;
+  box-shadow: 0 0 8px var(--color-accent-glow);
+}
+
+/* Compact badges */
+.compactBadge,
+.compactBadgeMuted,
+.compactBadgeWarning {
+  font-size: 0.625rem;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.compactBadge {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.compactBadgeMuted {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.compactBadgeWarning {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
+/* Panel titles and headers */
+.panelTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.panelSubtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: 2px 0 0 0;
+}
+
+/* 2D Topological layouts in Sidebar Detail Panel */
+.mapGridBlocks {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px; /* Spazio vuoto in mezzo alle isole ridotto a 1/4 (6px) */
+  margin-top: var(--space-4);
+  align-items: start;
+}
+
+.mapGridBlock {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  background: #ffffff;
+  box-shadow: var(--shadow-xs);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.mapGridBlockHeader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.mapGridBlockHeader strong {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.mapGridTable {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+
+.mapGridRow {
+  display: grid;
+  gap: 2px;
+  min-width: max-content;
+}
+
+.mapGridCell {
+  min-width: 1.75rem; /* Dimensione rack dimezzata (28px anziché 56px) */
+  height: 1.75rem;    /* Dimensione rack dimezzata (28px anziché 56px) */
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) var(--ease-spring);
+}
+
+.mapGridCellPosition {
+  cursor: pointer;
+}
+
+.mapGridCellPosition:hover {
+  transform: scale(1.12);
+  box-shadow: var(--shadow-sm);
+  z-index: 5;
+}
+
+.mapGridCellEmpty {
+  border-color: transparent;
+  background: rgba(241, 245, 249, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.15);
+}
+
+.mapGridCellLabel {
+  justify-items: center;
+  align-items: center;
+  background: var(--color-surface);
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-muted);
+}
+
+.mapGridCellPlenum {
+  justify-items: center;
+  align-items: center;
+  background: var(--color-info-subtle);
+  border-color: rgba(14, 165, 233, 0.2);
+  color: var(--color-info-strong);
+}
+
+/* Status colors */
+.mapGridCell.free {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-color: #059669;
+  color: #ffffff;
+}
+
+.mapGridCell.occupied {
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-hover) 100%);
+  border-color: var(--color-accent-hover);
+  color: #ffffff;
+}
+
+.mapGridCell.reserved {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border-color: #d97706;
+  color: #ffffff;
+}
+
+.mapGridCell.shared {
+  background: linear-gradient(135deg, #c026d3 0%, #a21caf 100%);
+  border-color: #a21caf;
+  color: #ffffff;
+}
+
+.mapGridCell.incomplete {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(241, 245, 249, 0.85),
+    rgba(241, 245, 249, 0.85) 4px,
+    rgba(226, 232, 240, 0.85) 4px,
+    rgba(226, 232, 240, 0.85) 8px
+  );
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.mapGridCell.incomplete:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Half positions */
+.mapGridCellHalf {
+  padding: 1px !important;
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.mapGridHalfStack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  height: 100%;
+  width: 100%;
+}
+
+.mapGridHalfSlot {
+  flex: 1;
+  border-radius: 1px;
+  transition: transform var(--duration-fast) var(--ease-spring), opacity var(--duration-fast);
+  cursor: pointer;
+}
+
+.mapGridHalfSlot:hover {
+  transform: scale(1.08);
+  z-index: 2;
+}
+
+.mapGridHalfSlot.free {
+  background: #10b981;
+}
+
+.mapGridHalfSlot.occupied {
+  background: var(--color-accent);
+}
+
+.mapGridHalfSlot.reserved {
+  background: #f59e0b;
+}
+
+.mapGridHalfSlot.shared {
+  background: #c026d3;
+}
+
+/* Slide-over drawer form wrap & Danger zone */
+.drawerFormWrap {
+  padding: var(--space-5) var(--space-6) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.dangerZone {
+  margin-top: var(--space-8);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  background: rgba(239, 68, 68, 0.02);
+  margin-bottom: var(--space-4);
+}
+
+.dangerZoneTitle {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-danger);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.dangerZoneText {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-4) 0;
+}
+
+.dangerZoneActions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+
+}
+
+/* DYNAMIC SPACIOUS LAYOUT FOR FEW ISLANDS */
+.mapGridBlocksSpacious {
+  gap: var(--space-4) !important; /* Larger gap between islands in spacious mode */
+}
+
+.mapGridBlocksSpacious .mapGridCell {
+  min-width: 3.25rem !important; /* Larger tiles (52px) */
+  height: 3.25rem !important;    /* Larger tiles (52px) */
+  border-radius: var(--radius-md) !important;
+  padding: 4px !important;
+  display: grid !important;
+  grid-template-rows: auto 1fr !important;
+  align-content: stretch !important;
+  text-align: left !important;
+}
+
+.mapGridBlocksSpacious .mapGridCell strong {
+  font-size: 0.75rem !important;
+  color: var(--color-text) !important;
+  line-height: 1 !important;
+  display: inline-block;
+}
+
+.mapGridBlocksSpacious .mapGridCellStatus {
+  font-size: 0.55rem !important;
+  color: var(--color-text-secondary) !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+  display: block;
+}
+
+.mapGridBlocksSpacious .mapGridCell.occupied .mapGridCellStatus,
+.mapGridBlocksSpacious .mapGridCell.shared .mapGridCellStatus {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.mapGridBlocksSpacious .mapGridCellHalf {
+  grid-template-rows: auto 1fr !important;
+  padding: 2px !important;
+}
+
+.mapGridBlocksSpacious .mapGridHalfStack {
+  gap: 2px !important;
+}
+
+.mapGridBlocksSpacious .mapGridHalfSlot {
+  border-radius: var(--radius-sm) !important;
 }
