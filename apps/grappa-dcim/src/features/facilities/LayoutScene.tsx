@@ -145,7 +145,11 @@ function addPositionTile(
   selected: boolean,
   selectable: THREE.Object3D[],
 ) {
-  const status = normalizeStatus(position.status);
+  // Full tile floor follows the position status (operator truth); a Half tile reads
+  // occupied when any half rack is present, the per-half meshes show the detail.
+  const status = isHalfPosition(position.type)
+    ? (position.racks.length > 0 ? 'occupied' : normalizeStatus(position.status))
+    : normalizeStatus(position.status);
   const color = selected ? STATUS_COLORS.selected : STATUS_COLORS[status];
   const tile = new THREE.Mesh(new THREE.BoxGeometry(1, 0.14, 1), makeMaterial(color, selected));
   tile.position.set(x, 0.04, z);

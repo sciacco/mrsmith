@@ -13,11 +13,12 @@ function statusClass(cell: LayoutGridCell) {
   if (cell.type !== 'position') return '';
   if (!cell.positionId) return styles.layoutGridCellIncomplete;
   if (isHalfPosition(cell.positionType)) return styles.layoutGridCellHalf;
+  // Full tile occupancy is the operator-maintained position status (a rack record
+  // can exist on a free position); half slots still colour by rack presence.
   const status = (cell.positionStatus ?? '').toLowerCase();
   if (status === 'occupied') return styles.occupied;
   if (status === 'reserved') return styles.reserved;
-  if (status === 'free') return styles.free;
-  return styles.layoutGridCellUnknown;
+  return styles.free;
 }
 
 function positionStatusText(cell: LayoutGridCell) {

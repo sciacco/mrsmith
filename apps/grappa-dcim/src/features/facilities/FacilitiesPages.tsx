@@ -15,7 +15,7 @@ import type { Building, BuildingInput, Datacenter, DatacenterInput, DatacenterMa
 import { ViewState } from '../../components/ViewState';
 import { LayoutGrid } from './LayoutGrid';
 import type { LayoutSelection } from './LayoutScene';
-import { fullRack, isHalfPosition, rackAt, slotStatus, type HalfSide } from './positions';
+import { fullRack, fullSlotStatus, isHalfPosition, rackAt, slotStatus, summarizeSlots, type HalfSide } from './positions';
 import styles from './workspace.module.css';
 
 const destructiveBody = { confirmPrimary: true, confirmSecondary: true };
@@ -441,12 +441,9 @@ export function LayoutPage() {
     () => datacenters.data?.map((item) => ({ value: item.id, label: `${item.name}${item.isMmr ? ' - MMR' : ''}` })) ?? [],
     [datacenters.data],
   );
-  const occupancy = useMemo(() => {
-    const free = scenePositions.filter((item) => item.status === 'free').length;
-    const occupied = scenePositions.filter((item) => item.status === 'occupied').length;
-    const reserved = scenePositions.filter((item) => item.status === 'reserved').length;
-    return { free, occupied, reserved, total: scenePositions.length };
-  }, [scenePositions]);
+  // Per-slot occupancy (Full = 1 posto, Half = 2), driven by active rack presence so
+  // the inspector/header counts match the coloured cells in the 2D/3D layout.
+  const occupancy = useMemo(() => summarizeSlots(scenePositions), [scenePositions]);
 
   useEffect(() => {
     const firstDatacenter = datacenters.data?.[0];
@@ -566,11 +563,11 @@ export function LayoutPage() {
             Vista 3D
           </button>
         </div>
-        <div className={styles.layoutStatusStrip} aria-label="Occupazione posizioni">
-          <span><strong>{occupancy.total}</strong> posizioni</span>
-          <span><strong>{occupancy.free}</strong> libere</span>
-          <span><strong>{occupancy.occupied}</strong> occupate</span>
-          <span><strong>{occupancy.reserved}</strong> riservate</span>
+        <div className={styles.layoutStatusStrip} aria-label="Occupazione posti rack">
+          <span><strong>{occupancy.total}</strong> posti</span>
+          <span><strong>{occupancy.free}</strong> liberi</span>
+          <span><strong>{occupancy.occupied}</strong> occupati</span>
+          <span><strong>{occupancy.reserved}</strong> riservati</span>
         </div>
       </div>
 
@@ -879,10 +876,10 @@ function LayoutInspector({
       <h2 className={styles.inspectorTitle}>{datacenter.name}</h2>
       <p className={styles.emptyText}>{datacenter.isMmr ? 'MMR' : 'Sala'} con {islets.length} isole configurate.</p>
       <div className={styles.detailGrid}>
-        <DetailItem label="Posizioni" value={occupancy.total} />
-        <DetailItem label="Libere" value={occupancy.free} />
-        <DetailItem label="Occupate" value={occupancy.occupied} />
-        <DetailItem label="Riservate" value={occupancy.reserved} />
+        <DetailItem label="Posti" value={occupancy.total} />
+        <DetailItem label="Liberi" value={occupancy.free} />
+        <DetailItem label="Occupati" value={occupancy.occupied} />
+        <DetailItem label="Riservati" value={occupancy.reserved} />
       </div>
       <div className={styles.inspectorActions}>
         {canOperate ? <Button onClick={onNewIslet} leftIcon={<Icon name="plus" size={16} />}>Nuova isola</Button> : null}
@@ -915,17 +912,18 @@ function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; lo
   if (loading) return <div className={styles.panel}><Skeleton rows={8} /></div>;
   if (error || !data) return <div className={styles.emptyPanel}><h3 className={styles.emptyTitle}>Mappa non disponibile</h3><p className={styles.emptyText}>Seleziona una sala per visualizzare il layout.</p></div>;
 
-  const occupied = data.positions.filter((position) => position.racks.length > 0 || position.status === 'occupied').length;
-  // Half slots reflect their own rack; a Full tile reflects the tile status (so an
-  // occupied tile whose only rack is decommissioned stays occupied, not free).
-  const hoveredStatus = hovered ? (hovered.side ? slotStatus(hovered.position.status, hovered.rack) : hovered.position.status) : 'free';
+  // Occupancy is counted per rack slot (posto: Full = 1, Half = 2) and driven by
+  // active rack presence, so the numbers match the coloured regions exactly.
+  const slots = summarizeSlots(data.positions);
+  const subtitle = `${slots.occupied} occupati / ${slots.total} posti${slots.reserved > 0 ? ` · ${slots.reserved} riservati` : ''}`;
+  const hoveredStatus = hovered ? (hovered.side ? slotStatus(hovered.position.status, hovered.rack) : fullSlotStatus(hovered.position)) : 'free';
 
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
         <div>
           <h2 className={styles.emptyTitle}>{data.datacenter.name}</h2>
-          <p className={styles.emptyText}>{data.incomplete ? 'Configurazione incompleta: mancano posizioni per le isole presenti.' : `${occupied} occupate / ${data.positions.length} posizioni`}</p>
+          <p className={styles.emptyText}>{data.incomplete ? 'Configurazione incompleta: mancano posizioni per le isole presenti.' : subtitle}</p>
         </div>
       </div>
 
@@ -988,7 +986,7 @@ function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; lo
           return (
             <div
               key={position.id}
-              className={`${styles.mapTile} ${styles[position.status] || ''}`}
+              className={`${styles.mapTile} ${styles[fullSlotStatus(position)] || ''}`}
               onMouseEnter={() => setHovered({ position, rack })}
               onMouseLeave={() => setHovered(null)}
             />
