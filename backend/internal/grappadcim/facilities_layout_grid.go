@@ -168,10 +168,7 @@ func (h *Handler) listLayoutGridBlocks(r *http.Request, dc Datacenter, positions
 							cell.PositionID = layoutGridIntPtr(position.ID)
 							cell.PositionStatus = layoutGridStringPtr(position.Status)
 							cell.PositionType = layoutGridStringPtr(position.Type)
-							cell.RackID = position.RackID
-							cell.RackName = position.RackName
-							cell.RackType = position.RackType
-							cell.RackPos = position.RackPos
+							cell.Racks = position.Racks
 						} else {
 							warnings = append(warnings, fmt.Sprintf("%s / %s: posizione %d non trovata nei dati Grappa", dc.Name, block.Title, *sourceCell.Pos))
 						}

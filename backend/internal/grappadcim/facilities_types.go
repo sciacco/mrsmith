@@ -122,13 +122,10 @@ type LayoutGridCell struct {
 	Text       *string `json:"text,omitempty"`
 	PlenumType *string `json:"plenumType,omitempty"`
 
-	PositionID     *int    `json:"positionId,omitempty"`
-	PositionStatus *string `json:"positionStatus,omitempty"`
-	PositionType   *string `json:"positionType,omitempty"`
-	RackID         *int    `json:"rackId,omitempty"`
-	RackName       *string `json:"rackName,omitempty"`
-	RackType       *string `json:"rackType,omitempty"`
-	RackPos        *string `json:"rackPos,omitempty"`
+	PositionID     *int           `json:"positionId,omitempty"`
+	PositionStatus *string        `json:"positionStatus,omitempty"`
+	PositionType   *string        `json:"positionType,omitempty"`
+	Racks          []PositionRack `json:"racks,omitempty"`
 
 	PlenumID     *int    `json:"plenumId,omitempty"`
 	PlenumName   *string `json:"plenumName,omitempty"`

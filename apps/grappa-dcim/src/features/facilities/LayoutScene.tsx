@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { Islet, Position } from '../../api/types';
+import { isHalfPosition } from './positions';
 import styles from './workspace.module.css';
 
 export type LayoutSelection =
@@ -48,10 +49,6 @@ function normalizeStatus(status: string) {
 
 function positionSort(a: Position, b: Position) {
   return a.num - b.num || a.id - b.id;
-}
-
-function isHalfRack(position: Position) {
-  return position.rackType?.toLowerCase() === 'half' || position.type.toLowerCase() === 'half';
 }
 
 function makeMaterial(color: number, selected = false) {
@@ -116,26 +113,28 @@ function addRack(
   selected: boolean,
   selectable: THREE.Object3D[],
 ) {
-  if (position.status !== 'occupied') return;
+  // One mesh per active rack on the tile: a Full tile draws one full-height rack,
+  // a Half tile draws up to two half-height racks stacked (A above, B below).
+  for (const rack of position.racks) {
+    const half = (rack.type ?? '').toLowerCase() === 'half' || isHalfPosition(position.type);
+    const height = half ? 1.15 : 2.1;
+    const y = half ? ((rack.pos ?? '').toUpperCase() === 'A' ? 1.72 : 0.695) : height / 2 + 0.12;
+    const color = selected ? STATUS_COLORS.selected : STATUS_COLORS.occupied;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.82, height, 0.82), makeMaterial(color, selected));
+    mesh.position.set(x, y, z);
+    mesh.userData = { type: 'position', id: position.id };
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    selectable.push(mesh);
+    group.add(mesh);
 
-  const half = isHalfRack(position);
-  const height = half ? 1.15 : 2.1;
-  const y = half && position.rackPos === 'A' ? 1.72 : height / 2 + 0.12;
-  const color = selected ? STATUS_COLORS.selected : STATUS_COLORS.occupied;
-  const rack = new THREE.Mesh(new THREE.BoxGeometry(0.82, height, 0.82), makeMaterial(color, selected));
-  rack.position.set(x, y, z);
-  rack.userData = { type: 'position', id: position.id };
-  rack.castShadow = true;
-  rack.receiveShadow = true;
-  selectable.push(rack);
-  group.add(rack);
-
-  const trim = new THREE.Mesh(
-    new THREE.BoxGeometry(0.88, 0.045, 0.88),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.08 }),
-  );
-  trim.position.set(x, y + height / 2 + 0.04, z);
-  group.add(trim);
+    const trim = new THREE.Mesh(
+      new THREE.BoxGeometry(0.88, 0.045, 0.88),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.08 }),
+    );
+    trim.position.set(x, y + height / 2 + 0.04, z);
+    group.add(trim);
+  }
 }
 
 function addPositionTile(

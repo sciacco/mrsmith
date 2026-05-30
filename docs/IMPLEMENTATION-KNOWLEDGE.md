@@ -656,6 +656,15 @@ Alyante ERP ID
 - Used by: `apps/grappa-dcim` layout transition planning.
 - Open questions: none.
 
+### Grappa DCIM Positions Are Whole Tiles; Half Racks Live On `racks`, Not `positions`
+
+- Context: `apps/grappa-dcim` rack/island maps (the Sale e MMR detail panel, the 2D layout grid, and the 3D scene), all fed by `positions` joined to `racks`.
+- Discovery: a `positions` row is one physical tile (mattonella) and has no A/B half concept — its columns are only `id, status, type, num, islets_id`, where `type` is `Full` or `Half`. The half-rack split lives entirely on `racks` (`racks.type` = `Full`/`Half`, `racks.pos` = `F`/`A`/`B`, `racks.positions_id` -> `positions.id`). So a `Half` tile can host two active racks (`A` = mezzo alto, `B` = mezzo basso) that both point at the same `positions.id`. A naive `positions LEFT JOIN racks ON racks.positions_id = positions.id` fans that one tile into two rows; counting rows double-counts the tile (e.g. DC4 reported 80 "posizioni" for 78 physical tiles) and any first-row-wins dedup silently drops the B rack. Separately, `listRacksForDatacenter` (the map `racks` array) has no active-state filter, so it returns every rack incl. `cessato`/`spento`/`chiuso` — never use its length as a rack count next to a tile grid (DC4: 152 vs 57 active).
+- Practical rule: group join rows by `positions.id` into one tile carrying its 0–2 racks before counting or rendering. Drive per-half occupancy from the presence of the `A`/`B` rack, but color a `Full` tile by `positions.status` (an occupied tile whose only rack is decommissioned must stay occupied, not free). Count occupancy per tile, not per rack row. For any "racks in this room" figure, filter to active racks (or count occupied tiles) — do not reuse the unfiltered map `racks` array.
+- Evidence: `docs/grappa/grappa_positions.json` (no `pos` column), `docs/grappa/grappa_racks.json` (`type`/`pos`/`positions_id`); backend grouping in `backend/internal/grappadcim/layout.go` (`scanPositions`, `positionsSelectSQL`) returning `Position.racks []PositionRack`; shared FE helpers `apps/grappa-dcim/src/features/facilities/positions.ts`; renderers in `FacilitiesPages.tsx` (`DatacenterMapPanel`), `LayoutGrid.tsx`, `LayoutScene.tsx`.
+- Used by: `apps/grappa-dcim` facilities map, 2D layout grid, and 3D scene.
+- Open questions: none.
+
 ### Alyante Product Translation Write Contract
 
 - Context: server-side sync of product short descriptions from kit-products into Alyante ERP table `MG87_ARTDESC`.

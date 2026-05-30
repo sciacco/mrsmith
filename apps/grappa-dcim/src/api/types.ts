@@ -112,16 +112,20 @@ export interface Islet {
   occupiedCount: number;
 }
 
+export interface PositionRack {
+  id: number;
+  name: string;
+  type: string; // 'Full' | 'Half'
+  pos: string; // 'F' | 'A' | 'B'
+}
+
 export interface Position {
   id: number;
   status: string;
-  type: string;
+  type: string; // 'Full' | 'Half'
   num: number;
   isletId: number;
-  rackId?: number;
-  rackName?: string;
-  rackType?: string;
-  rackPos?: string;
+  racks: PositionRack[];
 }
 
 export interface DatacenterMap {
@@ -161,10 +165,7 @@ export interface LayoutGridCell {
   positionId?: number;
   positionStatus?: string;
   positionType?: string;
-  rackId?: number;
-  rackName?: string;
-  rackType?: string;
-  rackPos?: string;
+  racks?: PositionRack[];
   plenumId?: number;
   plenumName?: string;
   plenumStatus?: string;

@@ -359,20 +359,35 @@ func scanIslet(rows *sql.Rows) (Islet, error) {
 	return item, nil
 }
 
+// scanPositions groups the LEFT JOIN rows by physical position (mattonella).
+// A Half position with two active racks (A/B) arrives as two rows sharing the
+// same position id; we collapse them into one Position carrying up to two
+// racks, so callers count and render one tile per physical position.
 func scanPositions(rows *sql.Rows) ([]Position, error) {
 	items := []Position{}
+	byID := map[int]int{}
 	for rows.Next() {
-		var item Position
+		var id, num, isletID int
+		var status, ptype string
 		var rackID sql.NullInt64
 		var rackName, rackType, rackPos sql.NullString
-		if err := rows.Scan(&item.ID, &item.Status, &item.Type, &item.Num, &item.IsletID, &rackID, &rackName, &rackType, &rackPos); err != nil {
+		if err := rows.Scan(&id, &status, &ptype, &num, &isletID, &rackID, &rackName, &rackType, &rackPos); err != nil {
 			return nil, err
 		}
-		item.RackID = nullableInt(rackID)
-		item.RackName = nullableString(rackName)
-		item.RackType = nullableString(rackType)
-		item.RackPos = nullableString(rackPos)
-		items = append(items, item)
+		idx, ok := byID[id]
+		if !ok {
+			items = append(items, Position{ID: id, Status: status, Type: ptype, Num: num, IsletID: isletID, Racks: []PositionRack{}})
+			idx = len(items) - 1
+			byID[id] = idx
+		}
+		if rackID.Valid {
+			items[idx].Racks = append(items[idx].Racks, PositionRack{
+				ID:   int(rackID.Int64),
+				Name: strings.TrimSpace(rackName.String),
+				Type: strings.TrimSpace(rackType.String),
+				Pos:  strings.TrimSpace(rackPos.String),
+			})
+		}
 	}
 	return items, rows.Err()
 }

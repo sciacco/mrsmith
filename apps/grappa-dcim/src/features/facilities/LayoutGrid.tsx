@@ -1,5 +1,6 @@
 import type { LayoutGridBlock, LayoutGridCell } from '../../api/types';
 import type { LayoutSelection } from './LayoutScene';
+import { fullRack, isHalfPosition, rackAt, slotStatus, type HalfSide } from './positions';
 import styles from './workspace.module.css';
 
 interface LayoutGridProps {
@@ -11,6 +12,7 @@ interface LayoutGridProps {
 function statusClass(cell: LayoutGridCell) {
   if (cell.type !== 'position') return '';
   if (!cell.positionId) return styles.layoutGridCellIncomplete;
+  if (isHalfPosition(cell.positionType)) return styles.layoutGridCellHalf;
   const status = (cell.positionStatus ?? '').toLowerCase();
   if (status === 'occupied') return styles.occupied;
   if (status === 'reserved') return styles.reserved;
@@ -21,28 +23,21 @@ function statusClass(cell: LayoutGridCell) {
 function positionStatusText(cell: LayoutGridCell) {
   if (!cell.positionId) return 'Posizione non trovata nei dati Grappa';
   const status = (cell.positionStatus ?? '').toLowerCase();
-  if (status === 'occupied') return cell.rackName ?? 'Occupata';
+  if (status === 'occupied') return fullRack(cell.racks)?.name ?? 'Occupata';
   if (status === 'reserved') return 'Riservata';
   if (status === 'free') return 'Libera';
   return cell.positionStatus ?? 'Stato non indicato';
 }
 
-function isHalfRack(cell: LayoutGridCell) {
-  return cell.rackType?.toLowerCase() === 'half' || cell.positionType?.toLowerCase() === 'half';
-}
-
-function halfRackLabel(cell: LayoutGridCell) {
-  if (!isHalfRack(cell)) return null;
-  if (cell.rackPos === 'A') return 'posizione alta';
-  if (cell.rackPos === 'B') return 'posizione bassa';
-  return null;
-}
-
-function halfRackBadge(cell: LayoutGridCell) {
-  if (!isHalfRack(cell)) return null;
-  if (cell.rackPos === 'A') return 'A';
-  if (cell.rackPos === 'B') return 'B';
-  return null;
+function HalfSlot({ cell, side }: { cell: LayoutGridCell; side: HalfSide }) {
+  const rack = rackAt(cell.racks, side);
+  const status = slotStatus(cell.positionStatus, rack);
+  return (
+    <span className={`${styles.layoutGridHalfSlot} ${styles[status] || ''}`} aria-label={side === 'A' ? 'mezzo alto' : 'mezzo basso'}>
+      <em>{side}</em>
+      <small>{rack?.name ?? (status === 'reserved' ? 'Riservata' : 'Libera')}</small>
+    </span>
+  );
 }
 
 function plenumLabel(cell: LayoutGridCell) {
@@ -69,16 +64,26 @@ function CellContent({ cell }: { cell: LayoutGridCell }) {
       </>
     );
   }
-  const halfBadge = halfRackBadge(cell);
-  const halfLabel = halfRackLabel(cell);
+  if (cell.positionId && isHalfPosition(cell.positionType)) {
+    return (
+      <>
+        <span className={styles.layoutGridPositionTopline}>
+          <strong>{cell.pos}</strong>
+          <em aria-label="posizione divisa">½</em>
+        </span>
+        <span className={styles.layoutGridHalfStack}>
+          <HalfSlot cell={cell} side="A" />
+          <HalfSlot cell={cell} side="B" />
+        </span>
+      </>
+    );
+  }
   return (
     <>
       <span className={styles.layoutGridPositionTopline}>
         <strong>{cell.pos}</strong>
-        {halfBadge ? <em aria-label={halfLabel ?? undefined}>{halfBadge}</em> : null}
       </span>
       <span>{positionStatusText(cell)}</span>
-      {halfLabel ? <small>{halfLabel}</small> : null}
     </>
   );
 }

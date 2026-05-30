@@ -11,10 +11,11 @@ import {
   useIslets,
   useLayoutMutations,
 } from '../../api/queries';
-import type { Building, BuildingInput, Datacenter, DatacenterInput, DatacenterMap, Islet, Position } from '../../api/types';
+import type { Building, BuildingInput, Datacenter, DatacenterInput, DatacenterMap, Islet, Position, PositionRack } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
 import { LayoutGrid } from './LayoutGrid';
 import type { LayoutSelection } from './LayoutScene';
+import { fullRack, isHalfPosition, rackAt, slotStatus, type HalfSide } from './positions';
 import styles from './workspace.module.css';
 
 const destructiveBody = { confirmPrimary: true, confirmSecondary: true };
@@ -799,13 +800,22 @@ function LayoutInspector({
         <div className={styles.detailGrid}>
           <DetailItem label="Isola" value={selectedIslet?.name} />
           <DetailItem label="Formato" value={selectedPosition.type} />
-          <DetailItem label="Rack" value={selectedPosition.rackName} />
-          <DetailItem label="Tipo rack" value={selectedPosition.rackType} />
-          <DetailItem label="Posizione rack" value={selectedPosition.rackPos === 'A' ? 'alta' : selectedPosition.rackPos === 'B' ? 'bassa' : selectedPosition.rackPos} />
           <DetailItem label="ID posizione" value={selectedPosition.id} />
         </div>
+        {selectedPosition.racks.length === 0 ? (
+          <p className={styles.emptyText}>Nessun rack su questa posizione.</p>
+        ) : selectedPosition.racks.map((rack) => (
+          <div key={rack.id} className={styles.detailGrid}>
+            <DetailItem label={positionRackLabel(rack.pos)} value={rack.name} />
+            <DetailItem label="Tipo rack" value={rack.type} />
+          </div>
+        ))}
         <div className={styles.inspectorActions}>
-          {selectedPosition.rackId ? <Button variant="secondary" onClick={() => selectedPosition.rackId && onOpenRack(selectedPosition.rackId)}>Apri rack</Button> : null}
+          {selectedPosition.racks.map((rack) => (
+            <Button key={rack.id} variant="secondary" onClick={() => onOpenRack(rack.id)}>
+              Apri {positionRackLabel(rack.pos).toLowerCase()}
+            </Button>
+          ))}
           {canOperate ? <Button variant="secondary" onClick={() => onEditPosition(selectedPosition)}>Modifica posizione</Button> : null}
           {canOperate ? <Button variant="danger" onClick={() => onDeletePosition(selectedPosition)}>Elimina posizione</Button> : null}
         </div>
@@ -897,44 +907,50 @@ function normalizePositionStatusClass(status: string) {
   return 'badgeMuted';
 }
 
+type HoveredSlot = { position: Position; rack?: PositionRack; side?: HalfSide };
+
 function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; loading: boolean; error: unknown }) {
-  const [hovered, setHovered] = useState<Position | null>(null);
+  const [hovered, setHovered] = useState<HoveredSlot | null>(null);
 
   if (loading) return <div className={styles.panel}><Skeleton rows={8} /></div>;
   if (error || !data) return <div className={styles.emptyPanel}><h3 className={styles.emptyTitle}>Mappa non disponibile</h3><p className={styles.emptyText}>Seleziona una sala per visualizzare il layout.</p></div>;
 
-  const hasHovered = hovered !== null;
+  const occupied = data.positions.filter((position) => position.racks.length > 0 || position.status === 'occupied').length;
+  // Half slots reflect their own rack; a Full tile reflects the tile status (so an
+  // occupied tile whose only rack is decommissioned stays occupied, not free).
+  const hoveredStatus = hovered ? (hovered.side ? slotStatus(hovered.position.status, hovered.rack) : hovered.position.status) : 'free';
 
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
         <div>
           <h2 className={styles.emptyTitle}>{data.datacenter.name}</h2>
-          <p className={styles.emptyText}>{data.incomplete ? 'Configurazione incompleta: mancano posizioni per le isole presenti.' : `${data.positions.length} posizioni visibili`}</p>
+          <p className={styles.emptyText}>{data.incomplete ? 'Configurazione incompleta: mancano posizioni per le isole presenti.' : `${occupied} occupate / ${data.positions.length} posizioni`}</p>
         </div>
-        <span className={styles.badgeMuted}>{data.racks.length} rack</span>
       </div>
 
-      <div className={`${styles.telemetryBar} ${hasHovered ? styles.telemetryActive : ''}`}>
-        {hasHovered ? (
+      <div className={`${styles.telemetryBar} ${hovered ? styles.telemetryActive : ''}`}>
+        {hovered ? (
           <>
-            <div className={`${styles.telemetryStatus} ${styles[hovered.status] || ''}`} />
+            <div className={`${styles.telemetryStatus} ${styles[hoveredStatus] || ''}`} />
             <div className={styles.telemetryContent}>
               <div className={styles.telemetryHeaderRow}>
-                <span className={styles.telemetryLabel}>Posizione {String(hovered.num).padStart(2, '0')}</span>
-                <span className={`${styles.telemetryBadge} ${styles[hovered.status] || ''}`}>
-                  {positionStatusLabel(hovered.status)}
+                <span className={styles.telemetryLabel}>
+                  Posizione {String(hovered.position.num).padStart(2, '0')}{hovered.side ? ` · ${hovered.side}` : ''}
+                </span>
+                <span className={`${styles.telemetryBadge} ${styles[hoveredStatus] || ''}`}>
+                  {positionStatusLabel(hoveredStatus)}
                 </span>
               </div>
               <strong className={styles.telemetryTitle}>
-                {hovered.rackName ?? 'Posizione vuota'}
+                {hovered.rack?.name ?? 'Posizione vuota'}
               </strong>
               <span className={styles.telemetrySubtitle}>
-                {hovered.rackType === 'Half' && hovered.rackPos === 'A'
-                  ? 'Posizione alta (Half)'
-                  : hovered.rackType === 'Half' && hovered.rackPos === 'B'
-                  ? 'Posizione bassa (Half)'
-                  : hovered.type}
+                {hovered.side === 'A'
+                  ? 'Mezzo alto (Half)'
+                  : hovered.side === 'B'
+                  ? 'Mezzo basso (Half)'
+                  : hovered.position.type}
               </span>
             </div>
           </>
@@ -949,14 +965,35 @@ function DatacenterMapPanel({ data, loading, error }: { data?: DatacenterMap; lo
       <div className={styles.mapGridCompact}>
         {data.positions.length === 0 ? (
           <p className={styles.emptyText}>Nessuna posizione configurata.</p>
-        ) : data.positions.map((position) => (
-          <div
-            key={position.id}
-            className={`${styles.mapTile} ${styles[position.status] || ''}`}
-            onMouseEnter={() => setHovered(position)}
-            onMouseLeave={() => setHovered(null)}
-          />
-        ))}
+        ) : data.positions.map((position) => {
+          if (isHalfPosition(position.type)) {
+            const rackA = rackAt(position.racks, 'A');
+            const rackB = rackAt(position.racks, 'B');
+            return (
+              <div key={position.id} className={`${styles.mapTile} ${styles.mapTileHalf}`}>
+                <div
+                  className={`${styles.mapTileHalfSlot} ${styles[slotStatus(position.status, rackA)] || ''}`}
+                  onMouseEnter={() => setHovered({ position, rack: rackA, side: 'A' })}
+                  onMouseLeave={() => setHovered(null)}
+                />
+                <div
+                  className={`${styles.mapTileHalfSlot} ${styles[slotStatus(position.status, rackB)] || ''}`}
+                  onMouseEnter={() => setHovered({ position, rack: rackB, side: 'B' })}
+                  onMouseLeave={() => setHovered(null)}
+                />
+              </div>
+            );
+          }
+          const rack = fullRack(position.racks);
+          return (
+            <div
+              key={position.id}
+              className={`${styles.mapTile} ${styles[position.status] || ''}`}
+              onMouseEnter={() => setHovered({ position, rack })}
+              onMouseLeave={() => setHovered(null)}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -1174,4 +1211,10 @@ function positionStatusLabel(status: string) {
   if (status === 'occupied') return 'occupata';
   if (status === 'reserved') return 'riservata';
   return valueOrDash(status);
+}
+
+function positionRackLabel(pos: string) {
+  if (pos === 'A') return 'Rack mezzo alto';
+  if (pos === 'B') return 'Rack mezzo basso';
+  return 'Rack';
 }

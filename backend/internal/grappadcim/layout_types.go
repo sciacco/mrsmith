@@ -36,15 +36,22 @@ type IsletPatch struct {
 }
 
 type Position struct {
-	ID       int     `json:"id"`
-	Status   string  `json:"status"`
-	Type     string  `json:"type"`
-	Num      int     `json:"num"`
-	IsletID  int     `json:"isletId"`
-	RackID   *int    `json:"rackId,omitempty"`
-	RackName *string `json:"rackName,omitempty"`
-	RackType *string `json:"rackType,omitempty"`
-	RackPos  *string `json:"rackPos,omitempty"`
+	ID      int            `json:"id"`
+	Status  string         `json:"status"`
+	Type    string         `json:"type"`
+	Num     int            `json:"num"`
+	IsletID int            `json:"isletId"`
+	Racks   []PositionRack `json:"racks"`
+}
+
+// PositionRack is an active rack placed on a position (mattonella).
+// A Full position holds at most one rack (pos "F"); a Half position holds
+// up to two (pos "A" = mezzo alto, pos "B" = mezzo basso).
+type PositionRack struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+	Pos  string `json:"pos"`
 }
 
 type PositionPatch struct {
