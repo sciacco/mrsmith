@@ -331,6 +331,60 @@ docker tag "$release_tag" "$archive_tag"' \
     "${IMAGE_ARCHIVE_TAG}"
 }
 
+create_git_release_tag() {
+  require_command git
+
+  local current_branch
+  current_branch="$(git -C "${REPO_ROOT}" symbolic-ref --short -q HEAD || echo "")"
+
+  if [[ "${current_branch}" != "main" ]]; then
+    log "Non siamo su branch main (branch corrente: '${current_branch}'), salto la creazione del tag"
+    return 0
+  fi
+
+  if git -C "${REPO_ROOT}" tag --points-at HEAD | grep -q "^PROD-"; then
+    log "Il commit corrente ha già un tag PROD-*, salto la creazione del tag"
+    return 0
+  fi
+
+  local tag_name
+  tag_name="PROD-$(date +%Y%m%d-%H%M)"
+
+  log "Deploy completato con successo. Aggiungo il tag Git: ${tag_name}"
+
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    log "DRY_RUN: salterei la creazione del tag Git locale: git tag ${tag_name}"
+  else
+    run_cmd git -C "${REPO_ROOT}" tag "${tag_name}"
+    log "Tag Git creato con successo: ${tag_name}"
+  fi
+
+  local upstream
+  upstream="$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref @{u} 2>/dev/null || echo "")"
+
+  if [[ -n "${upstream}" ]]; then
+    local local_commit upstream_commit
+    local_commit="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
+    upstream_commit="$(git -C "${REPO_ROOT}" rev-parse "${upstream}" 2>/dev/null || echo "")"
+
+    if [[ "${local_commit}" == "${upstream_commit}" ]]; then
+      local remote_name
+      remote_name="${upstream%%/*}"
+      log "La branch locale è allineata al remoto (${upstream}). Eseguo il push del tag..."
+      if [[ "${DRY_RUN:-0}" == "1" ]]; then
+        log "DRY_RUN: salterei il push del tag: git push ${remote_name} ${tag_name}"
+      else
+        run_cmd git -C "${REPO_ROOT}" push "${remote_name}" "${tag_name}"
+        log "Tag Git pushato con successo su ${remote_name}"
+      fi
+    else
+      log "La branch locale non è allineata al remoto (${upstream}) (local: ${local_commit:0:7}, remote: ${upstream_commit:0:7}). Salto il push del tag."
+    fi
+  else
+    log "Nessun remote upstream configurato per la branch corrente. Salto il push del tag."
+  fi
+}
+
 main() {
   load_env
 
@@ -372,6 +426,7 @@ main() {
       build_remote_image_from_stream
       restart_remote_service
       prune_remote_release_tags
+      create_git_release_tag
       ;;
     rollback)
       [[ -n "${RELEASE_TS:-}" ]] || fail "Imposta RELEASE_TS=YYYYmmddHHMMSS per il rollback"
