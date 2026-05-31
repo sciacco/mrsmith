@@ -169,6 +169,21 @@
   background: rgba(99, 91, 255, 0.06);
 }
 
+.fallbackRackList {
+  display: grid;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.fallbackRackTable {
+  min-width: 680px;
+}
+
+.fallbackRackTable td:first-child strong {
+  display: block;
+  margin-bottom: var(--space-1);
+}
+
 .clickable {
   cursor: pointer;
 }
@@ -1391,12 +1406,15 @@
 /* Compact badges */
 .compactBadge,
 .compactBadgeMuted,
-.compactBadgeWarning {
+.compactBadgeWarning,
+.compactBadgeShared {
   font-size: 0.625rem;
   padding: 2px 6px;
   border-radius: var(--radius-full);
   font-weight: 700;
   text-transform: uppercase;
+  display: inline-flex;
+  width: fit-content;
 }
 
 .compactBadge {
@@ -1412,6 +1430,11 @@
 .compactBadgeWarning {
   background: var(--color-warning-subtle);
   color: var(--color-warning-strong);
+}
+
+.compactBadgeShared {
+  background: rgba(192, 38, 211, 0.12);
+  color: #a21caf;
 }
 
 /* Panel titles and headers */
@@ -1437,6 +1460,46 @@
   gap: 6px; /* Spazio vuoto in mezzo alle isole ridotto a 1/4 (6px) */
   margin-top: var(--space-4);
   align-items: start;
+}
+
+/* Disposizione fisica a 3 regioni: Fila/Isole in alto, colonna rack a destra,
+   striscia orizzontale (es. Sezione 5) in fondo a tutta larghezza. */
+.mapGridLayout {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'main right'
+    'bottom bottom';
+  gap: 6px;
+  margin-top: var(--space-4);
+  align-items: start;
+}
+
+.mapGridLayoutMain {
+  grid-area: main;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.mapGridLayoutRight {
+  grid-area: right;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mapGridLayoutBottom {
+  grid-area: bottom;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.mapGridBlockBottomAligned {
+  align-self: flex-end;
 }
 
 .mapGridBlock {
@@ -1573,21 +1636,32 @@
 /* Half positions */
 .mapGridCellHalf {
   padding: 1px !important;
-  display: flex !important;
-  flex-direction: column;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  gap: 1px;
   align-items: stretch;
+  justify-items: stretch;
+}
+
+.mapGridCellHalf > strong {
+  justify-self: center;
+  line-height: 1;
+  text-align: center;
 }
 
 .mapGridHalfStack {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  min-height: 0;
   height: 100%;
   width: 100%;
 }
 
 .mapGridHalfSlot {
   flex: 1;
+  min-height: 0;
   border-radius: 1px;
   transition: transform var(--duration-fast) var(--ease-spring), opacity var(--duration-fast);
   cursor: pointer;
@@ -1695,6 +1769,11 @@
 .mapGridBlocksSpacious .mapGridCellHalf {
   grid-template-rows: auto 1fr !important;
   padding: 2px !important;
+}
+
+.mapGridBlocksSpacious .mapGridCellHalf > strong {
+  justify-self: start;
+  text-align: left;
 }
 
 .mapGridBlocksSpacious .mapGridHalfStack {

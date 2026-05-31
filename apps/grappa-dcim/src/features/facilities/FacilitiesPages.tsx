@@ -11,7 +11,7 @@ import {
   useIslets,
   useLayoutMutations,
 } from '../../api/queries';
-import type { Building, BuildingInput, Datacenter, DatacenterInput, Islet, Position, PositionRack, LayoutGridResponse, LayoutGridBlock, LayoutGridCell } from '../../api/types';
+import type { Building, BuildingInput, Datacenter, DatacenterInput, Islet, Position, PositionRack, RackListItem, LayoutGridResponse, LayoutGridBlock, LayoutGridCell } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
 import { LayoutGrid } from './LayoutGrid';
 import type { LayoutSelection } from './LayoutScene';
@@ -925,6 +925,209 @@ function positionEffectiveStatus(position: Position): SlotStatus {
 
 type HoveredSlot = { position: Position; rack?: PositionRack; side?: HalfSide };
 
+type FallbackRack = {
+  id: number;
+  name: string;
+  type?: string;
+  pos?: string;
+  shared: boolean;
+  positionNum?: number;
+  positionStatus?: string;
+  rackNumber?: number;
+  unitCount?: number;
+  customerId?: number;
+  orderCode?: string;
+  soldPower?: number;
+};
+
+function isOperationalRack(rack: RackListItem): boolean {
+  const status = (rack.status ?? '').trim().toLowerCase();
+  return !rack.ceasedAt && !['cessato', 'cessata', 'spento', 'chiuso'].includes(status);
+}
+
+function isSharedValue(value: string | undefined): boolean {
+  return (value ?? '').trim().toLowerCase() === 'si';
+}
+
+function buildFallbackRacks(data: LayoutGridResponse): FallbackRack[] {
+  const detailById = new Map(data.racks.map((rack) => [rack.id, rack]));
+  const fromPositions = data.positions.flatMap((position) => position.racks.map((rack) => {
+    const detail = detailById.get(rack.id);
+    return {
+      id: rack.id,
+      name: rack.name,
+      type: detail?.type ?? rack.type,
+      pos: detail?.position ?? rack.pos,
+      shared: rack.shared || isSharedValue(detail?.shared),
+      positionNum: position.num,
+      positionStatus: position.status,
+      rackNumber: detail?.rackNumber,
+      unitCount: detail?.unitCount,
+      customerId: detail?.customerId,
+      orderCode: detail?.orderCode,
+      soldPower: detail?.soldPower,
+    };
+  }));
+
+  if (fromPositions.length > 0) return fromPositions;
+
+  return data.racks.filter(isOperationalRack).map((rack) => ({
+    id: rack.id,
+    name: rack.name,
+    type: rack.type,
+    pos: rack.position,
+    shared: isSharedValue(rack.shared),
+    rackNumber: rack.rackNumber,
+    unitCount: rack.unitCount,
+    customerId: rack.customerId,
+    orderCode: rack.orderCode,
+    soldPower: rack.soldPower,
+  }));
+}
+
+function fallbackRackPositionLabel(rack: FallbackRack): string {
+  const num = rack.rackNumber ?? rack.positionNum;
+  const parts = [
+    num === undefined ? null : `Pos. ${num}`,
+    rack.type,
+    rack.pos,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : '-';
+}
+
+function fallbackRackPositionStatusLabel(rack: FallbackRack): string | null {
+  if (!rack.positionStatus) return null;
+  return positionStatusLabel(fullSlotStatus({
+    status: rack.positionStatus,
+    racks: [{ id: rack.id, name: rack.name, type: rack.type ?? '', pos: rack.pos ?? '', shared: rack.shared }],
+  }));
+}
+
+function FallbackRackTable({ racks }: { racks: FallbackRack[] }) {
+  return (
+    <div className={styles.fallbackRackList}>
+      <div className={styles.sectionHeader}>
+        <div>
+          <h3 className={styles.emptyTitle}>Rack registrati</h3>
+          <p className={styles.emptyText}>La sala non ha una mappa spaziale configurata; i rack sono mostrati come elenco operativo.</p>
+        </div>
+        <span className={styles.badgeMuted}>{racks.length} rack</span>
+      </div>
+      <div className={styles.tableWrap}>
+        <table className={`${styles.table} ${styles.fallbackRackTable}`}>
+          <thead>
+            <tr>
+              <th>Rack</th>
+              <th>Posizione</th>
+              <th>Unita</th>
+              <th>Cliente / Ordine</th>
+              <th>Potenza</th>
+            </tr>
+          </thead>
+          <tbody>
+            {racks.map((rack) => {
+              const positionStatus = fallbackRackPositionStatusLabel(rack);
+              return (
+                <tr key={rack.id}>
+                  <td>
+                    <strong>{rack.name}</strong>
+                    {rack.shared ? <span className={styles.compactBadgeShared}>Condiviso</span> : null}
+                  </td>
+                  <td>
+                    {fallbackRackPositionLabel(rack)}
+                    {positionStatus ? <br /> : null}
+                    {positionStatus ? <span className={styles.muted}>{positionStatus}</span> : null}
+                  </td>
+                  <td>{valueOrDash(rack.unitCount)}</td>
+                  <td>
+                    {valueOrDash(rack.customerId)}
+                    {rack.orderCode ? <br /> : null}
+                    {rack.orderCode ? <span className={styles.muted}>{rack.orderCode}</span> : null}
+                  </td>
+                  <td>{rack.soldPower === undefined ? '-' : `${rack.soldPower} kW`}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function countUnboundPositionCells(blocks: LayoutGridBlock[]): number {
+  return blocks.reduce((total, block) => (
+    total + block.grid.reduce((blockTotal, row) => (
+      blockTotal + row.filter((cell) => block.isletId !== undefined && cell.type === 'position' && !cell.positionId).length
+    ), 0)
+  ), 0);
+}
+
+function unboundPositionCellsLabel(count: number): string {
+  return count === 1 ? '1 posizione mappa non censita' : `${count} posizioni mappa non censite`;
+}
+
+function countUnboundPlenumCells(blocks: LayoutGridBlock[]): number {
+  return blocks.reduce((total, block) => (
+    total + block.grid.reduce((blockTotal, row) => (
+      blockTotal + row.filter((cell) => cell.type === 'plenum' && !cell.plenumId).length
+    ), 0)
+  ), 0);
+}
+
+function unboundPlenumCellsLabel(count: number): string {
+  return count === 1 ? '1 plenum non collegato' : `${count} plenum non collegati`;
+}
+
+function unlinkedIsletsLabel(count: number): string {
+  return count === 1 ? '1 isola non collegata' : `${count} isole non collegate`;
+}
+
+function otherWarningsLabel(count: number): string {
+  return count === 1 ? '1 segnalazione da verificare' : `${count} segnalazioni da verificare`;
+}
+
+function buildLayoutIssueLabels(data: LayoutGridResponse, unboundPositionCount: number, unboundPlenumCount: number): string[] {
+  const positionWarningCount = data.warnings.filter((warning) => warning.includes('posizione') && warning.includes('non trovata')).length;
+  const plenumWarningCount = data.warnings.filter((warning) => warning.includes('plenum') && warning.includes('non collegato')).length;
+  const unlinkedIsletCount = data.warnings.filter((warning) => warning.includes('isola non collegata')).length;
+  const otherWarningCount = data.warnings.filter((warning) => (
+    warning !== 'Mappa non configurata'
+    && !(warning.includes('posizione') && warning.includes('non trovata'))
+    && !(warning.includes('plenum') && warning.includes('non collegato'))
+    && !warning.includes('isola non collegata')
+  )).length;
+
+  const labels: string[] = [];
+  const positionIssueCount = Math.max(unboundPositionCount, positionWarningCount);
+  const plenumIssueCount = Math.max(unboundPlenumCount, plenumWarningCount);
+  if (positionIssueCount > 0) labels.push(unboundPositionCellsLabel(positionIssueCount));
+  if (plenumIssueCount > 0) labels.push(unboundPlenumCellsLabel(plenumIssueCount));
+  if (unlinkedIsletCount > 0) labels.push(unlinkedIsletsLabel(unlinkedIsletCount));
+  if (otherWarningCount > 0) labels.push(otherWarningsLabel(otherWarningCount));
+  return labels;
+}
+
+// The source layout flattened the original nested Bootstrap structure into a flat
+// list of blocks with only a `layoutWidth` hint, so we reconstruct the physical
+// arrangement heuristically from each block's shape:
+//  - a single-row, wide block (e.g. "Sezione 5") is a horizontal strip → bottom;
+//  - a narrow tall block ("col-2" or single-column) is a rack column → right;
+//  - everything else (the Fila/Isola grids) → main area, top.
+function blockCols(block: LayoutGridBlock): number {
+  return block.grid.reduce((max, row) => Math.max(max, row.length), 0);
+}
+
+function isBottomStrip(block: LayoutGridBlock): boolean {
+  return block.grid.length === 1 && blockCols(block) >= 5;
+}
+
+function isRightColumn(block: LayoutGridBlock): boolean {
+  if (isBottomStrip(block)) return false;
+  const width = block.layoutWidth ?? '';
+  return width.includes('col-2') || (blockCols(block) === 1 && block.grid.length >= 3);
+}
+
 function DatacenterMapPanel({
   data,
   loading,
@@ -943,7 +1146,11 @@ function DatacenterMapPanel({
   if (loading) return <div className={styles.panel}><Skeleton rows={8} /></div>;
   if (error || !data) return <div className={styles.emptyPanel}><h3 className={styles.emptyTitle}>Mappa non disponibile</h3><p className={styles.emptyText}>Seleziona una sala per visualizzare il layout.</p></div>;
 
-  const isSpacious = data.blocks.length <= 2;
+  const isSpacious = data.blocks.length <= 4;
+  const fallbackRacks = data.blocks.length === 0 ? buildFallbackRacks(data) : [];
+  const hasRackFallback = fallbackRacks.length > 0;
+  const unboundPositionCount = countUnboundPositionCells(data.blocks);
+  const unboundPlenumCount = countUnboundPlenumCells(data.blocks);
 
   // Occupancy is counted per rack slot (posto: Full = 1, Half = 2) and driven by
   // active rack presence, so the numbers match the coloured regions exactly.
@@ -951,7 +1158,151 @@ function DatacenterMapPanel({
   const subtitle = `${slots.occupied} occupati / ${slots.total} posti`
     + (slots.shared > 0 ? ` · ${slots.shared} condivisi` : '')
     + (slots.reserved > 0 ? ` · ${slots.reserved} riservati` : '');
+  const layoutIssueLabels = buildLayoutIssueLabels(data, unboundPositionCount, unboundPlenumCount);
+  const panelNote = hasRackFallback
+    ? `Mappa non configurata · ${fallbackRacks.length} rack registrati`
+    : data.blocks.length === 0
+    ? (slots.total > 0 ? `Mappa non configurata · ${subtitle}` : 'Mappa non configurata')
+    : layoutIssueLabels.length > 0
+    ? `${subtitle} · ${layoutIssueLabels.join(' · ')}`
+    : data.incomplete
+    ? `${subtitle} · configurazione da verificare`
+    : subtitle;
   const hoveredStatus = hovered ? (hovered.side ? slotStatus(hovered.position.status, hovered.rack) : fullSlotStatus(hovered.position)) : 'free';
+
+  // Blocks arrive already sorted by displayOrder. Split them into the three
+  // physical regions; rooms (DC) have no right/bottom blocks, so they fall back
+  // to the original single flex-wrap container and render exactly as before.
+  const bottomBlocks = data.blocks.filter(isBottomStrip);
+  const rightBlocks = data.blocks.filter(isRightColumn);
+  const mainBlocks = data.blocks.filter((block) => !isBottomStrip(block) && !isRightColumn(block));
+  const useRegions = rightBlocks.length > 0 || bottomBlocks.length > 0;
+
+  const renderBlock = (block: LayoutGridBlock) => (
+    <section
+      key={block.id}
+      className={`${styles.mapGridBlock} ${(block.layoutWidth ?? '').includes('align-self-end') ? styles.mapGridBlockBottomAligned : ''}`}
+    >
+      <div className={styles.mapGridBlockHeader}>
+        <strong>{block.title}</strong>
+      </div>
+      <div className={styles.mapGridTable}>
+        {block.grid.map((row: LayoutGridCell[], rowIndex: number) => (
+          <div
+            key={rowIndex}
+            className={styles.mapGridRow}
+            style={{ gridTemplateColumns: `repeat(${row.length}, 1fr)` }}
+          >
+            {row.map((cell: LayoutGridCell, colIndex: number) => {
+              const isCellHalf = cell.positionId && isHalfPosition(cell.positionType);
+              const fullStatus = cell.positionId ? fullSlotStatus({ status: cell.positionStatus ?? '', racks: cell.racks }) : 'free';
+
+              const cellClassName = [
+                styles.mapGridCell,
+                cell.type === 'empty' ? styles.mapGridCellEmpty : '',
+                cell.type === 'label' ? styles.mapGridCellLabel : '',
+                cell.type === 'plenum' ? styles.mapGridCellPlenum : '',
+                cell.type === 'position' ? styles.mapGridCellPosition : '',
+                cell.type === 'position' && !isCellHalf ? styles[fullStatus] : '',
+                cell.type === 'position' && isCellHalf ? styles.mapGridCellHalf : '',
+              ].filter(Boolean).join(' ');
+
+              if (cell.type === 'empty') {
+                return <div key={colIndex} className={cellClassName} />;
+              }
+
+              if (cell.type === 'label') {
+                return (
+                  <div key={colIndex} className={cellClassName} title={cell.text}>
+                    <strong>L</strong>
+                  </div>
+                );
+              }
+
+              if (cell.type === 'plenum') {
+                return (
+                  <div key={colIndex} className={cellClassName} title={cell.plenumName ?? 'Plenum'}>
+                    <strong>P</strong>
+                  </div>
+                );
+              }
+
+              // Position cell
+              if (cell.type === 'position' && !cell.positionId) {
+                return (
+                  <div
+                    key={colIndex}
+                    className={`${styles.mapGridCell} ${styles.incomplete}`}
+                    title={`Posizione ${cell.pos} non configurata nel database Grappa (Isola ID: ${block.isletId ?? 'N/D'})`}
+                  >
+                    <strong>{cell.pos}</strong>
+                  </div>
+                );
+              }
+
+              if (isCellHalf) {
+                const rackA = rackAt(cell.racks, 'A');
+                const rackB = rackAt(cell.racks, 'B');
+                const posObj: Position = {
+                  id: cell.positionId!,
+                  status: cell.positionStatus ?? 'Libera',
+                  type: 'Half',
+                  num: cell.pos ?? 0,
+                  isletId: block.isletId ?? 0,
+                  racks: cell.racks ?? [],
+                };
+
+                return (
+                  <div key={colIndex} className={cellClassName} title={`Posizione ${cell.pos} (Divisa)`}>
+                    <strong>{cell.pos}</strong>
+                    <div className={styles.mapGridHalfStack}>
+                      <div
+                        className={`${styles.mapGridHalfSlot} ${styles[slotStatus(cell.positionStatus, rackA)] || ''}`}
+                        onMouseEnter={() => setHovered({ position: posObj, rack: rackA, side: 'A' })}
+                        onMouseLeave={() => setHovered(null)}
+                      />
+                      <div
+                        className={`${styles.mapGridHalfSlot} ${styles[slotStatus(cell.positionStatus, rackB)] || ''}`}
+                        onMouseEnter={() => setHovered({ position: posObj, rack: rackB, side: 'B' })}
+                        onMouseLeave={() => setHovered(null)}
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              // Full position
+              const rack = fullRack(cell.racks);
+              const posObj: Position = {
+                id: cell.positionId!,
+                status: cell.positionStatus ?? 'Libera',
+                type: 'Full',
+                num: cell.pos ?? 0,
+                isletId: block.isletId ?? 0,
+                racks: cell.racks ?? [],
+              };
+
+              return (
+                <div
+                  key={colIndex}
+                  className={cellClassName}
+                  onMouseEnter={() => setHovered({ position: posObj, rack })}
+                  onMouseLeave={() => setHovered(null)}
+                >
+                  <strong>{cell.pos}</strong>
+                  {isSpacious && rack?.name && (
+                    <span className={styles.mapGridCellStatus}>
+                      {rack.name}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 
   return (
     <div className={styles.panel}>
@@ -973,7 +1324,7 @@ function DatacenterMapPanel({
       </div>
 
       <div className={styles.emptyText} style={{ fontSize: '0.8125rem', marginBottom: 'var(--space-4)' }}>
-        {data.incomplete ? 'Configurazione incompleta: mancano posizioni per le isole presenti.' : subtitle}
+        {panelNote}
       </div>
 
       <div className={`${styles.telemetryBar} ${hovered ? styles.telemetryActive : ''}`}>
@@ -1004,143 +1355,37 @@ function DatacenterMapPanel({
         ) : (
           <div className={styles.telemetryPlaceholder}>
             <Icon name="info" size={16} />
-            <span>Passa il mouse su una posizione per ispezionare il rack</span>
+            <span>{hasRackFallback ? 'Sala senza mappa spaziale: i rack sono mostrati come elenco operativo.' : 'Passa il mouse su una posizione per ispezionare il rack'}</span>
           </div>
         )}
       </div>
 
-      <div className={`${styles.mapGridBlocks} ${isSpacious ? styles.mapGridBlocksSpacious : ''}`}>
-        {data.blocks.length === 0 ? (
-          <div className={styles.emptyPanel} style={{ padding: 'var(--space-8) 0' }}>
-            <h3 className={styles.emptyTitle}>Mappa non configurata</h3>
-            <p className={styles.emptyText} style={{ fontSize: '0.8125rem' }}>
-              Questa sala non ha una disposizione spaziale di corridoi o posizioni configurata.
-            </p>
-          </div>
-        ) : (
-          data.blocks.map((block: LayoutGridBlock) => (
-            <section key={block.id} className={styles.mapGridBlock}>
-              <div className={styles.mapGridBlockHeader}>
-                <strong>{block.title}</strong>
-              </div>
-              <div className={styles.mapGridTable}>
-                {block.grid.map((row: LayoutGridCell[], rowIndex: number) => (
-                  <div
-                    key={rowIndex}
-                    className={styles.mapGridRow}
-                    style={{ gridTemplateColumns: `repeat(${row.length}, 1fr)` }}
-                  >
-                    {row.map((cell: LayoutGridCell, colIndex: number) => {
-                      const isCellHalf = cell.positionId && isHalfPosition(cell.positionType);
-                      const fullStatus = cell.positionId ? fullSlotStatus({ status: cell.positionStatus ?? '', racks: cell.racks }) : 'free';
-
-                      const cellClassName = [
-                        styles.mapGridCell,
-                        cell.type === 'empty' ? styles.mapGridCellEmpty : '',
-                        cell.type === 'label' ? styles.mapGridCellLabel : '',
-                        cell.type === 'plenum' ? styles.mapGridCellPlenum : '',
-                        cell.type === 'position' ? styles.mapGridCellPosition : '',
-                        cell.type === 'position' && !isCellHalf ? styles[fullStatus] : '',
-                        cell.type === 'position' && isCellHalf ? styles.mapGridCellHalf : '',
-                      ].filter(Boolean).join(' ');
-
-                      if (cell.type === 'empty') {
-                        return <div key={colIndex} className={cellClassName} />;
-                      }
-
-                      if (cell.type === 'label') {
-                        return (
-                          <div key={colIndex} className={cellClassName} title={cell.text}>
-                            <strong>L</strong>
-                          </div>
-                        );
-                      }
-
-                      if (cell.type === 'plenum') {
-                        return (
-                          <div key={colIndex} className={cellClassName} title={cell.plenumName ?? 'Plenum'}>
-                            <strong>P</strong>
-                          </div>
-                        );
-                      }
-
-                      // Position cell
-                      if (cell.type === 'position' && !cell.positionId) {
-                        return (
-                          <div
-                            key={colIndex}
-                            className={`${styles.mapGridCell} ${styles.incomplete}`}
-                            title={`Posizione ${cell.pos} non configurata nel database Grappa (Isola ID: ${block.isletId ?? 'N/D'})`}
-                          >
-                            <strong>{cell.pos}</strong>
-                          </div>
-                        );
-                      }
-
-                      if (isCellHalf) {
-                        const rackA = rackAt(cell.racks, 'A');
-                        const rackB = rackAt(cell.racks, 'B');
-                        const posObj: Position = {
-                          id: cell.positionId!,
-                          status: cell.positionStatus ?? 'Libera',
-                          type: 'Half',
-                          num: cell.pos ?? 0,
-                          isletId: block.isletId ?? 0,
-                          racks: cell.racks ?? [],
-                        };
-
-                        return (
-                          <div key={colIndex} className={cellClassName} title={`Posizione ${cell.pos} (Divisa)`}>
-                            <div className={styles.mapGridHalfStack}>
-                              <div
-                                className={`${styles.mapGridHalfSlot} ${styles[slotStatus(cell.positionStatus, rackA)] || ''}`}
-                                onMouseEnter={() => setHovered({ position: posObj, rack: rackA, side: 'A' })}
-                                onMouseLeave={() => setHovered(null)}
-                              />
-                              <div
-                                className={`${styles.mapGridHalfSlot} ${styles[slotStatus(cell.positionStatus, rackB)] || ''}`}
-                                onMouseEnter={() => setHovered({ position: posObj, rack: rackB, side: 'B' })}
-                                onMouseLeave={() => setHovered(null)}
-                              />
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      // Full position
-                      const rack = fullRack(cell.racks);
-                      const posObj: Position = {
-                        id: cell.positionId!,
-                        status: cell.positionStatus ?? 'Libera',
-                        type: 'Full',
-                        num: cell.pos ?? 0,
-                        isletId: block.isletId ?? 0,
-                        racks: cell.racks ?? [],
-                      };
-
-                      return (
-                        <div
-                          key={colIndex}
-                          className={cellClassName}
-                          onMouseEnter={() => setHovered({ position: posObj, rack })}
-                          onMouseLeave={() => setHovered(null)}
-                        >
-                          <strong>{cell.pos}</strong>
-                          {isSpacious && rack?.name && (
-                            <span className={styles.mapGridCellStatus}>
-                              {rack.name}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))
-        )}
-      </div>
+      {hasRackFallback ? (
+        <div className={`${styles.mapGridBlocks} ${isSpacious ? styles.mapGridBlocksSpacious : ''}`}>
+          <FallbackRackTable racks={fallbackRacks} />
+        </div>
+      ) : data.blocks.length === 0 ? (
+        <div className={styles.emptyPanel} style={{ padding: 'var(--space-8) 0' }}>
+          <h3 className={styles.emptyTitle}>Mappa non configurata</h3>
+          <p className={styles.emptyText} style={{ fontSize: '0.8125rem' }}>
+            Questa sala non ha una disposizione spaziale di corridoi o posizioni configurata.
+          </p>
+        </div>
+      ) : useRegions ? (
+        <div className={`${styles.mapGridLayout} ${isSpacious ? styles.mapGridBlocksSpacious : ''}`}>
+          <div className={styles.mapGridLayoutMain}>{mainBlocks.map(renderBlock)}</div>
+          {rightBlocks.length > 0 && (
+            <div className={styles.mapGridLayoutRight}>{rightBlocks.map(renderBlock)}</div>
+          )}
+          {bottomBlocks.length > 0 && (
+            <div className={styles.mapGridLayoutBottom}>{bottomBlocks.map(renderBlock)}</div>
+          )}
+        </div>
+      ) : (
+        <div className={`${styles.mapGridBlocks} ${isSpacious ? styles.mapGridBlocksSpacious : ''}`}>
+          {data.blocks.map(renderBlock)}
+        </div>
+      )}
     </div>
   );
 }
