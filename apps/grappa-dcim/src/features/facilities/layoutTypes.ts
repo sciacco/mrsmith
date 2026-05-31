@@ -7,4 +7,6 @@ export type LayoutSelection =
   | { type: 'position'; id: number }
   | null;
 
-export type LayoutViewMode = '2d' | '3d';
+// 'off' hides the map panel entirely (default) so the consultation list gets the
+// full width; '2d'/'3d' reveal the spatial map.
+export type LayoutViewMode = 'off' | '2d' | '3d';

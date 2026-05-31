@@ -45,6 +45,22 @@ const FORMAT_FILTERS = [
   { value: 'half', label: 'Half' },
 ];
 
+// Display order shared with the Sale e MMR page: buildings alphabetically, within a
+// building rooms (isMmr=false) before MMR, then by name; building-less last by name.
+function compareDatacenters(a: Datacenter, b: Datacenter): number {
+  const hasBuildingA = !!a.buildingName;
+  const hasBuildingB = !!b.buildingName;
+  if (hasBuildingA && !hasBuildingB) return -1;
+  if (!hasBuildingA && hasBuildingB) return 1;
+  if (hasBuildingA && hasBuildingB) {
+    const byBuilding = (a.buildingName || '').localeCompare(b.buildingName || '');
+    if (byBuilding !== 0) return byBuilding;
+    if (a.isMmr !== b.isMmr) return a.isMmr ? 1 : -1;
+    return a.name.localeCompare(b.name);
+  }
+  return a.name.localeCompare(b.name);
+}
+
 function valueOrDash(value: unknown) {
   if (value === undefined || value === null || value === '') return '-';
   return String(value);
@@ -268,33 +284,7 @@ export function DatacentersPage() {
       return item.buildingId === buildingFilter;
     });
 
-    return [...filtered].sort((a, b) => {
-      const hasBuildingA = !!a.buildingName;
-      const hasBuildingB = !!b.buildingName;
-
-      // 1) & 3) Sale con un edificio prima di quelle senza edificio
-      if (hasBuildingA && !hasBuildingB) return -1;
-      if (!hasBuildingA && hasBuildingB) return 1;
-
-      if (hasBuildingA && hasBuildingB) {
-        // Entrambi hanno un edificio: in ordine alfabetico dell'edificio
-        const bNameA = a.buildingName || '';
-        const bNameB = b.buildingName || '';
-        const bComp = bNameA.localeCompare(bNameB);
-        if (bComp !== 0) return bComp;
-
-        // 2) Nello stesso edificio: prima le sale (isMmr === false), poi le MMR (isMmr === true)
-        if (a.isMmr !== b.isMmr) {
-          return a.isMmr ? 1 : -1;
-        }
-
-        // Nello stesso edificio e stesso tipo: in ordine alfabetico di nome
-        return a.name.localeCompare(b.name);
-      }
-
-      // Entrambi senza edificio: in ordine alfabetico di nome
-      return a.name.localeCompare(b.name);
-    });
+    return [...filtered].sort(compareDatacenters);
   }, [query.data, buildingFilter]);
 
   const selected = filteredDatacenters.find((item) => item.id === selectedId) ?? filteredDatacenters[0] ?? null;
@@ -438,7 +428,7 @@ export function LayoutPage() {
   const datacenters = useDatacenters({ kind: 'all', status: 'active' });
   const [datacenterId, setDatacenterId] = useState<number | null>(null);
   const [selection, setSelection] = useState<LayoutSelection>(null);
-  const [viewMode, setViewMode] = useState<LayoutViewMode | null>(null);
+  const [viewMode, setViewMode] = useState<LayoutViewMode>('off');
   const [editingIslet, setEditingIslet] = useState<Islet | null | 'new'>(null);
   const [deletingIslet, setDeletingIslet] = useState<Islet | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
@@ -449,31 +439,23 @@ export function LayoutPage() {
   const [statusFilters, setStatusFilters] = useState<SlotStatus[]>([]);
   const [formatFilters, setFormatFilters] = useState<string[]>([]);
   const [scopeIsletId, setScopeIsletId] = useState<number | null>(null);
+  const [drawerPositionId, setDrawerPositionId] = useState<number | null>(null);
+  const [drawerIsletId, setDrawerIsletId] = useState<number | null>(null);
   const islets = useIslets(datacenterId);
   const map = useDatacenterMap(datacenterId);
   const layoutGrid = useDatacenterLayoutGrid(datacenterId);
   const mutations = useLayoutMutations();
 
-  const selectedDatacenter = datacenters.data?.find((item) => item.id === datacenterId) ?? null;
   const hasLayoutGridBlocks = (layoutGrid.data?.blocks.length ?? 0) > 0;
-  const effectiveViewMode: LayoutViewMode = viewMode ?? (hasLayoutGridBlocks ? '2d' : '3d');
-  const waitingForDefaultView = datacenterId !== null && viewMode === null && layoutGrid.isLoading;
   const sceneIslets = useMemo(() => map.data?.islets ?? islets.data ?? [], [islets.data, map.data?.islets]);
   const scenePositions = useMemo(() => layoutGrid.data?.positions ?? map.data?.positions ?? [], [layoutGrid.data?.positions, map.data?.positions]);
   const racksList = useMemo<RackListItem[]>(() => layoutGrid.data?.racks ?? map.data?.racks ?? [], [layoutGrid.data?.racks, map.data?.racks]);
-  const selectedPosition = selection?.type === 'position' ? scenePositions.find((item) => item.id === selection.id) ?? null : null;
-  const selectedIslet = selection?.type === 'islet'
-    ? sceneIslets.find((item) => item.id === selection.id) ?? null
-    : selectedPosition
-      ? sceneIslets.find((item) => item.id === selectedPosition.isletId) ?? null
-      : null;
   const datacenterOptions = useMemo(
-    () => datacenters.data?.map((item) => ({ value: item.id, label: `${item.name}${item.isMmr ? ' - MMR' : ''}` })) ?? [],
+    () => [...(datacenters.data ?? [])]
+      .sort(compareDatacenters)
+      .map((item) => ({ value: item.id, label: `${item.name}${item.isMmr ? ' - MMR' : ''}` })),
     [datacenters.data],
   );
-  // Per-slot occupancy (Full = 1 posto, Half = 2), driven by active rack presence so
-  // the sala summary counts match the coloured cells in the 2D/3D layout.
-  const occupancy = useMemo(() => summarizeSlots(scenePositions), [scenePositions]);
 
   // Unified consultation model: positions joined to islets + rich rack detail.
   const rows = useMemo(() => buildPositionRows(scenePositions, sceneIslets, racksList), [scenePositions, sceneIslets, racksList]);
@@ -485,6 +467,8 @@ export function LayoutPage() {
   // so each chip shows how many of the current matches fall in that state.
   const chipCounts = useMemo(() => statusCounts(rows.filter((row) => rowMatchesFilters(row, { ...filters, statuses: [] }))), [rows, filters]);
   const isletSummaries = useMemo(() => summarizeIslets(rows, sceneIslets, filters), [rows, sceneIslets, filters]);
+  const drawerRow = drawerPositionId !== null ? rows.find((item) => item.position.id === drawerPositionId) ?? null : null;
+  const drawerIslet = drawerIsletId !== null ? sceneIslets.find((item) => item.id === drawerIsletId) ?? null : null;
 
   const toggleStatusFilter = (status: SlotStatus) =>
     setStatusFilters((current) => (current.includes(status) ? current.filter((s) => s !== status) : [...current, status]));
@@ -508,11 +492,6 @@ export function LayoutPage() {
   }, [datacenterId, datacenters.data]);
 
   useEffect(() => {
-    if (datacenterId === null || viewMode !== null || layoutGrid.isLoading) return;
-    setViewMode(hasLayoutGridBlocks ? '2d' : '3d');
-  }, [datacenterId, hasLayoutGridBlocks, layoutGrid.isLoading, viewMode]);
-
-  useEffect(() => {
     if (!selection) return;
     const valid = selection.type === 'islet'
       ? sceneIslets.some((item) => item.id === selection.id)
@@ -521,12 +500,11 @@ export function LayoutPage() {
   }, [sceneIslets, scenePositions, selection]);
 
   async function createBatch() {
-    if (!selectedIslet) return;
+    if (!drawerIslet) return;
     try {
-      const result = await mutations.createPositions.mutateAsync({ isletId: selectedIslet.id, count: batchCount, type: batchType });
+      const result = await mutations.createPositions.mutateAsync({ isletId: drawerIslet.id, count: batchCount, type: batchType });
       toast.toast(result.message || 'Posizioni create.');
       setBatchCount(0);
-      setSelection({ type: 'islet', id: selectedIslet.id });
     } catch (error) {
       toast.toast(errorText(error, 'Creazione posizioni non riuscita.'), 'error');
     }
@@ -549,6 +527,8 @@ export function LayoutPage() {
       const result = await mutations.deleteIslet.mutateAsync({ id: deletingIslet.id, body: destructiveBody });
       toast.toast(result.message || 'Isola eliminata.');
       setDeletingIslet(null);
+      if (drawerIsletId === deletingIslet.id) setDrawerIsletId(null);
+      if (scopeIsletId === deletingIslet.id) scopeIslet(null);
       if (selection?.type === 'islet' && selection.id === deletingIslet.id) setSelection(null);
     } catch (error) {
       toast.toast(errorText(error, 'Eliminazione bloccata da dipendenze operative.'), 'error');
@@ -572,6 +552,7 @@ export function LayoutPage() {
       const result = await mutations.deletePosition.mutateAsync({ id: deletingPosition.id, body: destructiveBody });
       toast.toast(result.message || 'Posizione eliminata.');
       setDeletingPosition(null);
+      if (drawerPositionId === deletingPosition.id) setDrawerPositionId(null);
       if (selection?.type === 'position' && selection.id === deletingPosition.id) setSelection(null);
     } catch (error) {
       toast.toast(errorText(error, 'Eliminazione bloccata da dipendenze operative.'), 'error');
@@ -584,7 +565,6 @@ export function LayoutPage() {
         <div className={styles.titleBlock}>
           <span className={styles.eyebrow}>Layout</span>
           <h1 className={styles.title}>Isole e posizioni</h1>
-          <p className={styles.subtitle}>Vista fisica della sala, con occupazione rack e azioni operative sul punto selezionato.</p>
         </div>
         {canOperate ? <Button onClick={() => setEditingIslet('new')} disabled={!datacenterId} leftIcon={<Icon name="plus" size={16} />}>Nuova isola</Button> : null}
       </div>
@@ -597,7 +577,9 @@ export function LayoutPage() {
             onChange={(value) => {
               setDatacenterId(value);
               setSelection(null);
-              setViewMode(null);
+              setViewMode('off');
+              setDrawerPositionId(null);
+              setDrawerIsletId(null);
               resetFilters();
             }}
             placeholder="Seleziona sala"
@@ -642,6 +624,11 @@ export function LayoutPage() {
           {filtersActive ? (
             <button type="button" className={styles.layoutChipReset} onClick={resetFilters}>Azzera filtri</button>
           ) : null}
+          <div className={styles.layoutViewSwitchInline} role="group" aria-label="Vista mappa">
+            <button type="button" className={`${styles.layoutViewButton} ${viewMode === 'off' ? styles.layoutViewButtonActive : ''}`} onClick={() => setViewMode('off')}>Off</button>
+            <button type="button" className={`${styles.layoutViewButton} ${viewMode === '2d' ? styles.layoutViewButtonActive : ''}`} onClick={() => setViewMode('2d')}>2D</button>
+            <button type="button" className={`${styles.layoutViewButton} ${viewMode === '3d' ? styles.layoutViewButtonActive : ''}`} onClick={() => setViewMode('3d')}>3D</button>
+          </div>
         </div>
       </div>
 
@@ -652,66 +639,50 @@ export function LayoutPage() {
           filtersActive={filtersActive}
           loading={datacenterId !== null && (islets.isLoading || map.isLoading)}
           onScope={scopeIslet}
+          onOpenDetail={(id) => setDrawerIsletId(id)}
         />
 
         <div className={styles.layoutMain}>
-          {datacenterId !== null && hasLayoutGridBlocks ? (
-            <div className={styles.layoutViewToggleRow}>
-              <div className={styles.layoutViewSwitch} role="group" aria-label="Vista mappa">
-                <button
-                  type="button"
-                  className={`${styles.layoutViewButton} ${effectiveViewMode === '2d' ? styles.layoutViewButtonActive : ''}`}
-                  onClick={() => setViewMode('2d')}
-                >
-                  2D
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.layoutViewButton} ${effectiveViewMode === '3d' ? styles.layoutViewButtonActive : ''}`}
-                  onClick={() => setViewMode('3d')}
-                >
-                  3D
-                </button>
-              </div>
-            </div>
-          ) : null}
-
           {datacenterId === null ? (
             <div className={styles.layoutSceneFallback}>
               <h3 className={styles.emptyTitle}>Seleziona una sala</h3>
-              <p className={styles.emptyText}>Mappa, isole e posizioni si aggiornano sulla sala scelta.</p>
+              <p className={styles.emptyText}>Isole, posizioni e mappa si aggiornano sulla sala scelta.</p>
             </div>
-          ) : waitingForDefaultView || (effectiveViewMode === '2d' && layoutGrid.isLoading) || (effectiveViewMode === '3d' && (map.isLoading || islets.isLoading)) ? (
-            <div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>
-          ) : effectiveViewMode === '2d' && layoutGrid.error ? (
-            <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la vista 2D della sala." tone="error" />
-          ) : effectiveViewMode === '2d' && !hasLayoutGridBlocks ? (
-            <div className={styles.layoutMapNotice} role="status">
-              <strong>Mappa spaziale non configurata</strong>
-              <span>Questa sala non ha un layout 2D: consulta isole e posizioni nell'elenco qui sotto.</span>
-            </div>
-          ) : effectiveViewMode === '2d' ? (
-            <LayoutGrid
-              blocks={layoutGrid.data?.blocks ?? []}
-              selected={selection}
-              onSelect={setSelection}
-              emphasizedIds={emphasizedIds}
-              filtersActive={filtersActive}
-            />
-          ) : map.error ? (
-            <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la mappa fisica della sala." tone="error" />
-          ) : (
-            <Suspense fallback={<div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>}>
-              <LayoutSceneView
-                islets={sceneIslets}
-                positions={scenePositions}
+          ) : null}
+
+          {datacenterId !== null && viewMode !== 'off' ? (
+            (viewMode === '2d' && layoutGrid.isLoading) || (viewMode === '3d' && (map.isLoading || islets.isLoading)) ? (
+              <div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>
+            ) : viewMode === '2d' && layoutGrid.error ? (
+              <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la vista 2D della sala." tone="error" />
+            ) : viewMode === '2d' && !hasLayoutGridBlocks ? (
+              <div className={styles.layoutMapNotice} role="status">
+                <strong>Mappa spaziale non configurata</strong>
+                <span>Questa sala non ha un layout 2D: consulta isole e posizioni nell'elenco qui sotto.</span>
+              </div>
+            ) : viewMode === '2d' ? (
+              <LayoutGrid
+                blocks={layoutGrid.data?.blocks ?? []}
                 selected={selection}
                 onSelect={setSelection}
+                emphasizedIds={emphasizedIds}
+                filtersActive={filtersActive}
               />
-            </Suspense>
-          )}
+            ) : map.error ? (
+              <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la mappa fisica della sala." tone="error" />
+            ) : (
+              <Suspense fallback={<div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>}>
+                <LayoutSceneView
+                  islets={sceneIslets}
+                  positions={scenePositions}
+                  selected={selection}
+                  onSelect={setSelection}
+                />
+              </Suspense>
+            )
+          ) : null}
 
-          {effectiveViewMode === '2d' && (layoutGrid.data?.warnings.length ?? 0) > 0 ? (
+          {viewMode === '2d' && (layoutGrid.data?.warnings.length ?? 0) > 0 ? (
             <div className={styles.layoutWarningPanel} role="status">
               <strong>Da verificare</strong>
               <ul>
@@ -728,33 +699,11 @@ export function LayoutPage() {
               loading={islets.isLoading || layoutGrid.isLoading || map.isLoading}
               selectedPositionId={selection?.type === 'position' ? selection.id : null}
               onSelect={(id) => setSelection({ type: 'position', id })}
+              onOpenDetail={(id) => setDrawerPositionId(id)}
               onResetFilters={resetFilters}
             />
           ) : null}
         </div>
-
-        <LayoutInspector
-          canOperate={canOperate}
-          datacenter={selectedDatacenter}
-          islets={sceneIslets}
-          positions={scenePositions}
-          rows={rows}
-          selectedIslet={selectedIslet}
-          selectedPosition={selectedPosition}
-          occupancy={occupancy}
-          batchCount={batchCount}
-          batchType={batchType}
-          setBatchCount={setBatchCount}
-          setBatchType={setBatchType}
-          createBatch={createBatch}
-          createLoading={mutations.createPositions.isPending}
-          onNewIslet={() => setEditingIslet('new')}
-          onEditIslet={(item) => setEditingIslet(item)}
-          onDeleteIslet={(item) => setDeletingIslet(item)}
-          onEditPosition={(item) => setEditingPosition(item)}
-          onDeletePosition={(item) => setDeletingPosition(item)}
-          onOpenRack={(rackId) => navigate(`/rack/${rackId}`)}
-        />
       </div>
       <IsletModal
         open={editingIslet !== null}
@@ -787,24 +736,50 @@ export function LayoutPage() {
         onConfirm={deletePosition}
         loading={mutations.deletePosition.isPending}
       />
+      <PositionDrawer
+        row={drawerRow}
+        isletName={drawerRow ? sceneIslets.find((item) => item.id === drawerRow.position.isletId)?.name : undefined}
+        canOperate={canOperate}
+        onClose={() => setDrawerPositionId(null)}
+        onEditPosition={(item) => setEditingPosition(item)}
+        onDeletePosition={(item) => setDeletingPosition(item)}
+        onOpenRack={(rackId) => navigate(`/rack/${rackId}`)}
+      />
+      <IsletDrawer
+        islet={drawerIslet}
+        positions={scenePositions}
+        canOperate={canOperate}
+        batchCount={batchCount}
+        batchType={batchType}
+        setBatchCount={setBatchCount}
+        setBatchType={setBatchType}
+        createBatch={createBatch}
+        createLoading={mutations.createPositions.isPending}
+        onClose={() => setDrawerIsletId(null)}
+        onEditIslet={(item) => setEditingIslet(item)}
+        onDeleteIslet={(item) => setDeletingIslet(item)}
+      />
     </section>
   );
 }
 
 // Vertical, searchable islet index grouped by floor — replaces the horizontal
-// rails. Clicking an islet scopes the table/map to it; "Tutte le isole" clears it.
+// rails. Clicking an islet scopes the table/map to it ("Tutte le isole" clears it);
+// the icon next to the counter opens the islet drawer (detail + management).
 function IsletIndex({
   summaries,
   scopeIsletId,
   filtersActive,
   loading,
   onScope,
+  onOpenDetail,
 }: {
   summaries: IsletSummary[];
   scopeIsletId: number | null;
   filtersActive: boolean;
   loading: boolean;
   onScope: (isletId: number | null) => void;
+  onOpenDetail: (isletId: number) => void;
 }) {
   const byFloor = useMemo(() => {
     const grouped = new Map<number, IsletSummary[]>();
@@ -846,22 +821,35 @@ function IsletIndex({
                 const dim = filtersActive && summary.matchCount === 0;
                 const occRatio = summary.total > 0 ? Math.round((summary.occupied / summary.total) * 100) : 0;
                 return (
-                  <button
+                  <div
                     key={summary.islet.id}
-                    type="button"
-                    className={`${styles.isletIndexItem} ${active ? styles.isletIndexItemActive : ''} ${dim ? styles.isletIndexItemDim : ''}`}
-                    onClick={() => onScope(summary.islet.id)}
+                    className={`${styles.isletIndexEntry} ${active ? styles.isletIndexEntryActive : ''} ${dim ? styles.isletIndexItemDim : ''}`}
                   >
-                    <span className={styles.isletIndexRow}>
-                      <strong>{summary.islet.name}</strong>
-                      {filtersActive
-                        ? <span className={styles.isletIndexMatch}>{summary.matchCount}</span>
-                        : <span className={styles.isletIndexCount}>{summary.occupied}/{summary.total || summary.islet.rackNum}</span>}
-                    </span>
-                    <span className={styles.isletIndexBar} aria-hidden="true">
-                      <span className={styles.isletIndexBarFill} style={{ width: `${occRatio}%` }} />
-                    </span>
-                  </button>
+                    <button
+                      type="button"
+                      className={styles.isletIndexScope}
+                      onClick={() => onScope(summary.islet.id)}
+                      aria-label={`Filtra le posizioni sull'isola ${summary.islet.name}`}
+                    >
+                      <span className={styles.isletIndexRow}>
+                        <strong>{summary.islet.name}</strong>
+                        {filtersActive
+                          ? <span className={styles.isletIndexMatch}>{summary.matchCount}</span>
+                          : <span className={styles.isletIndexCount}>{summary.occupied}/{summary.total || summary.islet.rackNum}</span>}
+                      </span>
+                      <span className={styles.isletIndexBar} aria-hidden="true">
+                        <span className={styles.isletIndexBarFill} style={{ width: `${occRatio}%` }} />
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.isletIndexDetailButton}
+                      onClick={() => onOpenDetail(summary.islet.id)}
+                      aria-label={`Dettaglio e azioni isola ${summary.islet.name}`}
+                    >
+                      <Icon name="eye" size={16} />
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -914,6 +902,7 @@ function LinkedPositionsTable({
   loading,
   selectedPositionId,
   onSelect,
+  onOpenDetail,
   onResetFilters,
 }: {
   rows: PositionRow[];
@@ -922,6 +911,7 @@ function LinkedPositionsTable({
   loading: boolean;
   selectedPositionId: number | null;
   onSelect: (id: number) => void;
+  onOpenDetail: (id: number) => void;
   onResetFilters: () => void;
 }) {
   const [sort, setSort] = useState<{ key: PositionSortKey; dir: 'asc' | 'desc' }>({ key: 'islet', dir: 'asc' });
@@ -955,10 +945,7 @@ function LinkedPositionsTable({
   return (
     <div className={styles.linkedTablePanel}>
       <div className={styles.sectionHeader}>
-        <div>
-          <h3 className={styles.emptyTitle}>Posizioni</h3>
-          <p className={styles.emptyText}>Elenco collegato alla mappa: seleziona una riga per ispezionarla.</p>
-        </div>
+        <h3 className={styles.emptyTitle}>Posizioni</h3>
         <span className={styles.badgeMuted}>{filtersActive ? `${rows.length} di ${totalCount}` : `${totalCount}`}</span>
       </div>
       {loading ? (
@@ -982,6 +969,7 @@ function LinkedPositionsTable({
                 <th>Rack</th>
                 <th><button type="button" className={styles.sortHeader} onClick={() => setSortKey('customer')}>Cliente{sortIndicator('customer')}</button></th>
                 <th><button type="button" className={styles.sortHeader} onClick={() => setSortKey('power')}>Potenza{sortIndicator('power')}</button></th>
+                <th aria-label="Dettaglio" />
               </tr>
             </thead>
             <tbody>
@@ -990,12 +978,13 @@ function LinkedPositionsTable({
                   key={row.position.id}
                   className={selectedPositionId === row.position.id ? styles.selectedRow : ''}
                   onClick={() => onSelect(row.position.id)}
+                  onDoubleClick={() => onOpenDetail(row.position.id)}
                   tabIndex={0}
                   role="button"
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      onSelect(row.position.id);
+                      onOpenDetail(row.position.id);
                     }
                   }}
                 >
@@ -1006,6 +995,19 @@ function LinkedPositionsTable({
                   <td>{rackCellLabel(row)}</td>
                   <td>{customerCellLabel(row)}</td>
                   <td>{rowPower(row) > 0 ? `${rowPower(row)} kW` : '-'}</td>
+                  <td className={styles.rowDetailCell}>
+                    <button
+                      type="button"
+                      className={styles.rowDetailButton}
+                      aria-label={`Dettaglio posizione ${row.position.num}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onOpenDetail(row.position.id);
+                      }}
+                    >
+                      <Icon name="eye" size={16} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1016,172 +1018,155 @@ function LinkedPositionsTable({
   );
 }
 
-function LayoutInspector({
-  canOperate,
-  datacenter,
-  islets,
+// Islet detail + management in a drawer, opened from the index row icon. Position
+// detail lives in PositionDrawer; the sala summary card was removed (redundant with
+// the actionable occupancy chips).
+function IsletDrawer({
+  islet,
   positions,
-  rows,
-  selectedIslet,
-  selectedPosition,
-  occupancy,
+  canOperate,
   batchCount,
   batchType,
   setBatchCount,
   setBatchType,
   createBatch,
   createLoading,
-  onNewIslet,
+  onClose,
   onEditIslet,
   onDeleteIslet,
-  onEditPosition,
-  onDeletePosition,
-  onOpenRack,
 }: {
-  canOperate: boolean;
-  datacenter: Datacenter | null;
-  islets: Islet[];
+  islet: Islet | null;
   positions: Position[];
-  rows: PositionRow[];
-  selectedIslet: Islet | null;
-  selectedPosition: Position | null;
-  occupancy: { free: number; occupied: number; reserved: number; shared: number; total: number };
+  canOperate: boolean;
   batchCount: number;
   batchType: string;
   setBatchCount: (value: number) => void;
   setBatchType: (value: string) => void;
   createBatch: () => void;
   createLoading: boolean;
-  onNewIslet: () => void;
+  onClose: () => void;
   onEditIslet: (item: Islet) => void;
   onDeleteIslet: (item: Islet) => void;
+}) {
+  const isletPositions = islet ? positions.filter((item) => item.isletId === islet.id) : [];
+  const free = isletPositions.filter((item) => positionEffectiveStatus(item) === 'free').length;
+  const occupied = isletPositions.filter((item) => {
+    const status = positionEffectiveStatus(item);
+    return status === 'occupied' || status === 'shared';
+  }).length;
+
+  return (
+    <Drawer
+      open={islet !== null}
+      onClose={onClose}
+      size="sm"
+      ariaLabel="Dettaglio isola"
+      title={islet ? `Isola ${islet.name}` : undefined}
+      headerExtra={islet ? <span className={styles.badgeMuted}>{occupied} / {isletPositions.length || islet.rackNum}</span> : undefined}
+    >
+      {islet ? (
+        <div className={styles.drawerBody}>
+          <div className={styles.detailGrid}>
+            <DetailItem label="Tipo" value={islet.type} />
+            <DetailItem label="Piano" value={islet.floor} />
+            <DetailItem label="Libere" value={free} />
+            <DetailItem label="Occupate" value={occupied} />
+            <DetailItem label="Seriale" value={islet.serial} />
+            <DetailItem label="Ordine" value={islet.order} />
+          </div>
+          {canOperate ? (
+            <div className={styles.batchBox}>
+              <div className={styles.sectionHeader}>
+                <h3 className={styles.emptyTitle}>Crea posizioni</h3>
+                <span className={styles.badgeMuted}>{islet.name}</span>
+              </div>
+              <div className={styles.batchGrid}>
+                <div className={styles.field}>
+                  <label>Numero</label>
+                  <input type="number" min="1" value={batchCount || ''} onChange={(event) => setBatchCount(Number(event.target.value))} />
+                </div>
+                <div className={styles.field}>
+                  <label>Formato</label>
+                  <select value={batchType} onChange={(event) => setBatchType(event.target.value)}>
+                    <option value="full">Full</option>
+                    <option value="half">Half</option>
+                  </select>
+                </div>
+              </div>
+              <Button variant="secondary" onClick={createBatch} disabled={!batchCount || createLoading}>Crea posizioni</Button>
+            </div>
+          ) : null}
+          <div className={styles.inspectorActions}>
+            {canOperate ? <Button variant="secondary" onClick={() => onEditIslet(islet)}>Modifica isola</Button> : null}
+            {canOperate ? <Button variant="danger" onClick={() => onDeleteIslet(islet)}>Elimina isola</Button> : null}
+          </div>
+        </div>
+      ) : null}
+    </Drawer>
+  );
+}
+
+// Position detail in a drawer, opened by double-click or the row icon in the table.
+function PositionDrawer({
+  row,
+  isletName,
+  canOperate,
+  onClose,
+  onEditPosition,
+  onDeletePosition,
+  onOpenRack,
+}: {
+  row: PositionRow | null;
+  isletName?: string;
+  canOperate: boolean;
+  onClose: () => void;
   onEditPosition: (item: Position) => void;
   onDeletePosition: (item: Position) => void;
   onOpenRack: (rackId: number) => void;
 }) {
-  if (!datacenter) {
-    return (
-      <aside className={styles.layoutInspector} aria-label="Inspector layout">
-        <span className={styles.eyebrow}>Inspector</span>
-        <h2 className={styles.inspectorTitle}>Nessuna sala selezionata</h2>
-        <p className={styles.emptyText}>Seleziona una sala per visualizzare il layout fisico e le azioni disponibili.</p>
-      </aside>
-    );
-  }
-
-  if (selectedPosition) {
-    const row = rows.find((item) => item.position.id === selectedPosition.id);
-    const enrichedRacks = row?.racks ?? [];
-    const status = row?.status ?? positionEffectiveStatus(selectedPosition);
-    return (
-      <aside className={styles.layoutInspector} aria-label="Inspector layout">
-        <span className={styles.eyebrow}>Posizione</span>
-        <div className={styles.inspectorTitleRow}>
-          <h2 className={styles.inspectorTitle}>Posizione {selectedPosition.num}</h2>
-          <StatusTag status={status} />
-        </div>
-        <div className={styles.detailGrid}>
-          <DetailItem label="Isola" value={selectedIslet?.name} />
-          <DetailItem label="Formato" value={selectedPosition.type} />
-        </div>
-        {enrichedRacks.length === 0 ? (
-          <p className={styles.emptyText}>Nessun rack su questa posizione.</p>
-        ) : enrichedRacks.map((rack) => (
-          <div key={rack.id} className={styles.inspectorRackCard}>
-            <div className={styles.inspectorTitleRow}>
-              <strong>{rack.name}</strong>
-              <span className={styles.badgeMuted}>{positionRackLabel(rack.pos)}{rack.shared ? ' · condiviso' : ''}</span>
-            </div>
-            <div className={styles.detailGrid}>
-              <DetailItem label="Cliente" value={rack.customerId} />
-              <DetailItem label="Potenza" value={rack.soldPower !== undefined ? `${rack.soldPower} kW` : undefined} />
-              <DetailItem label="Stato rack" value={rack.rackStatus} />
-              <DetailItem label="Ordine" value={rack.orderCode} />
-            </div>
-          </div>
-        ))}
-        <div className={styles.inspectorActions}>
-          {enrichedRacks.map((rack) => (
-            <Button key={rack.id} variant="secondary" onClick={() => onOpenRack(rack.id)}>
-              Apri {positionRackLabel(rack.pos).toLowerCase()}
-            </Button>
-          ))}
-          {canOperate ? <Button variant="secondary" onClick={() => onEditPosition(selectedPosition)}>Modifica posizione</Button> : null}
-          {canOperate ? <Button variant="danger" onClick={() => onDeletePosition(selectedPosition)}>Elimina posizione</Button> : null}
-        </div>
-      </aside>
-    );
-  }
-
-  if (selectedIslet) {
-    const isletPositions = positions.filter((item) => item.isletId === selectedIslet.id);
-    const free = isletPositions.filter((item) => positionEffectiveStatus(item) === 'free').length;
-    const occupied = isletPositions.filter((item) => {
-      const status = positionEffectiveStatus(item);
-      return status === 'occupied' || status === 'shared';
-    }).length;
-
-    return (
-      <aside className={styles.layoutInspector} aria-label="Inspector layout">
-        <span className={styles.eyebrow}>Isola</span>
-        <div className={styles.inspectorTitleRow}>
-          <h2 className={styles.inspectorTitle}>{selectedIslet.name}</h2>
-          <span className={styles.badgeMuted}>{occupied} / {isletPositions.length || selectedIslet.rackNum}</span>
-        </div>
-        <div className={styles.detailGrid}>
-          <DetailItem label="Tipo" value={selectedIslet.type} />
-          <DetailItem label="Piano" value={selectedIslet.floor} />
-          <DetailItem label="Libere" value={free} />
-          <DetailItem label="Occupate" value={occupied} />
-          <DetailItem label="Seriale" value={selectedIslet.serial} />
-          <DetailItem label="Ordine" value={selectedIslet.order} />
-        </div>
-        {canOperate ? (
-          <div className={styles.batchBox}>
-            <div className={styles.sectionHeader}>
-              <h3 className={styles.emptyTitle}>Crea posizioni</h3>
-              <span className={styles.badgeMuted}>{selectedIslet.name}</span>
-            </div>
-            <div className={styles.batchGrid}>
-              <div className={styles.field}>
-                <label>Numero</label>
-                <input type="number" min="1" value={batchCount || ''} onChange={(event) => setBatchCount(Number(event.target.value))} />
-              </div>
-              <div className={styles.field}>
-                <label>Formato</label>
-                <select value={batchType} onChange={(event) => setBatchType(event.target.value)}>
-                  <option value="full">Full</option>
-                  <option value="half">Half</option>
-                </select>
-              </div>
-            </div>
-            <Button variant="secondary" onClick={createBatch} disabled={!batchCount || createLoading}>Crea posizioni</Button>
-          </div>
-        ) : null}
-        <div className={styles.inspectorActions}>
-          {canOperate ? <Button variant="secondary" onClick={() => onEditIslet(selectedIslet)}>Modifica isola</Button> : null}
-          {canOperate ? <Button variant="danger" onClick={() => onDeleteIslet(selectedIslet)}>Elimina isola</Button> : null}
-        </div>
-      </aside>
-    );
-  }
-
   return (
-    <aside className={styles.layoutInspector} aria-label="Inspector layout">
-      <span className={styles.eyebrow}>Sala</span>
-      <h2 className={styles.inspectorTitle}>{datacenter.name}</h2>
-      <p className={styles.emptyText}>{datacenter.isMmr ? 'MMR' : 'Sala'} con {islets.length} isole configurate.</p>
-      <div className={styles.detailGrid}>
-        <DetailItem label="Posti" value={occupancy.total} />
-        <DetailItem label="Liberi" value={occupancy.free} />
-        <DetailItem label="Occupati" value={occupancy.occupied} />
-        {occupancy.shared > 0 ? <DetailItem label="Condivisi" value={occupancy.shared} /> : null}
-        <DetailItem label="Riservati" value={occupancy.reserved} />
-      </div>
-      <div className={styles.inspectorActions}>
-        {canOperate ? <Button onClick={onNewIslet} leftIcon={<Icon name="plus" size={16} />}>Nuova isola</Button> : null}
-      </div>
-    </aside>
+    <Drawer
+      open={row !== null}
+      onClose={onClose}
+      size="sm"
+      ariaLabel="Dettaglio posizione"
+      title={row ? `Posizione ${row.position.num}` : undefined}
+      headerExtra={row ? <StatusTag status={row.status} /> : undefined}
+    >
+      {row ? (
+        <div className={styles.drawerBody}>
+          <div className={styles.detailGrid}>
+            <DetailItem label="Isola" value={isletName} />
+            <DetailItem label="Formato" value={row.position.type} />
+          </div>
+          {row.racks.length === 0 ? (
+            <p className={styles.emptyText}>Nessun rack su questa posizione.</p>
+          ) : row.racks.map((rack) => (
+            <div key={rack.id} className={styles.inspectorRackCard}>
+              <div className={styles.inspectorTitleRow}>
+                <strong>{rack.name}</strong>
+                <span className={styles.badgeMuted}>{positionRackLabel(rack.pos)}{rack.shared ? ' · condiviso' : ''}</span>
+              </div>
+              <div className={styles.detailGrid}>
+                <DetailItem label="Cliente" value={rack.customerId} />
+                <DetailItem label="Potenza" value={rack.soldPower !== undefined ? `${rack.soldPower} kW` : undefined} />
+                <DetailItem label="Stato rack" value={rack.rackStatus} />
+                <DetailItem label="Ordine" value={rack.orderCode} />
+              </div>
+            </div>
+          ))}
+          <div className={styles.inspectorActions}>
+            {row.racks.map((rack) => (
+              <Button key={rack.id} variant="secondary" onClick={() => onOpenRack(rack.id)}>
+                Apri {positionRackLabel(rack.pos).toLowerCase()}
+              </Button>
+            ))}
+            {canOperate ? <Button variant="secondary" onClick={() => onEditPosition(row.position)}>Modifica posizione</Button> : null}
+            {canOperate ? <Button variant="danger" onClick={() => onDeletePosition(row.position)}>Elimina posizione</Button> : null}
+          </div>
+        </div>
+      ) : null}
+    </Drawer>
   );
 }
 

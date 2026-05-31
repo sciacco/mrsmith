@@ -757,7 +757,7 @@
 
 .layoutWorkspace {
   display: grid;
-  grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
@@ -1941,6 +1941,60 @@
   opacity: 0.45;
 }
 
+/* Islet row entry: scope button + detail (drawer) icon, no nested buttons */
+.isletIndexEntry {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.isletIndexEntry:hover {
+  background: var(--color-surface);
+}
+
+.isletIndexEntryActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.isletIndexScope {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  text-align: left;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
+}
+
+.isletIndexDetailButton {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  border: 0;
+  border-left: 1px solid var(--color-border-subtle);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.isletIndexDetailButton:hover {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
 .isletIndexRow {
   display: flex;
   align-items: center;
@@ -1980,10 +2034,22 @@
   background: var(--color-accent);
 }
 
-/* View toggle row above the map */
-.layoutViewToggleRow {
-  display: flex;
-  justify-content: flex-end;
+/* Inline Off/2D/3D switch, right-aligned in the filters row */
+.layoutViewSwitchInline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+}
+
+.layoutViewSwitchInline .layoutViewButton {
+  min-height: 1.75rem;
+  padding: 0 var(--space-3);
 }
 
 /* Slim notice when no spatial map is configured */
@@ -2121,4 +2187,41 @@
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
+}
+
+/* Row detail (eye) button in the positions table */
+.rowDetailCell {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rowDetailButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.rowDetailButton:hover {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-muted);
+  color: var(--color-accent);
+}
+
+/* Position drawer body (Drawer ships an unpadded body) */
+.drawerBody {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
 }
