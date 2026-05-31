@@ -101,6 +101,38 @@ func (h *Handler) handleUpdateIslet(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, MutationResponse{ID: id, Message: "Isola aggiornata."})
 }
 
+// handleUpdateIsletCanvas upserts the representative room-canvas placement of an
+// islet (x, y, rotation). Coordinates are operator-authored, non-metric.
+func (h *Handler) handleUpdateIsletCanvas(w http.ResponseWriter, r *http.Request) {
+	if !h.requireDB(w) {
+		return
+	}
+	id, err := parsePathInt(r, "id")
+	if err != nil {
+		invalidRequest(w, "invalid_islet_id")
+		return
+	}
+	var body IsletCanvasInput
+	if err := decodeJSONBody(r, &body); err != nil {
+		invalidRequest(w, "invalid_islet_canvas_payload")
+		return
+	}
+	if body.DatacenterID <= 0 {
+		invalidRequest(w, "datacenter_id_required")
+		return
+	}
+	rotation := ((body.Rotation % 360) + 360) % 360
+	if _, err := h.grappa.ExecContext(r.Context(), `
+		INSERT INTO dcim_room_islet_layout (datacenter_id, islet_id, x, y, rotation)
+		VALUES (?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE x = VALUES(x), y = VALUES(y), rotation = VALUES(rotation)`,
+		body.DatacenterID, id, body.X, body.Y, rotation); err != nil {
+		h.dbFailure(w, r, "update_islet_canvas", err, "islet_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, MutationResponse{ID: id, Message: "Posizione isola aggiornata."})
+}
+
 func (h *Handler) handleDeleteIslet(w http.ResponseWriter, r *http.Request) {
 	if !h.requireDB(w) {
 		return
@@ -295,11 +327,13 @@ func (h *Handler) handleDeletePosition(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listIsletsForDatacenter(r *http.Request, datacenterID int) ([]Islet, error) {
 	rows, err := h.grappa.QueryContext(r.Context(), `
 		SELECT i.id, i.datacenter_id, i.name, i.rack_num, i.type, i.floor, i.serial, i.`+"`order`"+`, i.clifat_id,
-		       COUNT(p.id), SUM(CASE WHEN LOWER(p.status) = 'occupied' THEN 1 ELSE 0 END)
+		       COUNT(p.id), SUM(CASE WHEN LOWER(p.status) = 'occupied' THEN 1 ELSE 0 END),
+		       rl.x, rl.y, rl.rotation
 		FROM islets i
 		LEFT JOIN positions p ON p.islets_id = i.id
+		LEFT JOIN dcim_room_islet_layout rl ON rl.islet_id = i.id AND rl.datacenter_id = i.datacenter_id
 		WHERE i.datacenter_id = ?
-		GROUP BY i.id, i.datacenter_id, i.name, i.rack_num, i.type, i.floor, i.serial, i.`+"`order`"+`, i.clifat_id
+		GROUP BY i.id, i.datacenter_id, i.name, i.rack_num, i.type, i.floor, i.serial, i.`+"`order`"+`, i.clifat_id, rl.x, rl.y, rl.rotation
 		ORDER BY i.floor ASC, i.name ASC, i.id ASC`, datacenterID)
 	if err != nil {
 		return nil, err
@@ -347,7 +381,9 @@ func scanIslet(rows *sql.Rows) (Islet, error) {
 	var serial, order sql.NullString
 	var customerID sql.NullInt64
 	var occupied sql.NullInt64
-	if err := rows.Scan(&item.ID, &item.DatacenterID, &item.Name, &item.RackNum, &item.Type, &item.Floor, &serial, &order, &customerID, &item.PositionCount, &occupied); err != nil {
+	var canvasX, canvasY sql.NullFloat64
+	var canvasRotation sql.NullInt64
+	if err := rows.Scan(&item.ID, &item.DatacenterID, &item.Name, &item.RackNum, &item.Type, &item.Floor, &serial, &order, &customerID, &item.PositionCount, &occupied, &canvasX, &canvasY, &canvasRotation); err != nil {
 		return item, err
 	}
 	item.Serial = nullableString(serial)
@@ -355,6 +391,18 @@ func scanIslet(rows *sql.Rows) (Islet, error) {
 	item.CustomerID = nullableInt(customerID)
 	if occupied.Valid {
 		item.OccupiedCount = int(occupied.Int64)
+	}
+	if canvasX.Valid {
+		v := canvasX.Float64
+		item.CanvasX = &v
+	}
+	if canvasY.Valid {
+		v := canvasY.Float64
+		item.CanvasY = &v
+	}
+	if canvasRotation.Valid {
+		v := int(canvasRotation.Int64)
+		item.CanvasRotation = &v
 	}
 	return item, nil
 }

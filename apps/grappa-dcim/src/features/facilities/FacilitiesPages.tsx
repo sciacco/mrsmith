@@ -1,5 +1,5 @@
 import { Button, Drawer, Icon, Modal, SearchInput, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useBuildings,
@@ -13,7 +13,7 @@ import {
 } from '../../api/queries';
 import type { Building, BuildingInput, Datacenter, DatacenterInput, Islet, Position, PositionRack, RackListItem, LayoutGridResponse, LayoutGridBlock, LayoutGridCell } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
-import { LayoutGrid } from './LayoutGrid';
+import { RoomCanvas } from './RoomCanvas';
 import type { LayoutSelection, LayoutViewMode } from './layoutTypes';
 import {
   buildPositionRows,
@@ -31,7 +31,6 @@ import { fullRack, fullSlotStatus, isHalfPosition, positionEffectiveStatus, rack
 import styles from './workspace.module.css';
 
 const destructiveBody = { confirmPrimary: true, confirmSecondary: true };
-const LayoutSceneView = lazy(() => import('./LayoutScene').then((module) => ({ default: module.LayoutScene })));
 
 const STATUS_FILTER_ORDER: SlotStatus[] = ['free', 'occupied', 'shared', 'reserved'];
 const STATUS_PLURAL_LABEL: Record<SlotStatus, string> = {
@@ -446,15 +445,17 @@ export function LayoutPage() {
   const layoutGrid = useDatacenterLayoutGrid(datacenterId);
   const mutations = useLayoutMutations();
 
-  const hasLayoutGridBlocks = (layoutGrid.data?.blocks.length ?? 0) > 0;
   const sceneIslets = useMemo(() => map.data?.islets ?? islets.data ?? [], [islets.data, map.data?.islets]);
   const scenePositions = useMemo(() => layoutGrid.data?.positions ?? map.data?.positions ?? [], [layoutGrid.data?.positions, map.data?.positions]);
   const racksList = useMemo<RackListItem[]>(() => layoutGrid.data?.racks ?? map.data?.racks ?? [], [layoutGrid.data?.racks, map.data?.racks]);
-  const datacenterOptions = useMemo(
-    () => [...(datacenters.data ?? [])]
-      .sort(compareDatacenters)
-      .map((item) => ({ value: item.id, label: `${item.name}${item.isMmr ? ' - MMR' : ''}` })),
+  const sortedDatacenters = useMemo(
+    () => [...(datacenters.data ?? [])].sort(compareDatacenters),
     [datacenters.data],
+  );
+
+  const datacenterOptions = useMemo(
+    () => sortedDatacenters.map((item) => ({ value: item.id, label: `${item.name}${item.isMmr ? ' - MMR' : ''}` })),
+    [sortedDatacenters],
   );
 
   // Unified consultation model: positions joined to islets + rich rack detail.
@@ -486,10 +487,10 @@ export function LayoutPage() {
   };
 
   useEffect(() => {
-    const firstDatacenter = datacenters.data?.[0];
+    const firstDatacenter = sortedDatacenters[0];
     if (datacenterId !== null || !firstDatacenter) return;
     setDatacenterId(firstDatacenter.id);
-  }, [datacenterId, datacenters.data]);
+  }, [datacenterId, sortedDatacenters]);
 
   useEffect(() => {
     if (!selection) return;
@@ -507,6 +508,15 @@ export function LayoutPage() {
       setBatchCount(0);
     } catch (error) {
       toast.toast(errorText(error, 'Creazione posizioni non riuscita.'), 'error');
+    }
+  }
+
+  async function moveIslet(id: number, x: number, y: number) {
+    if (datacenterId === null) return;
+    try {
+      await mutations.saveIsletCanvas.mutateAsync({ id, body: { datacenterId, x, y, rotation: 0 } });
+    } catch (error) {
+      toast.toast(errorText(error, 'Salvataggio posizione isola non riuscito.'), 'error');
     }
   }
 
@@ -624,10 +634,9 @@ export function LayoutPage() {
           {filtersActive ? (
             <button type="button" className={styles.layoutChipReset} onClick={resetFilters}>Azzera filtri</button>
           ) : null}
-          <div className={styles.layoutViewSwitchInline} role="group" aria-label="Vista mappa">
+          <div className={styles.layoutViewSwitchInline} role="group" aria-label="Vista mappa sala">
             <button type="button" className={`${styles.layoutViewButton} ${viewMode === 'off' ? styles.layoutViewButtonActive : ''}`} onClick={() => setViewMode('off')}>Off</button>
-            <button type="button" className={`${styles.layoutViewButton} ${viewMode === '2d' ? styles.layoutViewButtonActive : ''}`} onClick={() => setViewMode('2d')}>2D</button>
-            <button type="button" className={`${styles.layoutViewButton} ${viewMode === '3d' ? styles.layoutViewButtonActive : ''}`} onClick={() => setViewMode('3d')}>3D</button>
+            <button type="button" className={`${styles.layoutViewButton} ${viewMode === 'map' ? styles.layoutViewButtonActive : ''}`} onClick={() => setViewMode('map')}>Mappa</button>
           </div>
         </div>
       </div>
@@ -650,45 +659,26 @@ export function LayoutPage() {
             </div>
           ) : null}
 
-          {datacenterId !== null && viewMode !== 'off' ? (
-            (viewMode === '2d' && layoutGrid.isLoading) || (viewMode === '3d' && (map.isLoading || islets.isLoading)) ? (
+          {datacenterId !== null && viewMode === 'map' ? (
+            islets.isLoading || layoutGrid.isLoading || map.isLoading ? (
               <div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>
-            ) : viewMode === '2d' && layoutGrid.error ? (
-              <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la vista 2D della sala." tone="error" />
-            ) : viewMode === '2d' && !hasLayoutGridBlocks ? (
-              <div className={styles.layoutMapNotice} role="status">
-                <strong>Mappa spaziale non configurata</strong>
-                <span>Questa sala non ha un layout 2D: consulta isole e posizioni nell'elenco qui sotto.</span>
-              </div>
-            ) : viewMode === '2d' ? (
-              <LayoutGrid
-                blocks={layoutGrid.data?.blocks ?? []}
-                selected={selection}
-                onSelect={setSelection}
-                emphasizedIds={emphasizedIds}
-                filtersActive={filtersActive}
-              />
-            ) : map.error ? (
-              <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la mappa fisica della sala." tone="error" />
             ) : (
-              <Suspense fallback={<div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>}>
-                <LayoutSceneView
-                  islets={sceneIslets}
-                  positions={scenePositions}
-                  selected={selection}
-                  onSelect={setSelection}
-                />
-              </Suspense>
+              <RoomCanvas
+                key={datacenterId}
+                islets={sceneIslets}
+                blocks={layoutGrid.data?.blocks ?? []}
+                positions={scenePositions}
+                canOperate={canOperate}
+                selection={selection}
+                scopeIsletId={scopeIsletId}
+                filtersActive={filtersActive}
+                emphasizedIds={emphasizedIds}
+                onSelectIslet={scopeIslet}
+                onOpenIsletDetail={(id) => setDrawerIsletId(id)}
+                onSelectPosition={(id) => setSelection({ type: 'position', id })}
+                onMoveIslet={moveIslet}
+              />
             )
-          ) : null}
-
-          {viewMode === '2d' && (layoutGrid.data?.warnings.length ?? 0) > 0 ? (
-            <div className={styles.layoutWarningPanel} role="status">
-              <strong>Da verificare</strong>
-              <ul>
-                {layoutGrid.data?.warnings.slice(0, 4).map((warning) => <li key={warning}>{warning}</li>)}
-              </ul>
-            </div>
           ) : null}
 
           {datacenterId !== null ? (

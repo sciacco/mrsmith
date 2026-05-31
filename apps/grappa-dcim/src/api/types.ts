@@ -110,6 +110,17 @@ export interface Islet {
   customerId?: number;
   positionCount: number;
   occupiedCount: number;
+  // Representative room-canvas placement (operator-authored, non-metric).
+  canvasX?: number;
+  canvasY?: number;
+  canvasRotation?: number;
+}
+
+export interface IsletCanvasInput {
+  datacenterId: number;
+  x: number;
+  y: number;
+  rotation: number;
 }
 
 export interface PositionRack {

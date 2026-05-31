@@ -6,7 +6,7 @@
 // index, the linked table and the actionable occupancy chips all read from
 // this so selection, search and filters stay consistent across the three views.
 
-import type { Islet, Position, PositionRack, RackListItem } from '../../api/types';
+import type { Islet, LayoutGridBlock, Position, PositionRack, RackListItem } from '../../api/types';
 import { positionEffectiveStatus, type SlotStatus } from './positions';
 
 export interface EnrichedRack extends PositionRack {
@@ -129,6 +129,52 @@ export interface IsletSummary {
 
 // One summary per configured islet (including empty ones), with occupancy and how
 // many of its positions pass the active filters so the index can highlight/dim.
+// --- Room canvas geometry (representative, non-metric) ------------------------
+// Logical units of the virtual room plane (== px at zoom 1).
+export const CANVAS_CELL = 84;
+export const CANVAS_HEADER = 34;
+export const CANVAS_PAD = 12;
+
+export interface IsletFootprint {
+  width: number;
+  height: number;
+  cols: number;
+  rows: number;
+}
+
+// Footprint of an islet node, derived from its block grid (faithful within the
+// islet) or, lacking a block, from a square-ish grid of its position count.
+export function isletFootprint(block: LayoutGridBlock | undefined, positionCount: number): IsletFootprint {
+  let cols: number;
+  let rows: number;
+  if (block && block.grid.length > 0) {
+    rows = block.grid.length;
+    cols = block.grid.reduce((max, row) => Math.max(max, row.length), 1);
+  } else {
+    const count = Math.max(positionCount, 1);
+    cols = Math.max(2, Math.ceil(Math.sqrt(count)));
+    rows = Math.max(1, Math.ceil(count / cols));
+  }
+  return {
+    cols,
+    rows,
+    width: cols * CANVAS_CELL + CANVAS_PAD * 2,
+    height: CANVAS_HEADER + rows * CANVAS_CELL + CANVAS_PAD * 2,
+  };
+}
+
+// Starting placement for islets without saved coordinates: a coarse grid the
+// operator then refines. Index follows the islets' display order.
+const DEFAULT_CANVAS_COLS = 3;
+const DEFAULT_CANVAS_STEP_X = 560;
+const DEFAULT_CANVAS_STEP_Y = 460;
+export function defaultIsletPosition(index: number): { x: number; y: number } {
+  return {
+    x: 40 + (index % DEFAULT_CANVAS_COLS) * DEFAULT_CANVAS_STEP_X,
+    y: 40 + Math.floor(index / DEFAULT_CANVAS_COLS) * DEFAULT_CANVAS_STEP_Y,
+  };
+}
+
 export function summarizeIslets(rows: PositionRow[], islets: Islet[], filters: LayoutFilters): IsletSummary[] {
   const byIslet = new Map<number, PositionRow[]>();
   for (const row of rows) {

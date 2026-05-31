@@ -2225,3 +2225,214 @@
   gap: var(--space-4);
   padding: var(--space-5);
 }
+
+/* ROOM CANVAS — representative island placement (Traccia 2) */
+.roomCanvas {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.roomCanvasToolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.roomCanvasHint {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.roomCanvasZoom {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+}
+
+.roomCanvasZoom button {
+  min-width: 2.25rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.roomCanvasZoom button:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.roomCanvasZoom button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.roomCanvasViewport {
+  position: relative;
+  height: 620px;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  background:
+    radial-gradient(circle, rgba(148, 163, 184, 0.28) 1px, transparent 1px) 0 0 / 26px 26px,
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.82));
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.6);
+  cursor: grab;
+  touch-action: none;
+}
+
+.roomCanvasViewport:active {
+  cursor: grabbing;
+}
+
+.roomCanvasViewportEdit {
+  background:
+    radial-gradient(circle, rgba(99, 91, 255, 0.22) 1px, transparent 1px) 0 0 / 26px 26px,
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(238, 242, 255, 0.8));
+}
+
+.roomCanvasEmpty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.roomCanvasPlane {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+/* Island node on the canvas */
+.islandNodeWrap {
+  position: absolute;
+  touch-action: none;
+}
+
+.islandNode {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  box-sizing: border-box;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out);
+}
+
+.islandNodeScoped {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle), var(--shadow-sm);
+}
+
+.islandNodeDim {
+  opacity: 0.32;
+}
+
+.islandNodeEditable {
+  border-style: dashed;
+}
+
+.islandNodeHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.islandNodeTitle {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.islandNodeTitle:disabled {
+  cursor: inherit;
+}
+
+.islandNodeCount {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.islandNodeDetail {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.islandNodeDetail:hover:not(:disabled) {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.islandNodeDetail:disabled {
+  opacity: 0.4;
+  cursor: inherit;
+}
+
+.islandNodeGrid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.islandNodeSummary {
+  display: grid;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+}
+
+.islandNodeBar {
+  display: flex;
+  height: 10px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.islandNodeBarSeg {
+  height: 100%;
+}
+
+.islandNodeMeta {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}

@@ -109,6 +109,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handleWrite("POST /grappa-dcim/v1/facilities/datacenters/{id}/ports", h.handleCreateDatacenterPort)
 	handleWrite("POST /grappa-dcim/v1/layout/islets", h.handleCreateIslet)
 	handleWrite("PATCH /grappa-dcim/v1/layout/islets/{id}", h.handleUpdateIslet)
+	handleWrite("PATCH /grappa-dcim/v1/layout/islets/{id}/canvas", h.handleUpdateIsletCanvas)
 	handleWrite("DELETE /grappa-dcim/v1/layout/islets/{id}", h.handleDeleteIslet)
 	handleWrite("POST /grappa-dcim/v1/layout/islets/{id}/positions/batch", h.handleCreatePositionBatch)
 	handleWrite("PATCH /grappa-dcim/v1/layout/positions/{id}", h.handleUpdatePosition)

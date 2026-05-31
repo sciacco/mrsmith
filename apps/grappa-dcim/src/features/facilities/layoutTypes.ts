@@ -7,6 +7,7 @@ export type LayoutSelection =
   | { type: 'position'; id: number }
   | null;
 
-// 'off' hides the map panel entirely (default) so the consultation list gets the
-// full width; '2d'/'3d' reveal the spatial map.
-export type LayoutViewMode = 'off' | '2d' | '3d';
+// 'off' hides the room map (default) so the consultation list gets the full width;
+// 'map' reveals the representative island canvas. (A future extruded 3D will be
+// derived from the same canvas coordinates.)
+export type LayoutViewMode = 'off' | 'map';

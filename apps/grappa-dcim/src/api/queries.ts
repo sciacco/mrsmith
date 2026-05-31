@@ -26,6 +26,7 @@ import type {
   FiberRingRoute,
   FiberRingTopology,
   Islet,
+  IsletCanvasInput,
   LookupItem,
   MutationResponse,
   Plenum,
@@ -788,6 +789,11 @@ export function useLayoutMutations() {
     createPositions: useMutation({
       mutationFn: ({ isletId, count, type }: { isletId: number; count: number; type: string }) =>
         api.post<MutationResponse>(`/grappa-dcim/v1/layout/islets/${isletId}/positions/batch`, { count, type }),
+      onSuccess: invalidate,
+    }),
+    saveIsletCanvas: useMutation({
+      mutationFn: ({ id, body }: { id: number; body: IsletCanvasInput }) =>
+        api.patch<MutationResponse>(`/grappa-dcim/v1/layout/islets/${id}/canvas`, body),
       onSuccess: invalidate,
     }),
     deleteIslet: useMutation({

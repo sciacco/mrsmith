@@ -12,6 +12,17 @@ type Islet struct {
 	CustomerID    *int    `json:"customerId,omitempty"`
 	PositionCount int     `json:"positionCount"`
 	OccupiedCount int     `json:"occupiedCount"`
+	// Representative room-canvas placement (operator-authored, non-metric).
+	CanvasX        *float64 `json:"canvasX,omitempty"`
+	CanvasY        *float64 `json:"canvasY,omitempty"`
+	CanvasRotation *int     `json:"canvasRotation,omitempty"`
+}
+
+type IsletCanvasInput struct {
+	DatacenterID int     `json:"datacenterId"`
+	X            float64 `json:"x"`
+	Y            float64 `json:"y"`
+	Rotation     int     `json:"rotation"`
 }
 
 type IsletInput struct {
