@@ -1,24 +1,16 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@mrsmith/ui';
 import type { Islet, LayoutGridBlock, Position } from '../../api/types';
-import { defaultIsletPosition, isletFootprint } from './layoutData';
-import { IslandNode } from './IslandNode';
-import type { LayoutSelection } from './layoutTypes';
+import { autoArrangePositions, glyphSize, isletCells, orientCells } from './layoutData';
+import { IsletGlyph } from './IsletGlyph';
+import { IsletDetailPanel } from './IsletDetailPanel';
 import styles from './workspace.module.css';
 
-const ZOOM_MIN = 0.3;
+const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.4;
-const ZOOM_STEP = 0.12;
-const GRID_THRESHOLD = 1; // at/above this zoom, islands reveal their position grid
-
-interface IslandLayout {
-  islet: Islet;
-  block?: LayoutGridBlock;
-  positions: Position[];
-  x: number;
-  y: number;
-  footprint: ReturnType<typeof isletFootprint>;
-}
+const ZOOM_STEP = 0.15;
+const FIT_PAD = 32;
+const FIT_MAX = 1.6;
 
 export function RoomCanvas({
   islets,
@@ -26,39 +18,43 @@ export function RoomCanvas({
   positions,
   canOperate,
   selection,
-  scopeIsletId,
-  filtersActive,
   emphasizedIds,
-  onSelectIslet,
-  onOpenIsletDetail,
+  filtersActive,
   onSelectPosition,
+  onOpenIsletActions,
   onMoveIslet,
 }: {
   islets: Islet[];
   blocks: LayoutGridBlock[];
   positions: Position[];
   canOperate: boolean;
-  selection: LayoutSelection;
-  scopeIsletId: number | null;
-  filtersActive: boolean;
+  selection: { type: 'islet' | 'position'; id: number } | null;
   emphasizedIds: Set<number>;
-  onSelectIslet: (id: number) => void;
-  onOpenIsletDetail: (id: number) => void;
+  filtersActive: boolean;
   onSelectPosition: (id: number) => void;
-  onMoveIslet: (id: number, x: number, y: number) => void;
+  onOpenIsletActions: (id: number) => void;
+  onMoveIslet: (id: number, x: number, y: number, rotation: number) => void;
 }) {
-  const [zoom, setZoom] = useState(0.7);
-  const [pan, setPan] = useState({ x: 24, y: 24 });
-  const [editMode, setEditMode] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [arrangeMode, setArrangeMode] = useState(false);
+  const [focusIsletId, setFocusIsletId] = useState<number | null>(null);
   const [overrides, setOverrides] = useState<Record<number, { x: number; y: number }>>({});
+  const [viewport, setViewport] = useState({ w: 800, h: 560 });
 
-  const zoomRef = useRef(zoom);
-  zoomRef.current = zoom;
-  const gesture = useRef<
-    | { kind: 'pan'; startX: number; startY: number; panX: number; panY: number }
-    | { kind: 'island'; isletId: number; startX: number; startY: number; baseX: number; baseY: number; lastX: number; lastY: number }
-    | null
-  >(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const scaleRef = useRef(1);
+  const gesture = useRef<{ id: number; startX: number; startY: number; baseX: number; baseY: number; lastX: number; lastY: number } | null>(null);
+
+  useEffect(() => {
+    const node = viewportRef.current;
+    if (!node) return undefined;
+    const observer = new ResizeObserver(() => {
+      const rect = node.getBoundingClientRect();
+      setViewport({ w: Math.max(320, rect.width), h: Math.max(320, rect.height) });
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   const blockByIslet = useMemo(() => {
     const map = new Map<number, LayoutGridBlock>();
@@ -76,125 +72,140 @@ export function RoomCanvas({
     return map;
   }, [positions]);
 
-  const layouts = useMemo<IslandLayout[]>(() => {
-    return islets.map((islet, index) => {
+  const layouts = useMemo(() =>
+    islets.map((islet) => {
       const block = blockByIslet.get(islet.id);
       const isletPositions = positionsByIslet.get(islet.id) ?? [];
-      const footprint = isletFootprint(block, isletPositions.length || islet.rackNum);
-      const override = overrides[islet.id];
-      const saved = islet.canvasX != null && islet.canvasY != null ? { x: islet.canvasX, y: islet.canvasY } : null;
-      const fallback = defaultIsletPosition(index);
-      const { x, y } = override ?? saved ?? fallback;
-      return { islet, block, positions: isletPositions, x, y, footprint };
-    });
-  }, [islets, blockByIslet, positionsByIslet, overrides]);
+      const baseCells = isletCells(block, isletPositions);
+      const oriented = orientCells(baseCells, islet.canvasRotation ?? 0);
+      return { islet, baseCells, oriented, size: glyphSize(oriented), positions: isletPositions };
+    }),
+  [islets, blockByIslet, positionsByIslet]);
 
-  const planeSize = useMemo(() => {
-    let width = 600;
-    let height = 400;
-    for (const item of layouts) {
-      width = Math.max(width, item.x + item.footprint.width + 40);
-      height = Math.max(height, item.y + item.footprint.height + 40);
-    }
-    return { width, height };
-  }, [layouts]);
+  const autoPos = useMemo(
+    () => autoArrangePositions(layouts.map((l) => ({ id: l.islet.id, width: l.size.width, height: l.size.height }))),
+    [layouts],
+  );
+
+  const placed = layouts.map((l) => {
+    const override = overrides[l.islet.id];
+    const saved = l.islet.canvasX != null && l.islet.canvasY != null ? { x: l.islet.canvasX, y: l.islet.canvasY } : null;
+    const pos = override ?? saved ?? autoPos[l.islet.id] ?? { x: 0, y: 0 };
+    return { ...l, x: pos.x, y: pos.y };
+  });
+
+  const plane = placed.reduce((acc, p) => ({ w: Math.max(acc.w, p.x + p.size.width), h: Math.max(acc.h, p.y + p.size.height) }), { w: 1, h: 1 });
+  const fitScale = Math.min((viewport.w - FIT_PAD) / plane.w, (viewport.h - FIT_PAD) / plane.h, FIT_MAX);
+  const scale = Math.max(0.1, fitScale) * zoom;
+  scaleRef.current = scale;
+
+  const focusLayout = focusIsletId != null ? layouts.find((l) => l.islet.id === focusIsletId) ?? null : null;
+  const selectedPositionId = selection?.type === 'position' ? selection.id : null;
 
   function endGesture() {
     const active = gesture.current;
     gesture.current = null;
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', endGesture);
-    if (active?.kind === 'island') {
-      onMoveIslet(active.isletId, Math.round(active.lastX), Math.round(active.lastY));
+    if (active) {
+      const islet = islets.find((i) => i.id === active.id);
+      onMoveIslet(active.id, Math.round(active.lastX), Math.round(active.lastY), islet?.canvasRotation ?? 0);
     }
   }
 
   function handlePointerMove(event: PointerEvent) {
     const active = gesture.current;
     if (!active) return;
-    if (active.kind === 'pan') {
-      setPan({ x: active.panX + (event.clientX - active.startX), y: active.panY + (event.clientY - active.startY) });
-      return;
-    }
-    const z = zoomRef.current || 1;
+    const z = scaleRef.current || 1;
     const nextX = Math.max(0, active.baseX + (event.clientX - active.startX) / z);
     const nextY = Math.max(0, active.baseY + (event.clientY - active.startY) / z);
     active.lastX = nextX;
     active.lastY = nextY;
-    setOverrides((prev) => ({ ...prev, [active.isletId]: { x: nextX, y: nextY } }));
+    setOverrides((prev) => ({ ...prev, [active.id]: { x: nextX, y: nextY } }));
   }
 
-  function startPan(event: React.PointerEvent) {
-    gesture.current = { kind: 'pan', startX: event.clientX, startY: event.clientY, panX: pan.x, panY: pan.y };
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', endGesture);
-  }
-
-  function startIslandDrag(event: React.PointerEvent, item: IslandLayout) {
+  function startDrag(event: React.PointerEvent, item: (typeof placed)[number]) {
+    if (!arrangeMode) return;
     event.stopPropagation();
-    if (!editMode) return;
-    gesture.current = { kind: 'island', isletId: item.islet.id, startX: event.clientX, startY: event.clientY, baseX: item.x, baseY: item.y, lastX: item.x, lastY: item.y };
+    gesture.current = { id: item.islet.id, startX: event.clientX, startY: event.clientY, baseX: item.x, baseY: item.y, lastX: item.x, lastY: item.y };
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', endGesture);
   }
-
-  const detail = zoom >= GRID_THRESHOLD;
 
   return (
-    <div className={styles.roomCanvas}>
-      <div className={styles.roomCanvasToolbar}>
-        {canOperate ? (
-          <Button variant={editMode ? 'primary' : 'secondary'} size="sm" onClick={() => setEditMode((value) => !value)}>
-            {editMode ? 'Fine modifica' : 'Modifica layout'}
-          </Button>
-        ) : null}
-        {editMode ? <span className={styles.roomCanvasHint}>Trascina le isole per disporle</span> : null}
-        <div className={styles.roomCanvasZoom} role="group" aria-label="Zoom mappa">
-          <button type="button" onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100))} disabled={zoom <= ZOOM_MIN} aria-label="Riduci zoom">−</button>
-          <button type="button" onClick={() => { setZoom(0.7); setPan({ x: 24, y: 24 }); }} aria-label="Reimposta vista">{Math.round(zoom * 100)}%</button>
-          <button type="button" onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100))} disabled={zoom >= ZOOM_MAX} aria-label="Aumenta zoom">+</button>
+    <div className={styles.mapWorkspace}>
+      <div className={styles.roomOverview}>
+        <div className={styles.roomOverviewToolbar}>
+          {canOperate ? (
+            <Button variant={arrangeMode ? 'primary' : 'secondary'} size="sm" onClick={() => setArrangeMode((v) => !v)}>
+              {arrangeMode ? 'Fine disposizione' : 'Disponi isole'}
+            </Button>
+          ) : null}
+          {arrangeMode ? <span className={styles.roomOverviewHint}>Trascina le isole; ⟳ ruota di 90°</span> : null}
+          <div className={styles.roomOverviewZoom} role="group" aria-label="Zoom mappa">
+            <button type="button" onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100))} disabled={zoom <= ZOOM_MIN} aria-label="Riduci zoom">−</button>
+            <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1} aria-label="Adatta alla sala">{Math.round(zoom * 100)}%</button>
+            <button type="button" onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100))} disabled={zoom >= ZOOM_MAX} aria-label="Aumenta zoom">+</button>
+          </div>
+        </div>
+        <div className={`${styles.roomOverviewViewport} ${arrangeMode ? styles.roomOverviewViewportEdit : ''}`} ref={viewportRef}>
+          {islets.length === 0 ? (
+            <div className={styles.roomCanvasEmpty}><p className={styles.emptyText}>Nessuna isola configurata in questa sala.</p></div>
+          ) : (
+            <div className={styles.roomOverviewPlane} style={{ width: plane.w, height: plane.h, transform: `scale(${scale})` }}>
+              {placed.map((item) => (
+                <div
+                  key={item.islet.id}
+                  className={styles.glyphWrap}
+                  style={{ left: item.x, top: item.y, cursor: arrangeMode ? 'grab' : 'default' }}
+                  onPointerDown={(event) => startDrag(event, item)}
+                >
+                  <IsletGlyph
+                    islet={item.islet}
+                    orientedCells={item.oriented}
+                    size={item.size}
+                    focused={focusIsletId === item.islet.id}
+                    dimmed={filtersActive && !item.positions.some((p) => emphasizedIds.has(p.id))}
+                    arrangeMode={arrangeMode}
+                    selectedPositionId={selectedPositionId}
+                    emphasizedIds={emphasizedIds}
+                    filtersActive={filtersActive}
+                    onFocus={() => setFocusIsletId(item.islet.id)}
+                    onSelectPosition={onSelectPosition}
+                  />
+                  {arrangeMode ? (
+                    <button
+                      type="button"
+                      className={styles.glyphRotate}
+                      aria-label={`Ruota isola ${item.islet.name}`}
+                      title="Ruota 90°"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onMoveIslet(item.islet.id, Math.round(item.x), Math.round(item.y), ((item.islet.canvasRotation ?? 0) + 90) % 360);
+                      }}
+                    >
+                      ⟳
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <div
-        className={`${styles.roomCanvasViewport} ${editMode ? styles.roomCanvasViewportEdit : ''}`}
-        onPointerDown={startPan}
-      >
-        {islets.length === 0 ? (
-          <div className={styles.roomCanvasEmpty}><p className={styles.emptyText}>Nessuna isola configurata in questa sala.</p></div>
-        ) : (
-          <div
-            className={styles.roomCanvasPlane}
-            style={{ width: planeSize.width, height: planeSize.height, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
-          >
-            {layouts.map((item) => (
-              <div
-                key={item.islet.id}
-                className={styles.islandNodeWrap}
-                style={{ left: item.x, top: item.y, cursor: editMode ? 'grab' : 'default' }}
-                onPointerDown={(event) => startIslandDrag(event, item)}
-              >
-                <IslandNode
-                  islet={item.islet}
-                  block={item.block}
-                  positions={item.positions}
-                  footprint={item.footprint}
-                  detail={detail}
-                  editMode={editMode}
-                  scoped={scopeIsletId === item.islet.id || (selection?.type === 'islet' && selection.id === item.islet.id)}
-                  dimmed={filtersActive && !item.positions.some((p) => emphasizedIds.has(p.id))}
-                  selectedPositionId={selection?.type === 'position' ? selection.id : null}
-                  emphasizedIds={emphasizedIds}
-                  filtersActive={filtersActive}
-                  onSelectIslet={() => onSelectIslet(item.islet.id)}
-                  onOpenDetail={() => onOpenIsletDetail(item.islet.id)}
-                  onSelectPosition={onSelectPosition}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <IsletDetailPanel
+        islet={focusLayout?.islet ?? null}
+        cells={focusLayout?.baseCells ?? []}
+        canOperate={canOperate}
+        selectedPositionId={selectedPositionId}
+        emphasizedIds={emphasizedIds}
+        filtersActive={filtersActive}
+        onSelectPosition={onSelectPosition}
+        onOpenActions={() => focusIsletId != null && onOpenIsletActions(focusIsletId)}
+        onClose={() => setFocusIsletId(null)}
+      />
     </div>
   );
 }

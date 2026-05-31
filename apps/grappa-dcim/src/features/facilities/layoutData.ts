@@ -6,7 +6,7 @@
 // index, the linked table and the actionable occupancy chips all read from
 // this so selection, search and filters stay consistent across the three views.
 
-import type { Islet, LayoutGridBlock, Position, PositionRack, RackListItem } from '../../api/types';
+import type { Islet, LayoutGridBlock, LayoutGridCell, Position, PositionRack, RackListItem } from '../../api/types';
 import { positionEffectiveStatus, type SlotStatus } from './positions';
 
 export interface EnrichedRack extends PositionRack {
@@ -129,50 +129,97 @@ export interface IsletSummary {
 
 // One summary per configured islet (including empty ones), with occupancy and how
 // many of its positions pass the active filters so the index can highlight/dim.
-// --- Room canvas geometry (representative, non-metric) ------------------------
-// Logical units of the virtual room plane (== px at zoom 1).
-export const CANVAS_CELL = 84;
-export const CANVAS_HEADER = 34;
-export const CANVAS_PAD = 12;
+// --- Room overview geometry (representative, non-metric) ----------------------
+// The room overview renders each islet as a compact occupancy "glyph": its real
+// rows×cols grid of status-colored cells. Footprint is DECOUPLED from the rich
+// detail cell size — the detail (full LayoutCell grid) lives in the focus panel.
+// Logical units == px at fit-scale 1.
+export const GLYPH_CELL = 22; // px per position cell in the overview glyph
+export const GLYPH_HEADER = 24; // px for the glyph name/occupancy header
+export const GLYPH_GAP = 18; // px gutter between glyphs when auto-arranging
 
-export interface IsletFootprint {
-  width: number;
-  height: number;
+// Base (canonical, unrotated) cell grid for an islet: its imported block grid, or
+// — lacking a block — its positions chunked into a square-ish grid.
+export function isletCells(block: LayoutGridBlock | undefined, positions: Position[]): LayoutGridCell[][] {
+  if (block && block.grid.length > 0) return block.grid;
+  const sorted = [...positions].sort((a, b) => a.num - b.num);
+  const cols = Math.max(2, Math.ceil(Math.sqrt(Math.max(sorted.length, 1))));
+  const rows: LayoutGridCell[][] = [];
+  for (let i = 0; i < sorted.length; i += cols) {
+    rows.push(
+      sorted.slice(i, i + cols).map((p) => ({
+        type: 'position' as const,
+        pos: p.num,
+        positionId: p.id,
+        positionStatus: p.status,
+        positionType: p.type,
+        racks: p.racks,
+      })),
+    );
+  }
+  return rows.length > 0 ? rows : [[]];
+}
+
+function padRectangular(cells: LayoutGridCell[][]): LayoutGridCell[][] {
+  const cols = cells.reduce((max, row) => Math.max(max, row.length), 0);
+  return cells.map((row) =>
+    row.length === cols ? row : [...row, ...Array.from({ length: cols - row.length }, () => ({ type: 'empty' as const }))],
+  );
+}
+
+// Rotate a cell grid by 0/90/180/270 degrees (for the room overview glyph only —
+// the focus detail panel always reads the canonical orientation).
+export function orientCells(cells: LayoutGridCell[][], rotation: number): LayoutGridCell[][] {
+  const steps = (((Math.round((rotation || 0) / 90) % 4) + 4) % 4);
+  let grid = padRectangular(cells);
+  const rotate90 = (matrix: LayoutGridCell[][]): LayoutGridCell[][] => {
+    const rows = matrix.length;
+    const cols = matrix[0]?.length ?? 0;
+    const out: LayoutGridCell[][] = [];
+    for (let c = 0; c < cols; c += 1) {
+      const row: LayoutGridCell[] = [];
+      for (let r = rows - 1; r >= 0; r -= 1) row.push(matrix[r]?.[c] ?? { type: 'empty' });
+      out.push(row);
+    }
+    return out;
+  };
+  for (let i = 0; i < steps; i += 1) grid = rotate90(grid);
+  return grid;
+}
+
+export interface GlyphSize {
   cols: number;
   rows: number;
+  width: number;
+  height: number;
 }
 
-// Footprint of an islet node, derived from its block grid (faithful within the
-// islet) or, lacking a block, from a square-ish grid of its position count.
-export function isletFootprint(block: LayoutGridBlock | undefined, positionCount: number): IsletFootprint {
-  let cols: number;
-  let rows: number;
-  if (block && block.grid.length > 0) {
-    rows = block.grid.length;
-    cols = block.grid.reduce((max, row) => Math.max(max, row.length), 1);
-  } else {
-    const count = Math.max(positionCount, 1);
-    cols = Math.max(2, Math.ceil(Math.sqrt(count)));
-    rows = Math.max(1, Math.ceil(count / cols));
+export function glyphSize(orientedCells: LayoutGridCell[][]): GlyphSize {
+  const rows = orientedCells.length;
+  const cols = orientedCells.reduce((max, row) => Math.max(max, row.length), 0);
+  const width = Math.max(cols, 1) * GLYPH_CELL + (Math.max(cols, 1) - 1) * 1;
+  const height = GLYPH_HEADER + 3 + Math.max(rows, 1) * GLYPH_CELL + (Math.max(rows, 1) - 1) * 1;
+  return { cols, rows, width, height };
+}
+
+// Auto-arrange glyphs into rows (shelf packing) at a target plane width, so islets
+// never overlap on first load. Saved per-islet coordinates override these defaults.
+export function autoArrangePositions(items: Array<{ id: number; width: number; height: number }>, targetWidth = 1100): Record<number, { x: number; y: number }> {
+  const out: Record<number, { x: number; y: number }> = {};
+  let x = 0;
+  let y = 0;
+  let rowHeight = 0;
+  for (const item of items) {
+    if (x > 0 && x + item.width > targetWidth) {
+      x = 0;
+      y += rowHeight + GLYPH_GAP;
+      rowHeight = 0;
+    }
+    out[item.id] = { x, y };
+    x += item.width + GLYPH_GAP;
+    rowHeight = Math.max(rowHeight, item.height);
   }
-  return {
-    cols,
-    rows,
-    width: cols * CANVAS_CELL + CANVAS_PAD * 2,
-    height: CANVAS_HEADER + rows * CANVAS_CELL + CANVAS_PAD * 2,
-  };
-}
-
-// Starting placement for islets without saved coordinates: a coarse grid the
-// operator then refines. Index follows the islets' display order.
-const DEFAULT_CANVAS_COLS = 3;
-const DEFAULT_CANVAS_STEP_X = 560;
-const DEFAULT_CANVAS_STEP_Y = 460;
-export function defaultIsletPosition(index: number): { x: number; y: number } {
-  return {
-    x: 40 + (index % DEFAULT_CANVAS_COLS) * DEFAULT_CANVAS_STEP_X,
-    y: 40 + Math.floor(index / DEFAULT_CANVAS_COLS) * DEFAULT_CANVAS_STEP_Y,
-  };
+  return out;
 }
 
 export function summarizeIslets(rows: PositionRow[], islets: Islet[], filters: LayoutFilters): IsletSummary[] {

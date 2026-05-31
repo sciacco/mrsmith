@@ -511,10 +511,10 @@ export function LayoutPage() {
     }
   }
 
-  async function moveIslet(id: number, x: number, y: number) {
+  async function moveIslet(id: number, x: number, y: number, rotation: number) {
     if (datacenterId === null) return;
     try {
-      await mutations.saveIsletCanvas.mutateAsync({ id, body: { datacenterId, x, y, rotation: 0 } });
+      await mutations.saveIsletCanvas.mutateAsync({ id, body: { datacenterId, x, y, rotation } });
     } catch (error) {
       toast.toast(errorText(error, 'Salvataggio posizione isola non riuscito.'), 'error');
     }
@@ -641,47 +641,40 @@ export function LayoutPage() {
         </div>
       </div>
 
-      <div className={styles.layoutWorkspace}>
-        <IsletIndex
-          summaries={isletSummaries}
-          scopeIsletId={scopeIsletId}
-          filtersActive={filtersActive}
-          loading={datacenterId !== null && (islets.isLoading || map.isLoading)}
-          onScope={scopeIslet}
-          onOpenDetail={(id) => setDrawerIsletId(id)}
-        />
-
-        <div className={styles.layoutMain}>
-          {datacenterId === null ? (
-            <div className={styles.layoutSceneFallback}>
-              <h3 className={styles.emptyTitle}>Seleziona una sala</h3>
-              <p className={styles.emptyText}>Isole, posizioni e mappa si aggiornano sulla sala scelta.</p>
-            </div>
-          ) : null}
-
-          {datacenterId !== null && viewMode === 'map' ? (
-            islets.isLoading || layoutGrid.isLoading || map.isLoading ? (
-              <div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>
-            ) : (
-              <RoomCanvas
-                key={datacenterId}
-                islets={sceneIslets}
-                blocks={layoutGrid.data?.blocks ?? []}
-                positions={scenePositions}
-                canOperate={canOperate}
-                selection={selection}
-                scopeIsletId={scopeIsletId}
-                filtersActive={filtersActive}
-                emphasizedIds={emphasizedIds}
-                onSelectIslet={scopeIslet}
-                onOpenIsletDetail={(id) => setDrawerIsletId(id)}
-                onSelectPosition={(id) => setSelection({ type: 'position', id })}
-                onMoveIslet={moveIslet}
-              />
-            )
-          ) : null}
-
-          {datacenterId !== null ? (
+      {datacenterId === null ? (
+        <div className={styles.layoutSceneFallback}>
+          <h3 className={styles.emptyTitle}>Seleziona una sala</h3>
+          <p className={styles.emptyText}>Isole, posizioni e mappa si aggiornano sulla sala scelta.</p>
+        </div>
+      ) : viewMode === 'map' ? (
+        islets.isLoading || layoutGrid.isLoading || map.isLoading ? (
+          <div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>
+        ) : (
+          <RoomCanvas
+            key={datacenterId}
+            islets={sceneIslets}
+            blocks={layoutGrid.data?.blocks ?? []}
+            positions={scenePositions}
+            canOperate={canOperate}
+            selection={selection}
+            emphasizedIds={emphasizedIds}
+            filtersActive={filtersActive}
+            onSelectPosition={(id) => { setSelection({ type: 'position', id }); setDrawerPositionId(id); }}
+            onOpenIsletActions={(id) => setDrawerIsletId(id)}
+            onMoveIslet={moveIslet}
+          />
+        )
+      ) : (
+        <div className={styles.layoutWorkspace}>
+          <IsletIndex
+            summaries={isletSummaries}
+            scopeIsletId={scopeIsletId}
+            filtersActive={filtersActive}
+            loading={islets.isLoading || map.isLoading}
+            onScope={scopeIslet}
+            onOpenDetail={(id) => setDrawerIsletId(id)}
+          />
+          <div className={styles.layoutMain}>
             <LinkedPositionsTable
               rows={filteredRows}
               totalCount={rows.length}
@@ -692,9 +685,9 @@ export function LayoutPage() {
               onOpenDetail={(id) => setDrawerPositionId(id)}
               onResetFilters={resetFilters}
             />
-          ) : null}
+          </div>
         </div>
-      </div>
+      )}
       <IsletModal
         open={editingIslet !== null}
         value={editingIslet === 'new' ? null : editingIslet}

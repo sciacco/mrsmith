@@ -10,6 +10,12 @@ export type HalfSide = 'A' | 'B';
 // occupied — it can NEVER be free, even when the position status still reads 'free'.
 export type SlotStatus = 'occupied' | 'reserved' | 'free' | 'shared';
 
+export interface GridCellSlot {
+  side?: HalfSide;
+  status: SlotStatus;
+  rack?: PositionRack;
+}
+
 export function isHalfPosition(type: string | undefined): boolean {
   return (type ?? '').toLowerCase() === 'half';
 }
@@ -46,15 +52,52 @@ export function slotStatus(positionStatus: string | undefined, rack: PositionRac
   return (positionStatus ?? '').toLowerCase() === 'reserved' ? 'reserved' : 'free';
 }
 
+export function gridCellSlots(cell: {
+  type: string;
+  positionId?: number;
+  positionStatus?: string;
+  positionType?: string;
+  racks?: PositionRack[];
+}): GridCellSlot[] {
+  if (cell.type !== 'position' || !cell.positionId) return [];
+  if (isHalfPosition(cell.positionType)) {
+    const rackA = rackAt(cell.racks, 'A');
+    const rackB = rackAt(cell.racks, 'B');
+    return [
+      { side: 'A', status: slotStatus(cell.positionStatus, rackA), rack: rackA },
+      { side: 'B', status: slotStatus(cell.positionStatus, rackB), rack: rackB },
+    ];
+  }
+  const rack = fullRack(cell.racks);
+  return [{ status: fullSlotStatus({ status: cell.positionStatus ?? '', racks: cell.racks }), rack }];
+}
+
+function slotRank(status: SlotStatus): number {
+  return status === 'shared' ? 3 : status === 'occupied' ? 2 : status === 'reserved' ? 1 : 0;
+}
+
+// Effective status of a layout-grid cell (for the room overview heatmap glyph):
+// null for non-position/unbound cells; otherwise the per-position effective status.
+export function gridCellStatus(cell: {
+  type: string;
+  positionId?: number;
+  positionStatus?: string;
+  positionType?: string;
+  racks?: PositionRack[];
+}): SlotStatus | null {
+  const slots = gridCellSlots(cell);
+  if (slots.length === 0) return null;
+  return slots.reduce((best, slot) => (slotRank(slot.status) > slotRank(best.status) ? slot : best), slots[0]!).status;
+}
+
 // Effective per-position status for badges/lists/rails: a shared cabinet is condiviso
 // (never free); otherwise a Full follows position.status and a Half takes the most
 // occupied of its two sides (shared > occupied > reserved > free).
 export function positionEffectiveStatus(position: Position): SlotStatus {
   if (!isHalfPosition(position.type)) return fullSlotStatus(position);
-  const rank = (s: SlotStatus) => (s === 'shared' ? 3 : s === 'occupied' ? 2 : s === 'reserved' ? 1 : 0);
   const a = slotStatus(position.status, rackAt(position.racks, 'A'));
   const b = slotStatus(position.status, rackAt(position.racks, 'B'));
-  return rank(a) >= rank(b) ? a : b;
+  return slotRank(a) >= slotRank(b) ? a : b;
 }
 
 // Occupancy counted per rack slot (posto): a Full tile is 1 slot, a Half tile is 2

@@ -2226,6 +2226,296 @@
   padding: var(--space-5);
 }
 
+/* ROOM MAP v2 — overview heatmap + focus detail panel */
+.mapWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+.roomOverview {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.roomOverviewToolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.roomOverviewHint {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.roomOverviewZoom {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+}
+
+.roomOverviewZoom button {
+  min-width: 2.25rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.roomOverviewZoom button:hover:not(:disabled) { background: var(--color-surface); color: var(--color-text); }
+.roomOverviewZoom button:disabled { opacity: 0.4; cursor: default; }
+
+.roomOverviewViewport {
+  position: relative;
+  height: 640px;
+  overflow: auto;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  background:
+    radial-gradient(circle, rgba(148, 163, 184, 0.22) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.82));
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.6);
+}
+
+.roomOverviewViewportEdit {
+  background:
+    radial-gradient(circle, rgba(99, 91, 255, 0.2) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(238, 242, 255, 0.8));
+}
+
+.roomCanvasEmpty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.roomOverviewPlane {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  padding: var(--space-4);
+}
+
+/* Islet glyph (overview heatmap) */
+.glyphWrap {
+  position: absolute;
+  touch-action: none;
+}
+
+.glyphRotate {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+}
+
+.glyphRotate:hover { color: var(--color-accent); border-color: var(--color-accent-muted); }
+
+.isletGlyph {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  padding: 4px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+  box-sizing: content-box;
+  transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+}
+
+.isletGlyphFocused {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle), var(--shadow-sm);
+}
+
+.isletGlyphDim { opacity: 0.32; }
+.isletGlyphArrange { border-style: dashed; }
+
+.isletGlyphHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0 2px;
+  color: var(--color-text);
+}
+
+.isletGlyphHeader strong { font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.isletGlyphHeader span { color: var(--color-text-muted); font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
+.isletGlyphHeader:disabled { cursor: inherit; }
+
+.isletGlyphGrid {
+  display: grid;
+  gap: 1px;
+}
+
+.glyphCell {
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
+  /* background comes from the status modifier (.statusDot*) — do not set a base
+     background here or it would override the status colour (source-order cascade). */
+  transition: outline var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.glyphCell:disabled { cursor: inherit; }
+.glyphCellSelected { outline: 2px solid var(--color-accent); outline-offset: 1px; z-index: 2; }
+.glyphCellDim { opacity: 0.22; }
+.glyphCellEmpty { background: transparent; box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.4); border-radius: 2px; }
+
+.glyphCellHalf {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  background: transparent;
+}
+
+.glyphHalfStack {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 1px;
+}
+
+.glyphHalfSlot {
+  min-width: 0;
+  min-height: 0;
+}
+
+.glyphHalfSlot:first-child {
+  border-radius: 2px 2px 0 0;
+}
+
+.glyphHalfSlot:last-child {
+  border-radius: 0 0 2px 2px;
+}
+
+.glyphCellNumber {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  justify-self: center;
+  padding: 0 2px;
+  border-radius: 2px;
+  background: rgba(15, 23, 42, 0.24);
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.7);
+  pointer-events: none;
+}
+
+/* Focus detail panel */
+.isletDetailPanel {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: var(--space-3);
+  height: 640px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+  min-width: 0;
+}
+
+.isletDetailEmpty {
+  align-self: center;
+  text-align: center;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-6);
+}
+
+.isletDetailHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.isletDetailTitle { flex: 1; min-width: 0; display: grid; gap: 0; }
+.isletDetailTitle h3 { margin: 0; font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere; }
+
+.isletDetailAction {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.isletDetailAction:hover { background: var(--color-accent-subtle); color: var(--color-accent); border-color: var(--color-accent-muted); }
+
+.isletDetailMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.isletDetailMeta strong { color: var(--color-text); font-variant-numeric: tabular-nums; }
+
+.isletDetailScroll {
+  overflow: auto;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--space-3);
+}
+
+.isletDetailGrid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+@media (max-width: 1000px) {
+  .mapWorkspace { grid-template-columns: 1fr; }
+  .isletDetailPanel { height: auto; max-height: 520px; }
+}
+
 /* ROOM CANVAS — representative island placement (Traccia 2) */
 .roomCanvas {
   display: grid;
