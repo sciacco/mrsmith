@@ -46,6 +46,17 @@ export function slotStatus(positionStatus: string | undefined, rack: PositionRac
   return (positionStatus ?? '').toLowerCase() === 'reserved' ? 'reserved' : 'free';
 }
 
+// Effective per-position status for badges/lists/rails: a shared cabinet is condiviso
+// (never free); otherwise a Full follows position.status and a Half takes the most
+// occupied of its two sides (shared > occupied > reserved > free).
+export function positionEffectiveStatus(position: Position): SlotStatus {
+  if (!isHalfPosition(position.type)) return fullSlotStatus(position);
+  const rank = (s: SlotStatus) => (s === 'shared' ? 3 : s === 'occupied' ? 2 : s === 'reserved' ? 1 : 0);
+  const a = slotStatus(position.status, rackAt(position.racks, 'A'));
+  const b = slotStatus(position.status, rackAt(position.racks, 'B'));
+  return rank(a) >= rank(b) ? a : b;
+}
+
 // Occupancy counted per rack slot (posto): a Full tile is 1 slot, a Half tile is 2
 // (A/B). Each slot is classified exactly like its rendered colour, so the totals
 // always match the coloured regions on the grid. `shared` is a flavour of occupied

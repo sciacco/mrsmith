@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { LayoutGridBlock, LayoutGridCell } from '../../api/types';
-import type { LayoutSelection } from './LayoutScene';
+import type { LayoutSelection } from './layoutTypes';
 import { fullRack, fullSlotStatus, isHalfPosition, rackAt, slotStatus, type HalfSide } from './positions';
 import styles from './workspace.module.css';
 
@@ -7,7 +8,15 @@ interface LayoutGridProps {
   blocks: LayoutGridBlock[];
   selected: LayoutSelection;
   onSelect: (selection: LayoutSelection) => void;
+  // When a search/filter is active, matching position cells are emphasised and the
+  // rest dimmed, so the room map doubles as a "where is X" surface.
+  emphasizedIds?: Set<number>;
+  filtersActive?: boolean;
 }
+
+const ZOOM_STEP = 0.15;
+const ZOOM_MIN = 0.6;
+const ZOOM_MAX = 1.8;
 
 function statusClass(cell: LayoutGridCell) {
   if (cell.type !== 'position') return '';
@@ -92,19 +101,27 @@ function CellContent({ cell }: { cell: LayoutGridCell }) {
   );
 }
 
-export function LayoutGrid({ blocks, selected, onSelect }: LayoutGridProps) {
+export function LayoutGrid({ blocks, selected, onSelect, emphasizedIds, filtersActive }: LayoutGridProps) {
+  const [zoom, setZoom] = useState(1);
+
   if (blocks.length === 0) {
     return (
       <div className={styles.layoutSceneFallback}>
         <h3 className={styles.emptyTitle}>Mappa non configurata</h3>
-        <p className={styles.emptyText}>Usa la Vista 3D per consultare isole e posizioni disponibili.</p>
+        <p className={styles.emptyText}>Consulta isole e posizioni nell'elenco qui sotto.</p>
       </div>
     );
   }
 
   return (
     <div className={styles.layoutGridScene} aria-label="Vista 2D layout sala">
-      <div className={styles.layoutGridBlocks}>
+      <div className={styles.layoutZoomBar} role="group" aria-label="Zoom mappa">
+        <button type="button" onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100))} disabled={zoom <= ZOOM_MIN} aria-label="Riduci zoom">−</button>
+        <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1} aria-label="Reimposta zoom">{Math.round(zoom * 100)}%</button>
+        <button type="button" onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100))} disabled={zoom >= ZOOM_MAX} aria-label="Aumenta zoom">+</button>
+      </div>
+      <div className={styles.layoutGridViewport}>
+      <div className={styles.layoutGridBlocks} style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
         {blocks.map((block) => (
           <section key={block.id} className={`${styles.layoutGridBlock} ${blockWidthClass(block.layoutWidth)}`}>
             <div className={styles.layoutGridBlockHeader}>
@@ -125,6 +142,10 @@ export function LayoutGrid({ blocks, selected, onSelect }: LayoutGridProps) {
                 >
                   {row.map((cell, colIndex) => {
                     const selectedCell = cell.positionId && selected?.type === 'position' && selected.id === cell.positionId;
+                    const matched = filtersActive && cell.type === 'position' && cell.positionId
+                      ? emphasizedIds?.has(cell.positionId) ?? false
+                      : false;
+                    const dimmed = Boolean(filtersActive) && cell.type === 'position' && !matched;
                     const className = [
                       styles.layoutGridCell,
                       cell.type === 'empty' ? styles.layoutGridCellEmpty : '',
@@ -133,6 +154,8 @@ export function LayoutGrid({ blocks, selected, onSelect }: LayoutGridProps) {
                       cell.type === 'position' ? styles.layoutGridCellPosition : '',
                       statusClass(cell),
                       selectedCell ? styles.layoutGridCellSelected : '',
+                      matched ? styles.layoutGridCellMatch : '',
+                      dimmed ? styles.layoutGridCellDim : '',
                     ].filter(Boolean).join(' ');
                     if (cell.type === 'position') {
                       return (
@@ -166,6 +189,7 @@ export function LayoutGrid({ blocks, selected, onSelect }: LayoutGridProps) {
             </div>
           </section>
         ))}
+      </div>
       </div>
       <div className={styles.layoutLegend}>
         <span><i className={styles.legendFree} />Libera</span>

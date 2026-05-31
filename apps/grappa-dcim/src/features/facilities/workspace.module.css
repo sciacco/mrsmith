@@ -757,7 +757,7 @@
 
 .layoutWorkspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(300px, 360px);
   gap: var(--space-4);
   align-items: start;
 }
@@ -1254,6 +1254,7 @@
 
   .split,
   .layoutCommandBar,
+  .layoutToolbar,
   .layoutWorkspace,
   .formGrid,
   .detailGrid,
@@ -1264,6 +1265,11 @@
 
   .layoutStatusStrip {
     justify-content: flex-start;
+  }
+
+  .isletIndex {
+    position: static;
+    max-height: none;
   }
 
   .layoutScene,
@@ -1782,4 +1788,337 @@
 
 .mapGridBlocksSpacious .mapGridHalfSlot {
   border-radius: var(--radius-sm) !important;
+}
+
+/* ISOLE E POSIZIONI — consultation-first layout (Opzione B) */
+
+.layoutToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.layoutSearchField {
+  flex: 1 1 280px;
+  min-width: 220px;
+}
+
+.layoutChips {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.layoutChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.layoutChip strong {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.layoutChip:hover {
+  border-color: var(--color-accent-muted);
+}
+
+.layoutChipActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  box-shadow: 0 0 0 2px var(--color-accent-subtle);
+}
+
+.layoutChipDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-faint);
+}
+
+.chip_free .layoutChipDot { background: var(--color-success); }
+.chip_occupied .layoutChipDot { background: var(--color-accent); }
+.chip_reserved .layoutChipDot { background: var(--color-warning); }
+.chip_shared .layoutChipDot { background: #c026d3; }
+
+.layoutChipDivider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px var(--space-1);
+  background: var(--color-border);
+}
+
+.layoutChipReset {
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 var(--space-2);
+}
+
+.layoutChipReset:hover { text-decoration: underline; }
+
+/* Islet index (left rail) */
+.isletIndex {
+  position: sticky;
+  top: calc(60px + var(--space-5));
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+  padding: var(--space-3);
+}
+
+.isletIndexList {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.isletIndexGroup {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.isletIndexGroupLabel {
+  color: var(--color-text-muted);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0 var(--space-2);
+}
+
+.isletIndexItem {
+  display: grid;
+  gap: var(--space-1);
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.isletIndexItem:hover {
+  background: var(--color-surface);
+}
+
+.isletIndexItemActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.isletIndexItemDim {
+  opacity: 0.45;
+}
+
+.isletIndexRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+}
+
+.isletIndexCount {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.isletIndexMatch {
+  min-width: 1.4rem;
+  text-align: center;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.isletIndexBar {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-subtle);
+  overflow: hidden;
+}
+
+.isletIndexBarFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
+
+/* View toggle row above the map */
+.layoutViewToggleRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Slim notice when no spatial map is configured */
+.layoutMapNotice {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.layoutMapNotice strong { color: var(--color-text); }
+.layoutMapNotice span { color: var(--color-text-secondary); font-size: 0.875rem; }
+
+/* Map zoom bar + viewport (LayoutGrid) */
+.layoutZoomBar {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-xs);
+}
+
+.layoutZoomBar button {
+  min-width: 2rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.layoutZoomBar button:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.layoutZoomBar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.layoutGridViewport {
+  overflow: auto;
+  max-height: 620px;
+  padding: var(--space-4);
+}
+
+/* Search/filter emphasis on the map */
+.layoutGridCellMatch {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  z-index: 2;
+}
+
+.layoutGridCellDim {
+  opacity: 0.28;
+  filter: saturate(0.7);
+}
+
+/* Linked positions table */
+.linkedTablePanel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+}
+
+.linkedTableEmpty {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+
+.linkedTable tbody tr {
+  cursor: pointer;
+}
+
+.sortHeader {
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sortHeader:hover {
+  color: var(--color-accent);
+}
+
+/* Status tag (dot + label) */
+.statusTag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-faint);
+}
+
+.statusDotFree { background: var(--color-success); }
+.statusDotOccupied { background: var(--color-accent); }
+.statusDotReserved { background: var(--color-warning); }
+.statusDotShared { background: #c026d3; }
+
+/* Inspector rack card */
+.inspectorRackCard {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
 }

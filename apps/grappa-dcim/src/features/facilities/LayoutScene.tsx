@@ -2,13 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { Islet, Position } from '../../api/types';
+import type { LayoutSelection } from './layoutTypes';
 import { fullSlotStatus, isHalfPosition } from './positions';
 import styles from './workspace.module.css';
-
-export type LayoutSelection =
-  | { type: 'islet'; id: number }
-  | { type: 'position'; id: number }
-  | null;
 
 interface LayoutSceneProps {
   islets: Islet[];

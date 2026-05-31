@@ -14,13 +14,36 @@ import {
 import type { Building, BuildingInput, Datacenter, DatacenterInput, Islet, Position, PositionRack, RackListItem, LayoutGridResponse, LayoutGridBlock, LayoutGridCell } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
 import { LayoutGrid } from './LayoutGrid';
-import type { LayoutSelection } from './LayoutScene';
-import { fullRack, fullSlotStatus, isHalfPosition, rackAt, slotStatus, summarizeSlots, type HalfSide, type SlotStatus } from './positions';
+import type { LayoutSelection, LayoutViewMode } from './layoutTypes';
+import {
+  buildPositionRows,
+  filterRows,
+  hasActiveFilters,
+  matchingPositionIds,
+  rowMatchesFilters,
+  statusCounts,
+  summarizeIslets,
+  type IsletSummary,
+  type LayoutFilters,
+  type PositionRow,
+} from './layoutData';
+import { fullRack, fullSlotStatus, isHalfPosition, positionEffectiveStatus, rackAt, slotStatus, summarizeSlots, type HalfSide, type SlotStatus } from './positions';
 import styles from './workspace.module.css';
 
 const destructiveBody = { confirmPrimary: true, confirmSecondary: true };
 const LayoutSceneView = lazy(() => import('./LayoutScene').then((module) => ({ default: module.LayoutScene })));
-type LayoutViewMode = '2d' | '3d';
+
+const STATUS_FILTER_ORDER: SlotStatus[] = ['free', 'occupied', 'shared', 'reserved'];
+const STATUS_PLURAL_LABEL: Record<SlotStatus, string> = {
+  free: 'libere',
+  occupied: 'occupate',
+  reserved: 'riservate',
+  shared: 'condivise',
+};
+const FORMAT_FILTERS = [
+  { value: 'full', label: 'Full' },
+  { value: 'half', label: 'Half' },
+];
 
 function valueOrDash(value: unknown) {
   if (value === undefined || value === null || value === '') return '-';
@@ -422,6 +445,10 @@ export function LayoutPage() {
   const [deletingPosition, setDeletingPosition] = useState<Position | null>(null);
   const [batchCount, setBatchCount] = useState(0);
   const [batchType, setBatchType] = useState('full');
+  const [query, setQuery] = useState('');
+  const [statusFilters, setStatusFilters] = useState<SlotStatus[]>([]);
+  const [formatFilters, setFormatFilters] = useState<string[]>([]);
+  const [scopeIsletId, setScopeIsletId] = useState<number | null>(null);
   const islets = useIslets(datacenterId);
   const map = useDatacenterMap(datacenterId);
   const layoutGrid = useDatacenterLayoutGrid(datacenterId);
@@ -433,6 +460,7 @@ export function LayoutPage() {
   const waitingForDefaultView = datacenterId !== null && viewMode === null && layoutGrid.isLoading;
   const sceneIslets = useMemo(() => map.data?.islets ?? islets.data ?? [], [islets.data, map.data?.islets]);
   const scenePositions = useMemo(() => layoutGrid.data?.positions ?? map.data?.positions ?? [], [layoutGrid.data?.positions, map.data?.positions]);
+  const racksList = useMemo<RackListItem[]>(() => layoutGrid.data?.racks ?? map.data?.racks ?? [], [layoutGrid.data?.racks, map.data?.racks]);
   const selectedPosition = selection?.type === 'position' ? scenePositions.find((item) => item.id === selection.id) ?? null : null;
   const selectedIslet = selection?.type === 'islet'
     ? sceneIslets.find((item) => item.id === selection.id) ?? null
@@ -444,8 +472,34 @@ export function LayoutPage() {
     [datacenters.data],
   );
   // Per-slot occupancy (Full = 1 posto, Half = 2), driven by active rack presence so
-  // the inspector/header counts match the coloured cells in the 2D/3D layout.
+  // the sala summary counts match the coloured cells in the 2D/3D layout.
   const occupancy = useMemo(() => summarizeSlots(scenePositions), [scenePositions]);
+
+  // Unified consultation model: positions joined to islets + rich rack detail.
+  const rows = useMemo(() => buildPositionRows(scenePositions, sceneIslets, racksList), [scenePositions, sceneIslets, racksList]);
+  const filters = useMemo<LayoutFilters>(() => ({ query, statuses: statusFilters, formats: formatFilters, isletId: scopeIsletId }), [query, statusFilters, formatFilters, scopeIsletId]);
+  const filtersActive = hasActiveFilters(filters);
+  const filteredRows = useMemo(() => filterRows(rows, filters), [rows, filters]);
+  const emphasizedIds = useMemo(() => (filtersActive ? matchingPositionIds(rows, filters) : new Set<number>()), [rows, filters, filtersActive]);
+  // Chip counts respect query/scope/format but ignore the status selection itself,
+  // so each chip shows how many of the current matches fall in that state.
+  const chipCounts = useMemo(() => statusCounts(rows.filter((row) => rowMatchesFilters(row, { ...filters, statuses: [] }))), [rows, filters]);
+  const isletSummaries = useMemo(() => summarizeIslets(rows, sceneIslets, filters), [rows, sceneIslets, filters]);
+
+  const toggleStatusFilter = (status: SlotStatus) =>
+    setStatusFilters((current) => (current.includes(status) ? current.filter((s) => s !== status) : [...current, status]));
+  const toggleFormatFilter = (format: string) =>
+    setFormatFilters((current) => (current.includes(format) ? current.filter((f) => f !== format) : [...current, format]));
+  const scopeIslet = (isletId: number | null) => {
+    setScopeIsletId(isletId);
+    setSelection(isletId === null ? null : { type: 'islet', id: isletId });
+  };
+  const resetFilters = () => {
+    setQuery('');
+    setStatusFilters([]);
+    setFormatFilters([]);
+    setScopeIsletId(null);
+  };
 
   useEffect(() => {
     const firstDatacenter = datacenters.data?.[0];
@@ -534,7 +588,7 @@ export function LayoutPage() {
         </div>
         {canOperate ? <Button onClick={() => setEditingIslet('new')} disabled={!datacenterId} leftIcon={<Icon name="plus" size={16} />}>Nuova isola</Button> : null}
       </div>
-      <div className={styles.layoutCommandBar}>
+      <div className={styles.layoutToolbar}>
         <div className={styles.layoutSelectField}>
           <label>Sala</label>
           <SingleSelect
@@ -544,52 +598,105 @@ export function LayoutPage() {
               setDatacenterId(value);
               setSelection(null);
               setViewMode(null);
+              resetFilters();
             }}
             placeholder="Seleziona sala"
           />
         </div>
-        <div className={styles.layoutViewSwitch} role="group" aria-label="Selezione vista layout">
-          <button
-            type="button"
-            className={`${styles.layoutViewButton} ${effectiveViewMode === '2d' ? styles.layoutViewButtonActive : ''}`}
-            onClick={() => setViewMode('2d')}
-            disabled={!hasLayoutGridBlocks && !layoutGrid.isLoading}
-          >
-            Vista 2D
-          </button>
-          <button
-            type="button"
-            className={`${styles.layoutViewButton} ${effectiveViewMode === '3d' ? styles.layoutViewButtonActive : ''}`}
-            onClick={() => setViewMode('3d')}
-          >
-            Vista 3D
-          </button>
+        <div className={styles.layoutSearchField}>
+          <SearchInput value={query} onChange={setQuery} placeholder="Cerca rack, posizione, cliente o isola" />
         </div>
-        <div className={styles.layoutStatusStrip} aria-label="Occupazione posti rack">
-          <span><strong>{occupancy.total}</strong> posti</span>
-          <span><strong>{occupancy.free}</strong> liberi</span>
-          <span><strong>{occupancy.occupied}</strong> occupati</span>
-          {occupancy.shared > 0 ? <span><strong>{occupancy.shared}</strong> condivisi</span> : null}
-          <span><strong>{occupancy.reserved}</strong> riservati</span>
+        <div className={styles.layoutChips} role="group" aria-label="Filtra per stato e formato">
+          {STATUS_FILTER_ORDER.map((status) => {
+            const count = chipCounts[status];
+            const active = statusFilters.includes(status);
+            if (status === 'shared' && count === 0 && !active) return null;
+            return (
+              <button
+                key={status}
+                type="button"
+                className={`${styles.layoutChip} ${styles[`chip_${status}`]} ${active ? styles.layoutChipActive : ''}`}
+                aria-pressed={active}
+                onClick={() => toggleStatusFilter(status)}
+              >
+                <span className={styles.layoutChipDot} aria-hidden="true" />
+                <strong>{count}</strong> {STATUS_PLURAL_LABEL[status]}
+              </button>
+            );
+          })}
+          <span className={styles.layoutChipDivider} aria-hidden="true" />
+          {FORMAT_FILTERS.map((format) => {
+            const active = formatFilters.includes(format.value);
+            return (
+              <button
+                key={format.value}
+                type="button"
+                className={`${styles.layoutChip} ${active ? styles.layoutChipActive : ''}`}
+                aria-pressed={active}
+                onClick={() => toggleFormatFilter(format.value)}
+              >
+                {format.label}
+              </button>
+            );
+          })}
+          {filtersActive ? (
+            <button type="button" className={styles.layoutChipReset} onClick={resetFilters}>Azzera filtri</button>
+          ) : null}
         </div>
       </div>
 
       <div className={styles.layoutWorkspace}>
+        <IsletIndex
+          summaries={isletSummaries}
+          scopeIsletId={scopeIsletId}
+          filtersActive={filtersActive}
+          loading={datacenterId !== null && (islets.isLoading || map.isLoading)}
+          onScope={scopeIslet}
+        />
+
         <div className={styles.layoutMain}>
+          {datacenterId !== null && hasLayoutGridBlocks ? (
+            <div className={styles.layoutViewToggleRow}>
+              <div className={styles.layoutViewSwitch} role="group" aria-label="Vista mappa">
+                <button
+                  type="button"
+                  className={`${styles.layoutViewButton} ${effectiveViewMode === '2d' ? styles.layoutViewButtonActive : ''}`}
+                  onClick={() => setViewMode('2d')}
+                >
+                  2D
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.layoutViewButton} ${effectiveViewMode === '3d' ? styles.layoutViewButtonActive : ''}`}
+                  onClick={() => setViewMode('3d')}
+                >
+                  3D
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {datacenterId === null ? (
             <div className={styles.layoutSceneFallback}>
               <h3 className={styles.emptyTitle}>Seleziona una sala</h3>
-              <p className={styles.emptyText}>La vista fisica si aggiorna con isole, posizioni e rack disponibili.</p>
+              <p className={styles.emptyText}>Mappa, isole e posizioni si aggiornano sulla sala scelta.</p>
             </div>
           ) : waitingForDefaultView || (effectiveViewMode === '2d' && layoutGrid.isLoading) || (effectiveViewMode === '3d' && (map.isLoading || islets.isLoading)) ? (
             <div className={styles.layoutSceneFallback}><Skeleton rows={9} /></div>
           ) : effectiveViewMode === '2d' && layoutGrid.error ? (
             <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la vista 2D della sala." tone="error" />
+          ) : effectiveViewMode === '2d' && !hasLayoutGridBlocks ? (
+            <div className={styles.layoutMapNotice} role="status">
+              <strong>Mappa spaziale non configurata</strong>
+              <span>Questa sala non ha un layout 2D: consulta isole e posizioni nell'elenco qui sotto.</span>
+            </div>
           ) : effectiveViewMode === '2d' ? (
             <LayoutGrid
               blocks={layoutGrid.data?.blocks ?? []}
               selected={selection}
               onSelect={setSelection}
+              emphasizedIds={emphasizedIds}
+              filtersActive={filtersActive}
             />
           ) : map.error ? (
             <ViewState title="Layout non disponibile" message="Non e stato possibile caricare la mappa fisica della sala." tone="error" />
@@ -603,6 +710,7 @@ export function LayoutPage() {
               />
             </Suspense>
           )}
+
           {effectiveViewMode === '2d' && (layoutGrid.data?.warnings.length ?? 0) > 0 ? (
             <div className={styles.layoutWarningPanel} role="status">
               <strong>Da verificare</strong>
@@ -611,12 +719,18 @@ export function LayoutPage() {
               </ul>
             </div>
           ) : null}
-          <LayoutQuickSelect
-            islets={sceneIslets}
-            positions={scenePositions}
-            selected={selection}
-            onSelect={setSelection}
-          />
+
+          {datacenterId !== null ? (
+            <LinkedPositionsTable
+              rows={filteredRows}
+              totalCount={rows.length}
+              filtersActive={filtersActive}
+              loading={islets.isLoading || layoutGrid.isLoading || map.isLoading}
+              selectedPositionId={selection?.type === 'position' ? selection.id : null}
+              onSelect={(id) => setSelection({ type: 'position', id })}
+              onResetFilters={resetFilters}
+            />
+          ) : null}
         </div>
 
         <LayoutInspector
@@ -624,6 +738,7 @@ export function LayoutPage() {
           datacenter={selectedDatacenter}
           islets={sceneIslets}
           positions={scenePositions}
+          rows={rows}
           selectedIslet={selectedIslet}
           selectedPosition={selectedPosition}
           occupancy={occupancy}
@@ -676,64 +791,227 @@ export function LayoutPage() {
   );
 }
 
-function LayoutQuickSelect({
-  islets,
-  positions,
-  selected,
-  onSelect,
+// Vertical, searchable islet index grouped by floor — replaces the horizontal
+// rails. Clicking an islet scopes the table/map to it; "Tutte le isole" clears it.
+function IsletIndex({
+  summaries,
+  scopeIsletId,
+  filtersActive,
+  loading,
+  onScope,
 }: {
-  islets: Islet[];
-  positions: Position[];
-  selected: LayoutSelection;
-  onSelect: (selection: LayoutSelection) => void;
+  summaries: IsletSummary[];
+  scopeIsletId: number | null;
+  filtersActive: boolean;
+  loading: boolean;
+  onScope: (isletId: number | null) => void;
 }) {
-  const selectedIsletId = selected?.type === 'islet'
-    ? selected.id
-    : selected?.type === 'position'
-      ? positions.find((item) => item.id === selected.id)?.isletId ?? null
-      : null;
-  const visiblePositions = selectedIsletId
-    ? positions.filter((item) => item.isletId === selectedIsletId).sort((a, b) => a.num - b.num)
-    : [];
+  const byFloor = useMemo(() => {
+    const grouped = new Map<number, IsletSummary[]>();
+    for (const summary of summaries) {
+      const list = grouped.get(summary.islet.floor) ?? [];
+      list.push(summary);
+      grouped.set(summary.islet.floor, list);
+    }
+    return [...grouped.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([floor, items]) => ({ floor, items: items.sort((a, b) => a.islet.name.localeCompare(b.islet.name)) }));
+  }, [summaries]);
+  const multiFloor = byFloor.length > 1;
 
   return (
-    <div className={styles.layoutQuickPanel}>
+    <aside className={styles.isletIndex} aria-label="Indice isole">
       <div className={styles.sectionHeader}>
-        <h2 className={styles.emptyTitle}>Selezione rapida</h2>
-        <span className={styles.badgeMuted}>{islets.length} isole</span>
+        <h2 className={styles.emptyTitle}>Isole</h2>
+        <span className={styles.badgeMuted}>{summaries.length}</span>
       </div>
-      <div className={styles.layoutRail} aria-label="Isole disponibili">
-        {islets.length === 0 ? (
-          <span className={styles.emptyText}>Nessuna isola configurata.</span>
-        ) : islets.map((item) => (
+      {loading ? (
+        <Skeleton rows={6} />
+      ) : summaries.length === 0 ? (
+        <p className={styles.emptyText}>Nessuna isola configurata.</p>
+      ) : (
+        <div className={styles.isletIndexList}>
           <button
             type="button"
-            key={item.id}
-            className={`${styles.layoutRailButton} ${selectedIsletId === item.id ? styles.layoutRailButtonActive : ''}`}
-            onClick={() => onSelect({ type: 'islet', id: item.id })}
+            className={`${styles.isletIndexItem} ${scopeIsletId === null ? styles.isletIndexItemActive : ''}`}
+            onClick={() => onScope(null)}
           >
-            <strong>{item.name}</strong>
-            <span>{item.occupiedCount} / {item.positionCount || item.rackNum}</span>
+            <span className={styles.isletIndexRow}><strong>Tutte le isole</strong></span>
           </button>
-        ))}
-      </div>
-      {selectedIsletId ? (
-        <div className={styles.positionRail} aria-label="Posizioni isola selezionata">
-          {visiblePositions.length === 0 ? (
-            <span className={styles.emptyText}>Nessuna posizione per l'isola selezionata.</span>
-          ) : visiblePositions.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              className={`${styles.positionRailButton} ${styles[normalizePositionStatusClass(positionEffectiveStatus(item))]} ${selected?.type === 'position' && selected.id === item.id ? styles.positionRailButtonActive : ''}`}
-              onClick={() => onSelect({ type: 'position', id: item.id })}
-            >
-              <strong>{item.num}</strong>
-              <span>{positionStatusLabel(positionEffectiveStatus(item))}</span>
-            </button>
+          {byFloor.map(({ floor, items }) => (
+            <div key={floor} className={styles.isletIndexGroup}>
+              {multiFloor ? <span className={styles.isletIndexGroupLabel}>Piano {floor}</span> : null}
+              {items.map((summary) => {
+                const active = scopeIsletId === summary.islet.id;
+                const dim = filtersActive && summary.matchCount === 0;
+                const occRatio = summary.total > 0 ? Math.round((summary.occupied / summary.total) * 100) : 0;
+                return (
+                  <button
+                    key={summary.islet.id}
+                    type="button"
+                    className={`${styles.isletIndexItem} ${active ? styles.isletIndexItemActive : ''} ${dim ? styles.isletIndexItemDim : ''}`}
+                    onClick={() => onScope(summary.islet.id)}
+                  >
+                    <span className={styles.isletIndexRow}>
+                      <strong>{summary.islet.name}</strong>
+                      {filtersActive
+                        ? <span className={styles.isletIndexMatch}>{summary.matchCount}</span>
+                        : <span className={styles.isletIndexCount}>{summary.occupied}/{summary.total || summary.islet.rackNum}</span>}
+                    </span>
+                    <span className={styles.isletIndexBar} aria-hidden="true">
+                      <span className={styles.isletIndexBarFill} style={{ width: `${occRatio}%` }} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           ))}
         </div>
-      ) : null}
+      )}
+    </aside>
+  );
+}
+
+const STATUS_DOT_CLASS: Record<SlotStatus, string> = {
+  free: 'statusDotFree',
+  occupied: 'statusDotOccupied',
+  reserved: 'statusDotReserved',
+  shared: 'statusDotShared',
+};
+
+function StatusTag({ status }: { status: SlotStatus }) {
+  return (
+    <span className={styles.statusTag}>
+      <span className={`${styles.statusDot} ${styles[STATUS_DOT_CLASS[status]]}`} aria-hidden="true" />
+      {positionStatusLabel(status)}
+    </span>
+  );
+}
+
+function rackCellLabel(row: PositionRow): string {
+  if (row.racks.length === 0) return '-';
+  return row.racks.map((rack) => (isHalfPosition(row.position.type) ? `${rack.pos}: ${rack.name}` : rack.name)).join(' · ');
+}
+
+function customerCellLabel(row: PositionRow): string {
+  const ids = [...new Set(row.customerIds)];
+  return ids.length > 0 ? ids.join(', ') : '-';
+}
+
+function rowPower(row: PositionRow): number {
+  return row.racks.reduce((sum, rack) => sum + (rack.soldPower ?? 0), 0);
+}
+
+type PositionSortKey = 'islet' | 'num' | 'status' | 'customer' | 'power';
+const STATUS_RANK: Record<SlotStatus, number> = { shared: 3, occupied: 2, reserved: 1, free: 0 };
+
+// Linked positions table: the consultation backbone and the fallback when a room
+// has no spatial map. Selecting a row cross-highlights the map (and vice versa).
+function LinkedPositionsTable({
+  rows,
+  totalCount,
+  filtersActive,
+  loading,
+  selectedPositionId,
+  onSelect,
+  onResetFilters,
+}: {
+  rows: PositionRow[];
+  totalCount: number;
+  filtersActive: boolean;
+  loading: boolean;
+  selectedPositionId: number | null;
+  onSelect: (id: number) => void;
+  onResetFilters: () => void;
+}) {
+  const [sort, setSort] = useState<{ key: PositionSortKey; dir: 'asc' | 'desc' }>({ key: 'islet', dir: 'asc' });
+
+  const sortedRows = useMemo(() => {
+    const factor = sort.dir === 'asc' ? 1 : -1;
+    const compare = (a: PositionRow, b: PositionRow): number => {
+      switch (sort.key) {
+        case 'num':
+          return (a.position.num - b.position.num) * factor;
+        case 'status':
+          return (STATUS_RANK[a.status] - STATUS_RANK[b.status]) * factor;
+        case 'customer':
+          return ((a.customerIds[0] ?? Number.MAX_SAFE_INTEGER) - (b.customerIds[0] ?? Number.MAX_SAFE_INTEGER)) * factor;
+        case 'power':
+          return (rowPower(a) - rowPower(b)) * factor;
+        case 'islet':
+        default: {
+          const byName = (a.islet?.name ?? '').localeCompare(b.islet?.name ?? '');
+          return (byName !== 0 ? byName : a.position.num - b.position.num) * factor;
+        }
+      }
+    };
+    return [...rows].sort(compare);
+  }, [rows, sort]);
+
+  const setSortKey = (key: PositionSortKey) =>
+    setSort((current) => (current.key === key ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
+  const sortIndicator = (key: PositionSortKey) => (sort.key === key ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '');
+
+  return (
+    <div className={styles.linkedTablePanel}>
+      <div className={styles.sectionHeader}>
+        <div>
+          <h3 className={styles.emptyTitle}>Posizioni</h3>
+          <p className={styles.emptyText}>Elenco collegato alla mappa: seleziona una riga per ispezionarla.</p>
+        </div>
+        <span className={styles.badgeMuted}>{filtersActive ? `${rows.length} di ${totalCount}` : `${totalCount}`}</span>
+      </div>
+      {loading ? (
+        <Skeleton rows={6} />
+      ) : totalCount === 0 ? (
+        <p className={styles.emptyText}>Nessuna posizione per questa sala.</p>
+      ) : rows.length === 0 ? (
+        <div className={styles.linkedTableEmpty}>
+          <p className={styles.emptyText}>Nessuna posizione corrisponde ai filtri attivi.</p>
+          <Button variant="secondary" size="sm" onClick={onResetFilters}>Azzera filtri</Button>
+        </div>
+      ) : (
+        <div className={styles.tableWrap}>
+          <table className={`${styles.table} ${styles.linkedTable}`}>
+            <thead>
+              <tr>
+                <th><button type="button" className={styles.sortHeader} onClick={() => setSortKey('islet')}>Isola{sortIndicator('islet')}</button></th>
+                <th><button type="button" className={styles.sortHeader} onClick={() => setSortKey('num')}>Pos.{sortIndicator('num')}</button></th>
+                <th>Formato</th>
+                <th><button type="button" className={styles.sortHeader} onClick={() => setSortKey('status')}>Stato{sortIndicator('status')}</button></th>
+                <th>Rack</th>
+                <th><button type="button" className={styles.sortHeader} onClick={() => setSortKey('customer')}>Cliente{sortIndicator('customer')}</button></th>
+                <th><button type="button" className={styles.sortHeader} onClick={() => setSortKey('power')}>Potenza{sortIndicator('power')}</button></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRows.map((row) => (
+                <tr
+                  key={row.position.id}
+                  className={selectedPositionId === row.position.id ? styles.selectedRow : ''}
+                  onClick={() => onSelect(row.position.id)}
+                  tabIndex={0}
+                  role="button"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onSelect(row.position.id);
+                    }
+                  }}
+                >
+                  <td>{row.islet?.name ?? '-'}</td>
+                  <td><strong>{row.position.num}</strong></td>
+                  <td>{valueOrDash(row.position.type)}</td>
+                  <td><StatusTag status={row.status} /></td>
+                  <td>{rackCellLabel(row)}</td>
+                  <td>{customerCellLabel(row)}</td>
+                  <td>{rowPower(row) > 0 ? `${rowPower(row)} kW` : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -743,6 +1021,7 @@ function LayoutInspector({
   datacenter,
   islets,
   positions,
+  rows,
   selectedIslet,
   selectedPosition,
   occupancy,
@@ -763,6 +1042,7 @@ function LayoutInspector({
   datacenter: Datacenter | null;
   islets: Islet[];
   positions: Position[];
+  rows: PositionRow[];
   selectedIslet: Islet | null;
   selectedPosition: Position | null;
   occupancy: { free: number; occupied: number; reserved: number; shared: number; total: number };
@@ -790,28 +1070,38 @@ function LayoutInspector({
   }
 
   if (selectedPosition) {
+    const row = rows.find((item) => item.position.id === selectedPosition.id);
+    const enrichedRacks = row?.racks ?? [];
+    const status = row?.status ?? positionEffectiveStatus(selectedPosition);
     return (
       <aside className={styles.layoutInspector} aria-label="Inspector layout">
         <span className={styles.eyebrow}>Posizione</span>
         <div className={styles.inspectorTitleRow}>
           <h2 className={styles.inspectorTitle}>Posizione {selectedPosition.num}</h2>
-          <span className={`${styles.badgeMuted} ${styles[normalizePositionStatusClass(positionEffectiveStatus(selectedPosition))]}`}>{positionStatusLabel(positionEffectiveStatus(selectedPosition))}</span>
+          <StatusTag status={status} />
         </div>
         <div className={styles.detailGrid}>
           <DetailItem label="Isola" value={selectedIslet?.name} />
           <DetailItem label="Formato" value={selectedPosition.type} />
-          <DetailItem label="ID posizione" value={selectedPosition.id} />
         </div>
-        {selectedPosition.racks.length === 0 ? (
+        {enrichedRacks.length === 0 ? (
           <p className={styles.emptyText}>Nessun rack su questa posizione.</p>
-        ) : selectedPosition.racks.map((rack) => (
-          <div key={rack.id} className={styles.detailGrid}>
-            <DetailItem label={positionRackLabel(rack.pos)} value={rack.name} />
-            <DetailItem label="Tipo rack" value={rack.type} />
+        ) : enrichedRacks.map((rack) => (
+          <div key={rack.id} className={styles.inspectorRackCard}>
+            <div className={styles.inspectorTitleRow}>
+              <strong>{rack.name}</strong>
+              <span className={styles.badgeMuted}>{positionRackLabel(rack.pos)}{rack.shared ? ' · condiviso' : ''}</span>
+            </div>
+            <div className={styles.detailGrid}>
+              <DetailItem label="Cliente" value={rack.customerId} />
+              <DetailItem label="Potenza" value={rack.soldPower !== undefined ? `${rack.soldPower} kW` : undefined} />
+              <DetailItem label="Stato rack" value={rack.rackStatus} />
+              <DetailItem label="Ordine" value={rack.orderCode} />
+            </div>
           </div>
         ))}
         <div className={styles.inspectorActions}>
-          {selectedPosition.racks.map((rack) => (
+          {enrichedRacks.map((rack) => (
             <Button key={rack.id} variant="secondary" onClick={() => onOpenRack(rack.id)}>
               Apri {positionRackLabel(rack.pos).toLowerCase()}
             </Button>
@@ -902,25 +1192,6 @@ function DetailItem({ label, value }: { label: string; value: unknown }) {
       <span className={styles.detailValue}>{valueOrDash(value)}</span>
     </div>
   );
-}
-
-function normalizePositionStatusClass(status: string) {
-  if (status === 'occupied') return 'occupied';
-  if (status === 'reserved') return 'reserved';
-  if (status === 'shared') return 'shared';
-  if (status === 'free') return 'free';
-  return 'badgeMuted';
-}
-
-// Effective per-position status for badges/rails: a shared cabinet is condiviso
-// (never free), otherwise Full follows position.status and Half takes the most
-// occupied of its two sides (shared > occupied > reserved > free).
-function positionEffectiveStatus(position: Position): SlotStatus {
-  if (!isHalfPosition(position.type)) return fullSlotStatus(position);
-  const rank = (s: SlotStatus) => (s === 'shared' ? 3 : s === 'occupied' ? 2 : s === 'reserved' ? 1 : 0);
-  const a = slotStatus(position.status, rackAt(position.racks, 'A'));
-  const b = slotStatus(position.status, rackAt(position.racks, 'B'));
-  return rank(a) >= rank(b) ? a : b;
 }
 
 type HoveredSlot = { position: Position; rack?: PositionRack; side?: HalfSide };
