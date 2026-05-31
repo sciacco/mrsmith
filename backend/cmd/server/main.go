@@ -377,7 +377,7 @@ func main() {
 	if cfg.GrappaDCIMAppURL != "" {
 		hrefOverrides[applaunch.GrappaDCIMAppID] = cfg.GrappaDCIMAppURL
 	} else if cfg.StaticDir == "" {
-		hrefOverrides[applaunch.GrappaDCIMAppID] = "http://localhost:5191"
+		hrefOverrides[applaunch.GrappaDCIMAppID] = "http://localhost:5193"
 	}
 	if cfg.KitProductsAppURL != "" {
 		hrefOverrides[applaunch.KitProductsAppID] = cfg.KitProductsAppURL

@@ -10,7 +10,7 @@ export default defineConfig(({ command }) => ({
     dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
   },
   server: {
-    port: 5191,
+    port: 5193,
     proxy: {
       '/api': backendTarget,
       '/config': backendTarget,
