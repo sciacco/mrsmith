@@ -14,6 +14,7 @@ function test(name: string, run: () => void) {
 }
 
 const baseDraft = {
+  serviceMode: 'recurring' as const,
   description: 'Descrizione riga',
   qty: 2,
   price: 10,

@@ -42,8 +42,10 @@ export function RowModal({
 
   const catalog = useMemo(() => articles.data ?? [], [articles.data]);
   const editing = row != null;
-  const preview = draft.article ? rowPreviewTotal(draft) : 0;
   const selectedType = draft.article?.type;
+  const oneShotService = selectedType === 'service' && draft.serviceMode === 'one_shot';
+  const preview = draft.article ? rowPreviewTotal(draft) : 0;
+  const previewLabel = oneShotService ? 'Totale una tantum' : 'Anteprima totale';
   const saving = createRow.isPending || replaceRow.isPending;
 
   useEffect(() => {
@@ -58,14 +60,26 @@ export function RowModal({
     setValidation(emptyValidation());
   }
 
+  function setServiceMode(serviceMode: RowPayloadDraft['serviceMode']) {
+    setValidation(emptyValidation());
+    setDraft((current) => ({
+      ...current,
+      serviceMode,
+      ...(serviceMode === 'one_shot'
+        ? { mrc: 0, duration: 1, recurrence: 1, automaticRenew: false, cancellationAdvice: '' }
+        : {}),
+    }));
+  }
+
   function selectArticle(article: Article | null) {
-    const previousType = draft.article?.type;
     setValidation(emptyValidation());
     setDraft((current) => {
-      if (!article) return { ...current, article: null };
+      const previousType = current.article?.type;
+      if (!article) return { ...current, article: null, serviceMode: 'recurring' };
       const next: RowPayloadDraft = {
         ...current,
         article,
+        serviceMode: 'recurring',
         description: article.description ?? article.code,
       };
       if (previousType && previousType !== article.type) {
@@ -155,29 +169,55 @@ export function RowModal({
               </div>
             ) : (
               <>
+                <div className="field wide">
+                  <label>Tipo servizio</label>
+                  <div className="serviceModeSegmented" role="group" aria-label="Tipo servizio">
+                    <button
+                      type="button"
+                      className="serviceModeButton"
+                      aria-pressed={draft.serviceMode === 'recurring'}
+                      onClick={() => setServiceMode('recurring')}
+                    >
+                      Servizio ricorrente
+                    </button>
+                    <button
+                      type="button"
+                      className="serviceModeButton"
+                      aria-pressed={draft.serviceMode === 'one_shot'}
+                      onClick={() => setServiceMode('one_shot')}
+                    >
+                      Servizio una tantum
+                    </button>
+                  </div>
+                  <p className="serviceModeHelper">Usa “una tantum” per servizi spot con solo NRC e senza canone ricorrente.</p>
+                </div>
                 <div className="field">
                   <label>NRC</label>
                   <input type="number" min="0" step="0.01" value={draft.nrc} onChange={(event) => updateDraft('nrc', Number(event.target.value))} />
                 </div>
-                <div className="field">
-                  <label>MRC</label>
-                  <input type="number" min="0" step="0.01" value={draft.mrc} onChange={(event) => updateDraft('mrc', Number(event.target.value))} />
-                </div>
-                <div className="field">
-                  <label>Durata mesi</label>
-                  <input type="number" min="1" value={draft.duration} onChange={(event) => updateDraft('duration', Number(event.target.value))} />
-                  {validation.fieldErrors.initial_subscription_months ? <p className="fieldError">{validation.fieldErrors.initial_subscription_months}</p> : null}
-                </div>
-                <div className="field">
-                  <label>Ricorrenza mesi</label>
-                  <select value={draft.recurrence} onChange={(event) => updateDraft('recurrence', Number(event.target.value))}>
-                    {[1, 3, 6, 12].map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {!oneShotService ? (
+                  <>
+                    <div className="field">
+                      <label>MRC</label>
+                      <input type="number" min="0" step="0.01" value={draft.mrc} onChange={(event) => updateDraft('mrc', Number(event.target.value))} />
+                    </div>
+                    <div className="field">
+                      <label>Durata mesi</label>
+                      <input type="number" min="1" value={draft.duration} onChange={(event) => updateDraft('duration', Number(event.target.value))} />
+                      {validation.fieldErrors.initial_subscription_months ? <p className="fieldError">{validation.fieldErrors.initial_subscription_months}</p> : null}
+                    </div>
+                    <div className="field">
+                      <label>Ricorrenza mesi</label>
+                      <select value={draft.recurrence} onChange={(event) => updateDraft('recurrence', Number(event.target.value))}>
+                        {[1, 3, 6, 12].map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                ) : null}
               </>
             )}
             <div className="field">
@@ -195,7 +235,7 @@ export function RowModal({
                 {validation.fieldErrors.start_at_date ? <p className="fieldError">{validation.fieldErrors.start_at_date}</p> : null}
               </div>
             ) : null}
-            {selectedType === 'service' ? (
+            {selectedType === 'service' && !oneShotService ? (
               <>
                 <label className="field checkboxField">
                   <span>Rinnovo automatico</span>
@@ -211,7 +251,7 @@ export function RowModal({
               </>
             ) : null}
             {validation.formErrors.length ? <p className="fieldError fullWidth">{validation.formErrors[0]}</p> : null}
-            <p className="muted fullWidth">Anteprima totale: {formatMoney(preview, currency)}. Il totale finale e calcolato dal servizio RDA.</p>
+            <p className="muted fullWidth">{previewLabel}: {formatMoney(preview, currency)}. Il totale finale e calcolato dal servizio RDA.</p>
             <div className="modalActions fullWidth">
               <Button variant="secondary" onClick={onClose}>
                 Annulla

@@ -1,8 +1,11 @@
 import type { Article, PoRow, RowPayload } from '../api/types';
 import { parseMistraMoney } from './format.js';
 
+export type ServiceMode = 'recurring' | 'one_shot';
+
 export interface RowPayloadDraft {
   article: Article | null;
+  serviceMode: ServiceMode;
   description: string;
   qty: number;
   price: number;
@@ -19,6 +22,7 @@ export interface RowPayloadDraft {
 export function emptyRowDraft(): RowPayloadDraft {
   return {
     article: null,
+    serviceMode: 'recurring',
     description: '',
     qty: 1,
     price: 0,
@@ -51,14 +55,18 @@ export function draftFromPoRow(row: PoRow, catalog: Article[] = []): RowPayloadD
   const startAt = normalizeStartAt(row.payment_detail?.start_at ?? row.payment_detail?.start_pay_at_activation_date, type);
   const duration = parseMistraMoney(row.renew_detail?.initial_subscription_months);
   const recurrence = parseMistraMoney(row.payment_detail?.month_recursion);
+  const nrc = parseMistraMoney(row.activation_fee ?? row.activation_price);
+  const mrc = parseMistraMoney(row.montly_fee ?? row.monthly_fee);
+  const serviceMode: ServiceMode = type === 'service' && mrc === 0 && nrc > 0 ? 'one_shot' : 'recurring';
 
   return {
     article,
+    serviceMode,
     description: row.description ?? row.product_description ?? '',
     qty: nonZero(parseMistraMoney(row.qty), 1),
     price: parseMistraMoney(row.price),
-    nrc: parseMistraMoney(row.activation_fee ?? row.activation_price),
-    mrc: parseMistraMoney(row.montly_fee ?? row.monthly_fee),
+    nrc,
+    mrc,
     duration: nonZero(duration, 12),
     recurrence: nonZero(recurrence, 1),
     startAt,
@@ -81,24 +89,29 @@ function normalizeStartAt(value: unknown, type: Article['type']): string {
 
 export function buildRowPayload(draft: RowPayloadDraft): RowPayload {
   const type = rowTypeFromArticle(draft.article);
+  const oneShotService = type === 'service' && draft.serviceMode === 'one_shot';
+  const effectiveMrc = oneShotService ? 0 : draft.mrc;
+  const effectiveDuration = oneShotService ? 1 : draft.duration;
+  const effectiveRecurrence = oneShotService ? 1 : draft.recurrence;
+
   return {
     type,
     description: draft.description.trim(),
     qty: draft.qty,
     product_code: draft.article?.code ?? '',
     product_description: draft.article?.description ?? draft.article?.code ?? '',
-    ...(type === 'good' ? { price: draft.price } : { monthly_fee: draft.mrc, activation_price: draft.nrc }),
+    ...(type === 'good' ? { price: draft.price } : { monthly_fee: effectiveMrc, activation_price: draft.nrc }),
     payment_detail: {
       start_at: draft.startAt,
       ...(draft.startAt === 'specific_date' ? { start_at_date: draft.startDate } : {}),
-      ...(type === 'service' ? { month_recursion: draft.recurrence } : {}),
+      ...(type === 'service' ? { month_recursion: effectiveRecurrence } : {}),
     },
     ...(type === 'service'
       ? {
           renew_detail: {
-            initial_subscription_months: draft.duration,
-            automatic_renew: draft.automaticRenew,
-            cancellation_advice: draft.cancellationAdvice,
+            initial_subscription_months: effectiveDuration,
+            automatic_renew: oneShotService ? false : draft.automaticRenew,
+            ...(!oneShotService ? { cancellation_advice: draft.cancellationAdvice } : {}),
           },
         }
       : {}),
@@ -108,5 +121,8 @@ export function buildRowPayload(draft: RowPayloadDraft): RowPayload {
 export function rowPreviewTotal(draft: RowPayloadDraft): number {
   const type = rowTypeFromArticle(draft.article);
   if (type === 'good') return draft.price * draft.qty;
-  return draft.mrc * draft.qty * draft.duration + draft.nrc * draft.qty;
+  const oneShotService = type === 'service' && draft.serviceMode === 'one_shot';
+  const effectiveMrc = oneShotService ? 0 : draft.mrc;
+  const effectiveDuration = oneShotService ? 1 : draft.duration;
+  return effectiveMrc * draft.qty * effectiveDuration + draft.nrc * draft.qty;
 }

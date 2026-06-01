@@ -1823,6 +1823,63 @@ textarea {
   font-weight: 600;
 }
 
+.serviceModeSegmented {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  width: min(100%, 30rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.25rem;
+  background: var(--color-surface);
+}
+
+.serviceModeButton {
+  min-width: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.72rem;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.serviceModeButton:hover {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+}
+
+.serviceModeButton[aria-pressed="true"] {
+  color: var(--color-accent-hover);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.serviceModeButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+.serviceModeButton[aria-pressed="true"]:focus-visible {
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 3px var(--color-accent-subtle);
+}
+
+.serviceModeHelper {
+  max-width: 34rem;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .articleQuantityRow {
   display: grid;
   align-items: start;
