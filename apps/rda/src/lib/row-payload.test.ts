@@ -1,4 +1,4 @@
-import { buildRowPayload, draftFromPoRow } from './row-payload.js';
+import { buildRowPayload, draftFromPoRow, rowPreviewTotal } from './row-payload.js';
 import type { Article } from '../api/types';
 
 function assertEqual<T>(actual: T, expected: T, message: string) {
@@ -39,6 +39,36 @@ test('service article produces service row payload', () => {
   assertEqual(payload.price, undefined, 'service payload should not include good price');
 });
 
+test('one-shot service payload forces non-recurring economics while keeping Mistra-required fields', () => {
+  const article: Article = { code: 'SVC-1', description: 'Servizio spot', type: 'service' };
+  const payload = buildRowPayload({
+    ...baseDraft,
+    article,
+    serviceMode: 'one_shot',
+    nrc: 100,
+    mrc: 50,
+    duration: 24,
+    recurrence: 12,
+    automaticRenew: true,
+    cancellationAdvice: '30',
+  });
+
+  assertEqual(payload.type, 'service', 'one-shot payload should still be a service row');
+  assertEqual(payload.monthly_fee, 0, 'one-shot payload should force MRC to zero');
+  assertEqual(payload.activation_price, 100, 'one-shot payload should keep NRC');
+  assertEqual(payload.payment_detail.month_recursion, 1, 'one-shot payload should keep a Mistra-compatible recurrence');
+  assertEqual(payload.renew_detail?.initial_subscription_months, 1, 'one-shot payload should keep a Mistra-compatible duration');
+  assertEqual(payload.renew_detail?.automatic_renew, false, 'one-shot payload should disable automatic renewal');
+  assertEqual(payload.renew_detail?.cancellation_advice, undefined, 'one-shot payload should omit cancellation advice');
+});
+
+test('one-shot service preview totals only NRC times quantity', () => {
+  const article: Article = { code: 'SVC-1', description: 'Servizio spot', type: 'service' };
+  const total = rowPreviewTotal({ ...baseDraft, article, serviceMode: 'one_shot', qty: 2, nrc: 100, mrc: 50, duration: 24 });
+
+  assertEqual(total, 200, 'one-shot preview should ignore dirty recurring values');
+});
+
 test('good article produces good row payload', () => {
   const article: Article = { code: 'GOOD-1', description: 'Monitor', type: 'good' };
   const payload = buildRowPayload({ ...baseDraft, article });
@@ -70,6 +100,7 @@ test('existing service row produces editable draft from read shape', () => {
   );
 
   assertEqual(draft.article, article, 'draft should reuse catalog article when present');
+  assertEqual(draft.serviceMode, 'recurring', 'draft should keep MRC-positive service rows recurring');
   assertEqual(draft.description, 'Canone aggiornato', 'draft should keep row description');
   assertEqual(draft.qty, 2, 'draft should parse quantity');
   assertEqual(draft.mrc, 7.5, 'draft should parse legacy montly_fee');
@@ -80,6 +111,30 @@ test('existing service row produces editable draft from read shape', () => {
   assertEqual(draft.startDate, '2026-05-01', 'draft should keep start date');
   assertEqual(draft.automaticRenew, true, 'draft should keep automatic renew');
   assertEqual(draft.cancellationAdvice, '2', 'draft should stringify cancellation advice');
+});
+
+test('existing NRC-only service row opens as one-shot service', () => {
+  const article: Article = { code: 'SVC-SPOT', description: 'Servizio spot', type: 'service' };
+  const draft = draftFromPoRow(
+    {
+      id: 14,
+      type: 'service',
+      description: 'Intervento spot',
+      product_code: 'SVC-SPOT',
+      product_description: 'Servizio spot',
+      qty: 2,
+      montly_fee: '0',
+      activation_fee: '150',
+      payment_detail: { start_at: 'activation_date', month_recursion: '1' },
+      renew_detail: { initial_subscription_months: '1', automatic_renew: false },
+    },
+    [article],
+  );
+
+  assertEqual(draft.article, article, 'draft should reuse catalog article when present');
+  assertEqual(draft.serviceMode, 'one_shot', 'draft should derive one-shot mode from zero MRC and positive NRC');
+  assertEqual(draft.mrc, 0, 'draft should parse zero MRC');
+  assertEqual(draft.nrc, 150, 'draft should parse positive NRC');
 });
 
 test('existing good row uses fallback article when catalog misses code', () => {
