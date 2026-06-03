@@ -14,7 +14,7 @@ export const PO_STATES = {
 
 const labels: Record<string, string> = {
   DRAFT: 'Bozza',
-  PENDING_APPROVAL_PROVIDER: 'Verifica qualifica',
+  PENDING_APPROVAL_PROVIDER: 'In attesa qualifica fornitore',
   PENDING_APPROVAL: 'Attesa approvazione',
   APPROVED: 'Approvata',
   REJECTED: 'Rifiutata',
@@ -33,7 +33,7 @@ const labels: Record<string, string> = {
 
 const fullLabels: Record<string, string> = {
   DRAFT: 'Bozza',
-  PENDING_APPROVAL_PROVIDER: 'In attesa verifica qualifica fornitore',
+  PENDING_APPROVAL_PROVIDER: 'In attesa qualifica fornitore',
   PENDING_APPROVAL: 'In attesa approvazione',
   APPROVED: 'Approvata',
   REJECTED: 'Rifiutata',
