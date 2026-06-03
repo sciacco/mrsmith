@@ -1,10 +1,12 @@
 import { ApiError } from '@mrsmith/api-client';
 import { Skeleton } from '@mrsmith/ui';
+import { useMemo } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useInbox, usePermissions } from '../api/queries';
 import { PoListTable } from '../components/PoListTable';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { inboxConfig, isInboxKind } from '../lib/inbox';
+import { isRdaInboxActionablePO } from '../lib/rda-dashboard';
 
 function inboxError(error: unknown): string {
   if (error instanceof ApiError && error.status === 403) return 'Accesso riservato';
@@ -23,12 +25,17 @@ function permissionError(error: unknown): { title: string; message: string } {
 
 export function InboxPage() {
   const { kind } = useParams();
-  const valid = isInboxKind(kind);
-  const config = valid ? inboxConfig[kind] : inboxConfig['level1-2'];
+  const inboxKind = isInboxKind(kind) ? kind : null;
+  const valid = inboxKind != null;
+  const config = inboxKind ? inboxConfig[inboxKind] : inboxConfig['level1-2'];
   const permissions = usePermissions(valid);
   const hasPermission = valid && Boolean(permissions.data?.[config.permission]);
-  const inbox = useInbox(kind, valid && hasPermission);
+  const inbox = useInbox(inboxKind ?? undefined, valid && hasPermission);
   const { user } = useOptionalAuth();
+  const actionableRows = useMemo(() => {
+    if (!inboxKind) return [];
+    return (inbox.data ?? []).filter((po) => isRdaInboxActionablePO(inboxKind, po, user?.email, permissions.data));
+  }, [inbox.data, inboxKind, permissions.data, user?.email]);
 
   if (!valid) return <Navigate to="/rda" replace />;
 
@@ -88,7 +95,7 @@ export function InboxPage() {
             </div>
           </div>
         ) : (
-          <PoListTable rows={inbox.data ?? []} mode="inbox" currentEmail={user?.email} />
+          <PoListTable rows={actionableRows} mode="inbox" currentEmail={user?.email} />
         )}
       </section>
     </main>

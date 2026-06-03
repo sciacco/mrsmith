@@ -372,6 +372,7 @@ function actionLabel(row: PoPreview, primaryQueue: RdaDashboardContext, isAssign
     case 'level1-2':
       return 'Valuta approvazione';
     case 'leasing':
+      if (row.state === 'PENDING_LEASING_ORDER_CREATION') return 'Conferma leasing creato';
       return 'Valuta leasing';
     case 'no-leasing':
       return 'Valuta no leasing';
@@ -499,17 +500,21 @@ function toDashboardRow(row: MutableRow): RdaDashboardRow {
   };
 }
 
-function isActionableInboxPO(kind: InboxKind, po: PoPreview, currentEmail: string | null | undefined, permissions?: RdaPermissions): boolean {
+export function isRdaInboxActionablePO(kind: InboxKind, po: PoPreview, currentEmail: string | null | undefined, permissions?: RdaPermissions): boolean {
   switch (kind) {
     case 'level1-2':
-      return Boolean(permissions?.is_approver && isApprover(po, currentEmail));
+      return Boolean(po.state === 'PENDING_APPROVAL' && permissions?.is_approver && isApprover(po, currentEmail));
     case 'leasing':
+      return Boolean(
+        (po.state === 'PENDING_LEASING' || po.state === 'PENDING_LEASING_ORDER_CREATION') &&
+          permissions?.is_afc,
+      );
     case 'payment-method':
-      return Boolean(permissions?.is_afc);
+      return Boolean(po.state === 'PENDING_APPROVAL_PAYMENT_METHOD' && permissions?.is_afc);
     case 'no-leasing':
-      return Boolean(permissions?.is_approver_no_leasing);
+      return Boolean(po.state === 'PENDING_APPROVAL_NO_LEASING' && permissions?.is_approver_no_leasing);
     case 'budget-increment':
-      return Boolean(permissions?.is_approver_extra_budget);
+      return Boolean(po.state === 'PENDING_BUDGET_INCREMENT' && permissions?.is_approver_extra_budget);
     default:
       return false;
   }
@@ -562,7 +567,7 @@ export function buildRdaDashboardModel({
       if (ownedByRequester && po.state !== 'DRAFT') {
         addContext(row, requesterContext());
       }
-      if (isActionableInboxPO(inbox.kind, row.po, currentEmail, permissions)) {
+      if (isRdaInboxActionablePO(inbox.kind, row.po, currentEmail, permissions)) {
         addContext(row, inboxContext(inbox.kind));
       } else {
         addContext(row, visibilityContext(permissions));

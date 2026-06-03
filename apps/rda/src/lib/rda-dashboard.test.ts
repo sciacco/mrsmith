@@ -1,5 +1,5 @@
 import type { PoPreview, RdaPermissions } from '../api/types.js';
-import { buildRdaDashboardModel, filterRdaDashboardRows } from './rda-dashboard.js';
+import { buildRdaDashboardModel, filterRdaDashboardRows, isRdaInboxActionablePO } from './rda-dashboard.js';
 
 function assertEqual<T>(actual: T, expected: T, message: string) {
   if (actual !== expected) throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);
@@ -41,7 +41,7 @@ function permissionsFixture(overrides: Partial<RdaPermissions> = {}): RdaPermiss
   };
 }
 
-test('PO present in multiple inboxes appears once', () => {
+test('PO present in actionable and stale inboxes appears once with only the actionable context', () => {
   const shared = poFixture({
     current_approval_level: '1',
     approvers: [{ level: '1', user: { email: 'approver@example.com' } }],
@@ -58,7 +58,8 @@ test('PO present in multiple inboxes appears once', () => {
 
   assertEqual(model.rows.length, 1, 'deduplicated row count');
   assertEqual(model.counts.toManage, 1, 'to-manage count should count the PO once');
-  assertEqual(model.rows[0]?.contexts.length, 2, 'row should keep both queue contexts');
+  assertEqual(model.rows[0]?.contexts.filter((context) => context.type === 'inbox').length, 1, 'row should keep only the actionable queue context');
+  assertEqual(model.rows[0]?.contexts.some((context) => context.key === 'payment-method'), false, 'stale payment inbox should not add a queue context');
   assertEqual(model.rows[0]?.primaryQueue.key, 'level1-2', 'primary queue should follow operational order');
 });
 
@@ -101,6 +102,54 @@ test('assigned pending approval enters the to-do view', () => {
   assertEqual(todo.length, 1, 'to-do includes assigned approval');
   assertEqual(todo[0]?.primaryQueue.key, 'level1-2', 'assigned approval queue');
   assertEqual(todo[0]?.actionLabel, 'Valuta approvazione', 'assigned approval action');
+});
+
+test('assigned pending provider approval stays visible but out of the to-do view', () => {
+  const providerWait = poFixture({
+    id: 155,
+    state: 'PENDING_APPROVAL_PROVIDER',
+    current_approval_level: '1',
+    requester: { email: 'other@example.com' },
+    approvers: [{ level: '1', user: { email: 'me@example.com' } }],
+  });
+  const model = buildRdaDashboardModel({
+    myRows: [],
+    currentEmail: 'me@example.com',
+    permissions: permissionsFixture({ is_approver: true }),
+    inboxes: [{ kind: 'level1-2', rows: [providerWait] }],
+  });
+
+  assertEqual(filterRdaDashboardRows(model.rows, { view: 'todo' }).length, 0, 'to-do excludes provider qualification wait');
+  assertEqual(filterRdaDashboardRows(model.rows, { view: 'all' }).length, 1, 'all includes provider qualification wait');
+  assertEqual(model.rows[0]?.isActionable, false, 'provider qualification wait is not dashboard work');
+  assertEqual(model.rows[0]?.primaryQueue.key, 'visible', 'provider qualification wait remains a visibility row');
+  assertEqual(model.rows[0]?.contexts.some((context) => context.key === 'level1-2'), false, 'provider wait does not get approval queue context');
+  assertEqual(model.rows[0]?.actionLabel, '', 'provider wait has no approval action label');
+});
+
+test('level approval inbox actionability requires the actual approval state', () => {
+  const providerWait = poFixture({
+    state: 'PENDING_APPROVAL_PROVIDER',
+    current_approval_level: '1',
+    approvers: [{ level: '1', user: { email: 'me@example.com' } }],
+  });
+  const pendingApproval = poFixture({
+    state: 'PENDING_APPROVAL',
+    current_approval_level: '1',
+    approvers: [{ level: '1', user: { email: 'me@example.com' } }],
+  });
+  const permissions = permissionsFixture({ is_approver: true });
+
+  assertEqual(
+    isRdaInboxActionablePO('level1-2', providerWait, 'me@example.com', permissions),
+    false,
+    'provider qualification wait is not actionable in approval inbox',
+  );
+  assertEqual(
+    isRdaInboxActionablePO('level1-2', pendingApproval, 'me@example.com', permissions),
+    true,
+    'pending approval remains actionable in approval inbox',
+  );
 });
 
 test('flat assigned approver enters the to-do view', () => {

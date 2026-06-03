@@ -172,6 +172,15 @@ Alyante ERP ID
 - Used by: `apps/rda` `/rda/new` supplier request modal and legacy inline new-provider form.
 - Open questions: none.
 
+### RDA Approval Inbox Actionability Is State-Gated
+
+- Context: `apps/rda` dashboard, L1/L2 approval inbox, and any future RDA inbox aggregation.
+- Discovery: Mistra `GET /arak/rda/v1/po/pending-approval` can surface intermediate provider-qualification waits such as `PENDING_APPROVAL_PROVIDER`. Those rows can include approver metadata, but the RDA detail action bar only permits L1/L2 approval when `state == PENDING_APPROVAL`.
+- Practical rule: treat upstream inbox membership as visibility, not sufficient actionability. Add an inbox action context only when the PO state matches the action handled by that inbox; keep `PENDING_APPROVAL_PROVIDER` visible for tracking but out of "Da fare" and out of actionable approval inbox rows until Mistra advances it to `PENDING_APPROVAL`.
+- Evidence: RDA dashboard actionability predicate in `apps/rda/src/lib/rda-dashboard.ts`, detail action guard in `apps/rda/src/components/ActionBar.tsx`, and Mistra pending-approval endpoint contract.
+- Used by: `apps/rda` dashboard and approver inbox pages.
+- Open questions: none.
+
 ### RDA Payment Method Standard Rule
 
 - Context: `apps/rda` PO create/edit flows and backend `POST/PATCH /api/rda/v1/pos`.
