@@ -428,7 +428,7 @@ func poWorkflowStage(state string) string {
 	switch strings.TrimSpace(state) {
 	case "DRAFT":
 		return "draft"
-	case "PENDING_APPROVAL", "APPROVED":
+	case "PENDING_APPROVAL", "APPROVED", "PENDING_PROVIDER_SAVED_IN_ALYANTE":
 		return "approval"
 	case "PENDING_APPROVAL_PAYMENT_METHOD", "PENDING_LEASING", "PENDING_LEASING_ORDER_CREATION", "PENDING_APPROVAL_NO_LEASING", "PENDING_BUDGET_INCREMENT":
 		return "method_budget"
