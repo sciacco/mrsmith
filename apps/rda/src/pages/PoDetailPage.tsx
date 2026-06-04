@@ -18,7 +18,7 @@ import {
   useUpdatePORecipients,
   type TransitionAction,
 } from '../api/queries';
-import type { ClonePOResponse, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
+import type { ClonePOResponse, ProviderReference, ProviderSummary } from '../api/types';
 import { BudgetIncrementApproveDialog } from '../components/BudgetIncrementApproveDialog';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ClonePoModal } from '../components/ClonePoModal';
@@ -39,16 +39,17 @@ import { buildPaymentMethodOptions, paymentCodeFromProvider, preferredPaymentMet
 import { canManageProviderContacts } from '../lib/provider-refs';
 import { PO_STATES } from '../lib/state-labels';
 
-function afterTransitionRoute(po: PoDetail, action: TransitionAction): string | null {
-  if (action === 'send-to-provider') return '/rda';
-  if (action === 'payment-method/approve') return '/rda/inbox/payment-method';
-  if (action === 'approve' || action === 'reject') {
-    if (po.state === PO_STATES.PENDING_APPROVAL) return '/rda/inbox/level1-2';
-    if (po.state === PO_STATES.PENDING_APPROVAL_PAYMENT_METHOD) return '/rda/inbox/payment-method';
-    if (po.state === PO_STATES.PENDING_APPROVAL_NO_LEASING) return '/rda/inbox/no-leasing';
+function afterTransitionRoute(action: TransitionAction): string | null {
+  if (
+    action === 'send-to-provider' ||
+    action === 'payment-method/approve' ||
+    action === 'approve' ||
+    action === 'reject' ||
+    action.startsWith('leasing/') ||
+    action.startsWith('budget-increment/')
+  ) {
+    return '/rda';
   }
-  if (action.startsWith('leasing/')) return '/rda/inbox/leasing';
-  if (action.startsWith('budget-increment/')) return '/rda/inbox/budget-increment';
   return null;
 }
 
@@ -313,7 +314,7 @@ export function PoDetailPage() {
     try {
       await transition.mutateAsync({ id: detail.id, action });
       toast('Operazione completata');
-      const next = afterTransitionRoute(detail, action);
+      const next = afterTransitionRoute(action);
       if (next) navigate(next);
     } catch {
       toast('Operazione non riuscita', 'error');
@@ -329,7 +330,7 @@ export function PoDetailPage() {
       });
       setBudgetIncrementOpen(false);
       toast('Operazione completata');
-      const next = afterTransitionRoute(detail, 'budget-increment/approve');
+      const next = afterTransitionRoute('budget-increment/approve');
       if (next) navigate(next);
     } catch {
       toast('Operazione non riuscita', 'error');
