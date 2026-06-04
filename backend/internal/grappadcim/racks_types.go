@@ -5,6 +5,7 @@ type RackListItem struct {
 	Name            string   `json:"name"`
 	UnitCount       int      `json:"unitCount"`
 	CustomerID      *int     `json:"customerId,omitempty"`
+	CustomerName    *string  `json:"customerName,omitempty"`
 	DatacenterID    int      `json:"datacenterId"`
 	DatacenterName  *string  `json:"datacenterName,omitempty"`
 	BuildingName    *string  `json:"buildingName,omitempty"`
@@ -29,6 +30,19 @@ type RackListItem struct {
 	CommittedPower  *float64 `json:"committedPower,omitempty"`
 	VariableBilling *int     `json:"variableBilling,omitempty"`
 	SocketCount     int      `json:"socketCount"`
+}
+
+type RackDatacenterFilterOption struct {
+	ID           int     `json:"id"`
+	Label        string  `json:"label"`
+	BuildingName *string `json:"buildingName,omitempty"`
+	IsMMR        bool    `json:"isMmr"`
+}
+
+type RackFilterOptions struct {
+	Customers   []LookupItem                 `json:"customers"`
+	Datacenters []RackDatacenterFilterOption `json:"datacenters"`
+	Statuses    []LookupItem                 `json:"statuses"`
 }
 
 type RackDetail struct {

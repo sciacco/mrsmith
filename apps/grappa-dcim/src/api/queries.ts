@@ -35,6 +35,7 @@ import type {
   PortItem,
   Position,
   RackDetail,
+  RackFilterOptions,
   RackInput,
   RackListItem,
   RackMediaInput,
@@ -70,6 +71,7 @@ export const grappaDCIMQueryKeys = {
   islets: (datacenterId: number | null) => [...grappaDCIMQueryKeys.all, 'islets', datacenterId] as const,
   positions: (isletId: number | null) => [...grappaDCIMQueryKeys.all, 'positions', isletId] as const,
   racks: (filters: Record<string, unknown>) => [...grappaDCIMQueryKeys.all, 'racks', filters] as const,
+  rackFilterOptions: () => [...grappaDCIMQueryKeys.all, 'rack-filter-options'] as const,
   rack: (id: number | null) => [...grappaDCIMQueryKeys.all, 'rack', id] as const,
   rackUnits: (id: number | null) => [...grappaDCIMQueryKeys.all, 'rack-units', id] as const,
   rackSockets: (id: number | null) => [...grappaDCIMQueryKeys.all, 'rack-sockets', id] as const,
@@ -420,11 +422,20 @@ export function usePositions(isletId: number | null) {
   });
 }
 
-export function useRacks(filters: { q?: string; status?: string; buildingId?: number | null; datacenterId?: number | null }) {
+export function useRacks(filters: { q?: string; status?: string; buildingId?: number | null; datacenterId?: number | null; customerId?: number | null }) {
   const api = useApiClient();
   return useQuery({
     queryKey: grappaDCIMQueryKeys.racks(filters),
     queryFn: () => api.get<RackListItem[]>(`/grappa-dcim/v1/racks${params(filters)}`),
+    retry: shouldRetry,
+  });
+}
+
+export function useRackFilterOptions() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: grappaDCIMQueryKeys.rackFilterOptions(),
+    queryFn: () => api.get<RackFilterOptions>('/grappa-dcim/v1/racks/filter-options'),
     retry: shouldRetry,
   });
 }

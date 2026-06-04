@@ -58,6 +58,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handleRead("GET /grappa-dcim/v1/layout/islets", h.handleListIslets)
 	handleRead("GET /grappa-dcim/v1/layout/islets/{id}/positions", h.handleListPositions)
 	handleRead("GET /grappa-dcim/v1/racks", h.handleListRacks)
+	handleRead("GET /grappa-dcim/v1/racks/filter-options", h.handleRackFilterOptions)
 	handleRead("GET /grappa-dcim/v1/racks/{id}", h.handleGetRack)
 	handleRead("GET /grappa-dcim/v1/racks/{id}/units", h.handleListRackUnits)
 	handleRead("GET /grappa-dcim/v1/racks/{id}/media", h.handleListRackMedia)

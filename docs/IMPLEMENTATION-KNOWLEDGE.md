@@ -91,6 +91,15 @@ Alyante ERP ID
 - Used by: IaaS Prezzi risorse, IaaS Credito omaggio, Sconti variabile energia (all in `apps/listini-e-sconti`).
 - Open questions: none.
 
+### Grappa Rack Customer Display Uses `cli_fatturazione.intestazione`
+
+- Context: Grappa DCIM rack search, rack registry filtering, and any Grappa UI that needs a human-readable customer name for `racks.id_anagrafica`.
+- Discovery: `racks.id_anagrafica` stores the internal Grappa customer ID, which resolves to `cli_fatturazione.id`; the customer display name is `cli_fatturazione.intestazione`.
+- Practical rule: for rack search/display, join `racks.id_anagrafica -> cli_fatturazione.id` and expose `cli_fatturazione.intestazione` as the customer name. Do not show only the numeric customer code when a customer name is needed.
+- Evidence: `docs/grappa/grappa_cli_fatturazione.json`, `docs/grappa/grappa_racks.json`, Grappa DCIM rack search contract in `backend/internal/grappadcim/racks.go`.
+- Used by: `apps/grappa-dcim` Rack search.
+- Open questions: none.
+
 ## Customer Eligibility and Exclusion Rules
 
 ### Known Grappa Customer Exclusions

@@ -15,6 +15,7 @@ const navGroups: TabGroup[] = [
     label: 'Infrastruttura',
     items: [
       { label: 'Rack', path: '/rack' },
+      { label: 'OLD RACK', path: '/old-rack' },
       { label: 'Sale e MMR', path: '/sale-mmr' },
       { label: 'Edifici', path: '/edifici' },
       { label: 'Isole e posizioni', path: '/isole-posizioni' },

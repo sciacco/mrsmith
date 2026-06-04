@@ -45,12 +45,21 @@ func (h *Handler) handleListRacks(w http.ResponseWriter, r *http.Request) {
 		where = append(where, "d.dc_build_id = ?")
 		args = append(args, id)
 	}
-	if q := strings.TrimSpace(r.URL.Query().Get("q")); q != "" {
-		where = append(where, "(r.name LIKE ? OR r.serialnumber LIKE ? OR r.codice_ordine LIKE ?)")
-		like := "%" + q + "%"
-		args = append(args, like, like, like)
+	if raw := strings.TrimSpace(r.URL.Query().Get("customerId")); raw != "" {
+		id, err := parsePositiveString(raw)
+		if err != nil {
+			invalidRequest(w, "invalid_customer_id")
+			return
+		}
+		where = append(where, "r.id_anagrafica = ?")
+		args = append(args, id)
 	}
-	rows, err := h.grappa.QueryContext(r.Context(), rackSelectSQL()+` WHERE `+strings.Join(where, " AND ")+` GROUP BY `+rackGroupSQL()+` ORDER BY db.name ASC, d.name ASC, r.name ASC, r.id_rack ASC`, args...)
+	if q := strings.TrimSpace(r.URL.Query().Get("q")); q != "" {
+		where = append(where, "(r.name LIKE ? OR r.serialnumber LIKE ? OR r.codice_ordine LIKE ? OR cf.intestazione LIKE ?)")
+		like := "%" + q + "%"
+		args = append(args, like, like, like, like)
+	}
+	rows, err := h.grappa.QueryContext(r.Context(), rackSelectSQL()+` WHERE `+strings.Join(where, " AND ")+` GROUP BY `+rackGroupSQL()+` ORDER BY CASE WHEN TRIM(COALESCE(db.name, '')) = '' THEN 1 ELSE 0 END ASC, db.name ASC, d.name ASC, r.name ASC, r.stato ASC, r.id_rack ASC`, args...)
 	if err != nil {
 		h.dbFailure(w, r, "list_racks", err)
 		return
@@ -69,6 +78,32 @@ func (h *Handler) handleListRacks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) handleRackFilterOptions(w http.ResponseWriter, r *http.Request) {
+	if !h.requireDB(w) {
+		return
+	}
+	customers, err := h.listRackCustomerOptions(r)
+	if err != nil {
+		h.dbFailure(w, r, "rack_filter_customers", err)
+		return
+	}
+	datacenters, err := h.listRackDatacenterOptions(r)
+	if err != nil {
+		h.dbFailure(w, r, "rack_filter_datacenters", err)
+		return
+	}
+	statuses, err := h.listRackStatusOptions(r)
+	if err != nil {
+		h.dbFailure(w, r, "rack_filter_statuses", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, RackFilterOptions{
+		Customers:   customers,
+		Datacenters: datacenters,
+		Statuses:    statuses,
+	})
 }
 
 func (h *Handler) handleGetRack(w http.ResponseWriter, r *http.Request) {
@@ -407,21 +442,117 @@ func (h *Handler) listRacksForDatacenter(r *http.Request, datacenterID int) ([]R
 	return items, rows.Err()
 }
 
+func (h *Handler) listRackCustomerOptions(r *http.Request) ([]LookupItem, error) {
+	rows, err := h.grappa.QueryContext(r.Context(), `
+		SELECT DISTINCT cf.id, cf.intestazione
+		FROM cli_fatturazione cf
+		JOIN racks r ON r.id_anagrafica = cf.id
+		WHERE cf.id IS NOT NULL
+		ORDER BY cf.intestazione ASC, cf.id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LookupItem{}
+	for rows.Next() {
+		var id int
+		var label sql.NullString
+		if err := rows.Scan(&id, &label); err != nil {
+			return nil, err
+		}
+		text := strings.TrimSpace(label.String)
+		if text == "" {
+			text = fmt.Sprintf("Cliente %d", id)
+		}
+		items = append(items, LookupItem{ID: id, Label: text})
+	}
+	return items, rows.Err()
+}
+
+func (h *Handler) listRackDatacenterOptions(r *http.Request) ([]RackDatacenterFilterOption, error) {
+	rows, err := h.grappa.QueryContext(r.Context(), `
+		SELECT DISTINCT d.id_datacenter, d.name, db.name, COALESCE(d.ismmr, 0)
+		FROM datacenter d
+		JOIN racks r ON r.id_datacenter = d.id_datacenter
+		LEFT JOIN dc_build db ON db.id = d.dc_build_id
+		ORDER BY db.name ASC, d.name ASC, d.id_datacenter ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RackDatacenterFilterOption{}
+	for rows.Next() {
+		var item RackDatacenterFilterOption
+		var name, building sql.NullString
+		var isMMR sql.NullInt64
+		if err := rows.Scan(&item.ID, &name, &building, &isMMR); err != nil {
+			return nil, err
+		}
+		roomName := strings.TrimSpace(name.String)
+		if roomName == "" {
+			roomName = fmt.Sprintf("Sala %d", item.ID)
+		}
+		prefix := "Sala"
+		if isMMR.Valid && isMMR.Int64 == 1 {
+			prefix = "MMR"
+			item.IsMMR = true
+		}
+		buildingName := strings.TrimSpace(building.String)
+		if buildingName != "" {
+			item.BuildingName = &buildingName
+			item.Label = fmt.Sprintf("%s - %s / %s", prefix, buildingName, roomName)
+		} else {
+			item.Label = fmt.Sprintf("%s - %s", prefix, roomName)
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (h *Handler) listRackStatusOptions(r *http.Request) ([]LookupItem, error) {
+	items := []LookupItem{
+		{ID: "active", Label: "Solo attivi"},
+		{ID: "all", Label: "Tutti"},
+	}
+	rows, err := h.grappa.QueryContext(r.Context(), `
+		SELECT DISTINCT TRIM(r.stato)
+		FROM racks r
+		WHERE TRIM(COALESCE(r.stato, '')) <> ''
+		ORDER BY TRIM(r.stato) ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var status sql.NullString
+		if err := rows.Scan(&status); err != nil {
+			return nil, err
+		}
+		value := strings.TrimSpace(status.String)
+		if value == "" || strings.EqualFold(value, "attivo") {
+			continue
+		}
+		items = append(items, LookupItem{ID: value, Label: value})
+	}
+	return items, rows.Err()
+}
+
 func rackSelectSQL() string {
 	return `
-		SELECT r.id_rack, r.name, r.unit, r.id_anagrafica, r.id_datacenter, d.name, db.name,
+		SELECT r.id_rack, r.name, r.unit, r.id_anagrafica, cf.intestazione, r.id_datacenter, d.name, db.name,
 		       r.stato, r.magnetotermico, r.ampere, r.floor, r.island, r.type, r.pos, r.racknum,
 		       r.positions_id, r.islet_id, r.shared, r.reserved, r.note, r.data_attivazione, r.data_cessazione,
 		       r.codice_ordine, r.sold_power, r.serialnumber, r.committed_power, r.variable_billing,
 		       COUNT(DISTINCT rs.id)
 		FROM racks r
+		LEFT JOIN cli_fatturazione cf ON cf.id = r.id_anagrafica
 		LEFT JOIN datacenter d ON d.id_datacenter = r.id_datacenter
 		LEFT JOIN dc_build db ON db.id = d.dc_build_id
 		LEFT JOIN rack_sockets rs ON rs.rack_id = r.id_rack`
 }
 
 func rackGroupSQL() string {
-	return `r.id_rack, r.name, r.unit, r.id_anagrafica, r.id_datacenter, d.name, db.name,
+	return `r.id_rack, r.name, r.unit, r.id_anagrafica, cf.intestazione, r.id_datacenter, d.name, db.name,
 		r.stato, r.magnetotermico, r.ampere, r.floor, r.island, r.type, r.pos, r.racknum,
 		r.positions_id, r.islet_id, r.shared, r.reserved, r.note, r.data_attivazione, r.data_cessazione,
 		r.codice_ordine, r.sold_power, r.serialnumber, r.committed_power, r.variable_billing`
@@ -434,11 +565,11 @@ type rackScanner interface {
 func scanRack(scanner rackScanner) (RackListItem, error) {
 	var item RackListItem
 	var customerID, ampere, floor, island, rackNum, positionID, isletID, variableBilling sql.NullInt64
-	var dcName, buildingName, status, magnetotermico, rackType, pos, shared, reserved, note, orderCode, serial sql.NullString
+	var customerName, dcName, buildingName, status, magnetotermico, rackType, pos, shared, reserved, note, orderCode, serial sql.NullString
 	var activatedAt, ceasedAt sql.NullTime
 	var sold, committed sql.NullFloat64
 	if err := scanner.Scan(
-		&item.ID, &item.Name, &item.UnitCount, &customerID, &item.DatacenterID, &dcName, &buildingName,
+		&item.ID, &item.Name, &item.UnitCount, &customerID, &customerName, &item.DatacenterID, &dcName, &buildingName,
 		&status, &magnetotermico, &ampere, &floor, &island, &rackType, &pos, &rackNum, &positionID,
 		&isletID, &shared, &reserved, &note, &activatedAt, &ceasedAt, &orderCode, &sold, &serial, &committed,
 		&variableBilling, &item.SocketCount,
@@ -446,6 +577,7 @@ func scanRack(scanner rackScanner) (RackListItem, error) {
 		return item, err
 	}
 	item.CustomerID = nullableInt(customerID)
+	item.CustomerName = nullableString(customerName)
 	item.DatacenterName = nullableString(dcName)
 	item.BuildingName = nullableString(buildingName)
 	item.Status = nullableString(status)

@@ -188,6 +188,7 @@ export interface RackListItem {
   name: string;
   unitCount: number;
   customerId?: number;
+  customerName?: string;
   datacenterId: number;
   datacenterName?: string;
   buildingName?: string;
@@ -212,6 +213,19 @@ export interface RackListItem {
   committedPower?: number;
   variableBilling?: number;
   socketCount: number;
+}
+
+export interface RackDatacenterFilterOption {
+  id: number;
+  label: string;
+  buildingName?: string;
+  isMmr: boolean;
+}
+
+export interface RackFilterOptions {
+  customers: LookupItem[];
+  datacenters: RackDatacenterFilterOption[];
+  statuses: LookupItem[];
 }
 
 export interface RackUnit {

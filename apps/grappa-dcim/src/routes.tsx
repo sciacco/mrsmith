@@ -4,7 +4,8 @@ import { CamerasPage } from './features/cameras/CameraPages';
 import { CableFiberPage, PlenumPage } from './features/cabling/CablingPages';
 import { EquipmentPage } from './features/equipment/EquipmentPages';
 import { BuildingsPage, DatacentersPage, LayoutPage } from './features/facilities/FacilitiesPages';
-import { RacksPage } from './features/racks/RackPages';
+import { OldRacksPage } from './features/racks/RackPages';
+import { RackSearchPage } from './features/racks/RackSearchPage';
 import { FiberRingsPage } from './features/rings/RingPages';
 import { ServersPage } from './features/servers/ServerPages';
 import { StoragePage } from './features/storage/StoragePages';
@@ -35,15 +36,27 @@ export const routes: RouteObject[] = [
   },
   {
     path: 'rack',
-    element: <RacksPage />,
+    element: <RackSearchPage />,
   },
   {
     path: 'rack/:rackId',
-    element: <RacksPage />,
+    element: <RackSearchPage />,
   },
   {
     path: 'rack/:rackId/potenza',
-    element: <RacksPage />,
+    element: <RackSearchPage />,
+  },
+  {
+    path: 'old-rack',
+    element: <OldRacksPage />,
+  },
+  {
+    path: 'old-rack/:rackId',
+    element: <OldRacksPage />,
+  },
+  {
+    path: 'old-rack/:rackId/potenza',
+    element: <OldRacksPage />,
   },
   {
     path: 'isole-posizioni',

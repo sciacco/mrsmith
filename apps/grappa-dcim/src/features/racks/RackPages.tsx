@@ -31,7 +31,7 @@ function errorText(error: unknown, fallback: string) {
   return fallback;
 }
 
-export function RacksPage() {
+export function OldRacksPage() {
   const params = useParams();
   const navigate = useNavigate();
   const toast = useToast();
@@ -164,7 +164,7 @@ export function RacksPage() {
               <thead><tr><th>Rack</th><th>Sala</th><th>Formato</th><th>Unita</th><th>Socket</th><th>Azioni</th></tr></thead>
               <tbody>
                 {racks.data?.map((item) => (
-                  <tr key={item.id} className={`${styles.clickable} ${selected?.id === item.id ? styles.selectedRow : ''}`} onClick={() => navigate(`/rack/${item.id}`)}>
+                  <tr key={item.id} className={`${styles.clickable} ${selected?.id === item.id ? styles.selectedRow : ''}`} onClick={() => navigate(`/old-rack/${item.id}`)}>
                     <td><strong>{item.name}</strong><br /><span className={styles.muted}>{item.serialNumber ?? item.orderCode ?? '-'}</span></td>
                     <td>{item.datacenterName ?? '-'}<br /><span className={styles.muted}>{item.buildingName ?? ''}</span></td>
                     <td>{rackPositionLabel(item.type, item.position)}</td>
@@ -239,7 +239,7 @@ export function RacksPage() {
 function RackSummary({ rack }: { rack: RackListItem }) {
   return (
     <div className={styles.detailGrid}>
-      <Detail label="Cliente" value={rack.customerId} />
+      <Detail label="Cliente" value={rack.customerName ?? rack.customerId} />
       <Detail label="Ordine" value={rack.orderCode} />
       <Detail label="Seriale" value={rack.serialNumber} />
       <Detail label="Magnetotermico" value={rack.magnetotermico} />

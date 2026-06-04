@@ -4,6 +4,8 @@
   position: relative;
   height: 100%;
   align-items: stretch;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .group {
@@ -32,8 +34,9 @@
               background var(--duration-normal, 250ms) var(--ease-out);
   position: relative;
   border-radius: var(--radius-sm, 6px) var(--radius-sm, 6px) 0 0;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .groupLabel:hover {
@@ -111,34 +114,43 @@
 /* ── Mobile ── */
 @media (max-width: 640px) {
   .groups {
-    flex-direction: column;
-    gap: 0;
+    flex-direction: row;
+    gap: 2px;
+    overflow-x: auto;
+    overflow-y: visible;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .groups::-webkit-scrollbar {
+    display: none;
   }
 
   .group {
-    flex-direction: column;
+    flex: 0 0 auto;
+    flex-direction: row;
   }
 
   .groupLabel {
-    padding: var(--space-3, 12px) var(--space-4, 16px);
-    border-radius: 0;
+    min-height: 60px;
+    padding: 0 var(--space-4, 16px);
+    border-radius: var(--radius-sm, 6px) var(--radius-sm, 6px) 0 0;
   }
 
   .dropdown {
-    position: static;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    animation: none;
-    padding: 0;
-    background: var(--color-surface);
+    position: fixed;
+    top: 60px;
+    left: var(--space-4, 16px);
+    right: var(--space-4, 16px);
+    max-height: min(70vh, 24rem);
+    overflow-y: auto;
   }
 
   .dropdownItem {
-    padding: var(--space-2, 8px) var(--space-4, 16px) var(--space-2, 8px) var(--space-8, 32px);
+    padding: var(--space-2, 8px) var(--space-4, 16px);
   }
 
   .indicator {
-    display: none;
+    display: block;
   }
 }
