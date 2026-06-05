@@ -255,7 +255,10 @@ func gatewayBodyMessage(body string) string {
 		if value, ok := payload[key].(string); ok {
 			value = strings.Join(strings.Fields(value), " ")
 			if len(value) > 256 {
-				value = value[:256] + "..."
+				runes := []rune(value)
+				if len(runes) > 256 {
+					value = string(runes[:256]) + "..."
+				}
 			}
 			return value
 		}
