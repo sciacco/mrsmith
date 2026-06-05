@@ -2,7 +2,7 @@ export interface MorAnomaly {
   conto: string;
   lastname: string | null;
   firstname: string | null;
-  is_da_fatturare: string | null;
+  is_da_fatturare: boolean | string | null;
   codice_ordine: string | null;
   serialnumber: string | null;
   periodo_inizio: string | null;
