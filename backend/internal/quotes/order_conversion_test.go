@@ -37,7 +37,7 @@ func TestBuildVodkaOrderHeaderMatchesRecoveredGpUtilsContract(t *testing.T) {
 		City:                    ns("Milano"),
 		ZIP:                     ns("20100"),
 		ProvinciaDiFatturazione: ns("MI - Milano"),
-		Lingua:                  ns("ITA"),
+		TemplateLang:            ns("en"),
 		OwnerName:               ns("Sales Owner"),
 		Services:                ns("[1,2]"),
 		TemplateDescription:     ns("COLO Dedicated"),
@@ -82,8 +82,8 @@ func TestBuildVodkaOrderHeaderMatchesRecoveredGpUtilsContract(t *testing.T) {
 	if got := ptrValue(header.ProfilePV); got != "MI" {
 		t.Fatalf("profile_pv = %q, want MI", got)
 	}
-	if header.ProfileLang != "it" {
-		t.Fatalf("profile_lang = %q, want it", header.ProfileLang)
+	if header.ProfileLang != "en" {
+		t.Fatalf("profile_lang = %q, want en", header.ProfileLang)
 	}
 	if header.ServiceType != "Colocation, IaaS" {
 		t.Fatalf("service_type = %q, want Colocation, IaaS", header.ServiceType)
@@ -106,12 +106,12 @@ func TestBuildVodkaOrderRowMatchesRecoveredGpUtilsContract(t *testing.T) {
 		Translations:        json.RawMessage(`[{"language":"it","short":"Prodotto IT"},{"language":"en","short":"Product EN"}]`),
 	}
 
-	row := buildVodkaOrderRow(701, "it", source, 9101, 8301)
+	row := buildVodkaOrderRow(701, "en", source, 9101, 8301)
 
 	if row.OrdersID != 701 || row.CdlanSystemODVRow != 9101 || row.CdlanSerialNumber != 8301 {
 		t.Fatalf("unexpected sequence/id mapping: %#v", row)
 	}
-	if row.CdlanDescart != "Prodotto IT\r\nDettaglio esteso" {
+	if row.CdlanDescart != "Product EN\r\nDettaglio esteso" {
 		t.Fatalf("cdlan_descart = %q", row.CdlanDescart)
 	}
 	if row.CdlanQta != "2" {
@@ -449,7 +449,7 @@ func (c *orderConversionStatusTestConn) QueryContext(_ context.Context, query st
 				"hs_deal_id", "description", "payment_method",
 				"customer_name", "customer_number", "partita_iva", "owner_name",
 				"city", "zip", "country", "provincia_di_fatturazione", "codice_fiscale",
-				"address", "lingua", "template_description", "template_is_colo", "rif_ordcli", "rif_tech_nom",
+				"address", "template_lang", "template_description", "template_is_colo", "rif_ordcli", "rif_tech_nom",
 				"rif_tech_tel", "rif_tech_email", "rif_altro_tech_nom", "rif_altro_tech_tel",
 				"rif_altro_tech_email", "rif_adm_nom", "rif_adm_tech_tel", "rif_adm_tech_email",
 			},
@@ -461,7 +461,7 @@ func (c *orderConversionStatusTestConn) QueryContext(_ context.Context, query st
 				int64(240882923764), "Descrizione", "402",
 				"ACME S.p.A.", "C-1001", "IT123", "Sales Owner",
 				"Milano", "20100", "IT", "MI", "CF123",
-				"Via Roma 1", "ITA", "Standard IT", false, nil, nil,
+				"Via Roma 1", "en", "Standard EN", false, nil, nil,
 				nil, nil, nil, nil,
 				nil, nil, nil, nil,
 			}},
@@ -664,7 +664,7 @@ func orderConversionSourceColumns() []string {
 		"hs_deal_id", "description", "payment_method",
 		"customer_name", "customer_number", "partita_iva", "owner_name",
 		"city", "zip", "country", "provincia_di_fatturazione", "codice_fiscale",
-		"address", "lingua", "template_description", "template_is_colo", "rif_ordcli", "rif_tech_nom",
+		"address", "template_lang", "template_description", "template_is_colo", "rif_ordcli", "rif_tech_nom",
 		"rif_tech_tel", "rif_tech_email", "rif_altro_tech_nom", "rif_altro_tech_tel",
 		"rif_altro_tech_email", "rif_adm_nom", "rif_adm_tech_tel", "rif_adm_tech_email",
 	}
@@ -679,7 +679,7 @@ func orderConversionSourceValues(status string) []driver.Value {
 		int64(240882923764), "Descrizione", "402",
 		"ACME S.p.A.", "C-1001", "IT123", "Sales Owner",
 		"Milano", "20100", "IT", "MI", "CF123",
-		"Via Roma 1", "ITA", "Standard IT", false, nil, nil,
+		"Via Roma 1", "en", "Standard EN", false, nil, nil,
 		nil, nil, nil, nil,
 		nil, nil, nil, nil,
 	}

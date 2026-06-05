@@ -427,7 +427,7 @@ type quoteOrderSource struct {
 	ProvinciaDiFatturazione sql.NullString
 	CodiceFiscale           sql.NullString
 	Address                 sql.NullString
-	Lingua                  sql.NullString
+	TemplateLang            sql.NullString
 	TemplateDescription     sql.NullString
 	TemplateIsColo          bool
 	RifOrdcli               sql.NullString
@@ -454,7 +454,7 @@ SELECT q.id, q.quote_number, q.customer_id, q.deal_number, q.owner,
        hc.name AS customer_name, hc.numero_azienda AS customer_number, hc.partita_iva,
        COALESCE(ho.first_name || ' ' || ho.last_name, '') AS owner_name,
        hc.city, hc.zip, hc.country, hc.provincia_di_fatturazione,
-       hc.codice_fiscale, hc.address, hc.lingua,
+       hc.codice_fiscale, hc.address, COALESCE(NULLIF(BTRIM(t.lang), ''), 'it') AS template_lang,
        t.description AS template_description,
        COALESCE(t.is_colo, false) AS template_is_colo,
        q.rif_ordcli, q.rif_tech_nom, q.rif_tech_tel, q.rif_tech_email,
@@ -475,7 +475,7 @@ WHERE q.id = $1`, quoteID)
 		&q.HSDealID, &q.Description, &q.PaymentMethod,
 		&q.CustomerName, &q.CustomerNumber, &q.PartitaIVA,
 		&q.OwnerName, &q.City, &q.ZIP, &q.Country, &q.ProvinciaDiFatturazione,
-		&q.CodiceFiscale, &q.Address, &q.Lingua, &q.TemplateDescription,
+		&q.CodiceFiscale, &q.Address, &q.TemplateLang, &q.TemplateDescription,
 		&q.TemplateIsColo,
 		&q.RifOrdcli, &q.RifTechNom, &q.RifTechTel, &q.RifTechEmail,
 		&q.RifAltroTechNom, &q.RifAltroTechTel, &q.RifAltroTechEmail,
@@ -805,7 +805,7 @@ func buildVodkaOrderHeader(source *quoteOrderSource, categoryNames map[int]strin
 		ProfileCAP:            stringPtr(nullStringValue(source.ZIP)),
 		ProfilePV:             provincePrefix(nullStringValue(source.ProvinciaDiFatturazione)),
 		ProfileSDI:            stringPtr(""),
-		ProfileLang:           normalizeLegacyQuoteLanguage(nullStringValue(source.Lingua)),
+		ProfileLang:           normalizeLegacyQuoteLanguage(nullStringValue(source.TemplateLang)),
 		CdlanClienteID:        nil,
 		ServiceType:           serviceNamesForLegacy(source.Services, categoryNames),
 		DataDecorrenza:        "",
