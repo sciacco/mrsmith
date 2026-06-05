@@ -33,6 +33,13 @@ export const afcToolsNavSections: NavSection[] = [
     ],
   },
   {
+    label: 'Reports',
+    items: [
+      { label: 'Anomalie MOR', path: '/anomalie-mor' },
+      { label: 'Accounting TIMOO', path: '/accounting-timoo' },
+    ],
+  },
+  {
     label: 'Aziende',
     items: [
       { label: 'Stato Aziende', path: '/stato-aziende' },

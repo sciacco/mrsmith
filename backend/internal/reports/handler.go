@@ -25,6 +25,13 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB, anisettaDB *sql.DB, 
 		mux.Handle(pattern, protect(http.HandlerFunc(handler)))
 	}
 
+	// MOR and Timoo endpoints are shared with AFC Tools.
+	sharedRoles := append(applaunch.ReportsAccessRoles(), applaunch.AFCToolsAccessRoles()...)
+	sharedProtect := acl.RequireRole(sharedRoles...)
+	handleShared := func(pattern string, handler http.HandlerFunc) {
+		mux.Handle(pattern, sharedProtect(http.HandlerFunc(handler)))
+	}
+
 	// -- Lookups --
 	handle("GET /reports/v1/order-statuses", h.handleOrderStatuses)
 	handle("GET /reports/v1/connection-types", h.handleConnectionTypes)
@@ -45,11 +52,11 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB, anisettaDB *sql.DB, 
 	handle("GET /reports/v1/upcoming-renewals", h.handleUpcomingRenewals)
 	handle("GET /reports/v1/upcoming-renewals/{customerId}/rows", h.handleUpcomingRenewalRows)
 
-	// -- MOR Anomalies --
-	handle("GET /reports/v1/mor-anomalies", h.handleMorAnomalies)
+	// -- MOR Anomalies (shared) --
+	handleShared("GET /reports/v1/mor-anomalies", h.handleMorAnomalies)
 
-	// -- Timoo --
-	handle("GET /reports/v1/timoo/daily-stats", h.handleTimooDailyStats)
+	// -- Timoo (shared) --
+	handleShared("GET /reports/v1/timoo/daily-stats", h.handleTimooDailyStats)
 
 	// -- AOV --
 	handle("POST /reports/v1/aov/preview", h.handleAovPreview)

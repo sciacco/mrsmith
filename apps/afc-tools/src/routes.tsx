@@ -1,5 +1,5 @@
 import { Navigate, type RouteObject } from 'react-router-dom';
-import { StatoAziendePage } from '@mrsmith/features';
+import { StatoAziendePage, AnomalieMorPage, AccountingTimooPage } from '@mrsmith/features';
 import TransazioniWhmcsPage from './pages/TransazioniWhmcsPage';
 import FatturePrometeusPage from './pages/FatturePrometeusPage';
 import NuoviArticoliPage from './pages/NuoviArticoliPage';
@@ -22,5 +22,7 @@ export const routes: RouteObject[] = [
   { path: 'ordini-sales/:id', element: <OrdiniSalesDetailPage /> },
   { path: 'report-ddt-cespiti', element: <ReportDdtCespitiPage /> },
   { path: 'stato-aziende', element: <StatoAziendePage /> },
+  { path: 'anomalie-mor', element: <AnomalieMorPage /> },
+  { path: 'accounting-timoo', element: <AccountingTimooPage /> },
   { path: '*', element: <Navigate to="/ordini-sales" replace /> },
 ];
