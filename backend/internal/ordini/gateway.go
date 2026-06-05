@@ -242,6 +242,27 @@ func gatewayBodyCode(body string) string {
 	return ""
 }
 
+func gatewayBodyMessage(body string) string {
+	text := strings.TrimSpace(body)
+	if text == "" {
+		return ""
+	}
+	var payload map[string]any
+	if json.Unmarshal([]byte(text), &payload) != nil {
+		return ""
+	}
+	for _, key := range []string{"message", "error_description"} {
+		if value, ok := payload[key].(string); ok {
+			value = strings.Join(strings.Fields(value), " ")
+			if len(value) > 256 {
+				value = value[:256] + "..."
+			}
+			return value
+		}
+	}
+	return ""
+}
+
 func isSafeGatewayCode(value string) bool {
 	if value == "" || len(value) > 80 {
 		return false
