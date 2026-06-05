@@ -1,29 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApiClient } from './client';
 import type {
-  MorAnomaly,
-  TimooDailyStat,
   PendingActivation,
   ActivationRow,
   RenewalSummary,
   RenewalRow,
 } from '../types';
-
-export function useMorAnomalies() {
-  const api = useApiClient();
-  return useQuery({
-    queryKey: ['mor-anomalies'],
-    queryFn: () => api.get<MorAnomaly[]>('/reports/v1/mor-anomalies'),
-  });
-}
-
-export function useTimooDailyStats() {
-  const api = useApiClient();
-  return useQuery({
-    queryKey: ['timoo-daily-stats'],
-    queryFn: () => api.get<TimooDailyStat[]>('/reports/v1/timoo/daily-stats'),
-  });
-}
 
 export function useOrderStatuses() {
   const api = useApiClient();

@@ -1,15 +1,14 @@
 import { Skeleton } from '@mrsmith/ui';
-import { useMorAnomalies } from '../api/queries';
-import { formatMoneyEUR } from '../utils/format';
-import shared from './shared.module.css';
+import { useMorAnomalies } from '../../hooks/useMorAnomalies';
+import { formatMoneyEUR } from '../../utils/format';
 import styles from './AnomalieMorPage.module.css';
 
-export default function AnomalieMorPage() {
+export function AnomalieMorPage() {
   const { data, isLoading, error } = useMorAnomalies();
 
   return (
-    <div className={shared.page}>
-      <h1 className={shared.title}>Anomalie MOR</h1>
+    <div className={styles.page}>
+      <h1 className={styles.title}>Anomalie MOR</h1>
 
       {isLoading && <Skeleton rows={8} />}
 
@@ -18,8 +17,8 @@ export default function AnomalieMorPage() {
       )}
 
       {data && (
-        <div className={shared.tableWrap}>
-          <table className={`${shared.table} ${styles.table}`}>
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
             <thead>
               <tr>
                 <th>Conto</th>
@@ -29,7 +28,7 @@ export default function AnomalieMorPage() {
                 <th>Codice ordine</th>
                 <th>Serial number</th>
                 <th>Periodo</th>
-                <th className={shared.numCol}>Importo</th>
+                <th className={styles.numCol}>Importo</th>
                 <th>Stato</th>
                 <th>Tipologia</th>
                 <th>Cliente</th>
@@ -56,7 +55,7 @@ export default function AnomalieMorPage() {
                     <td>{row.codice_ordine}</td>
                     <td>{row.serialnumber}</td>
                     <td>{row.periodo_inizio}</td>
-                    <td className={shared.numCol}>{row.importo != null ? formatMoneyEUR(row.importo) : ''}</td>
+                    <td className={styles.numCol}>{row.importo != null ? formatMoneyEUR(row.importo) : ''}</td>
                     <td>{row.stato}</td>
                     <td>{row.tipologia}</td>
                     <td>{row.id_cliente}</td>

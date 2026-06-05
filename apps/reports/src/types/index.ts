@@ -1,28 +1,3 @@
-export interface MorAnomaly {
-  conto: string;
-  lastname: string | null;
-  firstname: string | null;
-  is_da_fatturare: string | null;
-  codice_ordine: string | null;
-  serialnumber: string | null;
-  periodo_inizio: string | null;
-  importo: number | null;
-  stato: string | null;
-  tipologia: string | null;
-  id_cliente: number | null;
-  intestazione: string | null;
-  ordine_presente: string;
-  numero_ordine_corretto: string;
-}
-
-export interface TimooDailyStat {
-  tenant_id: number;
-  tenant_name: string;
-  day: string;
-  users: number;
-  service_extensions: number;
-}
-
 export interface PendingActivation {
   ragione_sociale: string;
   numero_ordine: string;

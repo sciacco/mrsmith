@@ -772,6 +772,9 @@ importers:
       '@mrsmith/auth-client':
         specifier: workspace:*
         version: link:../../packages/auth-client
+      '@mrsmith/features':
+        specifier: workspace:*
+        version: link:../../packages/features
       '@mrsmith/ui':
         specifier: workspace:*
         version: link:../../packages/ui

@@ -1,14 +1,13 @@
 import { Skeleton } from '@mrsmith/ui';
-import { useTimooDailyStats } from '../api/queries';
-import shared from './shared.module.css';
+import { useTimooDailyStats } from '../../hooks/useTimooDailyStats';
 import styles from './AccountingTimooPage.module.css';
 
-export default function AccountingTimooPage() {
+export function AccountingTimooPage() {
   const { data, isLoading, error } = useTimooDailyStats();
 
   return (
-    <div className={shared.page}>
-      <h1 className={shared.title}>Accounting TIMOO</h1>
+    <div className={styles.page}>
+      <h1 className={styles.title}>Accounting TIMOO</h1>
 
       {isLoading && <Skeleton rows={8} />}
 
@@ -17,8 +16,8 @@ export default function AccountingTimooPage() {
       )}
 
       {data && (
-        <div className={shared.tableWrap}>
-          <table className={`${shared.table} ${styles.table}`}>
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
             <thead>
               <tr>
                 <th>Tenant ID</th>

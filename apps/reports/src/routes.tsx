@@ -4,8 +4,8 @@ import OrdiniPage from './pages/OrdiniPage';
 import AccessiAttiviPage from './pages/AccessiAttiviPage';
 import AttivazioniInCorsoPage from './pages/AttivazioniInCorsoPage';
 import RinnoviInArrivoPage from './pages/RinnoviInArrivoPage';
-import AnomalieMorPage from './pages/AnomalieMorPage';
-import AccountingTimooPage from './pages/AccountingTimooPage';
+import { AnomalieMorPage } from '@mrsmith/features';
+import { AccountingTimooPage } from '@mrsmith/features';
 import AovPage from './pages/AovPage';
 
 export const routes: RouteObject[] = [
