@@ -236,7 +236,7 @@ function RackUnits({ rack }: { rack: import('../../api/types').RackDetail }) {
       {rack.units.map((unit) => (
         <div key={unit.id} className={`${styles.unitCell} ${occupied.has(unit.num) ? styles.occupied : styles.free}`}>
           <strong>U{unit.num ?? '-'}</strong>
-          <span>{unit.deviceId ? 'occupata' : 'libera'}</span>
+          <span>{unit.deviceId ? 'occupata' : ''}</span>
         </div>
       ))}
     </div>

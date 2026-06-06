@@ -226,30 +226,6 @@
   background: var(--color-surface);
 }
 
-.emptyRun {
-  display: grid;
-  grid-template-columns: 3.5rem 1fr auto;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-5);
-  border-bottom: 1px solid var(--color-border-subtle);
-  align-items: center;
-  min-height: 2.25rem;
-  width: 100%;
-  border-left: 0;
-  border-right: 0;
-  border-top: 0;
-  background: var(--color-surface);
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-  color: var(--color-text-secondary);
-  transition: background var(--duration-fast) var(--ease-out);
-}
-
-.emptyRun:hover {
-  background: var(--color-surface-hover);
-}
-
 .unitNum {
   color: var(--color-text-muted);
   font-family: var(--font-mono);
@@ -264,15 +240,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.unitEmpty {
-  color: var(--color-text-faint);
-}
-
-.emptyRunLabel {
-  color: var(--color-text-muted);
-  font-weight: 600;
 }
 
 /* ── Sidebar cards ── */

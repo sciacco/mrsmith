@@ -1,15 +1,12 @@
 import { Icon, Skeleton } from '@mrsmith/ui';
-import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useEquipment, useRackDetail, useRackPowerSummary } from '../../api/queries';
 import type { EquipmentItem, RackDetail, RackPowerSummaryPoint, RackSocket } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
 import {
-  buildSlotEntries,
   buildSparklinePath,
   formatDate,
   formatRelativeTime,
-  type SlotEntry,
 } from './rackDetailHelpers';
 import styles from './rackDetail.module.css';
 
@@ -133,8 +130,6 @@ function RackStatusBadge({ status }: { status?: string }) {
 }
 
 function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: EquipmentItem[] }) {
-  const [expandedRuns, setExpandedRuns] = useState<Set<number>>(new Set());
-
   const deviceByUnit = new Map<number, EquipmentItem>();
   for (const eq of equipment) {
     const pos = eq.unitPosition ?? eq.unit;
@@ -143,16 +138,7 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
 
   const unitCount = rack.unitCount || 42;
   // U01 is physically at the bottom — render highest unit numbers first
-  const entries = buildSlotEntries(rack.units, unitCount).reverse();
-
-  function toggleRun(from: number) {
-    setExpandedRuns((prev) => {
-      const next = new Set(prev);
-      if (next.has(from)) next.delete(from);
-      else next.add(from);
-      return next;
-    });
-  }
+  const unitNumbers = Array.from({ length: unitCount }, (_, index) => unitCount - index);
 
   return (
     <section className={styles.columnSection}>
@@ -166,78 +152,18 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
           <span>Dispositivo</span>
         </div>
 
-        {entries.map((entry) => {
-          if (entry.kind === 'empty-run') {
-            return (
-              <EmptyRunRow
-                key={`run-${entry.from}`}
-                entry={entry}
-                expanded={expandedRuns.has(entry.from)}
-                reversed
-                onToggle={() => toggleRun(entry.from)}
-              />
-            );
-          }
-
-          if (entry.kind === 'empty-single') {
-            return (
-              <div key={`unit-${entry.unitNum}`} className={styles.unitRowFree}>
-                <span className={styles.unitNum}>U{pad(entry.unitNum)}</span>
-                <span className={styles.unitEmpty}>— libero —</span>
-              </div>
-            );
-          }
-
-          const device = deviceByUnit.get(entry.unitNum);
+        {unitNumbers.map((unitNum) => {
+          const device = deviceByUnit.get(unitNum);
 
           return (
-            <div key={`unit-${entry.unitNum}`} className={styles.unitRowOccupied}>
-              <span className={styles.unitNum}>U{pad(entry.unitNum)}</span>
-              <span className={styles.unitDevice}>
-                {device?.name ?? `Apparato #${entry.unit.deviceId ?? entry.unit.id}`}
-              </span>
+            <div key={`unit-${unitNum}`} className={device ? styles.unitRowOccupied : styles.unitRowFree}>
+              <span className={styles.unitNum}>U{pad(unitNum)}</span>
+              <span className={styles.unitDevice}>{device?.name ?? ''}</span>
             </div>
           );
         })}
       </div>
     </section>
-  );
-}
-
-function EmptyRunRow({
-  entry,
-  expanded,
-  reversed = false,
-  onToggle,
-}: {
-  entry: Extract<SlotEntry, { kind: 'empty-run' }>;
-  expanded: boolean;
-  reversed?: boolean;
-  onToggle: () => void;
-}) {
-  const label = reversed
-    ? `U${pad(entry.to)}–U${pad(entry.from)}`
-    : `U${pad(entry.from)}–U${pad(entry.to)}`;
-
-  const expandedSlots = Array.from({ length: entry.count }, (_, i) => {
-    const unitNum = reversed ? entry.to - i : entry.from + i;
-    return (
-      <div key={unitNum} className={styles.unitRowFree}>
-        <span className={styles.unitNum}>U{pad(unitNum)}</span>
-        <span className={styles.unitEmpty}>— libero —</span>
-      </div>
-    );
-  });
-
-  return (
-    <>
-      <button type="button" className={styles.emptyRun} onClick={onToggle} aria-expanded={expanded}>
-        <span className={styles.unitNum}>{label}</span>
-        <span className={styles.emptyRunLabel}>{entry.count} unità libere</span>
-        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={13} />
-      </button>
-      {expanded && expandedSlots}
-    </>
   );
 }
 

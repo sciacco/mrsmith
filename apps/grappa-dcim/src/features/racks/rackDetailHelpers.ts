@@ -1,38 +1,4 @@
-import type { RackPowerSummaryPoint, RackUnit } from '../../api/types';
-
-export type SlotEntry =
-  | { kind: 'occupied'; unitNum: number; unit: RackUnit }
-  | { kind: 'empty-single'; unitNum: number }
-  | { kind: 'empty-run'; from: number; to: number; count: number };
-
-export function buildSlotEntries(units: RackUnit[], unitCount: number, collapseThreshold = 2): SlotEntry[] {
-  const occupied = new Map<number, RackUnit>();
-  for (const u of units) {
-    if (u.num !== undefined) occupied.set(u.num, u);
-  }
-
-  const entries: SlotEntry[] = [];
-  let i = 1;
-  while (i <= unitCount) {
-    if (occupied.has(i)) {
-      entries.push({ kind: 'occupied', unitNum: i, unit: occupied.get(i)! });
-      i++;
-    } else {
-      let j = i + 1;
-      while (j <= unitCount && !occupied.has(j)) j++;
-      const count = j - i;
-      if (count >= collapseThreshold) {
-        entries.push({ kind: 'empty-run', from: i, to: j - 1, count });
-      } else {
-        for (let k = i; k < j; k++) {
-          entries.push({ kind: 'empty-single', unitNum: k });
-        }
-      }
-      i = j;
-    }
-  }
-  return entries;
-}
+import type { RackPowerSummaryPoint } from '../../api/types';
 
 export function buildSparklinePath(points: RackPowerSummaryPoint[], width: number, height: number): string {
   const valid = points.filter((p) => p.kilowatt !== undefined);
