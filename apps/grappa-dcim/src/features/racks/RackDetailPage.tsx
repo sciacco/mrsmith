@@ -8,7 +8,6 @@ import {
   formatDate,
   formatRelativeTime,
 } from './rackDetailHelpers';
-import { EquipmentTypeBadge } from '../equipment/EquipmentTypeBadge';
 import { buildRackUnitMap, normalizeRackUnitCount } from './rackUnitMap';
 import styles from './rackDetail.module.css';
 
@@ -142,11 +141,6 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
       </div>
 
       <div className={styles.unitTable}>
-        <div className={styles.unitHeader}>
-          <span>U</span>
-          <span>Dispositivo</span>
-        </div>
-
         <div className={styles.unitGrid}>
           {unitRows.map((row) => (
             <UnitGridRow key={`unit-${row.unitNum}`} row={row} />
@@ -157,22 +151,165 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
   );
 }
 
+function deviceClass(iconName?: string | null, type?: string | null): string {
+  const label = type?.toLowerCase() || '';
+  if (label.includes('passacavo')) {
+    return 'devicePassacavo';
+  }
+  if (label.includes('housing') || label.includes('colocation')) {
+    return 'deviceHousing';
+  }
+  if (iconName === 'server' || iconName === 'database') {
+    return 'deviceServer';
+  }
+  if (iconName === 'router' || iconName === 'network' || iconName === 'route' || iconName === 'wifi') {
+    return 'deviceNetwork';
+  }
+  if (iconName === 'box' || iconName === 'cable') {
+    return 'devicePassive';
+  }
+  return 'deviceFallback';
+}
+
+function renderDeviceGraphics(iconName?: string | null, type?: string | null, span = 1) {
+  const label = type?.toLowerCase() || '';
+  if (label.includes('passacavo')) {
+    return (
+      <div className={styles.passacavoGraphics}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <span key={i} className={styles.passacavoHook} />
+        ))}
+      </div>
+    );
+  }
+  if (label.includes('housing') || label.includes('colocation')) {
+    return (
+      <div className={styles.housingGraphics}>
+        <div className={styles.housingGrille} />
+        <div className={styles.housingConsole} />
+      </div>
+    );
+  }
+  if (iconName === 'server' || iconName === 'database') {
+    return (
+      <div className={styles.serverGraphics}>
+        <div className={styles.diskBays}>
+          {Array.from({ length: Math.min(8, span * 4) }).map((_, i) => (
+            <span key={i} className={styles.diskBay} />
+          ))}
+        </div>
+        <div className={styles.serverGrille} />
+      </div>
+    );
+  }
+  if (iconName === 'router' || iconName === 'network' || iconName === 'route' || iconName === 'wifi') {
+    return (
+      <div className={styles.networkGraphics}>
+        <div className={styles.portGroup}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <span key={i} className={styles.rj45Port} />
+          ))}
+        </div>
+        <div className={styles.portGroup}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <span key={i} className={styles.rj45Port} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (iconName === 'box' || iconName === 'cable') {
+    return (
+      <div className={styles.passiveGraphics}>
+        <div className={styles.fiberPorts}>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <span key={i} className={styles.lcPort} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return <div className={styles.fallbackGraphics} />;
+}
+
 function UnitGridRow({ row }: { row: ReturnType<typeof buildRackUnitMap>[number] }) {
+  const resolvedVisual = row.kind === 'device' ? row.device.typeVisual : null;
+
   return (
     <>
       <span className={styles.unitNumCell}>U{pad(row.unitNum)}</span>
-      {row.kind === 'free' ? <span className={styles.unitFreeCell} /> : null}
-      {row.kind === 'device' ? (
-        <div className={styles.unitDeviceBlock} style={{ gridRow: `span ${row.span}` }}>
-          <span className={styles.unitDeviceInfo}>
-            <span className={styles.unitDeviceMain}>{row.device.name}</span>
-            <EquipmentTypeBadge type={row.device.type} visual={row.device.typeVisual} compact />
-          </span>
-          <span className={styles.unitDeviceMeta}>
-            {row.span > 1 ? `U${pad(row.startUnit)}-U${pad(row.endUnit)} · ${row.span}U` : `U${pad(row.startUnit)}`}
-          </span>
+      
+      {row.kind === 'free' ? (
+        <div className={styles.unitFreeCell}>
+          <span className={styles.unitFreeLabel}>Libero</span>
         </div>
       ) : null}
+
+      {row.kind === 'device' ? (
+        <Link
+          to={`/apparati/${row.device.id}`}
+          className={`${styles.unitDeviceBlock} ${styles[deviceClass(row.device.typeVisual?.iconName, row.device.type)]}`}
+          style={{
+            gridRow: `span ${row.span}`,
+            ['--device-bg' as any]: resolvedVisual?.backgroundHex,
+            ['--device-border' as any]: resolvedVisual?.borderHex,
+            ['--device-color' as any]: resolvedVisual?.colorHex,
+          }}
+        >
+          <div className={styles.deviceFace}>
+            <div className={styles.deviceIndicatorRow}>
+              <span className={`${styles.led} ${styles.ledActive}`} />
+              <span className={styles.deviceTitle}>{row.device.name}</span>
+            </div>
+            
+            {renderDeviceGraphics(row.device.typeVisual?.iconName, row.device.type, row.span)}
+            
+            <span className={styles.unitDeviceMeta}>
+              {row.span > 1 ? `${row.span}U` : `1U`}
+            </span>
+          </div>
+
+          <div className={styles.popover}>
+            <div className={styles.popoverHeader}>
+              <span className={styles.popoverName}>{row.device.name}</span>
+              <span className={styles.popoverStatus}>{row.device.status || 'Attivo'}</span>
+            </div>
+            <div className={styles.popoverGrid}>
+              <div className={styles.popoverRow}>
+                <span className={styles.popoverLabel}>Tipo</span>
+                <span className={styles.popoverValue}>{row.device.type || '-'}</span>
+              </div>
+              {row.device.model && (
+                <div className={styles.popoverRow}>
+                  <span className={styles.popoverLabel}>Modello</span>
+                  <span className={styles.popoverValue}>{row.device.model}</span>
+                </div>
+              )}
+              {row.device.serial && (
+                <div className={styles.popoverRow}>
+                  <span className={styles.popoverLabel}>Seriale</span>
+                  <span className={styles.popoverValue}>{row.device.serial}</span>
+                </div>
+              )}
+              {row.device.managementIp && (
+                <div className={styles.popoverRow}>
+                  <span className={styles.popoverLabel}>IP Gestione</span>
+                  <span className={styles.popoverValue}>{row.device.managementIp}</span>
+                </div>
+              )}
+              <div className={styles.popoverRow}>
+                <span className={styles.popoverLabel}>U-Space</span>
+                <span className={styles.popoverValue}>U{pad(row.startUnit)}{row.span > 1 ? `-U${pad(row.endUnit)}` : ''} ({row.span}U)</span>
+              </div>
+            </div>
+            <div className={styles.popoverAction}>
+              Clicca per gestire l'asset →
+            </div>
+          </div>
+        </Link>
+      ) : null}
+
+      <span className={styles.unitNumCellRight}>U{pad(row.unitNum)}</span>
     </>
   );
 }
