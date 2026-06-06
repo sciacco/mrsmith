@@ -1,6 +1,6 @@
 import type { EquipmentItem } from '../../api/types';
 
-export type RackOccupant = Pick<EquipmentItem, 'id' | 'name' | 'type'> &
+export type RackOccupant = Pick<EquipmentItem, 'id' | 'name' | 'type' | 'typeVisual'> &
   Partial<Pick<EquipmentItem, 'unitPosition' | 'unit' | 'occupiedUnits' | 'status'>>;
 
 export type RackUnitMapRow =

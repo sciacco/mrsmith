@@ -92,6 +92,15 @@ func (h *Handler) handleCreateEquipment(w http.ResponseWriter, r *http.Request) 
 		invalidRequest(w, err.Error())
 		return
 	}
+	canonicalType, err := h.requireActiveEquipmentType(r, body.Type)
+	if err != nil {
+		if isValidationError(err) {
+			invalidRequest(w, err.Error())
+			return
+		}
+		h.dbFailure(w, r, "validate_equipment_type", err)
+		return
+	}
 	var id int64
 	if err := withTx(r.Context(), h.grappa, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(r.Context(), `
@@ -103,7 +112,7 @@ func (h *Handler) handleCreateEquipment(w http.ResponseWriter, r *http.Request) 
 				 serialnumber, codice_ordine)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			strings.TrimSpace(body.Name), body.RackID, body.UnitPosition, body.Unit, optionalTrimmed(body.ManagementIP),
-			optionalTrimmed(body.Note), strings.TrimSpace(body.Type), optionalTrimmed(body.Serial), optionalTrimmed(body.OS),
+			optionalTrimmed(body.Note), canonicalType, optionalTrimmed(body.Serial), optionalTrimmed(body.OS),
 			optionalTrimmed(body.Model), body.CustomerID, statusOrActive(body.Status), body.Bandwidth, body.PortCount,
 			optionalTrimmed(body.PortName), optionalTrimmed(body.PortType), optionalTrimmed(body.PortLayer),
 			optionalTrimmed(body.ActivatedAt), optionalTrimmed(body.InstallAddress), optionalTrimmed(body.ShippingAddress),
@@ -137,6 +146,18 @@ func (h *Handler) handleUpdateEquipment(w http.ResponseWriter, r *http.Request) 
 	if err := decodeJSONBody(r, &body); err != nil {
 		invalidRequest(w, "invalid_equipment_payload")
 		return
+	}
+	if body.Type != nil {
+		canonicalType, err := h.requireActiveEquipmentType(r, *body.Type)
+		if err != nil {
+			if isValidationError(err) {
+				invalidRequest(w, err.Error())
+				return
+			}
+			h.dbFailure(w, r, "validate_equipment_type", err, "equipment_id", id)
+			return
+		}
+		body.Type = &canonicalType
 	}
 	sets, args, err := equipmentPatch(body)
 	if err != nil {
@@ -246,20 +267,25 @@ func (h *Handler) handleEquipmentTypeOptions(w http.ResponseWriter, r *http.Requ
 	if !h.requireDB(w) {
 		return
 	}
-	rows, err := h.grappa.QueryContext(r.Context(), `SELECT DISTINCT TRIM(type) FROM apparato WHERE TRIM(type) <> '' ORDER BY TRIM(type) ASC`)
+	rows, err := h.grappa.QueryContext(r.Context(), `
+		SELECT type_value, label, color_hex, background_hex, border_hex, icon_name
+		FROM dcim_equipment_type_visuals
+		WHERE active = 1
+		ORDER BY sort_order ASC, label ASC, type_value ASC`)
 	if err != nil {
 		h.dbFailure(w, r, "equipment_type_options", err)
 		return
 	}
 	defer rows.Close()
-	items := []LookupItem{}
+	items := []EquipmentTypeOption{}
 	for rows.Next() {
-		var value string
-		if err := rows.Scan(&value); err != nil {
+		var item EquipmentTypeOption
+		if err := rows.Scan(&item.Type, &item.Label, &item.ColorHex, &item.BackgroundHex, &item.BorderHex, &item.IconName); err != nil {
 			h.dbFailure(w, r, "equipment_type_options_scan", err)
 			return
 		}
-		items = append(items, LookupItem{ID: value, Label: value})
+		item.ID = item.Type
+		items = append(items, item)
 	}
 	if !h.rowsDone(w, r, rows, "equipment_type_options") {
 		return
@@ -279,7 +305,8 @@ func (h *Handler) getEquipment(r *http.Request, id int) (EquipmentItem, bool, er
 func equipmentSelectSQL() string {
 	return `
 		SELECT a.id_apparato, a.name, a.id_rack, r.name, d.name, a.unit_position, a.unit, a.ip_management,
-		       a.note, a.type, a.serial, a.os, a.model, a.id_anagrafica, a.stato, a.banda, a.numero_porte,
+		       a.note, a.type, etv.label, etv.color_hex, etv.background_hex, etv.border_hex, etv.icon_name,
+		       a.serial, a.os, a.model, a.id_anagrafica, a.stato, a.banda, a.numero_porte,
 		       a.nome_porte, a.tipo_porte, a.layer_porte, a.data_attivazione, a.data_cessazione,
 		       a.indirizzo_installazione, a.indirizzo_spedizione, a.proprieta_cdlan, a.cluster_name,
 		       a.cliente_finale, a.tipo_configurazione, a.spedizione, a.installazione_onsite,
@@ -288,12 +315,14 @@ func equipmentSelectSQL() string {
 		FROM apparato a
 		LEFT JOIN racks r ON r.id_rack = a.id_rack
 		LEFT JOIN datacenter d ON d.id_datacenter = r.id_datacenter
-		LEFT JOIN nic n ON n.id_apparato = a.id_apparato`
+		LEFT JOIN nic n ON n.id_apparato = a.id_apparato
+		LEFT JOIN dcim_equipment_type_visuals etv ON etv.type_value = a.type AND etv.active = 1`
 }
 
 func equipmentGroupSQL() string {
 	return `a.id_apparato, a.name, a.id_rack, r.name, d.name, a.unit_position, a.unit, a.ip_management,
-		a.note, a.type, a.serial, a.os, a.model, a.id_anagrafica, a.stato, a.banda, a.numero_porte,
+		a.note, a.type, etv.label, etv.color_hex, etv.background_hex, etv.border_hex, etv.icon_name,
+		a.serial, a.os, a.model, a.id_anagrafica, a.stato, a.banda, a.numero_porte,
 		a.nome_porte, a.tipo_porte, a.layer_porte, a.data_attivazione, a.data_cessazione,
 		a.indirizzo_installazione, a.indirizzo_spedizione, a.proprieta_cdlan, a.cluster_name,
 		a.cliente_finale, a.tipo_configurazione, a.spedizione, a.installazione_onsite,
@@ -307,13 +336,15 @@ type equipmentScanner interface {
 func scanEquipment(scanner equipmentScanner) (EquipmentItem, error) {
 	var item EquipmentItem
 	var rackID, unitPosition, unit, customerID, bandwidth, portCount sql.NullInt64
-	var rackName, datacenterName, managementIP, note, serial, os, model, status, portName, portType, portLayer sql.NullString
+	var rackName, datacenterName, managementIP, note, typeLabel, typeColor, typeBackground, typeBorder, typeIcon sql.NullString
+	var serial, os, model, status, portName, portType, portLayer sql.NullString
 	var installAddress, shippingAddress, cdlanOwned, clusterName, endCustomer, configurationType, shipping, onsiteInstallation sql.NullString
 	var monitoringActive, firewallType, serialNumber, orderCode sql.NullString
 	var activatedAt, ceasedAt, lastNotificationAt sql.NullTime
 	if err := scanner.Scan(
 		&item.ID, &item.Name, &rackID, &rackName, &datacenterName, &unitPosition, &unit, &managementIP,
-		&note, &item.Type, &serial, &os, &model, &customerID, &status, &bandwidth, &portCount, &portName,
+		&note, &item.Type, &typeLabel, &typeColor, &typeBackground, &typeBorder, &typeIcon,
+		&serial, &os, &model, &customerID, &status, &bandwidth, &portCount, &portName,
 		&portType, &portLayer, &activatedAt, &ceasedAt, &installAddress, &shippingAddress, &cdlanOwned,
 		&clusterName, &endCustomer, &configurationType, &shipping, &onsiteInstallation, &monitoringActive,
 		&firewallType, &serialNumber, &orderCode, &lastNotificationAt, &item.NICCount,
@@ -328,6 +359,7 @@ func scanEquipment(scanner equipmentScanner) (EquipmentItem, error) {
 	item.OccupiedUnits = occupiedUnits(unit)
 	item.ManagementIP = nullableString(managementIP)
 	item.Note = nullableString(note)
+	item.TypeVisual = equipmentTypeVisual(item.Type, typeLabel, typeColor, typeBackground, typeBorder, typeIcon)
 	item.Serial = nullableString(serial)
 	item.OS = nullableString(os)
 	item.Model = nullableString(model)
@@ -354,6 +386,48 @@ func scanEquipment(scanner equipmentScanner) (EquipmentItem, error) {
 	item.OrderCode = nullableString(orderCode)
 	item.LastNotificationAt = nullableTime(lastNotificationAt)
 	return item, nil
+}
+
+func equipmentTypeVisual(equipmentType string, label, color, background, border, icon sql.NullString) *EquipmentTypeVisual {
+	if !label.Valid || !color.Valid || !background.Valid || !border.Valid || !icon.Valid {
+		return nil
+	}
+	return &EquipmentTypeVisual{
+		Type:          strings.TrimSpace(equipmentType),
+		Label:         strings.TrimSpace(label.String),
+		ColorHex:      strings.TrimSpace(color.String),
+		BackgroundHex: strings.TrimSpace(background.String),
+		BorderHex:     strings.TrimSpace(border.String),
+		IconName:      strings.TrimSpace(icon.String),
+	}
+}
+
+func (h *Handler) requireActiveEquipmentType(r *http.Request, equipmentType string) (string, error) {
+	trimmed := strings.TrimSpace(equipmentType)
+	if trimmed == "" {
+		return "", fmt.Errorf("equipment_type_required")
+	}
+	var value string
+	err := h.grappa.QueryRowContext(r.Context(), `
+		SELECT type_value
+		FROM dcim_equipment_type_visuals
+		WHERE type_value = ? AND active = 1`, trimmed).Scan(&value)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("invalid_equipment_type")
+	}
+	if err != nil {
+		return "", err
+	}
+	return value, nil
+}
+
+func isValidationError(err error) bool {
+	switch err.Error() {
+	case "equipment_name_required", "equipment_type_required", "invalid_equipment_type", "invalid_equipment_port_count":
+		return true
+	default:
+		return false
+	}
 }
 
 func equipmentOccupancyStateSQL(column string) string {

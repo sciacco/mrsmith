@@ -1,4 +1,5 @@
 import { Button, Modal } from '@mrsmith/ui';
+import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import styles from '../facilities/workspace.module.css';
 
@@ -9,6 +10,11 @@ export function valueOrDash(value: unknown) {
   return String(value);
 }
 
+function detailValue(value: ReactNode) {
+  if (value === undefined || value === null || value === '') return '-';
+  return value;
+}
+
 export function errorText(error: unknown, fallback: string) {
   if (typeof error === 'object' && error && 'body' in error) {
     const body = (error as { body?: unknown }).body;
@@ -17,8 +23,8 @@ export function errorText(error: unknown, fallback: string) {
   return fallback;
 }
 
-export function Detail({ label, value }: { label: string; value: unknown }) {
-  return <div className={styles.detailItem}><span className={styles.detailLabel}>{label}</span><span className={styles.detailValue}>{valueOrDash(value)}</span></div>;
+export function Detail({ label, value }: { label: string; value: ReactNode }) {
+  return <div className={styles.detailItem}><span className={styles.detailLabel}>{label}</span><span className={styles.detailValue}>{detailValue(value)}</span></div>;
 }
 
 export function TextField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {

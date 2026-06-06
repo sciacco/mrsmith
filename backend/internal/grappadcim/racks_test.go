@@ -213,13 +213,13 @@ func (c *grappaDCIMRackTestConn) QueryContext(_ context.Context, query string, a
 			values: [][]driver.Value{
 				{
 					int64(91), "Switch core", int64(44), "Rack A01", "MMR 1", int64(10), int64(3), "10.0.0.1",
-					nil, "Switch", nil, nil, "Nexus", int64(22), "Spento", nil, int64(48), nil,
+					nil, "Switch", "Switch", "#65A30D", "#ECFCCB", "#BEF264", "network", nil, nil, "Nexus", int64(22), "Spento", nil, int64(48), nil,
 					nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "SN-SW",
 					"ORD-1", nil, int64(48),
 				},
 				{
 					int64(92), "Patch panel", int64(44), "Rack A01", "MMR 1", int64(20), nil, nil,
-					nil, "Patch panel", nil, nil, nil, nil, "Attivo", nil, nil, nil,
+					nil, "Patch panel", nil, nil, nil, nil, nil, nil, nil, nil, nil, "Attivo", nil, nil, nil,
 					nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 					nil, nil, int64(0),
 				},
@@ -242,7 +242,8 @@ func rackTestSelectColumns() []string {
 func equipmentTestSelectColumns() []string {
 	return []string{
 		"id_apparato", "name", "id_rack", "rack_name", "datacenter_name", "unit_position", "unit", "ip_management",
-		"note", "type", "serial", "os", "model", "id_anagrafica", "stato", "banda", "numero_porte",
+		"note", "type", "type_label", "type_color_hex", "type_background_hex", "type_border_hex", "type_icon_name",
+		"serial", "os", "model", "id_anagrafica", "stato", "banda", "numero_porte",
 		"nome_porte", "tipo_porte", "layer_porte", "data_attivazione", "data_cessazione",
 		"indirizzo_installazione", "indirizzo_spedizione", "proprieta_cdlan", "cluster_name",
 		"cliente_finale", "tipo_configurazione", "spedizione", "installazione_onsite",

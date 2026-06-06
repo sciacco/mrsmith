@@ -109,6 +109,15 @@ Alyante ERP ID
 - Used by: `apps/grappa-dcim` Rack detail.
 - Open questions: none.
 
+### Grappa Apparato Types Are Controlled By DCIM Lookup
+
+- Context: Grappa DCIM apparato create/update and any UI that presents `apparato.type`.
+- Discovery: MrSmith owns a Grappa-side `dcim_equipment_type_visuals` lookup for the allowed apparato types and their presentation metadata. The legacy `apparato.type` column remains textual for compatibility, but user create/update flows must use only active lookup values.
+- Practical rule: read type choices from `GET /api/grappa-dcim/v1/equipment/type-options`; do not rebuild the picker from distinct `apparato.type` values. Existing historical rows with non-lookup values may still be displayed, but new writes must be rejected unless the type is active in the lookup.
+- Evidence: `deploy/migrations/020_grappa_dcim_equipment_type_visuals.sql`, backend validation in `backend/internal/grappadcim/equipment.go`, and badges in `apps/grappa-dcim/src/features/equipment`.
+- Used by: `apps/grappa-dcim` Apparati, rack U-map, Server, and Storage views.
+- Open questions: none.
+
 ## Customer Eligibility and Exclusion Rules
 
 ### Known Grappa Customer Exclusions

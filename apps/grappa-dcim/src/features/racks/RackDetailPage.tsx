@@ -8,6 +8,7 @@ import {
   formatDate,
   formatRelativeTime,
 } from './rackDetailHelpers';
+import { EquipmentTypeBadge } from '../equipment/EquipmentTypeBadge';
 import { buildRackUnitMap, normalizeRackUnitCount } from './rackUnitMap';
 import styles from './rackDetail.module.css';
 
@@ -163,7 +164,10 @@ function UnitGridRow({ row }: { row: ReturnType<typeof buildRackUnitMap>[number]
       {row.kind === 'free' ? <span className={styles.unitFreeCell} /> : null}
       {row.kind === 'device' ? (
         <div className={styles.unitDeviceBlock} style={{ gridRow: `span ${row.span}` }}>
-          <span className={styles.unitDeviceMain}>{row.device.name}</span>
+          <span className={styles.unitDeviceInfo}>
+            <span className={styles.unitDeviceMain}>{row.device.name}</span>
+            <EquipmentTypeBadge type={row.device.type} visual={row.device.typeVisual} compact />
+          </span>
           <span className={styles.unitDeviceMeta}>
             {row.span > 1 ? `U${pad(row.startUnit)}-U${pad(row.endUnit)} · ${row.span}U` : `U${pad(row.startUnit)}`}
           </span>

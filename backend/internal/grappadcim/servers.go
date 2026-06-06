@@ -208,10 +208,13 @@ func serverSelectSQL() string {
 		       s.utenza_cliente, s.utenza_cdlan, s.server_syslog, s.servizi_sotto_syslog,
 		       s.hostname_backup, s.tipo_backup, s.server_cdp_nas, s.schedulazione_backup,
 		       s.quota_backup_cdp_gb, s.data_attivazione, s.data_cessazione, s.note, s.ip_mngt,
-		       s.note_backup, s.note_gestione, s.apparato_id, a.name, s.codice_ordine, s.serialnumber, s.porte
+		       s.note_backup, s.note_gestione, s.apparato_id, a.name, a.type,
+		       etv.label, etv.color_hex, etv.background_hex, etv.border_hex, etv.icon_name,
+		       s.codice_ordine, s.serialnumber, s.porte
 		FROM server s
 		LEFT JOIN racks r ON r.id_rack = s.id_rack
-		LEFT JOIN apparato a ON a.id_apparato = s.apparato_id`
+		LEFT JOIN apparato a ON a.id_apparato = s.apparato_id
+		LEFT JOIN dcim_equipment_type_visuals etv ON etv.type_value = a.type AND etv.active = 1`
 }
 
 type serverScanner interface {
@@ -223,7 +226,9 @@ func scanServer(scanner serverScanner) (ServerItem, error) {
 	var name, contact, status, os, architecture, hostname, rackName, slot, virtualizationType, virtualizationCluster sql.NullString
 	var model, serial, cpu, ramBanks, disks, raidLevel, iloAddress, patchingManagement, customerRootAccess sql.NullString
 	var customerUsername, cdlanUsername, syslogServer, syslogServices, backupHostname, backupType, backupNasServer sql.NullString
-	var backupSchedule, note, managementIP, backupNote, managementNote, equipmentName, orderCode, serialNumber sql.NullString
+	var backupSchedule, note, managementIP, backupNote, managementNote, equipmentName, equipmentType sql.NullString
+	var equipmentTypeLabel, equipmentTypeColor, equipmentTypeBackground, equipmentTypeBorder, equipmentTypeIcon sql.NullString
+	var orderCode, serialNumber sql.NullString
 	var customerID, rackID, unit, unitPosition, cpuSockets, coreCount, ram, hotspare, backupQuota, equipmentID, portCount sql.NullInt64
 	var activatedAt, ceasedAt sql.NullTime
 	if err := scanner.Scan(
@@ -233,7 +238,8 @@ func scanServer(scanner serverScanner) (ServerItem, error) {
 		&iloAddress, &patchingManagement, &customerRootAccess, &customerUsername, &cdlanUsername,
 		&syslogServer, &syslogServices, &backupHostname, &backupType, &backupNasServer, &backupSchedule,
 		&backupQuota, &activatedAt, &ceasedAt, &note, &managementIP, &backupNote, &managementNote,
-		&equipmentID, &equipmentName, &orderCode, &serialNumber, &portCount,
+		&equipmentID, &equipmentName, &equipmentType, &equipmentTypeLabel, &equipmentTypeColor,
+		&equipmentTypeBackground, &equipmentTypeBorder, &equipmentTypeIcon, &orderCode, &serialNumber, &portCount,
 	); err != nil {
 		return item, err
 	}
@@ -281,6 +287,10 @@ func scanServer(scanner serverScanner) (ServerItem, error) {
 	item.ManagementNote = nullableString(managementNote)
 	item.EquipmentID = nullableInt(equipmentID)
 	item.EquipmentName = nullableString(equipmentName)
+	item.EquipmentType = nullableString(equipmentType)
+	if item.EquipmentType != nil {
+		item.EquipmentTypeVisual = equipmentTypeVisual(*item.EquipmentType, equipmentTypeLabel, equipmentTypeColor, equipmentTypeBackground, equipmentTypeBorder, equipmentTypeIcon)
+	}
 	item.OrderCode = nullableString(orderCode)
 	item.SerialNumber = nullableString(serialNumber)
 	item.PortCount = nullableInt(portCount)

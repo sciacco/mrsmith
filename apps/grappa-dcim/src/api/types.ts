@@ -10,6 +10,19 @@ export interface LookupItem {
   label: string;
 }
 
+export interface EquipmentTypeVisual {
+  type: string;
+  label: string;
+  colorHex: string;
+  backgroundHex: string;
+  borderHex: string;
+  iconName: string;
+}
+
+export interface EquipmentTypeOption extends EquipmentTypeVisual {
+  id: string;
+}
+
 export interface GrappaDCIMLookups {
   infrastructure: LookupItem[];
   assets: LookupItem[];
@@ -340,6 +353,7 @@ export interface EquipmentItem {
   managementIp?: string;
   note?: string;
   type: string;
+  typeVisual?: EquipmentTypeVisual;
   serial?: string;
   os?: string;
   model?: string;
@@ -422,6 +436,8 @@ export interface ServerItem {
   managementIp?: string;
   equipmentId?: number;
   equipmentName?: string;
+  equipmentType?: string;
+  equipmentTypeVisual?: EquipmentTypeVisual;
   orderCode?: string;
   serialNumber?: string;
   portCount?: number;
@@ -490,6 +506,8 @@ export interface StorageItem {
   customerId: number;
   equipmentId: number;
   equipment?: string;
+  equipmentType?: string;
+  equipmentTypeVisual?: EquipmentTypeVisual;
   note?: string;
   sizeType?: string;
   status: string;

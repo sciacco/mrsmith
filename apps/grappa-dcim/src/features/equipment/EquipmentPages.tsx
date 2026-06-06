@@ -6,6 +6,7 @@ import type { EquipmentInput, EquipmentItem } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
 import styles from '../facilities/workspace.module.css';
 import { ConfirmModal, Detail, NumberField, SelectField, TextField, destructiveBody, errorText } from './assetPageUtils';
+import { EquipmentTypeBadge } from './EquipmentTypeBadge';
 
 export function EquipmentPage() {
   const params = useParams();
@@ -75,7 +76,7 @@ export function EquipmentPage() {
                 {equipment.data?.map((item) => (
                   <tr key={item.id} className={`${styles.clickable} ${selected?.id === item.id ? styles.selectedRow : ''}`} onClick={() => navigate(`/apparati/${item.id}`)}>
                     <td><strong>{item.name}</strong><br /><span className={styles.muted}>{item.managementIp ?? item.serialNumber ?? item.serial ?? '-'}</span></td>
-                    <td>{item.type}</td>
+                    <td><EquipmentTypeBadge type={item.type} visual={item.typeVisual} /></td>
                     <td>{item.rackName ?? '-'}<br /><span className={styles.muted}>{item.datacenterName ?? ''}</span></td>
                     <td>{item.nicCount}</td>
                     <td><span className={item.status === 'Cessato' ? styles.badgeDanger : styles.badge}>{item.status ?? 'Attivo'}</span></td>
@@ -90,7 +91,7 @@ export function EquipmentPage() {
               <div className={styles.emptyPanel}><h3 className={styles.emptyTitle}>Dettaglio non disponibile</h3><p className={styles.emptyText}>Seleziona un apparato dal registro.</p></div>
             ) : (
               <>
-                <div className={styles.header}><div><h2 className={styles.emptyTitle}>{detail.data.name}</h2><p className={styles.emptyText}>{detail.data.type} · {detail.data.rackName ?? 'Rack non indicato'}</p></div><span className={styles.badgeMuted}>{detail.data.status ?? 'Attivo'}</span></div>
+                <div className={styles.header}><div><h2 className={styles.emptyTitle}>{detail.data.name}</h2><div className={styles.inlineMeta}><EquipmentTypeBadge type={detail.data.type} visual={detail.data.typeVisual} /><span className={styles.emptyText}>{detail.data.rackName ?? 'Rack non indicato'}</span></div></div><span className={styles.badgeMuted}>{detail.data.status ?? 'Attivo'}</span></div>
                 <div className={styles.tabs}>{[['summary', 'Riepilogo'], ['nics', 'NIC'], ['rack', 'Rack'], ['history', 'Storico']].map(([key, label]) => <button key={key} className={`${styles.tab} ${tab === key ? styles.tabActive : ''}`} onClick={() => setTab(key as typeof tab)}>{label}</button>)}</div>
                 {tab === 'summary' ? <EquipmentSummary item={detail.data} /> : null}
                 {tab === 'nics' ? <NICList loading={nics.isLoading} items={nics.data} /> : null}
@@ -127,6 +128,8 @@ function EquipmentModal({ open, value, onClose, onSave, loading }: { open: boole
   const [draft, setDraft] = useState<EquipmentInput>({ name: '', type: '', status: 'Attivo', portCount: 0 });
 
   useEffect(() => {
+    const typeOptions = types.data ?? [];
+    const activeType = value?.type && (typeOptions.length === 0 || typeOptions.some((item) => item.type === value.type)) ? value.type : '';
     setDraft(value ? {
       name: value.name,
       rackId: value.rackId,
@@ -134,7 +137,7 @@ function EquipmentModal({ open, value, onClose, onSave, loading }: { open: boole
       unit: value.unit,
       managementIp: value.managementIp,
       note: value.note,
-      type: value.type,
+      type: activeType,
       serial: value.serial,
       os: value.os,
       model: value.model,
@@ -149,14 +152,16 @@ function EquipmentModal({ open, value, onClose, onSave, loading }: { open: boole
       firewallType: value.firewallType,
       serialNumber: value.serialNumber,
       orderCode: value.orderCode,
-    } : { name: '', type: types.data?.[0]?.label ?? '', status: 'Attivo', portCount: 0 });
+    } : { name: '', type: types.data?.[0]?.type ?? '', status: 'Attivo', portCount: 0 });
   }, [value, open, types.data]);
+
+  const selectedType = types.data?.find((item) => item.type === draft.type);
 
   return (
     <Modal open={open} onClose={onClose} title={value ? 'Modifica apparato' : 'Nuovo apparato'} size="wide">
       <div className={styles.formGrid}>
         <TextField label="Nome" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} />
-        <div className={styles.field}><label>Tipo</label><input list="equipment-types" value={draft.type} onChange={(event) => setDraft({ ...draft, type: event.target.value })} /><datalist id="equipment-types">{types.data?.map((item) => <option key={String(item.id)} value={item.label} />)}</datalist></div>
+        <div className={styles.field}><label>Tipo</label><select value={draft.type} disabled={types.isLoading} onChange={(event) => setDraft({ ...draft, type: event.target.value })}><option value="">Seleziona tipo</option>{types.data?.map((item) => <option key={item.id} value={item.type}>{item.label}</option>)}</select>{draft.type ? <div className={styles.fieldPreview}><EquipmentTypeBadge type={draft.type} visual={selectedType} compact /></div> : null}</div>
         <div className={styles.field}><label>Rack</label><select value={draft.rackId ?? 0} onChange={(event) => setDraft({ ...draft, rackId: Number(event.target.value) || undefined })}><option value={0}>Rack non indicato</option>{racks.data?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
         <TextField label="IP gestione" value={draft.managementIp ?? ''} onChange={(managementIp) => setDraft({ ...draft, managementIp })} />
         <TextField label="Modello" value={draft.model ?? ''} onChange={(model) => setDraft({ ...draft, model })} />

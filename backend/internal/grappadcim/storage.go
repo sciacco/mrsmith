@@ -196,9 +196,11 @@ func (h *Handler) getStorage(r *http.Request, id int) (StorageItem, bool, error)
 func storageSelectSQL() string {
 	return `
 		SELECT s.id, s.access_protocol, s.size, s.cli_fatturazione_id, s.apparato_id_apparato, a.name,
+		       a.type, etv.label, etv.color_hex, etv.background_hex, etv.border_hex, etv.icon_name,
 		       s.note, s.size_type, s.status, s.created_at, s.closed_at, s.codice_ordine, s.serial_number
 		FROM storage s
-		LEFT JOIN apparato a ON a.id_apparato = s.apparato_id_apparato`
+		LEFT JOIN apparato a ON a.id_apparato = s.apparato_id_apparato
+		LEFT JOIN dcim_equipment_type_visuals etv ON etv.type_value = a.type AND etv.active = 1`
 }
 
 type storageScanner interface {
@@ -207,15 +209,24 @@ type storageScanner interface {
 
 func scanStorage(scanner storageScanner) (StorageItem, error) {
 	var item StorageItem
-	var protocol, equipment, note, sizeType, orderCode, serial sql.NullString
+	var protocol, equipment, equipmentType, equipmentTypeLabel, equipmentTypeColor, equipmentTypeBackground, equipmentTypeBorder, equipmentTypeIcon sql.NullString
+	var note, sizeType, orderCode, serial sql.NullString
 	var size sql.NullInt64
 	var createdAt, closedAt sql.NullTime
-	if err := scanner.Scan(&item.ID, &protocol, &size, &item.CustomerID, &item.EquipmentID, &equipment, &note, &sizeType, &item.Status, &createdAt, &closedAt, &orderCode, &serial); err != nil {
+	if err := scanner.Scan(
+		&item.ID, &protocol, &size, &item.CustomerID, &item.EquipmentID, &equipment,
+		&equipmentType, &equipmentTypeLabel, &equipmentTypeColor, &equipmentTypeBackground, &equipmentTypeBorder, &equipmentTypeIcon,
+		&note, &sizeType, &item.Status, &createdAt, &closedAt, &orderCode, &serial,
+	); err != nil {
 		return item, err
 	}
 	item.Protocol = nullableString(protocol)
 	item.Size = nullableInt(size)
 	item.Equipment = nullableString(equipment)
+	item.EquipmentType = nullableString(equipmentType)
+	if item.EquipmentType != nil {
+		item.EquipmentTypeVisual = equipmentTypeVisual(*item.EquipmentType, equipmentTypeLabel, equipmentTypeColor, equipmentTypeBackground, equipmentTypeBorder, equipmentTypeIcon)
+	}
 	item.Note = nullableString(note)
 	item.SizeType = nullableString(sizeType)
 	item.CreatedAt = nullableTime(createdAt)

@@ -16,6 +16,7 @@ import type {
   LayoutGridResponse,
   EquipmentInput,
   EquipmentItem,
+  EquipmentTypeOption,
   Fiber,
   FiberAssignmentInput,
   FiberRing,
@@ -522,7 +523,7 @@ export function useEquipmentTypes() {
   const api = useApiClient();
   return useQuery({
     queryKey: grappaDCIMQueryKeys.equipmentTypes(),
-    queryFn: () => api.get<LookupItem[]>('/grappa-dcim/v1/equipment/type-options'),
+    queryFn: () => api.get<EquipmentTypeOption[]>('/grappa-dcim/v1/equipment/type-options'),
     retry: shouldRetry,
   });
 }

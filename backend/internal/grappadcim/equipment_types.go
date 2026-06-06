@@ -1,43 +1,44 @@
 package grappadcim
 
 type EquipmentItem struct {
-	ID                 int     `json:"id"`
-	Name               string  `json:"name"`
-	RackID             *int    `json:"rackId,omitempty"`
-	RackName           *string `json:"rackName,omitempty"`
-	DatacenterName     *string `json:"datacenterName,omitempty"`
-	UnitPosition       *int    `json:"unitPosition,omitempty"`
-	Unit               *int    `json:"unit,omitempty"`
-	OccupiedUnits      int     `json:"occupiedUnits"`
-	ManagementIP       *string `json:"managementIp,omitempty"`
-	Note               *string `json:"note,omitempty"`
-	Type               string  `json:"type"`
-	Serial             *string `json:"serial,omitempty"`
-	OS                 *string `json:"os,omitempty"`
-	Model              *string `json:"model,omitempty"`
-	CustomerID         *int    `json:"customerId,omitempty"`
-	Status             *string `json:"status,omitempty"`
-	Bandwidth          *int    `json:"bandwidth,omitempty"`
-	PortCount          *int    `json:"portCount,omitempty"`
-	PortName           *string `json:"portName,omitempty"`
-	PortType           *string `json:"portType,omitempty"`
-	PortLayer          *string `json:"portLayer,omitempty"`
-	ActivatedAt        *string `json:"activatedAt,omitempty"`
-	CeasedAt           *string `json:"ceasedAt,omitempty"`
-	InstallAddress     *string `json:"installAddress,omitempty"`
-	ShippingAddress    *string `json:"shippingAddress,omitempty"`
-	CdlanOwned         *string `json:"cdlanOwned,omitempty"`
-	ClusterName        *string `json:"clusterName,omitempty"`
-	EndCustomer        *string `json:"endCustomer,omitempty"`
-	ConfigurationType  *string `json:"configurationType,omitempty"`
-	Shipping           *string `json:"shipping,omitempty"`
-	OnsiteInstallation *string `json:"onsiteInstallation,omitempty"`
-	MonitoringActive   *string `json:"monitoringActive,omitempty"`
-	FirewallType       *string `json:"firewallType,omitempty"`
-	SerialNumber       *string `json:"serialNumber,omitempty"`
-	OrderCode          *string `json:"orderCode,omitempty"`
-	LastNotificationAt *string `json:"lastNotificationAt,omitempty"`
-	NICCount           int     `json:"nicCount"`
+	ID                 int                  `json:"id"`
+	Name               string               `json:"name"`
+	RackID             *int                 `json:"rackId,omitempty"`
+	RackName           *string              `json:"rackName,omitempty"`
+	DatacenterName     *string              `json:"datacenterName,omitempty"`
+	UnitPosition       *int                 `json:"unitPosition,omitempty"`
+	Unit               *int                 `json:"unit,omitempty"`
+	OccupiedUnits      int                  `json:"occupiedUnits"`
+	ManagementIP       *string              `json:"managementIp,omitempty"`
+	Note               *string              `json:"note,omitempty"`
+	Type               string               `json:"type"`
+	TypeVisual         *EquipmentTypeVisual `json:"typeVisual,omitempty"`
+	Serial             *string              `json:"serial,omitempty"`
+	OS                 *string              `json:"os,omitempty"`
+	Model              *string              `json:"model,omitempty"`
+	CustomerID         *int                 `json:"customerId,omitempty"`
+	Status             *string              `json:"status,omitempty"`
+	Bandwidth          *int                 `json:"bandwidth,omitempty"`
+	PortCount          *int                 `json:"portCount,omitempty"`
+	PortName           *string              `json:"portName,omitempty"`
+	PortType           *string              `json:"portType,omitempty"`
+	PortLayer          *string              `json:"portLayer,omitempty"`
+	ActivatedAt        *string              `json:"activatedAt,omitempty"`
+	CeasedAt           *string              `json:"ceasedAt,omitempty"`
+	InstallAddress     *string              `json:"installAddress,omitempty"`
+	ShippingAddress    *string              `json:"shippingAddress,omitempty"`
+	CdlanOwned         *string              `json:"cdlanOwned,omitempty"`
+	ClusterName        *string              `json:"clusterName,omitempty"`
+	EndCustomer        *string              `json:"endCustomer,omitempty"`
+	ConfigurationType  *string              `json:"configurationType,omitempty"`
+	Shipping           *string              `json:"shipping,omitempty"`
+	OnsiteInstallation *string              `json:"onsiteInstallation,omitempty"`
+	MonitoringActive   *string              `json:"monitoringActive,omitempty"`
+	FirewallType       *string              `json:"firewallType,omitempty"`
+	SerialNumber       *string              `json:"serialNumber,omitempty"`
+	OrderCode          *string              `json:"orderCode,omitempty"`
+	LastNotificationAt *string              `json:"lastNotificationAt,omitempty"`
+	NICCount           int                  `json:"nicCount"`
 }
 
 type EquipmentInput struct {
@@ -119,4 +120,18 @@ type NICItem struct {
 	Layer             *string `json:"layer,omitempty"`
 	LinkedServerID    *int    `json:"linkedServerId,omitempty"`
 	Status            *string `json:"status,omitempty"`
+}
+
+type EquipmentTypeVisual struct {
+	Type          string `json:"type"`
+	Label         string `json:"label"`
+	ColorHex      string `json:"colorHex"`
+	BackgroundHex string `json:"backgroundHex"`
+	BorderHex     string `json:"borderHex"`
+	IconName      string `json:"iconName"`
+}
+
+type EquipmentTypeOption struct {
+	ID string `json:"id"`
+	EquipmentTypeVisual
 }
