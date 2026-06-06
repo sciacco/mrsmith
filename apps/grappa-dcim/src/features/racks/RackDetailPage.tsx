@@ -133,7 +133,6 @@ function RackStatusBadge({ status }: { status?: string }) {
 }
 
 function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: EquipmentItem[] }) {
-  const [side, setSide] = useState<'front' | 'back'>('front');
   const [expandedRuns, setExpandedRuns] = useState<Set<number>>(new Set());
 
   const deviceByUnit = new Map<number, EquipmentItem>();
@@ -145,7 +144,6 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
   const unitCount = rack.unitCount || 42;
   // U01 is physically at the bottom — render highest unit numbers first
   const entries = buildSlotEntries(rack.units, unitCount).reverse();
-  const hasMedia = rack.media.some((m) => m.side === side && m.path);
 
   function toggleRun(from: number) {
     setExpandedRuns((prev) => {
@@ -160,29 +158,12 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
     <section className={styles.columnSection}>
       <div className={styles.columnToolbar}>
         <span className={styles.columnLabel}>Unità rack — {unitCount}U</span>
-        <div className={styles.sideToggle}>
-          <button
-            type="button"
-            className={`${styles.sideBtn} ${side === 'front' ? styles.sideBtnActive : ''}`}
-            onClick={() => setSide('front')}
-          >
-            Fronte
-          </button>
-          <button
-            type="button"
-            className={`${styles.sideBtn} ${side === 'back' ? styles.sideBtnActive : ''}`}
-            onClick={() => setSide('back')}
-          >
-            Retro
-          </button>
-        </div>
       </div>
 
       <div className={styles.unitTable}>
         <div className={styles.unitHeader}>
           <span>U</span>
           <span>Dispositivo</span>
-          {hasMedia ? <span>Foto</span> : null}
         </div>
 
         {entries.map((entry) => {
@@ -192,7 +173,6 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
                 key={`run-${entry.from}`}
                 entry={entry}
                 expanded={expandedRuns.has(entry.from)}
-                hasMedia={hasMedia}
                 reversed
                 onToggle={() => toggleRun(entry.from)}
               />
@@ -204,15 +184,11 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
               <div key={`unit-${entry.unitNum}`} className={styles.unitRowFree}>
                 <span className={styles.unitNum}>U{pad(entry.unitNum)}</span>
                 <span className={styles.unitEmpty}>— libero —</span>
-                {hasMedia ? <span /> : null}
               </div>
             );
           }
 
           const device = deviceByUnit.get(entry.unitNum);
-          const unitId = entry.unit.id;
-          const unitMedia = rack.media.filter((m) => m.unitId === unitId && m.side === side);
-          const mediaItem = unitMedia[0];
 
           return (
             <div key={`unit-${entry.unitNum}`} className={styles.unitRowOccupied}>
@@ -220,17 +196,6 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
               <span className={styles.unitDevice}>
                 {device?.name ?? `Apparato #${entry.unit.deviceId ?? entry.unit.id}`}
               </span>
-              {hasMedia ? (
-                <span className={styles.unitMedia}>
-                  {mediaItem?.path ? (
-                    <a href={mediaItem.path} target="_blank" rel="noreferrer" className={styles.mediaLink}>
-                      <Icon name="eye" size={13} />
-                    </a>
-                  ) : (
-                    <span className={styles.mediaEmpty}>—</span>
-                  )}
-                </span>
-              ) : null}
             </div>
           );
         })}
@@ -242,13 +207,11 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
 function EmptyRunRow({
   entry,
   expanded,
-  hasMedia,
   reversed = false,
   onToggle,
 }: {
   entry: Extract<SlotEntry, { kind: 'empty-run' }>;
   expanded: boolean;
-  hasMedia: boolean;
   reversed?: boolean;
   onToggle: () => void;
 }) {
@@ -262,7 +225,6 @@ function EmptyRunRow({
       <div key={unitNum} className={styles.unitRowFree}>
         <span className={styles.unitNum}>U{pad(unitNum)}</span>
         <span className={styles.unitEmpty}>— libero —</span>
-        {hasMedia ? <span /> : null}
       </div>
     );
   });
@@ -272,7 +234,6 @@ function EmptyRunRow({
       <button type="button" className={styles.emptyRun} onClick={onToggle} aria-expanded={expanded}>
         <span className={styles.unitNum}>{label}</span>
         <span className={styles.emptyRunLabel}>{entry.count} unità libere</span>
-        {hasMedia ? <span /> : null}
         <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={13} />
       </button>
       {expanded && expandedSlots}

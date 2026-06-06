@@ -134,12 +134,7 @@ func (h *Handler) handleGetRack(w http.ResponseWriter, r *http.Request) {
 		h.dbFailure(w, r, "get_rack_sockets", err, "rack_id", id)
 		return
 	}
-	media, err := h.listMediaForRack(r, id)
-	if err != nil {
-		h.dbFailure(w, r, "get_rack_media", err, "rack_id", id)
-		return
-	}
-	httputil.JSON(w, http.StatusOK, RackDetail{RackListItem: item, Units: units, Sockets: sockets, Media: media})
+	httputil.JSON(w, http.StatusOK, RackDetail{RackListItem: item, Units: units, Sockets: sockets})
 }
 
 func (h *Handler) handleCreateRack(w http.ResponseWriter, r *http.Request) {

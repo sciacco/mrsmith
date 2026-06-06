@@ -665,6 +665,15 @@ Alyante ERP ID
 
 ## Legacy Data Model Constraints
 
+### Grappa DCIM Rack Media Is Not A V1 Feature
+
+- Context: `apps/grappa-dcim` rack detail parity from the current Grappa application.
+- Discovery: the Grappa `media` table exists in the schema, but the current application data does not populate it for rack operations. Treating `media.unit_id` and `side` as the basis for rack front/back UI created a target-only feature, not real parity.
+- Practical rule: do not expose rack media endpoints, rack media mutation UI, or front/back photo controls in Grappa DCIM V1 unless product explicitly reopens the feature with live-data evidence. Keep `units` for the U-space grid; media may appear only in legacy cleanup paths such as deleting orphanable media rows when hard-deleting a rack.
+- Evidence: `docs/grappa/grappa_media.json`; removed public media contract in `backend/internal/grappadcim/handler.go`, `backend/internal/grappadcim/racks_types.go`, `apps/grappa-dcim/src/api/types.ts`, `apps/grappa-dcim/src/features/racks/RackDetailPage.tsx`, and `apps/grappa-dcim/src/features/racks/RackPages.tsx`.
+- Used by: `apps/grappa-dcim` rack detail and future Grappa DCIM migration corrections.
+- Open questions: none for V1.
+
 ### Grappa DCIM Grid Layouts Are Visual Blocks, Not One Layout Per Islet
 
 - Context: `apps/grappa-dcim` rack/island map parity from the previous Yii2 PHP implementation and `artifacts/mappe/totali.json`.

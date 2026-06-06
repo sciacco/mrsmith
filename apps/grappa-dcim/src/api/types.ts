@@ -269,28 +269,9 @@ export interface RackSocketInput {
   status?: string;
 }
 
-export interface RackMedia {
-  id: number;
-  path?: string;
-  unitId?: number;
-  side?: string;
-  updatedAt?: string;
-}
-
-export interface RackMediaWrite {
-  unitId: number;
-  side: string;
-  path: string;
-}
-
-export interface RackMediaInput {
-  items: RackMediaWrite[];
-}
-
 export interface RackDetail extends RackListItem {
   units: RackUnit[];
   sockets: RackSocket[];
-  media: RackMedia[];
 }
 
 export interface RackInput {

@@ -49,7 +49,6 @@ type RackDetail struct {
 	RackListItem
 	Units   []RackUnit   `json:"units"`
 	Sockets []RackSocket `json:"sockets"`
-	Media   []RackMedia  `json:"media"`
 }
 
 type RackInput struct {
@@ -108,22 +107,4 @@ type RackUnit struct {
 	Num      *int `json:"num,omitempty"`
 	RackID   *int `json:"rackId,omitempty"`
 	DeviceID *int `json:"deviceId,omitempty"`
-}
-
-type RackMedia struct {
-	ID        int     `json:"id"`
-	Path      *string `json:"path,omitempty"`
-	UnitID    *int    `json:"unitId,omitempty"`
-	Side      *string `json:"side,omitempty"`
-	UpdatedAt *string `json:"updatedAt,omitempty"`
-}
-
-type RackMediaInput struct {
-	Items []RackMediaWrite `json:"items"`
-}
-
-type RackMediaWrite struct {
-	UnitID int    `json:"unitId"`
-	Side   string `json:"side"`
-	Path   string `json:"path"`
 }

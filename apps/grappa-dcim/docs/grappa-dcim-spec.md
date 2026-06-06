@@ -41,7 +41,7 @@ V1 includes these source surfaces:
 | `dc-build` | Building/facility registry. |
 | `datacenter-sala-cage` | Non-MMR datacenter room/cage management, rack context, maps, port operations. |
 | `datacenter-mmr` | MMR management and interconnect context. |
-| `racks` | Rack CRUD, U-space map, power metadata, position occupancy, media. |
+| `racks` | Rack CRUD, U-space map, power metadata, position occupancy. |
 | `rack-sockets` | Rack PDU/socket inventory and power history/report context. |
 | `apparato` | Equipment inventory, NIC generation, server/firewall side effects. |
 | `server` | Physical/virtual server inventory and detailed child records. |
@@ -63,6 +63,7 @@ V1 includes these source surfaces:
 - Hive upload/sync for KML maps.
 - TIM GEA kit report (`kitgraph-kitview`). Current review treats the source data as residual; redesign/investigation is V2.
 - CWDM. Current review treats the feature as likely abandoned/residual; investigation before any implementation is tracked in `docs/TODO.md`.
+- Rack unit media UI/API. The current Grappa `media` table is not populated in practice, so V1 must not promote it to a first-class rack feature without fresh product approval and live-data evidence.
 - Schema/domain cleanup that renames source tables/fields or normalizes free-text values.
 - Safer delete/archive redesign beyond the V1 double-confirmation rule, unless approved later.
 - Target routes, component selection, Go package structure, Vite configuration, deployment, or other MrSmith implementation planning.
@@ -76,7 +77,7 @@ Recorded target deviations from exact source behavior:
 - Operativo can read/write approved V1 surfaces, execute lifecycle/archive actions, hard-delete where permitted, and view/update encrypted server credential fields.
 - Destructive hard deletes that remain available in V1 require double user confirmation and are allowed only when the record has no active operational dependencies.
 - Generated PHP map files are not reproduced literally; V1 preserves equivalent user-visible map/layout behavior.
-- Rack media, KML, and approved export artifacts preserve user outcome and historical artifacts where referenced, not exact legacy filesystem mechanics.
+- KML and approved export artifacts preserve user outcome and historical artifacts where referenced, not exact legacy filesystem mechanics.
 - Rack power OID fields and historical data are preserved, but polling/alerts are not V1.
 - Hive KML sync is V2.
 - UI picklists may offer known values, but unknown stored free-text values must remain visible and round-trip safe.
@@ -91,9 +92,8 @@ Recorded target deviations from exact source behavior:
 | `datacenter` | `id_datacenter` | list/filter, create, view, update, delete, port ops | `ismmr=0` Sala/Cage, `ismmr=1` MMR; `mmr_type` is a short MMR path identifier, not an enum; `portale_clienti=1` means Customer Portal exposure; cessation cascade verified for racks/apparati/NICs/optical cassettes. |
 | `islets` | `(id, datacenter_id)` | CRUD | Type `isle`/`row`/`side`; delete is blocked if any child position is occupied. |
 | `positions` | `(id, islets_id)` | CRUD, batch, rack assignment | Status `free`/`occupied`/possibly `reserved`; batch creates `free/full`; delete is blocked when occupied; rack moves must be explicit. |
-| `racks` | `id_rack` | CRUD, move, cease, media | Creates `units`, updates position, creates sockets; `Full` racks occupy a full position with `pos=F`; `Half` racks use vertical position `A` high or `B` low; cessation cascades child equipment/NICs/optical cassettes/sockets/position. |
-| `units` | `id` | generated/viewed indirectly | One per rack U; rack map and unit media depend on it. |
-| `media` | `id` | rack unit media update | Preserve referenced front/back images and media records. |
+| `racks` | `id_rack` | CRUD, move, cease | Creates `units`, updates position, creates sockets; `Full` racks occupy a full position with `pos=F`; `Half` racks use vertical position `A` high or `B` low; cessation cascades child equipment/NICs/optical cassettes/sockets/position. |
+| `units` | `id` | generated/viewed indirectly | One per rack U; rack map depends on it. |
 
 ### Equipment, compute, and storage
 
@@ -153,8 +153,8 @@ Recorded target deviations from exact source behavior:
 
 - User intent: manage physical rack layout and occupancy.
 - Pattern: data workspace plus admin support CRUD.
-- Source behavior: rack create generates U rows and socket rows, updates positions, shows U-map and media; position batch creates maps; islet delete deletes positions.
-- V1 contract: preserve rack U-map, unit/media behavior, position occupancy, batch creation block-if-existing rule, and destructive delete double confirmation. Delete occupied positions/islets is blocked. Rack move is explicit: free old position, occupy new position, and reject conflicts.
+- Source behavior: rack create generates U rows and socket rows, updates positions, and shows the U-map; position batch creates maps; islet delete deletes positions.
+- V1 contract: preserve rack U-map, unit generation behavior, position occupancy, batch creation block-if-existing rule, and destructive delete double confirmation. Delete occupied positions/islets is blocked. Rack move is explicit: free old position, occupy new position, and reject conflicts.
 - Half-rack contract: `Full` racks occupy a full position and use `pos=F`; `Half` racks use vertical position `A` high or `B` low. At most one `A` and one `B` half rack can share the same physical position. Do not call A/B "side" or "lato".
 
 ### Equipment, servers, and storage
@@ -204,7 +204,7 @@ This spec does not prescribe endpoint paths. Any target API must provide behavio
 - Explicit lifecycle operations for cascades instead of relying on client-side multi-step writes.
 - Explicit generated-child operations that are atomic or define partial failure behavior.
 - Report/history operations for power history context.
-- Artifact operations for rack media, datacenter/islet/MMR maps, plenum/fiber maps, and KML metadata/files.
+- Artifact operations for datacenter/islet/MMR maps, plenum/fiber maps, and KML metadata/files.
 - Permission-gated destructive actions with double confirmation.
 - Credential-safe server detail operations compatible with legacy encrypted data.
 
@@ -229,7 +229,6 @@ Implementation/security allocation:
 | Legacy data compatibility | Preserve source table/field/value semantics during migration and coexistence. |
 | Server credentials | Preserve `k_crypt` compatibility for proven encrypted fields. |
 | Generated maps | Preserve user-visible map/layout behavior; exact PHP file generation is not required. |
-| Rack media | Preserve existing referenced images and front/back media update behavior. |
 | KML files | Preserve metadata/files for history; Hive sync V2. |
 | TIM GEA XLS | Out of V1; report requires V2 redesign/investigation. |
 | Rack power readings | Preserve fields/data; polling/alerts V2/out of scope. |

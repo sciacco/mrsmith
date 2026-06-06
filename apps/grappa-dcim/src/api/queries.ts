@@ -38,7 +38,6 @@ import type {
   RackFilterOptions,
   RackInput,
   RackListItem,
-  RackMediaInput,
   RackMoveInput,
   RackPowerReadingsResponse,
   RackPowerSummaryPoint,
@@ -864,11 +863,6 @@ export function useRackMutations() {
     deleteRackSocket: useMutation({
       mutationFn: ({ id, body }: { id: number; body: DestructiveActionRequest }) =>
         deleteWithBody<MutationResponse>(`/grappa-dcim/v1/rack-sockets/${id}`, body),
-      onSuccess: invalidate,
-    }),
-    replaceRackMedia: useMutation({
-      mutationFn: ({ rackId, body }: { rackId: number; body: RackMediaInput }) =>
-        api.put<MutationResponse>(`/grappa-dcim/v1/racks/${rackId}/media`, body),
       onSuccess: invalidate,
     }),
   };

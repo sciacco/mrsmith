@@ -12,7 +12,7 @@ import {
   useRackPowerSummary,
   useRacks,
 } from '../../api/queries';
-import type { RackInput, RackListItem, RackMediaWrite, RackMoveInput, RackSocket, RackSocketInput } from '../../api/types';
+import type { RackInput, RackListItem, RackMoveInput, RackSocket, RackSocketInput } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
 import styles from '../facilities/workspace.module.css';
 
@@ -45,8 +45,7 @@ export function OldRacksPage() {
   const [deleting, setDeleting] = useState<RackListItem | null>(null);
   const [editingSocket, setEditingSocket] = useState<RackSocket | null | 'new'>(null);
   const [deletingSocket, setDeletingSocket] = useState<RackSocket | null>(null);
-  const [replacingMedia, setReplacingMedia] = useState<RackMediaWrite | null | 'new'>(null);
-  const [tab, setTab] = useState<'summary' | 'units' | 'sockets' | 'media' | 'power' | 'history'>(
+  const [tab, setTab] = useState<'summary' | 'units' | 'sockets' | 'power' | 'history'>(
     params.rackId && window.location.pathname.endsWith('/potenza') ? 'power' : 'summary',
   );
   const selectedId = params.rackId ? Number(params.rackId) : null;
@@ -122,17 +121,6 @@ export function OldRacksPage() {
     }
   }
 
-  async function replaceMedia(input: RackMediaWrite) {
-    if (!detail.data) return;
-    try {
-      const result = await mutations.replaceRackMedia.mutateAsync({ rackId: detail.data.id, body: { items: [input] } });
-      toast.toast(result.message || 'Media aggiornato.');
-      setReplacingMedia(null);
-    } catch (error) {
-      toast.toast(errorText(error, 'Aggiornamento media non riuscito.'), 'error');
-    }
-  }
-
   return (
     <section className={styles.page}>
       <div className={styles.header}>
@@ -200,7 +188,6 @@ export function OldRacksPage() {
                     ['summary', 'Riepilogo'],
                     ['units', 'Unita rack'],
                     ['sockets', 'Socket'],
-                    ['media', 'Media'],
                     ['power', 'Potenza'],
                     ['history', 'Storico'],
                   ].map(([key, label]) => (
@@ -210,7 +197,6 @@ export function OldRacksPage() {
                 {tab === 'summary' ? <RackSummary rack={detail.data} /> : null}
                 {tab === 'units' ? <RackUnits rack={detail.data} /> : null}
                 {tab === 'sockets' ? <RackSockets rack={detail.data} canOperate={canOperate} onCreate={() => setEditingSocket('new')} onEdit={setEditingSocket} onDelete={setDeletingSocket} /> : null}
-                {tab === 'media' ? <RackMedia rack={detail.data} canOperate={canOperate} onReplace={setReplacingMedia} /> : null}
                 {tab === 'power' ? <RackPower summary={powerSummary.data} loading={powerSummary.isLoading} /> : null}
                 {tab === 'history' ? <RackHistory data={powerReadings.data} loading={powerReadings.isLoading} /> : null}
               </>
@@ -223,14 +209,6 @@ export function OldRacksPage() {
       <ConfirmModal open={ceasing !== null} title="Cessa rack" message={`Confermi la cessazione di ${ceasing?.name ?? 'questo rack'}?`} onClose={() => setCeasing(null)} onConfirm={ceaseRack} loading={mutations.ceaseRack.isPending} />
       <ConfirmModal open={deleting !== null} title="Elimina rack" message={`Confermi l'eliminazione definitiva di ${deleting?.name ?? 'questo rack'}?`} onClose={() => setDeleting(null)} onConfirm={deleteRack} loading={mutations.deleteRack.isPending} />
       <RackSocketModal open={editingSocket !== null} value={editingSocket === 'new' ? null : editingSocket} onClose={() => setEditingSocket(null)} onSave={saveSocket} loading={mutations.saveRackSocket.isPending} />
-      <RackMediaModal
-        open={replacingMedia !== null}
-        value={replacingMedia === 'new' ? null : replacingMedia}
-        rack={detail.data ?? null}
-        onClose={() => setReplacingMedia(null)}
-        onSave={replaceMedia}
-        loading={mutations.replaceRackMedia.isPending}
-      />
       <ConfirmModal open={deletingSocket !== null} title="Elimina socket" message={`Confermi l'eliminazione definitiva di ${deletingSocket?.position || 'questo socket'}?`} onClose={() => setDeletingSocket(null)} onConfirm={deleteSocket} loading={mutations.deleteRackSocket.isPending} />
     </section>
   );
@@ -307,48 +285,6 @@ function RackSockets({
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function RackMedia({
-  rack,
-  canOperate,
-  onReplace,
-}: {
-  rack: import('../../api/types').RackDetail;
-  canOperate: boolean;
-  onReplace: (media: RackMediaWrite | 'new') => void;
-}) {
-  return (
-    <div className={styles.stack}>
-      {canOperate ? (
-        <div className={styles.sectionHeader}>
-          <span className={styles.emptyText}>{rack.media.length} media collegati</span>
-          <Button size="sm" variant="secondary" onClick={() => onReplace('new')}>Sostituisci media</Button>
-        </div>
-      ) : null}
-      {rack.media.length === 0 ? <p className={styles.emptyText}>Nessun media collegato alle unita.</p> : (
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead><tr><th>Unita</th><th>Lato</th><th>Percorso</th><th>Azioni</th></tr></thead>
-            <tbody>{rack.media.map((item) => (
-              <tr key={item.id}>
-                <td>{item.unitId}</td>
-                <td>{mediaSideLabel(item.side)}</td>
-                <td>{item.path ?? '-'}</td>
-                <td>
-                  {canOperate && item.unitId ? (
-                    <Button size="sm" variant="secondary" onClick={() => onReplace({ unitId: item.unitId!, side: item.side ?? 'front', path: item.path ?? '' })}>
-                      Sostituisci
-                    </Button>
-                  ) : null}
-                </td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
@@ -546,52 +482,6 @@ function RackSocketModal({
   );
 }
 
-function RackMediaModal({
-  open,
-  value,
-  rack,
-  onClose,
-  onSave,
-  loading,
-}: {
-  open: boolean;
-  value: RackMediaWrite | null;
-  rack: import('../../api/types').RackDetail | null;
-  onClose: () => void;
-  onSave: (value: RackMediaWrite) => void;
-  loading: boolean;
-}) {
-  const [draft, setDraft] = useState<RackMediaWrite>({ unitId: 0, side: 'front', path: '' });
-
-  useEffect(() => {
-    const firstUnit = rack?.units[0]?.id ?? 0;
-    setDraft(value ?? { unitId: firstUnit, side: 'front', path: '' });
-  }, [value, open, rack]);
-
-  return (
-    <Modal open={open} onClose={onClose} title="Sostituisci media rack">
-      <div className={styles.formGrid}>
-        <div className={styles.field}>
-          <label>Unita</label>
-          <select value={draft.unitId} onChange={(event) => setDraft({ ...draft, unitId: Number(event.target.value) })}>
-            <option value={0}>Seleziona unita</option>
-            {rack?.units.map((unit) => <option key={unit.id} value={unit.id}>U{unit.num ?? unit.id}</option>)}
-          </select>
-        </div>
-        <SelectField label="Lato" value={draft.side} onChange={(side) => setDraft({ ...draft, side })} options={['front', 'back']} />
-        <div className={`${styles.field} ${styles.fieldFull}`}>
-          <label>Percorso file</label>
-          <input value={draft.path} onChange={(event) => setDraft({ ...draft, path: event.target.value })} />
-        </div>
-      </div>
-      <div className={styles.modalActions}>
-        <Button variant="secondary" onClick={onClose}>Annulla</Button>
-        <Button loading={loading} disabled={!draft.unitId} onClick={() => onSave(draft)}>Salva</Button>
-      </div>
-    </Modal>
-  );
-}
-
 function ConfirmModal({ open, title, message, onClose, onConfirm, loading }: { open: boolean; title: string; message: string; onClose: () => void; onConfirm: () => void; loading: boolean }) {
   const [first, setFirst] = useState(false);
   const [second, setSecond] = useState(false);
@@ -637,16 +527,8 @@ function rackPositionLabel(type?: string, position?: string) {
   return `${valueOrDash(type)} ${valueOrDash(position)}`;
 }
 
-function mediaSideLabel(side?: string) {
-  if (side === 'front') return 'Fronte';
-  if (side === 'back') return 'Retro';
-  return valueOrDash(side);
-}
-
 function selectOptionLabel(option: string) {
   if (option === 'A') return 'A - posizione alta';
   if (option === 'B') return 'B - posizione bassa';
-  if (option === 'front') return 'Fronte';
-  if (option === 'back') return 'Retro';
   return option;
 }

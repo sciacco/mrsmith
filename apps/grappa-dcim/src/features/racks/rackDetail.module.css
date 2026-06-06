@@ -179,33 +179,6 @@
   color: var(--color-text-muted);
 }
 
-.sideToggle {
-  display: flex;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-
-.sideBtn {
-  min-height: 1.75rem;
-  padding: 0 var(--space-3);
-  border: 0;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 700;
-  transition:
-    background var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
-}
-
-.sideBtnActive {
-  background: var(--color-accent);
-  color: var(--color-text-on-accent);
-}
-
 /* Unit table rows */
 
 .unitTable {
@@ -214,7 +187,7 @@
 
 .unitHeader {
   display: grid;
-  grid-template-columns: 3.5rem 1fr auto;
+  grid-template-columns: 3.5rem 1fr;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-5);
   border-bottom: 1px solid var(--color-border-subtle);
@@ -228,7 +201,7 @@
 .unitRowOccupied,
 .unitRowFree {
   display: grid;
-  grid-template-columns: 3.5rem 1fr auto;
+  grid-template-columns: 3.5rem 1fr;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-5);
   border-bottom: 1px solid var(--color-border-subtle);
@@ -255,7 +228,7 @@
 
 .emptyRun {
   display: grid;
-  grid-template-columns: 3.5rem 1fr auto auto;
+  grid-template-columns: 3.5rem 1fr auto;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-5);
   border-bottom: 1px solid var(--color-border-subtle);
@@ -300,27 +273,6 @@
 .emptyRunLabel {
   color: var(--color-text-muted);
   font-weight: 600;
-}
-
-.unitMedia {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mediaLink {
-  display: inline-flex;
-  align-items: center;
-  color: var(--color-accent);
-  transition: opacity var(--duration-fast) var(--ease-out);
-}
-
-.mediaLink:hover {
-  opacity: 0.72;
-}
-
-.mediaEmpty {
-  color: var(--color-text-faint);
 }
 
 /* ── Sidebar cards ── */
