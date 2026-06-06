@@ -45,9 +45,6 @@ async function bootstrap() {
   }
 
   const config: BootstrapConfig = await res.json();
-  if (!config.keycloakUrl || !config.realm || !config.clientId) {
-    throw new Error('Grappa DCIM bootstrap is missing Keycloak frontend configuration.');
-  }
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>

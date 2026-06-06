@@ -5,6 +5,7 @@ import { CableFiberPage, PlenumPage } from './features/cabling/CablingPages';
 import { EquipmentPage } from './features/equipment/EquipmentPages';
 import { BuildingsPage, DatacentersPage, LayoutPage } from './features/facilities/FacilitiesPages';
 import { OldRacksPage } from './features/racks/RackPages';
+import { RackDetailPage } from './features/racks/RackDetailPage';
 import { RackSearchPage } from './features/racks/RackSearchPage';
 import { FiberRingsPage } from './features/rings/RingPages';
 import { ServersPage } from './features/servers/ServerPages';
@@ -40,11 +41,7 @@ export const routes: RouteObject[] = [
   },
   {
     path: 'rack/:rackId',
-    element: <RackSearchPage />,
-  },
-  {
-    path: 'rack/:rackId/potenza',
-    element: <RackSearchPage />,
+    element: <RackDetailPage />,
   },
   {
     path: 'old-rack',

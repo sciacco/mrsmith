@@ -1,0 +1,486 @@
+.page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding-inline: var(--space-6);
+  display: grid;
+  gap: var(--space-5);
+  animation: pageEnter 0.45s var(--ease-out) both;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: calc(60px + var(--space-5));
+  display: grid;
+  gap: var(--space-3);
+}
+
+.skeletonWrap {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.72);
+  padding: var(--space-4);
+}
+
+/* ── Header ── */
+
+.detailHeader {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5) var(--space-6);
+  display: grid;
+  gap: var(--space-3);
+  position: relative;
+  overflow: hidden;
+}
+
+.detailHeader::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-info), var(--color-success));
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.breadcrumbBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-accent);
+  font-weight: 700;
+  text-decoration: none;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.breadcrumbBack:hover {
+  opacity: 0.72;
+}
+
+.breadcrumbSep {
+  color: var(--color-text-faint);
+  user-select: none;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.rackName {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.badgeActive,
+.badgeDanger {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.badgeActive {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badgeDanger {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.metaRow {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.powerBarWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.powerBarTrack {
+  flex: none;
+  width: 200px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.powerBarFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+.powerLabel {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.activatedRow {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+/* ── Rack column ── */
+
+.columnSection {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.columnToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: rgba(248, 250, 252, 0.7);
+}
+
+.columnLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.sideToggle {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.sideBtn {
+  min-height: 1.75rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.sideBtnActive {
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+}
+
+/* Unit table rows */
+
+.unitTable {
+  font-size: 0.8125rem;
+}
+
+.unitHeader {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr auto;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(248, 250, 252, 0.5);
+}
+
+.unitRowOccupied,
+.unitRowFree {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr auto;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  align-items: center;
+  min-height: 2.25rem;
+}
+
+.unitRowOccupied {
+  background: var(--color-accent-subtle);
+  animation: rowEnter 0.3s var(--ease-out) both;
+}
+
+.unitRowOccupied:hover {
+  background: var(--color-accent-muted);
+}
+
+.unitRowFree {
+  background: transparent;
+}
+
+.unitRowFree:hover {
+  background: var(--color-surface);
+}
+
+.emptyRun {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr auto auto;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  align-items: center;
+  min-height: 2.25rem;
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: var(--color-surface);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: var(--color-text-secondary);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.emptyRun:hover {
+  background: var(--color-surface-hover);
+}
+
+.unitNum {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.unitDevice {
+  color: var(--color-text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unitEmpty {
+  color: var(--color-text-faint);
+}
+
+.emptyRunLabel {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.unitMedia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mediaLink {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-accent);
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.mediaLink:hover {
+  opacity: 0.72;
+}
+
+.mediaEmpty {
+  color: var(--color-text-faint);
+}
+
+/* ── Sidebar cards ── */
+
+.sideCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-xs);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sideCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sideCardTitle {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0;
+}
+
+.sideCardMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
+}
+
+.sideCardEmpty {
+  font-size: 0.8125rem;
+  color: var(--color-text-faint);
+}
+
+/* Socket list */
+
+.socketList {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.socketRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+}
+
+.socketOn {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.socketOff {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1.5px solid var(--color-text-faint);
+}
+
+.socketName {
+  flex: 1;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.socketAmpere {
+  color: var(--color-text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Sparkline */
+
+.sparklineWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sparkline {
+  flex: 1;
+  height: 28px;
+  color: var(--color-accent);
+  overflow: visible;
+}
+
+.sparklineLabel {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Anagraphic */
+
+.anagraphicGrid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.anagraphicRow {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+}
+
+.anagraphicRow dt {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding-top: 1px;
+}
+
+.anagraphicRow dd {
+  color: var(--color-text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 1100px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding-inline: var(--space-4);
+  }
+
+  .detailHeader {
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+  }
+
+  .powerBarTrack {
+    width: 120px;
+  }
+}

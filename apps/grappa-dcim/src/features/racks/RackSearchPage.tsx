@@ -47,8 +47,7 @@ export function RackSearchPage() {
   const hasFilters = q.trim() !== '' || customerId !== null || datacenterId !== null || status !== 'active';
 
   if (rackId) {
-    const suffix = window.location.pathname.endsWith('/potenza') ? '/potenza' : '';
-    return <Navigate to={`/old-rack/${rackId}${suffix}`} replace />;
+    return <Navigate to={`/rack/${rackId}`} replace />;
   }
 
   function resetFilters() {
@@ -145,7 +144,7 @@ export function RackSearchPage() {
             <p>Modifica i filtri applicati.</p>
           </div>
         ) : (
-          <RackResults rows={rows} onOpen={(id) => navigate(`/old-rack/${id}`)} />
+          <RackResults rows={rows} onOpen={(id) => navigate(`/rack/${id}`)} />
         )}
       </section>
     </main>
