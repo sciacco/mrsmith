@@ -143,8 +143,8 @@
               "onUpdate": "CASCADE"
             }
           ],
-          "rowCount": 1856,
-          "dataSize": 212992,
+          "rowCount": 1892,
+          "dataSize": 229376,
           "indexSize": 147456
         },
         {

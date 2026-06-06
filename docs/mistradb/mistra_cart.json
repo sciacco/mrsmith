@@ -55,7 +55,7 @@
               "visible": true
             }
           ],
-          "rowCount": 597,
+          "rowCount": 635,
           "dataSize": 40960,
           "indexSize": 73728
         },
@@ -363,9 +363,8 @@
               "onUpdate": "CASCADE"
             }
           ],
-          "rowCount": 1,
           "dataSize": 8192,
-          "indexSize": 57344
+          "indexSize": 49152
         },
         {
           "name": "cart_item_r_p_s_translations",
@@ -499,7 +498,7 @@
             }
           ],
           "dataSize": 8192,
-          "indexSize": 57344
+          "indexSize": 49152
         },
         {
           "name": "order_item_r_p_s",
@@ -1207,7 +1206,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1217,7 +1216,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1227,7 +1226,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1237,7 +1236,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1247,7 +1246,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1257,7 +1256,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1267,7 +1266,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1277,7 +1276,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1287,7 +1286,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1297,7 +1296,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1307,7 +1306,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         }

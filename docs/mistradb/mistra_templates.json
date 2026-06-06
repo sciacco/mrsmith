@@ -195,7 +195,7 @@
           ],
           "rowCount": 6,
           "dataSize": 49152,
-          "indexSize": 212992
+          "indexSize": 229376
         },
         {
           "name": "template_type",
@@ -308,8 +308,8 @@
               "onUpdate": "NO ACTION"
             }
           ],
-          "rowCount": 106,
-          "dataSize": 32768,
+          "rowCount": 120,
+          "dataSize": 49152,
           "indexSize": 73728
         }
       ],
@@ -320,7 +320,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -330,7 +330,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         }

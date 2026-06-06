@@ -37,8 +37,8 @@
               "visible": true
             }
           ],
-          "rowCount": 48,
-          "dataSize": 8192,
+          "rowCount": 60,
+          "dataSize": 16384,
           "indexSize": 57344
         }
       ]

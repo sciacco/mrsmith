@@ -695,6 +695,18 @@
           ],
           "foreignKeys": [
             {
+              "name": "user_struct_primary_email_fkey",
+              "columns": [
+                "primary_email"
+              ],
+              "referencedTable": "users.\"user\"",
+              "referencedColumns": [
+                "email"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
               "name": "user_struct_role_id_fkey",
               "columns": [
                 "role_id"
@@ -1049,7 +1061,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1059,7 +1071,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1069,7 +1081,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1079,7 +1091,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1089,7 +1101,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         }

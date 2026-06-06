@@ -104,9 +104,9 @@
               "visible": true
             }
           ],
-          "rowCount": 247102,
-          "dataSize": 41099264,
-          "indexSize": 5668864
+          "rowCount": 338897,
+          "dataSize": 56926208,
+          "indexSize": 7725056
         }
       ],
       "functions": [
@@ -122,7 +122,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         }

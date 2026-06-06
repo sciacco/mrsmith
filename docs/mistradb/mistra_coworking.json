@@ -1,0 +1,69 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "coworking",
+      "tables": [
+        {
+          "name": "room",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "bigint",
+              "nullable": false,
+              "default": "nextval('coworking.room_id_seq'::regclass)"
+            },
+            {
+              "name": "email",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "room_email_key",
+              "type": "BTREE",
+              "expressions": [
+                "email"
+              ],
+              "primary": false,
+              "unique": true,
+              "visible": true
+            },
+            {
+              "name": "room_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "id"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 40960
+        }
+      ],
+      "sequences": [
+        {
+          "name": "room_id_seq",
+          "dataType": "bigint",
+          "start": 1,
+          "increment": 1,
+          "min": 1,
+          "max": 9223372036854776000,
+          "cache": 1,
+          "cycle": false
+        }
+      ]
+    }
+  ]
+}

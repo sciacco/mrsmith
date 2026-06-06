@@ -113,7 +113,7 @@
               "onUpdate": "CASCADE"
             }
           ],
-          "rowCount": 318,
+          "rowCount": 331,
           "dataSize": 24576,
           "indexSize": 81920
         },
@@ -281,8 +281,8 @@
               "expression": "((request_source <> 'external'::customers.request_source_enum) OR (admin_user_struct_id IS NOT NULL))"
             }
           ],
-          "rowCount": 14,
-          "dataSize": 16384,
+          "rowCount": 37,
+          "dataSize": 24576,
           "indexSize": 98304
         },
         {
@@ -486,9 +486,17 @@
               "onUpdate": "NO ACTION"
             }
           ],
-          "rowCount": 1391,
-          "dataSize": 311296,
-          "indexSize": 344064
+          "triggers": [
+            {
+              "name": "trg_auto_add_hide_pages_variable",
+              "event": "INSERT",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER trg_auto_add_hide_pages_variable AFTER INSERT ON customers.customer FOR EACH ROW EXECUTE FUNCTION customers.auto_add_hide_pages_variable()"
+            }
+          ],
+          "rowCount": 2260,
+          "dataSize": 360448,
+          "indexSize": 385024
         },
         {
           "name": "customer_credit_transaction",
@@ -874,8 +882,9 @@
               "onUpdate": "NO ACTION"
             }
           ],
-          "rowCount": -1,
-          "indexSize": 16384
+          "rowCount": 2256,
+          "dataSize": 155648,
+          "indexSize": 196608
         },
         {
           "name": "group_association",
@@ -1047,9 +1056,9 @@
               "onUpdate": "CASCADE"
             }
           ],
-          "rowCount": 207,
+          "rowCount": 222,
           "dataSize": 16384,
-          "indexSize": 49152
+          "indexSize": 73728
         },
         {
           "name": "page_tree",
@@ -1177,9 +1186,9 @@
               "onUpdate": "NO ACTION"
             }
           ],
-          "rowCount": 325,
+          "rowCount": 373,
           "dataSize": 24576,
-          "indexSize": 65536
+          "indexSize": 98304
         },
         {
           "name": "role",
@@ -1314,7 +1323,7 @@
               "onUpdate": "NO ACTION"
             }
           ],
-          "rowCount": 2734,
+          "rowCount": 2757,
           "dataSize": 155648,
           "indexSize": 237568
         },
@@ -1379,9 +1388,9 @@
               "body": "CREATE TRIGGER create_entrance_detail_trigger AFTER INSERT ON customers.\"user\" FOR EACH ROW EXECUTE FUNCTION customers.create_user_entrance_detail()"
             }
           ],
-          "rowCount": 1029,
+          "rowCount": 1103,
           "dataSize": 106496,
-          "indexSize": 188416
+          "indexSize": 196608
         },
         {
           "name": "user_entrance_detail",
@@ -1422,7 +1431,21 @@
               "visible": true
             }
           ],
-          "rowCount": 1050,
+          "foreignKeys": [
+            {
+              "name": "user_entrance_detail_email_fkey",
+              "columns": [
+                "email"
+              ],
+              "referencedTable": "customers.\"user\"",
+              "referencedColumns": [
+                "email"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": 1108,
           "dataSize": 131072,
           "indexSize": 180224
         },
@@ -1589,6 +1612,18 @@
           ],
           "foreignKeys": [
             {
+              "name": "primary_email_fk",
+              "columns": [
+                "primary_email"
+              ],
+              "referencedTable": "customers.\"user\"",
+              "referencedColumns": [
+                "email"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            },
+            {
               "name": "user_struct_customer_id_fkey",
               "columns": [
                 "customer_id"
@@ -1649,8 +1684,8 @@
               "body": "CREATE TRIGGER update_biometric_user_struct_trigger AFTER UPDATE ON customers.user_struct FOR EACH ROW EXECUTE FUNCTION customers.update_biometric_user_struct()"
             }
           ],
-          "rowCount": 1136,
-          "dataSize": 204800,
+          "rowCount": 1193,
+          "dataSize": 221184,
           "indexSize": 98304
         },
         {
@@ -1687,6 +1722,44 @@
           "indexSize": 24576
         }
       ],
+      "views": [
+        {
+          "name": "customer_with_ecommerce",
+          "definition": " SELECT id,\n    name,\n    group_id,\n    state_id,\n    (EXISTS ( SELECT 1\n           FROM loader.erp_anagrafiche_clienti e\n          WHERE (e.id_anagrafica = c.id))) AS ecommerce\n   FROM customers.customer c;",
+          "columns": [
+            {
+              "name": "id",
+              "position": 1,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "name",
+              "position": 2,
+              "type": "character varying(255)",
+              "nullable": true
+            },
+            {
+              "name": "group_id",
+              "position": 3,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "state_id",
+              "position": 4,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "ecommerce",
+              "position": 5,
+              "type": "boolean",
+              "nullable": true
+            }
+          ]
+        }
+      ],
       "functions": [
         {
           "name": "anonymize_user_struct",
@@ -1711,6 +1784,10 @@
         {
           "name": "api_path_new",
           "definition": "CREATE OR REPLACE FUNCTION customers.api_path_new(json_data json)\n RETURNS bigint\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n    _id bigint;\nBEGIN\n    -- check already exists\n    IF EXISTS(SELECT * FROM api_path WHERE path = json_data->>'path' AND method = json_data->>'method') THEN\n        RAISE EXCEPTION 'ApiPath with path = % and method = % already exists', json_data ->> 'path', json_data->>'method' USING ERRCODE = 'T1AZ1';\n    end if;\n\n    INSERT INTO api_path (path, method) VALUES (json_data->>'path', json_data->>'method') RETURNING id INTO _id;\n    RETURN _id;\nEND;\n$function$\n"
+        },
+        {
+          "name": "auto_add_hide_pages_variable",
+          "definition": "CREATE OR REPLACE FUNCTION customers.auto_add_hide_pages_variable()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    INSERT INTO customers.customer_variable (customer_id, resource, action)\n    VALUES (NEW.id, 'servizi_gestiti', 'hide_pages');\n    RETURN NEW;\nEND;\n$function$\n"
         },
         {
           "name": "auto_add_pages_from_page",
@@ -2116,7 +2193,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -2136,7 +2213,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -2146,7 +2223,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -2176,7 +2253,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -2186,7 +2263,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -2196,7 +2273,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -2206,7 +2283,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -2216,7 +2293,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -2226,7 +2303,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         }

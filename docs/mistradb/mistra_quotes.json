@@ -303,9 +303,9 @@
               "body": "CREATE TRIGGER set_timestamp BEFORE UPDATE ON quotes.quote FOR EACH ROW EXECUTE FUNCTION common.trigger_set_timestamp()"
             }
           ],
-          "rowCount": 976,
+          "rowCount": 1081,
           "dataSize": 483328,
-          "indexSize": 270336
+          "indexSize": 311296
         },
         {
           "name": "quote_customer",
@@ -534,8 +534,8 @@
               "body": "CREATE TRIGGER update_kit_product_rows_trigger AFTER UPDATE OF kit_id ON quotes.quote_rows FOR EACH ROW WHEN ((old.kit_id IS DISTINCT FROM new.kit_id)) EXECUTE FUNCTION quotes.update_kit_product_rows()"
             }
           ],
-          "rowCount": 1910,
-          "dataSize": 237568,
+          "rowCount": 2086,
+          "dataSize": 253952,
           "indexSize": 98304
         },
         {
@@ -683,9 +683,9 @@
               "body": "CREATE TRIGGER trigger_update_quote_row_totals AFTER INSERT OR DELETE OR UPDATE ON quotes.quote_rows_products FOR EACH ROW EXECUTE FUNCTION quotes.update_quote_row_totals()"
             }
           ],
-          "rowCount": 24183,
-          "dataSize": 2859008,
-          "indexSize": 745472
+          "rowCount": 26277,
+          "dataSize": 3096576,
+          "indexSize": 819200
         },
         {
           "name": "template",
@@ -709,6 +709,39 @@
               "type": "character varying(2)",
               "nullable": true,
               "default": "''::character varying"
+            },
+            {
+              "name": "template_type",
+              "position": 4,
+              "type": "character varying(16)",
+              "nullable": true,
+              "default": "'standard'::character varying"
+            },
+            {
+              "name": "kit_id",
+              "position": 5,
+              "type": "bigint",
+              "nullable": true
+            },
+            {
+              "name": "service_category_id",
+              "position": 6,
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "is_colo",
+              "position": 7,
+              "type": "boolean",
+              "nullable": true,
+              "default": "false"
+            },
+            {
+              "name": "is_active",
+              "position": 8,
+              "type": "boolean",
+              "nullable": true,
+              "default": "true"
             }
           ],
           "indexes": [
@@ -723,6 +756,20 @@
               "visible": true
             }
           ],
+          "foreignKeys": [
+            {
+              "name": "template_kit_id_fkey",
+              "columns": [
+                "kit_id"
+              ],
+              "referencedTable": "products.kit",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
+            }
+          ],
           "rowCount": 5,
           "dataSize": 8192,
           "indexSize": 24576
@@ -731,7 +778,7 @@
       "views": [
         {
           "name": "v_quote_rows_for_hs",
-          "definition": " SELECT qr.id,\n    qr.quote_id,\n    qr.kit_id,\n    COALESCE(common.get_short_translation(k.translation_uuid, 'it'::character varying), k.internal_name) AS translation_it,\n    COALESCE(common.get_short_translation(k.translation_uuid, 'en'::character varying), k.internal_name) AS translation_en,\n    qr.internal_name,\n    qr.nrc_row,\n    qr.mrc_row,\n    qr.bundle_prefix_row,\n    qr.hs_line_item_id,\n    ( SELECT string_agg(((((('[n. '::text || (x.quantity)::text) || ']  <strong>'::text) || (x.translation_it)::text) || '</strong>'::text) || x.extended_description), ('<br/>'::character varying)::text) AS string_agg\n           FROM ( SELECT COALESCE(common.get_short_translation(p.translation_uuid, 'it'::character varying), p.internal_name) AS translation_it,\n                    qrp.quantity,\n                    qrp.extended_description\n                   FROM (quotes.quote_rows_products qrp\n                     JOIN products.product p ON (((qrp.product_code)::text = (p.code)::text)))\n                  WHERE ((qrp.quote_row_id = qr.id) AND (qrp.included = true))\n                  ORDER BY qrp.quote_row_id, qrp.main_product DESC, qrp.\"position\") x) AS descrizione_estesa,\n    ( SELECT string_agg(((((('[n. '::text || (x.quantity)::text) || ']  <strong>'::text) || (x.translation_en)::text) || '</strong>'::text) || x.extended_description), ('<br/>'::character varying)::text) AS string_agg\n           FROM ( SELECT COALESCE(common.get_short_translation(p.translation_uuid, 'en'::character varying), p.internal_name) AS translation_en,\n                    qrp.quantity,\n                    qrp.extended_description\n                   FROM (quotes.quote_rows_products qrp\n                     JOIN products.product p ON (((qrp.product_code)::text = (p.code)::text)))\n                  WHERE ((qrp.quote_row_id = qr.id) AND (qrp.included = true))\n                  ORDER BY qrp.quote_row_id, qrp.main_product DESC, qrp.\"position\") x) AS descrizione_estesa_en\n   FROM (quotes.quote_rows qr\n     JOIN products.kit k ON ((qr.kit_id = k.id)));",
+          "definition": " SELECT qr.id,\n    qr.quote_id,\n    qr.kit_id,\n    COALESCE(common.get_short_translation(k.translation_uuid, 'it'::character varying), k.internal_name) AS translation_it,\n    COALESCE(common.get_short_translation(k.translation_uuid, 'en'::character varying), k.internal_name) AS translation_en,\n    qr.internal_name,\n    qr.nrc_row,\n    qr.mrc_row,\n    qr.bundle_prefix_row,\n    qr.hs_line_item_id,\n    ( SELECT string_agg(((((('[n. '::text || (x.quantity)::text) || ']  <strong>'::text) || (x.translation_it)::text) || '</strong>'::text) ||\n                CASE\n                    WHEN (btrim(COALESCE(x.extended_description, ''::text)) = ''::text) THEN '<br/>'::text\n                    WHEN (\"left\"(ltrim(x.extended_description), 1) = '<'::text) THEN x.extended_description\n                    ELSE (('<br/>'::text || replace(replace(x.extended_description, '\r\n'::text, '\n'::text), '\n'::text, '<br/>'::text)) || '<br/>'::text)\n                END), (''::character varying)::text) AS string_agg\n           FROM ( SELECT COALESCE(common.get_short_translation(p.translation_uuid, 'it'::character varying), p.internal_name) AS translation_it,\n                    qrp.quantity,\n                    qrp.extended_description\n                   FROM (quotes.quote_rows_products qrp\n                     JOIN products.product p ON (((qrp.product_code)::text = (p.code)::text)))\n                  WHERE ((qrp.quote_row_id = qr.id) AND (qrp.included = true))\n                  ORDER BY qrp.quote_row_id, qrp.main_product DESC, qrp.\"position\") x) AS descrizione_estesa,\n    ( SELECT string_agg(((((('[n. '::text || (x.quantity)::text) || ']  <strong>'::text) || (x.translation_en)::text) || '</strong>'::text) ||\n                CASE\n                    WHEN (btrim(COALESCE(x.extended_description, ''::text)) = ''::text) THEN '<br/>'::text\n                    WHEN (\"left\"(ltrim(x.extended_description), 1) = '<'::text) THEN x.extended_description\n                    ELSE (('<br/>'::text || replace(replace(x.extended_description, '\r\n'::text, '\n'::text), '\n'::text, '<br/>'::text)) || '<br/>'::text)\n                END), (''::character varying)::text) AS string_agg\n           FROM ( SELECT COALESCE(common.get_short_translation(p.translation_uuid, 'en'::character varying), p.internal_name) AS translation_en,\n                    qrp.quantity,\n                    qrp.extended_description\n                   FROM (quotes.quote_rows_products qrp\n                     JOIN products.product p ON (((qrp.product_code)::text = (p.code)::text)))\n                  WHERE ((qrp.quote_row_id = qr.id) AND (qrp.included = true))\n                  ORDER BY qrp.quote_row_id, qrp.main_product DESC, qrp.\"position\") x) AS descrizione_estesa_en\n   FROM (quotes.quote_rows qr\n     JOIN products.kit k ON ((qr.kit_id = k.id)));",
           "columns": [
             {
               "name": "id",

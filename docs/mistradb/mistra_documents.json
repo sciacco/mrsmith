@@ -1,0 +1,184 @@
+{
+  "name": "mistra",
+  "searchPath": [
+    "$user",
+    "public"
+  ],
+  "schemas": [
+    {
+      "name": "documents",
+      "tables": [
+        {
+          "name": "arxivar_view",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "arxivar_view_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "document_src",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "document_src_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "document_type",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "src",
+              "position": 2,
+              "type": "character varying",
+              "nullable": false
+            }
+          ],
+          "indexes": [
+            {
+              "name": "document_type_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "document_type_src_fkey",
+              "columns": [
+                "src"
+              ],
+              "referencedTable": "documents.document_src",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        },
+        {
+          "name": "document_type_attribute_arxivar",
+          "columns": [
+            {
+              "name": "name",
+              "position": 1,
+              "type": "character varying",
+              "nullable": false
+            },
+            {
+              "name": "description",
+              "position": 2,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "has_doc_number",
+              "position": 3,
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "name": "arx_view",
+              "position": 4,
+              "type": "character varying",
+              "nullable": false,
+              "default": "'Dettaglio consumi fatturati'::character varying"
+            }
+          ],
+          "indexes": [
+            {
+              "name": "document_type_attribute_arxivar_pkey",
+              "type": "BTREE",
+              "expressions": [
+                "name"
+              ],
+              "primary": true,
+              "unique": true,
+              "visible": true
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "document_type_attribute_arxivar_arx_view_fkey",
+              "columns": [
+                "arx_view"
+              ],
+              "referencedTable": "documents.arxivar_view",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            },
+            {
+              "name": "document_type_attribute_arxivar_name_fkey",
+              "columns": [
+                "name"
+              ],
+              "referencedTable": "documents.document_type",
+              "referencedColumns": [
+                "name"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "CASCADE"
+            }
+          ],
+          "rowCount": -1,
+          "dataSize": 8192,
+          "indexSize": 24576
+        }
+      ]
+    }
+  ]
+}

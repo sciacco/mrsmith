@@ -620,7 +620,7 @@
               "onUpdate": "CASCADE"
             }
           ],
-          "rowCount": 730,
+          "rowCount": 776,
           "dataSize": 106496,
           "indexSize": 90112
         },
@@ -801,9 +801,9 @@
               "onUpdate": "RESTRICT"
             }
           ],
-          "rowCount": 836,
+          "rowCount": 864,
           "dataSize": 155648,
-          "indexSize": 204800
+          "indexSize": 212992
         },
         {
           "name": "product_category",
@@ -1191,11 +1191,11 @@
         },
         {
           "name": "get_kit_customer_group",
-          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_customer_group(search_kit bigint, only_sellable boolean)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\n-- restituisce la lista dei profili collegati a questo kit, con l'indicazione se i kit è vendibile o no\nselect json_agg(x) from (\nselect group_id, name, is_partner from products.v_kit_customer_group\n    where kit_id = search_kit and (only_sellable = false or sellable = true)\n    ) x;\n\n$function$\n"
+          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_customer_group(search_kit bigint)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\n\nselect json_agg(x) from (\nselect group_id, name, is_partner, sellable from products.v_kit_customer_group where kit_id = search_kit\n    ) x;\n\n$function$\n"
         },
         {
           "name": "get_kit_customer_group",
-          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_customer_group(search_kit bigint)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\n\nselect json_agg(x) from (\nselect group_id, name, is_partner, sellable from products.v_kit_customer_group where kit_id = search_kit\n    ) x;\n\n$function$\n"
+          "definition": "CREATE OR REPLACE FUNCTION products.get_kit_customer_group(search_kit bigint, only_sellable boolean)\n RETURNS json\n LANGUAGE sql\n SECURITY DEFINER\nAS $function$\n set search_path = pg_catalog,pg_temp;\n-- restituisce la lista dei profili collegati a questo kit, con l'indicazione se i kit è vendibile o no\nselect json_agg(x) from (\nselect group_id, name, is_partner from products.v_kit_customer_group\n    where kit_id = search_kit and (only_sellable = false or sellable = true)\n    ) x;\n\n$function$\n"
         },
         {
           "name": "get_kit_filtered",
@@ -1281,7 +1281,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1291,7 +1291,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1311,7 +1311,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -1331,7 +1331,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         }

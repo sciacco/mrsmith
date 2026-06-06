@@ -104,6 +104,18 @@
               ],
               "onDelete": "CASCADE",
               "onUpdate": "NO ACTION"
+            },
+            {
+              "name": "loader_cp_ordini_order_number_foreign",
+              "columns": [
+                "order_number"
+              ],
+              "referencedTable": "orders.\"order\"",
+              "referencedColumns": [
+                "order_number"
+              ],
+              "onDelete": "NO ACTION",
+              "onUpdate": "NO ACTION"
             }
           ],
           "rowCount": 48,
@@ -186,9 +198,9 @@
               "visible": true
             }
           ],
-          "rowCount": 826,
+          "rowCount": 831,
           "dataSize": 163840,
-          "indexSize": 98304
+          "indexSize": 90112
         },
         {
           "name": "erp_anagrafiche_clienti",
@@ -386,9 +398,9 @@
               "visible": true
             }
           ],
-          "rowCount": 1382,
-          "dataSize": 466944,
-          "indexSize": 114688
+          "rowCount": 1392,
+          "dataSize": 475136,
+          "indexSize": 106496
         },
         {
           "name": "erp_clienti_provenienza",
@@ -427,7 +439,7 @@
             }
           ],
           "comment": "somma documenti ecomm o fattimm",
-          "rowCount": 1308,
+          "rowCount": 1314,
           "dataSize": 589824,
           "indexSize": 237568
         },
@@ -642,9 +654,9 @@
               "visible": true
             }
           ],
-          "rowCount": 151432,
-          "dataSize": 60014592,
-          "indexSize": 10870784
+          "rowCount": 154054,
+          "dataSize": 61063168,
+          "indexSize": 11042816
         },
         {
           "name": "erp_metodi_pagamento",
@@ -881,8 +893,8 @@
               "visible": true
             }
           ],
-          "rowCount": 6543,
-          "dataSize": 1843200,
+          "rowCount": 6598,
+          "dataSize": 1859584,
           "indexSize": 344064
         },
         {
@@ -1003,9 +1015,9 @@
               "visible": true
             }
           ],
-          "rowCount": 20649,
+          "rowCount": 21008,
           "dataSize": 3899392,
-          "indexSize": 933888
+          "indexSize": 925696
         },
         {
           "name": "erp_righe_ordini",
@@ -1174,9 +1186,9 @@
               "visible": true
             }
           ],
-          "rowCount": 12326,
-          "dataSize": 4407296,
-          "indexSize": 557056
+          "rowCount": 12458,
+          "dataSize": 4448256,
+          "indexSize": 712704
         },
         {
           "name": "grappa_cli_fatturazione",
@@ -2151,9 +2163,9 @@
               "body": "CREATE TRIGGER set_timestamp BEFORE UPDATE ON loader.hubs_company FOR EACH ROW EXECUTE FUNCTION common.trigger_set_timestamp()"
             }
           ],
-          "rowCount": 4443,
-          "dataSize": 737280,
-          "indexSize": 434176
+          "rowCount": 4632,
+          "dataSize": 786432,
+          "indexSize": 442368
         },
         {
           "name": "hubs_contact",
@@ -2220,9 +2232,9 @@
               "body": "CREATE TRIGGER set_timestamp BEFORE UPDATE ON loader.hubs_contact FOR EACH ROW EXECUTE FUNCTION common.trigger_set_timestamp()"
             }
           ],
-          "rowCount": 9878,
-          "dataSize": 991232,
-          "indexSize": 393216
+          "rowCount": 10293,
+          "dataSize": 1032192,
+          "indexSize": 409600
         },
         {
           "name": "hubs_deal",
@@ -2329,9 +2341,9 @@
               "body": "CREATE TRIGGER set_timestamp BEFORE UPDATE ON loader.hubs_deal FOR EACH ROW EXECUTE FUNCTION common.trigger_set_timestamp()"
             }
           ],
-          "rowCount": 4098,
+          "rowCount": 4235,
           "dataSize": 835584,
-          "indexSize": 540672
+          "indexSize": 548864
         },
         {
           "name": "hubs_owner",
@@ -2423,7 +2435,7 @@
               "visible": true
             }
           ],
-          "rowCount": 127,
+          "rowCount": 130,
           "dataSize": 57344,
           "indexSize": 90112
         },

@@ -43,8 +43,8 @@
               "visible": true
             }
           ],
-          "rowCount": 393,
-          "dataSize": 598016,
+          "rowCount": 447,
+          "dataSize": 720896,
           "indexSize": 65536
         },
         {
@@ -356,8 +356,8 @@
               "body": "CREATE TRIGGER trigger_update_order_row_state AFTER UPDATE ON orders.\"order\" FOR EACH ROW WHEN ((new.state_id <> old.state_id)) EXECUTE FUNCTION orders.update_order_row_state()"
             }
           ],
-          "rowCount": 181,
-          "dataSize": 90112,
+          "rowCount": 205,
+          "dataSize": 131072,
           "indexSize": 90112
         },
         {
@@ -483,6 +483,18 @@
               "onUpdate": "NO ACTION"
             },
             {
+              "name": "order_row_order_id_fkey",
+              "columns": [
+                "order_id"
+              ],
+              "referencedTable": "orders.\"order\"",
+              "referencedColumns": [
+                "id"
+              ],
+              "onDelete": "CASCADE",
+              "onUpdate": "NO ACTION"
+            },
+            {
               "name": "order_row_product_code_fkey",
               "columns": [
                 "product_code"
@@ -541,8 +553,8 @@
               "body": "CREATE TRIGGER trigger_update_order_state AFTER UPDATE ON orders.order_row REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table FOR EACH STATEMENT EXECUTE FUNCTION orders.update_order_state()"
             }
           ],
-          "rowCount": 220,
-          "dataSize": 540672,
+          "rowCount": 489,
+          "dataSize": 712704,
           "indexSize": 81920
         },
         {
@@ -666,8 +678,8 @@
               "visible": true
             }
           ],
-          "rowCount": 750,
-          "dataSize": 81920,
+          "rowCount": 872,
+          "dataSize": 90112,
           "indexSize": 73728
         }
       ],
@@ -710,7 +722,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -720,7 +732,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         },
@@ -750,7 +762,7 @@
           "start": 1,
           "increment": 1,
           "min": 1,
-          "max": 9223372036854775807,
+          "max": 9223372036854776000,
           "cache": 1,
           "cycle": false
         }
