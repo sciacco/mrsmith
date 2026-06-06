@@ -336,6 +336,7 @@ export interface EquipmentItem {
   datacenterName?: string;
   unitPosition?: number;
   unit?: number;
+  occupiedUnits: number;
   managementIp?: string;
   note?: string;
   type: string;

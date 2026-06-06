@@ -100,6 +100,15 @@ Alyante ERP ID
 - Used by: `apps/grappa-dcim` Rack search.
 - Open questions: none.
 
+### Grappa Rack Equipment Occupancy Uses `apparato.unit`
+
+- Context: Grappa DCIM rack detail U-map and any UI that places `apparato` rows in rack units.
+- Discovery: `apparato.unit_position` is the starting rack U, while `apparato.unit` is the number of rack units occupied by the equipment. A multi-U apparatus must cover consecutive rack units starting at `unit_position`.
+- Practical rule: expose a business-facing occupied height field, such as `occupiedUnits`, derived from `apparato.unit` with a 1U fallback. Do not treat `apparato.unit` as an alternate position when rendering the rack map.
+- Evidence: `docs/grappa/grappa_apparato.json`, Grappa DCIM audit note in `apps/grappa-dcim/docs/GRAPPA-DCIM.md`, and rack detail implementation in `apps/grappa-dcim/src/features/racks`.
+- Used by: `apps/grappa-dcim` Rack detail.
+- Open questions: none.
+
 ## Customer Eligibility and Exclusion Rules
 
 ### Known Grappa Customer Exclusions

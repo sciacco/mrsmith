@@ -8,6 +8,7 @@ type EquipmentItem struct {
 	DatacenterName     *string `json:"datacenterName,omitempty"`
 	UnitPosition       *int    `json:"unitPosition,omitempty"`
 	Unit               *int    `json:"unit,omitempty"`
+	OccupiedUnits      int     `json:"occupiedUnits"`
 	ManagementIP       *string `json:"managementIp,omitempty"`
 	Note               *string `json:"note,omitempty"`
 	Type               string  `json:"type"`

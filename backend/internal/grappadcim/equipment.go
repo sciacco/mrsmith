@@ -17,6 +17,8 @@ func (h *Handler) handleListEquipment(w http.ResponseWriter, r *http.Request) {
 	args := []any{}
 	if status := strings.TrimSpace(r.URL.Query().Get("status")); status == "active" || status == "" {
 		where = append(where, activeStateSQL("a.stato"), "a.data_cessazione IS NULL")
+	} else if status == "occupancy" {
+		where = append(where, equipmentOccupancyStateSQL("a.stato"), "a.data_cessazione IS NULL")
 	} else if status != "all" {
 		where = append(where, "a.stato = ?")
 		args = append(args, status)
@@ -323,6 +325,7 @@ func scanEquipment(scanner equipmentScanner) (EquipmentItem, error) {
 	item.DatacenterName = nullableString(datacenterName)
 	item.UnitPosition = nullableInt(unitPosition)
 	item.Unit = nullableInt(unit)
+	item.OccupiedUnits = occupiedUnits(unit)
 	item.ManagementIP = nullableString(managementIP)
 	item.Note = nullableString(note)
 	item.Serial = nullableString(serial)
@@ -351,6 +354,17 @@ func scanEquipment(scanner equipmentScanner) (EquipmentItem, error) {
 	item.OrderCode = nullableString(orderCode)
 	item.LastNotificationAt = nullableTime(lastNotificationAt)
 	return item, nil
+}
+
+func equipmentOccupancyStateSQL(column string) string {
+	return "(COALESCE(TRIM(" + column + "), '') = '' OR LOWER(TRIM(" + column + ")) NOT IN ('cessato', 'cessata', 'chiuso'))"
+}
+
+func occupiedUnits(unit sql.NullInt64) int {
+	if unit.Valid && unit.Int64 > 0 {
+		return int(unit.Int64)
+	}
+	return 1
 }
 
 func validateEquipmentInput(name string, equipmentType string, portCount *int) error {

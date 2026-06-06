@@ -8,6 +8,7 @@ import {
   formatDate,
   formatRelativeTime,
 } from './rackDetailHelpers';
+import { buildRackUnitMap, normalizeRackUnitCount } from './rackUnitMap';
 import styles from './rackDetail.module.css';
 
 const powerFmt = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
@@ -18,7 +19,7 @@ export function RackDetailPage() {
 
   const rackQuery = useRackDetail(rackId);
   const powerSummaryQuery = useRackPowerSummary(rackId);
-  const equipmentQuery = useEquipment({ rackId });
+  const equipmentQuery = useEquipment({ rackId, status: 'occupancy' });
 
   if (rackQuery.isLoading) {
     return (
@@ -130,15 +131,8 @@ function RackStatusBadge({ status }: { status?: string }) {
 }
 
 function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: EquipmentItem[] }) {
-  const deviceByUnit = new Map<number, EquipmentItem>();
-  for (const eq of equipment) {
-    const pos = eq.unitPosition ?? eq.unit;
-    if (pos !== undefined && pos !== null) deviceByUnit.set(pos, eq);
-  }
-
-  const unitCount = rack.unitCount || 42;
-  // U01 is physically at the bottom — render highest unit numbers first
-  const unitNumbers = Array.from({ length: unitCount }, (_, index) => unitCount - index);
+  const unitCount = normalizeRackUnitCount(rack.unitCount);
+  const unitRows = buildRackUnitMap(unitCount, equipment);
 
   return (
     <section className={styles.columnSection}>
@@ -152,18 +146,30 @@ function RackColumn({ rack, equipment }: { rack: RackDetail; equipment: Equipmen
           <span>Dispositivo</span>
         </div>
 
-        {unitNumbers.map((unitNum) => {
-          const device = deviceByUnit.get(unitNum);
-
-          return (
-            <div key={`unit-${unitNum}`} className={device ? styles.unitRowOccupied : styles.unitRowFree}>
-              <span className={styles.unitNum}>U{pad(unitNum)}</span>
-              <span className={styles.unitDevice}>{device?.name ?? ''}</span>
-            </div>
-          );
-        })}
+        <div className={styles.unitGrid}>
+          {unitRows.map((row) => (
+            <UnitGridRow key={`unit-${row.unitNum}`} row={row} />
+          ))}
+        </div>
       </div>
     </section>
+  );
+}
+
+function UnitGridRow({ row }: { row: ReturnType<typeof buildRackUnitMap>[number] }) {
+  return (
+    <>
+      <span className={styles.unitNumCell}>U{pad(row.unitNum)}</span>
+      {row.kind === 'free' ? <span className={styles.unitFreeCell} /> : null}
+      {row.kind === 'device' ? (
+        <div className={styles.unitDeviceBlock} style={{ gridRow: `span ${row.span}` }}>
+          <span className={styles.unitDeviceMain}>{row.device.name}</span>
+          <span className={styles.unitDeviceMeta}>
+            {row.span > 1 ? `U${pad(row.startUnit)}-U${pad(row.endUnit)} · ${row.span}U` : `U${pad(row.startUnit)}`}
+          </span>
+        </div>
+      ) : null}
+    </>
   );
 }
 

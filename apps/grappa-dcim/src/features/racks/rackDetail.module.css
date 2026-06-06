@@ -198,35 +198,24 @@
   background: rgba(248, 250, 252, 0.5);
 }
 
-.unitRowOccupied,
-.unitRowFree {
+.unitGrid {
   display: grid;
   grid-template-columns: 3.5rem 1fr;
-  gap: var(--space-2);
+  grid-auto-rows: minmax(2.25rem, auto);
+  font-size: 0.8125rem;
+}
+
+.unitNumCell,
+.unitFreeCell,
+.unitDeviceBlock {
   padding: var(--space-2) var(--space-5);
   border-bottom: 1px solid var(--color-border-subtle);
-  align-items: center;
   min-height: 2.25rem;
 }
 
-.unitRowOccupied {
-  background: var(--color-accent-subtle);
-  animation: rowEnter 0.3s var(--ease-out) both;
-}
-
-.unitRowOccupied:hover {
-  background: var(--color-accent-muted);
-}
-
-.unitRowFree {
-  background: transparent;
-}
-
-.unitRowFree:hover {
-  background: var(--color-surface);
-}
-
-.unitNum {
+.unitNumCell {
+  display: flex;
+  align-items: center;
   color: var(--color-text-muted);
   font-family: var(--font-mono);
   font-size: 0.75rem;
@@ -234,11 +223,41 @@
   white-space: nowrap;
 }
 
-.unitDevice {
+.unitDeviceBlock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-accent-subtle);
+  animation: rowEnter 0.3s var(--ease-out) both;
+}
+
+.unitDeviceBlock:hover {
+  background: var(--color-accent-muted);
+}
+
+.unitFreeCell {
+  background: transparent;
+}
+
+.unitFreeCell:hover {
+  background: var(--color-surface);
+}
+
+.unitDeviceMain {
   color: var(--color-text);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unitDeviceMeta {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
   white-space: nowrap;
 }
 
