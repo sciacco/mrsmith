@@ -15,7 +15,7 @@
 ### Scope boundaries
 
 - **In scope V1**: 7 report pages (Ordini, Accessi attivi, Attivazioni in corso, Rinnovi in arrivo, Anomalie MOR Tab 1, Accounting TIMOO, AOV) + Home hub
-- **Out of scope V1**: AI analysis (Anomalie MOR Tab 2, OpenRouter), AOV query consolidation, AOV area bug fix
+- **Out of scope V1**: AI analysis (Anomalie MOR Tab 2, OpenRouter), AOV query consolidation
 - **Deferred items tracked in**: `docs/TODO.md` (3 entries under "Reports App")
 
 ---
@@ -54,7 +54,7 @@ No entity separation or abstraction in V1 — all queries use the same flat view
 
 ### Known audit gaps
 
-- MB1: AOV `get_report_data_area` inconsistency — replicated as-is, tracked in TODO
+- AOV category attribution resolved in the backend at order level; query consolidation remains deferred
 - MB2: DB view DDLs — resolved, present in `docs/mistradb/mistra_loader.json`
 - MB3: Carbone.io templates — preserved, same IDs as constants
 - MB6: Missing pages in git export — resolved, single-file JSON covers all 8
@@ -257,14 +257,14 @@ No entity separation or abstraction in V1 — all queries use the same flat view
   - Tab 3 "Per commerciale": AOV by sales rep + order type
   - Tab 4 "Dettaglio": Full order-level detail
 - **Actions**: "Esegui" (refresh all), "Esporta XLSX" (primary button)
-- **Business rules in queries** (all 4 queries, verbatim):
+- **Business rules in queries**:
   - AOV: `MRC_new * 12 + NRC` with substitution delta and TSC-ORDINE swap (BR1)
   - Date fallback: `data_conferma`, sentinel `0001-01-01` → `data_documento` (BR2)
   - Type mapping: N→NUOVO, A→SOST, R→RINNOVO, C→CESSAZIONE (BR3)
   - Sales rep: HubSpot join with `/`→`-` normalization, default `'CP'` (BR4)
-  - **Known inconsistency**: `get_report_data_area` does NOT subtract old MRC for substitutions (tracked in TODO)
+  - Per categoria aggregates the same order-level net economics as detail/type/sales, then attributes each order to one current product category by largest current-row AOV contribution; unmatched substitutions keep legacy `NULL` net/AOV semantics.
 - **Data source**: `POST /api/reports/aov/preview` (returns 4 datasets) → `POST /api/reports/aov/export`
-- **Appsmith SQL**: `get_report_data`, `get_report_data_tipo_ord`, `get_report_data_area`, `get_report_data_sales` — 4 separate verbatim queries in backend
+- **Appsmith SQL lineage**: `get_report_data`, `get_report_data_tipo_ord`, `get_report_data_area`, `get_report_data_sales` — 4 separate backend queries, with documented AOV corrections where approved
 
 ---
 
@@ -296,7 +296,6 @@ No entity separation or abstraction in V1 — all queries use the same flat view
 | AI analysis | OpenRouter proxy, prompt rules (BR8), model selector |
 | AI access control | Keycloak role `app_reports_ai_access` replacing email gate (BR10) |
 | AOV query consolidation | 4 queries → 1 parameterized query, post-coexistence |
-| AOV area bug fix | Correct `get_report_data_area` to subtract old MRC for substitutions |
 
 ---
 
@@ -575,7 +574,7 @@ ORDER BY day DESC, tenant_id;
 
 ### AOV queries
 
-The 4 AOV queries are extensive (each 40+ lines with complex CASE expressions). They are preserved verbatim from the audit in `apps/reports/APPSMITH-AUDIT.md` §2.8. The backend must implement them as 4 separate queries — **do not consolidate**.
+The 4 AOV queries are extensive (each 40+ lines with complex CASE expressions). They remain separate backend queries to prevent accidental drift during coexistence; category attribution and documented AOV business-rule corrections intentionally diverge from the original Appsmith SQL. Do not consolidate them without a dedicated parity check.
 
 ---
 
@@ -583,11 +582,10 @@ The 4 AOV queries are extensive (each 40+ lines with complex CASE expressions). 
 
 | # | Question | Status | Owner |
 |---|---|---|---|
-| 1 | AOV `get_report_data_area` inconsistency — is the missing MRC delta a bug or intentional? | Deferred post-coexistence | Domain expert |
-| 2 | AOV query consolidation — merge 4 queries into 1? | Deferred post-coexistence | Engineering |
-| 3 | AI analysis feature (Anomalie MOR Tab 2) | Deferred Phase 2 | Product |
-| 4 | Carbone template management (central admin module) | Tracked in `docs/TODO.md` | Product |
-| 5 | `as7_tenants.name` nullable — is KlajdiandCo the only test tenant to exclude? | Verify before implementation | Domain expert |
+| 1 | AOV query consolidation — merge 4 queries into 1? | Deferred post-coexistence | Engineering |
+| 2 | AI analysis feature (Anomalie MOR Tab 2) | Deferred Phase 2 | Product |
+| 3 | Carbone template management (central admin module) | Tracked in `docs/TODO.md` | Product |
+| 4 | `as7_tenants.name` nullable — is KlajdiandCo the only test tenant to exclude? | Verify before implementation | Domain expert |
 
 ---
 
@@ -604,7 +602,7 @@ The 4 AOV queries are extensive (each 40+ lines with complex CASE expressions). 
 ### What the expert confirmed
 
 - Migrazione 1:1 with Appsmith coexistence
-- AOV bug replicated as-is (tracked in TODO)
+- AOV category attribution resolved in backend at order level
 - AI analysis deferred to Phase 2
 - 4 AOV queries kept separate to prevent drift
 - Carbone.io maintained with same template IDs as constants
@@ -615,6 +613,5 @@ The 4 AOV queries are extensive (each 40+ lines with complex CASE expressions). 
 
 ### What still needs validation
 
-- AOV `get_report_data_area` computation correctness (post-coexistence)
 - `KlajdiandCo` exclusion — confirm this is still the only test tenant
 - Carbone.io template content (XLSX layouts) — verify templates still render correctly when called from backend instead of Appsmith

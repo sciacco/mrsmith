@@ -89,10 +89,10 @@ func (h *Handler) buildAovArgs(req aovRequest) []any {
 
 func aovWhereClause(statusPlaceholders string, dateFromIdx, dateToIdx int) string {
 	return fmt.Sprintf(`
-where stato_ordine in (%s)
+where o.stato_ordine in (%s)
 and (
 CASE
-	WHEN o.data_conferma ='0001-01-01 00:00:00' THEN data_ordine BETWEEN $%d AND $%d
+	WHEN o.data_conferma ='0001-01-01 00:00:00' THEN o.data_ordine BETWEEN $%d AND $%d
 	ELSE o.data_conferma BETWEEN $%d AND $%d
 END
 )`, statusPlaceholders, dateFromIdx, dateToIdx, dateFromIdx, dateToIdx)
@@ -161,13 +161,13 @@ CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
 			-
-			COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
 			FROM loader.v_ordini_ric_spot  AS odv WHERE
 			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
 				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
 			)
 			AND odv.annullato = 0
-			AND odv.data_disdetta = o.data_conferma), 0)
+			AND odv.data_disdetta = o.data_conferma)
 			)
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
 	ELSE sum(round(o.quantita::decimal * o.canone::decimal,2))
@@ -178,13 +178,13 @@ CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
 			-
-			COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
 			FROM loader.v_ordini_ric_spot  AS odv WHERE
 			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
 				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
 			)
 				AND odv.annullato = 0
-				AND odv.data_disdetta = o.data_conferma), 0)
+				AND odv.data_disdetta = o.data_conferma)
 				)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
 		WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
 		ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
@@ -245,14 +245,14 @@ func (h *Handler) queryAovByCategory(r *http.Request, req aovRequest) ([]aovByCa
 	statusPlaceholders, nextIdx := buildInClause(1, len(req.Statuses))
 	where := aovWhereClause(statusPlaceholders, nextIdx, nextIdx+1)
 
-	query := fmt.Sprintf(`SELECT anno, mese, categoria,
-count(distinct nome_testata_ordine) as numero_ordini,
-COALESCE(SUM(totale_mrc), 0) AS totale_mrc,
-COALESCE(SUM(totale_nrc), 0) AS totale_nrc,
-COALESCE(SUM(valore_aov), 0) AS valore_aov
-FROM(
+	query := fmt.Sprintf(`WITH filtered_orders AS (
+SELECT o.*
+from loader.v_ordini_ric_spot as o join loader.erp_anagrafiche_clienti eac on o.numero_azienda = eac.numero_azienda
+
+%s
+),
+order_economics AS (
 SELECT
-o.tipo_documento,
 CASE
 	WHEN o.data_conferma ='0001-01-01 00:00:00' THEN to_char(o.data_documento,'YYYY')
 	ELSE to_char(o.data_conferma,'YYYY')
@@ -265,45 +265,91 @@ END
 AS mese,
 o.nome_testata_ordine,
 CASE
-     WHEN o.tipo_ordine = 'N'  THEN 'NUOVO'
-     WHEN o.tipo_ordine = 'A'  THEN 'SOST'
-     WHEN o.tipo_ordine = 'R'  THEN 'RINNOVO'
-     WHEN o.tipo_ordine = 'C'  THEN 'CESSAZIONE'
-     ELSE  ''
-END
-as tipo_ordine,
- o.sost_ord,
-
-CASE
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
-	ELSE round(o.quantita::decimal * o.canone::decimal,2)
+	ELSE sum(round(o.quantita::decimal * o.canone::decimal,2))
 END
 as totale_mrc,
 
 CASE
-	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN round(o.quantita::decimal * o.canone::decimal,2)
-	ELSE round(o.quantita::decimal * o.setup::decimal,2)
+	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2))
+	ELSE sum(round(o.quantita::decimal * o.setup::decimal,2))
 END
-+ CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END
++ sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
 as totale_nrc,
+
 CASE
 	WHEN o.tipo_ordine = 'A' THEN
-		(((round(o.quantita::decimal * o.canone::decimal,2))))*12 + (round(o.quantita::decimal * o.setup::decimal,2)) + CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END
-	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN (round(o.quantita::decimal * o.canone::decimal,2)) + CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END
-	ELSE (round(o.quantita::decimal * o.setup::decimal,2)) + ((round(o.quantita::decimal * o.canone::decimal,2))*12) + CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END
+		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
+			-
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+			AND odv.annullato = 0
+			AND odv.data_disdetta = o.data_conferma)
+			)
+	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
+	ELSE sum(round(o.quantita::decimal * o.canone::decimal,2))
 END
-AS  valore_aov,
-(select c.name from products.product_category as c
- 		join products.product as p on c.id = p.category_id where p.code = o.codice_prodotto) AS categoria
+AS  totale_mrc_new,
 
+CASE
+	WHEN o.tipo_ordine = 'A' THEN
+		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
+			-
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			FROM loader.v_ordini_ric_spot  AS odv WHERE
+			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
+				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
+			)
+				AND odv.annullato = 0
+				AND odv.data_disdetta = o.data_conferma)
+				)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+		WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+		ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
+END
+AS  valore_aov
 
-from loader.v_ordini_ric_spot as o join loader.erp_anagrafiche_clienti eac on o.numero_azienda = eac.numero_azienda
+from filtered_orders as o
 
-%s
-
-) AS x
-GROUP BY anno, mese, categoria
-ORDER BY anno ASC, mese ASC, categoria ASC`, where)
+	GROUP BY
+	o.data_conferma,o.data_documento, o.tipo_ordine, o.nome_testata_ordine, o.sostituito_da, o.sost_ord, o.tipo_documento, o.data_disdetta
+),
+order_categories AS (
+	SELECT DISTINCT ON (nome_testata_ordine)
+		nome_testata_ordine,
+		categoria
+	FROM (
+		SELECT
+			o.nome_testata_ordine,
+			c.name AS categoria,
+			SUM(
+				CASE
+					WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN round(o.quantita::decimal * o.canone::decimal,2)
+					ELSE round(o.quantita::decimal * o.setup::decimal,2) + (round(o.quantita::decimal * o.canone::decimal,2) * 12)
+				END
+				+ CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END
+			) AS category_weight
+		FROM filtered_orders AS o
+			LEFT JOIN products.product AS p ON p.code = o.codice_prodotto
+			LEFT JOIN products.product_category AS c ON c.id = p.category_id
+		GROUP BY o.nome_testata_ordine, c.name
+	) AS weighted_categories
+	ORDER BY nome_testata_ordine, category_weight DESC NULLS LAST, categoria ASC NULLS LAST
+)
+SELECT
+oe.anno,
+oe.mese,
+oc.categoria,
+count(distinct oe.nome_testata_ordine) as numero_ordini,
+COALESCE(SUM(oe.totale_mrc_new), 0) AS totale_mrc,
+COALESCE(SUM(oe.totale_nrc), 0) AS totale_nrc,
+COALESCE(SUM(oe.valore_aov), 0) AS valore_aov
+FROM order_economics AS oe
+	LEFT JOIN order_categories AS oc ON oc.nome_testata_ordine = oe.nome_testata_ordine
+GROUP BY oe.anno, oe.mese, oc.categoria
+ORDER BY oe.anno ASC, oe.mese ASC, oc.categoria ASC`, where)
 
 	args := h.buildAovArgs(req)
 	rows, err := h.mistraDB.QueryContext(r.Context(), query, args...)
@@ -398,13 +444,13 @@ CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
 			-
-			COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
 			FROM loader.v_ordini_ric_spot  AS odv WHERE
 			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
 				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
 			)
 			AND odv.annullato = 0
-			AND odv.data_disdetta = o.data_conferma), 0)
+			AND odv.data_disdetta = o.data_conferma)
 			)
 	WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN 0::decimal
 	ELSE sum(round(o.quantita::decimal * o.canone::decimal,2))
@@ -414,13 +460,13 @@ CASE
 	WHEN o.tipo_ordine = 'A' THEN
 		((sum(round(o.quantita::decimal * o.canone::decimal,2)))
 			-
-			COALESCE((SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
+			(SELECT sum(round(odv.quantita::decimal * odv.canone::decimal,2))
 			FROM loader.v_ordini_ric_spot  AS odv WHERE
 			REPLACE(odv.nome_testata_ordine, '/', '-') = ANY (
 				string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')
 			)
 				AND odv.annullato = 0
-				AND odv.data_disdetta = o.data_conferma), 0)
+				AND odv.data_disdetta = o.data_conferma)
 				)*12 + sum(round(o.quantita::decimal * o.setup::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
 		WHEN trim(o.tipo_documento) = 'TSC-ORDINE' THEN sum(round(o.quantita::decimal * o.canone::decimal,2)) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
 		ELSE sum(round(o.quantita::decimal * o.setup::decimal,2)) + (sum(round(o.quantita::decimal * o.canone::decimal,2))*12) + sum(CASE WHEN trim(o.codice_prodotto) = 'CDL-CLOUD' THEN 600::decimal ELSE 0::decimal END)
@@ -511,7 +557,7 @@ as tipo_ordine,
 	ORDER BY d.id DESC
 	LIMIT 1
 ),'CP') AS commerciale,
- COALESCE((SELECT json_agg(json_build_object(
+COALESCE((SELECT json_agg(json_build_object(
 	'codice', TRIM(d.codice),
 	'name', NULLIF(TRIM(d.name), '')
 ) ORDER BY TRIM(d.codice), TRIM(d.name), d.id)::text

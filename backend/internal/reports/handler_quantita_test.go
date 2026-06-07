@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -247,6 +248,57 @@ func TestHandleAovPreviewIncludesOrderCountsAndDetailFields(t *testing.T) {
 	}
 }
 
+func TestAovByCategoryUsesOrderLevelReplacementDelta(t *testing.T) {
+	h := &Handler{mistraDB: openReportsTestDB(t, "aov-category-query-contract")}
+	req := httptest.NewRequest(http.MethodPost, "/reports/v1/aov/preview", nil)
+
+	rows, err := h.queryAovByCategory(req, aovRequest{
+		DateFrom: "2026-01-01",
+		DateTo:   "2026-12-31",
+		Statuses: []string{"Evaso"},
+	})
+	if err != nil {
+		t.Fatalf("queryAovByCategory returned error: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	if rows[0].Categoria == nil || *rows[0].Categoria != "CurrentDominant" {
+		t.Fatalf("expected current dominant category row, got %#v", rows[0].Categoria)
+	}
+	if rows[0].NumeroOrdini != 1 || rows[0].TotaleMRC != 75 || rows[0].ValoreAOV != 900 {
+		t.Fatalf("expected order-level replacement delta, got orders=%d mrc=%v aov=%v",
+			rows[0].NumeroOrdini, rows[0].TotaleMRC, rows[0].ValoreAOV)
+	}
+}
+
+func TestAovDetailKeepsLegacyNullForMissingReplacementMRC(t *testing.T) {
+	h := &Handler{mistraDB: openReportsTestDB(t, "aov-detail-query-contract")}
+	req := httptest.NewRequest(http.MethodPost, "/reports/v1/aov/preview", nil)
+
+	rows, err := h.queryAovDetail(req, aovRequest{
+		DateFrom: "2026-01-01",
+		DateTo:   "2026-12-31",
+		Statuses: []string{"Evaso"},
+	})
+	if err != nil {
+		t.Fatalf("queryAovDetail returned error: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	row := rows[0]
+	if row.TotaleMRCOdvSost != nil {
+		t.Fatalf("expected missing replacement MRC to stay null, got %#v", row.TotaleMRCOdvSost)
+	}
+	if row.TotaleMRCNew != nil {
+		t.Fatalf("expected replacement net MRC to stay null, got %#v", row.TotaleMRCNew)
+	}
+	if row.ValoreAOV != nil {
+		t.Fatalf("expected replacement AOV to stay null, got %#v", row.ValoreAOV)
+	}
+}
+
 func openReportsTestDB(t *testing.T, mode string) *sql.DB {
 	t.Helper()
 	registerReportsTestDriver()
@@ -382,14 +434,17 @@ func (c *reportsTestConn) QueryContext(_ context.Context, query string, _ []driv
 			if !strings.Contains(qLower, "order by\nanno asc,\nmese asc,") || !strings.Contains(qLower, "case tipo_ordine") {
 				return nil, errors.New("missing final ORDER BY in byType query")
 			}
+			if strings.Contains(qLower, "coalesce((select sum(round(odv.quantita::decimal * odv.canone::decimal,2))") {
+				return nil, errors.New("byType query must preserve legacy null replacement MRC semantics")
+			}
 			return &reportsTestRows{
 				columns: []string{"anno", "mese", "tipo_ordine", "numero_ordini", "totale_mrc", "totale_nrc", "valore_aov"},
 				values: [][]driver.Value{
 					{"2026", "04", "NUOVO", int64(3), float64(1000), float64(200), float64(12200)},
 				},
 			}, nil
-		case strings.Contains(query, "GROUP BY anno, mese, categoria"):
-			if !strings.Contains(qLower, "order by anno asc, mese asc, categoria asc") {
+		case strings.Contains(query, "GROUP BY oe.anno, oe.mese, oc.categoria"):
+			if !strings.Contains(qLower, "order by oe.anno asc, oe.mese asc, oc.categoria asc") {
 				return nil, errors.New("missing final ORDER BY in byCategory query")
 			}
 			return &reportsTestRows{
@@ -401,6 +456,9 @@ func (c *reportsTestConn) QueryContext(_ context.Context, query string, _ []driv
 		case strings.Contains(query, "GROUP BY anno, commerciale, tipo_ordine"):
 			if !strings.Contains(qLower, "order by\nanno asc,\ncommerciale asc,") || !strings.Contains(qLower, "case tipo_ordine") {
 				return nil, errors.New("missing final ORDER BY in bySales query")
+			}
+			if strings.Contains(qLower, "coalesce((select sum(round(odv.quantita::decimal * odv.canone::decimal,2))") {
+				return nil, errors.New("bySales query must preserve legacy null replacement MRC semantics")
 			}
 			return &reportsTestRows{
 				columns: []string{"anno", "commerciale", "tipo_ordine", "numero_ordini", "totale_mrc", "totale_nrc", "valore_aov"},
@@ -427,6 +485,64 @@ func (c *reportsTestConn) QueryContext(_ context.Context, query string, _ []driv
 				},
 			}, nil
 		}
+	case "aov-category-query-contract":
+		qLower := strings.ToLower(query)
+		if !strings.Contains(query, "GROUP BY oe.anno, oe.mese, oc.categoria") {
+			return nil, errors.New("expected byCategory query")
+		}
+		if strings.Contains(qLower, "union all") || strings.Contains(qLower, "where p.code = odv.codice_prodotto") {
+			return nil, errors.New("byCategory query must not subtract replaced-order rows by old product category")
+		}
+		required := []string{
+			"with filtered_orders as",
+			"order_economics as",
+			"order_categories as",
+			"distinct on (nome_testata_ordine)",
+			"where o.stato_ordine in",
+			"then o.data_ordine between",
+			"coalesce(sum(oe.totale_mrc_new), 0) as totale_mrc",
+			"coalesce(sum(oe.valore_aov), 0) as valore_aov",
+			"left join order_categories as oc on oc.nome_testata_ordine = oe.nome_testata_ordine",
+			"left join products.product as p on p.code = o.codice_prodotto",
+			"left join products.product_category as c on c.id = p.category_id",
+			"category_weight desc nulls last",
+			"string_to_array(replace(o.sost_ord, '/', '-'), ';')",
+			"odv.annullato = 0",
+			"odv.data_disdetta = o.data_conferma",
+		}
+		for _, needle := range required {
+			if !strings.Contains(qLower, needle) {
+				return nil, errors.New("missing byCategory replacement clause: " + needle)
+			}
+		}
+		return &reportsTestRows{
+			columns: []string{"anno", "mese", "categoria", "numero_ordini", "totale_mrc", "totale_nrc", "valore_aov"},
+			values: [][]driver.Value{
+				{"2026", "05", "CurrentDominant", int64(1), float64(75), float64(0), float64(900)},
+			},
+		}, nil
+	case "aov-detail-query-contract":
+		qLower := strings.ToLower(query)
+		if !strings.Contains(query, "SELECT\no.tipo_documento,") {
+			return nil, errors.New("expected detail query")
+		}
+		if count := strings.Count(qLower, "coalesce((select sum(round(odv.quantita::decimal * odv.canone::decimal,2))"); count != 0 {
+			return nil, fmt.Errorf("expected legacy null replacement MRC semantics in detail query, got %d COALESCE clauses", count)
+		}
+		return &reportsTestRows{
+			columns: []string{
+				"tipo_documento", "anno", "mese", "nome_testata_ordine", "tipo_ordine",
+				"sost_ord", "commerciale", "deals", "totale_mrc", "totale_nrc", "totale_mrc_odv_sost",
+				"totale_mrc_new", "valore_aov", "has_cdl_cloud",
+			},
+			values: [][]driver.Value{
+				{
+					"TSC-ORDINE-RIC", "2026", "04", "ORD-SOST", "SOST",
+					"OLD-000", "Mario Rossi", "[]", float64(120), float64(5), nil,
+					nil, nil, false,
+				},
+			},
+		}, nil
 	}
 
 	return nil, errors.New("unexpected query for mode: " + c.mode)
