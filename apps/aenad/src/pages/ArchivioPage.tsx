@@ -47,13 +47,22 @@ function dateError(dateFrom: string, dateTo: string) {
 
 function formatDate(value: string | null) {
   if (!value) return '-';
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleDateString('it-IT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }
   return value;
 }
 
-function formatNumber(value: number | null) {
-  if (value == null) return '-';
-  return value.toLocaleString('it-IT');
-}
 
 function formatMoney(value: number | null) {
   if (value == null) return '-';
@@ -169,15 +178,6 @@ export function ArchivioPage() {
                 : `${fromRow}-${toRow} di ${total}`}
             </p>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={<Icon name="calendar" size={15} />}
-            onClick={() => documents.refetch()}
-            disabled={Boolean(currentDateError) || documents.isFetching}
-          >
-            Aggiorna
-          </Button>
         </div>
 
         {documentTypes.error ? (
@@ -234,14 +234,9 @@ function DocumentTable({ rows }: { rows: AenadDocument[] }) {
       <table className={styles.table}>
         <thead>
           <tr>
-            <th>Documento</th>
-            <th>Tipo</th>
-            <th className={styles.numCol}>Cliente</th>
-            <th>Destinazione</th>
-            <th>Data</th>
-            <th className={styles.numCol}>Num</th>
-            <th>Data doc.</th>
             <th>Num doc.</th>
+            <th>Data doc.</th>
+            <th>Cliente</th>
             <th>Descrizione</th>
             <th className={styles.numCol}>Netto</th>
             <th className={styles.numCol}>Totale</th>
@@ -252,17 +247,9 @@ function DocumentTable({ rows }: { rows: AenadDocument[] }) {
         <tbody>
           {rows.map((row, index) => (
             <tr key={row.IDDoc} style={{ animationDelay: `${Math.min(index, 8) * 25}ms` }}>
-              <td className={styles.monoCell}>{row.IDDoc}</td>
-              <td>{row.TipoDoc ?? '-'}</td>
-              <td className={styles.numCol}>{formatNumber(row.IDAnagr)}</td>
-              <td>
-                <strong>{row.CodDest ?? '-'}</strong>
-                <span>{row.CodDest_IDAnagr ? `ID ${row.CodDest_IDAnagr}` : ''}</span>
-              </td>
-              <td>{formatDate(row.Data)}</td>
-              <td className={styles.numCol}>{formatNumber(row.Num)}</td>
-              <td>{formatDate(row.DataDoc)}</td>
               <td className={styles.monoCell}>{row.NumDoc ?? '-'}</td>
+              <td>{formatDate(row.DataDoc)}</td>
+              <td>{row.Anagr_Nome ?? '-'}</td>
               <td className={styles.descriptionCell}>{row.DescDoc ?? '-'}</td>
               <td className={styles.numCol}>{formatMoney(row.TotNetto)}</td>
               <td className={styles.numCol}>{formatMoney(row.TotDoc)}</td>

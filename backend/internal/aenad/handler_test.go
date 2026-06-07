@@ -265,6 +265,7 @@ func (c *aenadTestConn) QueryContext(_ context.Context, query string, args []dri
 					int64(215584),
 					"Q",
 					int64(12174),
+					"Test Customer Name",
 					int64(12174),
 					"Via Galvani",
 					testDate(2026, 5, 26),
@@ -276,6 +277,22 @@ func (c *aenadTestConn) QueryContext(_ context.Context, query string, args []dri
 					int64(2017),
 					int64(1521),
 					int64(132),
+					"Contanti",             // Pagamento
+					"IT1234567890",         // Pagam_CoordBancarie
+					"Nota interna di test", // NoteInterne
+					"Via Milano 12",        // Anagr_Indirizzo
+					"20100",                // Anagr_Cap
+					"Milano",               // Anagr_Citta
+					"MI",                   // Anagr_Prov
+					"Italia",               // Anagr_Nazione
+					"CF1234567890",         // Anagr_CodiceFiscale
+					"PI1234567890",         // Anagr_PartitaIva
+					"Destinatario Test",    // Anagr_DestNome
+					"Via Torino 5",         // Anagr_DestIndirizzo
+					"10100",                // Anagr_DestCap
+					"Torino",               // Anagr_DestCitta
+					"TO",                   // Anagr_DestProv
+					"Italia",               // Anagr_DestNazione
 				},
 			},
 		}, nil
@@ -308,6 +325,7 @@ func documentTestColumns() []string {
 		"IDDoc",
 		"TipoDoc",
 		"IDAnagr",
+		"Anagr_Nome",
 		"CodDest_IDAnagr",
 		"CodDest",
 		"Data",
@@ -319,6 +337,22 @@ func documentTestColumns() []string {
 		"TotDoc",
 		"TotPrezzoAcquisto",
 		"TotGuadagno",
+		"Pagamento",
+		"Pagam_CoordBancarie",
+		"NoteInterne",
+		"Anagr_Indirizzo",
+		"Anagr_Cap",
+		"Anagr_Citta",
+		"Anagr_Prov",
+		"Anagr_Nazione",
+		"Anagr_CodiceFiscale",
+		"Anagr_PartitaIva",
+		"Anagr_DestNome",
+		"Anagr_DestIndirizzo",
+		"Anagr_DestCap",
+		"Anagr_DestCitta",
+		"Anagr_DestProv",
+		"Anagr_DestNazione",
 	}
 }
 

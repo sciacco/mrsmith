@@ -52,20 +52,37 @@ type documentListResponse struct {
 }
 
 type documentRow struct {
-	IDDoc             int     `json:"IDDoc"`
-	TipoDoc           *string `json:"TipoDoc"`
-	IDAnagr           *int    `json:"IDAnagr"`
-	CodDestIDAnagr    *int    `json:"CodDest_IDAnagr"`
-	CodDest           *string `json:"CodDest"`
-	Data              *string `json:"Data"`
-	Num               *int    `json:"Num"`
-	DataDoc           *string `json:"DataDoc"`
-	NumDoc            *string `json:"NumDoc"`
-	DescDoc           *string `json:"DescDoc"`
-	TotNetto          *int64  `json:"TotNetto"`
-	TotDoc            *int64  `json:"TotDoc"`
-	TotPrezzoAcquisto *int64  `json:"TotPrezzoAcquisto"`
-	TotGuadagno       *int64  `json:"TotGuadagno"`
+	IDDoc               int     `json:"IDDoc"`
+	TipoDoc             *string `json:"TipoDoc"`
+	IDAnagr             *int    `json:"IDAnagr"`
+	AnagrNome           *string `json:"Anagr_Nome"`
+	CodDestIDAnagr      *int    `json:"CodDest_IDAnagr"`
+	CodDest             *string `json:"CodDest"`
+	Data                *string `json:"Data"`
+	Num                 *int    `json:"Num"`
+	DataDoc             *string `json:"DataDoc"`
+	NumDoc              *string `json:"NumDoc"`
+	DescDoc             *string `json:"DescDoc"`
+	TotNetto            *int64  `json:"TotNetto"`
+	TotDoc              *int64  `json:"TotDoc"`
+	TotPrezzoAcquisto   *int64  `json:"TotPrezzoAcquisto"`
+	TotGuadagno         *int64  `json:"TotGuadagno"`
+	Pagamento           *string `json:"Pagamento"`
+	PagamCoordBancarie  *string `json:"Pagam_CoordBancarie"`
+	NoteInterne         *string `json:"NoteInterne"`
+	AnagrIndirizzo      *string `json:"Anagr_Indirizzo"`
+	AnagrCap            *string `json:"Anagr_Cap"`
+	AnagrCitta          *string `json:"Anagr_Citta"`
+	AnagrProv           *string `json:"Anagr_Prov"`
+	AnagrNazione        *string `json:"Anagr_Nazione"`
+	AnagrCodiceFiscale  *string `json:"Anagr_CodiceFiscale"`
+	AnagrPartitaIva     *string `json:"Anagr_PartitaIva"`
+	AnagrDestNome       *string `json:"Anagr_DestNome"`
+	AnagrDestIndirizzo  *string `json:"Anagr_DestIndirizzo"`
+	AnagrDestCap        *string `json:"Anagr_DestCap"`
+	AnagrDestCitta      *string `json:"Anagr_DestCitta"`
+	AnagrDestProv       *string `json:"Anagr_DestProv"`
+	AnagrDestNazione    *string `json:"Anagr_DestNazione"`
 }
 
 func (h *Handler) handleDocumentTypes(w http.ResponseWriter, r *http.Request) {
@@ -137,6 +154,7 @@ func (h *Handler) handleDocuments(w http.ResponseWriter, r *http.Request) {
 			d."IDDoc",
 			d."TipoDoc",
 			d."IDAnagr",
+			d."Anagr_Nome",
 			d."CodDest_IDAnagr",
 			d."CodDest",
 			d."Data",
@@ -147,7 +165,23 @@ func (h *Handler) handleDocuments(w http.ResponseWriter, r *http.Request) {
 			d."TotNetto",
 			d."TotDoc",
 			d."TotPrezzoAcquisto",
-			d."TotGuadagno"
+			d."TotGuadagno",
+			d."Pagamento",
+			d."Pagam_CoordBancarie",
+			d."NoteInterne",
+			d."Anagr_Indirizzo",
+			d."Anagr_Cap",
+			d."Anagr_Citta",
+			d."Anagr_Prov",
+			d."Anagr_Nazione",
+			d."Anagr_CodiceFiscale",
+			d."Anagr_PartitaIva",
+			d."Anagr_DestNome",
+			d."Anagr_DestIndirizzo",
+			d."Anagr_DestCap",
+			d."Anagr_DestCitta",
+			d."Anagr_DestProv",
+			d."Anagr_DestNazione"
 		FROM aenad."TDocTestate" d
 		WHERE d."TipoDoc" = $1
 		  AND d."Data" >= $2::date
@@ -270,7 +304,8 @@ func inclusiveDays(from time.Time, to time.Time) int {
 
 func scanDocumentRow(rows *sql.Rows) (documentRow, error) {
 	var item documentRow
-	var tipoDoc, codDest, numDoc, descDoc sql.NullString
+	var tipoDoc, codDest, numDoc, descDoc, anagrNome sql.NullString
+	var pagamento, pagamCoordBancarie, noteInterne, anagrIndirizzo, anagrCap, anagrCitta, anagrProv, anagrNazione, anagrCodiceFiscale, anagrPartitaIva, anagrDestNome, anagrDestIndirizzo, anagrDestCap, anagrDestCitta, anagrDestProv, anagrDestNazione sql.NullString
 	var idAnagr, codDestIDAnagr, num sql.NullInt64
 	var data, dataDoc sql.NullTime
 	var totNetto, totDoc, totPrezzoAcquisto, totGuadagno sql.NullInt64
@@ -279,6 +314,7 @@ func scanDocumentRow(rows *sql.Rows) (documentRow, error) {
 		&item.IDDoc,
 		&tipoDoc,
 		&idAnagr,
+		&anagrNome,
 		&codDestIDAnagr,
 		&codDest,
 		&data,
@@ -290,12 +326,29 @@ func scanDocumentRow(rows *sql.Rows) (documentRow, error) {
 		&totDoc,
 		&totPrezzoAcquisto,
 		&totGuadagno,
+		&pagamento,
+		&pagamCoordBancarie,
+		&noteInterne,
+		&anagrIndirizzo,
+		&anagrCap,
+		&anagrCitta,
+		&anagrProv,
+		&anagrNazione,
+		&anagrCodiceFiscale,
+		&anagrPartitaIva,
+		&anagrDestNome,
+		&anagrDestIndirizzo,
+		&anagrDestCap,
+		&anagrDestCitta,
+		&anagrDestProv,
+		&anagrDestNazione,
 	); err != nil {
 		return documentRow{}, err
 	}
 
 	item.TipoDoc = nullableString(tipoDoc)
 	item.IDAnagr = nullableInt(idAnagr)
+	item.AnagrNome = nullableString(anagrNome)
 	item.CodDestIDAnagr = nullableInt(codDestIDAnagr)
 	item.CodDest = nullableString(codDest)
 	item.Data = nullableDate(data)
@@ -307,6 +360,22 @@ func scanDocumentRow(rows *sql.Rows) (documentRow, error) {
 	item.TotDoc = nullableInt64(totDoc)
 	item.TotPrezzoAcquisto = nullableInt64(totPrezzoAcquisto)
 	item.TotGuadagno = nullableInt64(totGuadagno)
+	item.Pagamento = nullableString(pagamento)
+	item.PagamCoordBancarie = nullableString(pagamCoordBancarie)
+	item.NoteInterne = nullableString(noteInterne)
+	item.AnagrIndirizzo = nullableString(anagrIndirizzo)
+	item.AnagrCap = nullableString(anagrCap)
+	item.AnagrCitta = nullableString(anagrCitta)
+	item.AnagrProv = nullableString(anagrProv)
+	item.AnagrNazione = nullableString(anagrNazione)
+	item.AnagrCodiceFiscale = nullableString(anagrCodiceFiscale)
+	item.AnagrPartitaIva = nullableString(anagrPartitaIva)
+	item.AnagrDestNome = nullableString(anagrDestNome)
+	item.AnagrDestIndirizzo = nullableString(anagrDestIndirizzo)
+	item.AnagrDestCap = nullableString(anagrDestCap)
+	item.AnagrDestCitta = nullableString(anagrDestCitta)
+	item.AnagrDestProv = nullableString(anagrDestProv)
+	item.AnagrDestNazione = nullableString(anagrDestNazione)
 
 	return item, nil
 }
