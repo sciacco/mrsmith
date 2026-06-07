@@ -51,3 +51,15 @@ export interface ArchiveDocumentFilters {
   page: number;
   pageSize: number;
 }
+
+export interface AenadDocumentRow {
+  IDDocRiga: number;
+  IDDoc: number;
+  CodArticolo: string | null;
+  Desc: string | null;
+  Qta: number | null;
+  Udm: string | null;
+  PrezzoNetto: number | null;
+  Sconti: string | null;
+  ImportoNettoRiga: number | null;
+}

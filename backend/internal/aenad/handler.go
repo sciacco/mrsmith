@@ -40,6 +40,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 
 	handle("GET /aenad/v1/document-types", h.handleDocumentTypes)
 	handle("GET /aenad/v1/documents", h.handleDocuments)
+	handle("GET /aenad/v1/documents/{id}/rows", h.handleDocumentRows)
 }
 
 func (h *Handler) requireMistra(w http.ResponseWriter) bool {

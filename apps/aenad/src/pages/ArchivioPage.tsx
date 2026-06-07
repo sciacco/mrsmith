@@ -1,6 +1,6 @@
-import { Button, Icon, SingleSelect, Skeleton } from '@mrsmith/ui';
+import { Button, Icon, SingleSelect, Skeleton, Drawer } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
-import { useArchiveDocuments, useDocumentTypes } from '../api/queries';
+import { useArchiveDocuments, useDocumentTypes, useDocumentRows } from '../api/queries';
 import type { AenadDocument } from '../api/types';
 import styles from './PreventiviPage.module.css';
 
@@ -75,6 +75,7 @@ export function ArchivioPage() {
   const [dateFrom, setDateFrom] = useState(range.from);
   const [dateTo, setDateTo] = useState(range.to);
   const [page, setPage] = useState(1);
+  const [selectedDoc, setSelectedDoc] = useState<AenadDocument | null>(null);
 
   const documentTypes = useDocumentTypes();
   const typeOptions = useMemo(
@@ -202,7 +203,7 @@ export function ArchivioPage() {
           <ViewState icon="search" title="Nessun documento trovato" message="Modifica tipo documento o periodo." />
         ) : (
           <>
-            <DocumentTable rows={rows} />
+            <DocumentTable rows={rows} onRowClick={setSelectedDoc} />
             <div className={styles.pagination}>
               <span>
                 {fromRow}-{toRow} di {total}
@@ -224,11 +225,13 @@ export function ArchivioPage() {
           </>
         )}
       </section>
+
+      <DocumentDetailsDrawer doc={selectedDoc} open={Boolean(selectedDoc)} onClose={() => setSelectedDoc(null)} />
     </main>
   );
 }
 
-function DocumentTable({ rows }: { rows: AenadDocument[] }) {
+function DocumentTable({ rows, onRowClick }: { rows: AenadDocument[]; onRowClick: (row: AenadDocument) => void }) {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
@@ -246,7 +249,12 @@ function DocumentTable({ rows }: { rows: AenadDocument[] }) {
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={row.IDDoc} style={{ animationDelay: `${Math.min(index, 8) * 25}ms` }}>
+            <tr
+              key={row.IDDoc}
+              style={{ animationDelay: `${Math.min(index, 8) * 25}ms` }}
+              className={styles.clickableRow}
+              onClick={() => onRowClick(row)}
+            >
               <td className={styles.monoCell}>{row.NumDoc ?? '-'}</td>
               <td>{formatDate(row.DataDoc)}</td>
               <td>{row.Anagr_Nome ?? '-'}</td>
@@ -260,6 +268,190 @@ function DocumentTable({ rows }: { rows: AenadDocument[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function DocumentDetailsDrawer({
+  doc,
+  open,
+  onClose,
+}: {
+  doc: AenadDocument | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const rowsQuery = useDocumentRows(doc?.IDDoc ?? 0, Boolean(doc && open));
+
+  if (!doc) return null;
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title={`Documento N. ${doc.NumDoc ?? '-'}`}
+      subtitle={`Data: ${formatDate(doc.DataDoc)} | Cliente: ${doc.Anagr_Nome ?? '-'}`}
+    >
+      <div className={styles.drawerContent}>
+        <div className={styles.detailsGrid}>
+          {/* Card Dati Cliente */}
+          <div className={styles.infoCard}>
+            <h3>Dati Cliente & Fatturazione</h3>
+            <div className={styles.infoRow}>
+              <span className={styles.infoRowLabel}>Rag. Sociale</span>
+              <span className={styles.infoRowValue}>{doc.Anagr_Nome ?? '-'}</span>
+            </div>
+            {(doc.Anagr_CodiceFiscale || doc.Anagr_PartitaIva) && (
+              <div className={styles.infoRow}>
+                <span className={styles.infoRowLabel}>Cod. Fisc. / P.IVA</span>
+                <span className={styles.infoRowValue}>
+                  {doc.Anagr_CodiceFiscale ?? '-'} / {doc.Anagr_PartitaIva ?? '-'}
+                </span>
+              </div>
+            )}
+            <div className={styles.infoRow}>
+              <span className={styles.infoRowLabel}>Indirizzo</span>
+              <span className={styles.infoRowValue}>
+                {doc.Anagr_Indirizzo ? (
+                  <>
+                    {doc.Anagr_Indirizzo}
+                    <br />
+                    {doc.Anagr_Cap} {doc.Anagr_Citta} ({doc.Anagr_Prov})
+                    {doc.Anagr_Nazione && ` - ${doc.Anagr_Nazione}`}
+                  </>
+                ) : (
+                  '-'
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* Card Spedizione e Pagamento */}
+          <div className={styles.infoCard}>
+            <h3>Spedizione & Pagamento</h3>
+            {doc.Anagr_DestNome ? (
+              <div className={styles.infoRow}>
+                <span className={styles.infoRowLabel}>Destinatario</span>
+                <span className={styles.infoRowValue}>
+                  <strong>{doc.Anagr_DestNome}</strong>
+                  <br />
+                  {doc.Anagr_DestIndirizzo}
+                  <br />
+                  {doc.Anagr_DestCap} {doc.Anagr_DestCitta} ({doc.Anagr_DestProv})
+                  {doc.Anagr_DestNazione && ` - ${doc.Anagr_DestNazione}`}
+                </span>
+              </div>
+            ) : (
+              <div className={styles.infoRow}>
+                <span className={styles.infoRowLabel}>Spedizione</span>
+                <span className={styles.infoRowValue}>Come indirizzo di fatturazione</span>
+              </div>
+            )}
+            <div className={styles.infoRow}>
+              <span className={styles.infoRowLabel}>Pagamento</span>
+              <span className={styles.infoRowValue}>{doc.Pagamento ?? '-'}</span>
+            </div>
+            {doc.Pagam_CoordBancarie && (
+              <div className={styles.infoRow}>
+                <span className={styles.infoRowLabel}>Coordinate Bancarie</span>
+                <span className={styles.infoRowValue}>{doc.Pagam_CoordBancarie}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Note Interne */}
+        {doc.NoteInterne && (
+          <div className={styles.notesBox}>
+            <h3>Note Interne</h3>
+            <p>{doc.NoteInterne}</p>
+          </div>
+        )}
+
+        {/* Riepilogo Totali */}
+        <div className={styles.infoCard}>
+          <h3>Riepilogo Importi</h3>
+          <div className={styles.detailsGrid}>
+            <div className={styles.infoRow}>
+              <span className={styles.infoRowLabel}>Totale Netto</span>
+              <span className={styles.infoRowValue}>{formatMoney(doc.TotNetto)}</span>
+            </div>
+            <div className={styles.infoRow}>
+              <span className={styles.infoRowLabel}>Totale Documento</span>
+              <span className={styles.infoRowValue}><strong>{formatMoney(doc.TotDoc)}</strong></span>
+            </div>
+            <div className={styles.infoRow}>
+              <span className={styles.infoRowLabel}>Totale Acquisto</span>
+              <span className={styles.infoRowValue}>{formatMoney(doc.TotPrezzoAcquisto)}</span>
+            </div>
+            <div className={styles.infoRow}>
+              <span className={styles.infoRowLabel}>Totale Guadagno</span>
+              <span className={styles.infoRowValue}>{formatMoney(doc.TotGuadagno)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Sezione Righe Documento */}
+        <div className={styles.linesSection}>
+          <h3>Righe Documento</h3>
+          {rowsQuery.isLoading ? (
+            <Skeleton rows={5} />
+          ) : rowsQuery.error ? (
+            <p style={{ color: 'var(--color-danger)' }}>Impossibile caricare le righe del documento.</p>
+          ) : !rowsQuery.data || rowsQuery.data.length === 0 ? (
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.8125rem' }}>Nessuna riga presente in questo documento.</p>
+          ) : (
+            <div className={styles.linesTableWrap}>
+              <table className={styles.linesTable}>
+                <thead>
+                  <tr>
+                    <th>Cod. Articolo</th>
+                    <th>Descrizione</th>
+                    <th className={styles.numCol}>Quantità</th>
+                    <th>U.M.</th>
+                    <th className={styles.numCol}>Prezzo Unit.</th>
+                    <th className={styles.numCol}>Sconti</th>
+                    <th className={styles.numCol}>Netto Riga</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rowsQuery.data.map((row) => {
+                    const isDescriptive = !row.CodArticolo && 
+                      (row.Qta === null || row.Qta === 0) && 
+                      row.Desc && 
+                      (row.PrezzoNetto === null || row.PrezzoNetto === 0) && 
+                      (row.ImportoNettoRiga === null || row.ImportoNettoRiga === 0);
+
+                    if (isDescriptive) {
+                      return (
+                        <tr key={row.IDDocRiga} className={styles.descriptiveRow}>
+                          <td></td>
+                          <td colSpan={6} className={styles.descriptiveCell}>
+                            {row.Desc}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return (
+                      <tr key={row.IDDocRiga}>
+                        <td className={styles.monoCell}>{row.CodArticolo ?? '-'}</td>
+                        <td>{row.Desc ?? '-'}</td>
+                        <td className={styles.numCol}>{row.Qta ?? 0}</td>
+                        <td>{row.Udm ?? '-'}</td>
+                        <td className={styles.numCol}>{formatMoney(row.PrezzoNetto)}</td>
+                        <td className={styles.numCol}>{row.Sconti ?? '-'}</td>
+                        <td className={styles.numCol}>{formatMoney(row.ImportoNettoRiga)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </Drawer>
   );
 }
 

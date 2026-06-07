@@ -413,3 +413,88 @@ func nullableDate(value sql.NullTime) *string {
 	formatted := value.Time.Format(dateLayout)
 	return &formatted
 }
+
+type documentRowDetail struct {
+	IDDocRiga        int     `json:"IDDocRiga"`
+	IDDoc            int     `json:"IDDoc"`
+	CodArticolo      *string `json:"CodArticolo"`
+	Desc             *string `json:"Desc"`
+	Qta              *int64  `json:"Qta"`
+	Udm              *string `json:"Udm"`
+	PrezzoNetto      *int64  `json:"PrezzoNetto"`
+	Sconti           *string `json:"Sconti"`
+	ImportoNettoRiga *int64  `json:"ImportoNettoRiga"`
+}
+
+func (h *Handler) handleDocumentRows(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMistra(w) {
+		return
+	}
+
+	idStr := r.PathValue("id")
+	idDoc, err := strconv.Atoi(idStr)
+	if err != nil || idDoc <= 0 {
+		httputil.Error(w, http.StatusBadRequest, "invalid_document_id")
+		return
+	}
+
+	rows, err := h.mistra.QueryContext(r.Context(), `
+		SELECT
+			"IDDocRiga",
+			"IDDoc",
+			"CodArticolo",
+			"Desc",
+			"Qta",
+			"Udm",
+			"PrezzoNetto",
+			"Sconti",
+			"ImportoNettoRiga"
+		FROM aenad."TDocRighe"
+		WHERE "IDDoc" = $1
+		  AND ("CodArticolo" IS NOT NULL OR "Desc" IS NOT NULL OR "Qta" IS NOT NULL OR "ImportoNettoRiga" IS NOT NULL)
+		ORDER BY "IDDocRiga" ASC`, idDoc)
+	if err != nil {
+		h.dbFailure(w, r, "document_rows", err, "id_doc", idDoc)
+		return
+	}
+	defer rows.Close()
+
+	items := make([]documentRowDetail, 0)
+	for rows.Next() {
+		var item documentRowDetail
+		var codArticolo, desc, udm, sconti sql.NullString
+		var qta, prezzoNetto, importoNettoRiga sql.NullInt64
+
+		if err := rows.Scan(
+			&item.IDDocRiga,
+			&item.IDDoc,
+			&codArticolo,
+			&desc,
+			&qta,
+			&udm,
+			&prezzoNetto,
+			&sconti,
+			&importoNettoRiga,
+		); err != nil {
+			h.dbFailure(w, r, "document_rows_scan", err)
+			return
+		}
+
+		item.CodArticolo = nullableString(codArticolo)
+		item.Desc = nullableString(desc)
+		item.Qta = nullableInt64(qta)
+		item.Udm = nullableString(udm)
+		item.PrezzoNetto = nullableInt64(prezzoNetto)
+		item.Sconti = nullableString(sconti)
+		item.ImportoNettoRiga = nullableInt64(importoNettoRiga)
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		h.dbFailure(w, r, "document_rows_loop", err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, items)
+}

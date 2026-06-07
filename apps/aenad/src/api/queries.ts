@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '@mrsmith/api-client';
 import { useApiClient } from './client';
-import type { AenadDocumentsPage, ArchiveDocumentFilters, DocumentTypeOption } from './types';
+import type { AenadDocumentsPage, ArchiveDocumentFilters, DocumentTypeOption, AenadDocumentRow } from './types';
 
 export const aenadQueryKeys = {
   all: ['aenad'] as const,
   documentTypes: () => [...aenadQueryKeys.all, 'document-types'] as const,
   documents: (filters: ArchiveDocumentFilters) => [...aenadQueryKeys.all, 'documents', filters] as const,
+  documentRows: (idDoc: number) => [...aenadQueryKeys.all, 'documents', idDoc, 'rows'] as const,
 };
 
 function shouldRetry(failureCount: number, error: unknown) {
@@ -42,6 +43,16 @@ export function useArchiveDocuments(filters: ArchiveDocumentFilters, enabled: bo
     queryFn: () => api.get<AenadDocumentsPage>(`/aenad/v1/documents?${documentParams(filters)}`),
     enabled,
     placeholderData: (previous) => previous,
+    retry: shouldRetry,
+  });
+}
+
+export function useDocumentRows(idDoc: number, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQueryKeys.documentRows(idDoc),
+    queryFn: () => api.get<AenadDocumentRow[]>(`/aenad/v1/documents/${idDoc}/rows`),
+    enabled,
     retry: shouldRetry,
   });
 }
