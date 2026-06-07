@@ -39,3 +39,5 @@ export { ToggleSwitch } from './components/ToggleSwitch/ToggleSwitch';
 export { ToastProvider, useToast } from './components/Toast/ToastProvider';
 export { useTableFilter } from './hooks/useTableFilter';
 export { provinces, provinceSelectOptions, type ProvinceOption } from './data/provinces';
+export { PhoneInput } from './components/PhoneInput/PhoneInput';
+export type { PhoneInputProps } from './components/PhoneInput/PhoneInput';
