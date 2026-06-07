@@ -17,6 +17,9 @@ importers:
 
   apps/aenad:
     dependencies:
+      '@mrsmith/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
       '@mrsmith/auth-client':
         specifier: workspace:*
         version: link:../../packages/auth-client

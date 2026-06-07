@@ -15,6 +15,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/microsoft/go-mssqldb"
 
+	"github.com/sciacco/mrsmith/internal/aenad"
 	"github.com/sciacco/mrsmith/internal/afctools"
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/budget"
@@ -604,6 +605,7 @@ func main() {
 		Carbone: afcToolsCarboneSvc,
 		Arak:    arakCli,
 	})
+	aenad.RegisterRoutes(api, aenad.Deps{Mistra: mistraDB, Logger: logger})
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),
