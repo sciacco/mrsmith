@@ -1,9 +1,8 @@
-import { Button, Icon, Modal } from '@mrsmith/ui';
+import { Button, Icon, Modal, PhoneInput } from '@mrsmith/ui';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { ProviderReference } from '../api/types';
 import {
   PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE,
-  PROVIDER_REFERENCE_PHONE_PATTERN,
   availableReferenceTypes,
   isValidOptionalProviderRefPhone,
   referenceTypeLabel,
@@ -121,20 +120,12 @@ export function ProviderContactModal({
           <label>Cognome</label>
           <input value={draft.last_name} onChange={(event) => update('last_name', event.target.value)} />
         </div>
-        <div className="field">
-          <label>Telefono</label>
-          <input
-            value={draft.phone}
-            type="tel"
-            inputMode="tel"
-            pattern={PROVIDER_REFERENCE_PHONE_PATTERN}
-            title={PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE}
-            placeholder="+391234567890"
-            aria-invalid={errors.phone ? 'true' : undefined}
-            onChange={(event) => update('phone', event.target.value)}
-          />
-          {errors.phone ? <p className="fieldError">{errors.phone}</p> : null}
-        </div>
+        <PhoneInput
+          value={draft.phone}
+          onChange={(val) => update('phone', val)}
+          label="Telefono"
+          error={errors.phone}
+        />
         <div className="field">
           <label>Tipo</label>
           {editing ? (

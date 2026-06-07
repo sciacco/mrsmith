@@ -1,4 +1,4 @@
-import { Button, Icon, useToast } from '@mrsmith/ui';
+import { Button, Icon, PhoneInput, useToast } from '@mrsmith/ui';
 import { useState } from 'react';
 import { useProviderMutations } from '../api/queries';
 import type { ProviderPayload, ProviderSummary } from '../api/types';
@@ -8,6 +8,7 @@ export function NewProviderInlineForm({ onCreated }: { onCreated: (provider: Pro
   const { createProvider } = useProviderMutations();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [phone, setPhone] = useState('');
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,6 +48,7 @@ export function NewProviderInlineForm({ onCreated }: { onCreated: (provider: Pro
       onCreated(provider);
       setOpen(false);
       event.currentTarget.reset();
+      setPhone('');
     } catch (error) {
       toast(apiErrorMessage(error, 'Dati fornitore non disponibili in questo momento'), 'error');
     }
@@ -69,7 +71,7 @@ export function NewProviderInlineForm({ onCreated }: { onCreated: (provider: Pro
           <div className="field"><label>Nome qualifica</label><input name="first_name" /></div>
           <div className="field"><label>Cognome qualifica</label><input name="last_name" /></div>
           <div className="field"><label>Email qualifica</label><input name="email" type="email" /></div>
-          <div className="field"><label>Telefono qualifica</label><input name="phone" /></div>
+          <PhoneInput name="phone" value={phone} onChange={setPhone} label="Telefono qualifica" />
           <div className="actionRow fullWidth">
             <Button type="submit" leftIcon={<Icon name="check" />} loading={createProvider.isPending}>Crea fornitore</Button>
           </div>

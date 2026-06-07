@@ -161,6 +161,7 @@ export interface PhoneInputProps {
   required?: boolean;
   error?: string;
   id?: string;
+  name?: string;
 }
 
 const findCountryByValue = (val: string): Country => {
@@ -180,6 +181,7 @@ export function PhoneInput({
   required = false,
   error,
   id,
+  name,
 }: PhoneInputProps) {
   const [selectedCountry, setSelectedCountry] = useState<Country>(() => findCountryByValue(value));
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -404,6 +406,7 @@ export function PhoneInput({
           placeholder={selectedCountry.code === 'OTHER' ? 'Prefisso + Numero' : '333 123 4567'}
         />
       </div>
+      {name && <input type="hidden" name={name} value={value} />}
       {error && <span className={styles.errorText}>{error}</span>}
 
       {dropdownOpen && !disabled && (renderInline ? dropdown : createPortal(dropdown, document.body))}

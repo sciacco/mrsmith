@@ -1,4 +1,4 @@
-import { Button, Icon, Modal, SingleSelect, provinceSelectOptions, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, PhoneInput, SingleSelect, provinceSelectOptions, useToast } from '@mrsmith/ui';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useCountries, useProviderMutations } from '../api/queries';
 import type { Country, ProviderPayload, ProviderSummary } from '../api/types';
@@ -64,6 +64,7 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
   const [country, setCountry] = useState('IT');
   const [language, setLanguage] = useState('it');
   const [province, setProvince] = useState('');
+  const [phone, setPhone] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const countryOptions = useMemo(() => countrySelectOptions(countriesQuery.data, country), [countriesQuery.data, country]);
   const provinceOptions = useMemo(() => provinceSelectOptions(province), [province]);
@@ -75,6 +76,7 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
     setCountry('IT');
     setLanguage('it');
     setProvince('');
+    setPhone('');
     setErrors({});
 
     const companyInput = form?.elements.namedItem('company_name');
@@ -363,9 +365,13 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
                 onChange={() => clearError('email')}
               />
             </div>
-            <div className={`field ${styles.contactPhoneField}`}>
-              <label>Telefono</label>
-              <input name="phone" />
+            <div className={styles.contactPhoneField}>
+              <PhoneInput
+                name="phone"
+                value={phone}
+                onChange={setPhone}
+                label="Telefono"
+              />
             </div>
             {errors.email ? (
               <div className={styles.contactErrorRow}>
