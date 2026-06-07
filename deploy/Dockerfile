@@ -18,6 +18,7 @@ RUN go mod download && CGO_ENABLED=0 go build -o server ./cmd/server
 FROM gcr.io/distroless/static-debian12
 COPY --from=backend /app/server /server
 COPY --from=frontend /app/apps/portal/dist /static
+COPY --from=frontend /app/apps/aenad/dist /static/apps/aenad
 COPY --from=frontend /app/apps/budget/dist /static/apps/budget
 COPY --from=frontend /app/apps/fornitori/dist /static/apps/fornitori
 COPY --from=frontend /app/apps/rda/dist /static/apps/rda

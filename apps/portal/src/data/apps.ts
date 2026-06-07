@@ -52,6 +52,7 @@ export const categories: Category[] = [
     { name: 'Richieste Fattibilità', icon: 'clipboard' },
     { name: 'Listini e Sconti', icon: 'tag' },
     { name: 'Ordini', icon: 'document' },
+    { name: 'Aenad', icon: 'document', status: 'dev' },
   ]),
   createCategory('smart-apps', 'SMART APPS', [
     { name: 'Reports', icon: 'chart' },

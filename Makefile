@@ -31,6 +31,10 @@ dev-backend:          ## Solo backend con air
 dev-portal:           ## Solo portal
 	pnpm --filter mrsmith-portal dev
 
+.PHONY: dev-aenad
+dev-aenad:            ## Solo aenad app
+	pnpm --filter mrsmith-aenad dev
+
 .PHONY: dev-budget
 dev-budget:           ## Solo budget app
 	pnpm --filter mrsmith-budget dev

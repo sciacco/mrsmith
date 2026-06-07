@@ -338,6 +338,11 @@ func main() {
 	// API routes (with auth)
 	api := http.NewServeMux()
 	hrefOverrides := map[string]string{}
+	if cfg.AenadAppURL != "" {
+		hrefOverrides[applaunch.AenadAppID] = cfg.AenadAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.AenadAppID] = "http://localhost:5194"
+	}
 	if cfg.BudgetAppURL != "" {
 		hrefOverrides[applaunch.BudgetAppID] = cfg.BudgetAppURL
 	} else if cfg.StaticDir == "" {

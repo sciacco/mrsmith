@@ -8,6 +8,9 @@ import (
 )
 
 const (
+	AenadAppID   = "aenad"
+	AenadAppHref = "/apps/aenad/"
+
 	BudgetAppID   = "budget"
 	BudgetAppHref = "/apps/budget/"
 
@@ -70,6 +73,7 @@ const (
 )
 
 var (
+	aenadAccessRoles                 = []string{"app_aenad_access"}
 	budgetAccessRoles                = []string{"app_budget_access"}
 	fornitoriAccessRoles             = []string{"app_fornitori_access"}
 	fornitoriSkipQualificationRoles  = []string{"app_fornitori_skip_qualification"}
@@ -256,6 +260,17 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryID:    "mkt-sales",
 			CategoryTitle: "MKT&Sales",
 			AccessRoles:   ListiniAccessRoles(),
+		},
+		{
+			ID:            AenadAppID,
+			Name:          "Aenad",
+			Description:   "Preventivi di vendita.",
+			Icon:          "document",
+			Href:          AenadAppHref,
+			Status:        "dev",
+			CategoryID:    "mkt-sales",
+			CategoryTitle: "MKT&Sales",
+			AccessRoles:   AenadAccessRoles(),
 		},
 		// {
 		// 	ID:            "ordini",
@@ -455,6 +470,10 @@ func BudgetAccessRoles() []string {
 	return slices.Clone(budgetAccessRoles)
 }
 
+func AenadAccessRoles() []string {
+	return slices.Clone(aenadAccessRoles)
+}
+
 func FornitoriAccessRoles() []string {
 	return slices.Clone(fornitoriAccessRoles)
 }
@@ -596,6 +615,7 @@ func DefaultAccessRoles() []string {
 // where the caller needs to simulate an omnipotent user.
 func AllRoles() []string {
 	groups := [][]string{
+		aenadAccessRoles,
 		budgetAccessRoles,
 		fornitoriAccessRoles,
 		fornitoriSkipQualificationRoles,

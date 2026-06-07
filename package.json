@@ -6,6 +6,7 @@
     "dev": "concurrently --names backend,apps --prefix-colors blue,green \"cd backend && air\" \"pnpm --filter './apps/*' --parallel --if-present dev\"",
     "dev:backend": "cd backend && air",
     "dev:portal": "pnpm --filter mrsmith-portal dev",
+    "dev:aenad": "pnpm --filter mrsmith-aenad dev",
     "dev:budget": "pnpm --filter mrsmith-budget dev",
     "dev:fornitori": "pnpm --filter mrsmith-fornitori dev",
     "dev:rda": "pnpm --filter mrsmith-rda dev",
