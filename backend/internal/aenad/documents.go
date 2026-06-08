@@ -2,6 +2,7 @@ package aenad
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -414,6 +415,89 @@ func nullableDate(value sql.NullTime) *string {
 	return &formatted
 }
 
+func (h *Handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMistra(w) {
+		return
+	}
+
+	idStr := r.PathValue("id")
+	idDoc, err := strconv.Atoi(idStr)
+	if err != nil || idDoc <= 0 {
+		httputil.Error(w, http.StatusBadRequest, "invalid_document_id")
+		return
+	}
+
+	var updatedRow documentRow
+	rowQuery := h.mistra.QueryRowContext(r.Context(), `
+		SELECT
+			d."IDDoc", d."TipoDoc", d."IDAnagr", d."Anagr_Nome", d."CodDest_IDAnagr", d."CodDest",
+			d."Data", d."Num", d."DataDoc", d."NumDoc", d."DescDoc", d."TotNetto", d."TotDoc",
+			d."TotPrezzoAcquisto", d."TotGuadagno", d."Pagamento", d."Pagam_CoordBancarie",
+			d."NoteInterne", d."Anagr_Indirizzo", d."Anagr_Cap", d."Anagr_Citta", d."Anagr_Prov",
+			d."Anagr_Nazione", d."Anagr_CodiceFiscale", d."Anagr_PartitaIva", d."Anagr_DestNome",
+			d."Anagr_DestIndirizzo", d."Anagr_DestCap", d."Anagr_DestCitta", d."Anagr_DestProv",
+			d."Anagr_DestNazione"
+		FROM aenad."TDocTestate" d
+		WHERE d."IDDoc" = $1`, idDoc)
+
+	var tipoDoc, codDest, numDoc, descDoc, anagrNome sql.NullString
+	var pagamento, pagamCoordBancarie, noteInterne, anagrIndirizzo, anagrCap, anagrCitta, anagrProv, anagrNazione, anagrCodiceFiscale, anagrPartitaIva, anagrDestNome, anagrDestIndirizzo, anagrDestCap, anagrDestCitta, anagrDestProv, anagrDestNazione sql.NullString
+	var idAnagr, codDestIDAnagr, num sql.NullInt64
+	var data, dataDoc sql.NullTime
+	var totNetto, totDoc, totPrezzoAcquisto, totGuadagno sql.NullInt64
+
+	err = rowQuery.Scan(
+		&updatedRow.IDDoc, &tipoDoc, &idAnagr, &anagrNome, &codDestIDAnagr, &codDest,
+		&data, &num, &dataDoc, &numDoc, &descDoc, &totNetto, &totDoc,
+		&totPrezzoAcquisto, &totGuadagno, &pagamento, &pagamCoordBancarie,
+		&noteInterne, &anagrIndirizzo, &anagrCap, &anagrCitta, &anagrProv,
+		&anagrNazione, &anagrCodiceFiscale, &anagrPartitaIva, &anagrDestNome,
+		&anagrDestIndirizzo, &anagrDestCap, &anagrDestCitta, &anagrDestProv,
+		&anagrDestNazione,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			httputil.Error(w, http.StatusNotFound, "document_not_found")
+			return
+		}
+		h.dbFailure(w, r, "query_document", err, "id_doc", idDoc)
+		return
+	}
+
+	updatedRow.TipoDoc = nullableString(tipoDoc)
+	updatedRow.IDAnagr = nullableInt(idAnagr)
+	updatedRow.AnagrNome = nullableString(anagrNome)
+	updatedRow.CodDestIDAnagr = nullableInt(codDestIDAnagr)
+	updatedRow.CodDest = nullableString(codDest)
+	updatedRow.Data = nullableDate(data)
+	updatedRow.Num = nullableInt(num)
+	updatedRow.DataDoc = nullableDate(dataDoc)
+	updatedRow.NumDoc = nullableString(numDoc)
+	updatedRow.DescDoc = nullableString(descDoc)
+	updatedRow.TotNetto = nullableInt64(totNetto)
+	updatedRow.TotDoc = nullableInt64(totDoc)
+	updatedRow.TotPrezzoAcquisto = nullableInt64(totPrezzoAcquisto)
+	updatedRow.TotGuadagno = nullableInt64(totGuadagno)
+	updatedRow.Pagamento = nullableString(pagamento)
+	updatedRow.PagamCoordBancarie = nullableString(pagamCoordBancarie)
+	updatedRow.NoteInterne = nullableString(noteInterne)
+	updatedRow.AnagrIndirizzo = nullableString(anagrIndirizzo)
+	updatedRow.AnagrCap = nullableString(anagrCap)
+	updatedRow.AnagrCitta = nullableString(anagrCitta)
+	updatedRow.AnagrProv = nullableString(anagrProv)
+	updatedRow.AnagrNazione = nullableString(anagrNazione)
+	updatedRow.AnagrCodiceFiscale = nullableString(anagrCodiceFiscale)
+	updatedRow.AnagrPartitaIva = nullableString(anagrPartitaIva)
+	updatedRow.AnagrDestNome = nullableString(anagrDestNome)
+	updatedRow.AnagrDestIndirizzo = nullableString(anagrDestIndirizzo)
+	updatedRow.AnagrDestCap = nullableString(anagrDestCap)
+	updatedRow.AnagrDestCitta = nullableString(anagrDestCitta)
+	updatedRow.AnagrDestProv = nullableString(anagrDestProv)
+	updatedRow.AnagrDestNazione = nullableString(anagrDestNazione)
+
+	httputil.JSON(w, http.StatusOK, updatedRow)
+}
+
 type documentRowDetail struct {
 	IDDocRiga        int     `json:"IDDocRiga"`
 	IDDoc            int     `json:"IDDoc"`
@@ -497,4 +581,255 @@ func (h *Handler) handleDocumentRows(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.JSON(w, http.StatusOK, items)
+}
+
+type updateDocumentRequest struct {
+	AnagrNome           *string                 `json:"Anagr_Nome"`
+	AnagrIndirizzo      *string                 `json:"Anagr_Indirizzo"`
+	AnagrCap            *string                 `json:"Anagr_Cap"`
+	AnagrCitta          *string                 `json:"Anagr_Citta"`
+	AnagrProv           *string                 `json:"Anagr_Prov"`
+	AnagrNazione        *string                 `json:"Anagr_Nazione"`
+	AnagrCodiceFiscale  *string                 `json:"Anagr_CodiceFiscale"`
+	AnagrPartitaIva     *string                 `json:"Anagr_PartitaIva"`
+	AnagrDestNome       *string                 `json:"Anagr_DestNome"`
+	AnagrDestIndirizzo  *string                 `json:"Anagr_DestIndirizzo"`
+	AnagrDestCap        *string                 `json:"Anagr_DestCap"`
+	AnagrDestCitta      *string                 `json:"Anagr_DestCitta"`
+	AnagrDestProv       *string                 `json:"Anagr_DestProv"`
+	AnagrDestNazione    *string                 `json:"Anagr_DestNazione"`
+	Pagamento           *string                 `json:"Pagamento"`
+	PagamCoordBancarie  *string                 `json:"Pagam_CoordBancarie"`
+	NoteInterne         *string                 `json:"NoteInterne"`
+	DescDoc             *string                 `json:"DescDoc"`
+	DataDoc             *string                 `json:"DataDoc"`
+	NumDoc              *string                 `json:"NumDoc"`
+	Rows                []updateDocumentRowItem `json:"Rows"`
+}
+
+type updateDocumentRowItem struct {
+	IDDocRiga   int     `json:"IDDocRiga"`
+	CodArticolo *string `json:"CodArticolo"`
+	Desc        *string `json:"Desc"`
+	Qta         *int64  `json:"Qta"`
+	Udm         *string `json:"Udm"`
+	PrezzoNetto *int64  `json:"PrezzoNetto"`
+	Sconti      *string `json:"Sconti"`
+}
+
+func (h *Handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMistra(w) {
+		return
+	}
+
+	idStr := r.PathValue("id")
+	idDoc, err := strconv.Atoi(idStr)
+	if err != nil || idDoc <= 0 {
+		httputil.Error(w, http.StatusBadRequest, "invalid_document_id")
+		return
+	}
+
+	var req updateDocumentRequest
+	defer r.Body.Close()
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json_body")
+		return
+	}
+
+	tx, err := h.mistra.BeginTx(r.Context(), nil)
+	if err != nil {
+		h.dbFailure(w, r, "begin_tx", err)
+		return
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	// 1. Update TDocTestate
+	_, err = tx.ExecContext(r.Context(), `
+		UPDATE aenad."TDocTestate" SET
+			"Anagr_Nome" = $1,
+			"Anagr_Indirizzo" = $2,
+			"Anagr_Cap" = $3,
+			"Anagr_Citta" = $4,
+			"Anagr_Prov" = $5,
+			"Anagr_Nazione" = $6,
+			"Anagr_CodiceFiscale" = $7,
+			"Anagr_PartitaIva" = $8,
+			"Anagr_DestNome" = $9,
+			"Anagr_DestIndirizzo" = $10,
+			"Anagr_DestCap" = $11,
+			"Anagr_DestCitta" = $12,
+			"Anagr_DestProv" = $13,
+			"Anagr_DestNazione" = $14,
+			"Pagamento" = $15,
+			"Pagam_CoordBancarie" = $16,
+			"NoteInterne" = $17,
+			"DescDoc" = $18,
+			"DataDoc" = $19::date,
+			"NumDoc" = $20
+		WHERE "IDDoc" = $21`,
+		req.AnagrNome,
+		req.AnagrIndirizzo,
+		req.AnagrCap,
+		req.AnagrCitta,
+		req.AnagrProv,
+		req.AnagrNazione,
+		req.AnagrCodiceFiscale,
+		req.AnagrPartitaIva,
+		req.AnagrDestNome,
+		req.AnagrDestIndirizzo,
+		req.AnagrDestCap,
+		req.AnagrDestCitta,
+		req.AnagrDestProv,
+		req.AnagrDestNazione,
+		req.Pagamento,
+		req.PagamCoordBancarie,
+		req.NoteInterne,
+		req.DescDoc,
+		req.DataDoc,
+		req.NumDoc,
+		idDoc,
+	)
+	if err != nil {
+		h.dbFailure(w, r, "update_testata", err, "id_doc", idDoc)
+		return
+	}
+
+	// 2. Identify rows to delete (keep existing ones in request)
+	var keepIDs []string
+	for _, row := range req.Rows {
+		if row.IDDocRiga > 0 {
+			keepIDs = append(keepIDs, strconv.Itoa(row.IDDocRiga))
+		}
+	}
+
+	if len(keepIDs) > 0 {
+		query := `DELETE FROM aenad."TDocRighe" WHERE "IDDoc" = $1 AND "IDDocRiga" NOT IN (` + strings.Join(keepIDs, ",") + `)`
+		_, err = tx.ExecContext(r.Context(), query, idDoc)
+	} else {
+		_, err = tx.ExecContext(r.Context(), `DELETE FROM aenad."TDocRighe" WHERE "IDDoc" = $1`, idDoc)
+	}
+	if err != nil {
+		h.dbFailure(w, r, "delete_removed_rows", err, "id_doc", idDoc)
+		return
+	}
+
+	// 3. Update or Insert rows
+	for _, row := range req.Rows {
+		if row.IDDocRiga > 0 {
+			// Update
+			_, err = tx.ExecContext(r.Context(), `
+				UPDATE aenad."TDocRighe" SET
+					"CodArticolo" = $1,
+					"Desc" = $2,
+					"Qta" = $3,
+					"Udm" = $4,
+					"PrezzoNetto" = $5,
+					"Sconti" = $6
+				WHERE "IDDocRiga" = $7 AND "IDDoc" = $8`,
+				row.CodArticolo,
+				row.Desc,
+				row.Qta,
+				row.Udm,
+				row.PrezzoNetto,
+				row.Sconti,
+				row.IDDocRiga,
+				idDoc,
+			)
+		} else {
+			// Insert
+			_, err = tx.ExecContext(r.Context(), `
+				INSERT INTO aenad."TDocRighe" (
+					"IDDoc", "CodArticolo", "Desc", "Qta", "Udm", "PrezzoNetto", "Sconti"
+				) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+				idDoc,
+				row.CodArticolo,
+				row.Desc,
+				row.Qta,
+				row.Udm,
+				row.PrezzoNetto,
+				row.Sconti,
+			)
+		}
+		if err != nil {
+			h.dbFailure(w, r, "upsert_row", err, "id_doc", idDoc, "row_id", row.IDDocRiga)
+			return
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		h.dbFailure(w, r, "commit_tx", err)
+		return
+	}
+
+	// Query updated document details
+	var updatedRow documentRow
+	rowQuery := h.mistra.QueryRowContext(r.Context(), `
+		SELECT
+			d."IDDoc", d."TipoDoc", d."IDAnagr", d."Anagr_Nome", d."CodDest_IDAnagr", d."CodDest",
+			d."Data", d."Num", d."DataDoc", d."NumDoc", d."DescDoc", d."TotNetto", d."TotDoc",
+			d."TotPrezzoAcquisto", d."TotGuadagno", d."Pagamento", d."Pagam_CoordBancarie",
+			d."NoteInterne", d."Anagr_Indirizzo", d."Anagr_Cap", d."Anagr_Citta", d."Anagr_Prov",
+			d."Anagr_Nazione", d."Anagr_CodiceFiscale", d."Anagr_PartitaIva", d."Anagr_DestNome",
+			d."Anagr_DestIndirizzo", d."Anagr_DestCap", d."Anagr_DestCitta", d."Anagr_DestProv",
+			d."Anagr_DestNazione"
+		FROM aenad."TDocTestate" d
+		WHERE d."IDDoc" = $1`, idDoc)
+
+	var tipoDoc, codDest, numDoc, descDoc, anagrNome sql.NullString
+	var pagamento, pagamCoordBancarie, noteInterne, anagrIndirizzo, anagrCap, anagrCitta, anagrProv, anagrNazione, anagrCodiceFiscale, anagrPartitaIva, anagrDestNome, anagrDestIndirizzo, anagrDestCap, anagrDestCitta, anagrDestProv, anagrDestNazione sql.NullString
+	var idAnagr, codDestIDAnagr, num sql.NullInt64
+	var data, dataDoc sql.NullTime
+	var totNetto, totDoc, totPrezzoAcquisto, totGuadagno sql.NullInt64
+
+	err = rowQuery.Scan(
+		&updatedRow.IDDoc, &tipoDoc, &idAnagr, &anagrNome, &codDestIDAnagr, &codDest,
+		&data, &num, &dataDoc, &numDoc, &descDoc, &totNetto, &totDoc,
+		&totPrezzoAcquisto, &totGuadagno, &pagamento, &pagamCoordBancarie,
+		&noteInterne, &anagrIndirizzo, &anagrCap, &anagrCitta, &anagrProv,
+		&anagrNazione, &anagrCodiceFiscale, &anagrPartitaIva, &anagrDestNome,
+		&anagrDestIndirizzo, &anagrDestCap, &anagrDestCitta, &anagrDestProv,
+		&anagrDestNazione,
+	)
+	if err != nil {
+		h.dbFailure(w, r, "query_updated_document", err, "id_doc", idDoc)
+		return
+	}
+
+	updatedRow.TipoDoc = nullableString(tipoDoc)
+	updatedRow.IDAnagr = nullableInt(idAnagr)
+	updatedRow.AnagrNome = nullableString(anagrNome)
+	updatedRow.CodDestIDAnagr = nullableInt(codDestIDAnagr)
+	updatedRow.CodDest = nullableString(codDest)
+	updatedRow.Data = nullableDate(data)
+	updatedRow.Num = nullableInt(num)
+	updatedRow.DataDoc = nullableDate(dataDoc)
+	updatedRow.NumDoc = nullableString(numDoc)
+	updatedRow.DescDoc = nullableString(descDoc)
+	updatedRow.TotNetto = nullableInt64(totNetto)
+	updatedRow.TotDoc = nullableInt64(totDoc)
+	updatedRow.TotPrezzoAcquisto = nullableInt64(totPrezzoAcquisto)
+	updatedRow.TotGuadagno = nullableInt64(totGuadagno)
+	updatedRow.Pagamento = nullableString(pagamento)
+	updatedRow.PagamCoordBancarie = nullableString(pagamCoordBancarie)
+	updatedRow.NoteInterne = nullableString(noteInterne)
+	updatedRow.AnagrIndirizzo = nullableString(anagrIndirizzo)
+	updatedRow.AnagrCap = nullableString(anagrCap)
+	updatedRow.AnagrCitta = nullableString(anagrCitta)
+	updatedRow.AnagrProv = nullableString(anagrProv)
+	updatedRow.AnagrNazione = nullableString(anagrNazione)
+	updatedRow.AnagrCodiceFiscale = nullableString(anagrCodiceFiscale)
+	updatedRow.AnagrPartitaIva = nullableString(anagrPartitaIva)
+	updatedRow.AnagrDestNome = nullableString(anagrDestNome)
+	updatedRow.AnagrDestIndirizzo = nullableString(anagrDestIndirizzo)
+	updatedRow.AnagrDestCap = nullableString(anagrDestCap)
+	updatedRow.AnagrDestCitta = nullableString(anagrDestCitta)
+	updatedRow.AnagrDestProv = nullableString(anagrDestProv)
+	updatedRow.AnagrDestNazione = nullableString(anagrDestNazione)
+
+	httputil.JSON(w, http.StatusOK, updatedRow)
 }

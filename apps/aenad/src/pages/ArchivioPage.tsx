@@ -1,5 +1,6 @@
 import { Button, Icon, SingleSelect, Skeleton, Drawer } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useArchiveDocuments, useDocumentTypes, useDocumentRows } from '../api/queries';
 import type { AenadDocument } from '../api/types';
 import styles from './PreventiviPage.module.css';
@@ -280,6 +281,7 @@ function DocumentDetailsDrawer({
   open: boolean;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
   const rowsQuery = useDocumentRows(doc?.IDDoc ?? 0, Boolean(doc && open));
 
   if (!doc) return null;
@@ -291,6 +293,11 @@ function DocumentDetailsDrawer({
       size="lg"
       title={`Documento N. ${doc.NumDoc ?? '-'}`}
       subtitle={`Data: ${formatDate(doc.DataDoc)} | Cliente: ${doc.Anagr_Nome ?? '-'}`}
+      headerExtra={
+        <Button size="sm" onClick={() => navigate(`/archivio/${doc.IDDoc}/modifica`)}>
+          <Icon name="pencil" size={16} /> Modifica
+        </Button>
+      }
     >
       <div className={styles.drawerContent}>
         <div className={styles.detailsGrid}>

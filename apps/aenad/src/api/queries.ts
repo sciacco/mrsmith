@@ -1,12 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@mrsmith/api-client';
 import { useApiClient } from './client';
-import type { AenadDocumentsPage, ArchiveDocumentFilters, DocumentTypeOption, AenadDocumentRow } from './types';
+import type { AenadDocumentsPage, ArchiveDocumentFilters, DocumentTypeOption, AenadDocumentRow, AenadDocument } from './types';
 
 export const aenadQueryKeys = {
   all: ['aenad'] as const,
   documentTypes: () => [...aenadQueryKeys.all, 'document-types'] as const,
   documents: (filters: ArchiveDocumentFilters) => [...aenadQueryKeys.all, 'documents', filters] as const,
+  documentDetails: (idDoc: number) => [...aenadQueryKeys.all, 'documents', idDoc] as const,
   documentRows: (idDoc: number) => [...aenadQueryKeys.all, 'documents', idDoc, 'rows'] as const,
 };
 
@@ -54,5 +55,60 @@ export function useDocumentRows(idDoc: number, enabled: boolean) {
     queryFn: () => api.get<AenadDocumentRow[]>(`/aenad/v1/documents/${idDoc}/rows`),
     enabled,
     retry: shouldRetry,
+  });
+}
+
+export function useDocumentDetails(idDoc: number, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQueryKeys.documentDetails(idDoc),
+    queryFn: () => api.get<AenadDocument>(`/aenad/v1/documents/${idDoc}`),
+    enabled,
+    retry: shouldRetry,
+  });
+}
+
+export interface UpdateDocumentPayload {
+  Anagr_Nome: string | null;
+  Anagr_Indirizzo: string | null;
+  Anagr_Cap: string | null;
+  Anagr_Citta: string | null;
+  Anagr_Prov: string | null;
+  Anagr_Nazione: string | null;
+  Anagr_CodiceFiscale: string | null;
+  Anagr_PartitaIva: string | null;
+  Anagr_DestNome: string | null;
+  Anagr_DestIndirizzo: string | null;
+  Anagr_DestCap: string | null;
+  Anagr_DestCitta: string | null;
+  Anagr_DestProv: string | null;
+  Anagr_DestNazione: string | null;
+  Pagamento: string | null;
+  Pagam_CoordBancarie: string | null;
+  NoteInterne: string | null;
+  DescDoc: string | null;
+  DataDoc: string | null;
+  NumDoc: string | null;
+  Rows: {
+    IDDocRiga: number;
+    CodArticolo: string | null;
+    Desc: string | null;
+    Qta: number | null;
+    Udm: string | null;
+    PrezzoNetto: number | null;
+    Sconti: string | null;
+  }[];
+}
+
+export function useUpdateDocument() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ idDoc, payload }: { idDoc: number; payload: UpdateDocumentPayload }) =>
+      api.put<AenadDocument>(`/aenad/v1/documents/${idDoc}`, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: aenadQueryKeys.all });
+    },
   });
 }
