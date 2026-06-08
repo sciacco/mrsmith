@@ -13,7 +13,7 @@ Questi file descrivono il database applicativo, mentre `docs/mistra-dist.yaml` r
 | #  | Schema      | Tabelle | Viste | Funzioni | Ambito principale                                 | File |
 | -- | ----------- | ------- | ----- | -------- | ------------------------------------------------- | ---- |
 | 1  | accounting  | 1       | 0     | 1        | Log contabili e audit trail applicativo           | [mistra_accounting.json](mistra_accounting.json) |
-| 2  | aenad       | 63      | 0     | 0        | Tabelle ERP Aenad e strutture operative mirror    | [mistra_aenad.json](mistra_aenad.json) |
+| 2  | aenad       | 63      | 0     | 6        | Tabelle ERP Aenad e strutture operative mirror    | [mistra_aenad.json](mistra_aenad.json) |
 | 3  | cart        | 11      | 0     | 4        | Carrello, righe ordine e stati operativi          | [mistra_cart.json](mistra_cart.json) |
 | 4  | common      | 4       | 0     | 11       | Traduzioni, vocabolari e utility condivise        | [mistra_common.json](mistra_common.json) |
 | 5  | coworking   | 1       | 0     | 0        | Sale coworking                                    | [mistra_coworking.json](mistra_coworking.json) |
@@ -31,7 +31,7 @@ Questi file descrivono il database applicativo, mentre `docs/mistra-dist.yaml` r
 ## Note di lettura
 
 - Gli schemi con maggiore logica lato database sono `customers`, `users` e `products`, che concentrano la maggior parte delle stored procedure.
-- `aenad` contiene il blocco piu' ampio di tabelle operative e mirror ERP nella versione aggiornata del dump.
+- `aenad` contiene il blocco piu' ampio di tabelle operative e mirror ERP nella versione aggiornata del dump, incluse funzioni di calcolo per i totali documento Aenad.
 - `loader` contiene tabelle e viste di appoggio per importazioni e raccordo con sistemi esterni come ERP e dataset provenienti da altri domini.
 - `documents` raccoglie metadati documentali e riferimenti Arxivar; `coworking` contiene la tabella di appoggio per le sale coworking.
 - `public` espone funzioni di accesso semplificato, mentre la logica applicativa principale e' distribuita negli schemi funzionali (`products`, `orders`, `quotes`, `customers`, `users`).

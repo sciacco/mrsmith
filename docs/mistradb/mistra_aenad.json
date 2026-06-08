@@ -4455,7 +4455,21 @@
           ],
           "rowCount": 788392,
           "dataSize": 132931584,
-          "indexSize": 49373184
+          "indexSize": 49373184,
+          "triggers": [
+            {
+              "name": "tdoc_righe_set_totals",
+              "event": "INSERT",
+              "timing": "BEFORE",
+              "body": "CREATE TRIGGER tdoc_righe_set_totals BEFORE INSERT OR UPDATE OF \"Qta\", \"PrezzoNetto\", \"PrezzoAcquisto\", \"Sconti\", \"CodIva\" ON aenad.\"TDocRighe\" FOR EACH ROW EXECUTE FUNCTION aenad.tdoc_righe_set_totals();"
+            },
+            {
+              "name": "tdoc_righe_recalculate_header",
+              "event": "INSERT",
+              "timing": "AFTER",
+              "body": "CREATE TRIGGER tdoc_righe_recalculate_header AFTER INSERT OR DELETE OR UPDATE OF   \"IDDoc\",   \"Qta\",   \"PrezzoNetto\",   \"PrezzoAcquisto\",   \"Sconti\",   \"CodIva\",   \"ImportoAcquistoRiga\",   \"ImportoNettoRiga\",   \"ImportoIvatoRiga\",   \"GuadagnoRiga\" ON aenad.\"TDocRighe\" FOR EACH ROW EXECUTE FUNCTION aenad.tdoc_righe_recalculate_header();"
+            }
+          ]
         },
         {
           "name": "TDocTestate",
@@ -9330,6 +9344,38 @@
           "rowCount": 21,
           "dataSize": 8192,
           "indexSize": 32768
+        }
+      ],
+      "functions": [
+        {
+          "name": "tdoc_discount_multiplier",
+          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_discount_multiplier(discounts text)\nRETURNS numeric\nLANGUAGE plpgsql\nIMMUTABLE\nAS $$\nDECLARE\n  cleaned text;\n  part text;\n  percent numeric;\n  multiplier numeric := 1;\nBEGIN\n  cleaned := regexp_replace(coalesce(discounts, ''), '[[:space:]]+', '', 'g');\n  cleaned := replace(cleaned, ',', '.');\n\n  IF cleaned = '' THEN\n    RETURN 1;\n  END IF;\n\n  FOREACH part IN ARRAY string_to_array(cleaned, '+')\n  LOOP\n    part := regexp_replace(part, '%$', '');\n\n    IF part = '' OR part !~ '^[+-]?[0-9]+([.][0-9]+)?$' THEN\n      RAISE EXCEPTION 'Invalid Aenad discount value: %', discounts\n        USING ERRCODE = '22023';\n    END IF;\n\n    percent := part::numeric;\n    multiplier := multiplier * (1 - (percent / 100));\n  END LOOP;\n\n  RETURN multiplier;\nEND;\n$$;"
+        },
+        {
+          "name": "tdoc_net_amount",
+          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_net_amount(\n  price_net bigint,\n  quantity bigint,\n  discounts text\n)\nRETURNS bigint\nLANGUAGE plpgsql\nIMMUTABLE\nAS $$\nDECLARE\n  discount_multiplier numeric;\nBEGIN\n  discount_multiplier := aenad.tdoc_discount_multiplier(discounts);\n\n  IF price_net IS NULL OR quantity IS NULL THEN\n    RETURN NULL;\n  END IF;\n\n  RETURN round(price_net::numeric * quantity::numeric * discount_multiplier)::bigint;\nEND;\n$$;"
+        },
+        {
+          "name": "tdoc_gross_amount",
+          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_gross_amount(\n  net_amount bigint,\n  vat_code character varying\n)\nRETURNS bigint\nLANGUAGE plpgsql\nSTABLE\nAS $$\nDECLARE\n  vat_percent numeric;\nBEGIN\n  IF net_amount IS NULL OR vat_code IS NULL THEN\n    RETURN NULL;\n  END IF;\n\n  SELECT \"PercIva\"::numeric\n  INTO vat_percent\n  FROM aenad.\"TIva\"\n  WHERE \"CodIva\" = vat_code;\n\n  IF vat_percent IS NULL THEN\n    RETURN NULL;\n  END IF;\n\n  RETURN round(net_amount::numeric * (1 + (vat_percent / 100)))::bigint;\nEND;\n$$;"
+        },
+        {
+          "name": "tdoc_righe_set_totals",
+          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_righe_set_totals()\nRETURNS trigger\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  NEW.\"ImportoAcquistoRiga\" := NEW.\"PrezzoAcquisto\" * NEW.\"Qta\";\n  NEW.\"ImportoNettoRiga\" := aenad.tdoc_net_amount(NEW.\"PrezzoNetto\", NEW.\"Qta\", NEW.\"Sconti\");\n  NEW.\"GuadagnoRiga\" := NEW.\"ImportoNettoRiga\" - NEW.\"ImportoAcquistoRiga\";\n  NEW.\"ImportoIvatoRiga\" := aenad.tdoc_gross_amount(NEW.\"ImportoNettoRiga\", NEW.\"CodIva\");\n\n  RETURN NEW;\nEND;\n$$;"
+        },
+        {
+          "name": "tdoc_recalculate_header",
+          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_recalculate_header(document_id integer)\nRETURNS void\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  IF document_id IS NULL THEN\n    RETURN;\n  END IF;\n\n  UPDATE aenad.\"TDocTestate\" header\n  SET\n    \"TotNetto\" = totals.tot_netto,\n    \"TotIva\" = totals.tot_iva,\n    \"TotDoc\" = totals.tot_doc,\n    \"TotPrezzoAcquisto\" = totals.tot_prezzo_acquisto,\n    \"TotGuadagno\" = totals.tot_guadagno\n  FROM (\n    SELECT\n      SUM(\"ImportoNettoRiga\")::bigint AS tot_netto,\n      SUM(\"ImportoIvatoRiga\" - \"ImportoNettoRiga\")::bigint AS tot_iva,\n      SUM(\"ImportoIvatoRiga\")::bigint AS tot_doc,\n      SUM(\"ImportoAcquistoRiga\")::bigint AS tot_prezzo_acquisto,\n      SUM(\"GuadagnoRiga\")::bigint AS tot_guadagno\n    FROM aenad.\"TDocRighe\"\n    WHERE \"IDDoc\" = document_id\n  ) totals\n  WHERE header.\"IDDoc\" = document_id;\nEND;\n$$;"
+        },
+        {
+          "name": "tdoc_righe_recalculate_header",
+          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_righe_recalculate_header()\nRETURNS trigger\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  IF current_setting('aenad.skip_header_recalc', true) = 'on' THEN\n    IF TG_OP = 'DELETE' THEN\n      RETURN OLD;\n    END IF;\n    RETURN NEW;\n  END IF;\n\n  IF TG_OP = 'DELETE' THEN\n    PERFORM aenad.tdoc_recalculate_header(OLD.\"IDDoc\");\n    RETURN OLD;\n  END IF;\n\n  PERFORM aenad.tdoc_recalculate_header(NEW.\"IDDoc\");\n\n  IF TG_OP = 'UPDATE' AND OLD.\"IDDoc\" IS DISTINCT FROM NEW.\"IDDoc\" THEN\n    PERFORM aenad.tdoc_recalculate_header(OLD.\"IDDoc\");\n  END IF;\n\n  RETURN NEW;\nEND;\n$$;"
+        }
+      ],
+      "procedures": [
+        {
+          "name": "recalculate_tdoc_totals",
+          "definition": "CREATE OR REPLACE PROCEDURE aenad.recalculate_tdoc_totals(p_id_doc integer DEFAULT NULL)\nLANGUAGE plpgsql\nAS $$\nDECLARE\n  rec record;\nBEGIN\n  PERFORM set_config('aenad.skip_header_recalc', 'on', true);\n\n  WITH calculated AS (\n    SELECT\n      row_data.\"IDDocRiga\",\n      row_data.\"PrezzoAcquisto\" * row_data.\"Qta\" AS importo_acquisto_riga,\n      net.importo_netto_riga,\n      net.importo_netto_riga - (row_data.\"PrezzoAcquisto\" * row_data.\"Qta\") AS guadagno_riga,\n      aenad.tdoc_gross_amount(net.importo_netto_riga, row_data.\"CodIva\") AS importo_ivato_riga\n    FROM aenad.\"TDocRighe\" row_data\n    CROSS JOIN LATERAL (\n      SELECT aenad.tdoc_net_amount(row_data.\"PrezzoNetto\", row_data.\"Qta\", row_data.\"Sconti\") AS importo_netto_riga\n    ) net\n    WHERE p_id_doc IS NULL OR row_data.\"IDDoc\" = p_id_doc\n  )\n  UPDATE aenad.\"TDocRighe\" row_data\n  SET\n    \"ImportoAcquistoRiga\" = calculated.importo_acquisto_riga,\n    \"ImportoNettoRiga\" = calculated.importo_netto_riga,\n    \"GuadagnoRiga\" = calculated.guadagno_riga,\n    \"ImportoIvatoRiga\" = calculated.importo_ivato_riga\n  FROM calculated\n  WHERE row_data.\"IDDocRiga\" = calculated.\"IDDocRiga\"\n    AND (\n      row_data.\"ImportoAcquistoRiga\" IS DISTINCT FROM calculated.importo_acquisto_riga\n      OR row_data.\"ImportoNettoRiga\" IS DISTINCT FROM calculated.importo_netto_riga\n      OR row_data.\"GuadagnoRiga\" IS DISTINCT FROM calculated.guadagno_riga\n      OR row_data.\"ImportoIvatoRiga\" IS DISTINCT FROM calculated.importo_ivato_riga\n    );\n\n  PERFORM set_config('aenad.skip_header_recalc', 'off', true);\n\n  FOR rec IN\n    SELECT \"IDDoc\"\n    FROM aenad.\"TDocTestate\"\n    WHERE p_id_doc IS NULL OR \"IDDoc\" = p_id_doc\n  LOOP\n    PERFORM aenad.tdoc_recalculate_header(rec.\"IDDoc\");\n  END LOOP;\nEND;\n$$;"
         }
       ]
     }

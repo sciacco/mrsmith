@@ -683,6 +683,15 @@ Alyante ERP ID
 
 ## Legacy Data Model Constraints
 
+### Aenad Document Totals Are Database-Owned First-Tranche Calculations
+
+- Context: Aenad document rows and headers in Mistra schema `aenad`.
+- Discovery: first-tranche totals are derived from `TDocRighe` numeric row fields and `TIva.PercIva`; `Sconti` is free text but current supported values are percentage chains such as `10%` and `5+3%`.
+- Practical rule: compute row purchase as `PrezzoAcquisto * Qta`, net as `PrezzoNetto * Qta` after sequential discounts, gross as net plus VAT from `CodIva -> TIva.PercIva`, and gain as net minus purchase. Do not rewrite `TDocRighe.Sconti`; parse it only for calculation. Header totals are sums of the calculated row fields.
+- Evidence: `deploy/migrations/021_aenad_document_totals.sql` and schema documentation in `docs/mistradb/mistra_aenad.json`.
+- Used by: `apps/aenad` archive totals and future Aenad write flows.
+- Open questions: forced VAT, eco-contributions, withholding, split payment, fidelity, and payment-derived totals are not part of the first tranche.
+
 ### Grappa DCIM Rack Media Is Not A V1 Feature
 
 - Context: `apps/grappa-dcim` rack detail parity from the current Grappa application.
