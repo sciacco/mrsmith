@@ -112,6 +112,7 @@ export function useQuotes(params: {
   page?: number;
   status?: string;
   owner?: string;
+  customer_id?: string;
   q?: string;
   date_from?: string;
   date_to?: string;
@@ -143,6 +144,7 @@ export function useCreateQuote() {
       api.post<{ id: number; quote_number: string; status: string }>('/quotes/v1/quotes', data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['quotes'] });
+      void qc.invalidateQueries({ queryKey: ['customers'] });
     },
   });
 }
@@ -239,6 +241,7 @@ export function useDeleteQuote() {
     mutationFn: (id: number) => api.delete(`/quotes/v1/quotes/${id}`),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['quotes'] });
+      void qc.invalidateQueries({ queryKey: ['customers'] });
     },
   });
 }

@@ -10,10 +10,11 @@ export function QuoteListPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const pageValue = Number(params.get('page') ?? '1');
+   const pageValue = Number(params.get('page') ?? '1');
   const page = Number.isFinite(pageValue) && pageValue > 0 ? pageValue : 1;
   const status = params.get('status') ?? '';
   const owner = params.get('owner') ?? '';
+  const customerId = params.get('customer_id') ?? '';
   const search = params.get('q') ?? '';
   const dateFrom = params.get('date_from') ?? '';
   const dateTo = params.get('date_to') ?? '';
@@ -22,12 +23,12 @@ export function QuoteListPage() {
 
   const { data, isLoading, isFetching } = useQuotes({
     page,
-    status, owner, q: search,
+    status, owner, customer_id: customerId, q: search,
     date_from: dateFrom, date_to: dateTo,
     sort, dir,
   });
 
-  const hasFilters = !!(status || owner || search || dateFrom || dateTo);
+  const hasFilters = !!(status || owner || customerId || search || dateFrom || dateTo);
 
   const handleClearFilters = useCallback(() => {
     setParams({});

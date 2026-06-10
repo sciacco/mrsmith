@@ -67,6 +67,7 @@ func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 
 	status := q.Get("status")
 	owner := q.Get("owner")
+	customerID := q.Get("customer_id")
 	search := q.Get("q")
 	dateFrom := q.Get("date_from")
 	dateTo := q.Get("date_to")
@@ -105,6 +106,11 @@ func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 		argIdx++
 		where = append(where, fmt.Sprintf("q.owner = $%d", argIdx))
 		args = append(args, owner)
+	}
+	if customerID != "" {
+		argIdx++
+		where = append(where, fmt.Sprintf("q.customer_id = $%d::bigint", argIdx))
+		args = append(args, customerID)
 	}
 	if search != "" {
 		argIdx++

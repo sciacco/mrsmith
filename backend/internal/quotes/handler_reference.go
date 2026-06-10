@@ -337,7 +337,10 @@ func (h *Handler) handleListCustomers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `SELECT id, name, numero_azienda FROM loader.hubs_company ORDER BY name`
+	query := `SELECT DISTINCT c.id, c.name, c.numero_azienda 
+	          FROM loader.hubs_company c
+	          INNER JOIN quotes.quote q ON q.customer_id = c.id
+	          ORDER BY c.name`
 
 	rows, err := h.db.QueryContext(r.Context(), query)
 	if err != nil {
