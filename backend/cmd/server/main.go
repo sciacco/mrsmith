@@ -336,6 +336,12 @@ func main() {
 		logger.Info("carbone service configured", "component", "afctools")
 	}
 
+	var aenadCarboneSvc *aenad.CarboneService
+	if cfg.CarboneAPIKey != "" {
+		aenadCarboneSvc = aenad.NewCarboneService(cfg.CarboneAPIKey)
+		logger.Info("carbone service configured", "component", "aenad")
+	}
+
 	// API routes (with auth)
 	api := http.NewServeMux()
 	hrefOverrides := map[string]string{}
@@ -605,7 +611,7 @@ func main() {
 		Carbone: afcToolsCarboneSvc,
 		Arak:    arakCli,
 	})
-	aenad.RegisterRoutes(api, aenad.Deps{Mistra: mistraDB, Logger: logger})
+	aenad.RegisterRoutes(api, aenad.Deps{Mistra: mistraDB, Logger: logger, ConfigDB: anisettaDB, Carbone: aenadCarboneSvc})
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),

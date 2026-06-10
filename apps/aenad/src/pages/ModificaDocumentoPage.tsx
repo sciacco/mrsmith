@@ -9,6 +9,7 @@ import {
   type UpdateDocumentPayload,
 } from '../api/queries';
 import { formatMoney, parseDecimal, trimDecimalZeros } from '../utils/format';
+import { ScaricaPdfButton } from '../components/ScaricaPdfButton';
 import styles from './ModificaDocumentoPage.module.css';
 
 interface DocumentState {
@@ -264,6 +265,15 @@ export function ModificaDocumentoPage() {
         </div>
 
         <div className={styles.topBarRight}>
+          {/* Il PDF riflette i dati salvati, non le modifiche in corso. */}
+          <ScaricaPdfButton
+            doc={{
+              IDDoc: idDoc,
+              NumDoc: header.NumDoc || null,
+              DataDoc: header.DataDoc || null,
+              Anagr_Nome: header.Anagr_Nome || null,
+            }}
+          />
           <Button onClick={handleSave} disabled={updateMutation.isPending}>
             {updateMutation.isPending ? 'Salvataggio...' : 'Salva Documento'}
           </Button>

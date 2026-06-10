@@ -1,0 +1,26 @@
+{
+  "titolo": "Offerta",
+  "numero": "1038",
+  "data": "03/06/2026",
+  "destinatario": {
+    "nome": "RIMOND S.R.L.",
+    "indirizzo": "Corso Italia, 17",
+    "capCittaProv": "20122  Milano  (MI)",
+    "rigaFiscale": "P.Iva 07594680964"
+  },
+  "righe": [
+    { "codice": "", "descrizione": "<b>FLOATING 2 - FLOATING 3</b>", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "<b>SERVIZI A CANONE MENSILE FATTURAZIONE TRIMESTRALE</b>", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "1414", "descrizione": "CANONE NOLEGGIO APPARECCHIATURE", "udm": "nr", "qta": "2", "prezzo": "€ 120,00", "sconto": "", "importo": "€ 240,00", "iva": "22" },
+    { "codice": "5453", "descrizione": "NB Dell Pro Max 16 - Intel® Core™ Ultra 7 265H, vPro® Enterprise 16 core (6 pCore + 8 eCore + 2 lpeCore) 5.3 GHz - RAM 32 GB DDR5, 5.600 MT/s - SSD M.2 PCIe NVMe Gen 4, 1024 GB - Scheda Grafica Nvidia RTX PRO 2000 Blackwell 8GB - Display 16 pollici, FHD+, LCD, 300 nit - Scheda wireless Intel® Wi-Fi 6E 2x2, 802.11ax, Bluetooth® 5.3 - Tastiera retroilluminata con tasto Copilot e tastierino numerico - 4 celle, 64 Wh, compatibile con ExpressCharge™ - 1 porta HDMI 2.1 - 1 porta Ethernet RJ45 (1 Gb/s) - 2 porte USB 3.2 Gen 1 Type-A - 2 porte Thunderbolt™ 4 (40 Gbps) Type-C® - Colore Carbon Black - Peso 2,11 kg - Windows 11 Professional – 3 Anni di Garanzia Dell Basic OnSite", "udm": "pz", "qta": "2", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "5454", "descrizione": "AC ADAPTER DELL 130W USB-C - ITALY", "udm": "pz", "qta": "2", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "5197", "descrizione": "Estensione di Garanzia Dell da 3 OnSite a 3 Anni ProSupport Plus", "udm": "nr", "qta": "2", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "<i>PRO SUPPORT PLUS :</i><br><i>Supporto in loco entro il giorno lavorativo successivo alla chiamata dopo la diagnosi da remoto. Include la riparazione per danni accidentali causati da rovesciamento di liquidi, cadute, picchi di corrente.</i>", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "<i>Noleggio hardware durata 36mesi</i>", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" }
+  ],
+  "totali": { "imponibile": "€ 240,00", "iva": "€ 52,80", "documento": "€ 292,80" },
+  "pagamento": "Bonifico 30 gg F.M.",
+  "mostraCondizioni": false
+}

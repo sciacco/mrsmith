@@ -1,0 +1,23 @@
+{
+  "titolo": "Offerta",
+  "numero": "901",
+  "data": "06/05/2026",
+  "destinatario": {
+    "nome": "MOSCA DR. ROMANO",
+    "indirizzo": "VICOLO LA CITTADELLA, 4",
+    "capCittaProv": "24060  Telgate  (BG)",
+    "rigaFiscale": "P.Iva 01872880164"
+  },
+  "righe": [
+    { "codice": "5053", "descrizione": "NB Dell 14 Premium - Intel® Core™ Ultra 7 255H 16 core (6 pCore + 8 eCore + 2 lpeCore) 5,1 GHz - RAM 32 GB DDR5, 6.400 MT/s - SSD M.2 PCIe NVMe Gen 4, 1024 GB - Scheda Grafica Nvidia GeForce RTX 4050 6GB - 14,5 pollici, 2K, 30 - 120 Hz, 500 nit - Intel® Killer™ Wi-Fi 7 1750i 2x2 e Bluetooth 5.4 - Tastiera retroilluminata con lettore di impronte digitali - 6 celle, 69,5 Wh - 1 porta HDMI 2.1 - 2 porte USB 3.2 Gen 1 (5 Gb/s) Type-A - 1 porta Thunderbolt™ 4 (40 Gb/s) Type-C® - Colore Magnetite - Peso 1,63 kg - Windows 11 Professional –  1 Anno di Garanzia Dell OnSite Pro Support", "udm": "pz", "qta": "1", "prezzo": "€ 3.199,00", "sconto": "10%", "importo": "€ 2.879,10", "iva": "22" },
+    { "codice": "5418", "descrizione": "Estensione di Garanzia Dell da 1 Anno a 4 Anni ProSupport Plus", "udm": "nr", "qta": "1", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "5419", "descrizione": "MOUSE CORDLESS DELL Pro Premium 7421 - 4 livelli DPI, batteria ricaricabile, Swift Pair - Wireless + Bluetooth - Platinum Silver", "udm": "pz", "qta": "1", "prezzo": "€ 59,00", "sconto": "10%", "importo": "€ 53,10", "iva": "22" },
+    { "codice": "4844", "descrizione": "BORSA DELL EcoLoop Pro Classic Briefcase 14", "udm": "pz", "qta": "1", "prezzo": "€ 39,00", "sconto": "10%", "importo": "€ 35,10", "iva": "22" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "2773", "descrizione": "HUB USB 3.0 TYPE-C MINI DOCKING / 2X USB TYPE-A + 1X Gigabit Ethernet + 1x HDMI + 1x USB Type-C Power Delivery 100W", "udm": "pz", "qta": "1", "prezzo": "€ 129,00", "sconto": "10%", "importo": "€ 116,10", "iva": "22" }
+  ],
+  "totali": { "imponibile": "€ 3.083,40", "iva": "€ 678,35", "documento": "€ 3.761,75" },
+  "pagamento": "Rimessa Diretta",
+  "mostraCondizioni": true
+}

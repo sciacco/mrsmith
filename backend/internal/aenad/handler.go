@@ -1,6 +1,7 @@
 package aenad
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"net/http"
@@ -12,14 +13,24 @@ import (
 
 const component = "aenad"
 
+// pdfRenderer is satisfied by *CarboneService; kept as an interface for tests.
+type pdfRenderer interface {
+	GeneratePDF(ctx context.Context, templateID string, payload any) ([]byte, error)
+}
+
 type Deps struct {
 	Mistra *sql.DB
 	Logger *slog.Logger
+	// ConfigDB is the Anisetta connection hosting mrsmith.runtime_config.
+	ConfigDB *sql.DB
+	Carbone  *CarboneService
 }
 
 type Handler struct {
-	mistra *sql.DB
-	logger *slog.Logger
+	mistra   *sql.DB
+	logger   *slog.Logger
+	configDB *sql.DB
+	carbone  pdfRenderer
 }
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
@@ -29,8 +40,12 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	}
 
 	h := &Handler{
-		mistra: deps.Mistra,
-		logger: logger.With("component", component),
+		mistra:   deps.Mistra,
+		logger:   logger.With("component", component),
+		configDB: deps.ConfigDB,
+	}
+	if deps.Carbone != nil {
+		h.carbone = deps.Carbone
 	}
 
 	protect := acl.RequireRole(applaunch.AenadAccessRoles()...)
@@ -42,6 +57,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handle("GET /aenad/v1/documents", h.handleDocuments)
 	handle("GET /aenad/v1/documents/{id}", h.handleGetDocument)
 	handle("GET /aenad/v1/documents/{id}/rows", h.handleDocumentRows)
+	handle("GET /aenad/v1/documents/{id}/pdf", h.handleDocumentPDF)
 	handle("PUT /aenad/v1/documents/{id}", h.handleUpdateDocument)
 	handle("GET /aenad/v1/customers", h.handleCustomers)
 	handle("GET /aenad/v1/payment-methods", h.handlePaymentMethods)

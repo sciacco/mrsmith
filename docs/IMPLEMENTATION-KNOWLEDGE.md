@@ -701,6 +701,15 @@ Alyante ERP ID
 - Used by: `apps/aenad` archive, document detail, and row editing; any future Aenad view exposing fields from the numeric list.
 - Open questions: none.
 
+### Aenad Offer Print Semantics: Easyfatt Inline Markers, Spacer Rows, Display-Ready Columns
+
+- Context: replicating the legacy Easyfatt "Offerta" printouts (examples in `artifacts/aenad/`) for Carbone PDF generation from Mistra schema `aenad`.
+- Discovery: `TDocRighe.Desc` carries Easyfatt inline formatting markers: `**` toggles bold and `//` toggles italic; markers are often unclosed prefixes that style the rest of the line (`"**SERVIZI UNA TANTUM"`, `"//OPZIONALE"`), closed inline pairs also occur (`"**RICONDIZIONATO** Docking…"`), and descriptions can be multi-line with `\r\n`. No `__` markers or URLs appear in 2025-2026 preventivi. Fully-NULL `TDocRighe` rows are intentional visual spacers between items in the printout (the existing rows endpoint filters them out; a print replica must keep them). `Sconti` is already display-formatted (`"30%"`, `"35+5%"`), and the printed "Iva" column is literally `CodIva` (`"22"`), not `TIva.PercIva`. The printed title comes from `TTipiDoc.TitoloReport` (`'Q'` → `"Offerta"`, while `Nome` is `"Preventivo"`). `TDocTestate.NomeReport` records which Easyfatt report printed the document: `"SHELLI CDLAN offerta"` (full supply-conditions closing block, double signature, clausole 1341-1342) vs `"SHELLI CDLAN offerta noleggio-servizi"` (privacy-only closing); the most common report `"SHELLI preventivo"` is a different layout not covered by the offer template.
+- Practical rule: when rendering offer rows for print, fetch ALL rows ordered by `IDDocRiga` without the empty-row filter; convert `Desc` markers to HTML per line (escape HTML first, toggle `<b>` on `**` and `<i>` on `//` skipping `://`, close open tags at end of line, join lines with `<br>`); pass `Sconti` and `CodIva` through verbatim; take the document title from `TTipiDoc.TitoloReport`; drive the conditions-block variant from an explicit caller flag (the legacy equivalent is the operator's report choice, recorded in `NomeReport`).
+- Evidence: read-only inspection of docs `IDDoc` 215441/215464/215564 (Num 879/901/994, matching `artifacts/aenad/` PDFs); `docs/mistradb/mistra_aenad.json`.
+- Used by: aenad offer PDF generation (Carbone template + `backend/internal/aenad` PDF endpoint).
+- Open questions: `QtaShown` vs `Qta` divergence never observed — `Qta` is used.
+
 ### Grappa DCIM Rack Media Is Not A V1 Feature
 
 - Context: `apps/grappa-dcim` rack detail parity from the current Grappa application.

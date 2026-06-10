@@ -1,0 +1,26 @@
+{
+  "titolo": "Offerta",
+  "numero": "994",
+  "data": "21/05/2026",
+  "destinatario": {
+    "nome": "Zampieri Holding S.R.L.",
+    "indirizzo": "Via Lima 41",
+    "capCittaProv": "00198  Roma  (RM)",
+    "rigaFiscale": "C.F./P.Iva 11361441006"
+  },
+  "righe": [
+    { "codice": "", "descrizione": "<b>SERVIZI UNA TANTUM</b>", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "S400P", "descrizione": "SERVIZIO DI ASSISTENZA TECNICA ON-SITE PROGETTO", "udm": "nr", "qta": "1", "prezzo": "€ 2.000,00", "sconto": "", "importo": "€ 2.000,00", "iva": "22" },
+    { "codice": "S300P", "descrizione": "SERVIZIO DI ASSISTENZA CON COLLEGAMENTO DA REMOTO A PROGETTO", "udm": "nr", "qta": "1", "prezzo": "€ 1.200,00", "sconto": "", "importo": "€ 1.200,00", "iva": "22" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "S100", "descrizione": "NOC BASIC - MONITORAGGIO SERVER E BACKUP", "udm": "mese", "qta": "1", "prezzo": "€ 80,00", "sconto": "", "importo": "€ 80,00", "iva": "22" },
+    { "codice": "1501", "descrizione": "MONITORAGGIO RETE - 1 AGENTE/SUBNET", "udm": "nr", "qta": "1", "prezzo": "€ 60,00", "sconto": "", "importo": "€ 60,00", "iva": "22" },
+    { "codice": "", "descrizione": "<b> Canone mensile:  € 140,00</b>", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "<b>SERVIZI A CANONE MENSILE FATTURAZIONE TRIMESTRALE</b>", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" }
+  ],
+  "totali": { "imponibile": "€ 3.340,00", "iva": "€ 734,80", "documento": "€ 4.074,80" },
+  "pagamento": "RIBA 30 gg F.M.",
+  "mostraCondizioni": false
+}

@@ -123,6 +123,12 @@ export interface UpdateDocumentPayload {
   }[];
 }
 
+export function useDocumentPdfDownload() {
+  const api = useApiClient();
+  return (idDoc: number, condizioni: boolean) =>
+    api.getBlob(`/aenad/v1/documents/${idDoc}/pdf?condizioni=${condizioni ? '1' : '0'}`);
+}
+
 export function useUpdateDocument() {
   const api = useApiClient();
   const queryClient = useQueryClient();

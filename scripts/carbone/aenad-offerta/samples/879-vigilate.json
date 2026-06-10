@@ -1,0 +1,27 @@
+{
+  "titolo": "Offerta",
+  "numero": "879",
+  "data": "04/05/2026",
+  "destinatario": {
+    "nome": "VIGILATE S.R.L.",
+    "indirizzo": "Via Napoleonica, 6",
+    "capCittaProv": "24086  Rezzato  (BS)",
+    "rigaFiscale": "P.Iva 01598660056"
+  },
+  "righe": [
+    { "codice": "", "descrizione": "NVIDIA RTX PRO 2000 Blackwell Retail", "udm": "pz", "qta": "1", "prezzo": "€ 1.109,82", "sconto": "30%", "importo": "€ 776,87", "iva": "22" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "NVIDIA RTX PRO 4000 Blackwell - scheda grafica - RTX PRO 4000 Blackwell - 24 GB", "udm": "pz", "qta": "1", "prezzo": "€ 2.513,06", "sconto": "30%", "importo": "€ 1.759,14", "iva": "22" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "NVIDIA RTX PRO 4500 Blackwell - scheda grafica - RTX PRO 4500 Blackwell - 32 GB", "udm": "pz", "qta": "1", "prezzo": "€ 4.107,90", "sconto": "30%", "importo": "€ 2.875,53", "iva": "22" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "NVIDIA RTX PRO 5000 Blackwell - scheda grafica - RTX PRO 5000 Blackwell - 48 GB", "udm": "pz", "qta": "1", "prezzo": "€ 6.990,34", "sconto": "35%", "importo": "€ 4.543,72", "iva": "22" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "NVIDIA RTX PRO 5000 Blackwell - scheda grafica - RTX PRO 5000 Blackwell - 72 GB", "udm": "pz", "qta": "1", "prezzo": "€ 9.890,03", "sconto": "35+5%", "importo": "€ 6.107,09", "iva": "22" },
+    { "codice": "", "descrizione": "", "udm": "", "qta": "", "prezzo": "", "sconto": "", "importo": "", "iva": "" },
+    { "codice": "", "descrizione": "NVIDIA RTX PRO 6000 Blackwell - Server Edition - scheda grafica - RTX PRO 6000 Blackwell - 96 GB", "udm": "pz", "qta": "1", "prezzo": "€ 13.689,64", "sconto": "40%", "importo": "€ 8.213,78", "iva": "22" }
+  ],
+  "totali": { "imponibile": "€ 24.276,13", "iva": "€ 5.340,75", "documento": "€ 29.616,88" },
+  "pagamento": "RIBA 30-60 gg F.M. NOSP",
+  "mostraCondizioni": true
+}

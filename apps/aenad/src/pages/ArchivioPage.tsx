@@ -2,6 +2,7 @@ import { Button, Icon, SingleSelect, Skeleton, Drawer } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useArchiveDocuments, useDocumentTypes, useDocumentRows, useCustomers } from '../api/queries';
+import { ScaricaPdfButton } from '../components/ScaricaPdfButton';
 import type { AenadDocument } from '../api/types';
 import { formatMoney, formatQuantity, parseDecimal } from '../utils/format';
 import styles from './PreventiviPage.module.css';
@@ -331,9 +332,12 @@ function DocumentDetailsDrawer({
       title={`Documento N. ${doc.NumDoc ?? '-'}`}
       subtitle={`Data: ${formatDate(doc.DataDoc)} | Cliente: ${doc.Anagr_Nome ?? '-'}`}
       headerExtra={
-        <Button size="sm" onClick={() => navigate(`/archivio/${doc.IDDoc}/modifica`)}>
-          <Icon name="pencil" size={16} /> Modifica
-        </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <ScaricaPdfButton doc={doc} size="sm" />
+          <Button size="sm" onClick={() => navigate(`/archivio/${doc.IDDoc}/modifica`)}>
+            <Icon name="pencil" size={16} /> Modifica
+          </Button>
+        </div>
       }
     >
       <div className={styles.drawerContent}>

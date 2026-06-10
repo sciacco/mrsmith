@@ -1,0 +1,13 @@
+{
+  "name": "aenad-offerta-carbone-template",
+  "private": true,
+  "type": "module",
+  "description": "Generatore del template Carbone DOCX per i PDF delle offerte aenad",
+  "scripts": {
+    "generate": "node generate.mjs",
+    "render-test": "node render-test.mjs"
+  },
+  "dependencies": {
+    "docx": "^9.5.1"
+  }
+}
