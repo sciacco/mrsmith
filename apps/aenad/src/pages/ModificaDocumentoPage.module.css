@@ -59,31 +59,6 @@
   flex-wrap: wrap;
 }
 
-.layoutSelector {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-.layoutSelector select {
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-elevated);
-  font: inherit;
-  font-weight: 600;
-  color: var(--color-text);
-  outline: none;
-  cursor: pointer;
-}
-
-.layoutSelector select:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-subtle);
-}
 
 /* Common Layout Components */
 .loadingContainer {
@@ -125,79 +100,11 @@
   color: var(--color-text-secondary);
 }
 
-/* Split-Screen Layout (Option 1) */
-.splitLayout {
-  display: grid;
-  grid-template-columns: 380px 1fr;
-  gap: var(--space-6);
-  align-items: start;
-}
-
-.splitSidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  position: sticky;
-  top: 80px;
-  max-height: calc(100vh - 120px);
-  overflow-y: auto;
-  padding-right: 2px;
-}
-
-.splitContent {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-/* Tabbed Wizard Layout (Option 3) */
+/* Document Layout */
 .wizardLayout {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-}
-
-.tabBar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 2px;
-}
-
-.tabBtn {
-  background: transparent;
-  border: none;
-  padding: var(--space-3) var(--space-5);
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  position: relative;
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.tabBtn:hover {
-  color: var(--color-text);
-}
-
-.tabBtnActive {
-  color: var(--color-accent);
-}
-
-.tabBtnActive::after {
-  content: '';
-  position: absolute;
-  bottom: -3px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--color-accent);
-  border-radius: var(--radius-full);
-}
-
-.wizardStepContent {
-  animation: pageEnter 0.3s var(--ease-out) both;
 }
 
 /* Form Styles */
@@ -467,71 +374,6 @@
   color: var(--color-success);
 }
 
-/* Read-only Preview Styles (for Wizard Step 3) */
-.previewLayout {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-.previewGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: var(--space-4);
-}
-
-.previewCard {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated);
-  padding: var(--space-5);
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.previewCard h3 {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: var(--color-text);
-  border-bottom: 1px solid var(--color-border-subtle);
-  padding-bottom: var(--space-2);
-  margin-bottom: var(--space-1);
-}
-
-.previewRow {
-  display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: var(--space-2);
-  font-size: 0.875rem;
-  line-height: 1.4;
-}
-
-.previewLabel {
-  color: var(--color-text-muted);
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.02em;
-}
-
-.previewValue {
-  color: var(--color-text-secondary);
-}
-
-/* Responsive Overrides */
-@media (max-width: 1020px) {
-  .splitLayout {
-    grid-template-columns: 1fr;
-  }
-
-  .splitSidebar {
-    position: static;
-    max-height: none;
-    overflow-y: visible;
-  }
-}
 
 @keyframes pageEnter {
   from { opacity: 0; transform: translateY(8px); }

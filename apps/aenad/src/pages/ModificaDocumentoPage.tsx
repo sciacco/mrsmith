@@ -7,7 +7,7 @@ import {
   useUpdateDocument,
   type UpdateDocumentPayload,
 } from '../api/queries';
-import { formatMoney, formatQuantity, parseDecimal, trimDecimalZeros } from '../utils/format';
+import { formatMoney, parseDecimal, trimDecimalZeros } from '../utils/format';
 import styles from './ModificaDocumentoPage.module.css';
 
 interface DocumentState {
@@ -56,9 +56,6 @@ export function ModificaDocumentoPage() {
   const idDoc = parseInt(id ?? '0') || 0;
   const navigate = useNavigate();
 
-  // layoutMode state to switch between the 3 proposed UI/UX options
-  const [layoutMode, setLayoutMode] = useState<'split' | 'drawer' | 'wizard'>('drawer');
-  const [activeTab, setActiveTab] = useState<'testata' | 'righe' | 'riepilogo'>('testata');
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const docQuery = useDocumentDetails(idDoc, idDoc > 0);
@@ -254,7 +251,6 @@ export function ModificaDocumentoPage() {
 
   return (
     <main className={styles.page}>
-      {/* Dynamic layout switcher so user can test all 3 options */}
       <div className={styles.topBar}>
         <div className={styles.topBarLeft}>
           <button className={styles.backBtn} onClick={() => navigate('/archivio')}>
@@ -266,263 +262,54 @@ export function ModificaDocumentoPage() {
         </div>
 
         <div className={styles.topBarRight}>
-          <div className={styles.layoutSelector}>
-            <label htmlFor="layout-select">Layout UI/UX:</label>
-            <select
-              id="layout-select"
-              value={layoutMode}
-              onChange={(e) => {
-                setLayoutMode(e.target.value as 'split' | 'drawer' | 'wizard');
-                setActiveTab('testata'); // Reset tab if switching to wizard
-              }}
-            >
-              <option value="drawer">Opzione 2: Focus Righe + Drawer (Consigliata)</option>
-              <option value="split">Opzione 1: Split-Screen</option>
-              <option value="wizard">Opzione 3: Tabbed Wizard</option>
-            </select>
-          </div>
           <Button onClick={handleSave} disabled={updateMutation.isPending}>
             {updateMutation.isPending ? 'Salvataggio...' : 'Salva Documento'}
           </Button>
         </div>
       </div>
 
-      {/* Render selected UI/UX Layout */}
-      {layoutMode === 'split' && (
-        <div className={styles.splitLayout}>
-          <div className={styles.splitSidebar}>
+      <div className={styles.wizardLayout}>
+        <div className={styles.summaryBanner}>
+          <div className={styles.summaryBannerText}>
+            <span className={styles.summaryBannerTitle}>{header.Anagr_Nome || 'Nessun cliente'}</span>
+            <span className={styles.summaryBannerSubtitle}>
+              {header.Anagr_Citta && `${header.Anagr_Citta} (${header.Anagr_Prov})`} | Pagamento: {header.Pagamento || '-'}
+            </span>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setDrawerOpen(true)}>
+            <Icon name="settings" size={16} /> Modifica Dati Testata
+          </Button>
+        </div>
+
+        <RowsEditor
+          rows={rows}
+          onUpdateRow={handleUpdateRowField}
+          onAddRow={handleAddRow}
+          onDeleteRow={handleDeleteRow}
+          onMoveRow={handleMoveRow}
+          getRowNetTotal={getRowNetTotal}
+        />
+        <TotalsSummary
+          netto={totalNetto}
+          acquisto={totalAcquisto}
+          guadagno={totalGuadagno}
+        />
+
+        <Drawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          size="md"
+          title="Dati Testata Documento"
+        >
+          <div style={{ padding: 'var(--space-5) var(--space-6)' }}>
             <HeaderForm header={header} onChange={handleHeaderChange} />
-          </div>
-          <div className={styles.splitContent}>
-            <RowsEditor
-              rows={rows}
-              onUpdateRow={handleUpdateRowField}
-              onAddRow={handleAddRow}
-              onDeleteRow={handleDeleteRow}
-              onMoveRow={handleMoveRow}
-              getRowNetTotal={getRowNetTotal}
-            />
-            <TotalsSummary
-              netto={totalNetto}
-              acquisto={totalAcquisto}
-              guadagno={totalGuadagno}
-            />
-          </div>
-        </div>
-      )}
-
-      {layoutMode === 'drawer' && (
-        <div className={styles.wizardLayout}>
-          <div className={styles.summaryBanner}>
-            <div className={styles.summaryBannerText}>
-              <span className={styles.summaryBannerTitle}>{header.Anagr_Nome || 'Nessun cliente'}</span>
-              <span className={styles.summaryBannerSubtitle}>
-                {header.Anagr_Citta && `${header.Anagr_Citta} (${header.Anagr_Prov})`} | Pagamento: {header.Pagamento || '-'}
-              </span>
+            <div style={{ marginTop: 'var(--space-5)', display: 'flex', justifyContent: 'flex-end' }}>
+              <Button onClick={() => setDrawerOpen(false)}>Conferma</Button>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => setDrawerOpen(true)}>
-              <Icon name="settings" size={16} /> Modifica Dati Testata
-            </Button>
           </div>
+        </Drawer>
+      </div>
 
-          <RowsEditor
-            rows={rows}
-            onUpdateRow={handleUpdateRowField}
-            onAddRow={handleAddRow}
-            onDeleteRow={handleDeleteRow}
-            onMoveRow={handleMoveRow}
-            getRowNetTotal={getRowNetTotal}
-          />
-          <TotalsSummary
-            netto={totalNetto}
-            acquisto={totalAcquisto}
-            guadagno={totalGuadagno}
-          />
-
-          <Drawer
-            open={drawerOpen}
-            onClose={() => setDrawerOpen(false)}
-            size="md"
-            title="Dati Testata Documento"
-          >
-            <div style={{ padding: 'var(--space-5) var(--space-6)' }}>
-              <HeaderForm header={header} onChange={handleHeaderChange} />
-              <div style={{ marginTop: 'var(--space-5)', display: 'flex', justifyContent: 'flex-end' }}>
-                <Button onClick={() => setDrawerOpen(false)}>Conferma</Button>
-              </div>
-            </div>
-          </Drawer>
-        </div>
-      )}
-
-      {layoutMode === 'wizard' && (
-        <div className={styles.wizardLayout}>
-          <div className={styles.tabBar}>
-            <button
-              className={`${styles.tabBtn} ${activeTab === 'testata' ? styles.tabBtnActive : ''}`}
-              onClick={() => setActiveTab('testata')}
-            >
-              1. Dati Testata
-            </button>
-            <button
-              className={`${styles.tabBtn} ${activeTab === 'righe' ? styles.tabBtnActive : ''}`}
-              onClick={() => setActiveTab('righe')}
-            >
-              2. Righe Articolo
-            </button>
-            <button
-              className={`${styles.tabBtn} ${activeTab === 'riepilogo' ? styles.tabBtnActive : ''}`}
-              onClick={() => setActiveTab('riepilogo')}
-            >
-              3. Riepilogo & Salva
-            </button>
-          </div>
-
-          <div className={styles.wizardStepContent}>
-            {activeTab === 'testata' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                <HeaderForm header={header} onChange={handleHeaderChange} />
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <Button onClick={() => setActiveTab('righe')}>Avanti: Modifica Righe ➔</Button>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'righe' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                <RowsEditor
-                  rows={rows}
-                  onUpdateRow={handleUpdateRowField}
-                  onAddRow={handleAddRow}
-                  onDeleteRow={handleDeleteRow}
-                  onMoveRow={handleMoveRow}
-                  getRowNetTotal={getRowNetTotal}
-                />
-                <TotalsSummary
-                  netto={totalNetto}
-                  acquisto={totalAcquisto}
-                  guadagno={totalGuadagno}
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Button variant="secondary" onClick={() => setActiveTab('testata')}>
-                    ⬅ Indietro: Testata
-                  </Button>
-                  <Button onClick={() => setActiveTab('riepilogo')}>
-                    Avanti: Riepilogo ➔
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'riepilogo' && (
-              <div className={styles.previewLayout}>
-                <div className={styles.previewGrid}>
-                  <div className={styles.previewCard}>
-                    <h3>Cliente & Fatturazione</h3>
-                    <div className={styles.previewRow}>
-                      <span className={styles.previewLabel}>Cliente</span>
-                      <span className={styles.previewValue}>{header.Anagr_Nome}</span>
-                    </div>
-                    {(header.Anagr_CodiceFiscale || header.Anagr_PartitaIva) && (
-                      <div className={styles.previewRow}>
-                        <span className={styles.previewLabel}>C.F. / P.IVA</span>
-                        <span className={styles.previewValue}>
-                          {header.Anagr_CodiceFiscale} / {header.Anagr_PartitaIva}
-                        </span>
-                      </div>
-                    )}
-                    <div className={styles.previewRow}>
-                      <span className={styles.previewLabel}>Indirizzo</span>
-                      <span className={styles.previewValue}>
-                        {header.Anagr_Indirizzo}
-                        <br />
-                        {header.Anagr_Cap} {header.Anagr_Citta} ({header.Anagr_Prov})
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className={styles.previewCard}>
-                    <h3>Dettagli Spedizione & Pagamento</h3>
-                    <div className={styles.previewRow}>
-                      <span className={styles.previewLabel}>Destinatario</span>
-                      <span className={styles.previewValue}>
-                        {header.Anagr_DestNome || 'Uguale a fatturazione'}
-                      </span>
-                    </div>
-                    <div className={styles.previewRow}>
-                      <span className={styles.previewLabel}>Spedizione</span>
-                      <span className={styles.previewValue}>
-                        {header.Anagr_DestIndirizzo}
-                        {header.Anagr_DestCitta && ` - ${header.Anagr_DestCap} ${header.Anagr_DestCitta}`}
-                      </span>
-                    </div>
-                    <div className={styles.previewRow}>
-                      <span className={styles.previewLabel}>Pagamento</span>
-                      <span className={styles.previewValue}>{header.Pagamento}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.previewCard}>
-                  <h3>Righe Preventivo</h3>
-                  <table className={styles.editTable}>
-                    <thead>
-                      <tr>
-                        <th>Codice</th>
-                        <th>Descrizione</th>
-                        <th style={{ textAlign: 'right' }}>Qta</th>
-                        <th>Udm</th>
-                        <th style={{ textAlign: 'right' }}>Prezzo Unit.</th>
-                        <th style={{ textAlign: 'right' }}>Sconti</th>
-                        <th style={{ textAlign: 'right' }}>Importo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((row, index) => (
-                        <tr key={index} className={row.isDescriptive ? styles.descriptiveRow : ''}>
-                          {row.isDescriptive ? (
-                            <>
-                              <td></td>
-                              <td colSpan={6} style={{ fontStyle: 'italic', color: 'var(--color-text-secondary)' }}>
-                                {row.Desc}
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td>{row.CodArticolo}</td>
-                              <td>{row.Desc}</td>
-                              <td style={{ textAlign: 'right' }}>{formatQuantity(row.Qta)}</td>
-                              <td>{row.Udm}</td>
-                              <td style={{ textAlign: 'right' }}>{formatMoney(row.PrezzoNetto)}</td>
-                              <td style={{ textAlign: 'right' }}>{row.Sconti}</td>
-                              <td style={{ textAlign: 'right' }}>{formatMoney(getRowNetTotal(row))}</td>
-                            </>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <TotalsSummary
-                  netto={totalNetto}
-                  acquisto={totalAcquisto}
-                  guadagno={totalGuadagno}
-                />
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-4)' }}>
-                  <Button variant="secondary" onClick={() => setActiveTab('righe')}>
-                    ⬅ Indietro: Righe
-                  </Button>
-                  <Button onClick={handleSave} disabled={updateMutation.isPending}>
-                    {updateMutation.isPending ? 'Salvataggio...' : '✓ Conferma e Salva Documento'}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </main>
   );
 }
