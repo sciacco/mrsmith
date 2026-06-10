@@ -1,7 +1,7 @@
 import { Button, Icon, SingleSelect, Skeleton, Drawer } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useArchiveDocuments, useDocumentTypes, useDocumentRows } from '../api/queries';
+import { useArchiveDocuments, useDocumentTypes, useDocumentRows, useCustomers } from '../api/queries';
 import type { AenadDocument } from '../api/types';
 import { formatMoney, formatQuantity, parseDecimal } from '../utils/format';
 import styles from './PreventiviPage.module.css';
@@ -64,6 +64,7 @@ export function ArchivioPage() {
   const [tipoDoc, setTipoDoc] = useState(DEFAULT_TIPO_DOC);
   const [dateFrom, setDateFrom] = useState(range.from);
   const [dateTo, setDateTo] = useState(range.to);
+  const [idAnagr, setIdAnagr] = useState<number | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [selectedDoc, setSelectedDoc] = useState<AenadDocument | null>(null);
 
@@ -72,6 +73,16 @@ export function ArchivioPage() {
     () => (documentTypes.data ?? []).map((item) => ({ value: item.tipoDoc, label: `${item.tipoDoc} - ${item.label}` })),
     [documentTypes.data],
   );
+
+  const customers = useCustomers();
+  const customerOptions = useMemo(
+    () => [
+      { value: '', label: 'Tutti i clienti' },
+      ...(customers.data ?? []).map((item) => ({ value: String(item.idAnagr), label: item.nome })),
+    ],
+    [customers.data],
+  );
+
   const selectedTypeExists = typeOptions.length === 0 || typeOptions.some((item) => item.value === tipoDoc);
   const currentDateError = dateError(dateFrom, dateTo);
 
@@ -89,6 +100,7 @@ export function ArchivioPage() {
       tipoDoc,
       dateFrom,
       dateTo,
+      idAnagr,
       page,
       pageSize: PAGE_SIZE,
     },
@@ -137,6 +149,19 @@ export function ArchivioPage() {
               onChange={updateTipoDoc}
               placeholder={documentTypes.isLoading ? 'Caricamento...' : 'Seleziona tipo'}
               disabled={documentTypes.isLoading || Boolean(documentTypes.error)}
+            />
+          </div>
+          <div className={styles.field}>
+            <label>Cliente</label>
+            <SingleSelect
+              options={customerOptions}
+              selected={idAnagr !== undefined ? String(idAnagr) : ''}
+              onChange={(value) => {
+                setIdAnagr(value ? Number(value) : undefined);
+                setPage(1);
+              }}
+              placeholder={customers.isLoading ? 'Caricamento...' : 'Tutti i clienti'}
+              disabled={customers.isLoading || Boolean(customers.error)}
             />
           </div>
           <div className={styles.field}>

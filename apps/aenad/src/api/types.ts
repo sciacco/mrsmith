@@ -48,8 +48,14 @@ export interface ArchiveDocumentFilters {
   tipoDoc: string;
   dateFrom: string;
   dateTo: string;
+  idAnagr?: number;
   page: number;
   pageSize: number;
+}
+
+export interface CustomerOption {
+  idAnagr: number;
+  nome: string;
 }
 
 export interface AenadDocumentRow {

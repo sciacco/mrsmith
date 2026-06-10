@@ -46,6 +46,7 @@ type documentListFilters struct {
 	TipoDoc  string
 	DateFrom string
 	DateTo   string
+	IDAnagr  *int
 	Page     int
 	PageSize int
 	Offset   int
@@ -143,20 +144,26 @@ func (h *Handler) handleDocuments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var total int
-	if err := h.mistra.QueryRowContext(r.Context(), `
+	countQuery := `
 		SELECT COUNT(*)
 		FROM aenad."TDocTestate" d
 		WHERE d."TipoDoc" = $1
 		  AND d."Data" >= $2::date
-		  AND d."Data" <= $3::date`,
-		filters.TipoDoc, filters.DateFrom, filters.DateTo,
-	).Scan(&total); err != nil {
+		  AND d."Data" <= $3::date`
+	
+	countArgs := []any{filters.TipoDoc, filters.DateFrom, filters.DateTo}
+	if filters.IDAnagr != nil {
+		countQuery += ` AND d."IDAnagr" = $4`
+		countArgs = append(countArgs, *filters.IDAnagr)
+	}
+
+	var total int
+	if err := h.mistra.QueryRowContext(r.Context(), countQuery, countArgs...).Scan(&total); err != nil {
 		h.dbFailure(w, r, "documents_count", err, "tipo_doc", filters.TipoDoc)
 		return
 	}
 
-	rows, err := h.mistra.QueryContext(r.Context(), `
+	query := `
 		SELECT
 			d."IDDoc",
 			d."TipoDoc",
@@ -192,11 +199,21 @@ func (h *Handler) handleDocuments(w http.ResponseWriter, r *http.Request) {
 		FROM aenad."TDocTestate" d
 		WHERE d."TipoDoc" = $1
 		  AND d."Data" >= $2::date
-		  AND d."Data" <= $3::date
-		ORDER BY d."Data" DESC, d."IDDoc" DESC
-		LIMIT $4 OFFSET $5`,
-		filters.TipoDoc, filters.DateFrom, filters.DateTo, filters.PageSize, filters.Offset,
-	)
+		  AND d."Data" <= $3::date`
+
+	args := []any{filters.TipoDoc, filters.DateFrom, filters.DateTo}
+	paramIdx := 4
+	if filters.IDAnagr != nil {
+		query += ` AND d."IDAnagr" = $` + strconv.Itoa(paramIdx)
+		args = append(args, *filters.IDAnagr)
+		paramIdx++
+	}
+	
+	query += ` ORDER BY d."Data" DESC, d."IDDoc" DESC
+		LIMIT $` + strconv.Itoa(paramIdx) + ` OFFSET $` + strconv.Itoa(paramIdx+1)
+	args = append(args, filters.PageSize, filters.Offset)
+
+	rows, err := h.mistra.QueryContext(r.Context(), query, args...)
 	if err != nil {
 		h.dbFailure(w, r, "documents", err, "tipo_doc", filters.TipoDoc)
 		return
@@ -267,10 +284,20 @@ func parseDocumentListFilters(r *http.Request, now time.Time) (documentListFilte
 		return documentListFilters{}, errInvalidPageSize
 	}
 
+	var idAnagr *int
+	if idAnagrStr := strings.TrimSpace(q.Get("idAnagr")); idAnagrStr != "" {
+		val, err := strconv.Atoi(idAnagrStr)
+		if err != nil {
+			return documentListFilters{}, errors.New("invalid_id_anagr")
+		}
+		idAnagr = &val
+	}
+
 	return documentListFilters{
 		TipoDoc:  tipoDoc,
 		DateFrom: dateFrom.Format(dateLayout),
 		DateTo:   dateTo.Format(dateLayout),
+		IDAnagr:  idAnagr,
 		Page:     page,
 		PageSize: pageSize,
 		Offset:   (page - 1) * pageSize,
@@ -870,4 +897,47 @@ func (h *Handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 	updatedRow.AnagrDestNazione = nullableString(anagrDestNazione)
 
 	httputil.JSON(w, http.StatusOK, updatedRow)
+}
+
+type customerOption struct {
+	IDAnagr int    `json:"idAnagr"`
+	Nome    string `json:"nome"`
+}
+
+func (h *Handler) handleCustomers(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMistra(w) {
+		return
+	}
+
+	rows, err := h.mistra.QueryContext(r.Context(), `
+		SELECT "IDAnagr", "Nome"
+		FROM aenad."TAnagrafica"
+		WHERE COALESCE("Cliente", 0) = 1
+		ORDER BY "Nome", "IDAnagr"`)
+	if err != nil {
+		h.dbFailure(w, r, "customers", err)
+		return
+	}
+	defer rows.Close()
+
+	items := make([]customerOption, 0)
+	for rows.Next() {
+		var item customerOption
+		var nome sql.NullString
+		if err := rows.Scan(&item.IDAnagr, &nome); err != nil {
+			h.dbFailure(w, r, "customers_scan", err)
+			return
+		}
+		item.Nome = strings.TrimSpace(nome.String)
+		if item.Nome == "" {
+			item.Nome = "Cliente #" + strconv.Itoa(item.IDAnagr)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		h.dbFailure(w, r, "customers_rows", err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, items)
 }

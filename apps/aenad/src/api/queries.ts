@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@mrsmith/api-client';
 import { useApiClient } from './client';
-import type { AenadDocumentsPage, ArchiveDocumentFilters, DocumentTypeOption, AenadDocumentRow, AenadDocument } from './types';
+import type { AenadDocumentsPage, ArchiveDocumentFilters, DocumentTypeOption, AenadDocumentRow, AenadDocument, CustomerOption } from './types';
 
 export const aenadQueryKeys = {
   all: ['aenad'] as const,
   documentTypes: () => [...aenadQueryKeys.all, 'document-types'] as const,
+  customers: () => [...aenadQueryKeys.all, 'customers'] as const,
   documents: (filters: ArchiveDocumentFilters) => [...aenadQueryKeys.all, 'documents', filters] as const,
   documentDetails: (idDoc: number) => [...aenadQueryKeys.all, 'documents', idDoc] as const,
   documentRows: (idDoc: number) => [...aenadQueryKeys.all, 'documents', idDoc, 'rows'] as const,
@@ -23,6 +24,9 @@ function documentParams(filters: ArchiveDocumentFilters) {
   params.set('tipoDoc', filters.tipoDoc);
   params.set('dateFrom', filters.dateFrom);
   params.set('dateTo', filters.dateTo);
+  if (filters.idAnagr !== undefined) {
+    params.set('idAnagr', String(filters.idAnagr));
+  }
   params.set('page', String(filters.page));
   params.set('pageSize', String(filters.pageSize));
   return params.toString();
@@ -33,6 +37,15 @@ export function useDocumentTypes() {
   return useQuery({
     queryKey: aenadQueryKeys.documentTypes(),
     queryFn: () => api.get<DocumentTypeOption[]>('/aenad/v1/document-types'),
+    retry: shouldRetry,
+  });
+}
+
+export function useCustomers() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQueryKeys.customers(),
+    queryFn: () => api.get<CustomerOption[]>('/aenad/v1/customers'),
     retry: shouldRetry,
   });
 }

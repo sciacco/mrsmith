@@ -46,9 +46,25 @@
 
 .filterGrid {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(150px, 180px) minmax(150px, 180px);
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--space-3);
   align-items: end;
+}
+
+.filterGrid > .field:nth-child(1) {
+  grid-column: span 1;
+}
+
+.filterGrid > .field:nth-child(2) {
+  grid-column: span 3;
+}
+
+.filterGrid > .field:nth-child(3) {
+  grid-column: span 1;
+}
+
+.filterGrid > .field:nth-child(4) {
+  grid-column: span 1;
 }
 
 .field {
@@ -321,6 +337,10 @@
 
   .filterGrid {
     grid-template-columns: 1fr;
+  }
+
+  .filterGrid > .field {
+    grid-column: auto !important;
   }
 
   .resultsPanel,
