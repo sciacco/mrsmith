@@ -523,3 +523,367 @@
   margin-top: var(--space-1);
 }
 
+/* Payment Selector (Autocomplete & Modal Lookup) */
+.paymentInputWrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.paymentInputWrapper input {
+  width: 100%;
+  padding-right: 44px !important;
+}
+
+.paymentLookupBtn {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  bottom: 1px;
+  width: 42px;
+  border: none;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.paymentLookupBtn:hover {
+  background: var(--color-bg-elevated);
+  color: var(--color-accent);
+}
+
+.autocompletePopover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-top: 4px;
+  box-shadow: var(--shadow-lg);
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+}
+
+.autocompleteItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.autocompleteItem:hover {
+  background: var(--color-surface);
+}
+
+.autocompleteItemName {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.autocompleteItemCategory {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+/* Modal Lookup Dialog */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  animation: modalFadeIn 0.2s var(--ease-out) both;
+}
+
+.modalContent {
+  width: min(100%, 750px);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  animation: modalSlideUp 0.3s var(--ease-out) both;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.modalTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+}
+
+.modalTitle h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.modalCloseBtn {
+  background: transparent;
+  border: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-full);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.modalCloseBtn:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+  transform: rotate(90deg);
+}
+
+.modalBody {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow: hidden;
+}
+
+.modalSearchWrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.modalSearchIcon {
+  position: absolute;
+  left: var(--space-3);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.modalSearchInput {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 var(--space-3) 0 var(--space-10);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.modalSearchInput:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+  outline: none;
+}
+
+.modalListWrap {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  min-height: 250px;
+}
+
+.modalLoading,
+.modalEmpty {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.modalTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  text-align: left;
+}
+
+.modalTable th {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+}
+
+.modalTableRow {
+  border-bottom: 1px solid var(--color-border-subtle);
+  transition: all var(--duration-fast) var(--ease-out);
+  cursor: pointer;
+}
+
+.modalTableRow:last-child {
+  border-bottom: 0;
+}
+
+.modalTableRow:hover {
+  background: rgba(99, 91, 255, 0.04);
+}
+
+.modalTableRow:active {
+  transform: scale(0.995);
+}
+
+.modalTable td {
+  padding: var(--space-3) var(--space-4);
+  vertical-align: middle;
+}
+
+.modalCellName {
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.modalCellRate {
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+
+.modalCategoryBadge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+
+.modalCellAction {
+  text-align: right;
+  padding-right: var(--space-5);
+}
+
+.selectAction {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.modalTableRow:hover .selectAction {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.selectArrow {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.modalTableRow:hover .selectArrow {
+  transform: translateX(2px);
+}
+
+/* Structured Rate Badges */
+.ratesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.rateBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  box-shadow: var(--shadow-xs);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.modalTableRow:hover .rateBadge {
+  border-color: var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+}
+
+.rateDays {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.rateFm {
+  font-size: 0.625rem;
+  font-weight: 700;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  padding: 0 4px;
+  border-radius: 4px;
+  line-height: 1.3;
+}
+
+.ratePercent {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+

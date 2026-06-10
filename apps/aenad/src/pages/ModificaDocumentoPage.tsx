@@ -1,10 +1,11 @@
 import { Button, Drawer, Icon, Skeleton } from '@mrsmith/ui';
-import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useState, Fragment, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useDocumentDetails,
   useDocumentRows,
   useUpdateDocument,
+  usePaymentMethods,
   type UpdateDocumentPayload,
 } from '../api/queries';
 import { formatMoney, parseDecimal, trimDecimalZeros } from '../utils/format';
@@ -301,7 +302,7 @@ export function ModificaDocumentoPage() {
         <Drawer
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
-          size="md"
+          size="xl"
           title="Dati Testata Documento"
         >
           <div style={{ padding: 'var(--space-5) var(--space-6)' }}>
@@ -317,7 +318,6 @@ export function ModificaDocumentoPage() {
   );
 }
 
-// Sub-component for Header form
 function HeaderForm({
   header,
   onChange,
@@ -325,6 +325,33 @@ function HeaderForm({
   header: DocumentState;
   onChange: (field: keyof DocumentState, value: string) => void;
 }) {
+  const pmQuery = usePaymentMethods();
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalSearch, setModalSearch] = useState('');
+
+  const paymentMethods = pmQuery.data ?? [];
+
+  // Filter for autocomplete: match by name (case-insensitive)
+  const filteredAutocomplete = useMemo(() => {
+    const query = (header.Pagamento ?? '').toLowerCase();
+    if (!query) return paymentMethods.slice(0, 8); // Show first 8 if empty
+    return paymentMethods
+      .filter((pm) => pm.nomePagamento.toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [paymentMethods, header.Pagamento]);
+
+  // Filter for modal
+  const filteredModal = useMemo(() => {
+    const query = modalSearch.toLowerCase();
+    if (!query) return paymentMethods;
+    return paymentMethods.filter(
+      (pm) =>
+        pm.nomePagamento.toLowerCase().includes(query) ||
+        (pm.categPagamento?.toLowerCase().includes(query) ?? false)
+    );
+  }, [paymentMethods, modalSearch]);
+
   return (
     <div className={styles.formSection}>
       <h2>Dati Anagrafici & Testata</h2>
@@ -442,14 +469,194 @@ function HeaderForm({
       </div>
 
       <h2>Pagamento & Altro</h2>
-      <div className={styles.formField}>
+      <div className={styles.formField} style={{ position: 'relative' }}>
         <span className={styles.formFieldLabel}>Metodo Pagamento</span>
-        <input
-          className={styles.formFieldInput}
-          value={header.Pagamento}
-          onChange={(e) => onChange('Pagamento', e.target.value)}
-        />
+        <div className={styles.paymentInputWrapper}>
+          <input
+            className={styles.formFieldInput}
+            value={header.Pagamento}
+            onChange={(e) => {
+              onChange('Pagamento', e.target.value);
+              setShowAutocomplete(true);
+            }}
+            onFocus={() => setShowAutocomplete(true)}
+            onBlur={() => {
+              // Delay hide slightly so that click on option registers
+              setTimeout(() => setShowAutocomplete(false), 200);
+            }}
+            placeholder="Seleziona o scrivi metodo..."
+          />
+          <button
+            type="button"
+            className={styles.paymentLookupBtn}
+            onClick={() => {
+              setModalSearch('');
+              setShowModal(true);
+            }}
+            title="Apri ricerca avanzata"
+          >
+            <Icon name="search" size={16} />
+          </button>
+        </div>
+
+        {/* Autocomplete Popover */}
+        {showAutocomplete && filteredAutocomplete.length > 0 && (
+          <div className={styles.autocompletePopover}>
+            {filteredAutocomplete.map((pm) => (
+              <button
+                key={pm.nomePagamento}
+                type="button"
+                className={styles.autocompleteItem}
+                onMouseDown={() => {
+                  onChange('Pagamento', pm.nomePagamento);
+                  setShowAutocomplete(false);
+                }}
+              >
+                <div className={styles.autocompleteItemName}>{pm.nomePagamento}</div>
+                {pm.categPagamento && (
+                  <div className={styles.autocompleteItemCategory}>{pm.categPagamento}</div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Search Modal Dialog */}
+      {showModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <div className={styles.modalHeader}>
+              <div className={styles.modalTitle}>
+                <Icon name="credit-card" size={18} />
+                <h3>Seleziona Metodo Pagamento</h3>
+              </div>
+              <button
+                type="button"
+                className={styles.modalCloseBtn}
+                onClick={() => setShowModal(false)}
+                aria-label="Chiudi"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+
+            <div className={styles.modalBody}>
+              <div className={styles.modalSearchWrapper}>
+                <Icon name="search" size={16} className={styles.modalSearchIcon} />
+                <input
+                  type="text"
+                  className={styles.modalSearchInput}
+                  value={modalSearch}
+                  onChange={(e) => setModalSearch(e.target.value)}
+                  placeholder="Cerca metodo di pagamento o categoria..."
+                  autoFocus
+                />
+              </div>
+
+              <div className={styles.modalListWrap}>
+                {pmQuery.isLoading ? (
+                  <div className={styles.modalLoading}>Caricamento metodi di pagamento...</div>
+                ) : filteredModal.length === 0 ? (
+                  <div className={styles.modalEmpty}>Nessun metodo trovato per "{modalSearch}"</div>
+                ) : (
+                  <table className={styles.modalTable}>
+                    <thead>
+                      <tr>
+                        <th>Nome Pagamento</th>
+                        <th>Categoria</th>
+                        <th>Dettagli / Rate</th>
+                        <th>Azione</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredModal.map((pm) => {
+                        // Parse rates into structured data
+                        const parsedRates = (() => {
+                          if (!pm.rate) return [];
+                          const matches = pm.rate.match(/\[\d+\|[\d.]+\|[TF]\]/g);
+                          if (!matches) return [];
+                          return matches.map(m => {
+                            const parts = m.slice(1, -1).split('|');
+                            const daysStr = parts[0] ?? '0';
+                            const percentStr = parts[1] ?? '0';
+                            const endOfMonthVal = (parts[2] ?? 'F') === 'T';
+                            return {
+                              days: parseInt(daysStr, 10),
+                              percent: parseFloat(percentStr),
+                              endOfMonth: endOfMonthVal
+                            };
+                          });
+                        })();
+
+                        // Format category display label
+                        const displayCategory = (() => {
+                          if (!pm.categPagamento) return null;
+                          const mappings: Record<string, string> = {
+                            'AssegnoCirc': 'Assegno Circolare',
+                            'Assegno': 'Assegno',
+                            'Bonifico': 'Bonifico',
+                            'Contanti': 'Contanti',
+                            'RIBA': 'Ri.Ba.',
+                            'Altro': 'Altro'
+                          };
+                          return mappings[pm.categPagamento] || pm.categPagamento;
+                        })();
+
+                        return (
+                          <tr
+                            key={pm.nomePagamento}
+                            className={styles.modalTableRow}
+                            onClick={() => {
+                              onChange('Pagamento', pm.nomePagamento);
+                              setShowModal(false);
+                            }}
+                          >
+                            <td className={styles.modalCellName}>
+                              <strong>{pm.nomePagamento}</strong>
+                            </td>
+                            <td>
+                              {displayCategory ? (
+                                <span className={styles.modalCategoryBadge}>{displayCategory}</span>
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                            <td>
+                              {parsedRates.length > 0 ? (
+                                <div className={styles.ratesList}>
+                                  {parsedRates.map((r, idx) => (
+                                    <span key={idx} className={styles.rateBadge}>
+                                      <span className={styles.rateDays}>
+                                        {r.days === 0 ? 'Immediato' : `${r.days} gg`}
+                                      </span>
+                                      {r.endOfMonth && <span className={styles.rateFm}>FM</span>}
+                                      {!(r.percent === 100 && parsedRates.length === 1) && (
+                                        <span className={styles.ratePercent}>{r.percent}%</span>
+                                      )}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className={styles.modalCellRate}>{pm.rate || '-'}</span>
+                              )}
+                            </td>
+                            <td className={styles.modalCellAction}>
+                              <span className={styles.selectAction}>
+                                Seleziona <Icon name="arrow-right" size={14} className={styles.selectArrow} />
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={styles.formField}>
         <span className={styles.formFieldLabel}>Coordinate Bancarie</span>

@@ -69,3 +69,9 @@ export interface AenadDocumentRow {
   Sconti: string | null;
   ImportoNettoRiga: string | null;
 }
+
+export interface PaymentMethodOption {
+  nomePagamento: string;
+  categPagamento: string | null;
+  rate: string | null;
+}

@@ -1,12 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@mrsmith/api-client';
 import { useApiClient } from './client';
-import type { AenadDocumentsPage, ArchiveDocumentFilters, DocumentTypeOption, AenadDocumentRow, AenadDocument, CustomerOption } from './types';
+import type { AenadDocumentsPage, ArchiveDocumentFilters, DocumentTypeOption, AenadDocumentRow, AenadDocument, CustomerOption, PaymentMethodOption } from './types';
 
 export const aenadQueryKeys = {
   all: ['aenad'] as const,
   documentTypes: () => [...aenadQueryKeys.all, 'document-types'] as const,
   customers: () => [...aenadQueryKeys.all, 'customers'] as const,
+  paymentMethods: () => [...aenadQueryKeys.all, 'payment-methods'] as const,
   documents: (filters: ArchiveDocumentFilters) => [...aenadQueryKeys.all, 'documents', filters] as const,
   documentDetails: (idDoc: number) => [...aenadQueryKeys.all, 'documents', idDoc] as const,
   documentRows: (idDoc: number) => [...aenadQueryKeys.all, 'documents', idDoc, 'rows'] as const,
@@ -46,6 +47,15 @@ export function useCustomers() {
   return useQuery({
     queryKey: aenadQueryKeys.customers(),
     queryFn: () => api.get<CustomerOption[]>('/aenad/v1/customers'),
+    retry: shouldRetry,
+  });
+}
+
+export function usePaymentMethods() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQueryKeys.paymentMethods(),
+    queryFn: () => api.get<PaymentMethodOption[]>('/aenad/v1/payment-methods'),
     retry: shouldRetry,
   });
 }

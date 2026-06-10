@@ -941,3 +941,45 @@ func (h *Handler) handleCustomers(w http.ResponseWriter, r *http.Request) {
 
 	httputil.JSON(w, http.StatusOK, items)
 }
+
+type paymentMethodOption struct {
+	NomePagamento  string  `json:"nomePagamento"`
+	CategPagamento *string `json:"categPagamento"`
+	Rate           *string `json:"rate"`
+}
+
+func (h *Handler) handlePaymentMethods(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMistra(w) {
+		return
+	}
+
+	rows, err := h.mistra.QueryContext(r.Context(), `
+		SELECT "NomePagamento", "CategPagamento", "Rate"
+		FROM aenad."TPagamenti"
+		ORDER BY "NomePagamento"`)
+	if err != nil {
+		h.dbFailure(w, r, "payment_methods", err)
+		return
+	}
+	defer rows.Close()
+
+	items := make([]paymentMethodOption, 0)
+	for rows.Next() {
+		var item paymentMethodOption
+		var categ, rate sql.NullString
+		if err := rows.Scan(&item.NomePagamento, &categ, &rate); err != nil {
+			h.dbFailure(w, r, "payment_methods_scan", err)
+			return
+		}
+		item.NomePagamento = strings.TrimSpace(item.NomePagamento)
+		item.CategPagamento = nullableString(categ)
+		item.Rate = nullableString(rate)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		h.dbFailure(w, r, "payment_methods_rows", err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, items)
+}
