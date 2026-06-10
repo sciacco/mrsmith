@@ -66,11 +66,11 @@ func TestCustomersWithInvoicesNilDB(t *testing.T) {
 	}
 }
 
-func TestOrdersSummaryNilDB(t *testing.T) {
+func TestOrdersDetailNilDB(t *testing.T) {
 	h := &Handler{}
-	req := httptest.NewRequest("GET", "/panoramica/v1/orders/summary", nil)
+	req := httptest.NewRequest("GET", "/panoramica/v1/orders/detail", nil)
 	rec := httptest.NewRecorder()
-	h.handleListOrdersSummary(rec, req)
+	h.handleListOrdersDetail(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", rec.Code)
 	}

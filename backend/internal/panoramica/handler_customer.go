@@ -46,40 +46,19 @@ func (h *Handler) handleListCustomersWithInvoices(w http.ResponseWriter, r *http
 	httputil.JSON(w, http.StatusOK, result)
 }
 
-// handleListCustomersWithOrders returns customers with orders.
-// GET /panoramica/v1/customers/with-orders?variant=a|b
-// variant=a: recurring orders only, includes IS NULL dismissal check (Ordini ricorrenti OLD page)
-// variant=b: recurring + spot orders, excludes IS NULL dismissal check (Ordini R&S page)
+// handleListCustomersWithOrders returns customers having recurring or spot orders.
+// GET /panoramica/v1/customers/with-orders
 func (h *Handler) handleListCustomersWithOrders(w http.ResponseWriter, r *http.Request) {
 	if !h.requireMistra(w) {
 		return
 	}
 
-	variant := r.URL.Query().Get("variant")
-	if variant == "" {
-		variant = "a"
-	}
-	if variant != "a" && variant != "b" {
-		httputil.Error(w, http.StatusBadRequest, "invalid_variant_parameter")
-		return
-	}
-
-	var query string
-	if variant == "a" {
-		query = `SELECT DISTINCT odv.numero_azienda, odv.ragione_sociale
-FROM loader.v_ordini_ricorrenti AS odv
-JOIN loader.erp_anagrafiche_clienti AS cli
-  ON cli.numero_azienda = odv.numero_azienda
-  AND (cli.data_dismissione >= NOW() OR cli.data_dismissione = '0001-01-01 00:00:00' OR cli.data_dismissione IS NULL)
-ORDER BY ragione_sociale`
-	} else {
-		query = `SELECT DISTINCT odv.numero_azienda, odv.ragione_sociale
+	query := `SELECT DISTINCT odv.numero_azienda, odv.ragione_sociale
 FROM loader.v_ordini_ric_spot AS odv
 JOIN loader.erp_anagrafiche_clienti AS cli
   ON cli.numero_azienda = odv.numero_azienda
   AND (cli.data_dismissione >= NOW() OR cli.data_dismissione = '0001-01-01 00:00:00')
 ORDER BY ragione_sociale`
-	}
 
 	rows, err := h.mistraDB.QueryContext(r.Context(), query)
 	if err != nil {

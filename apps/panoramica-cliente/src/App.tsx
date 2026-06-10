@@ -8,10 +8,7 @@ import styles from './App.module.css';
 const navGroups: TabGroup[] = [
   {
     label: 'Ordini',
-    items: [
-      { label: 'Ordini Ricorrenti e Spot', path: '/ordini-dettaglio' },
-      { label: 'Ordini Ricorrenti (OLD)', path: '/ordini-ricorrenti' },
-    ],
+    items: [{ label: 'Ordini Ricorrenti e Spot', path: '/ordini-dettaglio' }],
   },
   {
     label: 'Fatture',

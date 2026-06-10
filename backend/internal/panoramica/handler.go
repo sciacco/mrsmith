@@ -31,7 +31,6 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB, anisettaDB *sql.DB) 
 
 	// ── Mistra: Orders ──
 	handle("GET /panoramica/v1/order-statuses", h.handleListOrderStatuses)
-	handle("GET /panoramica/v1/orders/summary", h.handleListOrdersSummary)
 	handle("GET /panoramica/v1/orders/detail", h.handleListOrdersDetail)
 
 	// ── Mistra: Invoices ──

@@ -4,7 +4,6 @@ import type {
   CustomerWithInvoices,
   CustomerWithOrders,
   CustomerWithAccessLines,
-  OrderSummaryRow,
   OrderDetailRow,
   InvoiceLine,
   AccessLine,
@@ -27,11 +26,11 @@ export function useCustomersWithInvoices() {
   });
 }
 
-export function useCustomersWithOrders(variant: 'a' | 'b') {
+export function useCustomersWithOrders() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['panoramica', 'customers', 'orders', variant],
-    queryFn: () => api.get<CustomerWithOrders[]>(`/panoramica/v1/customers/with-orders?variant=${variant}`),
+    queryKey: ['panoramica', 'customers', 'orders'],
+    queryFn: () => api.get<CustomerWithOrders[]>('/panoramica/v1/customers/with-orders'),
   });
 }
 
@@ -50,17 +49,6 @@ export function useOrderStatuses() {
   return useQuery({
     queryKey: ['panoramica', 'order-statuses'],
     queryFn: () => api.get<string[]>('/panoramica/v1/order-statuses'),
-  });
-}
-
-export function useOrdersSummary(cliente: number | null, stati: string[]) {
-  const api = useApiClient();
-  return useQuery({
-    queryKey: ['panoramica', 'orders', 'summary', cliente, stati],
-    queryFn: () => api.get<OrderSummaryRow[]>(
-      `/panoramica/v1/orders/summary?cliente=${cliente}&stati=${stati.join(',')}`
-    ),
-    enabled: cliente !== null && stati.length > 0,
   });
 }
 

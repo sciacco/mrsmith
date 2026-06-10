@@ -14,34 +14,6 @@ export interface CustomerWithAccessLines {
   intestazione: string;
 }
 
-// ── Orders: Summary ──
-export interface OrderSummaryRow {
-  stato: string;
-  numero_ordine: string;
-  descrizione_long: string;
-  quantita: number | null;
-  nrc: number;
-  mrc: number;
-  totale_mrc: number;
-  stato_ordine: string;
-  nome_testata_ordine: string;
-  rn: number;
-  numero_azienda: number;
-  data_documento: string | null;
-  stato_riga: string;
-  data_ultima_fatt: string | null;
-  serialnumber: string | null;
-  metodo_pagamento: string | null;
-  durata_servizio: string | null;
-  durata_rinnovo: string | null;
-  data_cessazione: string | null;
-  data_attivazione: string | null;
-  note_legali: string | null;
-  sost_ord: string | null;
-  sostituito_da: string | null;
-  storico: string | null;
-}
-
 // ── Orders: Detail ──
 export interface OrderDetailRow {
   // Anagrafica

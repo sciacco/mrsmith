@@ -458,8 +458,8 @@ Alyante ERP ID
 - Discovery: production data can return `NULL` for multiple `loader.v_ordini_sintesi` text fields used by the summary endpoint, including `stato` and `numero_ordine`, even though the original backend/frontend contract modeled them as required strings.
 - Practical rule: scan summary text columns with `sql.NullString` in backend handlers and normalize them deliberately before JSON encoding; do not scan those columns directly into Go `string` fields.
 - Evidence: backend failures `list_orders_summary_scan` on 2026-04-09 for `stato` and `numero_ordine` (`converting NULL to string is unsupported`), fixed in `backend/internal/panoramica/handler_orders.go`.
-- Used by: `apps/panoramica-cliente` recurring orders summary view.
-- Open questions: whether the frontend contract should eventually widen affected summary text fields to `string | null` instead of preserving empty-string fallbacks.
+- Used by: nothing anymore — the summary endpoint and the Ordini Ricorrenti (OLD) page were removed on 2026-06-10; the general rule (scan loader text columns with `sql.NullString`) still applies to all loader-backed handlers.
+- Open questions: none.
 
 ### RDF `fornitori_preferiti` Must Be Treated as Nullable Text
 

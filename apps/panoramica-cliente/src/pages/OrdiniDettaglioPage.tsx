@@ -131,7 +131,7 @@ export function OrdiniDettaglioPage() {
   const [selectedRow, setSelectedRow] = useState<OrderDetailRow | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('testata');
 
-  const customersQ = useCustomersWithOrders('b');
+  const customersQ = useCustomersWithOrders();
   const statusesQ = useOrderStatuses();
   const ordersQ = useOrdersDetail(
     searchTriggered ? cliente : null,
