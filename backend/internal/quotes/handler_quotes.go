@@ -161,7 +161,7 @@ func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 	selectQuery := `SELECT q.id, q.quote_number, q.customer_id, q.document_date, q.document_type,
 	       q.status, q.owner, q.hs_deal_id, q.hs_quote_id, q.proposal_type, q.created_at, q.updated_at,
 	       c.name as customer_name, d.name as deal_name,
-	       COALESCE(o.first_name || ' ' || o.last_name, '') as owner_name` +
+	       COALESCE(o.first_name || ' ' || o.last_name, '') as owner_name, q.deal_number` +
 		baseFrom + whereClause +
 		" ORDER BY " + sortCol + " " + sortDir +
 		" LIMIT $" + strconv.Itoa(limitArg) + " OFFSET $" + strconv.Itoa(offsetArg)
@@ -199,6 +199,8 @@ func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 		DealNameV     *string        `json:"deal_name"`
 		OwnerName     sql.NullString `json:"-"`
 		OwnerNameV    *string        `json:"owner_name"`
+		DealNumber    sql.NullString `json:"-"`
+		DealNumberV   *string        `json:"deal_number"`
 	}
 
 	quotes := []quoteRow{}
@@ -208,7 +210,7 @@ func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 			&qr.ID, &qr.QuoteNumber, &qr.CustomerID, &qr.DocumentDate, &qr.DocumentType,
 			&qr.Status, &qr.Owner, &qr.HSDealID, &qr.HSQuoteID, &qr.ProposalType,
 			&qr.CreatedAt, &qr.UpdatedAt,
-			&qr.CustomerName, &qr.DealName, &qr.OwnerName,
+			&qr.CustomerName, &qr.DealName, &qr.OwnerName, &qr.DealNumber,
 		); err != nil {
 			h.dbFailure(w, r, "list_quotes_scan", err)
 			return
@@ -242,6 +244,9 @@ func (h *Handler) handleListQuotes(w http.ResponseWriter, r *http.Request) {
 		}
 		if qr.OwnerName.Valid {
 			qr.OwnerNameV = &qr.OwnerName.String
+		}
+		if qr.DealNumber.Valid {
+			qr.DealNumberV = &qr.DealNumber.String
 		}
 		quotes = append(quotes, qr)
 	}

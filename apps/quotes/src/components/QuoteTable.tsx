@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Icon, Skeleton } from '@mrsmith/ui';
+import { Button, Icon, Skeleton, Tooltip } from '@mrsmith/ui';
 import { hasRole } from '@mrsmith/auth-client';
 import type { Quote } from '../api/types';
 import { StatusBadge } from './StatusBadge';
@@ -163,8 +163,62 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
             </td>
             <td><div className={`${styles.cell} ${styles.mono}`}>{q.quote_number}</div></td>
             <td><div className={`${styles.cell} ${styles.muted}`}>{formatDate(q.document_date)}</div></td>
-            <td><div className={`${styles.cell} ${styles.truncate}`}>{q.customer_name ?? '—'}</div></td>
-            <td><div className={`${styles.cell} ${styles.truncate} ${styles.muted}`}>{q.deal_name ?? '—'}</div></td>
+            <td>
+              <div className={`${styles.cell} ${styles.customerCell} ${styles.truncate}`}>
+                {q.customer_name ?? '—'}
+              </div>
+            </td>
+            <td>
+              {q.deal_name ? (
+                <Tooltip
+                  content={
+                    <div className={styles.dealTooltip} onClick={(e) => e.stopPropagation()}>
+                      <div className={styles.dealTooltipHeader}>
+                        <span className={styles.dealTooltipNumber}>
+                          {q.deal_number || 'Senza Numero'}
+                        </span>
+                        {q.hs_deal_id && (
+                          <a
+                            href={`https://app-eu1.hubspot.com/contacts/26622471/record/0-3/${q.hs_deal_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.dealTooltipLink}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            HubSpot ↗
+                          </a>
+                        )}
+                      </div>
+                      <div className={styles.dealTooltipTitle}>{q.deal_name}</div>
+                      {(q.customer_name || q.owner_name) && (
+                        <div className={styles.dealTooltipFooter}>
+                          {q.customer_name && (
+                            <span className={styles.dealTooltipCustomer}>
+                              {q.customer_name}
+                            </span>
+                          )}
+                          {q.owner_name && (
+                            <span className={styles.dealTooltipOwner}>
+                              Owner: {abbreviateName(q.owner_name)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  }
+                  placement="top"
+                  maxWidth={360}
+                >
+                  <div className={`${styles.cell} ${styles.dealCell} ${styles.truncate} ${styles.muted}`}>
+                    {q.deal_name}
+                  </div>
+                </Tooltip>
+              ) : (
+                <div className={`${styles.cell} ${styles.dealCell} ${styles.truncate} ${styles.muted}`}>
+                  —
+                </div>
+              )}
+            </td>
             <td><div className={`${styles.cell} ${styles.muted}`}>{abbreviateName(q.owner_name)}</div></td>
             <td><div className={styles.cell}><StatusBadge status={q.status} /></div></td>
             <td className={styles.kebabCell}>
