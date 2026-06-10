@@ -1,8 +1,10 @@
 import { useCallback } from 'react';
 
-interface CsvColumn<T> {
+export interface CsvColumn<T> {
   key: keyof T;
   label: string;
+  // derives the cell value from the row; when set, takes precedence over key
+  value?: (row: T) => unknown;
 }
 
 export function useCsvExport<T>(columns: CsvColumn<T>[], filename: string) {
@@ -10,7 +12,7 @@ export function useCsvExport<T>(columns: CsvColumn<T>[], filename: string) {
     const header = columns.map(c => c.label).join(';');
     const rows = data.map(row =>
       columns.map(c => {
-        const v = row[c.key];
+        const v = c.value ? c.value(row) : row[c.key];
         if (v == null) return '';
         const s = String(v).replace(/"/g, '""');
         return s.includes(';') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;

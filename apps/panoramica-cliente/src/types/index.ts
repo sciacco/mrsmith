@@ -101,7 +101,6 @@ export interface OrderDetailRow {
   system_odv_row: string | null;
   id_gamma_testata: string | null;
   progressivo_riga: number;
-  ordine: string | null;
   annullato: number;
   data_scadenza_ordine: string | null;
   mrc: number | null;

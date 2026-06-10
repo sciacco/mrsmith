@@ -240,7 +240,6 @@ func (h *Handler) handleListOrdersDetail(w http.ResponseWriter, r *http.Request)
     v.raggruppamento_fatturazione, v.intervallo_fatt_attivazione, v.intervallo_fatt_canone,
     v.data_ultima_fatt, v.data_fine_fatt,
     v.system_odv_row, v.id_gamma_testata, v.progressivo_riga,
-    CASE WHEN v.progressivo_riga = 1 THEN v.nome_testata_ordine ELSE NULL END AS ordine,
     v.annullato,
     v.data_scadenza_ordine,
     CASE WHEN btrim(v.tipo_documento) = 'TSC-ORDINE' THEN NULL
@@ -319,7 +318,6 @@ ORDER BY v.data_documento DESC NULLS LAST, v.nome_testata_ordine, v.progressivo_
 		SystemOdvRow               *string  `json:"system_odv_row"`
 		IDGammaTestata             *string  `json:"id_gamma_testata"`
 		ProgressivoRiga            int      `json:"progressivo_riga"`
-		Ordine                     *string  `json:"ordine"`
 		Annullato                  int      `json:"annullato"`
 		DataScadenzaOrdine         *string  `json:"data_scadenza_ordine"`
 		MRC                        *float64 `json:"mrc"`
@@ -350,7 +348,7 @@ ORDER BY v.data_documento DESC NULLS LAST, v.nome_testata_ordine, v.progressivo_
 			dataAtt, dataDisdetta, dataCess                           sql.NullString
 			raggFatt, intFattAtt, intFattCanone                       sql.NullString
 			dataUltFatt, dataFineFatt, sysOdvRow, idGammaTestata      sql.NullString
-			ordine, dataScadenza                                      sql.NullString
+			dataScadenza                                              sql.NullString
 			famiglia, sottoFamiglia, contoRicavo                      sql.NullString
 			intOrdine, descLong, storico                              sql.NullString
 			quantita, mrc                                             sql.NullFloat64
@@ -371,7 +369,7 @@ ORDER BY v.data_documento DESC NULLS LAST, v.nome_testata_ordine, v.progressivo_
 			&dataAtt, &dataDisdetta, &dataCess,
 			&raggFatt, &intFattAtt, &intFattCanone,
 			&dataUltFatt, &dataFineFatt, &sysOdvRow, &idGammaTestata, &d.ProgressivoRiga,
-			&ordine, &d.Annullato, &dataScadenza, &mrc,
+			&d.Annullato, &dataScadenza, &mrc,
 			&famiglia, &sottoFamiglia, &contoRicavo,
 			&d.StatoRiga, &intOrdine, &descLong, &storico,
 		); err != nil {
@@ -424,7 +422,6 @@ ORDER BY v.data_documento DESC NULLS LAST, v.nome_testata_ordine, v.progressivo_
 		d.DataFineFatt = nullStringPtr(dataFineFatt)
 		d.SystemOdvRow = nullStringPtr(sysOdvRow)
 		d.IDGammaTestata = nullStringPtr(idGammaTestata)
-		d.Ordine = nullStringPtr(ordine)
 		d.DataScadenzaOrdine = nullStringPtr(dataScadenza)
 		d.MRC = nullFloat64Ptr(mrc)
 		d.Famiglia = nullStringPtr(famiglia)

@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { SingleSelect, MultiSelect, SearchInput, useTableFilter } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { useCustomersWithOrders, useOrderStatuses, useOrdersDetail } from '../api/queries';
-import { useCsvExport } from '../hooks/useCsvExport';
+import { useCsvExport, type CsvColumn } from '../hooks/useCsvExport';
 import { ServiceUnavailable } from '../components/shared/ServiceUnavailable';
 import { SlideOverPanel } from '../components/shared/SlideOverPanel';
 import type { OrderDetailRow } from '../types';
@@ -11,6 +11,22 @@ import os from './OrdiniDettaglio.module.css';
 
 const defaultStati = ['Evaso', 'Confermato'];
 
+type TipoOrdineFilter = 'tutti' | 'ricorrenti' | 'spot';
+
+const tipoOrdineOptions: { value: TipoOrdineFilter; label: string }[] = [
+  { value: 'tutti', label: 'Tutti' },
+  { value: 'ricorrenti', label: 'Ricorrenti' },
+  { value: 'spot', label: 'Spot' },
+];
+
+function isSpotRow(row: OrderDetailRow) {
+  return (row.tipo_documento ?? '').trim() === 'TSC-ORDINE';
+}
+
+function tipoOrdineLabel(row: OrderDetailRow) {
+  return isSpotRow(row) ? 'SPOT' : 'RICORRENTE';
+}
+
 const moneyFormatter = new Intl.NumberFormat('it-IT', {
   style: 'currency',
   currency: 'EUR',
@@ -18,14 +34,16 @@ const moneyFormatter = new Intl.NumberFormat('it-IT', {
   maximumFractionDigits: 2,
 });
 
-const csvColumns: { key: keyof OrderDetailRow; label: string }[] = [
+const csvColumns: CsvColumn<OrderDetailRow>[] = [
   { key: 'stato_ordine', label: 'Stato Ordine' },
-  { key: 'ordine', label: 'Ordine' },
+  { key: 'nome_testata_ordine', label: 'Ordine' },
+  { key: 'tipo_documento', label: 'Tipo', value: row => tipoOrdineLabel(row) },
   { key: 'descrizione_long', label: 'Descrizione' },
   { key: 'tipo_ordine', label: 'Tipo Ordine' },
   { key: 'commerciale', label: 'Commerciale' },
   { key: 'data_ordine', label: 'Data Ordine' },
   { key: 'quantita', label: 'Qta' },
+  { key: 'setup', label: 'NRC' },
   { key: 'mrc', label: 'MRC' },
   { key: 'stato_riga', label: 'Stato Riga' },
   { key: 'serialnumber', label: 'Serialnumber' },
@@ -107,6 +125,7 @@ function HtmlDescription({
 export function OrdiniDettaglioPage() {
   const [cliente, setCliente] = useState<number | null>(null);
   const [stati, setStati] = useState<string[]>(defaultStati);
+  const [tipoOrdine, setTipoOrdine] = useState<TipoOrdineFilter>('tutti');
   const [searchTriggered, setSearchTriggered] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedRow, setSelectedRow] = useState<OrderDetailRow | null>(null);
@@ -119,8 +138,14 @@ export function OrdiniDettaglioPage() {
     searchTriggered ? stati : [],
   );
 
+  const tipoRows = useMemo(() => {
+    const data = ordersQ.data ?? [];
+    if (tipoOrdine === 'tutti') return data;
+    return data.filter(row => isSpotRow(row) === (tipoOrdine === 'spot'));
+  }, [ordersQ.data, tipoOrdine]);
+
   const { filtered } = useTableFilter<OrderDetailRow>({
-    data: ordersQ.data,
+    data: tipoRows,
     searchQuery: search,
     searchFields: ['descrizione_long', 'nome_testata_ordine', 'serialnumber', 'codice_prodotto'],
   });
@@ -128,8 +153,8 @@ export function OrdiniDettaglioPage() {
   const exportCsv = useCsvExport(csvColumns, 'ordini-dettaglio');
 
   const allRowsByOrder = useMemo(
-    () => groupRowsByOrder(ordersQ.data ?? []),
-    [ordersQ.data],
+    () => groupRowsByOrder(tipoRows),
+    [tipoRows],
   );
 
   const orderGroups = useMemo(() => {
@@ -218,6 +243,10 @@ export function OrdiniDettaglioPage() {
           <label>Stati ordine</label>
           <MultiSelect options={statiOptions} selected={stati} onChange={setStati} placeholder="Stati..." />
         </div>
+        <div className={s.field} style={{ minWidth: 140 }}>
+          <label>Tipo</label>
+          <SingleSelect options={tipoOrdineOptions} selected={tipoOrdine} onChange={v => setTipoOrdine(v ?? 'tutti')} placeholder="Tutti" />
+        </div>
         <button className={s.btnPrimary} onClick={handleSearch} disabled={cliente === null || stati.length === 0}>Cerca</button>
         <SearchInput value={search} onChange={setSearch} placeholder="Filtra..." />
         {filtered.length > 0 && (
@@ -270,6 +299,7 @@ export function OrdiniDettaglioPage() {
                               {statoBadge(first.stato_ordine)}
                             </div>
                             <div className={os.orderHeaderMeta}>
+                              <span>{tipoOrdineLabel(first)}</span>
                               <span>{rowCountLabel(group.allRows.length)}</span>
                               {hasPartialFilter && <span>{group.rows.length} visibili</span>}
                               <span>{shortDate(first.data_ordine)}</span>
