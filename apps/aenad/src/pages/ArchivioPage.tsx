@@ -61,12 +61,35 @@ function formatDate(value: string | null) {
 
 export function ArchivioPage() {
   const range = useMemo(defaultDateRange, []);
-  const [tipoDoc, setTipoDoc] = useState(DEFAULT_TIPO_DOC);
-  const [dateFrom, setDateFrom] = useState(range.from);
-  const [dateTo, setDateTo] = useState(range.to);
-  const [idAnagr, setIdAnagr] = useState<number | undefined>(undefined);
-  const [page, setPage] = useState(1);
+
+  const savedFilters = useMemo(() => {
+    try {
+      const saved = sessionStorage.getItem('aenad_archivio_filters');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const [tipoDoc, setTipoDoc] = useState<string>(() => savedFilters?.tipoDoc ?? DEFAULT_TIPO_DOC);
+  const [dateFrom, setDateFrom] = useState<string>(() => savedFilters?.dateFrom ?? range.from);
+  const [dateTo, setDateTo] = useState<string>(() => savedFilters?.dateTo ?? range.to);
+  const [idAnagr, setIdAnagr] = useState<number | undefined>(() => savedFilters?.idAnagr);
+  const [page, setPage] = useState<number>(() => savedFilters?.page ?? 1);
   const [selectedDoc, setSelectedDoc] = useState<AenadDocument | null>(null);
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      'aenad_archivio_filters',
+      JSON.stringify({
+        tipoDoc,
+        dateFrom,
+        dateTo,
+        idAnagr,
+        page,
+      }),
+    );
+  }, [tipoDoc, dateFrom, dateTo, idAnagr, page]);
 
   const documentTypes = useDocumentTypes();
   const typeOptions = useMemo(
