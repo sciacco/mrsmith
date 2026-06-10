@@ -157,8 +157,8 @@ func TestHandleDocumentsQueriesFilteredPageAndMapsRows(t *testing.T) {
 	if row.Data == nil || *row.Data != "2026-05-26" || row.DataDoc == nil || *row.DataDoc != "2026-05-26" {
 		t.Fatalf("unexpected document dates: %#v %#v", row.Data, row.DataDoc)
 	}
-	if row.TotDoc == nil || *row.TotDoc != 2017 {
-		t.Fatalf("expected TotDoc 2017, got %#v", row.TotDoc)
+	if row.TotDoc == nil || *row.TotDoc != "2017.5000" {
+		t.Fatalf("expected TotDoc 2017.5000, got %#v", row.TotDoc)
 	}
 }
 
@@ -252,6 +252,9 @@ func (c *aenadTestConn) QueryContext(_ context.Context, query string, args []dri
 		if !strings.Contains(query, `ORDER BY d."Data" DESC, d."IDDoc" DESC`) || !strings.Contains(query, "LIMIT $4 OFFSET $5") {
 			return nil, errors.New("documents query should order and paginate")
 		}
+		if !strings.Contains(query, `d."TotDoc"::text`) {
+			return nil, errors.New("documents query should read numeric totals as text")
+		}
 		if len(args) != 5 {
 			return nil, errors.New("unexpected page args length")
 		}
@@ -273,10 +276,10 @@ func (c *aenadTestConn) QueryContext(_ context.Context, query string, args []dri
 					testDate(2026, 5, 26),
 					"1013",
 					"Prev. 1013 del 26/5/26",
-					int64(1653),
-					int64(2017),
-					int64(1521),
-					int64(132),
+					"1653.7500",
+					"2017.5000",
+					"1521.0000",
+					"132.2500",
 					"Contanti",             // Pagamento
 					"IT1234567890",         // Pagam_CoordBancarie
 					"Nota interna di test", // NoteInterne

@@ -39,12 +39,15 @@ BEGIN
 END;
 $$;
 
+-- Drop conflicting overloads so the script is re-runnable.
+DROP FUNCTION IF EXISTS aenad.tdoc_net_amount(bigint, bigint, text);
+
 CREATE OR REPLACE FUNCTION aenad.tdoc_net_amount(
-  price_net bigint,
-  quantity bigint,
+  price_net numeric,
+  quantity numeric,
   discounts text
 )
-RETURNS bigint
+RETURNS numeric
 LANGUAGE plpgsql
 IMMUTABLE
 AS $$
@@ -57,15 +60,18 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  RETURN round(price_net::numeric * quantity::numeric * discount_multiplier)::bigint;
+  RETURN (price_net * quantity * discount_multiplier)::numeric(18,4);
 END;
 $$;
 
+-- Drop conflicting overloads so the script is re-runnable.
+DROP FUNCTION IF EXISTS aenad.tdoc_gross_amount(bigint, character varying);
+
 CREATE OR REPLACE FUNCTION aenad.tdoc_gross_amount(
-  net_amount bigint,
+  net_amount numeric,
   vat_code character varying
 )
-RETURNS bigint
+RETURNS numeric
 LANGUAGE plpgsql
 STABLE
 AS $$
@@ -85,7 +91,7 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  RETURN round(net_amount::numeric * (1 + (vat_percent / 100)))::bigint;
+  RETURN (net_amount * (1 + (vat_percent / 100)))::numeric(18,4);
 END;
 $$;
 
@@ -121,11 +127,11 @@ BEGIN
     "TotGuadagno" = totals.tot_guadagno
   FROM (
     SELECT
-      SUM("ImportoNettoRiga")::bigint AS tot_netto,
-      SUM("ImportoIvatoRiga" - "ImportoNettoRiga")::bigint AS tot_iva,
-      SUM("ImportoIvatoRiga")::bigint AS tot_doc,
-      SUM("ImportoAcquistoRiga")::bigint AS tot_prezzo_acquisto,
-      SUM("GuadagnoRiga")::bigint AS tot_guadagno
+      SUM("ImportoNettoRiga")::numeric(18,4) AS tot_netto,
+      SUM("ImportoIvatoRiga" - "ImportoNettoRiga")::numeric(18,4) AS tot_iva,
+      SUM("ImportoIvatoRiga")::numeric(18,4) AS tot_doc,
+      SUM("ImportoAcquistoRiga")::numeric(18,4) AS tot_prezzo_acquisto,
+      SUM("GuadagnoRiga")::numeric(18,4) AS tot_guadagno
     FROM aenad."TDocRighe"
     WHERE "IDDoc" = document_id
   ) totals

@@ -14,7 +14,8 @@
       "mcp__plugin_playwright_playwright__browser_close",
       "Skill(playwright-cli)",
       "Bash(playwright-cli -s=manutsmoke press PageDown)",
-      "Bash(playwright-cli -s=manutsmoke screenshot --filename=/tmp/claude/manut-section.png)"
+      "Bash(playwright-cli -s=manutsmoke screenshot --filename=/tmp/claude/manut-section.png)",
+      "WebFetch(domain:api.github.com)"
     ]
   },
   "spinnerTipsEnabled": false

@@ -93,9 +93,9 @@ export interface UpdateDocumentPayload {
     IDDocRiga: number;
     CodArticolo: string | null;
     Desc: string | null;
-    Qta: number | null;
+    Qta: string | null;
     Udm: string | null;
-    PrezzoNetto: number | null;
+    PrezzoNetto: string | null;
     Sconti: string | null;
   }[];
 }

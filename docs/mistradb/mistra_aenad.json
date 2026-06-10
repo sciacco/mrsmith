@@ -95,55 +95,55 @@
             {
               "name": "ProvvListino1",
               "position": 3,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ProvvListino2",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ProvvListino3",
               "position": 5,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ProvvListino4",
               "position": 6,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ProvvListino5",
               "position": 7,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ProvvListino6",
               "position": 8,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ProvvListino7",
               "position": 9,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ProvvListino8",
               "position": 10,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ProvvListino9",
               "position": 11,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -278,13 +278,13 @@
             {
               "name": "TotNetto",
               "position": 11,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotDovuto",
               "position": 12,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -528,7 +528,7 @@
             {
               "name": "Fido",
               "position": 27,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -1203,109 +1203,109 @@
             {
               "name": "PrezzoNetto1",
               "position": 11,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoNetto2",
               "position": 12,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoNetto3",
               "position": 13,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoNetto4",
               "position": 14,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoNetto5",
               "position": 15,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoNetto6",
               "position": 16,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoNetto7",
               "position": 17,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoNetto8",
               "position": 18,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoNetto9",
               "position": 19,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvato1",
               "position": 20,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvato2",
               "position": 21,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvato3",
               "position": 22,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvato4",
               "position": 23,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvato5",
               "position": 24,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvato6",
               "position": 25,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvato7",
               "position": 26,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvato8",
               "position": 27,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvato9",
               "position": 28,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -1365,13 +1365,13 @@
             {
               "name": "EcoContribNetto",
               "position": 38,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "EcoContribIvato",
               "position": 39,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -1401,13 +1401,13 @@
             {
               "name": "PrezzoNettoForn",
               "position": 44,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvatoForn",
               "position": 45,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -1522,31 +1522,31 @@
             {
               "name": "OrdinaAMultipliDi",
               "position": 64,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaGiacenza_Import",
               "position": 65,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoMedioCarico",
               "position": 66,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoMedioScarico",
               "position": 67,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoUltimoCarico",
               "position": 68,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -1775,7 +1775,7 @@
             {
               "name": "Qta",
               "position": 3,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -1905,13 +1905,13 @@
             {
               "name": "PrezzoNettoForn",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvatoForn",
               "position": 5,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -2002,7 +2002,7 @@
             {
               "name": "ScortaMin",
               "position": 3,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -2014,25 +2014,25 @@
             {
               "name": "QtaCaricata",
               "position": 5,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaScaricata",
               "position": 6,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaImpegnata",
               "position": 7,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaInArrivo",
               "position": 8,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -2403,7 +2403,7 @@
             {
               "name": "ManArc_ApplRevision",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -2928,7 +2928,7 @@
             {
               "name": "Art_ArrotondListini",
               "position": 87,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -3342,7 +3342,7 @@
             {
               "name": "Fidelity_EuroPerPunto",
               "position": 153,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -3938,13 +3938,13 @@
             {
               "name": "Qta",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "Costo",
               "position": 5,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -4035,19 +4035,19 @@
             {
               "name": "ImportoNetto",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "Iva",
               "position": 5,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "IvaDetr",
               "position": 6,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -4161,13 +4161,13 @@
             {
               "name": "QtaShown",
               "position": 8,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "Qta",
               "position": 9,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4191,13 +4191,13 @@
             {
               "name": "PrezzoNetto",
               "position": 13,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoIvato",
               "position": 14,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4209,13 +4209,13 @@
             {
               "name": "EcoContribNetto",
               "position": 16,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "EcoContribIvato",
               "position": 17,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4234,31 +4234,31 @@
             {
               "name": "ImportoNettoRiga",
               "position": 20,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "IvaForzataRiga",
               "position": 21,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ImportoIvatoRiga",
               "position": 22,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "EcoContribNettoRiga",
               "position": 23,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "EcoContribIvatoRiga",
               "position": 24,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4277,7 +4277,7 @@
             {
               "name": "QtaArrivata",
               "position": 27,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4289,7 +4289,7 @@
             {
               "name": "ImportoProvvRiga",
               "position": 29,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4301,25 +4301,25 @@
             {
               "name": "Peso_Tmp",
               "position": 31,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoAcquisto",
               "position": 32,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ImportoAcquistoRiga",
               "position": 33,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "GuadagnoRiga",
               "position": 34,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4574,13 +4574,13 @@
             {
               "name": "ContrPrev_ImportoNetto",
               "position": 17,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ContrPrev_ImportoIvato",
               "position": 18,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4605,49 +4605,49 @@
             {
               "name": "Spese_ImportoNetto",
               "position": 22,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "Spese_ImportoIvato",
               "position": 23,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotNetto",
               "position": 24,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotIva",
               "position": 25,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotIvaDetr",
               "position": 26,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotDoc",
               "position": 27,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotIvaNonDovuta",
               "position": 28,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotIvaSplitPaym",
               "position": 29,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4660,37 +4660,37 @@
             {
               "name": "TotRitAcconto",
               "position": 31,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotRitVarie",
               "position": 32,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotDocNoRit",
               "position": 33,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotPrezzoAcquisto",
               "position": 34,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "TotGuadagno",
               "position": 35,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ImportoSoggettoRA",
               "position": 36,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4720,7 +4720,7 @@
             {
               "name": "TotEcoContribNetto",
               "position": 41,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4789,7 +4789,7 @@
             {
               "name": "Pagam_AccontoDaIncludere",
               "position": 52,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -4829,19 +4829,19 @@
             {
               "name": "Pagam_TotPagamenti",
               "position": 58,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "Pagam_ImportoSaldato",
               "position": 59,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "Pagam_ImportoDaSaldare",
               "position": 60,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -5058,13 +5058,13 @@
             {
               "name": "Agente_ImportoSoggettoProvv",
               "position": 96,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "Agente_ImportoProvv",
               "position": 97,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -5120,7 +5120,7 @@
             {
               "name": "TotIvaDovutaEntroUnAnno",
               "position": 106,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -5132,7 +5132,7 @@
             {
               "name": "Fidelity_EuroPerPunto",
               "position": 108,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -5214,7 +5214,7 @@
             {
               "name": "FE_Bollo",
               "position": 121,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -5989,7 +5989,7 @@
             {
               "name": "Qta",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -6554,31 +6554,31 @@
             {
               "name": "QtaCaricata",
               "position": 8,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaScaricata",
               "position": 9,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaImpegnata",
               "position": 10,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaInArrivo",
               "position": 11,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoNetto",
               "position": 12,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -6945,7 +6945,7 @@
             {
               "name": "Importo",
               "position": 12,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -6994,13 +6994,13 @@
             {
               "name": "Auto_Importo",
               "position": 20,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ImportoIvaPerCassa",
               "position": 21,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -7206,7 +7206,7 @@
             {
               "name": "SaldoIniziale",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -7344,13 +7344,13 @@
             {
               "name": "ImportoNetto",
               "position": 3,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "ImportoIvato",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -7430,7 +7430,7 @@
             {
               "name": "Importo",
               "position": 6,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -7650,7 +7650,7 @@
             {
               "name": "SignQta",
               "position": 26,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -7832,7 +7832,7 @@
             {
               "name": "QtaRichiesta",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -7974,7 +7974,7 @@
             {
               "name": "ImportoPagam",
               "position": 17,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -8056,13 +8056,13 @@
             {
               "name": "QtaCaricata",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaScaricata",
               "position": 5,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -8074,31 +8074,31 @@
             {
               "name": "QtaCaricataConPrezzo",
               "position": 7,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaScaricataConPrezzo",
               "position": 8,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoMedioCarico",
               "position": 9,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoMedioScarico",
               "position": 10,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoUltimoCarico",
               "position": 11,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -8225,7 +8225,7 @@
             {
               "name": "Qta",
               "position": 6,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -8268,19 +8268,19 @@
             {
               "name": "MM_QtaCaricata",
               "position": 5,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "MM_QtaScaricata",
               "position": 6,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "MM_QtaImpegnata",
               "position": 7,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -8310,25 +8310,25 @@
             {
               "name": "QtaCaricata",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaScaricata",
               "position": 5,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaImpegnata",
               "position": 6,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaInArrivo",
               "position": 7,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
@@ -8358,31 +8358,31 @@
             {
               "name": "QtaCaricataConPrezzo",
               "position": 12,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "QtaScaricataConPrezzo",
               "position": 13,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoMedioCarico",
               "position": 14,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoMedioScarico",
               "position": 15,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             },
             {
               "name": "PrezzoUltimoCarico",
               "position": 16,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -8487,7 +8487,7 @@
             {
               "name": "QtaArrivata",
               "position": 2,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -8530,7 +8530,7 @@
             {
               "name": "Qta",
               "position": 4,
-              "type": "bigint",
+              "type": "numeric(18,4)",
               "nullable": true
             }
           ],
@@ -9353,11 +9353,11 @@
         },
         {
           "name": "tdoc_net_amount",
-          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_net_amount(\n  price_net bigint,\n  quantity bigint,\n  discounts text\n)\nRETURNS bigint\nLANGUAGE plpgsql\nIMMUTABLE\nAS $$\nDECLARE\n  discount_multiplier numeric;\nBEGIN\n  discount_multiplier := aenad.tdoc_discount_multiplier(discounts);\n\n  IF price_net IS NULL OR quantity IS NULL THEN\n    RETURN NULL;\n  END IF;\n\n  RETURN round(price_net::numeric * quantity::numeric * discount_multiplier)::bigint;\nEND;\n$$;"
+          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_net_amount(\n  price_net numeric,\n  quantity numeric,\n  discounts text\n)\nRETURNS numeric\nLANGUAGE plpgsql\nIMMUTABLE\nAS $$\nDECLARE\n  discount_multiplier numeric;\nBEGIN\n  discount_multiplier := aenad.tdoc_discount_multiplier(discounts);\n\n  IF price_net IS NULL OR quantity IS NULL THEN\n    RETURN NULL;\n  END IF;\n\n  RETURN (price_net * quantity * discount_multiplier)::numeric(18,4);\nEND;\n$$;"
         },
         {
           "name": "tdoc_gross_amount",
-          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_gross_amount(\n  net_amount bigint,\n  vat_code character varying\n)\nRETURNS bigint\nLANGUAGE plpgsql\nSTABLE\nAS $$\nDECLARE\n  vat_percent numeric;\nBEGIN\n  IF net_amount IS NULL OR vat_code IS NULL THEN\n    RETURN NULL;\n  END IF;\n\n  SELECT \"PercIva\"::numeric\n  INTO vat_percent\n  FROM aenad.\"TIva\"\n  WHERE \"CodIva\" = vat_code;\n\n  IF vat_percent IS NULL THEN\n    RETURN NULL;\n  END IF;\n\n  RETURN round(net_amount::numeric * (1 + (vat_percent / 100)))::bigint;\nEND;\n$$;"
+          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_gross_amount(\n  net_amount numeric,\n  vat_code character varying\n)\nRETURNS numeric\nLANGUAGE plpgsql\nSTABLE\nAS $$\nDECLARE\n  vat_percent numeric;\nBEGIN\n  IF net_amount IS NULL OR vat_code IS NULL THEN\n    RETURN NULL;\n  END IF;\n\n  SELECT \"PercIva\"::numeric\n  INTO vat_percent\n  FROM aenad.\"TIva\"\n  WHERE \"CodIva\" = vat_code;\n\n  IF vat_percent IS NULL THEN\n    RETURN NULL;\n  END IF;\n\n  RETURN (net_amount * (1 + (vat_percent / 100)))::numeric(18,4);\nEND;\n$$;"
         },
         {
           "name": "tdoc_righe_set_totals",
@@ -9365,7 +9365,7 @@
         },
         {
           "name": "tdoc_recalculate_header",
-          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_recalculate_header(document_id integer)\nRETURNS void\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  IF document_id IS NULL THEN\n    RETURN;\n  END IF;\n\n  UPDATE aenad.\"TDocTestate\" header\n  SET\n    \"TotNetto\" = totals.tot_netto,\n    \"TotIva\" = totals.tot_iva,\n    \"TotDoc\" = totals.tot_doc,\n    \"TotPrezzoAcquisto\" = totals.tot_prezzo_acquisto,\n    \"TotGuadagno\" = totals.tot_guadagno\n  FROM (\n    SELECT\n      SUM(\"ImportoNettoRiga\")::bigint AS tot_netto,\n      SUM(\"ImportoIvatoRiga\" - \"ImportoNettoRiga\")::bigint AS tot_iva,\n      SUM(\"ImportoIvatoRiga\")::bigint AS tot_doc,\n      SUM(\"ImportoAcquistoRiga\")::bigint AS tot_prezzo_acquisto,\n      SUM(\"GuadagnoRiga\")::bigint AS tot_guadagno\n    FROM aenad.\"TDocRighe\"\n    WHERE \"IDDoc\" = document_id\n  ) totals\n  WHERE header.\"IDDoc\" = document_id;\nEND;\n$$;"
+          "definition": "CREATE OR REPLACE FUNCTION aenad.tdoc_recalculate_header(document_id integer)\nRETURNS void\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  IF document_id IS NULL THEN\n    RETURN;\n  END IF;\n\n  UPDATE aenad.\"TDocTestate\" header\n  SET\n    \"TotNetto\" = totals.tot_netto,\n    \"TotIva\" = totals.tot_iva,\n    \"TotDoc\" = totals.tot_doc,\n    \"TotPrezzoAcquisto\" = totals.tot_prezzo_acquisto,\n    \"TotGuadagno\" = totals.tot_guadagno\n  FROM (\n    SELECT\n      SUM(\"ImportoNettoRiga\")::numeric(18,4) AS tot_netto,\n      SUM(\"ImportoIvatoRiga\" - \"ImportoNettoRiga\")::numeric(18,4) AS tot_iva,\n      SUM(\"ImportoIvatoRiga\")::numeric(18,4) AS tot_doc,\n      SUM(\"ImportoAcquistoRiga\")::numeric(18,4) AS tot_prezzo_acquisto,\n      SUM(\"GuadagnoRiga\")::numeric(18,4) AS tot_guadagno\n    FROM aenad.\"TDocRighe\"\n    WHERE \"IDDoc\" = document_id\n  ) totals\n  WHERE header.\"IDDoc\" = document_id;\nEND;\n$$;"
         },
         {
           "name": "tdoc_righe_recalculate_header",

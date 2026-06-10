@@ -3,18 +3,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useArchiveDocuments, useDocumentTypes, useDocumentRows } from '../api/queries';
 import type { AenadDocument } from '../api/types';
+import { formatMoney, formatQuantity, parseDecimal } from '../utils/format';
 import styles from './PreventiviPage.module.css';
 
 const DEFAULT_TIPO_DOC = 'Q';
 const DEFAULT_DAYS = 100;
 const MAX_DAYS = 380;
 const PAGE_SIZE = 50;
-
-const moneyFormatter = new Intl.NumberFormat('it-IT', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-});
 
 function formatISODate(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -62,12 +57,6 @@ function formatDate(value: string | null) {
     });
   }
   return value;
-}
-
-
-function formatMoney(value: number | null) {
-  if (value == null) return '-';
-  return moneyFormatter.format(value);
 }
 
 export function ArchivioPage() {
@@ -423,11 +412,14 @@ function DocumentDetailsDrawer({
                 </thead>
                 <tbody>
                   {rowsQuery.data.map((row) => {
-                    const isDescriptive = !row.CodArticolo && 
-                      (row.Qta === null || row.Qta === 0) && 
-                      row.Desc && 
-                      (row.PrezzoNetto === null || row.PrezzoNetto === 0) && 
-                      (row.ImportoNettoRiga === null || row.ImportoNettoRiga === 0);
+                    const qta = parseDecimal(row.Qta);
+                    const prezzoNetto = parseDecimal(row.PrezzoNetto);
+                    const importoNettoRiga = parseDecimal(row.ImportoNettoRiga);
+                    const isDescriptive = !row.CodArticolo &&
+                      (qta === null || qta === 0) &&
+                      row.Desc &&
+                      (prezzoNetto === null || prezzoNetto === 0) &&
+                      (importoNettoRiga === null || importoNettoRiga === 0);
 
                     if (isDescriptive) {
                       return (
@@ -444,7 +436,7 @@ function DocumentDetailsDrawer({
                       <tr key={row.IDDocRiga}>
                         <td className={styles.monoCell}>{row.CodArticolo ?? '-'}</td>
                         <td>{row.Desc ?? '-'}</td>
-                        <td className={styles.numCol}>{row.Qta ?? 0}</td>
+                        <td className={styles.numCol}>{formatQuantity(row.Qta)}</td>
                         <td>{row.Udm ?? '-'}</td>
                         <td className={styles.numCol}>{formatMoney(row.PrezzoNetto)}</td>
                         <td className={styles.numCol}>{row.Sconti ?? '-'}</td>

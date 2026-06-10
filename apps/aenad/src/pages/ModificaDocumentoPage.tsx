@@ -7,6 +7,7 @@ import {
   useUpdateDocument,
   type UpdateDocumentPayload,
 } from '../api/queries';
+import { formatMoney, formatQuantity, parseDecimal, trimDecimalZeros } from '../utils/format';
 import styles from './ModificaDocumentoPage.module.css';
 
 interface DocumentState {
@@ -36,25 +37,19 @@ interface LocalRow {
   IDDocRiga: number;
   CodArticolo: string;
   Desc: string;
-  Qta: number;
+  Qta: string;
   Udm: string;
-  PrezzoNetto: number;
+  PrezzoNetto: string;
   Sconti: string;
   isDescriptive?: boolean;
 }
 
-const moneyFormatter = new Intl.NumberFormat('it-IT', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-});
-
-function formatMoney(value: number | null) {
-  if (value == null) return '-';
-  return moneyFormatter.format(value);
+// normalizeDecimalInput porta il valore di un input alla stringa decimale del
+// payload: separatore punto, vuoto trattato come zero.
+function normalizeDecimalInput(value: string): string {
+  const normalized = value.trim().replace(',', '.');
+  return normalized === '' ? '0' : normalized;
 }
-
-// formatDate is not used in this file
 
 export function ModificaDocumentoPage() {
   const { id } = useParams<{ id: string }>();
@@ -106,20 +101,23 @@ export function ModificaDocumentoPage() {
     if (rowsQuery.data) {
       setRows(
         rowsQuery.data.map((row) => {
+          const qta = parseDecimal(row.Qta);
+          const prezzoNetto = parseDecimal(row.PrezzoNetto);
+          const importoNettoRiga = parseDecimal(row.ImportoNettoRiga);
           const isDescriptive =
             !row.CodArticolo &&
-            (row.Qta === null || row.Qta === 0) &&
+            (qta === null || qta === 0) &&
             row.Desc &&
-            (row.PrezzoNetto === null || row.PrezzoNetto === 0) &&
-            (row.ImportoNettoRiga === null || row.ImportoNettoRiga === 0);
+            (prezzoNetto === null || prezzoNetto === 0) &&
+            (importoNettoRiga === null || importoNettoRiga === 0);
 
           return {
             IDDocRiga: row.IDDocRiga,
             CodArticolo: row.CodArticolo ?? '',
             Desc: row.Desc ?? '',
-            Qta: row.Qta ?? 0,
+            Qta: row.Qta ? trimDecimalZeros(row.Qta) : '0',
             Udm: row.Udm ?? '',
-            PrezzoNetto: row.PrezzoNetto ?? 0,
+            PrezzoNetto: row.PrezzoNetto ? trimDecimalZeros(row.PrezzoNetto) : '0',
             Sconti: row.Sconti ?? '',
             isDescriptive: Boolean(isDescriptive),
           };
@@ -156,7 +154,7 @@ export function ModificaDocumentoPage() {
   const handleUpdateRowField = (
     index: number,
     field: keyof LocalRow,
-    value: string | number | boolean,
+    value: string | boolean,
   ) => {
     setRows((prev) =>
       prev.map((row, idx) => (idx === index ? { ...row, [field]: value } : row)),
@@ -170,9 +168,9 @@ export function ModificaDocumentoPage() {
         IDDocRiga: 0,
         CodArticolo: '',
         Desc: '',
-        Qta: isDescriptive ? 0 : 1,
+        Qta: isDescriptive ? '0' : '1',
         Udm: isDescriptive ? '' : 'PZ',
-        PrezzoNetto: 0,
+        PrezzoNetto: '0',
         Sconti: '',
         isDescriptive,
       },
@@ -199,7 +197,9 @@ export function ModificaDocumentoPage() {
 
   const getRowNetTotal = (row: LocalRow) => {
     if (row.isDescriptive) return 0;
-    let net = row.PrezzoNetto * row.Qta;
+    const prezzoNetto = parseDecimal(row.PrezzoNetto) ?? 0;
+    const qta = parseDecimal(row.Qta) ?? 0;
+    let net = prezzoNetto * qta;
     if (!row.Sconti) return net;
     const discounts = row.Sconti
       .split('+')
@@ -208,7 +208,7 @@ export function ModificaDocumentoPage() {
     for (const pct of discounts) {
       net = net * (1 - pct / 100);
     }
-    return Math.round(net);
+    return net;
   };
 
   // Calculate frontend approximate totals
@@ -232,9 +232,9 @@ export function ModificaDocumentoPage() {
         IDDocRiga: r.IDDocRiga,
         CodArticolo: r.isDescriptive ? null : r.CodArticolo || null,
         Desc: r.Desc || null,
-        Qta: r.isDescriptive ? null : r.Qta,
+        Qta: r.isDescriptive ? null : normalizeDecimalInput(r.Qta),
         Udm: r.isDescriptive ? null : r.Udm || null,
-        PrezzoNetto: r.isDescriptive ? null : r.PrezzoNetto,
+        PrezzoNetto: r.isDescriptive ? null : normalizeDecimalInput(r.PrezzoNetto),
         Sconti: r.isDescriptive ? null : r.Sconti || null,
       })),
     };
@@ -491,7 +491,7 @@ export function ModificaDocumentoPage() {
                             <>
                               <td>{row.CodArticolo}</td>
                               <td>{row.Desc}</td>
-                              <td style={{ textAlign: 'right' }}>{row.Qta}</td>
+                              <td style={{ textAlign: 'right' }}>{formatQuantity(row.Qta)}</td>
                               <td>{row.Udm}</td>
                               <td style={{ textAlign: 'right' }}>{formatMoney(row.PrezzoNetto)}</td>
                               <td style={{ textAlign: 'right' }}>{row.Sconti}</td>
@@ -711,7 +711,7 @@ function RowsEditor({
   getRowNetTotal,
 }: {
   rows: LocalRow[];
-  onUpdateRow: (index: number, field: keyof LocalRow, value: string | number | boolean) => void;
+  onUpdateRow: (index: number, field: keyof LocalRow, value: string | boolean) => void;
   onAddRow: (isDescriptive?: boolean) => void;
   onDeleteRow: (index: number) => void;
   onMoveRow: (index: number, direction: 'up' | 'down') => void;
@@ -783,9 +783,11 @@ function RowsEditor({
                     <td>
                       <input
                         type="number"
+                        step="0.0001"
+                        inputMode="decimal"
                         className={`${styles.cellInput} ${styles.numCellInput}`}
                         value={row.Qta}
-                        onChange={(e) => onUpdateRow(index, 'Qta', parseInt(e.target.value) || 0)}
+                        onChange={(e) => onUpdateRow(index, 'Qta', e.target.value)}
                       />
                     </td>
                     <td>
@@ -799,9 +801,11 @@ function RowsEditor({
                     <td>
                       <input
                         type="number"
+                        step="0.0001"
+                        inputMode="decimal"
                         className={`${styles.cellInput} ${styles.numCellInput}`}
                         value={row.PrezzoNetto}
-                        onChange={(e) => onUpdateRow(index, 'PrezzoNetto', parseInt(e.target.value) || 0)}
+                        onChange={(e) => onUpdateRow(index, 'PrezzoNetto', e.target.value)}
                       />
                     </td>
                     <td>

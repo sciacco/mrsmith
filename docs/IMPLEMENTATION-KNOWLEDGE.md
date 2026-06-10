@@ -692,6 +692,15 @@ Alyante ERP ID
 - Used by: `apps/aenad` archive totals and future Aenad write flows.
 - Open questions: forced VAT, eco-contributions, withholding, split payment, fidelity, and payment-derived totals are not part of the first tranche.
 
+### Aenad Monetary And Quantity Fields Are numeric(18,4) Exposed As Decimal Strings
+
+- Context: Aenad amounts, prices, quantities, and stock fields in Mistra schema `aenad` (DAZERO source structure).
+- Discovery: monetary and quantity columns (`TDocTestate` totals, `TDocRighe.Qta`/`PrezzoNetto`/`ImportoNettoRiga`, `TArticoli` prices, and the rest of the per-table list in `docs/mistradb/mistra_aenad.json`) are `numeric(18,4)`. JSON numbers and Go int64/float64 cannot carry these values losslessly.
+- Practical rule: Go reads them with a SQL `::text` cast scanned into `sql.NullString` and exposes them as decimal strings (`*string` in DTOs, `string | null` in frontend API types); writes accept validated decimal strings (dot separator, max 14 integer digits, max 4 decimals) and bind with explicit `$n::numeric(18,4)` casts. Rounding happens only in the database functions, to 4 decimals at function boundaries; the frontend converts to number only for non-persisted preview calculations and display formatting.
+- Evidence: `backend/internal/aenad/documents.go` (`normalizeDecimal`, `::text` scans), `deploy/migrations/021_aenad_document_totals.sql`, `apps/aenad/src/utils/format.ts`.
+- Used by: `apps/aenad` archive, document detail, and row editing; any future Aenad view exposing fields from the numeric list.
+- Open questions: none.
+
 ### Grappa DCIM Rack Media Is Not A V1 Feature
 
 - Context: `apps/grappa-dcim` rack detail parity from the current Grappa application.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -29,7 +30,12 @@ var (
 	errInvalidDateRange = errors.New("invalid_date_range")
 	errInvalidPage      = errors.New("invalid_page")
 	errInvalidPageSize  = errors.New("invalid_page_size")
+	errInvalidDecimal   = errors.New("invalid_decimal")
 )
+
+// decimalPattern bounds payload values to numeric(18,4): up to 14 integer
+// digits and up to 4 decimals, dot separator.
+var decimalPattern = regexp.MustCompile(`^-?\d{1,14}(\.\d{1,4})?$`)
 
 type documentTypeOption struct {
 	TipoDoc string `json:"tipoDoc"`
@@ -64,10 +70,10 @@ type documentRow struct {
 	DataDoc             *string `json:"DataDoc"`
 	NumDoc              *string `json:"NumDoc"`
 	DescDoc             *string `json:"DescDoc"`
-	TotNetto            *int64  `json:"TotNetto"`
-	TotDoc              *int64  `json:"TotDoc"`
-	TotPrezzoAcquisto   *int64  `json:"TotPrezzoAcquisto"`
-	TotGuadagno         *int64  `json:"TotGuadagno"`
+	TotNetto            *string `json:"TotNetto"`
+	TotDoc              *string `json:"TotDoc"`
+	TotPrezzoAcquisto   *string `json:"TotPrezzoAcquisto"`
+	TotGuadagno         *string `json:"TotGuadagno"`
 	Pagamento           *string `json:"Pagamento"`
 	PagamCoordBancarie  *string `json:"Pagam_CoordBancarie"`
 	NoteInterne         *string `json:"NoteInterne"`
@@ -163,10 +169,10 @@ func (h *Handler) handleDocuments(w http.ResponseWriter, r *http.Request) {
 			d."DataDoc",
 			d."NumDoc",
 			d."DescDoc",
-			d."TotNetto",
-			d."TotDoc",
-			d."TotPrezzoAcquisto",
-			d."TotGuadagno",
+			d."TotNetto"::text,
+			d."TotDoc"::text,
+			d."TotPrezzoAcquisto"::text,
+			d."TotGuadagno"::text,
 			d."Pagamento",
 			d."Pagam_CoordBancarie",
 			d."NoteInterne",
@@ -309,7 +315,7 @@ func scanDocumentRow(rows *sql.Rows) (documentRow, error) {
 	var pagamento, pagamCoordBancarie, noteInterne, anagrIndirizzo, anagrCap, anagrCitta, anagrProv, anagrNazione, anagrCodiceFiscale, anagrPartitaIva, anagrDestNome, anagrDestIndirizzo, anagrDestCap, anagrDestCitta, anagrDestProv, anagrDestNazione sql.NullString
 	var idAnagr, codDestIDAnagr, num sql.NullInt64
 	var data, dataDoc sql.NullTime
-	var totNetto, totDoc, totPrezzoAcquisto, totGuadagno sql.NullInt64
+	var totNetto, totDoc, totPrezzoAcquisto, totGuadagno sql.NullString
 
 	if err := rows.Scan(
 		&item.IDDoc,
@@ -357,10 +363,10 @@ func scanDocumentRow(rows *sql.Rows) (documentRow, error) {
 	item.DataDoc = nullableDate(dataDoc)
 	item.NumDoc = nullableString(numDoc)
 	item.DescDoc = nullableString(descDoc)
-	item.TotNetto = nullableInt64(totNetto)
-	item.TotDoc = nullableInt64(totDoc)
-	item.TotPrezzoAcquisto = nullableInt64(totPrezzoAcquisto)
-	item.TotGuadagno = nullableInt64(totGuadagno)
+	item.TotNetto = nullableString(totNetto)
+	item.TotDoc = nullableString(totDoc)
+	item.TotPrezzoAcquisto = nullableString(totPrezzoAcquisto)
+	item.TotGuadagno = nullableString(totGuadagno)
 	item.Pagamento = nullableString(pagamento)
 	item.PagamCoordBancarie = nullableString(pagamCoordBancarie)
 	item.NoteInterne = nullableString(noteInterne)
@@ -400,13 +406,6 @@ func nullableInt(value sql.NullInt64) *int {
 	return &v
 }
 
-func nullableInt64(value sql.NullInt64) *int64 {
-	if !value.Valid {
-		return nil
-	}
-	return &value.Int64
-}
-
 func nullableDate(value sql.NullTime) *string {
 	if !value.Valid {
 		return nil
@@ -431,8 +430,8 @@ func (h *Handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
 	rowQuery := h.mistra.QueryRowContext(r.Context(), `
 		SELECT
 			d."IDDoc", d."TipoDoc", d."IDAnagr", d."Anagr_Nome", d."CodDest_IDAnagr", d."CodDest",
-			d."Data", d."Num", d."DataDoc", d."NumDoc", d."DescDoc", d."TotNetto", d."TotDoc",
-			d."TotPrezzoAcquisto", d."TotGuadagno", d."Pagamento", d."Pagam_CoordBancarie",
+			d."Data", d."Num", d."DataDoc", d."NumDoc", d."DescDoc", d."TotNetto"::text, d."TotDoc"::text,
+			d."TotPrezzoAcquisto"::text, d."TotGuadagno"::text, d."Pagamento", d."Pagam_CoordBancarie",
 			d."NoteInterne", d."Anagr_Indirizzo", d."Anagr_Cap", d."Anagr_Citta", d."Anagr_Prov",
 			d."Anagr_Nazione", d."Anagr_CodiceFiscale", d."Anagr_PartitaIva", d."Anagr_DestNome",
 			d."Anagr_DestIndirizzo", d."Anagr_DestCap", d."Anagr_DestCitta", d."Anagr_DestProv",
@@ -444,7 +443,7 @@ func (h *Handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
 	var pagamento, pagamCoordBancarie, noteInterne, anagrIndirizzo, anagrCap, anagrCitta, anagrProv, anagrNazione, anagrCodiceFiscale, anagrPartitaIva, anagrDestNome, anagrDestIndirizzo, anagrDestCap, anagrDestCitta, anagrDestProv, anagrDestNazione sql.NullString
 	var idAnagr, codDestIDAnagr, num sql.NullInt64
 	var data, dataDoc sql.NullTime
-	var totNetto, totDoc, totPrezzoAcquisto, totGuadagno sql.NullInt64
+	var totNetto, totDoc, totPrezzoAcquisto, totGuadagno sql.NullString
 
 	err = rowQuery.Scan(
 		&updatedRow.IDDoc, &tipoDoc, &idAnagr, &anagrNome, &codDestIDAnagr, &codDest,
@@ -474,10 +473,10 @@ func (h *Handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
 	updatedRow.DataDoc = nullableDate(dataDoc)
 	updatedRow.NumDoc = nullableString(numDoc)
 	updatedRow.DescDoc = nullableString(descDoc)
-	updatedRow.TotNetto = nullableInt64(totNetto)
-	updatedRow.TotDoc = nullableInt64(totDoc)
-	updatedRow.TotPrezzoAcquisto = nullableInt64(totPrezzoAcquisto)
-	updatedRow.TotGuadagno = nullableInt64(totGuadagno)
+	updatedRow.TotNetto = nullableString(totNetto)
+	updatedRow.TotDoc = nullableString(totDoc)
+	updatedRow.TotPrezzoAcquisto = nullableString(totPrezzoAcquisto)
+	updatedRow.TotGuadagno = nullableString(totGuadagno)
 	updatedRow.Pagamento = nullableString(pagamento)
 	updatedRow.PagamCoordBancarie = nullableString(pagamCoordBancarie)
 	updatedRow.NoteInterne = nullableString(noteInterne)
@@ -503,11 +502,11 @@ type documentRowDetail struct {
 	IDDoc            int     `json:"IDDoc"`
 	CodArticolo      *string `json:"CodArticolo"`
 	Desc             *string `json:"Desc"`
-	Qta              *int64  `json:"Qta"`
+	Qta              *string `json:"Qta"`
 	Udm              *string `json:"Udm"`
-	PrezzoNetto      *int64  `json:"PrezzoNetto"`
+	PrezzoNetto      *string `json:"PrezzoNetto"`
 	Sconti           *string `json:"Sconti"`
-	ImportoNettoRiga *int64  `json:"ImportoNettoRiga"`
+	ImportoNettoRiga *string `json:"ImportoNettoRiga"`
 }
 
 func (h *Handler) handleDocumentRows(w http.ResponseWriter, r *http.Request) {
@@ -528,11 +527,11 @@ func (h *Handler) handleDocumentRows(w http.ResponseWriter, r *http.Request) {
 			"IDDoc",
 			"CodArticolo",
 			"Desc",
-			"Qta",
+			"Qta"::text,
 			"Udm",
-			"PrezzoNetto",
+			"PrezzoNetto"::text,
 			"Sconti",
-			"ImportoNettoRiga"
+			"ImportoNettoRiga"::text
 		FROM aenad."TDocRighe"
 		WHERE "IDDoc" = $1
 		  AND ("CodArticolo" IS NOT NULL OR "Desc" IS NOT NULL OR "Qta" IS NOT NULL OR "ImportoNettoRiga" IS NOT NULL)
@@ -547,7 +546,7 @@ func (h *Handler) handleDocumentRows(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item documentRowDetail
 		var codArticolo, desc, udm, sconti sql.NullString
-		var qta, prezzoNetto, importoNettoRiga sql.NullInt64
+		var qta, prezzoNetto, importoNettoRiga sql.NullString
 
 		if err := rows.Scan(
 			&item.IDDocRiga,
@@ -566,11 +565,11 @@ func (h *Handler) handleDocumentRows(w http.ResponseWriter, r *http.Request) {
 
 		item.CodArticolo = nullableString(codArticolo)
 		item.Desc = nullableString(desc)
-		item.Qta = nullableInt64(qta)
+		item.Qta = nullableString(qta)
 		item.Udm = nullableString(udm)
-		item.PrezzoNetto = nullableInt64(prezzoNetto)
+		item.PrezzoNetto = nullableString(prezzoNetto)
 		item.Sconti = nullableString(sconti)
-		item.ImportoNettoRiga = nullableInt64(importoNettoRiga)
+		item.ImportoNettoRiga = nullableString(importoNettoRiga)
 
 		items = append(items, item)
 	}
@@ -611,10 +610,34 @@ type updateDocumentRowItem struct {
 	IDDocRiga   int     `json:"IDDocRiga"`
 	CodArticolo *string `json:"CodArticolo"`
 	Desc        *string `json:"Desc"`
-	Qta         *int64  `json:"Qta"`
+	Qta         *string `json:"Qta"`
 	Udm         *string `json:"Udm"`
-	PrezzoNetto *int64  `json:"PrezzoNetto"`
+	PrezzoNetto *string `json:"PrezzoNetto"`
 	Sconti      *string `json:"Sconti"`
+}
+
+// normalizeDecimal validates a numeric(18,4) payload value and returns its
+// canonical form with a dot decimal separator. Empty values map to nil (SQL
+// NULL); out-of-bound or malformed values are rejected, never rounded.
+func normalizeDecimal(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	normalized := strings.TrimSpace(*value)
+	if normalized == "" {
+		return nil, nil
+	}
+	normalized = strings.ReplaceAll(normalized, ",", ".")
+	normalized = strings.TrimSuffix(normalized, ".")
+	if strings.HasPrefix(normalized, ".") {
+		normalized = "0" + normalized
+	} else if strings.HasPrefix(normalized, "-.") {
+		normalized = "-0" + normalized[1:]
+	}
+	if !decimalPattern.MatchString(normalized) {
+		return nil, errInvalidDecimal
+	}
+	return &normalized, nil
 }
 
 func (h *Handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
@@ -634,6 +657,21 @@ func (h *Handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.Error(w, http.StatusBadRequest, "invalid_json_body")
 		return
+	}
+
+	for i := range req.Rows {
+		qta, err := normalizeDecimal(req.Rows[i].Qta)
+		if err != nil {
+			httputil.Error(w, http.StatusBadRequest, "invalid_payload")
+			return
+		}
+		prezzoNetto, err := normalizeDecimal(req.Rows[i].PrezzoNetto)
+		if err != nil {
+			httputil.Error(w, http.StatusBadRequest, "invalid_payload")
+			return
+		}
+		req.Rows[i].Qta = qta
+		req.Rows[i].PrezzoNetto = prezzoNetto
 	}
 
 	tx, err := h.mistra.BeginTx(r.Context(), nil)
@@ -725,9 +763,9 @@ func (h *Handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 				UPDATE aenad."TDocRighe" SET
 					"CodArticolo" = $1,
 					"Desc" = $2,
-					"Qta" = $3,
+					"Qta" = $3::numeric(18,4),
 					"Udm" = $4,
-					"PrezzoNetto" = $5,
+					"PrezzoNetto" = $5::numeric(18,4),
 					"Sconti" = $6
 				WHERE "IDDocRiga" = $7 AND "IDDoc" = $8`,
 				row.CodArticolo,
@@ -744,7 +782,7 @@ func (h *Handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 			_, err = tx.ExecContext(r.Context(), `
 				INSERT INTO aenad."TDocRighe" (
 					"IDDoc", "CodArticolo", "Desc", "Qta", "Udm", "PrezzoNetto", "Sconti"
-				) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+				) VALUES ($1, $2, $3, $4::numeric(18,4), $5, $6::numeric(18,4), $7)`,
 				idDoc,
 				row.CodArticolo,
 				row.Desc,
@@ -771,8 +809,8 @@ func (h *Handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 	rowQuery := h.mistra.QueryRowContext(r.Context(), `
 		SELECT
 			d."IDDoc", d."TipoDoc", d."IDAnagr", d."Anagr_Nome", d."CodDest_IDAnagr", d."CodDest",
-			d."Data", d."Num", d."DataDoc", d."NumDoc", d."DescDoc", d."TotNetto", d."TotDoc",
-			d."TotPrezzoAcquisto", d."TotGuadagno", d."Pagamento", d."Pagam_CoordBancarie",
+			d."Data", d."Num", d."DataDoc", d."NumDoc", d."DescDoc", d."TotNetto"::text, d."TotDoc"::text,
+			d."TotPrezzoAcquisto"::text, d."TotGuadagno"::text, d."Pagamento", d."Pagam_CoordBancarie",
 			d."NoteInterne", d."Anagr_Indirizzo", d."Anagr_Cap", d."Anagr_Citta", d."Anagr_Prov",
 			d."Anagr_Nazione", d."Anagr_CodiceFiscale", d."Anagr_PartitaIva", d."Anagr_DestNome",
 			d."Anagr_DestIndirizzo", d."Anagr_DestCap", d."Anagr_DestCitta", d."Anagr_DestProv",
@@ -784,7 +822,7 @@ func (h *Handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 	var pagamento, pagamCoordBancarie, noteInterne, anagrIndirizzo, anagrCap, anagrCitta, anagrProv, anagrNazione, anagrCodiceFiscale, anagrPartitaIva, anagrDestNome, anagrDestIndirizzo, anagrDestCap, anagrDestCitta, anagrDestProv, anagrDestNazione sql.NullString
 	var idAnagr, codDestIDAnagr, num sql.NullInt64
 	var data, dataDoc sql.NullTime
-	var totNetto, totDoc, totPrezzoAcquisto, totGuadagno sql.NullInt64
+	var totNetto, totDoc, totPrezzoAcquisto, totGuadagno sql.NullString
 
 	err = rowQuery.Scan(
 		&updatedRow.IDDoc, &tipoDoc, &idAnagr, &anagrNome, &codDestIDAnagr, &codDest,
@@ -810,10 +848,10 @@ func (h *Handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 	updatedRow.DataDoc = nullableDate(dataDoc)
 	updatedRow.NumDoc = nullableString(numDoc)
 	updatedRow.DescDoc = nullableString(descDoc)
-	updatedRow.TotNetto = nullableInt64(totNetto)
-	updatedRow.TotDoc = nullableInt64(totDoc)
-	updatedRow.TotPrezzoAcquisto = nullableInt64(totPrezzoAcquisto)
-	updatedRow.TotGuadagno = nullableInt64(totGuadagno)
+	updatedRow.TotNetto = nullableString(totNetto)
+	updatedRow.TotDoc = nullableString(totDoc)
+	updatedRow.TotPrezzoAcquisto = nullableString(totPrezzoAcquisto)
+	updatedRow.TotGuadagno = nullableString(totGuadagno)
 	updatedRow.Pagamento = nullableString(pagamento)
 	updatedRow.PagamCoordBancarie = nullableString(pagamCoordBancarie)
 	updatedRow.NoteInterne = nullableString(noteInterne)

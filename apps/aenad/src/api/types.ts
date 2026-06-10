@@ -15,10 +15,10 @@ export interface AenadDocument {
   DataDoc: string | null;
   NumDoc: string | null;
   DescDoc: string | null;
-  TotNetto: number | null;
-  TotDoc: number | null;
-  TotPrezzoAcquisto: number | null;
-  TotGuadagno: number | null;
+  TotNetto: string | null;
+  TotDoc: string | null;
+  TotPrezzoAcquisto: string | null;
+  TotGuadagno: string | null;
   Pagamento: string | null;
   Pagam_CoordBancarie: string | null;
   NoteInterne: string | null;
@@ -57,9 +57,9 @@ export interface AenadDocumentRow {
   IDDoc: number;
   CodArticolo: string | null;
   Desc: string | null;
-  Qta: number | null;
+  Qta: string | null;
   Udm: string | null;
-  PrezzoNetto: number | null;
+  PrezzoNetto: string | null;
   Sconti: string | null;
-  ImportoNettoRiga: number | null;
+  ImportoNettoRiga: string | null;
 }
