@@ -50,7 +50,8 @@ type OrderGroup = {
   allRows: OrderDetailRow[];
   first: OrderDetailRow;
   totalNrc: number;
-  totalMrc: number;
+  // null when no row carries an MRC (spot orders: the one-off amount is folded into NRC)
+  totalMrc: number | null;
 };
 
 function orderGroupKey(row: OrderDetailRow) {
@@ -140,7 +141,8 @@ export function OrdiniDettaglioPage() {
       if (!first) return null;
 
       const totalNrc = allRows.reduce((sum, row) => sum + row.setup, 0);
-      const totalMrc = allRows.reduce((sum, row) => sum + row.mrc, 0);
+      const mrcValues = allRows.map(row => row.mrc).filter((v): v is number => v != null);
+      const totalMrc = mrcValues.length > 0 ? mrcValues.reduce((sum, v) => sum + v, 0) : null;
 
       return { key, rows, allRows, first, totalNrc, totalMrc };
     }).filter((group): group is OrderGroup => group !== null);
@@ -273,7 +275,9 @@ export function OrdiniDettaglioPage() {
                               <span>{shortDate(first.data_ordine)}</span>
                               {first.commerciale && <span>{first.commerciale}</span>}
                               <span className={os.orderHeaderTotal}>NRC {formatMoneyEUR(group.totalNrc)}</span>
-                              <span className={os.orderHeaderTotal}>MRC {formatMoneyEUR(group.totalMrc)}</span>
+                              {group.totalMrc != null && (
+                                <span className={os.orderHeaderTotal}>MRC {formatMoneyEUR(group.totalMrc)}</span>
+                              )}
                             </div>
                           </div>
                         </td>

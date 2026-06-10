@@ -17,7 +17,7 @@ func (h *Handler) handleListOrderStatuses(w http.ResponseWriter, r *http.Request
 	}
 
 	rows, err := h.mistraDB.QueryContext(r.Context(),
-		`SELECT DISTINCT stato_ordine FROM loader.v_ordini_ricorrenti ORDER BY stato_ordine`)
+		`SELECT DISTINCT stato_ordine FROM loader.v_ordini_ric_spot ORDER BY stato_ordine`)
 	if err != nil {
 		h.dbFailure(w, r, "list_order_statuses", err)
 		return
@@ -179,6 +179,8 @@ ORDER BY data_documento, nome_testata_ordine, rn`, placeholders)
 }
 
 // handleListOrdersDetail returns full order detail rows for a customer and status filter.
+// Covers recurring (TSC-ORDINE-RIC) and spot (TSC-ORDINE) orders; for spot orders the
+// canone is a one-off charge, so it is folded into setup (NRC) and mrc is NULL.
 // GET /panoramica/v1/orders/detail?cliente=123&stati=Evaso,Confermato
 func (h *Handler) handleListOrdersDetail(w http.ResponseWriter, r *http.Request) {
 	if !h.requireMistra(w) {
@@ -214,55 +216,43 @@ func (h *Handler) handleListOrdersDetail(w http.ResponseWriter, r *http.Request)
 		placeholders += fmt.Sprintf("$%d", i+2)
 	}
 
-	query := fmt.Sprintf(`SELECT c.ragione_sociale,
-    CASE WHEN o.data_conferma > o.data_documento THEN o.data_conferma ELSE o.data_documento END AS data_ordine,
-    o.nome_testata_ordine, o.cliente, o.numero_azienda, o.id_gamma, o.commerciale,
-    o.data_documento, o.data_conferma, o.stato_ordine, o.tipo_ordine, o.tipo_documento,
-    o.sost_ord, o.riferimento_odv_cliente, o.durata_servizio, o.tacito_rinnovo,
-    o.durata_rinnovo, o.tempi_rilascio, o.metodo_pagamento, o.note_legali,
-    o.referente_amm_nome, o.referente_amm_mail, o.referente_amm_tel,
-    o.referente_tech_nome, o.referente_tech_mail, o.referente_tech_tel,
-    o.referente_altro_nome, o.referente_altro_mail, o.referente_altro_tel,
-    o.data_creazione, o.data_variazione, o.sostituito_da,
-    r.quantita, r.codice_kit, r.codice_prodotto, r.descrizione_prodotto, r.descrizione_estesa,
-    r.serialnumber, r.setup, r.canone, r.valuta, r.costo_cessazione,
-    NULLIF(r.data_attivazione, '0001-01-01 00:00:00'::timestamp) AS data_attivazione,
-    NULLIF(r.data_disdetta, '0001-01-01 00:00:00'::timestamp) AS data_disdetta,
-    NULLIF(r.data_cessazione, '0001-01-01 00:00:00'::timestamp) AS data_cessazione,
-    r.raggruppamento_fatturazione, r.intervallo_fatt_attivazione, r.intervallo_fatt_canone,
-    NULLIF(r.data_ultima_fatt, '0001-01-01 00:00:00'::timestamp) AS data_ultima_fatt,
-    NULLIF(r.data_fine_fatt, '0001-01-01 00:00:00'::timestamp) AS data_fine_fatt,
-    r.system_odv_row, r.id_gamma_testata, r.progressivo_riga,
-    CASE WHEN r.progressivo_riga = 1 THEN o.nome_testata_ordine ELSE NULL END AS ordine,
-    r.annullato,
-    NULLIF(r.data_scadenza_ordine, '0001-01-01 00:00:00'::timestamp) AS data_scadenza_ordine,
-    r.quantita * r.canone AS mrc,
-    p.famiglia, p.sotto_famiglia, p.desc_conto_ricavo AS conto_ricavo,
-    CASE
-        WHEN o.stato_ordine = 'Cessato' THEN 'Cessata'
-        WHEN o.stato_ordine = 'Bloccato' THEN 'Bloccata'
-        WHEN o.stato_ordine = 'Confermato' AND date_part('year', r.data_attivazione) = 1 THEN 'Da attivare'
-        WHEN o.stato_ordine = 'Confermato' AND date_part('year', r.data_attivazione) > 1 THEN 'Attiva'
-        WHEN r.annullato = 1 THEN 'Annullata'
-        WHEN date_part('year', r.data_cessazione) = 1 THEN 'Attiva'
-        WHEN r.data_cessazione >= '0001-01-01'::timestamp AND r.data_cessazione <= now() THEN 'Cessata'
-        WHEN r.data_cessazione > now() THEN 'Cessazione richiesta'
-        ELSE 'Unknown'
-    END AS stato_riga,
-    o.nome_testata_ordine || ' del ' || to_char(o.data_documento, 'YYYY-MM-DD') || ' (' || o.stato_ordine || ')' AS intestazione_ordine,
-    CASE
-        WHEN r.descrizione_prodotto = r.descrizione_estesa OR r.descrizione_estesa IS NULL OR r.descrizione_estesa = '' THEN r.descrizione_prodotto
-        ELSE r.descrizione_prodotto || chr(13) || chr(10) || r.descrizione_estesa
-    END AS descrizione_long,
-    loader.get_reverse_order_history_path(o.nome_testata_ordine) AS storico
-FROM loader.erp_ordini o
-  JOIN loader.erp_righe_ordini r ON o.id_gamma = r.id_gamma_testata
-  JOIN loader.erp_anagrafiche_clienti c ON o.numero_azienda = c.numero_azienda
-  LEFT JOIN loader.erp_anagrafica_articoli_vendita p ON r.codice_prodotto = btrim(p.cod_articolo)
-WHERE c.numero_azienda = $1
-  AND o.stato_ordine IN (%s)
-  AND r.codice_prodotto <> 'CDL-AUTO'
-ORDER BY o.data_documento DESC NULLS LAST, o.nome_testata_ordine, r.progressivo_riga`, placeholders)
+	// v_ordini_ric_spot is the canonical recurring+spot source (it already trims the
+	// fixed-width padded tipo_documento, e.g. 'TSC-ORDINE    ', and excludes CDL-AUTO).
+	// On top of it: for spot orders (TSC-ORDINE) the canone is a one-off charge, so it
+	// is folded into setup (NRC) and mrc is NULL.
+	query := fmt.Sprintf(`SELECT v.ragione_sociale, v.data_ordine,
+    v.nome_testata_ordine, v.cliente, v.numero_azienda, v.id_gamma, v.commerciale,
+    v.data_documento, v.data_conferma, v.stato_ordine, v.tipo_ordine, v.tipo_documento,
+    v.sost_ord, v.riferimento_odv_cliente, v.durata_servizio, v.tacito_rinnovo,
+    v.durata_rinnovo, v.tempi_rilascio, v.metodo_pagamento, v.note_legali,
+    v.referente_amm_nome, v.referente_amm_mail, v.referente_amm_tel,
+    v.referente_tech_nome, v.referente_tech_mail, v.referente_tech_tel,
+    v.referente_altro_nome, v.referente_altro_mail, v.referente_altro_tel,
+    v.data_creazione, v.data_variazione, v.sostituito_da,
+    v.quantita, v.codice_kit, v.codice_prodotto, v.descrizione_prodotto, v.descrizione_estesa,
+    v.serialnumber,
+    CASE WHEN btrim(v.tipo_documento) = 'TSC-ORDINE'
+         THEN v.setup + COALESCE(v.quantita * v.canone, 0)
+         ELSE v.setup
+    END AS setup,
+    v.canone, v.valuta, v.costo_cessazione,
+    v.data_attivazione, v.data_disdetta, v.data_cessazione,
+    v.raggruppamento_fatturazione, v.intervallo_fatt_attivazione, v.intervallo_fatt_canone,
+    v.data_ultima_fatt, v.data_fine_fatt,
+    v.system_odv_row, v.id_gamma_testata, v.progressivo_riga,
+    CASE WHEN v.progressivo_riga = 1 THEN v.nome_testata_ordine ELSE NULL END AS ordine,
+    v.annullato,
+    v.data_scadenza_ordine,
+    CASE WHEN btrim(v.tipo_documento) = 'TSC-ORDINE' THEN NULL
+         ELSE v.mrc
+    END AS mrc,
+    v.famiglia, v.sotto_famiglia, v.conto_ricavo,
+    v.stato_riga, v.intestazione_ordine, v.descrizione_long,
+    loader.get_reverse_order_history_path(v.nome_testata_ordine) AS storico
+FROM loader.v_ordini_ric_spot v
+WHERE v.numero_azienda = $1
+  AND v.stato_ordine IN (%s)
+ORDER BY v.data_documento DESC NULLS LAST, v.nome_testata_ordine, v.progressivo_riga`, placeholders)
 
 	rows, err := h.mistraDB.QueryContext(r.Context(), query, args...)
 	if err != nil {
@@ -332,7 +322,7 @@ ORDER BY o.data_documento DESC NULLS LAST, o.nome_testata_ordine, r.progressivo_
 		Ordine                     *string  `json:"ordine"`
 		Annullato                  int      `json:"annullato"`
 		DataScadenzaOrdine         *string  `json:"data_scadenza_ordine"`
-		MRC                        float64  `json:"mrc"`
+		MRC                        *float64 `json:"mrc"`
 		// Prodotto
 		Famiglia        *string `json:"famiglia"`
 		SottoFamiglia   *string `json:"sotto_famiglia"`
@@ -363,7 +353,7 @@ ORDER BY o.data_documento DESC NULLS LAST, o.nome_testata_ordine, r.progressivo_
 			ordine, dataScadenza                                      sql.NullString
 			famiglia, sottoFamiglia, contoRicavo                      sql.NullString
 			intOrdine, descLong, storico                              sql.NullString
-			quantita                                                  sql.NullFloat64
+			quantita, mrc                                             sql.NullFloat64
 		)
 
 		if err := rows.Scan(
@@ -381,7 +371,7 @@ ORDER BY o.data_documento DESC NULLS LAST, o.nome_testata_ordine, r.progressivo_
 			&dataAtt, &dataDisdetta, &dataCess,
 			&raggFatt, &intFattAtt, &intFattCanone,
 			&dataUltFatt, &dataFineFatt, &sysOdvRow, &idGammaTestata, &d.ProgressivoRiga,
-			&ordine, &d.Annullato, &dataScadenza, &d.MRC,
+			&ordine, &d.Annullato, &dataScadenza, &mrc,
 			&famiglia, &sottoFamiglia, &contoRicavo,
 			&d.StatoRiga, &intOrdine, &descLong, &storico,
 		); err != nil {
@@ -436,6 +426,7 @@ ORDER BY o.data_documento DESC NULLS LAST, o.nome_testata_ordine, r.progressivo_
 		d.IDGammaTestata = nullStringPtr(idGammaTestata)
 		d.Ordine = nullStringPtr(ordine)
 		d.DataScadenzaOrdine = nullStringPtr(dataScadenza)
+		d.MRC = nullFloat64Ptr(mrc)
 		d.Famiglia = nullStringPtr(famiglia)
 		d.SottoFamiglia = nullStringPtr(sottoFamiglia)
 		d.ContoRicavo = nullStringPtr(contoRicavo)

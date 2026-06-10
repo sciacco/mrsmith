@@ -104,7 +104,7 @@ export interface OrderDetailRow {
   ordine: string | null;
   annullato: number;
   data_scadenza_ordine: string | null;
-  mrc: number;
+  mrc: number | null;
   // Prodotto
   famiglia: string | null;
   sotto_famiglia: string | null;

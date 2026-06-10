@@ -479,6 +479,24 @@ Alyante ERP ID
 - Used by: `apps/reports` (`orders`, `active-lines`, `pending-activations`, `upcoming-renewals`) and `apps/panoramica-cliente` (`orders/summary`, `orders/detail`).
 - Open questions: none.
 
+### Loader `tipo_documento` Is Fixed-Width Padded; `v_ordini_ric_spot` Is The Canonical Recurring+Spot Source
+
+- Context: any query distinguishing recurring (`TSC-ORDINE-RIC`) from spot (`TSC-ORDINE`) orders in `loader.erp_ordini`.
+- Discovery: the ERP loader pads `tipo_documento` to fixed width, so spot orders are stored as `'TSC-ORDINE    '` (14 chars, trailing spaces) in a `varchar(100)` column. Exact equality (`tipo_documento = 'TSC-ORDINE'`) silently matches zero spot rows. The view `loader.v_ordini_ric_spot` already handles this (`TRIM(BOTH FROM tipo_documento)` in its WHERE) and is the canonical recurring+spot row source (same shape as `v_ordini_ricorrenti`, also excludes `CDL-AUTO`).
+- Practical rule: never compare `tipo_documento` with raw equality — use `btrim(tipo_documento)` or, better, query `loader.v_ordini_ric_spot` instead of rebuilding the join. Note the view requires at least one non-CDL-AUTO order row, so customer/status lookups built on it match exactly what an order grid built on it can show.
+- Evidence: read-only probe on Mistra dev DB (2026-06-10): `length(tipo_documento) = 14` for both values; `loader.v_ordini_ric_spot` definition in `docs/mistradb/mistra_loader.json`; used by `backend/internal/reports/handler_ordini.go` and `backend/internal/panoramica/handler_orders.go`.
+- Used by: `apps/reports` order endpoints, `apps/panoramica-cliente` Ordini Ricorrenti e Spot.
+- Open questions: none.
+
+### Spot Orders Carry One-Off Amounts In `canone`; MRC Must Be Reclassified As NRC
+
+- Context: any report or app showing NRC/MRC for orders that include spot documents (`TSC-ORDINE`).
+- Discovery: for spot orders the ERP stores the one-off amount in the row's `canone` field (with `setup` typically 0), so the conventional `quantita * canone AS mrc` produces a fictitious monthly recurring charge for spot rows.
+- Practical rule: when `btrim(tipo_documento) = 'TSC-ORDINE'`, fold the amount into NRC (`setup + COALESCE(quantita * canone, 0)`) and emit `mrc` as NULL (UI shows an empty cell, order totals omit the MRC label). Recurring orders keep `setup` and `quantita * canone` as-is.
+- Evidence: Mistra dev DB spot rows (e.g. order `OC/0001116/2026-2026`: `setup = 0`, `canone = 50`, qta 2/28/32) verified 2026-06-10; implemented in `backend/internal/panoramica/handler_orders.go` (orders/detail).
+- Used by: `apps/panoramica-cliente` Ordini Ricorrenti e Spot.
+- Open questions: `stato_riga` semantics (Da attivare/Attiva/Cessata) are modeled on recurring lifecycles; spot rows inherit them and may show misleading states.
+
 ### Reports AOV Replacement MRC Matching
 
 - Context: AOV calculations in `apps/reports` that subtract replaced-order MRC for substitution orders (`tipo_ordine = 'A'`) from `loader.v_ordini_ric_spot`.
