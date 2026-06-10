@@ -1,5 +1,5 @@
 import { Button, Drawer, Icon, Skeleton } from '@mrsmith/ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useDocumentDetails,
@@ -57,6 +57,7 @@ export function ModificaDocumentoPage() {
   const navigate = useNavigate();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [expandedDescIndex, setExpandedDescIndex] = useState<number | null>(null);
 
   const docQuery = useDocumentDetails(idDoc, idDoc > 0);
   const rowsQuery = useDocumentRows(idDoc, idDoc > 0);
@@ -288,6 +289,8 @@ export function ModificaDocumentoPage() {
           onDeleteRow={handleDeleteRow}
           onMoveRow={handleMoveRow}
           getRowNetTotal={getRowNetTotal}
+          expandedIndex={expandedDescIndex}
+          onToggleExpand={(index) => setExpandedDescIndex(expandedDescIndex === index ? null : index)}
         />
         <TotalsSummary
           netto={totalNetto}
@@ -496,6 +499,8 @@ function RowsEditor({
   onDeleteRow,
   onMoveRow,
   getRowNetTotal,
+  expandedIndex,
+  onToggleExpand,
 }: {
   rows: LocalRow[];
   onUpdateRow: (index: number, field: keyof LocalRow, value: string | boolean) => void;
@@ -503,6 +508,8 @@ function RowsEditor({
   onDeleteRow: (index: number) => void;
   onMoveRow: (index: number, direction: 'up' | 'down') => void;
   getRowNetTotal: (row: LocalRow) => number;
+  expandedIndex: number | null;
+  onToggleExpand: (index: number) => void;
 }) {
   return (
     <div className={styles.rowsContainer}>
@@ -533,113 +540,180 @@ function RowsEditor({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
-              <tr key={index} className={row.isDescriptive ? styles.descriptiveRow : ''}>
-                {row.isDescriptive ? (
-                  <>
-                    <td style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Nota / Separatore</td>
-                    <td colSpan={5} className={styles.descriptiveCell}>
-                      <textarea
-                        className={`${styles.cellInput} ${styles.descTextarea}`}
-                        value={row.Desc}
-                        onChange={(e) => onUpdateRow(index, 'Desc', e.target.value)}
-                        placeholder="Inserisci un testo per la nota o un separatore visivo..."
-                        rows={2}
-                      />
+            {rows.map((row, index) => {
+              const isExpanded = expandedIndex === index;
+              const hasLongDesc = row.Desc.length > 50;
+
+              return (
+                <Fragment key={index}>
+                  <tr className={row.isDescriptive ? styles.descriptiveRow : ''}>
+                    {row.isDescriptive ? (
+                      <>
+                        <td style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Nota / Separatore</td>
+                        <td colSpan={5} className={styles.descriptiveCell}>
+                          <div className={styles.descCellWrapper}>
+                            <textarea
+                              className={`${styles.cellInput} ${styles.descTextareaCompact}`}
+                              value={row.Desc}
+                              onChange={(e) => onUpdateRow(index, 'Desc', e.target.value)}
+                              placeholder="Inserisci un testo per la nota o un separatore visivo..."
+                              rows={1}
+                            />
+                            <button
+                              type="button"
+                              className={`${styles.expandBtn} ${isExpanded ? styles.expandBtnActive : ''}`}
+                              onClick={() => onToggleExpand(index)}
+                              title={isExpanded ? "Comprimi editor esteso" : "Espandi editor esteso"}
+                            >
+                              <Icon name={isExpanded ? "chevron-up" : "chevron-down"} size={14} />
+                              {hasLongDesc && !isExpanded && (
+                                <span className={styles.longDescIndicator} />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td>
+                          <input
+                            className={styles.cellInput}
+                            value={row.CodArticolo}
+                            onChange={(e) => onUpdateRow(index, 'CodArticolo', e.target.value)}
+                            placeholder="Cod. Articolo"
+                          />
+                        </td>
+                        <td>
+                          <div className={styles.descCellWrapper}>
+                            <textarea
+                              className={`${styles.cellInput} ${styles.descTextareaCompact}`}
+                              value={row.Desc}
+                              onChange={(e) => onUpdateRow(index, 'Desc', e.target.value)}
+                              placeholder="Descrizione articolo..."
+                              rows={1}
+                            />
+                            <button
+                              type="button"
+                              className={`${styles.expandBtn} ${isExpanded ? styles.expandBtnActive : ''}`}
+                              onClick={() => onToggleExpand(index)}
+                              title={isExpanded ? "Comprimi editor esteso" : "Espandi editor esteso"}
+                            >
+                              <Icon name={isExpanded ? "chevron-up" : "chevron-down"} size={14} />
+                              {hasLongDesc && !isExpanded && (
+                                <span className={styles.longDescIndicator} />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.0001"
+                            inputMode="decimal"
+                            className={`${styles.cellInput} ${styles.numCellInput}`}
+                            value={row.Qta}
+                            onChange={(e) => onUpdateRow(index, 'Qta', e.target.value)}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className={styles.cellInput}
+                            value={row.Udm}
+                            onChange={(e) => onUpdateRow(index, 'Udm', e.target.value)}
+                            placeholder="PZ"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.0001"
+                            inputMode="decimal"
+                            className={`${styles.cellInput} ${styles.numCellInput}`}
+                            value={row.PrezzoNetto}
+                            onChange={(e) => onUpdateRow(index, 'PrezzoNetto', e.target.value)}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className={styles.cellInput}
+                            value={row.Sconti}
+                            onChange={(e) => onUpdateRow(index, 'Sconti', e.target.value)}
+                            placeholder="es. 10+5"
+                          />
+                        </td>
+                      </>
+                    )}
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                      {row.isDescriptive ? '-' : formatMoney(getRowNetTotal(row))}
                     </td>
-                  </>
-                ) : (
-                  <>
                     <td>
-                      <input
-                        className={styles.cellInput}
-                        value={row.CodArticolo}
-                        onChange={(e) => onUpdateRow(index, 'CodArticolo', e.target.value)}
-                        placeholder="Cod. Articolo"
-                      />
+                      <div className={styles.actionCell}>
+                        <button
+                          type="button"
+                          className={styles.rowBtn}
+                          onClick={() => onMoveRow(index, 'up')}
+                          disabled={index === 0}
+                          title="Sposta Su"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.rowBtn}
+                          onClick={() => onMoveRow(index, 'down')}
+                          disabled={index === rows.length - 1}
+                          title="Sposta Giù"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.rowBtn} ${styles.rowBtnDelete}`}
+                          onClick={() => onDeleteRow(index)}
+                          title="Rimuovi"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </td>
-                    <td>
-                      <textarea
-                        className={`${styles.cellInput} ${styles.descTextarea}`}
-                        value={row.Desc}
-                        onChange={(e) => onUpdateRow(index, 'Desc', e.target.value)}
-                        placeholder="Descrizione"
-                        rows={2}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        step="0.0001"
-                        inputMode="decimal"
-                        className={`${styles.cellInput} ${styles.numCellInput}`}
-                        value={row.Qta}
-                        onChange={(e) => onUpdateRow(index, 'Qta', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className={styles.cellInput}
-                        value={row.Udm}
-                        onChange={(e) => onUpdateRow(index, 'Udm', e.target.value)}
-                        placeholder="PZ"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        step="0.0001"
-                        inputMode="decimal"
-                        className={`${styles.cellInput} ${styles.numCellInput}`}
-                        value={row.PrezzoNetto}
-                        onChange={(e) => onUpdateRow(index, 'PrezzoNetto', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className={styles.cellInput}
-                        value={row.Sconti}
-                        onChange={(e) => onUpdateRow(index, 'Sconti', e.target.value)}
-                        placeholder="es. 10+5"
-                      />
-                    </td>
-                  </>
-                )}
-                <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                  {row.isDescriptive ? '-' : formatMoney(getRowNetTotal(row))}
-                </td>
-                <td>
-                  <div className={styles.actionCell}>
-                    <button
-                      type="button"
-                      className={styles.rowBtn}
-                      onClick={() => onMoveRow(index, 'up')}
-                      disabled={index === 0}
-                      title="Sposta Su"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.rowBtn}
-                      onClick={() => onMoveRow(index, 'down')}
-                      disabled={index === rows.length - 1}
-                      title="Sposta Giù"
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.rowBtn} ${styles.rowBtnDelete}`}
-                      onClick={() => onDeleteRow(index)}
-                      title="Rimuovi"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </tr>
+
+                  {isExpanded && (
+                    <tr className={styles.expandedRow}>
+                      <td colSpan={8}>
+                        <div className={styles.expandedEditorContainer}>
+                          <div className={styles.expandedEditorHeader}>
+                            <div className={styles.expandedEditorTitle}>
+                              <Icon name="file-text" size={14} />
+                              <span>Descrizione Estesa & Specifiche Tecniche (Riga {index + 1})</span>
+                            </div>
+                            <div className={styles.expandedEditorInfo}>
+                              <span>Workspace esteso. Supporta testo multi-riga.</span>
+                            </div>
+                          </div>
+                          <textarea
+                            className={styles.expandedTextarea}
+                            value={row.Desc}
+                            onChange={(e) => onUpdateRow(index, 'Desc', e.target.value)}
+                            placeholder="Inserisci la descrizione dettagliata dell'articolo..."
+                            autoFocus
+                            rows={6}
+                          />
+                          <div className={styles.expandedEditorFooter}>
+                            <Button
+                              size="sm"
+                              onClick={() => onToggleExpand(index)}
+                            >
+                              Conferma e Chiudi
+                            </Button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
