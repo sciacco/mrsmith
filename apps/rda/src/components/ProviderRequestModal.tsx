@@ -131,8 +131,6 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
       if (postalCode.length < 5) nextErrors.postal_code = 'CAP non valido';
       if (!selectedProvince) nextErrors.province = 'Seleziona la provincia';
     }
-    if (!firstName) nextErrors.first_name = 'Inserisci il nome';
-    if (!lastName) nextErrors.last_name = 'Inserisci il cognome';
     if (!email) nextErrors.email = "Inserisci l'email del contatto qualifica";
 
     const validationMessage = firstError(nextErrors);
@@ -151,11 +149,7 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
                 ? 'postal_code'
                 : nextErrors.province
                   ? 'province'
-                  : nextErrors.first_name
-                    ? 'first_name'
-                    : nextErrors.last_name
-                      ? 'last_name'
-                      : 'email';
+                  : 'email';
       const field = form.elements.namedItem(fieldName);
       if (field instanceof HTMLElement) field.focus();
       return;
@@ -173,8 +167,8 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
       city,
       address,
       ref: {
-        first_name: firstName,
-        last_name: lastName,
+        first_name: firstName || undefined,
+        last_name: lastName || undefined,
         email,
         phone: String(formData.get('phone') ?? '').trim(),
         reference_type: 'QUALIFICATION_REF',
@@ -333,28 +327,12 @@ export function ProviderRequestModal({ open, initialCompanyName, onClose, onCrea
           <div className={`${styles.sectionGrid} ${styles.contactGrid}`}>
             <div className={`field ${styles.contactFirstField}`}>
               <label>Nome</label>
-              <input
-                name="first_name"
-                required
-                aria-invalid={Boolean(errors.first_name)}
-                onChange={() => clearError('first_name')}
-              />
+              <input name="first_name" />
             </div>
             <div className={`field ${styles.contactLastField}`}>
               <label>Cognome</label>
-              <input
-                name="last_name"
-                required
-                aria-invalid={Boolean(errors.last_name)}
-                onChange={() => clearError('last_name')}
-              />
+              <input name="last_name" />
             </div>
-            {errors.first_name || errors.last_name ? (
-              <div className={styles.contactErrorRow}>
-                {errors.first_name ? <p className={`fieldError ${styles.contactFirstError}`}>{errors.first_name}</p> : <span className={styles.contactFirstError} />}
-                {errors.last_name ? <p className={`fieldError ${styles.contactLastError}`}>{errors.last_name}</p> : <span className={styles.contactLastError} />}
-              </div>
-            ) : null}
             <div className={`field ${styles.contactEmailField}`}>
               <label>Email qualifica</label>
               <input
