@@ -254,19 +254,17 @@ func TestSanitizeGatewayError(t *testing.T) {
 	}
 }
 
-func TestGatewayFailureAttrsDoNotLeakRawUpstreamBodies(t *testing.T) {
+func TestGatewayFailureAttrsIncludeRawUpstreamBody(t *testing.T) {
 	err := &gatewayHTTPError{Status: http.StatusBadGateway, Body: `{"error":"precondition_missing","detail":"dsn=password-secret"}`}
 	if strings.Contains(err.Error(), "password-secret") || strings.Contains(err.Error(), "precondition_missing") {
 		t.Fatalf("gatewayHTTPError leaked body text: %q", err.Error())
 	}
 	attrs := gatewayFailureAttrs("/orders/v1/erp", err, "order_id", int64(1))
-	for _, attr := range attrs {
-		if strings.Contains(toString(attr), "password-secret") {
-			t.Fatalf("raw upstream body leaked in attrs: %#v", attrs)
-		}
-	}
 	if !containsAttr(attrs, "upstream_status", http.StatusBadGateway) || !containsAttr(attrs, "upstream_code", "precondition_missing") {
 		t.Fatalf("missing sanitized gateway attrs: %#v", attrs)
+	}
+	if !containsAttr(attrs, "upstream_body", `{"error":"precondition_missing","detail":"dsn=password-secret"}`) {
+		t.Fatalf("missing raw upstream body attr: %#v", attrs)
 	}
 }
 
@@ -1465,15 +1463,4 @@ func containsAttr(attrs []any, key string, value any) bool {
 		}
 	}
 	return false
-}
-
-func toString(value any) string {
-	switch v := value.(type) {
-	case string:
-		return v
-	case error:
-		return v.Error()
-	default:
-		return ""
-	}
 }

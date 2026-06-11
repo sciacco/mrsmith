@@ -277,10 +277,27 @@ WHERE id = ? AND cdlan_stato = 'BOZZA'`, nullIfBlank(payload.CustomerPO), confir
 		return
 	}
 	if affected, err := res.RowsAffected(); err == nil && affected == 0 {
-		httputil.Error(w, http.StatusConflict, "wrong_state")
+		h.writeOrderIfStillInStateOrConflict(w, r, id, OrderStateBozza)
 		return
 	}
 	h.writeOrderOrNotFound(w, r, id)
+}
+
+func (h *Handler) writeOrderIfStillInStateOrConflict(w http.ResponseWriter, r *http.Request, id int64, allowed ...OrderState) bool {
+	order, err := h.getOrder(r, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			httputil.Error(w, http.StatusNotFound, "order_not_found")
+			return false
+		}
+		h.dbFailure(w, r, "get_order_after_noop_update", err, "order_id", id)
+		return false
+	}
+	if !requireState(w, stateOf(order), allowed...) {
+		return false
+	}
+	httputil.JSON(w, http.StatusOK, order)
+	return true
 }
 
 func (h *Handler) handlePatchReferents(w http.ResponseWriter, r *http.Request) {

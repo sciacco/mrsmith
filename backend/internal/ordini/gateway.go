@@ -43,7 +43,7 @@ func (h *Handler) gatewayPostJSON(path string, payload any) error {
 	defer resp.Body.Close()
 	if resp.StatusCode >= http.StatusBadRequest {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return &gatewayHTTPError{Status: resp.StatusCode, Body: compactGatewayBody(bodyBytes)}
+		return &gatewayHTTPError{Status: resp.StatusCode, Body: string(bodyBytes)}
 	}
 	_, _ = io.Copy(io.Discard, resp.Body)
 	return nil
@@ -102,7 +102,7 @@ func (h *Handler) gatewayUploadToArxivar(order *OrderDetail, pdf []byte, filenam
 	defer resp.Body.Close()
 	if resp.StatusCode >= http.StatusBadRequest {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return &gatewayHTTPError{Status: resp.StatusCode, Body: compactGatewayBody(bodyBytes)}
+		return &gatewayHTTPError{Status: resp.StatusCode, Body: string(bodyBytes)}
 	}
 	_, _ = io.Copy(io.Discard, resp.Body)
 	return nil
@@ -290,6 +290,9 @@ func gatewayFailureAttrs(path string, err error, attrs ...any) []any {
 		args = append(args, "upstream_status", httpErr.Status)
 		if code := gatewayBodyCode(httpErr.Body); code != "" {
 			args = append(args, "upstream_code", code)
+		}
+		if httpErr.Body != "" {
+			args = append(args, "upstream_body", httpErr.Body)
 		}
 	}
 	args = append(args, attrs...)
