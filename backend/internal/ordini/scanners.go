@@ -75,32 +75,34 @@ func (d NullDate) String() string {
 	return d.Time.Format("2006-01-02")
 }
 
+// NullFloat parses vodka varchar money/quantity columns into a number for the
+// app API and comparisons, while Raw preserves the column content verbatim
+// (production data mixes "10,00" and "350.00" in the same record) for paths
+// that must forward it untouched, such as the ERP gateway payload.
 type NullFloat struct {
 	Float64 float64
 	Valid   bool
+	Raw     *string
 }
 
 func (f *NullFloat) Scan(value any) error {
 	if value == nil {
 		f.Valid = false
+		f.Raw = nil
 		return nil
 	}
 	switch v := value.(type) {
 	case float64:
-		f.Float64 = v
-		f.Valid = true
+		f.setFloat(v)
 		return nil
 	case float32:
-		f.Float64 = float64(v)
-		f.Valid = true
+		f.setFloat(float64(v))
 		return nil
 	case int:
-		f.Float64 = float64(v)
-		f.Valid = true
+		f.setFloat(float64(v))
 		return nil
 	case int64:
-		f.Float64 = float64(v)
-		f.Valid = true
+		f.setFloat(float64(v))
 		return nil
 	case []byte:
 		return f.scanString(string(v))
@@ -111,14 +113,21 @@ func (f *NullFloat) Scan(value any) error {
 	}
 }
 
+func (f *NullFloat) setFloat(value float64) {
+	f.Float64 = value
+	f.Valid = true
+	raw := strconv.FormatFloat(value, 'f', -1, 64)
+	f.Raw = &raw
+}
+
 func (f *NullFloat) scanString(value string) error {
-	value = strings.TrimSpace(value)
-	if value == "" {
+	f.Raw = &value
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
 		f.Valid = false
 		return nil
 	}
-	value = strings.ReplaceAll(value, ",", ".")
-	parsed, err := strconv.ParseFloat(value, 64)
+	parsed, err := strconv.ParseFloat(strings.ReplaceAll(trimmed, ",", "."), 64)
 	if err != nil {
 		return err
 	}

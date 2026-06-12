@@ -109,10 +109,14 @@ func (h *Handler) gatewayUploadToArxivar(order *OrderDetail, pdf []byte, filenam
 }
 
 // buildSendToERPPayload mirrors the legacy Appsmith GW_SendToErp payload
-// field-for-field: the gateway rejects empty-string values on date-typed
-// fields the legacy app never sent (cdlan_data_attivazione, data_annullamento,
-// data_decorrenza), so keys outside the legacy shape must stay absent, and
-// fields the legacy app sent through parseInt() must stay numeric.
+// field-for-field, including JSON value types: the legacy app used smart
+// substitution, so the gateway struct expects the JS types the legacy app
+// produced — vodka varchar columns stay strings even when numeric-looking
+// (cdlan_anno, cdlan_qta, cdlan_prezzo*), parseInt()'d fields stay numbers,
+// and date-typed fields the legacy app never sent (cdlan_data_attivazione,
+// data_annullamento, data_decorrenza) must stay absent because the gateway
+// rejects "" as a date. cdlan_codice_kit carries the kit-index composite
+// (bundle_code), not the raw kit code.
 func buildSendToERPPayload(order *OrderDetail, row OrderRow) (map[string]any, error) {
 	systemODV, ok := parseRequiredInt(ptrStringValue(order.CdlanSystemODV))
 	if !ok || row.CdlanSystemODVRow == nil {
@@ -149,17 +153,17 @@ func buildSendToERPPayload(order *OrderDetail, row OrderRow) (map[string]any, er
 		"cdlan_int_fatturazione_att": intValueOrNull(order.CdlanIntFatturazioneAtt),
 		"cdlan_codart":               ptrStringValue(row.CdlanCodart),
 		"cdlan_descart":              ptrStringValue(row.CdlanDescart),
-		"cdlan_qta":                  nullFloatValue(row.CdlanQta),
+		"cdlan_qta":                  nullFloatRawValue(row.CdlanQta),
 		"cdlan_serialnumber":         ptrStringValue(row.CdlanSerialNumber),
-		"cdlan_prezzo":               nullFloatValue(row.Canone),
-		"cdlan_prezzo_attivazione":   nullFloatValue(row.ActivationPrice),
-		"cdlan_prezzo_cessazione":    nullFloatValue(row.TerminationPrice),
+		"cdlan_prezzo":               nullFloatRawValue(row.Canone),
+		"cdlan_prezzo_attivazione":   nullFloatRawValue(row.ActivationPrice),
+		"cdlan_prezzo_cessazione":    nullFloatRawValue(row.TerminationPrice),
 		"cdlan_ragg_fatturazione":    ptrStringValue(row.CdlanRaggFatturazione),
 		"cdlan_stato":                "CREATO",
 		"cdlan_evaso":                ptrIntValue(order.CdlanEvaso),
 		"cdlan_chiuso":               ptrIntValue(order.CdlanChiuso),
-		"cdlan_anno":                 ptrIntValue(order.CdlanAnno),
-		"cdlan_codice_kit":           ptrStringValue(row.CdlanCodiceKit),
+		"cdlan_anno":                 ptrIntAsStringValue(order.CdlanAnno),
+		"cdlan_codice_kit":           ptrStringValue(row.BundleCode),
 		"cdlan_valuta":               ptrStringValue(order.CdlanValuta),
 	}
 	return payload, nil
@@ -187,11 +191,24 @@ func intValueOrNull(value *string) any {
 	return parsed
 }
 
-func nullFloatValue(value NullFloat) any {
-	if !value.Valid {
+// ptrIntAsStringValue renders an int-scanned vodka varchar column back to the
+// string the gateway expects (e.g. Orders.cdlan_anno is a Go string upstream).
+func ptrIntAsStringValue(value *int64) any {
+	if value == nil {
 		return nil
 	}
-	return value.Float64
+	return strconv.FormatInt(*value, 10)
+}
+
+// nullFloatRawValue forwards the vodka column content verbatim: the legacy app
+// passed cdlan_qta and cdlan_prezzo* through untouched (mixed "10,00" and
+// "350.00" formats exist in production), so the gateway declares them as Go
+// strings and the ERP must keep receiving the stored format.
+func nullFloatRawValue(value NullFloat) any {
+	if value.Raw == nil {
+		return nil
+	}
+	return *value.Raw
 }
 
 func gatewayPathWithID(prefix string, id int64, suffix string) string {

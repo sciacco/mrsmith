@@ -242,6 +242,141 @@ func TestPatchReferentsUsesSQLStateGuard(t *testing.T) {
 	}
 }
 
+// TestBuildSendToERPPayloadMatchesLegacyContract pins the gw /orders/v1/erp
+// payload to the legacy Appsmith GW_SendToErp shape: exact field set, string
+// vs number types derived from what the legacy app evaluated, money/quantity
+// varchars forwarded verbatim (production mixes "10,00" and "350.00"), single
+// space fallbacks, and the kit-index composite in cdlan_codice_kit. The
+// fixture mirrors production orders_rows record 7876.
+func TestBuildSendToERPPayloadMatchesLegacyContract(t *testing.T) {
+	strPtr := func(s string) *string { return &s }
+	intPtr := func(i int64) *int64 { return &i }
+	mustScan := func(dst sql.Scanner, value any) {
+		t.Helper()
+		if err := dst.Scan(value); err != nil {
+			t.Fatalf("scan %v: %v", value, err)
+		}
+	}
+
+	order := &OrderDetail{}
+	order.ID = 1905
+	order.CdlanSystemODV = strPtr("31905")
+	order.CdlanTipodoc = strPtr("TSC-ORDINE")
+	order.CdlanNdoc = strPtr("123")
+	order.CdlanAnno = intPtr(2026)
+	order.CdlanCliente = strPtr("ACME S.p.A.")
+	order.CdlanClienteID = intPtr(4242)
+	order.CdlanCommerciale = nil
+	order.CdlanCodTerminiPag = strPtr("BB30")
+	order.CdlanNote = strPtr("")
+	order.CdlanTipoOrd = strPtr("N")
+	order.CdlanDurRin = strPtr("36")
+	order.CdlanTacitoRin = strPtr("1")
+	order.CdlanSostOrd = nil
+	order.CdlanTempiRil = strPtr("30")
+	order.CdlanDurataServizio = strPtr("36")
+	order.CdlanRifOrdcli = strPtr("PO-998")
+	order.CdlanRifTechNom = strPtr("Mario Rossi")
+	order.CdlanIntFatturazione = strPtr("12")
+	order.CdlanIntFatturazioneAtt = strPtr("1")
+	order.CdlanEvaso = intPtr(0)
+	order.CdlanChiuso = intPtr(0)
+	order.CdlanValuta = strPtr("EURO")
+	mustScan(&order.CdlanDatadoc, "2026-06-10")
+	mustScan(&order.CdlanDataconferma, "2026-06-12")
+	// Fields outside the legacy payload: the exact-JSON assertion below proves
+	// none of these leak into the request.
+	order.WrittenBy = strPtr("someone")
+	order.ProfileIVA = strPtr("IT01234567890")
+	order.ServiceType = strPtr("xconnect")
+	order.IsColo = strPtr("0")
+	order.FromCP = intPtr(0)
+	order.IsArxivar = intPtr(1)
+	mustScan(&order.DataDecorrenza, "")
+
+	row := OrderRow{
+		ID:                     7876,
+		OrderID:                1905,
+		CdlanSystemODVRow:      intPtr(37876),
+		CdlanCodiceKit:         strPtr("XLOCAL"),
+		IndexKit:               intPtr(353),
+		BundleCode:             strPtr("XLOCAL-353"),
+		CdlanCodart:            strPtr("CDL-XLOCAL"),
+		CdlanDescart:           strPtr("xConnect Local C21/E100 - Optical Fiber Pair SM"),
+		CdlanRaggFatturazione:  strPtr("C"),
+		CdlanSerialNumber:      strPtr("IN-66-19EB1844C39"),
+		ConfirmDataAttivazione: intPtr(1),
+	}
+	mustScan(&row.CdlanQta, "1")
+	mustScan(&row.Canone, "10,00")
+	mustScan(&row.ActivationPrice, "350.00")
+	mustScan(&row.TerminationPrice, nil)
+	mustScan(&row.CdlanDataAttivazione, "2026-06-10")
+	mustScan(&row.DataAnnullamento, nil)
+
+	payload, err := buildSendToERPPayload(order, row)
+	if err != nil {
+		t.Fatalf("buildSendToERPPayload: %v", err)
+	}
+
+	expected := map[string]any{
+		"cdlan_systemodv":            31905,
+		"cdlan_systemodv_row":        37876,
+		"cdlan_tipodoc":              "TSC-ORDINE",
+		"cdlan_ndoc":                 "123",
+		"cdlan_datadoc":              "2026-06-10",
+		"cdlan_cliente":              "ACME S.p.A.",
+		"cdlan_commerciale":          " ",
+		"cdlan_cod_termini_pag":      "BB30",
+		"cdlan_note":                 "",
+		"cdlan_tipo_ord":             "N",
+		"cdlan_dur_rin":              36,
+		"cdlan_tacito_rin":           1,
+		"cdlan_sost_ord":             " ",
+		"cdlan_tempi_ril":            "30",
+		"cdlan_durata_servizio":      "36",
+		"cdlan_dataconferma":         "2026-06-12",
+		"cdlan_rif_ordcli":           "PO-998",
+		"cdlan_rif_tech_nom":         "Mario Rossi",
+		"cdlan_rif_tech_tel":         "",
+		"cdlan_rif_tech_email":       "",
+		"cdlan_rif_altro_tech_nom":   "",
+		"cdlan_rif_altro_tech_tel":   "",
+		"cdlan_rif_altro_tech_email": "",
+		"cdlan_rif_adm_nom":          "",
+		"cdlan_rif_adm_tech_tel":     "",
+		"cdlan_rif_adm_tech_email":   "",
+		"cdlan_int_fatturazione":     12,
+		"cdlan_int_fatturazione_att": 1,
+		"cdlan_codart":               "CDL-XLOCAL",
+		"cdlan_descart":              "xConnect Local C21/E100 - Optical Fiber Pair SM",
+		"cdlan_qta":                  "1",
+		"cdlan_serialnumber":         "IN-66-19EB1844C39",
+		"cdlan_prezzo":               "10,00",
+		"cdlan_prezzo_attivazione":   "350.00",
+		"cdlan_prezzo_cessazione":    nil,
+		"cdlan_ragg_fatturazione":    "C",
+		"cdlan_stato":                "CREATO",
+		"cdlan_evaso":                0,
+		"cdlan_chiuso":               0,
+		"cdlan_anno":                 "2026",
+		"cdlan_codice_kit":           "XLOCAL-353",
+		"cdlan_valuta":               "EURO",
+	}
+
+	got, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	want, err := json.Marshal(expected)
+	if err != nil {
+		t.Fatalf("marshal expected: %v", err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("payload diverges from legacy contract:\n got: %s\nwant: %s", got, want)
+	}
+}
+
 func TestSanitizeGatewayError(t *testing.T) {
 	if got := sanitizeGatewayError(errGatewayPreconditionMissing); got != "precondition_missing" {
 		t.Fatalf("sentinel = %q", got)
