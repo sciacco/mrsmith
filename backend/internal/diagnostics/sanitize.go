@@ -17,6 +17,10 @@ const (
 	maxObjectFields   = 120
 	maxArrayItems     = 50
 	maxDepth          = 8
+
+	// Temporary diagnostic mode: keep sensitive-looking attrs visible while
+	// investigating upstream failures. Set to false to restore redaction.
+	sensitiveAttrsPassthrough = true
 )
 
 var sensitiveKeyParts = []string{
@@ -215,6 +219,9 @@ func intField(attrs map[string]any, key string) *int {
 }
 
 func isSensitiveKey(key string) bool {
+	if sensitiveAttrsPassthrough {
+		return false
+	}
 	normalized := strings.ToLower(strings.TrimSpace(key))
 	for _, part := range sensitiveKeyParts {
 		if strings.Contains(normalized, part) {

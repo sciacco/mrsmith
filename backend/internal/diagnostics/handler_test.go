@@ -37,8 +37,8 @@ func TestSlogHandlerCapturesWarnAndErrorOnly(t *testing.T) {
 	if warn.Component != "diagnostics-test" || warn.Operation != "warn_op" || warn.RequestID != "req-123" {
 		t.Fatalf("unexpected warn metadata: %#v", warn)
 	}
-	if warn.Attrs["token"] != "[redacted]" {
-		t.Fatalf("expected sensitive token to be redacted, got %#v", warn.Attrs["token"])
+	if warn.Attrs["token"] != "secret-token" {
+		t.Fatalf("expected token to pass through, got %#v", warn.Attrs["token"])
 	}
 
 	errEvent := recorder.events[1]
@@ -53,7 +53,7 @@ func TestSlogHandlerCapturesWarnAndErrorOnly(t *testing.T) {
 	}
 }
 
-func TestSlogHandlerSanitizesNestedSensitiveFields(t *testing.T) {
+func TestSlogHandlerPassesThroughNestedSensitiveFields(t *testing.T) {
 	recorder := &recordingSink{}
 	logger := slog.New(NewSlogHandler(slog.NewJSONHandler(io.Discard, nil), recorder))
 
@@ -75,8 +75,8 @@ func TestSlogHandlerSanitizesNestedSensitiveFields(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected headers map, got %#v", contextAttr["headers"])
 	}
-	if headers["authorization"] != "[redacted]" {
-		t.Fatalf("expected authorization to be redacted, got %#v", headers["authorization"])
+	if headers["authorization"] != "Bearer secret" {
+		t.Fatalf("expected authorization to pass through, got %#v", headers["authorization"])
 	}
 }
 
