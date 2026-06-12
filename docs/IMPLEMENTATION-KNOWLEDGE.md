@@ -551,6 +551,15 @@ Alyante ERP ID
 - Used by: `apps/afc-tools` XConnect order PDF download flow and `backend/internal/afctools/gateway.go`.
 - Open questions: whether other gw-int PDF/document endpoints use the same Arxivar-coded missing-document pattern and should be normalized separately.
 
+### GW `/orders/v1/erp` Accepts Only the Legacy Appsmith Payload Shape
+
+- Context: `apps/ordini` INVIA in ERP flow pushing order rows to Alyante through gw-int.
+- Discovery: the gateway decodes the JSON body into a struct that ignores unknown keys but hard-fails on type mismatches, stopping at the first bad field in key order (Go marshals maps alphabetically, so one failure can mask later ones). Date-typed fields parse with layout `2006-01-02` and reject `""` (`cannot parse "" as "2006"` → HTTP 400). The legacy Appsmith `GW_SendToErp` action sent exactly 42 fields and never included `cdlan_data_attivazione`, `data_annullamento`, `data_decorrenza`, `confirm_data_attivazione`, `order_id`/`orders_id`, `cdlan_cliente_id`, or any `profile_*`/`written_by`/`service_type`/`is_colo`/`from_cp`/`is_arxivar` field — `cdlanDataAttivazione` and `confirmDataAttivazione` are commented out in the Appsmith JS, evidence this exact failure was hit before. It also sent `cdlan_dur_rin`, `cdlan_tacito_rin`, `cdlan_int_fatturazione`, `cdlan_int_fatturazione_att` through `parseInt()` (numbers, not strings) and used `?? " "` (single space) fallbacks for `cdlan_commerciale` and `cdlan_sost_ord`.
+- Practical rule: treat the legacy Appsmith payload as the de-facto gateway contract. Never add fields beyond that shape (especially date fields — sending a NULL date as `""` rejects the whole row) and keep the legacy value types: parseInt'd fields stay numeric-or-null, space-fallback fields stay `" "` when NULL. When a row send fails with a date-parse 400, suspect an empty-string date key that the legacy app never sent.
+- Evidence: production log 2026-06-12 (`order_id=1905`, `row_id=7842`, upstream 400 `parsing time "" as "2006-01-02"`); `apps/ordini/Ordini.json.gz` `GW_SendToErp` action and `SendToErp` JS object; `backend/internal/ordini/gateway.go` `buildSendToERPPayload`.
+- Used by: `POST /api/ordini/v1/orders/{id}/send-to-erp`.
+- Open questions: whether `/orders/v1/set-order-activation` shares the same strict date decoding for malformed (non-empty) date strings.
+
 ## Deployment and Runtime Integration Rules
 
 ### MrSmith-Owned Tables In Anisetta

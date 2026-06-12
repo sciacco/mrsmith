@@ -108,29 +108,30 @@ func (h *Handler) gatewayUploadToArxivar(order *OrderDetail, pdf []byte, filenam
 	return nil
 }
 
+// buildSendToERPPayload mirrors the legacy Appsmith GW_SendToErp payload
+// field-for-field: the gateway rejects empty-string values on date-typed
+// fields the legacy app never sent (cdlan_data_attivazione, data_annullamento,
+// data_decorrenza), so keys outside the legacy shape must stay absent, and
+// fields the legacy app sent through parseInt() must stay numeric.
 func buildSendToERPPayload(order *OrderDetail, row OrderRow) (map[string]any, error) {
 	systemODV, ok := parseRequiredInt(ptrStringValue(order.CdlanSystemODV))
 	if !ok || row.CdlanSystemODVRow == nil {
 		return nil, errGatewayPreconditionMissing
 	}
 	payload := map[string]any{
-		"order_id":                   order.ID,
-		"orders_id":                  row.OrderID,
 		"cdlan_systemodv":            systemODV,
 		"cdlan_systemodv_row":        *row.CdlanSystemODVRow,
 		"cdlan_tipodoc":              ptrStringValue(order.CdlanTipodoc),
 		"cdlan_ndoc":                 ptrStringValue(order.CdlanNdoc),
-		"cdlan_anno":                 ptrIntValue(order.CdlanAnno),
 		"cdlan_datadoc":              order.CdlanDatadoc.String(),
 		"cdlan_cliente":              ptrStringValue(order.CdlanCliente),
-		"cdlan_cliente_id":           ptrIntValue(order.CdlanClienteID),
-		"cdlan_commerciale":          ptrStringValue(order.CdlanCommerciale),
+		"cdlan_commerciale":          stringValueOrSpace(order.CdlanCommerciale),
 		"cdlan_cod_termini_pag":      ptrStringValue(order.CdlanCodTerminiPag),
 		"cdlan_note":                 ptrStringValue(order.CdlanNote),
 		"cdlan_tipo_ord":             ptrStringValue(order.CdlanTipoOrd),
-		"cdlan_dur_rin":              ptrStringValue(order.CdlanDurRin),
-		"cdlan_tacito_rin":           ptrStringValue(order.CdlanTacitoRin),
-		"cdlan_sost_ord":             ptrStringValue(order.CdlanSostOrd),
+		"cdlan_dur_rin":              intValueOrNull(order.CdlanDurRin),
+		"cdlan_tacito_rin":           intValueOrNull(order.CdlanTacitoRin),
+		"cdlan_sost_ord":             stringValueOrSpace(order.CdlanSostOrd),
 		"cdlan_tempi_ril":            ptrStringValue(order.CdlanTempiRil),
 		"cdlan_durata_servizio":      ptrStringValue(order.CdlanDurataServizio),
 		"cdlan_dataconferma":         order.CdlanDataconferma.String(),
@@ -144,31 +145,8 @@ func buildSendToERPPayload(order *OrderDetail, row OrderRow) (map[string]any, er
 		"cdlan_rif_adm_nom":          ptrStringValue(order.CdlanRifAdmNom),
 		"cdlan_rif_adm_tech_tel":     ptrStringValue(order.CdlanRifAdmTechTel),
 		"cdlan_rif_adm_tech_email":   ptrStringValue(order.CdlanRifAdmTechEmail),
-		"cdlan_int_fatturazione":     ptrStringValue(order.CdlanIntFatturazione),
-		"cdlan_int_fatturazione_att": ptrStringValue(order.CdlanIntFatturazioneAtt),
-		"cdlan_stato":                "CREATO",
-		"cdlan_evaso":                ptrIntValue(order.CdlanEvaso),
-		"cdlan_chiuso":               ptrIntValue(order.CdlanChiuso),
-		"cdlan_valuta":               ptrStringValue(order.CdlanValuta),
-		"written_by":                 ptrStringValue(order.WrittenBy),
-		"profile_iva":                ptrStringValue(order.ProfileIVA),
-		"profile_cf":                 ptrStringValue(order.ProfileCF),
-		"profile_address":            ptrStringValue(order.ProfileAddress),
-		"profile_city":               ptrStringValue(order.ProfileCity),
-		"profile_cap":                ptrStringValue(order.ProfileCAP),
-		"profile_pv":                 ptrStringValue(order.ProfilePV),
-		"profile_sdi":                ptrStringValue(order.ProfileSDI),
-		"profile_lang":               ptrStringValue(order.ProfileLang),
-		"service_type":               ptrStringValue(order.ServiceType),
-		"data_decorrenza":            order.DataDecorrenza.String(),
-		"cdlan_tacito_rin_in_pdf":    ptrStringValue(order.CdlanTacitoRinInPDF),
-		"is_colo":                    ptrStringValue(order.IsColo),
-		"origin_cod_termini_pag":     ptrStringValue(order.OriginCodTerminiPag),
-		"is_arxivar":                 ptrIntValue(order.IsArxivar),
-		"from_cp":                    ptrIntValue(order.FromCP),
-		"cdlan_codice_kit":           ptrStringValue(row.CdlanCodiceKit),
-		"index_kit":                  ptrIntValue(row.IndexKit),
-		"bundle_code":                ptrStringValue(row.BundleCode),
+		"cdlan_int_fatturazione":     intValueOrNull(order.CdlanIntFatturazione),
+		"cdlan_int_fatturazione_att": intValueOrNull(order.CdlanIntFatturazioneAtt),
 		"cdlan_codart":               ptrStringValue(row.CdlanCodart),
 		"cdlan_descart":              ptrStringValue(row.CdlanDescart),
 		"cdlan_qta":                  nullFloatValue(row.CdlanQta),
@@ -177,11 +155,36 @@ func buildSendToERPPayload(order *OrderDetail, row OrderRow) (map[string]any, er
 		"cdlan_prezzo_attivazione":   nullFloatValue(row.ActivationPrice),
 		"cdlan_prezzo_cessazione":    nullFloatValue(row.TerminationPrice),
 		"cdlan_ragg_fatturazione":    ptrStringValue(row.CdlanRaggFatturazione),
-		"cdlan_data_attivazione":     row.CdlanDataAttivazione.String(),
-		"confirm_data_attivazione":   ptrIntValue(row.ConfirmDataAttivazione),
-		"data_annullamento":          row.DataAnnullamento.String(),
+		"cdlan_stato":                "CREATO",
+		"cdlan_evaso":                ptrIntValue(order.CdlanEvaso),
+		"cdlan_chiuso":               ptrIntValue(order.CdlanChiuso),
+		"cdlan_anno":                 ptrIntValue(order.CdlanAnno),
+		"cdlan_codice_kit":           ptrStringValue(row.CdlanCodiceKit),
+		"cdlan_valuta":               ptrStringValue(order.CdlanValuta),
 	}
 	return payload, nil
+}
+
+// stringValueOrSpace mirrors the legacy `?? " "` fallback: the gateway has only
+// ever received a single space for these fields when the vodka column is NULL.
+func stringValueOrSpace(value *string) string {
+	if value == nil {
+		return " "
+	}
+	return *value
+}
+
+// intValueOrNull mirrors the legacy parseInt(): the gateway expects a number,
+// and JSON null when the value is missing or not numeric.
+func intValueOrNull(value *string) any {
+	if value == nil {
+		return nil
+	}
+	parsed, ok := parseRequiredInt(*value)
+	if !ok {
+		return nil
+	}
+	return parsed
 }
 
 func nullFloatValue(value NullFloat) any {
