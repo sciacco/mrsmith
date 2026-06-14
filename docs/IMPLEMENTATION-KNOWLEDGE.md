@@ -634,6 +634,79 @@ Alyante ERP ID
 - Used by: launcher-backed apps including `reports`, `coperture`, and `energia-dc`.
 - Open questions: none.
 
+### HubSpot Writes Go Through A Shared Async Queue On Anisetta
+
+- Context: backend-driven HubSpot integrations that must not block the user-facing save, starting with raenad quote → deal creation (parent #56).
+- Discovery: HubSpot calls are persisted as rows in `mrsmith.hubspot_request` on Anisetta and processed asynchronously with retry/backoff, instead of fire-and-forget goroutines or a synchronous call. A unique `dedupe_key` makes enqueue idempotent (`raenad:quote:{id}:deal:create` for the first deal; `raenad:quote:{id}:deal:update` for quote-owned updates), `attempt_count`/`max_attempts`/`next_attempt_at` drive backoff, statuses are `pending|locked|succeeded|failed|dead|cancelled`, and per-try detail is appended to `mrsmith.hubspot_request_attempt`. The local entity reference (e.g. `raenad.quote.hubspot_deal_id`) stays NULL until the worker completes, so a reconciler can re-enqueue `hubspot_sync_status='pending'` rows that have no matching live request. V1 also queues manual PDF attachment to HubSpot instead of doing it synchronously.
+- Practical rule: enqueue HubSpot writes via `mrsmith.hubspot_request` with a stable `dedupe_key`; never make the user-facing save or manual PDF attach request depend on a synchronous HubSpot response. Use latest-wins coalescing for `hubspot.update_deal`: each relevant quote save upserts the single update request `raenad:quote:{id}:deal:update` and overwrites a non-locked retryable payload (`pending`, `failed`, or previously `succeeded`) with the newest quote-owned state. The payload must include the source `quote.updated_at` (or an equivalent sync version). If an update request is already `locked`, do not blindly overwrite the in-flight payload; the worker must compare the payload source version with the current quote after the attempt and re-arm a latest update if the quote changed during processing. If the update worker runs before `hubspot_deal_id` exists, it must defer/retry until `hubspot.create_deal` succeeds; update payloads must not modify `dealstage`. Gate the worker through `mrsmith.runtime_config` (namespace `raenad`, key `hubspot_queue_worker`) like other workers. Claim due rows with the `hubspot_request_due_idx` partial index under an advisory lock, and reconcile via the `(entity_type, entity_id)` index.
+- Evidence: `deploy/migrations/024_mrsmith_hubspot_queue.sql`, `deploy/migrations/004_anisetta_mrsmith_support.sql` (mrsmith schema + runtime_config), and the worker-switch precedent in `deploy/migrations/011_quotes_hubspot_status_sync_config.sql`.
+- Used by: raenad quote → HubSpot deal creation; reusable for any future backend-owned HubSpot write.
+- Open questions: backend worker, reconciler, and backoff curve land in later #56 sub-phases.
+
+### Raenad HubSpot Deal Pipeline Config Lives In Anisetta Runtime Config
+
+- Context: creating HubSpot deals for new Aenad quotes (parent #56).
+- Discovery: Aenad V1 uses a single HubSpot pipeline/stage pair for new quote deals: pipeline id `3883934920`, initial deal stage id `5521139911`. This is operational runtime configuration, not raenad quote-domain data. A previous local table idea (`raenad.hubspot_pipeline_config`) was removed before deployment to avoid duplicating HubSpot as a second source of truth.
+- Practical rule: read the active deal pipeline config from `mrsmith.runtime_config` on Anisetta, namespace `raenad`, key `hubspot_deal_pipeline`, value `{"pipeline_id": "3883934920", "initial_dealstage_id": "5521139911"}`. When a quote/deal is created, copy the ids actually used into `raenad.quote.hubspot_pipeline_id` and `raenad.quote.hubspot_dealstage_id` as per-quote snapshots.
+- Evidence: `deploy/migrations/024_mrsmith_hubspot_queue.sql`, `deploy/migrations/023_raenad_schema.sql`.
+- Used by: raenad quote → HubSpot deal creation.
+
+### Raenad Stage Choices Come From The HubSpot Loader Mirror
+
+- Context: user-driven stage transitions for new Aenad quotes (parent #56).
+- Discovery: HubSpot pipeline and stage metadata is already mirrored in Mistra `loader.hubs_pipeline` (`id`, `label`) and `loader.hubs_stages` (`id`, `label`, `pipeline`, `display_order`). V1 does not need a local stage mapping table or hardcoded action list: the stages in the configured HubSpot pipeline are already aligned with the app.
+- Practical rule: list selectable target stages from `loader.hubs_stages` filtered by the configured `pipeline_id`, ordered by `display_order` and `label`, joining `loader.hubs_pipeline` only when the pipeline label is needed. Treat the mirror as read-only and potentially delayed: writes still go through the backend HubSpot integration. For an Aenad-initiated transition, accept `expected_dealstage_id` and `target_dealstage_id`, verify the target exists in the configured pipeline mirror, fetch the live HubSpot deal, stop with conflict if the live stage differs from `expected_dealstage_id`, otherwise update HubSpot and persist the resulting `hubspot_dealstage_id`/label snapshot on `raenad.quote`.
+- Evidence: `docs/mistradb/mistra_loader.json`, existing joins in `backend/internal/rdf/handler.go` and `backend/internal/quotes/handler_reference.go`.
+- Used by: raenad stage selector and Aenad-initiated HubSpot stage transition.
+
+### Raenad Deal Owner Maps From User Email To HubSpot Owner
+
+- Context: assigning HubSpot owners when creating deals for new Aenad quotes (parent #56).
+- Discovery: HubSpot owners are mirrored in Mistra `loader.hubs_owner` with `id`, `email`, `first_name`, `last_name`, and `archived`. The V1 owner should follow the authenticated Aenad user when possible, with an operational fallback owner configured on Anisetta.
+- Practical rule: resolve `hubspot_owner_id` by matching the authenticated user's email case-insensitively against `loader.hubs_owner.email` where `archived = false`. If no active owner matches, read `mrsmith.runtime_config` on Anisetta, namespace `raenad`, key `hubspot_deal_owner`, value `{"fallback_owner_email": "service01@cdlan.it"}`, and resolve that email against active `loader.hubs_owner`. If neither lookup resolves, fail deal creation/sync as misconfigured instead of creating an unowned deal. Send the resolved owner id to HubSpot as the deal owner.
+- Evidence: `docs/mistradb/mistra_loader.json`, `deploy/migrations/024_mrsmith_hubspot_queue.sql`.
+- Used by: raenad quote → HubSpot deal creation.
+
+### Raenad Deal Create Uses Only Standard HubSpot Properties In V1
+
+- Context: minimum HubSpot deal property mapping for new Aenad quotes (parent #56).
+- Discovery: V1 does not require custom mandatory HubSpot properties beyond the agreed standard deal mapping.
+- Practical rule: create/update HubSpot deals with `dealname = "{quote_number} - {customer_name}"`, `amount = raenad.quote.total_net`, `closedate = document_date + 30 days`, configured `pipeline`, configured initial `dealstage` on create only, resolved `hubspot_owner_id`, company association, and optional contact association. Ordinary quote-owned updates may refresh name, amount, closedate, owner, and associations, but must not change `dealstage`.
+- Evidence: issue #56 grill-me decisions; `deploy/migrations/024_mrsmith_hubspot_queue.sql`.
+- Used by: raenad quote → HubSpot deal create/update payloads.
+
+### Raenad UI/UX Planning Is Deferred Until Backend Contracts Are Stable
+
+- Context: planning the new Aenad Preventivi area (parent #56/#61).
+- Discovery: the UI/UX needs its own grill-me session and likely child subtickets, but should not be designed before backend API, lifecycle, HubSpot sync, article search, PDF, and attachment contracts are stable.
+- Practical rule: defer UI/UX specification and frontend implementation until the backend contract is complete. Track the deferred UI/UX scope in #61; do not make frontend layout or workflow decisions in backend planning tickets beyond preserving necessary API affordances.
+- Evidence: issue #56/#61 grill-me decisions.
+- Used by: future Aenad Preventivi UI planning and implementation.
+
+### Aenad Quote Line Defaults Live In Anisetta Runtime Config
+
+- Context: creating item lines for new Aenad quotes from Alyante article search (parent #56/#60).
+- Discovery: the Alyante V1 article query does not return `cod_iva`, and purchase cost is manual. The V1 default VAT code is `22`, stored as runtime config rather than hardcoded in the frontend.
+- Practical rule: read quote-line defaults from `mrsmith.runtime_config` on Anisetta, namespace `aenad`, key `quote_defaults`, value `{"cod_iva": "22"}`. Use this only as an initialization default; users can still edit `cod_iva`, and persisted lines keep both `cod_iva` and `iva_percent_snapshot`.
+- Evidence: `deploy/migrations/024_mrsmith_hubspot_queue.sql`, `deploy/migrations/023_raenad_schema.sql`.
+- Used by: raenad quote line creation, Alyante product import.
+
+### Raenad Payment Methods Come From loader.erp_metodi_pagamento
+
+- Context: selecting and validating payment method on new Aenad quotes (parent #56).
+- Discovery: Mistra loader mirrors ERP payment methods in `loader.erp_metodi_pagamento` with `cod_pagamento`, `desc_pagamento`, and `selezionabile`.
+- Practical rule: list/select payment methods from `loader.erp_metodi_pagamento` where `selezionabile = true`, ordered by `desc_pagamento`/`cod_pagamento`. Persist `cod_pagamento` into `raenad.quote.payment_method_code` and `desc_pagamento` into `payment_method_label` as a printable snapshot. `payment_bank_details` remains a quote snapshot field supplied by backend rules or later implementation details; do not infer it from the loader table because the mirror exposes only code, description, and selectability.
+- Evidence: `docs/mistradb/mistra_loader.json`, `deploy/migrations/023_raenad_schema.sql`.
+- Used by: raenad quote header editing and mark-ready validation.
+
+### Raenad Ready Quotes Return To Draft On Commercial Changes
+
+- Context: authoring lifecycle for new Aenad quotes (parent #56).
+- Discovery: `ready` is a manual user action, not an automatic promotion, and relevant edits after `ready` must force the quote back to `draft`.
+- Practical rule: when `authoring_status = 'ready'`, changes to customer/company/contact snapshot or HubSpot refs, document header fields (`document_date`, description/title, payment method, bank details), quote lines, quantities, prices, discounts, VAT, purchase cost, or any DB-owned totals must set `authoring_status = 'draft'` and make the latest PDF revision stale. Pure internal notes do not force draft. HubSpot stage changes do not force draft because commercial state remains HubSpot-owned.
+- Evidence: issue #56/#58 grill-me decisions; `deploy/migrations/023_raenad_schema.sql`.
+- Used by: raenad quote save/update endpoints and PDF stale-state handling.
+
 ## Auth and Transport Behavior
 
 ### Keycloak Role User Lookups Must Include Group-Derived Membership
@@ -736,6 +809,51 @@ Alyante ERP ID
 - Evidence: read-only inspection of docs `IDDoc` 215441/215464/215564 (Num 879/901/994, matching `artifacts/aenad/` PDFs); `docs/mistradb/mistra_aenad.json`.
 - Used by: aenad offer PDF generation (Carbone template + `backend/internal/aenad` PDF endpoint).
 - Open questions: `QtaShown` vs `Qta` divergence never observed — `Qta` is used.
+
+### Raenad Is The Operational Quote Schema, Separate From The Aenad Archive
+
+- Context: new Aenad quote-creation flow (parent #56); the existing `aenad` schema stays the read-only historical archive.
+- Discovery: new quotes live in a dedicated lowercase-only Mistra schema `raenad` (`quote`, `quote_line`, `quote_pdf_export`, `quote_event`), not as an extension of legacy mixed-case `aenad`. Totals are DB-owned, replicating the verified `aenad` 021 calc logic (sequential `discount_multiplier`, `line_net`, header recalc triggers with a `raenad.skip_header_recalc` guard and a bulk `raenad.recalculate_quote_totals` procedure). Money/quantity are `numeric(18,4)`; non-economic rows (`line_type` `spacer`/`description`) leave all economic columns NULL.
+- Practical rule: build the new quote flow against `raenad`; keep object/column names lowercase; reuse the aenad calc shape (do not invent a new discount/VAT algorithm); expose `numeric(18,4)` as decimal strings over the API exactly as the aenad archive does.
+- Evidence: `deploy/migrations/023_raenad_schema.sql`, `deploy/migrations/021_aenad_document_totals.sql`.
+- Used by: raenad quote authoring; future raenad backend/API/UI.
+- Open questions: none for the schema; lifecycle/state mapping is a later #56 sub-phase.
+
+### Raenad Quote Numbers Use common.new_document_number('AE-')
+
+- Context: numbering new raenad quotes.
+- Discovery: `quote_number` defaults to `common.new_document_number('AE-')`, which draws from the shared global `common.document_seq` and returns `AE-<n>/<YYYY>` (e.g. `AE-1003/2026`). The sequence is shared across document types, so numbers are globally unique but not per-prefix contiguous.
+- Practical rule: let the database assign the number via the column default (NOT NULL UNIQUE); do not implement an app-side counter or assume gap-free `AE-` numbering. Use the same `common.new_document_number(prefix)` helper for any future document type.
+- Evidence: `deploy/migrations/023_raenad_schema.sql`, `common.new_document_number` / `common.document_seq` in `docs/mistradb/mistra_common.json`.
+- Used by: raenad quote creation.
+- Open questions: none.
+
+### Raenad Stores A Printable Customer/Contact Snapshot Decoupled From The HubSpot Mirror
+
+- Context: persisting customer/contact data on a raenad quote for stable PDFs/exports.
+- Discovery: `raenad.quote` keeps a full printable snapshot of customer (`customer_*`, `numero_azienda_snapshot`) and contact (`contact_first_name/_last_name/_full_name/_email/_role`) alongside HubSpot reference ids. There is no physical FK to `loader.hubs_company`/`loader.hubs_contact` because that mirror can lag behind HubSpot writes; `contact_full_name` is retained even though derivable, and the contact mirror only exposes `id/firstname/lastname/email` (no phone in V1).
+- Practical rule: copy a customer/contact snapshot onto the quote at authoring time and render PDFs/exports from the snapshot, not from a live mirror join; treat `numero_azienda_snapshot` as the Alyante ERP id captured at that moment. Keep HubSpot ids as text reference fields, not FKs.
+- Evidence: `deploy/migrations/023_raenad_schema.sql`; mirror columns in `docs/mistradb/mistra_loader.json`.
+- Used by: raenad quote authoring, PDF/export rendering.
+- Open questions: none for V1.
+
+### Raenad VAT Is cod_iva Plus A Persisted iva_percent_snapshot
+
+- Context: VAT calculation on raenad quote lines (V1: standard calculation only).
+- Discovery: each item line stores both `cod_iva` (the printable code) and `iva_percent_snapshot` (numeric). The line trigger uses `iva_percent_snapshot` when present and only falls back to resolving it from `aenad."TIva".PercIva` via `cod_iva` when NULL — so `aenad."TIva"` remains the shared VAT master on the same Mistra DB (no VAT table is copied into `raenad`). `raenad` models VAT explicitly: `line_vat = round(line_net * pct/100, 4)`, `line_gross = line_net + line_vat` (a deliberate, minor rounding-order difference from aenad's `gross = net*(1+pct)`).
+- Practical rule: persist both `cod_iva` and `iva_percent_snapshot` so exports stay stable if the VAT master changes later; resolve the snapshot once at calc time. Forced VAT, eco-contributi, and ritenute are out of V1.
+- Evidence: `deploy/migrations/023_raenad_schema.sql`, `aenad."TIva"` in `docs/mistradb/mistra_aenad.json`.
+- Used by: raenad line/header totals, PDF/export.
+- Open questions: none for V1.
+
+### Raenad PDF Exports Are Immutable Revisions
+
+- Context: persisting generated PDFs and attaching them to HubSpot deals.
+- Discovery: `raenad.quote_pdf_export` rows are immutable revisions, unique on `(quote_id, revision)`. A BEFORE UPDATE trigger blocks changes to the content columns (`revision`, `filename`, `content_type`, `checksum_sha256`, `render_payload`, `created_at`, `created_by`); only the `hubspot_*` attachment-status fields are mutable. V1 uses a dedicated raenad PDF template; it does not reuse the legacy Aenad offer Carbone template. The PDF binary is not persisted in V1: the document is reproducible through Carbone from the dedicated template plus the saved `render_payload` and checksum metadata.
+- Practical rule: never overwrite an export row; create a new revision instead. Render new operational quotes with a dedicated raenad template/config, separate from `aenad.carbone_offerta`. Store metadata, checksum, and `render_payload`, not PDF bytes. Manual HubSpot attachment is queued via `mrsmith.hubspot_request`; update only `hubspot_attachment_status` and the other `hubspot_*` fields when the queued attach completes, so the export history is preserved.
+- Evidence: `deploy/migrations/023_raenad_schema.sql`.
+- Used by: raenad PDF generation and HubSpot deal attachment.
+- Open questions: exact template asset/id is deferred to the PDF implementation phase.
 
 ### Grappa DCIM Rack Media Is Not A V1 Feature
 
