@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,6 +18,15 @@ const AssocTypeNoteToDeal = 214
 
 type UploadedFile struct {
 	ID string `json:"id"`
+}
+
+type NoteWithAttachmentRequest struct {
+	TargetObjectType  string
+	TargetObjectID    string
+	AssociationTypeID int
+	AttachmentIDs     []string
+	Body              string
+	Timestamp         time.Time
 }
 
 func (c *Client) UploadFile(ctx context.Context, filename string, content []byte, folderPath string, options map[string]any) (*UploadedFile, error) {
@@ -82,37 +92,72 @@ func (c *Client) UploadFile(ctx context.Context, filename string, content []byte
 }
 
 func (c *Client) CreateNoteWithAttachment(ctx context.Context, dealID, fileID string, orderID int64) (int64, error) {
-	dealIDInt, err := strconv.ParseInt(dealID, 10, 64)
+	noteID, err := c.CreateGenericNoteWithAttachment(ctx, NoteWithAttachmentRequest{
+		TargetObjectType:  ObjectTypeDeal,
+		TargetObjectID:    dealID,
+		AssociationTypeID: AssocTypeNoteToDeal,
+		AttachmentIDs:     []string{fileID},
+		Body:              fmt.Sprintf("Order PDF %d", orderID),
+	})
 	if err != nil {
-		return 0, fmt.Errorf("invalid deal id %q: %w", dealID, err)
+		return 0, err
+	}
+	id, err := strconv.ParseInt(noteID, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse note response: invalid id %q: %w", noteID, err)
+	}
+	return id, nil
+}
+
+func (c *Client) CreateGenericNoteWithAttachment(ctx context.Context, req NoteWithAttachmentRequest) (string, error) {
+	if req.TargetObjectType == "" {
+		return "", fmt.Errorf("create note: missing target object type")
+	}
+	if req.TargetObjectID == "" {
+		return "", fmt.Errorf("create note: missing target object id")
+	}
+	if req.AssociationTypeID == 0 {
+		return "", fmt.Errorf("create note: missing association type id")
+	}
+	timestamp := req.Timestamp
+	if timestamp.IsZero() {
+		timestamp = time.Now().UTC()
+	}
+	properties := map[string]any{
+		"hs_timestamp": timestamp.UTC().Format(time.RFC3339),
+	}
+	if req.Body != "" {
+		properties["hs_note_body"] = req.Body
+	}
+	if len(req.AttachmentIDs) > 0 {
+		properties["hs_attachment_ids"] = strings.Join(req.AttachmentIDs, ";")
 	}
 	body := map[string]any{
-		"properties": map[string]any{
-			"hs_timestamp":      time.Now().UTC().Format(time.RFC3339),
-			"hs_note_body":      fmt.Sprintf("Order PDF %d", orderID),
-			"hs_attachment_ids": fileID,
-		},
-		"associations": []Association{
+		"properties": properties,
+		"associations": []ObjectAssociation{
 			{
-				To: AssociationTo{ID: dealIDInt},
+				To: ObjectAssociationTo{ID: req.TargetObjectID},
 				Types: []AssociationType{{
 					Category: "HUBSPOT_DEFINED",
-					TypeID:   AssocTypeNoteToDeal,
+					TypeID:   req.AssociationTypeID,
 				}},
 			},
 		},
 	}
 	resp, err := c.Post(ctx, "/crm/v3/objects/notes", body)
 	if err != nil {
-		return 0, fmt.Errorf("create note: %w", err)
+		return "", fmt.Errorf("create note: %w", err)
 	}
 	var result struct {
-		ID string `json:"id"`
+		ID json.RawMessage `json:"id"`
 	}
 	if err := json.Unmarshal(resp, &result); err != nil {
-		return 0, fmt.Errorf("parse note response: %w", err)
+		return "", fmt.Errorf("parse note response: %w", err)
 	}
-	id, _ := strconv.ParseInt(result.ID, 10, 64)
+	id := rawJSONID(result.ID)
+	if id == "" {
+		return "", fmt.Errorf("parse note response: missing id")
+	}
 	return id, nil
 }
 

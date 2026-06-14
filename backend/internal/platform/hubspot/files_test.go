@@ -2,10 +2,13 @@ package hubspot
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDeleteNoteAndFile(t *testing.T) {
@@ -38,5 +41,125 @@ func TestIsNotFound(t *testing.T) {
 	}
 	if IsNotFound(&APIError{StatusCode: http.StatusInternalServerError}) {
 		t.Fatal("IsNotFound returned true for 500 API error")
+	}
+}
+
+func TestCreateGenericNoteWithAttachment(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method = %s", r.Method)
+		}
+		if got, want := r.URL.Path, "/crm/v3/objects/notes"; got != want {
+			t.Fatalf("path = %s, want %s", got, want)
+		}
+		var body struct {
+			Properties   map[string]string   `json:"properties"`
+			Associations []ObjectAssociation `json:"associations"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if got, want := body.Properties["hs_timestamp"], "2026-06-14T10:00:00Z"; got != want {
+			t.Fatalf("timestamp = %s, want %s", got, want)
+		}
+		if got, want := body.Properties["hs_note_body"], "Quote PDF"; got != want {
+			t.Fatalf("body = %s, want %s", got, want)
+		}
+		if got, want := body.Properties["hs_attachment_ids"], "file-1;file-2"; got != want {
+			t.Fatalf("attachments = %s, want %s", got, want)
+		}
+		if got, want := body.Associations[0].To.ID, "deal-123"; got != want {
+			t.Fatalf("association id = %s, want %s", got, want)
+		}
+		if got, want := body.Associations[0].Types[0].TypeID, AssocTypeNoteToDeal; got != want {
+			t.Fatalf("association type = %d, want %d", got, want)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":987}`)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	noteID, err := client.CreateGenericNoteWithAttachment(context.Background(), NoteWithAttachmentRequest{
+		TargetObjectType:  ObjectTypeDeal,
+		TargetObjectID:    "deal-123",
+		AssociationTypeID: AssocTypeNoteToDeal,
+		AttachmentIDs:     []string{"file-1", "file-2"},
+		Body:              "Quote PDF",
+		Timestamp:         time.Date(2026, 6, 14, 10, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("CreateGenericNoteWithAttachment() error = %v", err)
+	}
+	if got, want := noteID, "987"; got != want {
+		t.Fatalf("noteID = %s, want %s", got, want)
+	}
+}
+
+func TestCreateNoteWithAttachmentCompatibility(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got, want := r.URL.Path, "/crm/v3/objects/notes"; got != want {
+			t.Fatalf("path = %s, want %s", got, want)
+		}
+		var body struct {
+			Properties   map[string]string   `json:"properties"`
+			Associations []ObjectAssociation `json:"associations"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if got, want := body.Properties["hs_note_body"], "Order PDF 42"; got != want {
+			t.Fatalf("body = %s, want %s", got, want)
+		}
+		if got, want := body.Properties["hs_attachment_ids"], "file-123"; got != want {
+			t.Fatalf("attachment = %s, want %s", got, want)
+		}
+		if got, want := body.Associations[0].To.ID, "123"; got != want {
+			t.Fatalf("association id = %s, want %s", got, want)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"456"}`)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	noteID, err := client.CreateNoteWithAttachment(context.Background(), "123", "file-123", 42)
+	if err != nil {
+		t.Fatalf("CreateNoteWithAttachment() error = %v", err)
+	}
+	if got, want := noteID, int64(456); got != want {
+		t.Fatalf("noteID = %d, want %d", got, want)
+	}
+}
+
+func TestCreateNoteWithAttachmentInvalidReturnedID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"note-456"}`)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	if _, err := client.CreateNoteWithAttachment(context.Background(), "123", "file-123", 42); err == nil {
+		t.Fatal("CreateNoteWithAttachment() error = nil")
+	}
+}
+
+func TestCreateGenericNoteWithAttachmentMissingReturnedID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"properties":{}}`)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	_, err := client.CreateGenericNoteWithAttachment(context.Background(), NoteWithAttachmentRequest{
+		TargetObjectType:  ObjectTypeDeal,
+		TargetObjectID:    "123",
+		AssociationTypeID: AssocTypeNoteToDeal,
+		AttachmentIDs:     []string{"file-123"},
+	})
+	if err == nil {
+		t.Fatal("CreateGenericNoteWithAttachment() error = nil")
 	}
 }

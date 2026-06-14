@@ -46,6 +46,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/staticspa"
 	"github.com/sciacco/mrsmith/internal/portal"
 	"github.com/sciacco/mrsmith/internal/quotes"
+	"github.com/sciacco/mrsmith/internal/raenad"
 	"github.com/sciacco/mrsmith/internal/rda"
 	"github.com/sciacco/mrsmith/internal/rdf"
 	"github.com/sciacco/mrsmith/internal/rdfbackend"
@@ -244,6 +245,12 @@ func main() {
 	if cfg.HubSpotAPIKey != "" {
 		hubspotCli = hubspot.New(cfg.HubSpotAPIKey)
 		logger.Info("shared hubspot client configured", "component", "hubspot")
+	}
+	var raenadHubSpot raenad.HubSpotProspectClient
+	var raenadHubSpotStage raenad.HubSpotStageClient
+	if hubspotCli != nil {
+		raenadHubSpot = hubspotCli
+		raenadHubSpotStage = hubspotCli
 	}
 
 	var openrouterCli *openrouter.Client
@@ -612,6 +619,7 @@ func main() {
 		Arak:    arakCli,
 	})
 	aenad.RegisterRoutes(api, aenad.Deps{Mistra: mistraDB, Logger: logger, ConfigDB: anisettaDB, Carbone: aenadCarboneSvc})
+	raenad.RegisterRoutes(api, raenad.Deps{Mistra: mistraDB, ConfigDB: anisettaDB, Alyante: alyanteDB, HubSpot: raenadHubSpot, HubSpotStage: raenadHubSpotStage, Carbone: aenadCarboneSvc, Logger: logger})
 
 	mux.Handle("/api/", middleware.Chain(
 		http.StripPrefix("/api", api),
@@ -670,6 +678,28 @@ func main() {
 		logger.Info("quotes hubspot status sync worker not started without mistra database", "component", "quotes")
 	} else {
 		logger.Info("quotes hubspot status sync worker not started without hubspot client", "component", "quotes")
+	}
+	if mistraDB != nil && anisettaDB != nil && hubspotCli != nil {
+		worker := raenad.NewHubSpotQueueWorker(raenad.HubSpotQueueWorkerDeps{
+			Mistra:   mistraDB,
+			Anisetta: anisettaDB,
+			HubSpot:  hubspotCli,
+			Carbone:  aenadCarboneSvc,
+			Logger:   logger,
+		})
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			worker.Run(appCtx)
+		}()
+	} else {
+		logger.Info(
+			"raenad hubspot queue worker not started",
+			"component", "raenad",
+			"missing_mistra", mistraDB == nil,
+			"missing_anisetta", anisettaDB == nil,
+			"missing_hubspot", hubspotCli == nil,
+		)
 	}
 	if cfg.TrainingJobsEnabled && anisettaDB != nil {
 		worker := training.NewJobRunner(
