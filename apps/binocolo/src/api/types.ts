@@ -14,3 +14,18 @@ export interface Province {
   istat: string;
   regione: string;
 }
+
+export interface CompanySearchRow {
+  id: string;
+  taxCode?: string | null;
+  companyName?: string | null;
+  vatCode?: string | null;
+  activityStatus?: string | null;
+  address?: {
+    registeredOffice?: {
+      town?: string | null;
+      province?: string | null;
+      zipCode?: string | null;
+    };
+  };
+}

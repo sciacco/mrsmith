@@ -58,6 +58,10 @@ func (c *CompanyClient) SearchIT(ctx context.Context, params CompanyITSearchPara
 	return c.getDatasetList(ctx, "/IT-search", params.values())
 }
 
+func (c *CompanyClient) SearchITRaw(ctx context.Context, params CompanyITSearchParams) (Envelope[CompanyDataset], error) {
+	return c.getDataset(ctx, "/IT-search", params.values())
+}
+
 func (c *CompanyClient) GetITShareholders(ctx context.Context, vatCodeTaxCodeOrID string) (Envelope[CompanyDataset], error) {
 	return c.getDataset(ctx, "/IT-shareholders/"+pathSegment(vatCodeTaxCodeOrID), nil)
 }

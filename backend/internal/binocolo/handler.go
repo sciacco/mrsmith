@@ -26,6 +26,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	}
 
 	handle("GET /binocolo/v1/provinces", h.handleListProvinces)
+	handle("GET /binocolo/v1/companies/search", h.handleSearchCompanies)
 }
 
 func (h *Handler) requireOpenAPIIT(w http.ResponseWriter) bool {
