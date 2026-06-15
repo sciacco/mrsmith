@@ -93,8 +93,8 @@ export function TargetPage() {
       .then((data) => {
         if (!active) return;
         setLLMOptions(data);
-        setSelectedModelId(defaultOptionID(data.models));
-        setSelectedPromptId(defaultOptionID(data.prompts));
+        setSelectedModelId(defaultOptionID(data.models, 'ma_strategy'));
+        setSelectedPromptId(defaultOptionID(data.prompts, 'ma_strategy'));
       })
       .catch((err) => {
         if (active) setError(errorLabel(err));
@@ -679,8 +679,16 @@ function groupEstimates(estimates: MAEstimate[]): EstimateGroup[] {
   return groups.filter((group) => group.rows.length > 0);
 }
 
-function defaultOptionID<T extends { id: string; isDefault: boolean }>(options: T[]): string {
-  return options.find((item) => item.isDefault)?.id ?? options[0]?.id ?? '';
+function defaultOptionID<T extends { id: string; isDefault: boolean; scope: string }>(options: T[], preferredScope: string): string {
+  const preferredOptions = options.filter((item) => item.scope === preferredScope);
+  const fallbackOptions = options.filter((item) => item.scope === 'default');
+  return (
+    preferredOptions.find((item) => item.isDefault)?.id ??
+    preferredOptions[0]?.id ??
+    fallbackOptions.find((item) => item.isDefault)?.id ??
+    fallbackOptions[0]?.id ??
+    ''
+  );
 }
 
 function estimateLabel(estimate: MAEstimate): string {

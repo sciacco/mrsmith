@@ -652,7 +652,7 @@ func (s *SQLStore) ResolveMAModel(ctx context.Context, scope string, modelID str
 SELECT id::text, scope, name, model, is_default
 FROM binocolo.llm_model
 WHERE id = $1::uuid
-  AND scope = $2
+  AND scope IN ($2, 'default')
 `, modelID, scope)
 	}
 	model, err := s.loadMALLMModel(ctx, `
@@ -683,7 +683,7 @@ func (s *SQLStore) ResolveMAPrompt(ctx context.Context, scope string, promptID s
 SELECT id::text, scope, name, prompt, is_default
 FROM binocolo.llm_prompt
 WHERE id = $1::uuid
-  AND scope = $2
+  AND scope IN ($2, 'default')
 `, promptID, scope)
 	}
 	prompt, err := s.loadMALLMPrompt(ctx, `
