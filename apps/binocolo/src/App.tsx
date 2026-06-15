@@ -4,7 +4,10 @@ import { AccessNotice, AppShell, TabNav } from '@mrsmith/ui';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 
-const navItems = [{ label: 'Test', path: '/test' }];
+const navItems = [
+  { label: 'Target M&A', path: '/target' },
+  { label: 'Test', path: '/test' },
+];
 
 function AppRoutes() {
   const element = useRoutes(routes);
