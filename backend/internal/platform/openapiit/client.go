@@ -37,10 +37,12 @@ type Client struct {
 }
 
 type Envelope[T any] struct {
-	Data    T      `json:"data"`
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-	Error   *int   `json:"error"`
+	Data    T        `json:"data"`
+	Success bool     `json:"success"`
+	Message string   `json:"message"`
+	Error   *int     `json:"error"`
+	Count   *int     `json:"count,omitempty"`
+	Cost    *float64 `json:"cost,omitempty"`
 }
 
 type APIError struct {

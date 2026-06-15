@@ -3,6 +3,8 @@ export interface OpenAPIITEnvelope<T> {
   success: boolean;
   message: string;
   error: number | null;
+  count?: number;
+  cost?: number;
 }
 
 export interface Province {

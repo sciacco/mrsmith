@@ -1,16 +1,76 @@
-import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { ApiError } from '@mrsmith/api-client';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Button, Icon, SearchInput, Skeleton, ToggleSwitch } from '@mrsmith/ui';
+import { useMutation } from '@tanstack/react-query';
+import { Button, Icon, Skeleton, ToggleSwitch } from '@mrsmith/ui';
 import { useApiClient } from '../api/client';
-import type { CompanySearchRow, OpenAPIITEnvelope, Province } from '../api/types';
+import type { CompanySearchRow, OpenAPIITEnvelope } from '../api/types';
 import styles from './TestPage.module.css';
 
 const numberFormat = new Intl.NumberFormat('it-IT');
-const areaFormat = new Intl.NumberFormat('it-IT', {
-  maximumFractionDigits: 2,
-});
-const defaultCompanyProvince = 'AG';
+const defaultCompanyFilters = {
+  province: 'AG',
+  dataEnrichment: 'start',
+  activityStatus: 'ATTIVA',
+  companyName: '',
+  atecoCode: '',
+  cciaa: '',
+  reaCode: '',
+  minTurnover: '',
+  maxTurnover: '',
+  minEmployees: '',
+  maxEmployees: '',
+  skip: '0',
+  limit: '10',
+};
+
+type CompanySearchFilters = typeof defaultCompanyFilters;
+type CompanySearchFilterField = keyof CompanySearchFilters;
+
+const dataEnrichmentOptions = [
+  { value: '', label: 'Non impostato' },
+  { value: 'start', label: 'Start' },
+  { value: 'advanced', label: 'Advanced' },
+  { value: 'pec', label: 'PEC' },
+  { value: 'address', label: 'Address' },
+  { value: 'shareholders', label: 'Shareholders' },
+  { value: 'name', label: 'Name' },
+];
+
+const activityStatusOptions = [
+  { value: '', label: 'Tutti' },
+  { value: 'ATTIVA', label: 'ATTIVA' },
+  { value: 'CESSATA', label: 'CESSATA' },
+  { value: 'REGISTRATA', label: 'REGISTRATA' },
+  { value: 'INATTIVA', label: 'INATTIVA' },
+  { value: 'SOSPESA', label: 'SOSPESA' },
+  { value: 'IN_ISCRIZIONE', label: 'IN_ISCRIZIONE' },
+];
+
+const textFilterFields: Array<{
+  name: CompanySearchFilterField;
+  label: string;
+  maxLength?: number;
+}> = [
+  { name: 'companyName', label: 'Nome azienda' },
+  { name: 'atecoCode', label: 'ATECO' },
+  { name: 'cciaa', label: 'CCIAA', maxLength: 2 },
+  { name: 'reaCode', label: 'REA' },
+];
+
+const numberFilterFields: Array<{
+  name: CompanySearchFilterField;
+  label: string;
+  min?: number;
+  max?: number;
+}> = [
+  { name: 'minTurnover', label: 'Fatturato min', min: 0 },
+  { name: 'maxTurnover', label: 'Fatturato max', min: 0 },
+  { name: 'minEmployees', label: 'Dipendenti min', min: 0 },
+  { name: 'maxEmployees', label: 'Dipendenti max', min: 0 },
+  { name: 'skip', label: 'Skip', min: 0 },
+  { name: 'limit', label: 'Limit', min: 1, max: 1000 },
+];
+
 const countHints = ['count', 'record', 'total', 'found', 'result'];
 const priceHints = ['price', 'cost', 'amount', 'prezzo'];
 
@@ -92,57 +152,78 @@ function normalizeProvinceInput(value: string): string {
   return value.trim().toUpperCase();
 }
 
+function appendSearchParam(
+  params: URLSearchParams,
+  key: string,
+  value: string,
+  normalize: (value: string) => string = (item) => item,
+) {
+  const normalized = normalize(value.trim());
+  if (normalized) params.set(key, normalized);
+}
+
+function companyFilterSummary(filters: CompanySearchFilters): string {
+  const parts: string[] = [];
+  const province = normalizeProvinceInput(filters.province);
+  const status = filters.activityStatus.trim().toUpperCase();
+  const name = filters.companyName.trim();
+
+  if (province) parts.push(`provincia ${province}`);
+  if (status) parts.push(`stato ${status}`);
+  if (name) parts.push(`nome ${name}`);
+  if (filters.atecoCode.trim()) parts.push(`ATECO ${filters.atecoCode.trim()}`);
+  if (filters.cciaa.trim()) parts.push(`CCIAA ${filters.cciaa.trim().toUpperCase()}`);
+  if (filters.reaCode.trim()) parts.push(`REA ${filters.reaCode.trim()}`);
+
+  return parts.length > 0 ? parts.join(', ') : 'tutte le aziende';
+}
+
 export function TestPage() {
   const api = useApiClient();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [companyProvince, setCompanyProvince] = useState(defaultCompanyProvince);
+  const [companyFilters, setCompanyFilters] = useState<CompanySearchFilters>(defaultCompanyFilters);
   const [companyDryRun, setCompanyDryRun] = useState(true);
-
-  const provincesQuery = useQuery({
-    queryKey: ['binocolo', 'provinces'],
-    queryFn: () => api.get<OpenAPIITEnvelope<Province[]>>('/binocolo/v1/provinces'),
-  });
 
   const companySearch = useMutation({
     mutationFn: () => {
       const params = new URLSearchParams({ dry_run: String(companyDryRun) });
-      const province = normalizeProvinceInput(companyProvince);
-      if (province) params.set('province', province);
+      appendSearchParam(params, 'province', companyFilters.province, normalizeProvinceInput);
+      appendSearchParam(params, 'dataEnrichment', companyFilters.dataEnrichment);
+      appendSearchParam(params, 'activityStatus', companyFilters.activityStatus, (value) => value.toUpperCase());
+      appendSearchParam(params, 'companyName', companyFilters.companyName);
+      appendSearchParam(params, 'atecoCode', companyFilters.atecoCode);
+      appendSearchParam(params, 'cciaa', companyFilters.cciaa, (value) => value.toUpperCase());
+      appendSearchParam(params, 'reaCode', companyFilters.reaCode);
+      appendSearchParam(params, 'minTurnover', companyFilters.minTurnover);
+      appendSearchParam(params, 'maxTurnover', companyFilters.maxTurnover);
+      appendSearchParam(params, 'minEmployees', companyFilters.minEmployees);
+      appendSearchParam(params, 'maxEmployees', companyFilters.maxEmployees);
+      appendSearchParam(params, 'skip', companyFilters.skip);
+      appendSearchParam(params, 'limit', companyFilters.limit);
       return api.get<OpenAPIITEnvelope<unknown>>(`/binocolo/v1/companies/search?${params.toString()}`);
     },
   });
 
-  const provinces = provincesQuery.data?.data ?? [];
-  const filteredProvinces = useMemo(() => {
-    const needle = searchQuery.trim().toLowerCase();
-    if (!needle) return provinces;
-
-    return provinces.filter((province) =>
-      [
-        province.sigla,
-        province.provincia,
-        province.regione,
-        province.istat,
-      ].some((value) => value.toLowerCase().includes(needle)),
-    );
-  }, [provinces, searchQuery]);
   const companyData = companySearch.data?.data;
   const companyRows: CompanySearchRow[] = Array.isArray(companyData)
     ? (companyData as CompanySearchRow[])
     : [];
-  const dryRunCount = findMetric(companyData, countHints);
-  const dryRunPrice = findMetric(companyData, priceHints);
-  const companyProvinceFilter = normalizeProvinceInput(companyProvince);
-  const companyScopeLabel = companyProvinceFilter ? `provincia ${companyProvinceFilter}` : 'tutte le province';
+  const dryRunCount = findMetric(companySearch.data, countHints);
+  const dryRunPrice = findMetric(companySearch.data, priceHints);
+  const companyScopeLabel = companyFilterSummary(companyFilters);
 
   function handleCompanyDryRunChange(value: boolean) {
     setCompanyDryRun(value);
     companySearch.reset();
   }
 
-  function handleCompanyProvinceChange(event: ChangeEvent<HTMLInputElement>) {
-    setCompanyProvince(event.target.value);
-    companySearch.reset();
+  function handleCompanyFilterChange(field: CompanySearchFilterField) {
+    return (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      setCompanyFilters((current) => ({
+        ...current,
+        [field]: event.target.value,
+      }));
+      companySearch.reset();
+    };
   }
 
   function handleCompanySubmit(event: FormEvent<HTMLFormElement>) {
@@ -155,96 +236,9 @@ export function TestPage() {
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Test</h1>
-          <p className={styles.pageSubtitle}>Verifica la lista delle province italiane.</p>
+          <p className={styles.pageSubtitle}>Verifica l'API di ricerca aziende.</p>
         </div>
-        <Button
-          variant="secondary"
-          onClick={() => void provincesQuery.refetch()}
-          loading={provincesQuery.isFetching}
-          leftIcon={<Icon name="refresh-cw" />}
-        >
-          Aggiorna
-        </Button>
       </div>
-
-      <section className={`${styles.panel} ${styles.provincePanel}`} aria-labelledby="province-title">
-        <div className={styles.panelHeader}>
-          <div>
-            <div className={styles.endpointLine}>
-              <span className={styles.method}>GET</span>
-              <span className={styles.path}>/binocolo/v1/provinces</span>
-            </div>
-            <h2 id="province-title" className={styles.sectionTitle}>Province</h2>
-          </div>
-          <div className={styles.searchWrap}>
-            <SearchInput
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Cerca provincia..."
-            />
-          </div>
-        </div>
-
-        {provincesQuery.isLoading ? (
-          <div className={styles.skeletonWrap}>
-            <Skeleton rows={8} />
-          </div>
-        ) : provincesQuery.isError ? (
-          <div className={styles.statePanel} role="alert">
-            <div className={styles.stateIcon}>
-              <Icon name="triangle-alert" size={22} />
-            </div>
-            <p className={styles.stateTitle}>Province non disponibili</p>
-            <p className={styles.stateText}>{errorLabel(provincesQuery.error)}</p>
-            <Button variant="secondary" size="sm" onClick={() => void provincesQuery.refetch()}>
-              Riprova
-            </Button>
-          </div>
-        ) : filteredProvinces.length === 0 ? (
-          <div className={styles.statePanel}>
-            <div className={styles.stateIcon}>
-              <Icon name="search" size={22} />
-            </div>
-            <p className={styles.stateTitle}>Nessuna provincia trovata</p>
-            <p className={styles.stateText}>Modifica la ricerca per vedere altri risultati.</p>
-          </div>
-        ) : (
-          <>
-            <div className={styles.responseBar}>
-              <span>{filteredProvinces.length} province visualizzate</span>
-              {provincesQuery.data?.message ? <span>{provincesQuery.data.message}</span> : null}
-            </div>
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Sigla</th>
-                    <th>Provincia</th>
-                    <th>Regione</th>
-                    <th className={styles.numberCol}>Comuni</th>
-                    <th className={styles.numberCol}>Residenti</th>
-                    <th className={styles.numberCol}>Superficie</th>
-                    <th>ISTAT</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProvinces.map((province) => (
-                    <tr key={province.sigla}>
-                      <td className={styles.codeCell}>{province.sigla}</td>
-                      <td>{province.provincia}</td>
-                      <td>{province.regione}</td>
-                      <td className={styles.numberCol}>{numberFormat.format(province.num_comuni)}</td>
-                      <td className={styles.numberCol}>{numberFormat.format(province.residenti)}</td>
-                      <td className={styles.numberCol}>{areaFormat.format(province.superficie)} kmq</td>
-                      <td className={styles.codeCell}>{province.istat}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </section>
 
       <section className={`${styles.panel} ${styles.companyPanel}`} aria-labelledby="companies-title">
         <div className={styles.panelHeader}>
@@ -256,32 +250,91 @@ export function TestPage() {
             <h2 id="companies-title" className={styles.sectionTitle}>Company search</h2>
           </div>
           <form className={styles.companyForm} onSubmit={handleCompanySubmit}>
-            <label className={styles.provinceField}>
-              <span>Provincia</span>
-              <input
-                type="text"
-                value={companyProvince}
-                onChange={handleCompanyProvinceChange}
-                maxLength={2}
-                autoCapitalize="characters"
-                autoComplete="off"
-                spellCheck={false}
-                aria-label="Provincia"
-              />
-            </label>
-            <ToggleSwitch
-              id="binocolo-company-dry-run"
-              checked={companyDryRun}
-              onChange={handleCompanyDryRunChange}
-              label="dry_run"
-            />
-            <Button
-              type="submit"
-              loading={companySearch.isPending}
-              leftIcon={<Icon name="search" />}
-            >
-              Esegui
-            </Button>
+            <div className={styles.filterGrid}>
+              <label className={styles.filterField}>
+                <span>Provincia</span>
+                <input
+                  type="text"
+                  value={companyFilters.province}
+                  onChange={handleCompanyFilterChange('province')}
+                  maxLength={2}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-label="Provincia"
+                  className={styles.codeInput}
+                />
+              </label>
+              <label className={styles.filterField}>
+                <span>Data enrichment</span>
+                <select
+                  value={companyFilters.dataEnrichment}
+                  onChange={handleCompanyFilterChange('dataEnrichment')}
+                  aria-label="Data enrichment"
+                >
+                  {dataEnrichmentOptions.map((option) => (
+                    <option key={option.value || 'empty'} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.filterField}>
+                <span>Stato</span>
+                <select
+                  value={companyFilters.activityStatus}
+                  onChange={handleCompanyFilterChange('activityStatus')}
+                  aria-label="Stato"
+                >
+                  {activityStatusOptions.map((option) => (
+                    <option key={option.value || 'empty'} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              {textFilterFields.map((field) => (
+                <label key={field.name} className={styles.filterField}>
+                  <span>{field.label}</span>
+                  <input
+                    type="text"
+                    value={companyFilters[field.name]}
+                    onChange={handleCompanyFilterChange(field.name)}
+                    maxLength={field.maxLength}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className={field.name === 'cciaa' ? styles.codeInput : undefined}
+                  />
+                </label>
+              ))}
+              {numberFilterFields.map((field) => (
+                <label key={field.name} className={styles.filterField}>
+                  <span>{field.label}</span>
+                  <input
+                    type="number"
+                    value={companyFilters[field.name]}
+                    onChange={handleCompanyFilterChange(field.name)}
+                    min={field.min}
+                    max={field.max}
+                    step="1"
+                    inputMode="numeric"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className={styles.formActions}>
+              <label className={styles.dryRunField}>
+                <span>dry_run</span>
+                <ToggleSwitch
+                  id="binocolo-company-dry-run"
+                  checked={companyDryRun}
+                  onChange={handleCompanyDryRunChange}
+                />
+              </label>
+              <Button
+                type="submit"
+                loading={companySearch.isPending}
+                leftIcon={<Icon name="search" />}
+              >
+                Esegui
+              </Button>
+            </div>
           </form>
         </div>
 
@@ -326,7 +379,7 @@ export function TestPage() {
             </div>
             <div className={styles.rawBlock}>
               <span>Risposta</span>
-              <pre>{rawPreview(companyData)}</pre>
+              <pre>{rawPreview(companySearch.data)}</pre>
             </div>
           </div>
         ) : companyRows.length === 0 ? (
@@ -368,6 +421,10 @@ export function TestPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className={`${styles.rawBlock} ${styles.rawBlockSeparated}`}>
+              <span>Risposta</span>
+              <pre>{rawPreview(companySearch.data)}</pre>
             </div>
           </>
         )}
