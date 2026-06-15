@@ -1,7 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@mrsmith/api-client';
 import { useApiClient } from './client';
-import type { AenadDocumentsPage, ArchiveDocumentFilters, DocumentTypeOption, AenadDocumentRow, AenadDocument, CustomerOption, PaymentMethodOption } from './types';
+import type {
+  AenadDocumentsPage,
+  ArchiveDocumentFilters,
+  DocumentTypeOption,
+  AenadDocumentRow,
+  AenadDocument,
+  CustomerOption,
+  PaymentMethodOption,
+  QuoteListResponse,
+  QuoteResponse,
+  SaveQuotePayload,
+  CustomerSelection,
+  ProspectPayload,
+  ProspectResponse,
+  ArticleLineInitializer,
+  PaymentMethodSelection,
+  QuoteDefaultsResponse,
+  StagesResponse,
+  PdfExport,
+} from './types';
+
 
 export const aenadQueryKeys = {
   all: ['aenad'] as const,
@@ -141,3 +161,205 @@ export function useUpdateDocument() {
     },
   });
 }
+
+export const aenadQuoteKeys = {
+  all: ['aenad-quotes'] as const,
+  list: (page: number, pageSize: number) => [...aenadQuoteKeys.all, 'list', { page, pageSize }] as const,
+  details: (id: number) => [...aenadQuoteKeys.all, 'details', id] as const,
+  customers: (q: string) => [...aenadQuoteKeys.all, 'customers', q] as const,
+  articles: (q: string) => [...aenadQuoteKeys.all, 'articles', q] as const,
+  paymentMethods: () => [...aenadQuoteKeys.all, 'payment-methods'] as const,
+  defaults: () => [...aenadQuoteKeys.all, 'defaults'] as const,
+  pdfExports: (id: number) => [...aenadQuoteKeys.all, 'pdf-exports', id] as const,
+  stages: () => [...aenadQuoteKeys.all, 'stages'] as const,
+};
+
+export function useQuotesList(page: number, pageSize: number) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQuoteKeys.list(page, pageSize),
+    queryFn: () => api.get<QuoteListResponse>(`/aenad/v1/quotes?page=${page}&page_size=${pageSize}`),
+    placeholderData: (previous) => previous,
+    retry: shouldRetry,
+  });
+}
+
+export function useQuoteDetails(id: number, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQuoteKeys.details(id),
+    queryFn: () => api.get<QuoteResponse>(`/aenad/v1/quotes/${id}`),
+    enabled,
+    retry: shouldRetry,
+  });
+}
+
+export function useCreateQuote() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SaveQuotePayload) => api.post<QuoteResponse>('/aenad/v1/quotes', payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.all });
+    },
+  });
+}
+
+export function useUpdateQuote() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: SaveQuotePayload }) =>
+      api.put<QuoteResponse>(`/aenad/v1/quotes/${id}`, payload),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.all });
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.details(data.id) });
+    },
+  });
+}
+
+export function useQuoteReady() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.post<QuoteResponse>(`/aenad/v1/quotes/${id}/ready`, {}),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.all });
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.details(data.id) });
+    },
+  });
+}
+
+export function useHubSpotRetry() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.post<QuoteResponse>(`/aenad/v1/quotes/${id}/hubspot/retry`, {}),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.all });
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.details(data.id) });
+    },
+  });
+}
+
+export function useQuoteCustomers(search: string, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQuoteKeys.customers(search),
+    queryFn: () => api.get<CustomerSelection[]>(`/aenad/v1/quotes/customers?q=${encodeURIComponent(search)}&limit=15`),
+    enabled,
+    retry: shouldRetry,
+  });
+}
+
+export function useCreateProspect() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ProspectPayload) => api.post<ProspectResponse>('/aenad/v1/quotes/prospects', payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.customers('') });
+    },
+  });
+}
+
+export function useQuoteArticles(search: string, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQuoteKeys.articles(search),
+    queryFn: () => api.get<ArticleLineInitializer[]>(`/aenad/v1/quotes/articles?q=${encodeURIComponent(search)}&limit=25`),
+    enabled,
+    retry: shouldRetry,
+  });
+}
+
+export function useQuotePaymentMethods() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQuoteKeys.paymentMethods(),
+    queryFn: () => api.get<PaymentMethodSelection[]>('/aenad/v1/quotes/payment-methods'),
+    retry: shouldRetry,
+  });
+}
+
+export function useQuoteDefaults() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQuoteKeys.defaults(),
+    queryFn: () => api.get<QuoteDefaultsResponse>('/aenad/v1/quotes/defaults'),
+    retry: shouldRetry,
+  });
+}
+
+export function usePdfExports(quoteId: number, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQuoteKeys.pdfExports(quoteId),
+    queryFn: () => api.get<PdfExport[]>(`/aenad/v1/quotes/${quoteId}/pdf-exports`),
+    enabled,
+    retry: shouldRetry,
+  });
+}
+
+export function useCreatePdfExport() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (quoteId: number) => api.post<PdfExport>(`/aenad/v1/quotes/${quoteId}/pdf-exports`, {}),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.pdfExports(data.quote_id) });
+    },
+  });
+}
+
+export function usePdfExportDownload() {
+  const api = useApiClient();
+  return (quoteId: number, exportId: number) =>
+    api.getBlob(`/aenad/v1/quotes/${quoteId}/pdf-exports/${exportId}/download`);
+}
+
+export function useAttachPdfExport() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ quoteId, exportId }: { quoteId: number; exportId: number }) =>
+      api.post<PdfExport>(`/aenad/v1/quotes/${quoteId}/pdf-exports/${exportId}/attach`, {}),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.pdfExports(data.quote_id) });
+    },
+  });
+}
+
+export function useQuoteStages() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: aenadQuoteKeys.stages(),
+    queryFn: () => api.get<StagesResponse>('/aenad/v1/quotes/stages'),
+    retry: shouldRetry,
+  });
+}
+
+export function useTransitionStage() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      quoteId,
+      expectedDealstageId,
+      targetDealstageId,
+    }: {
+      quoteId: number;
+      expectedDealstageId: string;
+      targetDealstageId: string;
+    }) =>
+      api.post<QuoteResponse>(`/aenad/v1/quotes/${quoteId}/hubspot/stage`, {
+        expected_dealstage_id: expectedDealstageId,
+        target_dealstage_id: targetDealstageId,
+      }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.all });
+      void queryClient.invalidateQueries({ queryKey: aenadQuoteKeys.details(data.id) });
+    },
+  });
+}
+

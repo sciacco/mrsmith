@@ -33,3 +33,23 @@ export function trimDecimalZeros(value: string): string {
   if (!value.includes('.')) return value;
   return value.replace(/0+$/, '').replace(/\.$/, '');
 }
+
+/** Calcola il moltiplicatore dello sconto sequenziale (es. "10+5%" o "10+5+2" -> 0.855) */
+export function calculateDiscountMultiplier(discounts: string | null | undefined): number {
+  if (!discounts) return 1;
+  const cleaned = discounts.replace(/\s+/g, '').replace(/,/g, '.');
+  if (cleaned === '') return 1;
+
+  let multiplier = 1;
+  const parts = cleaned.split('+');
+  for (let part of parts) {
+    part = part.replace(/%$/, '');
+    if (part === '' || Number.isNaN(Number(part))) {
+      continue;
+    }
+    const percent = Number(part);
+    multiplier = multiplier * (1 - percent / 100);
+  }
+  return multiplier;
+}
+

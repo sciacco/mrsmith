@@ -529,3 +529,78 @@
   padding-left: var(--space-4) !important;
 }
 
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.badgeDraft {
+  background: var(--color-bg-secondary, #f3f4f6);
+  color: var(--color-text-secondary, #4b5563);
+  border: 1px solid var(--color-border);
+}
+
+.badgeReady {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success, #10b981);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.badgeArchived {
+  background: #374151;
+  color: #f3f4f6;
+  border: 1px solid #4b5563;
+}
+
+.badgeHubSpotPending {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning-strong, #d97706);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.badgeHubSpotSucceeded {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success, #10b981);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.badgeHubSpotFailed {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error, #ef4444);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.retryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  background: var(--color-error, #ef4444);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-left: var(--space-2);
+  transition: opacity 0.2s;
+}
+
+.retryBtn:hover {
+  opacity: 0.85;
+}
+
+.retryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
