@@ -76,6 +76,11 @@ const priceHints = ['price', 'cost', 'amount', 'prezzo'];
 
 function errorLabel(error: unknown): string {
   if (error instanceof ApiError) {
+    const body = error.body as { error?: unknown } | undefined;
+    const code = body && typeof body === 'object' && typeof body.error === 'string' ? body.error : undefined;
+    if (error.status === 503 && code === 'binocolo_cache_not_configured') {
+      return 'La cache Anisetta per Binocolo non e configurata in questo ambiente.';
+    }
     if (error.status === 503) return 'OpenAPI.it non e configurato in questo ambiente.';
     if (error.status === 502) return 'OpenAPI.it non ha risposto correttamente.';
     if (error.status === 401) return 'Sessione non valida.';
@@ -182,10 +187,12 @@ export function TestPage() {
   const api = useApiClient();
   const [companyFilters, setCompanyFilters] = useState<CompanySearchFilters>(defaultCompanyFilters);
   const [companyDryRun, setCompanyDryRun] = useState(true);
+  const [companyForceRefresh, setCompanyForceRefresh] = useState(false);
 
   const companySearch = useMutation({
-    mutationFn: () => {
+    mutationFn: (forceRefresh: boolean = companyForceRefresh) => {
       const params = new URLSearchParams({ dry_run: String(companyDryRun) });
+      if (forceRefresh) params.set('force_refresh', 'true');
       appendSearchParam(params, 'province', companyFilters.province, normalizeProvinceInput);
       appendSearchParam(params, 'dataEnrichment', companyFilters.dataEnrichment);
       appendSearchParam(params, 'activityStatus', companyFilters.activityStatus, (value) => value.toUpperCase());
@@ -200,6 +207,9 @@ export function TestPage() {
       appendSearchParam(params, 'skip', companyFilters.skip);
       appendSearchParam(params, 'limit', companyFilters.limit);
       return api.get<OpenAPIITEnvelope<unknown>>(`/binocolo/v1/companies/search?${params.toString()}`);
+    },
+    onSettled: (_data, _error, forceRefresh) => {
+      if (forceRefresh) setCompanyForceRefresh(false);
     },
   });
 
@@ -216,6 +226,11 @@ export function TestPage() {
     companySearch.reset();
   }
 
+  function handleCompanyForceRefreshChange(value: boolean) {
+    setCompanyForceRefresh(value);
+    companySearch.reset();
+  }
+
   function handleCompanyFilterChange(field: CompanySearchFilterField) {
     return (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       setCompanyFilters((current) => ({
@@ -228,7 +243,7 @@ export function TestPage() {
 
   function handleCompanySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    companySearch.mutate();
+    companySearch.mutate(companyForceRefresh);
   }
 
   return (
@@ -327,6 +342,14 @@ export function TestPage() {
                   onChange={handleCompanyDryRunChange}
                 />
               </label>
+              <label className={styles.dryRunField}>
+                <span>Forza nuova ricerca</span>
+                <ToggleSwitch
+                  id="binocolo-company-force-refresh"
+                  checked={companyForceRefresh}
+                  onChange={handleCompanyForceRefreshChange}
+                />
+              </label>
               <Button
                 type="submit"
                 loading={companySearch.isPending}
@@ -357,7 +380,7 @@ export function TestPage() {
             </div>
             <p className={styles.stateTitle}>Ricerca non disponibile</p>
             <p className={styles.stateText}>{errorLabel(companySearch.error)}</p>
-            <Button variant="secondary" size="sm" onClick={() => companySearch.mutate()}>
+            <Button variant="secondary" size="sm" onClick={() => companySearch.mutate(companyForceRefresh)}>
               Riprova
             </Button>
           </div>

@@ -1,6 +1,7 @@
 package binocolo
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/sciacco/mrsmith/internal/acl"
@@ -11,15 +12,21 @@ import (
 )
 
 type Deps struct {
-	OpenAPIIT *openapiit.Client
+	OpenAPIIT  *openapiit.Client
+	AnisettaDB *sql.DB
 }
 
 type Handler struct {
-	openapiit *openapiit.Client
+	openapiit          *openapiit.Client
+	companySearchCache companySearchCacheStore
 }
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
-	h := &Handler{openapiit: deps.OpenAPIIT}
+	var cache companySearchCacheStore
+	if deps.AnisettaDB != nil {
+		cache = NewSQLStore(deps.AnisettaDB)
+	}
+	h := &Handler{openapiit: deps.OpenAPIIT, companySearchCache: cache}
 	protect := acl.RequireRole(applaunch.BinocoloAccessRoles()...)
 	handle := func(pattern string, handler http.HandlerFunc) {
 		mux.Handle(pattern, protect(http.HandlerFunc(handler)))
@@ -45,4 +52,13 @@ func (h *Handler) openAPIITFailure(w http.ResponseWriter, r *http.Request, opera
 		"error", err,
 	)
 	httputil.Error(w, http.StatusBadGateway, "openapiit_upstream_error")
+}
+
+func (h *Handler) binocoloCacheFailure(w http.ResponseWriter, r *http.Request, err error) {
+	logging.FromContext(r.Context()).Error(
+		"binocolo cache request failed",
+		"component", "binocolo",
+		"error", err,
+	)
+	httputil.Error(w, http.StatusInternalServerError, "binocolo_cache_error")
 }

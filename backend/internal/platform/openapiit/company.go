@@ -256,6 +256,10 @@ func (c *CompanyClient) postRequest(ctx context.Context, path string, body Compa
 	return out, err
 }
 
+func (p CompanyITSearchParams) Values() url.Values {
+	return p.values()
+}
+
 func (p CompanyITSearchParams) values() url.Values {
 	query := url.Values{}
 	setIntQueryValue(query, "dryRun", p.DryRun)

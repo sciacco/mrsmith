@@ -546,7 +546,7 @@ func main() {
 		appCatalog = filtered
 	}
 	portal.RegisterRoutes(api, appCatalog)
-	binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli})
+	binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, AnisettaDB: anisettaDB})
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	rda.RegisterRoutes(api, rda.Deps{

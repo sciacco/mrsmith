@@ -1,10 +1,15 @@
 package binocolo
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 )
@@ -27,73 +32,156 @@ var companySearchActivityStatuses = map[string]struct{}{
 	"IN_ISCRIZIONE": {},
 }
 
+type companySearchRequest struct {
+	params         openapiit.CompanyITSearchParams
+	cacheKey       string
+	paramsJSON     json.RawMessage
+	dryRun         bool
+	dataEnrichment string
+	forceRefresh   bool
+}
+
 func (h *Handler) handleSearchCompanies(w http.ResponseWriter, r *http.Request) {
+	searchReq, badRequestCode, err := parseCompanySearchRequest(r.URL.Query())
+	if badRequestCode != "" {
+		httputil.Error(w, http.StatusBadRequest, badRequestCode)
+		return
+	}
+	if err != nil {
+		h.binocoloCacheFailure(w, r, err)
+		return
+	}
+	if h.companySearchCache == nil {
+		httputil.Error(w, http.StatusServiceUnavailable, "binocolo_cache_not_configured")
+		return
+	}
+
+	if !searchReq.forceRefresh {
+		entry, err := h.companySearchCache.GetValidCompanySearch(r.Context(), searchReq.cacheKey, time.Now().UTC())
+		if err != nil {
+			h.binocoloCacheFailure(w, r, err)
+			return
+		}
+		if entry != nil {
+			httputil.JSON(w, http.StatusOK, json.RawMessage(entry.Response))
+			return
+		}
+	}
+
 	if !h.requireOpenAPIIT(w) {
 		return
 	}
 
-	query := r.URL.Query()
+	var response json.RawMessage
+	var upstreamErr error
+	err = h.companySearchCache.WithCompanySearchCacheLock(r.Context(), searchReq.cacheKey, func(ctx context.Context) error {
+		if !searchReq.forceRefresh {
+			entry, err := h.companySearchCache.GetValidCompanySearch(ctx, searchReq.cacheKey, time.Now().UTC())
+			if err != nil {
+				return err
+			}
+			if entry != nil {
+				response = entry.Response
+				return nil
+			}
+		}
 
+		result, err := h.openapiit.Company().SearchITRaw(ctx, searchReq.params)
+		if err != nil {
+			upstreamErr = err
+			return nil
+		}
+
+		raw, err := json.Marshal(result)
+		if err != nil {
+			return err
+		}
+		fetchedAt := time.Now().UTC()
+		subject, email := companySearchRefreshActor(r.Context())
+		if err := h.companySearchCache.UpsertCompanySearch(ctx, companySearchCacheWrite{
+			CacheKey:           searchReq.cacheKey,
+			Params:             searchReq.paramsJSON,
+			Response:           raw,
+			DryRun:             searchReq.dryRun,
+			DataEnrichment:     searchReq.dataEnrichment,
+			FetchedAt:          fetchedAt,
+			ExpiresAt:          fetchedAt.Add(companySearchCacheTTL),
+			RefreshedBySubject: subject,
+			RefreshedByEmail:   email,
+		}); err != nil {
+			return err
+		}
+		response = raw
+		return nil
+	})
+	if err != nil {
+		h.binocoloCacheFailure(w, r, err)
+		return
+	}
+	if upstreamErr != nil {
+		h.openAPIITFailure(w, r, "search_companies", upstreamErr)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, json.RawMessage(response))
+}
+
+func parseCompanySearchRequest(query url.Values) (companySearchRequest, string, error) {
 	province, ok := normalizeProvince(query.Get("province"))
 	if !ok {
-		httputil.Error(w, http.StatusBadRequest, "invalid_province")
-		return
+		return companySearchRequest{}, "invalid_province", nil
 	}
 
 	dryRun, err := parseBoolQuery(query.Get("dry_run"))
 	if err != nil {
-		httputil.Error(w, http.StatusBadRequest, "invalid_dry_run")
-		return
+		return companySearchRequest{}, "invalid_dry_run", nil
 	}
 	dryRunFlag := 0
 	if dryRun {
 		dryRunFlag = 1
 	}
 
+	forceRefresh, err := parseBoolQuery(query.Get("force_refresh"))
+	if err != nil {
+		return companySearchRequest{}, "invalid_force_refresh", nil
+	}
+
 	dataEnrichment, ok := normalizeCompanyDataEnrichment(query.Get("dataEnrichment"))
 	if !ok {
-		httputil.Error(w, http.StatusBadRequest, "invalid_data_enrichment")
-		return
+		return companySearchRequest{}, "invalid_data_enrichment", nil
 	}
 
 	activityStatus, ok := normalizeCompanyActivityStatus(query.Get("activityStatus"))
 	if !ok {
-		httputil.Error(w, http.StatusBadRequest, "invalid_activity_status")
-		return
+		return companySearchRequest{}, "invalid_activity_status", nil
 	}
 
 	minTurnover, err := parseOptionalIntQuery(query.Get("minTurnover"))
 	if err != nil {
-		httputil.Error(w, http.StatusBadRequest, "invalid_min_turnover")
-		return
+		return companySearchRequest{}, "invalid_min_turnover", nil
 	}
 	maxTurnover, err := parseOptionalIntQuery(query.Get("maxTurnover"))
 	if err != nil {
-		httputil.Error(w, http.StatusBadRequest, "invalid_max_turnover")
-		return
+		return companySearchRequest{}, "invalid_max_turnover", nil
 	}
 	minEmployees, err := parseOptionalIntQuery(query.Get("minEmployees"))
 	if err != nil {
-		httputil.Error(w, http.StatusBadRequest, "invalid_min_employees")
-		return
+		return companySearchRequest{}, "invalid_min_employees", nil
 	}
 	maxEmployees, err := parseOptionalIntQuery(query.Get("maxEmployees"))
 	if err != nil {
-		httputil.Error(w, http.StatusBadRequest, "invalid_max_employees")
-		return
+		return companySearchRequest{}, "invalid_max_employees", nil
 	}
 	skip, err := parseOptionalIntQuery(query.Get("skip"))
 	if err != nil || (skip != nil && *skip < 0) {
-		httputil.Error(w, http.StatusBadRequest, "invalid_skip")
-		return
+		return companySearchRequest{}, "invalid_skip", nil
 	}
 	limit, err := parseOptionalIntQuery(query.Get("limit"))
 	if err != nil || (limit != nil && (*limit < 1 || *limit > 1000)) {
-		httputil.Error(w, http.StatusBadRequest, "invalid_limit")
-		return
+		return companySearchRequest{}, "invalid_limit", nil
 	}
 
-	result, err := h.openapiit.Company().SearchITRaw(r.Context(), openapiit.CompanyITSearchParams{
+	params := openapiit.CompanyITSearchParams{
 		Province:       province,
 		DryRun:         &dryRunFlag,
 		DataEnrichment: dataEnrichment,
@@ -108,13 +196,20 @@ func (h *Handler) handleSearchCompanies(w http.ResponseWriter, r *http.Request) 
 		ActivityStatus: activityStatus,
 		Skip:           skip,
 		Limit:          limit,
-	})
+	}
+	cacheKey, paramsJSON, err := companySearchCacheKey(params)
 	if err != nil {
-		h.openAPIITFailure(w, r, "search_companies", err)
-		return
+		return companySearchRequest{}, "", err
 	}
 
-	httputil.JSON(w, http.StatusOK, result)
+	return companySearchRequest{
+		params:         params,
+		cacheKey:       cacheKey,
+		paramsJSON:     paramsJSON,
+		dryRun:         dryRun,
+		dataEnrichment: dataEnrichment,
+		forceRefresh:   forceRefresh,
+	}, "", nil
 }
 
 func normalizeProvince(raw string) (string, bool) {
@@ -169,4 +264,12 @@ func parseOptionalIntQuery(raw string) (*int, error) {
 		return nil, err
 	}
 	return &parsed, nil
+}
+
+func companySearchRefreshActor(ctx context.Context) (string, string) {
+	claims, ok := auth.GetClaims(ctx)
+	if !ok {
+		return "", ""
+	}
+	return strings.TrimSpace(claims.Subject), strings.TrimSpace(claims.Email)
 }
