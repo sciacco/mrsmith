@@ -157,8 +157,8 @@ Alyante ERP ID
 ### Binocolo M&A Uses Company `IT-search` With ATECO-First Fallback
 
 - Context: Binocolo M&A target discovery and future Italian-company research workflows.
-- Discovery: V1 target discovery should stay on the Company `IT-search` endpoint and keep the OpenAPI.it token backend-only. ATECO-filtered estimates are attempted first, but they are too narrow when the aggregate estimate is below 10 candidates.
-- Practical rule: run ATECO dry-runs with hard filters first; select the ATECO strategy only when the aggregate estimate is at least 10. Otherwise default to `dataEnrichment=advanced` without hard ATECO and classify the sector from returned ATECO descriptions. Missing shareholder age or non-derivable fields should become `match parziale`, not automatic exclusion.
+- Discovery: V1 target discovery should stay on the Company `IT-search` endpoint and keep the OpenAPI.it token backend-only. ATECO-filtered estimates are attempted first, but they are too narrow when the aggregate estimate is below 10 candidates. LLM models and prompts are runtime configuration in Anisetta, with multiple selectable models/prompts per scope and one default per scope.
+- Practical rule: run ATECO dry-runs with hard filters first; select the ATECO strategy only when the aggregate estimate is at least 10. Otherwise default to `dataEnrichment=advanced` without hard ATECO and classify the sector from returned ATECO descriptions. Missing shareholder age or non-derivable fields should become `match parziale`, not automatic exclusion. Do not hardcode Binocolo M&A prompts in Go; store prompt text in `binocolo.llm_prompt` and resolve the selected/default prompt at request time.
 - Evidence: Binocolo Target M&A implementation in `backend/internal/binocolo/ma_service.go`, scoring rules in `backend/internal/binocolo/ma_rules.go`, and migration `deploy/migrations/026_anisetta_binocolo_ma.sql`.
 - Used by: `apps/binocolo` `/target`.
 - Open questions: whether the threshold should become an admin-configurable value after real usage data.

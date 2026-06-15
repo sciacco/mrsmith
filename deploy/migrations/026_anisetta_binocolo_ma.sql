@@ -6,22 +6,98 @@
 BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS binocolo;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS binocolo.llm_model (
-  scope       text PRIMARY KEY,
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scope       text NOT NULL,
+  name        text NOT NULL CHECK (btrim(name) <> ''),
   model       text NOT NULL CHECK (btrim(model) <> ''),
+  is_default  boolean NOT NULL DEFAULT false,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
 
   CONSTRAINT llm_model_scope_check CHECK (scope ~ '^[a-z][a-z0-9_]*$')
 );
 
-INSERT INTO binocolo.llm_model (scope, model)
+CREATE UNIQUE INDEX IF NOT EXISTS llm_model_scope_model_unique
+  ON binocolo.llm_model (scope, model);
+
+CREATE UNIQUE INDEX IF NOT EXISTS llm_model_one_default_per_scope
+  ON binocolo.llm_model (scope)
+  WHERE is_default;
+
+INSERT INTO binocolo.llm_model (id, scope, name, model, is_default)
 VALUES
-  ('default', 'google/gemini-2.5-flash-lite-preview-09-2025'),
-  ('ma_strategy', 'google/gemini-2.5-flash-lite-preview-09-2025'),
-  ('ma_sector_classification', 'google/gemini-2.5-flash-lite-preview-09-2025')
-ON CONFLICT (scope) DO NOTHING;
+  ('00000000-0000-0000-0000-000000000101', 'default', 'Gemini Flash Lite', 'google/gemini-2.5-flash-lite-preview-09-2025', true),
+  ('00000000-0000-0000-0000-000000000111', 'ma_strategy', 'Gemini Flash Lite', 'google/gemini-2.5-flash-lite-preview-09-2025', true),
+  ('00000000-0000-0000-0000-000000000112', 'ma_strategy', 'Gemini Flash Lite precedente', 'google/gemini-2.5-flash-lite-preview-06-17', false),
+  ('00000000-0000-0000-0000-000000000121', 'ma_sector_classification', 'Gemini Flash Lite', 'google/gemini-2.5-flash-lite-preview-09-2025', true),
+  ('00000000-0000-0000-0000-000000000122', 'ma_sector_classification', 'Gemini Flash Lite precedente', 'google/gemini-2.5-flash-lite-preview-06-17', false)
+ON CONFLICT (scope, model) DO UPDATE
+SET name = EXCLUDED.name,
+    is_default = EXCLUDED.is_default;
+
+CREATE TABLE IF NOT EXISTS binocolo.llm_prompt (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scope       text NOT NULL,
+  name        text NOT NULL CHECK (btrim(name) <> ''),
+  prompt      text NOT NULL CHECK (btrim(prompt) <> ''),
+  is_default  boolean NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+
+  CONSTRAINT llm_prompt_scope_check CHECK (scope ~ '^[a-z][a-z0-9_]*$')
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS llm_prompt_scope_name_unique
+  ON binocolo.llm_prompt (scope, name);
+
+CREATE UNIQUE INDEX IF NOT EXISTS llm_prompt_one_default_per_scope
+  ON binocolo.llm_prompt (scope)
+  WHERE is_default;
+
+INSERT INTO binocolo.llm_prompt (id, scope, name, prompt, is_default)
+VALUES (
+  '00000000-0000-0000-0000-000000000211',
+  'ma_strategy',
+  'Strategia M&A v1',
+  $prompt$
+Sei un analista M&A per ricerche su aziende italiane.
+Trasforma la richiesta dell'utente in una strategia JSON per interrogare Company IT-search.
+Rispondi solo con JSON valido nel formato:
+{
+  "strategy": {
+    "title": "titolo breve",
+    "sectorDescription": "settore target",
+    "territoryLabel": "territorio in parole",
+    "provinces": ["MI"],
+    "activityStatus": "ATTIVA",
+    "turnoverAround": 5000000,
+    "turnoverMin": 3500000,
+    "turnoverMax": 6500000,
+    "employeeMin": null,
+    "employeeMax": null,
+    "atecoCandidates": [{"code":"6201","description":"...","rationale":"..."}],
+    "keywords": ["software"],
+    "shareholder": {"requiresEqualSplit": true, "tolerance": 2},
+    "shareholderAge": {"required": true, "min": 55, "max": null},
+    "rationale": "sintesi della strategia",
+    "missingCriteria": []
+  }
+}
+Regole:
+- usa activityStatus ATTIVA se non richiesto diversamente;
+- se l'utente dice "intorno a" un fatturato, imposta turnoverAround e anche min/max a +/-30%;
+- proponi codici ATECO plausibili con razionale, ma non inventare dati aziendali;
+- se un criterio non e' derivabile dalla richiesta, lascialo vuoto e aggiungilo a missingCriteria;
+- provinces deve contenere sigle italiane di due lettere quando il territorio e' provinciale.
+$prompt$,
+  true
+)
+ON CONFLICT (scope, name) DO UPDATE
+SET prompt = EXCLUDED.prompt,
+    is_default = EXCLUDED.is_default;
 
 CREATE TABLE IF NOT EXISTS binocolo.ma_session (
   id                    uuid PRIMARY KEY,
@@ -136,6 +212,8 @@ CREATE TABLE IF NOT EXISTS binocolo.ma_model_audit (
   session_id           uuid REFERENCES binocolo.ma_session(id) ON DELETE CASCADE,
   strategy_version_id  uuid REFERENCES binocolo.ma_strategy_version(id) ON DELETE SET NULL,
   scope                text NOT NULL,
+  model_id             uuid REFERENCES binocolo.llm_model(id) ON DELETE SET NULL,
+  prompt_id            uuid REFERENCES binocolo.llm_prompt(id) ON DELETE SET NULL,
   model                text NOT NULL,
   prompt               jsonb NOT NULL DEFAULT '{}'::jsonb,
   response             jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -191,6 +269,12 @@ EXECUTE FUNCTION binocolo.set_updated_at();
 DROP TRIGGER IF EXISTS llm_model_set_updated_at ON binocolo.llm_model;
 CREATE TRIGGER llm_model_set_updated_at
 BEFORE UPDATE ON binocolo.llm_model
+FOR EACH ROW
+EXECUTE FUNCTION binocolo.set_updated_at();
+
+DROP TRIGGER IF EXISTS llm_prompt_set_updated_at ON binocolo.llm_prompt;
+CREATE TRIGGER llm_prompt_set_updated_at
+BEFORE UPDATE ON binocolo.llm_prompt
 FOR EACH ROW
 EXECUTE FUNCTION binocolo.set_updated_at();
 

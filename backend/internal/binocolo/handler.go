@@ -49,6 +49,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 
 	handle("GET /binocolo/v1/provinces", h.handleListProvinces)
 	handle("GET /binocolo/v1/companies/search", h.handleSearchCompanies)
+	handle("GET /binocolo/v1/ma/llm-options", h.handleListMALLMOptions)
 	handle("GET /binocolo/v1/ma/sessions", h.handleListMASessions)
 	handle("POST /binocolo/v1/ma/sessions", h.handleCreateMASession)
 	handle("GET /binocolo/v1/ma/sessions/{id}", h.handleGetMASession)
@@ -82,6 +83,15 @@ func (h *Handler) binocoloCacheFailure(w http.ResponseWriter, r *http.Request, e
 		"error", err,
 	)
 	httputil.Error(w, http.StatusInternalServerError, "binocolo_cache_error")
+}
+
+func (h *Handler) handleListMALLMOptions(w http.ResponseWriter, r *http.Request) {
+	options, err := h.ma.listLLMOptions(r.Context())
+	if err != nil {
+		h.maFailure(w, r, "ma_llm_options", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, options)
 }
 
 func (h *Handler) handleListMASessions(w http.ResponseWriter, r *http.Request) {
@@ -205,6 +215,9 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMAOpenRouterUnavailable) {
 		return http.StatusServiceUnavailable, "openrouter_not_configured", "warn"
+	}
+	if errors.Is(err, errMALLMConfigUnavailable) {
+		return http.StatusServiceUnavailable, "binocolo_llm_config_not_configured", "warn"
 	}
 	if errors.Is(err, errMAEstimateTooLarge) {
 		return http.StatusBadRequest, "estimate_too_large", "warn"

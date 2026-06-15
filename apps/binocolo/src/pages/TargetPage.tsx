@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import { useApiClient } from '../api/client';
 import type {
   MAAtecoCandidate,
+  MALLMOptionsResponse,
   MAEstimate,
   MASessionDetail,
   MASessionListResponse,
@@ -57,11 +58,14 @@ interface EstimateGroup {
 export function TargetPage() {
   const api = useApiClient();
   const [sessions, setSessions] = useState<MASessionSummary[]>([]);
+  const [llmOptions, setLLMOptions] = useState<MALLMOptionsResponse>({ models: [], prompts: [] });
   const [detail, setDetail] = useState<MASessionDetail | null>(null);
   const [strategy, setStrategy] = useState<MAStrategySpec>(emptyStrategy);
   const [prompt, setPrompt] = useState('');
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [chosenStrategy, setChosenStrategy] = useState<MAStrategyType | ''>('');
+  const [selectedModelId, setSelectedModelId] = useState('');
+  const [selectedPromptId, setSelectedPromptId] = useState('');
   const [busy, setBusy] = useState<BusyState>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,6 +87,24 @@ export function TargetPage() {
   }, [loadSessions]);
 
   useEffect(() => {
+    let active = true;
+    api
+      .get<MALLMOptionsResponse>('/binocolo/v1/ma/llm-options')
+      .then((data) => {
+        if (!active) return;
+        setLLMOptions(data);
+        setSelectedModelId(defaultOptionID(data.models));
+        setSelectedPromptId(defaultOptionID(data.prompts));
+      })
+      .catch((err) => {
+        if (active) setError(errorLabel(err));
+      });
+    return () => {
+      active = false;
+    };
+  }, [api]);
+
+  useEffect(() => {
     if (!detail?.strategy?.strategy) return;
     setStrategy(detail.strategy.strategy);
     setChosenStrategy(detail.session.selectedStrategy ?? detail.strategy.strategy.selectedStrategy ?? '');
@@ -99,6 +121,8 @@ export function TargetPage() {
   const hasStrategy = Boolean(detail?.strategy);
   const hasEstimate = estimateGroups.length > 0;
   const hasTargets = (detail?.targets.length ?? 0) > 0;
+  const strategyModels = llmOptions.models.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
+  const strategyPrompts = llmOptions.prompts.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
   const canEstimate = hasStrategy && busy !== 'create' && busy !== 'estimate';
   const canExecute = hasStrategy && hasEstimate && busy !== 'execute';
 
@@ -122,7 +146,11 @@ export function TargetPage() {
     setBusy('create');
     setError(null);
     try {
-      const data = await api.post<MASessionDetail>('/binocolo/v1/ma/sessions', { prompt: normalized });
+      const data = await api.post<MASessionDetail>('/binocolo/v1/ma/sessions', {
+        prompt: normalized,
+        modelId: selectedModelId || undefined,
+        promptId: selectedPromptId || undefined,
+      });
       setDetail(data);
       setPrompt('');
       await loadSessions();
@@ -267,6 +295,28 @@ export function TargetPage() {
                 <Button type="submit" loading={busy === 'create'} disabled={!prompt.trim()} leftIcon={<Icon name="sparkles" />}>
                   Prepara strategia
                 </Button>
+              </div>
+              <div className={styles.aiOptions}>
+                <label>
+                  <span>Modello IA</span>
+                  <select value={selectedModelId} onChange={(event) => setSelectedModelId(event.target.value)}>
+                    {strategyModels.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}{item.isDefault ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Istruzioni</span>
+                  <select value={selectedPromptId} onChange={(event) => setSelectedPromptId(event.target.value)}>
+                    {strategyPrompts.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}{item.isDefault ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
             </form>
           </section>
@@ -629,6 +679,10 @@ function groupEstimates(estimates: MAEstimate[]): EstimateGroup[] {
   return groups.filter((group) => group.rows.length > 0);
 }
 
+function defaultOptionID<T extends { id: string; isDefault: boolean }>(options: T[]): string {
+  return options.find((item) => item.isDefault)?.id ?? options[0]?.id ?? '';
+}
+
 function estimateLabel(estimate: MAEstimate): string {
   const parts = [strategyTypeLabel(estimate.strategyType)];
   if (estimate.atecoCode) parts.push(estimate.atecoCode);
@@ -726,6 +780,9 @@ function errorLabel(error: unknown): string {
     }
     if (code === 'openrouter_not_configured') {
       return 'La preparazione della strategia non e disponibile in questo ambiente.';
+    }
+    if (code === 'binocolo_llm_config_not_configured') {
+      return 'La configurazione IA di Binocolo non e completa.';
     }
     if (code === 'openapiit_not_configured') {
       return 'La ricerca aziende non e disponibile in questo ambiente.';

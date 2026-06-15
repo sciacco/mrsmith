@@ -3,6 +3,7 @@ package binocolo
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ var (
 	errMAStoreUnavailable      = errors.New("ma store unavailable")
 	errMAOpenAPIITUnavailable  = errors.New("openapiit unavailable")
 	errMAOpenRouterUnavailable = errors.New("openrouter unavailable")
+	errMALLMConfigUnavailable  = errors.New("ma llm config unavailable")
 	errMAEstimateTooLarge      = errors.New("estimate too large")
 )
 
@@ -58,6 +60,13 @@ func (s *maService) getSession(ctx context.Context, id string) (MASessionDetail,
 	return s.store.GetMASession(ctx, id)
 }
 
+func (s *maService) listLLMOptions(ctx context.Context) (MALLMOptionsResponse, error) {
+	if s.store == nil {
+		return MALLMOptionsResponse{}, errMAStoreUnavailable
+	}
+	return s.store.ListMALLMOptions(ctx)
+}
+
 func (s *maService) createSession(ctx context.Context, req MACreateSessionRequest, subject, email string) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
@@ -66,7 +75,7 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	if prompt == "" {
 		return MASessionDetail{}, fmt.Errorf("%w: prompt", errMAStrategyInvalid)
 	}
-	strategy, audit, err := s.draftStrategy(ctx, prompt)
+	strategy, audit, err := s.draftStrategy(ctx, prompt, req.ModelID, req.PromptID)
 	if err != nil {
 		return MASessionDetail{}, err
 	}
@@ -250,32 +259,43 @@ func (s *maService) exportSession(ctx context.Context, sessionID string, format 
 	return content, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", nil
 }
 
-func (s *maService) draftStrategy(ctx context.Context, prompt string) (MAStrategySpec, maModelAuditWrite, error) {
+func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID string, promptID string) (MAStrategySpec, maModelAuditWrite, error) {
 	if s.ai == nil {
 		return MAStrategySpec{}, maModelAuditWrite{}, errMAOpenRouterUnavailable
 	}
-	model := maDefaultModel
-	if s.store != nil {
-		resolved, err := s.store.ResolveMAModel(ctx, maModelScopeStrategy)
-		if err != nil {
-			return MAStrategySpec{}, maModelAuditWrite{}, err
-		}
-		if strings.TrimSpace(resolved) != "" {
-			model = resolved
-		}
+	if s.store == nil {
+		return MAStrategySpec{}, maModelAuditWrite{}, errMAStoreUnavailable
+	}
+	if err := validateOptionalUUID(modelID); err != nil {
+		return MAStrategySpec{}, maModelAuditWrite{}, err
+	}
+	if err := validateOptionalUUID(promptID); err != nil {
+		return MAStrategySpec{}, maModelAuditWrite{}, err
+	}
+	modelConfig, err := s.store.ResolveMAModel(ctx, maModelScopeStrategy, modelID)
+	if err != nil {
+		return MAStrategySpec{}, maModelAuditWrite{}, llmConfigError(err)
+	}
+	promptConfig, err := s.store.ResolveMAPrompt(ctx, maModelScopeStrategy, promptID)
+	if err != nil {
+		return MAStrategySpec{}, maModelAuditWrite{}, llmConfigError(err)
 	}
 	messages := []openrouter.Message{
-		{Role: "system", Content: maStrategySystemPrompt},
+		{Role: "system", Content: promptConfig.Prompt},
 		{Role: "user", Content: prompt},
 	}
 	req := openrouter.ChatRequest{
-		Model:          model,
+		Model:          modelConfig.Model,
 		Temperature:    0,
 		MaxTokens:      1800,
 		ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
 		Messages:       messages,
 	}
-	promptRaw, _ := json.Marshal(map[string]any{"messages": messages})
+	promptRaw, _ := json.Marshal(map[string]any{
+		"model_id":  modelConfig.ID,
+		"prompt_id": promptConfig.ID,
+		"messages":  messages,
+	})
 	response, err := s.ai.Chat(ctx, req)
 	if err != nil {
 		return MAStrategySpec{}, maModelAuditWrite{}, err
@@ -299,7 +319,9 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string) (MAStrateg
 	usageRaw, _ := json.Marshal(response.Usage)
 	return strategy, maModelAuditWrite{
 		Scope:    maModelScopeStrategy,
-		Model:    model,
+		ModelID:  modelConfig.ID,
+		PromptID: promptConfig.ID,
+		Model:    modelConfig.Model,
 		Prompt:   promptRaw,
 		Response: responseRaw,
 		Usage:    usageRaw,
@@ -583,32 +605,20 @@ func maErrorCode(err error) string {
 	return "execution_error"
 }
 
-const maStrategySystemPrompt = `Sei un analista M&A per ricerche su aziende italiane.
-Trasforma la richiesta dell'utente in una strategia JSON per interrogare Company IT-search.
-Rispondi solo con JSON valido nel formato:
-{
-  "strategy": {
-    "title": "titolo breve",
-    "sectorDescription": "settore target",
-    "territoryLabel": "territorio in parole",
-    "provinces": ["MI"],
-    "activityStatus": "ATTIVA",
-    "turnoverAround": 5000000,
-    "turnoverMin": 3500000,
-    "turnoverMax": 6500000,
-    "employeeMin": null,
-    "employeeMax": null,
-    "atecoCandidates": [{"code":"6201","description":"...","rationale":"..."}],
-    "keywords": ["software"],
-    "shareholder": {"requiresEqualSplit": true, "tolerance": 2},
-    "shareholderAge": {"required": true, "min": 55, "max": null},
-    "rationale": "sintesi della strategia",
-    "missingCriteria": []
-  }
+func validateOptionalUUID(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	if _, err := uuid.Parse(value); err != nil {
+		return fmt.Errorf("%w: llm selection", errMAStrategyInvalid)
+	}
+	return nil
 }
-Regole:
-- usa activityStatus ATTIVA se non richiesto diversamente;
-- se l'utente dice "intorno a" un fatturato, imposta turnoverAround e anche min/max a +/-30%;
-- proponi codici ATECO plausibili con razionale, ma non inventare dati aziendali;
-- se un criterio non e' derivabile dalla richiesta, lascialo vuoto e aggiungilo a missingCriteria;
-- provinces deve contenere sigle italiane di due lettere quando il territorio e' provinciale.`
+
+func llmConfigError(err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return errMALLMConfigUnavailable
+	}
+	return err
+}

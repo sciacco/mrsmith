@@ -21,7 +21,9 @@ type maWorkspaceStore interface {
 	CompleteMAExecutionRun(ctx context.Context, runID, status string, resultCount int, errorCode string) error
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
 	RecordMAModelAudit(ctx context.Context, input maModelAuditWrite) error
-	ResolveMAModel(ctx context.Context, scope string) (string, error)
+	ListMALLMOptions(ctx context.Context) (MALLMOptionsResponse, error)
+	ResolveMAModel(ctx context.Context, scope string, modelID string) (maLLMModel, error)
+	ResolveMAPrompt(ctx context.Context, scope string, promptID string) (maLLMPrompt, error)
 	RecordMAExport(ctx context.Context, sessionID, format string, rowCount int, createdByEmail string) error
 }
 
@@ -548,17 +550,21 @@ INSERT INTO binocolo.ma_model_audit (
   session_id,
   strategy_version_id,
   scope,
+  model_id,
+  prompt_id,
   model,
   prompt,
   response,
   usage
 ) VALUES (
-  $1::uuid, $2::uuid, NULLIF($3, '')::uuid, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb
+  $1::uuid, $2::uuid, NULLIF($3, '')::uuid, $4, NULLIF($5, '')::uuid, NULLIF($6, '')::uuid, $7, $8::jsonb, $9::jsonb, $10::jsonb
 )
 `, uuid.NewString(),
 		input.SessionID,
 		input.StrategyVersionID,
 		input.Scope,
+		input.ModelID,
+		input.PromptID,
 		input.Model,
 		[]byte(prompt),
 		[]byte(response),
@@ -570,34 +576,169 @@ INSERT INTO binocolo.ma_model_audit (
 	return nil
 }
 
-func (s *SQLStore) ResolveMAModel(ctx context.Context, scope string) (string, error) {
+func (s *SQLStore) ListMALLMOptions(ctx context.Context) (MALLMOptionsResponse, error) {
 	if s == nil || s.db == nil {
-		return "", errors.New("binocolo ma store not configured")
+		return MALLMOptionsResponse{}, errors.New("binocolo ma store not configured")
 	}
-	scope = strings.TrimSpace(scope)
-	if scope == "" {
-		scope = maModelScopeStrategy
+	models, err := s.listMALLMModels(ctx)
+	if err != nil {
+		return MALLMOptionsResponse{}, err
 	}
-	var model string
-	err := s.db.QueryRowContext(ctx, `
-SELECT model
+	prompts, err := s.listMALLMPrompts(ctx)
+	if err != nil {
+		return MALLMOptionsResponse{}, err
+	}
+	return MALLMOptionsResponse{Models: models, Prompts: prompts}, nil
+}
+
+func (s *SQLStore) listMALLMModels(ctx context.Context) ([]MALLMModelOption, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id::text, scope, name, model, is_default
+FROM binocolo.llm_model
+WHERE scope IN ($1, $2, $3)
+ORDER BY scope, is_default DESC, name
+`, "default", maModelScopeStrategy, maModelScopeSectorClassification)
+	if err != nil {
+		return nil, fmt.Errorf("list ma llm models: %w", err)
+	}
+	defer rows.Close()
+	out := []MALLMModelOption{}
+	for rows.Next() {
+		var item MALLMModelOption
+		if err := rows.Scan(&item.ID, &item.Scope, &item.Name, &item.Model, &item.IsDefault); err != nil {
+			return nil, fmt.Errorf("scan ma llm model: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma llm models: %w", err)
+	}
+	return out, nil
+}
+
+func (s *SQLStore) listMALLMPrompts(ctx context.Context) ([]MALLMPromptOption, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id::text, scope, name, is_default
+FROM binocolo.llm_prompt
+WHERE scope IN ($1, $2)
+ORDER BY scope, is_default DESC, name
+`, "default", maModelScopeStrategy)
+	if err != nil {
+		return nil, fmt.Errorf("list ma llm prompts: %w", err)
+	}
+	defer rows.Close()
+	out := []MALLMPromptOption{}
+	for rows.Next() {
+		var item MALLMPromptOption
+		if err := rows.Scan(&item.ID, &item.Scope, &item.Name, &item.IsDefault); err != nil {
+			return nil, fmt.Errorf("scan ma llm prompt: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma llm prompts: %w", err)
+	}
+	return out, nil
+}
+
+func (s *SQLStore) ResolveMAModel(ctx context.Context, scope string, modelID string) (maLLMModel, error) {
+	if s == nil || s.db == nil {
+		return maLLMModel{}, errors.New("binocolo ma store not configured")
+	}
+	scope = normalizeLLMScope(scope, maModelScopeStrategy)
+	modelID = strings.TrimSpace(modelID)
+	if modelID != "" {
+		return s.loadMALLMModel(ctx, `
+SELECT id::text, scope, name, model, is_default
+FROM binocolo.llm_model
+WHERE id = $1::uuid
+  AND scope = $2
+`, modelID, scope)
+	}
+	model, err := s.loadMALLMModel(ctx, `
+SELECT id::text, scope, name, model, is_default
 FROM binocolo.llm_model
 WHERE scope = $1
-`, scope).Scan(&model)
+  AND is_default
+`, scope)
 	if errors.Is(err, sql.ErrNoRows) && scope != "default" {
-		err = s.db.QueryRowContext(ctx, `SELECT model FROM binocolo.llm_model WHERE scope = 'default'`).Scan(&model)
+		model, err = s.loadMALLMModel(ctx, `
+SELECT id::text, scope, name, model, is_default
+FROM binocolo.llm_model
+WHERE scope = 'default'
+  AND is_default
+`)
 	}
-	if errors.Is(err, sql.ErrNoRows) {
-		return maDefaultModel, nil
+	return model, err
+}
+
+func (s *SQLStore) ResolveMAPrompt(ctx context.Context, scope string, promptID string) (maLLMPrompt, error) {
+	if s == nil || s.db == nil {
+		return maLLMPrompt{}, errors.New("binocolo ma store not configured")
 	}
+	scope = normalizeLLMScope(scope, maModelScopeStrategy)
+	promptID = strings.TrimSpace(promptID)
+	if promptID != "" {
+		return s.loadMALLMPrompt(ctx, `
+SELECT id::text, scope, name, prompt, is_default
+FROM binocolo.llm_prompt
+WHERE id = $1::uuid
+  AND scope = $2
+`, promptID, scope)
+	}
+	prompt, err := s.loadMALLMPrompt(ctx, `
+SELECT id::text, scope, name, prompt, is_default
+FROM binocolo.llm_prompt
+WHERE scope = $1
+  AND is_default
+`, scope)
+	if errors.Is(err, sql.ErrNoRows) && scope != "default" {
+		prompt, err = s.loadMALLMPrompt(ctx, `
+SELECT id::text, scope, name, prompt, is_default
+FROM binocolo.llm_prompt
+WHERE scope = 'default'
+  AND is_default
+`)
+	}
+	return prompt, err
+}
+
+func (s *SQLStore) loadMALLMModel(ctx context.Context, query string, args ...any) (maLLMModel, error) {
+	var item maLLMModel
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(&item.ID, &item.Scope, &item.Name, &item.Model, &item.IsDefault)
 	if err != nil {
-		return "", fmt.Errorf("resolve ma model: %w", err)
+		return maLLMModel{}, err
 	}
-	model = strings.TrimSpace(model)
-	if model == "" {
-		return maDefaultModel, nil
+	item.Scope = strings.TrimSpace(item.Scope)
+	item.Name = strings.TrimSpace(item.Name)
+	item.Model = strings.TrimSpace(item.Model)
+	if item.Model == "" {
+		return maLLMModel{}, sql.ErrNoRows
 	}
-	return model, nil
+	return item, nil
+}
+
+func (s *SQLStore) loadMALLMPrompt(ctx context.Context, query string, args ...any) (maLLMPrompt, error) {
+	var item maLLMPrompt
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(&item.ID, &item.Scope, &item.Name, &item.Prompt, &item.IsDefault)
+	if err != nil {
+		return maLLMPrompt{}, err
+	}
+	item.Scope = strings.TrimSpace(item.Scope)
+	item.Name = strings.TrimSpace(item.Name)
+	item.Prompt = strings.TrimSpace(item.Prompt)
+	if item.Prompt == "" {
+		return maLLMPrompt{}, sql.ErrNoRows
+	}
+	return item, nil
+}
+
+func normalizeLLMScope(scope string, fallback string) string {
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		return fallback
+	}
+	return scope
 }
 
 func (s *SQLStore) RecordMAExport(ctx context.Context, sessionID, format string, rowCount int, createdByEmail string) error {

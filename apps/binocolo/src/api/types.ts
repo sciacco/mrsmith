@@ -36,6 +36,26 @@ export interface MASessionListResponse {
   items: MASessionSummary[];
 }
 
+export interface MALLMOptionsResponse {
+  models: MALLMModelOption[];
+  prompts: MALLMPromptOption[];
+}
+
+export interface MALLMModelOption {
+  id: string;
+  scope: string;
+  name: string;
+  model: string;
+  isDefault: boolean;
+}
+
+export interface MALLMPromptOption {
+  id: string;
+  scope: string;
+  name: string;
+  isDefault: boolean;
+}
+
 export interface MASessionSummary {
   id: string;
   title: string;

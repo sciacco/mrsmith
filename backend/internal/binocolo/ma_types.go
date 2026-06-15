@@ -30,7 +30,6 @@ const (
 
 	maModelScopeStrategy             = "ma_strategy"
 	maModelScopeSectorClassification = "ma_sector_classification"
-	maDefaultModel                   = "google/gemini-2.5-flash-lite-preview-09-2025"
 
 	maATECOSuccessThreshold = 10
 	maDefaultSearchLimit    = 100
@@ -38,7 +37,9 @@ const (
 )
 
 type MACreateSessionRequest struct {
-	Prompt string `json:"prompt"`
+	Prompt   string `json:"prompt"`
+	ModelID  string `json:"modelId,omitempty"`
+	PromptID string `json:"promptId,omitempty"`
 }
 
 type MAEstimateSessionRequest struct {
@@ -53,6 +54,26 @@ type MAExecuteSessionRequest struct {
 
 type MAExportRequest struct {
 	Format string `json:"format,omitempty"`
+}
+
+type MALLMOptionsResponse struct {
+	Models  []MALLMModelOption  `json:"models"`
+	Prompts []MALLMPromptOption `json:"prompts"`
+}
+
+type MALLMModelOption struct {
+	ID        string `json:"id"`
+	Scope     string `json:"scope"`
+	Name      string `json:"name"`
+	Model     string `json:"model"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+type MALLMPromptOption struct {
+	ID        string `json:"id"`
+	Scope     string `json:"scope"`
+	Name      string `json:"name"`
+	IsDefault bool   `json:"isDefault"`
 }
 
 type MASessionSummary struct {
@@ -209,10 +230,28 @@ type maModelAuditWrite struct {
 	SessionID         string
 	StrategyVersionID string
 	Scope             string
+	ModelID           string
+	PromptID          string
 	Model             string
 	Prompt            json.RawMessage
 	Response          json.RawMessage
 	Usage             json.RawMessage
+}
+
+type maLLMModel struct {
+	ID        string
+	Scope     string
+	Name      string
+	Model     string
+	IsDefault bool
+}
+
+type maLLMPrompt struct {
+	ID        string
+	Scope     string
+	Name      string
+	Prompt    string
+	IsDefault bool
 }
 
 type maSessionCreate struct {
