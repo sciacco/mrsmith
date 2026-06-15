@@ -13,6 +13,8 @@ data:
   KEYCLOAK_ADMIN_TOKEN_URL: "https://keycloak.example.com/realms/mrsmith/protocol/openid-connect/token"
   CORS_ORIGINS: "https://mrsmith.example.com"
   STATIC_DIR: "/static"
+  OPENAPI_IT_CAP_BASE_URL: "https://cap.openapi.it"
+  OPENAPI_IT_COMPANY_BASE_URL: "https://company.openapi.com"
   MRSMITH_PUBLIC_BASE_URL: "https://mrsmith.example.com"
   NOTIFICATIONS_WORKER_ENABLED: "true"
   NOTIFICATIONS_WORKER_INTERVAL: "60s"

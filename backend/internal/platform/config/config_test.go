@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/sciacco/mrsmith/internal/platform/openapiit"
+)
 
 func TestRDAQuoteThresholdConfig(t *testing.T) {
 	t.Run("defaults when absent", func(t *testing.T) {
@@ -54,6 +58,36 @@ func TestSMTPConfigDefaults(t *testing.T) {
 	if cfg.SMTPAuthMode != "auto" {
 		t.Fatalf("expected default SMTP auth mode auto, got %q", cfg.SMTPAuthMode)
 	}
+}
+
+func TestOpenAPIITConfigDefaultsAndOverrides(t *testing.T) {
+	t.Run("defaults when absent", func(t *testing.T) {
+		t.Setenv("OPENAPI_IT_API_TOKEN", "")
+		t.Setenv("OPENAPI_IT_CAP_BASE_URL", "")
+
+		cfg := Load()
+
+		if cfg.OpenAPIITAPIToken != "" {
+			t.Fatalf("expected empty OpenAPI.it token, got %q", cfg.OpenAPIITAPIToken)
+		}
+		if cfg.OpenAPIITCAPBaseURL != openapiit.DefaultCAPBaseURL {
+			t.Fatalf("expected default CAP base URL %q, got %q", openapiit.DefaultCAPBaseURL, cfg.OpenAPIITCAPBaseURL)
+		}
+	})
+
+	t.Run("uses env values", func(t *testing.T) {
+		t.Setenv("OPENAPI_IT_API_TOKEN", "vendor-token")
+		t.Setenv("OPENAPI_IT_CAP_BASE_URL", "https://test.cap.openapi.it")
+
+		cfg := Load()
+
+		if cfg.OpenAPIITAPIToken != "vendor-token" {
+			t.Fatalf("expected OpenAPI.it token from env, got %q", cfg.OpenAPIITAPIToken)
+		}
+		if cfg.OpenAPIITCAPBaseURL != "https://test.cap.openapi.it" {
+			t.Fatalf("expected CAP base URL from env, got %q", cfg.OpenAPIITCAPBaseURL)
+		}
+	})
 }
 
 func TestSMTPConfigFromEnv(t *testing.T) {

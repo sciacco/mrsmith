@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/afctools"
+	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 	"github.com/sciacco/mrsmith/internal/simulatorivendita"
 )
 
@@ -93,6 +94,11 @@ type Config struct {
 
 	// OpenRouter AI integration (optional)
 	OpenRouterAPIKey string
+
+	// OpenAPI.it integrations (optional)
+	OpenAPIITAPIToken       string
+	OpenAPIITCAPBaseURL     string
+	OpenAPIITCompanyBaseURL string
 
 	// SMTP email delivery (optional, disabled by default)
 	SMTPEnabled       bool
@@ -214,6 +220,9 @@ func Load() Config {
 			afctools.DefaultTransazioniTemplateID,
 		),
 		OpenRouterAPIKey:            envOr("OPENROUTER_API_KEY", ""),
+		OpenAPIITAPIToken:           envOr("OPENAPI_IT_API_TOKEN", ""),
+		OpenAPIITCAPBaseURL:         envOr("OPENAPI_IT_CAP_BASE_URL", openapiit.DefaultCAPBaseURL),
+		OpenAPIITCompanyBaseURL:     envOr("OPENAPI_IT_COMPANY_BASE_URL", openapiit.DefaultCompanyBaseURL),
 		SMTPEnabled:                 boolEnvOr("SMTP_ENABLED", false),
 		SMTPHost:                    envOr("SMTP_HOST", ""),
 		SMTPPort:                    envOr("SMTP_PORT", "587"),

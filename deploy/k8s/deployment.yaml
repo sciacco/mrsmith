@@ -88,6 +88,12 @@ spec:
                   name: mrsmith-secrets
                   key: CARBONE_API_KEY
                   optional: true
+            - name: OPENAPI_IT_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: OPENAPI_IT_API_TOKEN
+                  optional: true
             - name: SMTP_HOST
               valueFrom:
                 secretKeyRef:

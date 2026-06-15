@@ -136,6 +136,24 @@ Alyante ERP ID
 
 ## API and Backend Contract Quirks
 
+### OpenAPI.it Wrappers Stay Backend-Side
+
+- Context: any MrSmith app that needs OpenAPI.it services such as CAP or Company.
+- Discovery: OpenAPI.it specs use bearer authentication with service-specific hosts. CAP uses `https://cap.openapi.it` in production and `https://test.cap.openapi.it` for sandbox; Company uses `https://company.openapi.com` in production and `https://test.company.openapi.com` for sandbox. The token is shared backend secret material and must not be exposed through frontend config or browser clients.
+- Practical rule: call OpenAPI.it through `backend/internal/platform/openapiit`. Configure `OPENAPI_IT_API_TOKEN` as a backend-only secret, `OPENAPI_IT_CAP_BASE_URL` only when overriding the default CAP production host, and `OPENAPI_IT_COMPANY_BASE_URL` only when overriding the default Company production host. Apps should inject the shared backend client into app-specific handlers rather than adding a generic public proxy.
+- Evidence: `apps/binocolo/docs/cap.openapi.json`, `apps/binocolo/docs/company.openapi.json`, `backend/internal/platform/openapiit`, and backend config env wiring.
+- Used by: future CAP/address validation and enrichment flows.
+- Open questions: none.
+
+### OpenAPI.it CAP `cod_fisco` Can Be Alphanumeric
+
+- Context: CAP suppressed-municipality responses.
+- Discovery: the CAP spec models `comuni_soppressi.cod_fisco` as a number, but its example contains alphanumeric Belfiore/cadastral codes such as `A627`.
+- Practical rule: treat CAP fiscal/cadastral code fields as strings in MrSmith DTOs, even when the vendor schema says number.
+- Evidence: `apps/binocolo/docs/cap.openapi.json`, endpoint `/comuni_soppressi`.
+- Used by: `backend/internal/platform/openapiit` CAP DTOs.
+- Open questions: none.
+
 ### Training Directory Chips Are Action-First
 
 - Context: `apps/training` People directory (`/persone`) and backend `GET /api/training/v1/people/directory`.
