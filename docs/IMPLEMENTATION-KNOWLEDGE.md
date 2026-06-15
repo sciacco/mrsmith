@@ -142,7 +142,7 @@ Alyante ERP ID
 - Discovery: OpenAPI.it specs use bearer authentication with service-specific hosts. CAP uses `https://cap.openapi.it` in production and `https://test.cap.openapi.it` for sandbox; Company uses `https://company.openapi.com` in production and `https://test.company.openapi.com` for sandbox. The token is shared backend secret material and must not be exposed through frontend config or browser clients.
 - Practical rule: call OpenAPI.it through `backend/internal/platform/openapiit`. Configure `OPENAPI_IT_API_TOKEN` as a backend-only secret, `OPENAPI_IT_CAP_BASE_URL` only when overriding the default CAP production host, and `OPENAPI_IT_COMPANY_BASE_URL` only when overriding the default Company production host. Apps should inject the shared backend client into app-specific handlers rather than adding a generic public proxy.
 - Evidence: `apps/binocolo/docs/cap.openapi.json`, `apps/binocolo/docs/company.openapi.json`, `backend/internal/platform/openapiit`, and backend config env wiring.
-- Used by: future CAP/address validation and enrichment flows.
+- Used by: `apps/binocolo` endpoint test workspace, future CAP/address validation and enrichment flows.
 - Open questions: none.
 
 ### OpenAPI.it CAP `cod_fisco` Can Be Alphanumeric

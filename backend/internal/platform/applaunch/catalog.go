@@ -11,6 +11,9 @@ const (
 	AenadAppID   = "aenad"
 	AenadAppHref = "/apps/aenad/"
 
+	BinocoloAppID   = "binocolo"
+	BinocoloAppHref = "/apps/binocolo/"
+
 	BudgetAppID   = "budget"
 	BudgetAppHref = "/apps/budget/"
 
@@ -74,6 +77,7 @@ const (
 
 var (
 	aenadAccessRoles                 = []string{"app_aenad_access"}
+	binocoloAccessRoles              = []string{"app_binocolo_access"}
 	budgetAccessRoles                = []string{"app_budget_access"}
 	fornitoriAccessRoles             = []string{"app_fornitori_access"}
 	fornitoriSkipQualificationRoles  = []string{"app_fornitori_skip_qualification"}
@@ -293,6 +297,17 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			AccessRoles:   ReportsAccessRoles(),
 		},
 		{
+			ID:            BinocoloAppID,
+			Name:          "Binocolo",
+			Description:   "Verifiche OpenAPI.it.",
+			Icon:          "database",
+			Href:          BinocoloAppHref,
+			Status:        "dev",
+			CategoryID:    "smart-apps",
+			CategoryTitle: "SMART APPS",
+			AccessRoles:   BinocoloAccessRoles(),
+		},
+		{
 			ID:            CopertureAppID,
 			Name:          "Coperture",
 			Icon:          "shield",
@@ -472,6 +487,10 @@ func BudgetAccessRoles() []string {
 
 func AenadAccessRoles() []string {
 	return slices.Clone(aenadAccessRoles)
+}
+
+func BinocoloAccessRoles() []string {
+	return slices.Clone(binocoloAccessRoles)
 }
 
 func FornitoriAccessRoles() []string {

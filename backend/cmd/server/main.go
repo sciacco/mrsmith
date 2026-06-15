@@ -18,6 +18,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/aenad"
 	"github.com/sciacco/mrsmith/internal/afctools"
 	"github.com/sciacco/mrsmith/internal/auth"
+	"github.com/sciacco/mrsmith/internal/binocolo"
 	"github.com/sciacco/mrsmith/internal/budget"
 	"github.com/sciacco/mrsmith/internal/compliance"
 	"github.com/sciacco/mrsmith/internal/coperture"
@@ -42,6 +43,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 	"github.com/sciacco/mrsmith/internal/platform/keycloak"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
+	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 	"github.com/sciacco/mrsmith/internal/platform/staticspa"
 	"github.com/sciacco/mrsmith/internal/portal"
@@ -259,6 +261,16 @@ func main() {
 		logger.Info("shared openrouter client configured", "component", "openrouter")
 	}
 
+	var openapiitCli *openapiit.Client
+	if cfg.OpenAPIITAPIToken != "" {
+		openapiitCli = openapiit.New(openapiit.Config{
+			APIToken:       cfg.OpenAPIITAPIToken,
+			CAPBaseURL:     cfg.OpenAPIITCAPBaseURL,
+			CompanyBaseURL: cfg.OpenAPIITCompanyBaseURL,
+		})
+		logger.Info("shared openapi.it client configured", "component", "openapiit")
+	}
+
 	mailer, err := email.NewSMTPClient(email.Config{
 		Enabled:       cfg.SMTPEnabled,
 		Host:          cfg.SMTPHost,
@@ -356,6 +368,11 @@ func main() {
 		hrefOverrides[applaunch.AenadAppID] = cfg.AenadAppURL
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.AenadAppID] = "http://localhost:5194"
+	}
+	if cfg.BinocoloAppURL != "" {
+		hrefOverrides[applaunch.BinocoloAppID] = cfg.BinocoloAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.BinocoloAppID] = "http://localhost:5195"
 	}
 	if cfg.BudgetAppURL != "" {
 		hrefOverrides[applaunch.BudgetAppID] = cfg.BudgetAppURL
@@ -474,6 +491,9 @@ func main() {
 			if definition.ID == applaunch.CPBackofficeAppID && (arakCli == nil || cfg.MistraDSN == "") {
 				continue
 			}
+			if definition.ID == applaunch.BinocoloAppID && openapiitCli == nil {
+				continue
+			}
 			if definition.ID == applaunch.FornitoriAppID && (arakCli == nil || cfg.ArakDSN == "") {
 				continue
 			}
@@ -526,6 +546,7 @@ func main() {
 		appCatalog = filtered
 	}
 	portal.RegisterRoutes(api, appCatalog)
+	binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli})
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	rda.RegisterRoutes(api, rda.Deps{

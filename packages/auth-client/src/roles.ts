@@ -18,6 +18,7 @@ export const TRAINING_APP_ACCESS_ROLES = [
 
 export const APP_ACCESS_ROLES = {
   aenad: ['app_aenad_access'],
+  binocolo: ['app_binocolo_access'],
   budget: ['app_budget_access'],
   fornitori: ['app_fornitori_access'],
   rda: ['app_rda_access'],
