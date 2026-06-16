@@ -74,12 +74,40 @@ const numberFilterFields: Array<{
 const countHints = ['count', 'record', 'total', 'found', 'result'];
 const priceHints = ['price', 'cost', 'amount', 'prezzo'];
 
+const validationErrorLabels: Record<string, string> = {
+  invalid_province: 'Provincia non valida. Inserisci una sigla di due lettere.',
+  invalid_dry_run: 'Valore dry_run non valido.',
+  invalid_force_refresh: 'Valore Forza nuova ricerca non valido.',
+  invalid_data_enrichment: 'Arricchimento dati non valido. Seleziona una voce disponibile.',
+  invalid_activity_status: 'Stato attivita non valido. Seleziona una voce disponibile.',
+  invalid_min_turnover: 'Fatturato minimo non valido. Inserisci un numero intero.',
+  invalid_max_turnover: 'Fatturato massimo non valido. Inserisci un numero intero.',
+  invalid_min_employees: 'Dipendenti minimi non validi. Inserisci un numero intero.',
+  invalid_max_employees: 'Dipendenti massimi non validi. Inserisci un numero intero.',
+  invalid_skip: 'Skip non valido. Inserisci un numero maggiore o uguale a 0.',
+  invalid_limit: 'Limit non valido. Inserisci un numero tra 1 e 1000.',
+  invalid_ateco_code: 'Codice ATECO non trovato. Inserisci un codice ATECO 2025 valido.',
+};
+
+function apiErrorCode(error: ApiError): string | undefined {
+  const body = error.body as { error?: unknown } | undefined;
+  return body && typeof body === 'object' && typeof body.error === 'string' ? body.error : undefined;
+}
+
 function errorLabel(error: unknown): string {
   if (error instanceof ApiError) {
-    const body = error.body as { error?: unknown } | undefined;
-    const code = body && typeof body === 'object' && typeof body.error === 'string' ? body.error : undefined;
+    const code = apiErrorCode(error);
+    if (error.status === 400 && code && validationErrorLabels[code]) return validationErrorLabels[code];
+    if (error.status === 400 && code) return `Richiesta non valida: ${code}.`;
+    if (error.status === 400) return 'Richiesta non valida. Controlla i parametri inseriti.';
     if (error.status === 503 && code === 'binocolo_cache_not_configured') {
       return 'La cache Anisetta per Binocolo non e configurata in questo ambiente.';
+    }
+    if (error.status === 503 && code === 'binocolo_ateco_not_configured') {
+      return 'Archivio ATECO Binocolo non configurato in questo ambiente.';
+    }
+    if (error.status === 503 && code === 'openapiit_not_configured') {
+      return 'OpenAPI.it non e configurato in questo ambiente.';
     }
     if (error.status === 503) return 'OpenAPI.it non e configurato in questo ambiente.';
     if (error.status === 502) return 'OpenAPI.it non ha risposto correttamente.';
@@ -89,6 +117,22 @@ function errorLabel(error: unknown): string {
   }
   if (error instanceof Error) return error.message;
   return 'Richiesta non riuscita.';
+}
+
+function isRetryableCompanySearchError(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    const code = apiErrorCode(error);
+    if (error.status === 400 || error.status === 401 || error.status === 403) return false;
+    if (
+      error.status === 503 &&
+      (code === 'binocolo_cache_not_configured' ||
+        code === 'binocolo_ateco_not_configured' ||
+        code === 'openapiit_not_configured')
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -380,9 +424,11 @@ export function TestPage() {
             </div>
             <p className={styles.stateTitle}>Ricerca non disponibile</p>
             <p className={styles.stateText}>{errorLabel(companySearch.error)}</p>
-            <Button variant="secondary" size="sm" onClick={() => companySearch.mutate(companyForceRefresh)}>
-              Riprova
-            </Button>
+            {isRetryableCompanySearchError(companySearch.error) ? (
+              <Button variant="secondary" size="sm" onClick={() => companySearch.mutate(companyForceRefresh)}>
+                Riprova
+              </Button>
+            ) : null}
           </div>
         ) : companyDryRun ? (
           <div className={styles.companyResult}>

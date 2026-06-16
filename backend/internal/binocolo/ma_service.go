@@ -25,6 +25,7 @@ var (
 	errMAOpenRouterUnavailable = errors.New("openrouter unavailable")
 	errMALLMConfigUnavailable  = errors.New("ma llm config unavailable")
 	errMAEstimateTooLarge      = errors.New("estimate too large")
+	errMAEstimateOverBudget    = errors.New("estimate over budget")
 )
 
 const (
@@ -88,7 +89,22 @@ func (s *maService) getSession(ctx context.Context, id string) (MASessionDetail,
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
-	return s.store.GetMASession(ctx, id)
+	detail, err := s.store.GetMASession(ctx, id)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	return decorateMACost(detail), nil
+}
+
+// decorateMACost attaches the active enrichment budget and unit price so the UI
+// can show projected spend and the cost gate without duplicating the constant.
+func decorateMACost(detail MASessionDetail) MASessionDetail {
+	detail.CostPerCompanyEUR = maCostPerCompanyEUR
+	detail.BudgetEUR = maDefaultBudgetEUR
+	if detail.Strategy != nil {
+		detail.BudgetEUR = maStrategyBudget(detail.Strategy.Strategy)
+	}
+	return detail
 }
 
 func (s *maService) listLLMOptions(ctx context.Context) (MALLMOptionsResponse, error) {
@@ -165,7 +181,7 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	}); err != nil {
 		return MASessionDetail{}, err
 	}
-	return detail, nil
+	return decorateMACost(detail), nil
 }
 
 func (s *maService) estimateSession(ctx context.Context, sessionID string, req MAEstimateSessionRequest, subject, email string) (MASessionDetail, error) {
@@ -218,6 +234,10 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 	if err != nil {
 		return MASessionDetail{}, err
 	}
+	strategyVersion.Strategy, err = s.expandStrategyAteco(ctx, strategyVersion.Strategy, subject, email)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
 
 	estimates, selected, err := s.runEstimates(ctx, sessionID, strategyVersion.ID, strategyVersion.Strategy, subject, email)
 	if err != nil {
@@ -238,7 +258,7 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 	}); err != nil {
 		return MASessionDetail{}, err
 	}
-	return s.store.GetMASession(ctx, sessionID)
+	return s.getSession(ctx, sessionID)
 }
 
 func (s *maService) executeSession(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string) (MASessionDetail, error) {
@@ -295,6 +315,10 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	if err != nil {
 		return MASessionDetail{}, err
 	}
+	strategyVersion.Strategy, err = s.expandStrategyAteco(ctx, strategyVersion.Strategy, subject, email)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
 	strategyType := normalizeMAStrategyType(req.StrategyType)
 	if strategyType == "" {
 		strategyType = detail.Session.SelectedStrategy
@@ -318,6 +342,16 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	}
 	if !estimatesMatchSearchLimit(detail.Estimates, strategyType, limit) {
 		return MASessionDetail{}, fmt.Errorf("%w: stale estimate", errMAStrategyInvalid)
+	}
+	budget := maStrategyBudget(strategyVersion.Strategy)
+	projectedCost := maProjectedSpend(estimatedCount, limit)
+	if projectedCost > budget && !req.AcknowledgeCost {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_execution_over_budget",
+			Status:    maTraceEventInfo,
+			Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "projected_cost": projectedCost, "budget": budget, "estimated_count": estimatedCount, "limit": limit}),
+		})
+		return MASessionDetail{}, errMAEstimateOverBudget
 	}
 
 	run, err := s.store.CreateMAExecutionRun(ctx, maExecutionRunCreate{
@@ -378,7 +412,7 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	}); err != nil {
 		return MASessionDetail{}, err
 	}
-	return s.store.GetMASession(ctx, sessionID)
+	return s.getSession(ctx, sessionID)
 }
 
 func (s *maService) exportSession(ctx context.Context, sessionID string, format string, email string) ([]byte, string, string, error) {
@@ -1084,11 +1118,99 @@ func (s *maService) canonicalizeMAStrategyAteco(ctx context.Context, strategy MA
 	return strategy, nil
 }
 
+// expandStrategyAteco replaces each analyst/LLM-selected ATECO sector node with
+// the exact codes in its subtree that are actually populated at OpenAPI.it.
+// OpenAPI.it matches the ATECO code exactly (no prefix, no descent) and companies
+// are tagged at heterogeneous levels per branch, so a selected node (e.g. 62.20)
+// is frequently empty while a descendant (62.20.1) holds the companies.
+// Discovery is a dry-run probe (count only, €0.01) per subtree code, applying the
+// economic filters but neither province nor legal form for maximum cache reuse.
+// It is deterministic and cache-backed, so estimate and execution derive the same
+// populated set without persisting it onto the stored strategy.
+func (s *maService) expandStrategyAteco(ctx context.Context, strategy MAStrategySpec, subject, email string) (MAStrategySpec, error) {
+	if s.ateco == nil || len(strategy.AtecoCandidates) == 0 {
+		return strategy, nil
+	}
+	type subtreeCode struct {
+		code, searchCode, titolo string
+	}
+	seen := map[string]struct{}{}
+	ordered := make([]subtreeCode, 0, len(strategy.AtecoCandidates)*4)
+	for _, candidate := range strategy.AtecoCandidates {
+		descendants, err := s.ateco.SubtreeAtecoCodes(ctx, candidate.Code)
+		if err != nil {
+			return MAStrategySpec{}, err
+		}
+		for _, descendant := range descendants {
+			if descendant.CodiceSearch == "" {
+				continue
+			}
+			if _, exists := seen[descendant.CodiceSearch]; exists {
+				continue
+			}
+			seen[descendant.CodiceSearch] = struct{}{}
+			ordered = append(ordered, subtreeCode{code: descendant.Codice, searchCode: descendant.CodiceSearch, titolo: descendant.Titolo})
+		}
+	}
+	if len(ordered) == 0 {
+		return strategy, nil
+	}
+	if len(ordered) > maAtecoSubtreeProbeCap {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_ateco_discovery_skipped",
+			Status:    maTraceEventInfo,
+			Metadata:  maTraceJSON(map[string]any{"subtree_codes": len(ordered), "cap": maAtecoSubtreeProbeCap}),
+		})
+		return strategy, nil
+	}
+	populated := make([]MAAtecoCandidate, 0, len(ordered))
+	for _, item := range ordered {
+		params := openapiit.CompanyITSearchParams{
+			DataEnrichment: "advanced",
+			ActivityStatus: strategy.ActivityStatus,
+			MinTurnover:    strategy.TurnoverMin,
+			MaxTurnover:    strategy.TurnoverMax,
+			MinEmployees:   strategy.EmployeeMin,
+			MaxEmployees:   strategy.EmployeeMax,
+			AtecoCode:      item.searchCode,
+		}
+		surface, err := s.probeMASearchSurface(ctx, params, subject, email)
+		if err != nil {
+			return MAStrategySpec{}, err
+		}
+		if surface.EstimatedCount <= 0 {
+			continue
+		}
+		populated = append(populated, MAAtecoCandidate{
+			Code:        item.code,
+			Description: item.titolo,
+			SearchCode:  item.searchCode,
+		})
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_ateco_discovery",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"selected_nodes":  len(strategy.AtecoCandidates),
+			"subtree_codes":   len(ordered),
+			"populated_codes": len(populated),
+		}),
+	})
+	if len(populated) == 0 {
+		// None of the subtree codes returned companies under the economic
+		// filters; keep the original selection so the estimate still runs (and
+		// reports zero) rather than silently emptying the strategy.
+		return strategy, nil
+	}
+	strategy.AtecoCandidates = populated
+	return strategy, nil
+}
+
 func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec, subject, email string) ([]MAEstimate, string, error) {
 	queries := buildMAEstimateQueries(strategy)
 	estimates := make([]MAEstimate, 0, len(queries))
 	for _, query := range queries {
-		query.params = baseMASurfaceParams(strategy, query.province, query.params.DryRun)
+		query.params = baseMASurfaceParams(strategy, query.province, query.legalForm, query.params.DryRun)
 		if query.atecoSearchCode != "" {
 			query.params.AtecoCode = query.atecoSearchCode
 		}
@@ -1102,6 +1224,7 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 				"strategy_type":       query.strategyType,
 				"province":            query.province,
 				"ateco_code":          query.atecoCode,
+				"legal_form":          query.legalForm,
 			}),
 		}); err != nil {
 			return nil, "", err
@@ -1153,7 +1276,19 @@ type maSearchQuery struct {
 	atecoSearchCode  string
 	atecoDescription string
 	province         string
+	legalForm        string
 	params           openapiit.CompanyITSearchParams
+}
+
+// maStrategyLegalForms returns the legal-form axis of the search cartesian: the
+// explicit perimeter, or a single empty value meaning "any form" (no server-side
+// legal-form filter). Because legalFormCode is single-valued at OpenAPI.it, each
+// form is a separate query rather than a post-enrichment filter.
+func maStrategyLegalForms(strategy MAStrategySpec) []string {
+	if len(strategy.LegalForms) == 0 {
+		return []string{""}
+	}
+	return strategy.LegalForms
 }
 
 func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
@@ -1162,30 +1297,35 @@ func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 	if len(provinces) == 0 {
 		provinces = []string{""}
 	}
-	queries := make([]maSearchQuery, 0, len(provinces)*(len(strategy.AtecoCandidates)+1))
+	forms := maStrategyLegalForms(strategy)
+	queries := make([]maSearchQuery, 0, len(provinces)*(len(strategy.AtecoCandidates)+1)*len(forms))
 	for _, province := range provinces {
-		for _, candidate := range strategy.AtecoCandidates {
-			searchCode := candidate.SearchCode
-			if searchCode == "" {
-				searchCode = atecoSearchCode(candidate.Code)
+		for _, form := range forms {
+			for _, candidate := range strategy.AtecoCandidates {
+				searchCode := candidate.SearchCode
+				if searchCode == "" {
+					searchCode = atecoSearchCode(candidate.Code)
+				}
+				params := baseMASurfaceParams(strategy, province, form, &dryRun)
+				params.AtecoCode = searchCode
+				queries = append(queries, maSearchQuery{
+					strategyType:     maStrategyTypeATECO,
+					atecoCode:        candidate.Code,
+					atecoSearchCode:  searchCode,
+					atecoDescription: candidate.Description,
+					province:         province,
+					legalForm:        form,
+					params:           params,
+				})
 			}
-			params := baseMASurfaceParams(strategy, province, &dryRun)
-			params.AtecoCode = searchCode
+			params := baseMASurfaceParams(strategy, province, form, &dryRun)
 			queries = append(queries, maSearchQuery{
-				strategyType:     maStrategyTypeATECO,
-				atecoCode:        candidate.Code,
-				atecoSearchCode:  searchCode,
-				atecoDescription: candidate.Description,
-				province:         province,
-				params:           params,
+				strategyType: maStrategyTypeExpanded,
+				province:     province,
+				legalForm:    form,
+				params:       params,
 			})
 		}
-		params := baseMASurfaceParams(strategy, province, &dryRun)
-		queries = append(queries, maSearchQuery{
-			strategyType: maStrategyTypeExpanded,
-			province:     province,
-			params:       params,
-		})
 	}
 	return queries
 }
@@ -1203,7 +1343,9 @@ func (s *maService) probeMASearchSurface(ctx context.Context, params openapiit.C
 	probes := []maSurfaceProbeAudit{first}
 	status := maEstimateSurfaceExact
 	estimatedCount := first.Count
-	estimatedCost := first.Cost
+	// Projected advanced-enrichment cost of fetching these companies — NOT the
+	// dry-run's own spend (first.Cost, ~€0.01), which is tracked in the probe audit.
+	estimatedCost := float64(estimatedCount) * maCostPerCompanyEUR
 	if first.Count > maVendorLimit {
 		status = maEstimateSurfaceTooBroad
 	}
@@ -1249,52 +1391,78 @@ func (s *maService) runMASurfaceProbe(ctx context.Context, params openapiit.Comp
 	}, nil
 }
 
+// maExecutionCombo is one cell of the (province × ateco code × legal form)
+// search cartesian. A company matches exactly one combo (one registered
+// province, one exact ateco code, one legal form), so the union of combo results
+// is distinct and the per-combo dry-run count feeds a fair budget allocation.
+type maExecutionCombo struct {
+	province   string
+	atecoCode  string
+	searchCode string
+	legalForm  string
+	count      int
+}
+
 func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, strategyType string, limit int, subject, email string) ([]MATarget, error) {
-	dryRun := 0
 	provinces := strategy.Provinces
 	if len(provinces) == 0 {
 		provinces = []string{""}
 	}
-	remaining := limit
-	rawTargets := []MATarget{}
+	forms := maStrategyLegalForms(strategy)
+
+	combos := []maExecutionCombo{}
 	for _, province := range provinces {
-		if remaining <= 0 {
-			break
-		}
-		if strategyType == maStrategyTypeATECO {
-			for _, candidate := range strategy.AtecoCandidates {
-				if remaining <= 0 {
-					break
+		for _, form := range forms {
+			if strategyType == maStrategyTypeATECO {
+				for _, candidate := range strategy.AtecoCandidates {
+					searchCode := candidate.SearchCode
+					if searchCode == "" {
+						searchCode = atecoSearchCode(candidate.Code)
+					}
+					combos = append(combos, maExecutionCombo{province: province, atecoCode: candidate.Code, searchCode: searchCode, legalForm: form})
 				}
-				params := baseMASearchParams(strategy, province, &dryRun, remaining)
-				if candidate.SearchCode != "" {
-					params.AtecoCode = candidate.SearchCode
-				} else {
-					params.AtecoCode = atecoSearchCode(candidate.Code)
-				}
-				if err := s.traceEvent(ctx, maTraceEventWrite{
-					EventType: "ma_execution_query",
-					Status:    maTraceEventStarted,
-					Request:   maTraceJSON(params.Values()),
-					Metadata:  maTraceJSON(map[string]any{"strategy_type": strategyType, "province": province, "ateco_code": candidate.Code, "remaining": remaining}),
-				}); err != nil {
-					return nil, err
-				}
-				targets, err := s.executeCompanySearch(ctx, params, subject, email)
-				if err != nil {
-					return nil, err
-				}
-				rawTargets = append(rawTargets, targets...)
-				remaining = limit - len(dedupeMATargets(rawTargets))
+			} else {
+				combos = append(combos, maExecutionCombo{province: province, legalForm: form})
 			}
+		}
+	}
+
+	// Count per combo (dry-run, count only). These hit the cache populated by the
+	// estimate phase, so the allocation costs effectively nothing.
+	for index := range combos {
+		surfaceParams := baseMASurfaceParams(strategy, combos[index].province, combos[index].legalForm, nil)
+		if combos[index].searchCode != "" {
+			surfaceParams.AtecoCode = combos[index].searchCode
+		}
+		surface, err := s.probeMASearchSurface(ctx, surfaceParams, subject, email)
+		if err != nil {
+			return nil, err
+		}
+		combos[index].count = surface.EstimatedCount
+	}
+
+	counts := make([]int, len(combos))
+	for index, combo := range combos {
+		counts[index] = combo.count
+	}
+	allocation := allocateExecutionLimit(counts, limit)
+
+	dryRun := 0
+	rawTargets := []MATarget{}
+	for index, combo := range combos {
+		slot := allocation[index]
+		if slot <= 0 {
 			continue
 		}
-		params := baseMASearchParams(strategy, province, &dryRun, remaining)
+		params := baseMASearchParams(strategy, combo.province, combo.legalForm, &dryRun, slot)
+		if combo.searchCode != "" {
+			params.AtecoCode = combo.searchCode
+		}
 		if err := s.traceEvent(ctx, maTraceEventWrite{
 			EventType: "ma_execution_query",
 			Status:    maTraceEventStarted,
 			Request:   maTraceJSON(params.Values()),
-			Metadata:  maTraceJSON(map[string]any{"strategy_type": strategyType, "province": province, "remaining": remaining}),
+			Metadata:  maTraceJSON(map[string]any{"strategy_type": strategyType, "province": combo.province, "ateco_code": combo.atecoCode, "legal_form": combo.legalForm, "allocated": slot, "available": combo.count}),
 		}); err != nil {
 			return nil, err
 		}
@@ -1303,20 +1471,117 @@ func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, s
 			return nil, err
 		}
 		rawTargets = append(rawTargets, targets...)
-		remaining = limit - len(dedupeMATargets(rawTargets))
 	}
-	targets := maFilterByLegalForms(dedupeMATargets(rawTargets), strategy.LegalForms)
+	targets := dedupeMATargets(rawTargets)
 	if len(targets) > limit {
 		targets = targets[:limit]
 	}
 	if err := s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_execution_queries_completed",
 		Status:    maTraceEventSucceeded,
-		Metadata:  maTraceJSON(map[string]any{"strategy_type": strategyType, "limit": limit, "raw_target_count": len(rawTargets), "deduped_target_count": len(targets)}),
+		Metadata:  maTraceJSON(map[string]any{"strategy_type": strategyType, "limit": limit, "combo_count": len(combos), "raw_target_count": len(rawTargets), "deduped_target_count": len(targets)}),
 	}); err != nil {
 		return nil, err
 	}
 	return targets, nil
+}
+
+// allocateExecutionLimit distributes a fetch limit across search combos using a
+// floor (equal guaranteed minimum per non-empty combo) plus proportional shares
+// of the remainder (largest-remainder method). When the combos together hold no
+// more than the limit, every company is fetched. The result is aligned with the
+// input counts and sums to min(limit, totalAvailable). Deterministic: ties break
+// by lowest index.
+func allocateExecutionLimit(counts []int, limit int) []int {
+	slots := make([]int, len(counts))
+	if limit <= 0 {
+		return slots
+	}
+	total, nonEmpty := 0, 0
+	for _, count := range counts {
+		if count > 0 {
+			total += count
+			nonEmpty++
+		}
+	}
+	if total == 0 {
+		return slots
+	}
+	if total <= limit {
+		for index, count := range counts {
+			if count > 0 {
+				slots[index] = count
+			}
+		}
+		return slots
+	}
+	// Stage 1 — floor: a small guaranteed minimum per non-empty combo so a named
+	// province/form is never fully starved by a larger one. Only when affordable.
+	floor := 0
+	if limit >= nonEmpty {
+		floor = 1
+	}
+	used := 0
+	for index, count := range counts {
+		if count <= 0 {
+			continue
+		}
+		give := floor
+		if give > count {
+			give = count
+		}
+		slots[index] = give
+		used += give
+	}
+	// Stage 2 — proportional remainder over residual demand (largest-remainder).
+	remaining := limit - used
+	residualTotal := 0
+	for index, count := range counts {
+		if count > slots[index] {
+			residualTotal += count - slots[index]
+		}
+	}
+	remainder := make([]float64, len(counts))
+	if residualTotal > 0 {
+		for index, count := range counts {
+			capacity := count - slots[index]
+			if capacity <= 0 {
+				continue
+			}
+			ideal := float64(remaining) * float64(capacity) / float64(residualTotal)
+			give := int(ideal)
+			if give > capacity {
+				give = capacity
+			}
+			slots[index] += give
+			used += give
+			remainder[index] = ideal - float64(int(ideal))
+		}
+	}
+	// Distribute any leftover one unit at a time by largest remainder; on ties
+	// prefer the least-filled combo so units spread rather than pile on index 0.
+	for used < limit {
+		best := -1
+		for index, count := range counts {
+			if count <= slots[index] {
+				continue
+			}
+			if best == -1 {
+				best = index
+				continue
+			}
+			if remainder[index] > remainder[best] ||
+				(remainder[index] == remainder[best] && slots[index] < slots[best]) {
+				best = index
+			}
+		}
+		if best == -1 {
+			break
+		}
+		slots[best]++
+		used++
+	}
+	return slots
 }
 
 func (s *maService) executeCompanySearch(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) ([]MATarget, error) {
@@ -1505,7 +1770,12 @@ func decodeCompanySearchEnvelope(raw json.RawMessage) (openapiit.Envelope[openap
 	return response, nil
 }
 
-func baseMASearchParams(strategy MAStrategySpec, province string, dryRun *int, limit int) openapiit.CompanyITSearchParams {
+// baseMASearchParams builds an execution search for one cell of the
+// (province × ateco code × legal form) iteration. Province, atecoCode and
+// legalFormCode are single-valued at OpenAPI.it, so each is one axis of the
+// cartesian; the caller iterates and passes a single value per call. An empty
+// legalForm means "any form" (no server-side legal-form filter).
+func baseMASearchParams(strategy MAStrategySpec, province, legalForm string, dryRun *int, limit int) openapiit.CompanyITSearchParams {
 	if limit <= 0 {
 		limit = maDefaultSearchLimit
 	}
@@ -1516,6 +1786,7 @@ func baseMASearchParams(strategy MAStrategySpec, province string, dryRun *int, l
 		DryRun:         dryRun,
 		DataEnrichment: "advanced",
 		Province:       province,
+		LegalFormCode:  legalForm,
 		ActivityStatus: strategy.ActivityStatus,
 		MinTurnover:    strategy.TurnoverMin,
 		MaxTurnover:    strategy.TurnoverMax,
@@ -1523,29 +1794,21 @@ func baseMASearchParams(strategy MAStrategySpec, province string, dryRun *int, l
 		MaxEmployees:   strategy.EmployeeMax,
 		Limit:          &limit,
 	}
-	// A single explicit legal-form constraint filters server-side; multiple forms
-	// are enforced by post-filtering the results (see maFilterByLegalForms).
-	if len(strategy.LegalForms) == 1 {
-		params.LegalFormCode = strategy.LegalForms[0]
-	}
 	return params
 }
 
-func baseMASurfaceParams(strategy MAStrategySpec, province string, dryRun *int) openapiit.CompanyITSearchParams {
-	params := openapiit.CompanyITSearchParams{
+func baseMASurfaceParams(strategy MAStrategySpec, province, legalForm string, dryRun *int) openapiit.CompanyITSearchParams {
+	return openapiit.CompanyITSearchParams{
 		DryRun:         dryRun,
 		DataEnrichment: "advanced",
 		Province:       province,
+		LegalFormCode:  legalForm,
 		ActivityStatus: strategy.ActivityStatus,
 		MinTurnover:    strategy.TurnoverMin,
 		MaxTurnover:    strategy.TurnoverMax,
 		MinEmployees:   strategy.EmployeeMin,
 		MaxEmployees:   strategy.EmployeeMax,
 	}
-	if len(strategy.LegalForms) == 1 {
-		params.LegalFormCode = strategy.LegalForms[0]
-	}
-	return params
 }
 
 func envelopeCount(envelope openapiit.Envelope[openapiit.CompanyDataset]) int {
@@ -1560,6 +1823,26 @@ func envelopeCost(envelope openapiit.Envelope[openapiit.CompanyDataset]) float64
 		return *envelope.Cost
 	}
 	return 0
+}
+
+func maStrategyBudget(strategy MAStrategySpec) float64 {
+	if strategy.MaxBudgetEUR != nil && *strategy.MaxBudgetEUR > 0 {
+		return *strategy.MaxBudgetEUR
+	}
+	return maDefaultBudgetEUR
+}
+
+// maProjectedSpend is the advanced-enrichment cost of a run: at most `limit`
+// companies out of `available` are fetched, each priced at maCostPerCompanyEUR.
+func maProjectedSpend(available, limit int) float64 {
+	fetched := available
+	if limit > 0 && fetched > limit {
+		fetched = limit
+	}
+	if fetched < 0 {
+		fetched = 0
+	}
+	return float64(fetched) * maCostPerCompanyEUR
 }
 
 func estimateTotal(estimates []MAEstimate, strategyType string) int {

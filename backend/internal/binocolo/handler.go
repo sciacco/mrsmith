@@ -290,6 +290,9 @@ func maHTTPError(err error) (int, string, string) {
 	if errors.Is(err, errMAEstimateTooLarge) {
 		return http.StatusBadRequest, "estimate_too_large", "warn"
 	}
+	if errors.Is(err, errMAEstimateOverBudget) {
+		return http.StatusConflict, "estimate_over_budget", "warn"
+	}
 	if errors.Is(err, errAtecoCodeNotFound) {
 		return http.StatusBadRequest, "invalid_ateco_code", "warn"
 	}

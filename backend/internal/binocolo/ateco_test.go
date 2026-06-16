@@ -316,7 +316,7 @@ func TestMASurfaceProbeExactRunsWithoutLimit(t *testing.T) {
 	strategy := validSurfaceStrategy()
 	dryRun := 1
 	limit := 25
-	params := baseMASearchParams(strategy, "MI", &dryRun, limit)
+	params := baseMASearchParams(strategy, "MI", "", &dryRun, limit)
 
 	result, err := service.probeMASearchSurface(context.Background(), params, "", "")
 	if err != nil {
@@ -361,7 +361,7 @@ func TestMASurfaceProbeTreatsThousandAsExactSingleDryRun(t *testing.T) {
 	}
 	strategy := validSurfaceStrategy()
 	dryRun := 1
-	result, err := service.probeMASearchSurface(context.Background(), baseMASurfaceParams(strategy, "MI", &dryRun), "", "")
+	result, err := service.probeMASearchSurface(context.Background(), baseMASurfaceParams(strategy, "MI", "", &dryRun), "", "")
 	if err != nil {
 		t.Fatalf("probeMASearchSurface returned error: %v", err)
 	}
@@ -396,7 +396,7 @@ func TestMASurfaceProbeMarksAboveVendorLimitTooBroadWithExactCount(t *testing.T)
 	}
 	strategy := validSurfaceStrategy()
 	dryRun := 1
-	result, err := service.probeMASearchSurface(context.Background(), baseMASurfaceParams(strategy, "MI", &dryRun), "", "")
+	result, err := service.probeMASearchSurface(context.Background(), baseMASurfaceParams(strategy, "MI", "", &dryRun), "", "")
 	if err != nil {
 		t.Fatalf("probeMASearchSurface returned error: %v", err)
 	}
@@ -658,6 +658,27 @@ func (s *fakeAtecoStore) ResolveAtecoCode(_ context.Context, code string) (Ateco
 		return AtecoCode{}, errAtecoCodeNotFound
 	}
 	return item, nil
+}
+
+func (s *fakeAtecoStore) SubtreeAtecoCodes(_ context.Context, code string) ([]AtecoCode, error) {
+	code = normalizeAtecoCode(code)
+	if code == "" {
+		return nil, errAtecoCodeNotFound
+	}
+	out := make([]AtecoCode, 0, len(s.items))
+	seen := map[string]struct{}{}
+	for _, item := range s.items {
+		dotted := normalizeAtecoCode(item.Codice)
+		if dotted != code && !strings.HasPrefix(dotted, code+".") {
+			continue
+		}
+		if _, exists := seen[item.CodiceSearch]; exists {
+			continue
+		}
+		seen[item.CodiceSearch] = struct{}{}
+		out = append(out, item)
+	}
+	return out, nil
 }
 
 func (s *fakeAtecoStore) SearchAteco(_ context.Context, query string, limit int) ([]AtecoCode, error) {

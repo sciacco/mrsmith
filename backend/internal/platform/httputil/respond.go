@@ -7,6 +7,10 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
+type responseErrorRecorder interface {
+	RecordResponseError(message string)
+}
+
 func JSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -14,6 +18,9 @@ func JSON(w http.ResponseWriter, status int, data any) {
 }
 
 func Error(w http.ResponseWriter, status int, message string) {
+	if recorder, ok := w.(responseErrorRecorder); ok {
+		recorder.RecordResponseError(message)
+	}
 	JSON(w, status, map[string]string{"error": message})
 }
 

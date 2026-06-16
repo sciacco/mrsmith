@@ -37,6 +37,21 @@ const (
 	maATECOSuccessThreshold = 10
 	maDefaultSearchLimit    = 100
 	maVendorLimit           = 1000
+
+	// maAtecoSubtreeProbeCap bounds how many dry-run probes (€0.01 each) the
+	// subtree discovery may spend resolving which exact ATECO codes are
+	// populated. Beyond this the selected sector is too broad to probe code by
+	// code and the original selection is kept untouched.
+	maAtecoSubtreeProbeCap = 60
+
+	// maCostPerCompanyEUR is the OpenAPI.it advanced-enrichment price per
+	// returned company; maCostPerDryRunEUR is the dry-run (count-only) price.
+	maCostPerCompanyEUR = 0.10
+	maCostPerDryRunEUR  = 0.01
+
+	// maDefaultBudgetEUR caps the projected enrichment spend of a single run
+	// unless the analyst explicitly acknowledges a higher cost.
+	maDefaultBudgetEUR = 50.0
 )
 
 type MACreateSessionRequest struct {
@@ -53,6 +68,9 @@ type MAExecuteSessionRequest struct {
 	Strategy     *MAStrategySpec `json:"strategy,omitempty"`
 	StrategyType string          `json:"strategyType,omitempty"`
 	Limit        int             `json:"limit,omitempty"`
+	// AcknowledgeCost lets the analyst proceed when the projected enrichment
+	// spend exceeds the budget ceiling (the cost gate).
+	AcknowledgeCost bool `json:"acknowledgeCost,omitempty"`
 }
 
 type MAExportRequest struct {
@@ -99,6 +117,11 @@ type MASessionDetail struct {
 	Estimates []MAEstimate       `json:"estimates"`
 	Runs      []MAExecutionRun   `json:"runs"`
 	Targets   []MATarget         `json:"targets"`
+	// Cost summary (computed, not persisted). BudgetEUR is the active ceiling and
+	// CostPerCompanyEUR the advanced-enrichment unit price, so the UI can show the
+	// projected spend and the cost gate without duplicating the pricing constant.
+	BudgetEUR         float64 `json:"budgetEur"`
+	CostPerCompanyEUR float64 `json:"costPerCompanyEur"`
 }
 
 type MASession struct {
@@ -150,6 +173,9 @@ type MAStrategySpec struct {
 	Thesis        string         `json:"thesis,omitempty"`
 	LegalForms    []string       `json:"legalForms,omitempty"`
 	SignalWeights map[string]int `json:"signalWeights,omitempty"`
+	// MaxBudgetEUR overrides the per-run enrichment budget ceiling; nil uses
+	// maDefaultBudgetEUR. Stored in the strategy JSONB blob (migration-free).
+	MaxBudgetEUR *float64 `json:"maxBudgetEur,omitempty"`
 }
 
 type MAAtecoCandidate struct {

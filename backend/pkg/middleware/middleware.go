@@ -112,6 +112,9 @@ func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 			if ctxErr := r.Context().Err(); ctxErr != nil {
 				args = append(args, "request_context_error", ctxErr.Error())
 			}
+			if rec.responseError != "" {
+				args = append(args, "error", rec.responseError, "response_error", rec.responseError)
+			}
 			accessAttrs := logging.AccessLogAttrs(r.Context())
 			args = append(args, accessAttrs...)
 
@@ -152,9 +155,10 @@ func isRoutineAuthUnauthorized(status int, attrs []any) bool {
 
 type responseRecorder struct {
 	http.ResponseWriter
-	status       int
-	bytesWritten int
-	writeErr     error
+	status        int
+	bytesWritten  int
+	writeErr      error
+	responseError string
 }
 
 func (r *responseRecorder) WriteHeader(status int) {
@@ -172,4 +176,8 @@ func (r *responseRecorder) Write(p []byte) (int, error) {
 		r.writeErr = err
 	}
 	return n, err
+}
+
+func (r *responseRecorder) RecordResponseError(message string) {
+	r.responseError = strings.TrimSpace(message)
 }

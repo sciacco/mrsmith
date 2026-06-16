@@ -249,28 +249,6 @@ func normalizeMASignalWeights(input map[string]int) map[string]int {
 	return out
 }
 
-// maFilterByLegalForms drops targets whose legal form is outside an explicit constraint.
-func maFilterByLegalForms(targets []MATarget, forms []string) []MATarget {
-	if len(forms) == 0 {
-		return targets
-	}
-	allowed := map[string]struct{}{}
-	for _, form := range forms {
-		allowed[strings.ToUpper(strings.TrimSpace(form))] = struct{}{}
-	}
-	out := make([]MATarget, 0, len(targets))
-	for _, target := range targets {
-		code := ""
-		if object, err := decodeVendorObject(target.VendorPayload); err == nil {
-			code = strings.ToUpper(firstVendorString(object, "detailedLegalForm.code"))
-		}
-		if _, ok := allowed[code]; ok {
-			out = append(out, target)
-		}
-	}
-	return out
-}
-
 // maTurnoverIdeal returns the "sweet spot" turnover used by the proximity signal:
 // the explicit turnoverAround, else the midpoint of an explicit min/max range.
 func maTurnoverIdeal(strategy MAStrategySpec) int {

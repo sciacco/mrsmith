@@ -24,6 +24,7 @@ var (
 type atecoStore interface {
 	ResolveAtecoCode(ctx context.Context, code string) (AtecoCode, error)
 	SearchAteco(ctx context.Context, query string, limit int) ([]AtecoCode, error)
+	SubtreeAtecoCodes(ctx context.Context, code string) ([]AtecoCode, error)
 }
 
 type AtecoCode struct {
@@ -60,6 +61,43 @@ LIMIT 1
 		return AtecoCode{}, fmt.Errorf("resolve ateco code: %w", err)
 	}
 	return item, nil
+}
+
+// SubtreeAtecoCodes returns the node itself plus every descendant in the ATECO
+// hierarchy. Because OpenAPI.it matches the ATECO code exactly (no prefix, no
+// descent) and companies are tagged at heterogeneous levels per branch, callers
+// probe the whole subtree to discover which exact codes are actually populated.
+func (s *SQLStore) SubtreeAtecoCodes(ctx context.Context, code string) ([]AtecoCode, error) {
+	if s == nil || s.db == nil {
+		return nil, errAtecoStoreUnavailable
+	}
+	code = normalizeAtecoCode(code)
+	if code == "" {
+		return nil, errAtecoCodeNotFound
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT ordine, codice, codice_search, titolo, gerarchia, numero_corrispondenze
+FROM binocolo.codici_ateco_2025
+WHERE codice_search ~ '^[0-9]+$'
+  AND (upper(codice) = upper($1) OR upper(codice) LIKE upper($1) || '.%')
+ORDER BY ordine
+`, code)
+	if err != nil {
+		return nil, fmt.Errorf("subtree ateco codes: %w", err)
+	}
+	defer rows.Close()
+	out := []AtecoCode{}
+	for rows.Next() {
+		item, err := scanAtecoScanner(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate subtree ateco codes: %w", err)
+	}
+	return out, nil
 }
 
 func (s *SQLStore) SearchAteco(ctx context.Context, query string, limit int) ([]AtecoCode, error) {

@@ -76,6 +76,8 @@ export interface MASessionDetail {
   estimates: MAEstimate[];
   runs: MAExecutionRun[];
   targets: MATarget[];
+  budgetEur: number;
+  costPerCompanyEur: number;
 }
 
 export type MASessionStatus = 'draft' | 'estimated' | 'running' | 'completed' | 'failed';
@@ -130,6 +132,7 @@ export interface MAStrategySpec {
   thesis?: MAThesis;
   legalForms?: string[];
   signalWeights?: Record<string, number>;
+  maxBudgetEur?: number;
 }
 
 export interface MAAtecoCandidate {

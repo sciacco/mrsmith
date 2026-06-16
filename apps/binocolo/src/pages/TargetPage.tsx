@@ -26,9 +26,11 @@ const moneyFormat = new Intl.NumberFormat('it-IT', {
   currency: 'EUR',
   maximumFractionDigits: 0,
 });
-const costFormat = new Intl.NumberFormat('it-IT', {
+const eurFormat = new Intl.NumberFormat('it-IT', {
+  style: 'currency',
+  currency: 'EUR',
   minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
+  maximumFractionDigits: 2,
 });
 const defaultSearchLimit = 100;
 const maxSearchLimit = 1000;
@@ -84,6 +86,7 @@ export function TargetPage() {
   const [selectedPromptId, setSelectedPromptId] = useState('');
   const [busy, setBusy] = useState<BusyState>(null);
   const [error, setError] = useState<string | null>(null);
+  const [acknowledgeCost, setAcknowledgeCost] = useState(false);
   const [activeTab, setActiveTab] = useState<'results' | 'config'>('results');
 
   useEffect(() => {
@@ -167,7 +170,24 @@ export function TargetPage() {
   const strategyModels = useMemo(() => filterStrategyModels(llmOptions.models), [llmOptions.models]);
   const strategyPrompts = llmOptions.prompts.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
   const canEstimate = hasStrategy && busy !== 'create' && busy !== 'estimate';
-  const canExecute = hasStrategy && hasEstimate && estimateMatchesStrategy && !selectedEstimateGroup?.blocked && busy !== 'execute';
+  const costPerCompanyEur = detail?.costPerCompanyEur ?? 0.1;
+  const budgetEur = detail?.budgetEur ?? 0;
+  const projectedFetched = selectedEstimateGroup
+    ? Math.min(selectedEstimateGroup.count, normalizeSearchLimit(strategy.searchLimit))
+    : 0;
+  const projectedSpendEur = projectedFetched * costPerCompanyEur;
+  const overBudget = budgetEur > 0 && projectedSpendEur > budgetEur;
+  const canExecute =
+    hasStrategy &&
+    hasEstimate &&
+    estimateMatchesStrategy &&
+    !selectedEstimateGroup?.blocked &&
+    (!overBudget || acknowledgeCost) &&
+    busy !== 'execute';
+
+  useEffect(() => {
+    setAcknowledgeCost(false);
+  }, [selectedEstimateType, detail?.strategy?.id, strategy.searchLimit]);
 
   async function openSession(id: string) {
     setBusy('sessions');
@@ -229,6 +249,7 @@ export function TargetPage() {
       const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/execute`, {
         strategyType: selectedEstimateType,
         limit: normalizeSearchLimit(strategy.searchLimit),
+        acknowledgeCost,
       });
       setDetail(data);
       await loadSessions();
@@ -532,6 +553,30 @@ export function TargetPage() {
                         <div className={styles.estimateWarning}>
                           Questa strategia supera 1.000 risultati: restringi i criteri prima di confermare.
                         </div>
+                      ) : null}
+                      {selectedEstimateGroup ? (
+                        <div className={overBudget ? styles.costSummaryOver : styles.costSummary}>
+                          <span>
+                            Costo enrichment stimato: <strong>{eurFormat.format(projectedSpendEur)}</strong>
+                            {selectedEstimateGroup.count > projectedFetched
+                              ? ` · ${numberFormat.format(projectedFetched)} di ${numberFormat.format(selectedEstimateGroup.count)} aziende`
+                              : ` · ${numberFormat.format(projectedFetched)} aziende`}
+                          </span>
+                          <span>Budget sessione: {eurFormat.format(budgetEur)}</span>
+                        </div>
+                      ) : null}
+                      {overBudget ? (
+                        <label className={styles.costAck}>
+                          <input
+                            type="checkbox"
+                            checked={acknowledgeCost}
+                            onChange={(event) => setAcknowledgeCost(event.target.checked)}
+                          />
+                          <span>
+                            Il costo stimato supera il budget di sessione. Restringi i criteri, oppure
+                            conferma di voler procedere a {eurFormat.format(projectedSpendEur)}.
+                          </span>
+                        </label>
                       ) : null}
                       <div className={styles.strategyActions}>
                         <Button
@@ -961,7 +1006,7 @@ function formatEstimateCount(count: number, lowerBound: boolean): string {
 }
 
 function estimateCostLabel(cost: number, probeCount: number): string {
-  const costText = cost > 0 ? `${costFormat.format(cost)} costo stimato` : 'costo non indicato';
+  const costText = cost > 0 ? `${eurFormat.format(cost)} enrichment` : 'costo non indicato';
   if (probeCount > 1) return `${costText} · ${probeCount} dry-run`;
   return `${costText} · 1 dry-run`;
 }
@@ -1062,6 +1107,9 @@ function errorLabel(error: unknown): string {
     }
     if (code === 'estimate_too_large') {
       return 'La stima e troppo ampia: restringi territorio, fatturato o settore prima di confermare.';
+    }
+    if (code === 'estimate_over_budget') {
+      return 'Il costo stimato supera il budget di sessione: restringi i criteri o conferma il costo prima di procedere.';
     }
     if (code === 'invalid_ma_request') {
       return 'Controlla i criteri della strategia e riprova.';
