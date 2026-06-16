@@ -15,7 +15,7 @@ import (
 
 var (
 	errMAStrategyInvalid = errors.New("invalid ma strategy")
-	atecoCodePattern     = regexp.MustCompile(`^[A-Z]?\d{2}(\.?\d{1,4})?$`)
+	atecoCodePattern     = regexp.MustCompile(`^[A-Z0-9]+(\.[A-Z0-9]+)*$`)
 )
 
 func validateMAStrategy(input MAStrategySpec) (MAStrategySpec, error) {

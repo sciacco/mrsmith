@@ -3,6 +3,7 @@ package binocolo
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -42,12 +43,16 @@ type companySearchRequest struct {
 }
 
 func (h *Handler) handleSearchCompanies(w http.ResponseWriter, r *http.Request) {
-	searchReq, badRequestCode, err := parseCompanySearchRequest(r.URL.Query())
+	searchReq, badRequestCode, err := parseCompanySearchRequest(r.Context(), r.URL.Query(), h.ateco)
 	if badRequestCode != "" {
 		httputil.Error(w, http.StatusBadRequest, badRequestCode)
 		return
 	}
 	if err != nil {
+		if errors.Is(err, errAtecoStoreUnavailable) {
+			httputil.Error(w, http.StatusServiceUnavailable, "binocolo_ateco_not_configured")
+			return
+		}
 		h.binocoloCacheFailure(w, r, err)
 		return
 	}
@@ -126,7 +131,7 @@ func (h *Handler) handleSearchCompanies(w http.ResponseWriter, r *http.Request) 
 	httputil.JSON(w, http.StatusOK, json.RawMessage(response))
 }
 
-func parseCompanySearchRequest(query url.Values) (companySearchRequest, string, error) {
+func parseCompanySearchRequest(ctx context.Context, query url.Values, ateco atecoStore) (companySearchRequest, string, error) {
 	province, ok := normalizeProvince(query.Get("province"))
 	if !ok {
 		return companySearchRequest{}, "invalid_province", nil
@@ -186,7 +191,6 @@ func parseCompanySearchRequest(query url.Values) (companySearchRequest, string, 
 		DryRun:         &dryRunFlag,
 		DataEnrichment: dataEnrichment,
 		CompanyName:    strings.TrimSpace(query.Get("companyName")),
-		AtecoCode:      strings.TrimSpace(query.Get("atecoCode")),
 		CCIAA:          strings.ToUpper(strings.TrimSpace(query.Get("cciaa"))),
 		REACode:        strings.TrimSpace(query.Get("reaCode")),
 		MinTurnover:    minTurnover,
@@ -196,6 +200,19 @@ func parseCompanySearchRequest(query url.Values) (companySearchRequest, string, 
 		ActivityStatus: activityStatus,
 		Skip:           skip,
 		Limit:          limit,
+	}
+	if atecoCode := strings.TrimSpace(query.Get("atecoCode")); atecoCode != "" {
+		if ateco == nil {
+			return companySearchRequest{}, "", errAtecoStoreUnavailable
+		}
+		item, err := ateco.ResolveAtecoCode(ctx, atecoCode)
+		if errors.Is(err, errAtecoCodeNotFound) {
+			return companySearchRequest{}, "invalid_ateco_code", nil
+		}
+		if err != nil {
+			return companySearchRequest{}, "", err
+		}
+		params.AtecoCode = item.CodiceSearch
 	}
 	cacheKey, paramsJSON, err := companySearchCacheKey(params)
 	if err != nil {

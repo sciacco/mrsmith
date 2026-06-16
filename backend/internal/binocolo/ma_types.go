@@ -147,6 +147,7 @@ type MAAtecoCandidate struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
 	Rationale   string `json:"rationale"`
+	SearchCode  string `json:"-"`
 }
 
 type MAScoringCriterion struct {

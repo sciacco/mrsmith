@@ -11,7 +11,6 @@ import (
 
 	openai "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
-	"github.com/openai/openai-go/v3/shared"
 )
 
 type Client struct {
@@ -19,12 +18,36 @@ type Client struct {
 }
 
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 }
 
 type ResponseFormat struct {
 	Type string `json:"type"`
+}
+
+type Tool struct {
+	Type     string       `json:"type"`
+	Function ToolFunction `json:"function"`
+}
+
+type ToolFunction struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
+}
+
+type ToolCall struct {
+	ID       string           `json:"id"`
+	Type     string           `json:"type"`
+	Function ToolCallFunction `json:"function"`
+}
+
+type ToolCallFunction struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 type ChatRequest struct {
@@ -33,6 +56,8 @@ type ChatRequest struct {
 	Temperature    float64         `json:"temperature,omitempty"`
 	MaxTokens      int             `json:"max_tokens,omitempty"`
 	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
+	Tools          []Tool          `json:"tools,omitempty"`
+	ToolChoice     any             `json:"tool_choice,omitempty"`
 }
 
 type Usage struct {
@@ -42,10 +67,11 @@ type Usage struct {
 }
 
 type ChatResponse struct {
-	ID      string `json:"id"`
-	Model   string `json:"model"`
-	Content string `json:"content"`
-	Usage   Usage  `json:"usage"`
+	ID        string     `json:"id"`
+	Model     string     `json:"model"`
+	Content   string     `json:"content"`
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	Usage     Usage      `json:"usage"`
 }
 
 type APIError struct {
@@ -92,7 +118,8 @@ func (c *Client) Chat(ctx context.Context, reqBody ChatRequest) (ChatResponse, e
 		Model   string `json:"model"`
 		Choices []struct {
 			Message struct {
-				Content any `json:"content"`
+				Content   any        `json:"content"`
+				ToolCalls []ToolCall `json:"tool_calls"`
 			} `json:"message"`
 		} `json:"choices"`
 		Usage Usage `json:"usage"`
@@ -114,63 +141,66 @@ func (c *Client) Chat(ctx context.Context, reqBody ChatRequest) (ChatResponse, e
 	}
 
 	return ChatResponse{
-		ID:      decoded.ID,
-		Model:   decoded.Model,
-		Content: content,
-		Usage:   decoded.Usage,
+		ID:        decoded.ID,
+		Model:     decoded.Model,
+		Content:   content,
+		ToolCalls: decoded.Choices[0].Message.ToolCalls,
+		Usage:     decoded.Usage,
 	}, nil
 }
 
-func buildChatCompletionParams(reqBody ChatRequest) (openai.ChatCompletionNewParams, error) {
-	params := openai.ChatCompletionNewParams{
-		Model:    openai.ChatModel(reqBody.Model),
-		Messages: make([]openai.ChatCompletionMessageParamUnion, 0, len(reqBody.Messages)),
+func buildChatCompletionParams(reqBody ChatRequest) (map[string]any, error) {
+	params := map[string]any{
+		"model":    reqBody.Model,
+		"messages": make([]map[string]any, 0, len(reqBody.Messages)),
 	}
+	messages := params["messages"].([]map[string]any)
 	for _, message := range reqBody.Messages {
 		mapped, err := mapMessage(message)
 		if err != nil {
-			return openai.ChatCompletionNewParams{}, err
+			return nil, err
 		}
-		params.Messages = append(params.Messages, mapped)
+		messages = append(messages, mapped)
 	}
+	params["messages"] = messages
 	if reqBody.Temperature != 0 {
-		params.Temperature = openai.Float(reqBody.Temperature)
+		params["temperature"] = reqBody.Temperature
 	}
 	if reqBody.MaxTokens > 0 {
-		params.MaxTokens = openai.Int(int64(reqBody.MaxTokens))
+		params["max_tokens"] = reqBody.MaxTokens
 	}
 	if reqBody.ResponseFormat != nil {
-		responseFormat, err := mapResponseFormat(*reqBody.ResponseFormat)
-		if err != nil {
-			return openai.ChatCompletionNewParams{}, err
-		}
-		params.ResponseFormat = responseFormat
+		params["response_format"] = *reqBody.ResponseFormat
+	}
+	if len(reqBody.Tools) > 0 {
+		params["tools"] = reqBody.Tools
+	}
+	if reqBody.ToolChoice != nil {
+		params["tool_choice"] = reqBody.ToolChoice
 	}
 	return params, nil
 }
 
-func mapMessage(message Message) (openai.ChatCompletionMessageParamUnion, error) {
+func mapMessage(message Message) (map[string]any, error) {
 	switch strings.TrimSpace(message.Role) {
-	case "system":
-		return openai.SystemMessage(message.Content), nil
-	case "developer":
-		return openai.DeveloperMessage(message.Content), nil
-	case "user":
-		return openai.UserMessage(message.Content), nil
+	case "system", "developer", "user":
+		return map[string]any{"role": strings.TrimSpace(message.Role), "content": message.Content}, nil
 	case "assistant":
-		return openai.AssistantMessage(message.Content), nil
+		out := map[string]any{"role": "assistant"}
+		if message.Content != "" {
+			out["content"] = message.Content
+		}
+		if len(message.ToolCalls) > 0 {
+			out["tool_calls"] = message.ToolCalls
+		}
+		return out, nil
+	case "tool":
+		if strings.TrimSpace(message.ToolCallID) == "" {
+			return nil, fmt.Errorf("tool message missing tool_call_id")
+		}
+		return map[string]any{"role": "tool", "tool_call_id": message.ToolCallID, "content": message.Content}, nil
 	default:
-		return openai.ChatCompletionMessageParamUnion{}, fmt.Errorf("unsupported role %q", message.Role)
-	}
-}
-
-func mapResponseFormat(responseFormat ResponseFormat) (openai.ChatCompletionNewParamsResponseFormatUnion, error) {
-	switch strings.TrimSpace(responseFormat.Type) {
-	case "json_object":
-		jsonObject := shared.NewResponseFormatJSONObjectParam()
-		return openai.ChatCompletionNewParamsResponseFormatUnion{OfJSONObject: &jsonObject}, nil
-	default:
-		return openai.ChatCompletionNewParamsResponseFormatUnion{}, fmt.Errorf("unsupported response format %q", responseFormat.Type)
+		return nil, fmt.Errorf("unsupported role %q", message.Role)
 	}
 }
 
@@ -189,6 +219,8 @@ func errorBody(err *openai.Error) string {
 
 func flattenContent(value any) (string, error) {
 	switch typed := value.(type) {
+	case nil:
+		return "", nil
 	case string:
 		return typed, nil
 	case []any:

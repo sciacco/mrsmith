@@ -209,7 +209,7 @@ func mustParseCompanySearchRequest(t *testing.T, rawQuery string) companySearchR
 	if err != nil {
 		t.Fatalf("parse query: %v", err)
 	}
-	searchReq, code, err := parseCompanySearchRequest(values)
+	searchReq, code, err := parseCompanySearchRequest(context.Background(), values, nil)
 	if code != "" {
 		t.Fatalf("unexpected bad request code %q", code)
 	}

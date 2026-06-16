@@ -163,6 +163,15 @@ Alyante ERP ID
 - Used by: `apps/binocolo` `/target`.
 - Open questions: whether the threshold should become an admin-configurable value after real usage data.
 
+### Binocolo ATECO 2025 Codes Are Tool-Gated
+
+- Context: Binocolo M&A ATECO candidate selection and OpenAPI.it Company `IT-search` calls.
+- Discovery: OpenAPI.it `IT-search` expects the ATECO query parameter without dots, while the ATECO 2025 source list uses canonical dotted codes. LLM-generated codes are not authoritative enough for deterministic searches.
+- Practical rule: store ATECO 2025 in `binocolo.codici_ateco_2025`, keep canonical `codice` for UI/audit, derive `codice_search` by removing dots for vendor calls, and require M&A strategy drafting to select ATECO candidates only from the backend `search_ateco_2025` tool results. Reject codes that are not present in the table or were not returned by the tool in the same strategy conversation.
+- Evidence: `apps/binocolo/docs/codici_ateco_2025.json`, migration `deploy/migrations/027_anisetta_binocolo_ateco_2025.sql`, and Binocolo ATECO resolver/tool wiring in `backend/internal/binocolo`.
+- Used by: `apps/binocolo` `/target` and `/test` company search.
+- Open questions: none.
+
 ### Training Directory Chips Are Action-First
 
 - Context: `apps/training` People directory (`/persone`) and backend `GET /api/training/v1/people/directory`.

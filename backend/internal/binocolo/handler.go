@@ -26,21 +26,25 @@ type Deps struct {
 type Handler struct {
 	openapiit          *openapiit.Client
 	companySearchCache companySearchCacheStore
+	ateco              atecoStore
 	ma                 *maService
 }
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	var cache companySearchCacheStore
 	var maStore maWorkspaceStore
+	var ateco atecoStore
 	if deps.AnisettaDB != nil {
 		store := NewSQLStore(deps.AnisettaDB)
 		cache = store
 		maStore = store
+		ateco = store
 	}
 	h := &Handler{
 		openapiit:          deps.OpenAPIIT,
 		companySearchCache: cache,
-		ma:                 newMAService(maStore, cache, deps.OpenAPIIT, deps.OpenRouter),
+		ateco:              ateco,
+		ma:                 newMAService(maStore, cache, ateco, deps.OpenAPIIT, deps.OpenRouter),
 	}
 	protect := acl.RequireRole(applaunch.BinocoloAccessRoles()...)
 	handle := func(pattern string, handler http.HandlerFunc) {
@@ -219,8 +223,14 @@ func maHTTPError(err error) (int, string, string) {
 	if errors.Is(err, errMALLMConfigUnavailable) {
 		return http.StatusServiceUnavailable, "binocolo_llm_config_not_configured", "warn"
 	}
+	if errors.Is(err, errAtecoStoreUnavailable) {
+		return http.StatusServiceUnavailable, "binocolo_ateco_not_configured", "warn"
+	}
 	if errors.Is(err, errMAEstimateTooLarge) {
 		return http.StatusBadRequest, "estimate_too_large", "warn"
+	}
+	if errors.Is(err, errAtecoCodeNotFound) {
+		return http.StatusBadRequest, "invalid_ateco_code", "warn"
 	}
 	if errors.Is(err, sql.ErrNoRows) || strings.Contains(err.Error(), "no rows in result set") {
 		return http.StatusNotFound, "ma_session_not_found", "warn"

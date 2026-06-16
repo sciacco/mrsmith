@@ -27,6 +27,11 @@ var (
 	errMAEstimateTooLarge      = errors.New("estimate too large")
 )
 
+const (
+	maAtecoToolName = "search_ateco_2025"
+	maMaxToolRounds = 4
+)
+
 type maAIClient interface {
 	Chat(context.Context, openrouter.ChatRequest) (openrouter.ChatResponse, error)
 }
@@ -34,15 +39,17 @@ type maAIClient interface {
 type maService struct {
 	store       maWorkspaceStore
 	searchCache companySearchCacheStore
+	ateco       atecoStore
 	openapiit   *openapiit.Client
 	ai          maAIClient
 	now         func() time.Time
 }
 
-func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, openapiitClient *openapiit.Client, ai maAIClient) *maService {
+func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, ateco atecoStore, openapiitClient *openapiit.Client, ai maAIClient) *maService {
 	return &maService{
 		store:       store,
 		searchCache: searchCache,
+		ateco:       ateco,
 		openapiit:   openapiitClient,
 		ai:          ai,
 		now:         func() time.Time { return time.Now().UTC() },
@@ -126,6 +133,10 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 		if err != nil {
 			return MASessionDetail{}, err
 		}
+		strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategy, nil, false)
+		if err != nil {
+			return MASessionDetail{}, err
+		}
 		strategyVersion, err = s.store.AddMAStrategyVersion(ctx, sessionID, strategy, email)
 		if err != nil {
 			return MASessionDetail{}, err
@@ -133,6 +144,10 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 	}
 	if strategyVersion == nil {
 		return MASessionDetail{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
+	}
+	strategyVersion.Strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategyVersion.Strategy, nil, false)
+	if err != nil {
+		return MASessionDetail{}, err
 	}
 
 	estimates, selected, err := s.runEstimates(ctx, sessionID, strategyVersion.ID, strategyVersion.Strategy, subject, email)
@@ -162,6 +177,10 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 		if err != nil {
 			return MASessionDetail{}, err
 		}
+		strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategy, nil, false)
+		if err != nil {
+			return MASessionDetail{}, err
+		}
 		strategyVersion, err = s.store.AddMAStrategyVersion(ctx, sessionID, strategy, email)
 		if err != nil {
 			return MASessionDetail{}, err
@@ -173,6 +192,10 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	}
 	if strategyVersion == nil {
 		return MASessionDetail{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
+	}
+	strategyVersion.Strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategyVersion.Strategy, nil, false)
+	if err != nil {
+		return MASessionDetail{}, err
 	}
 	strategyType := normalizeMAStrategyType(req.StrategyType)
 	if strategyType == "" {
@@ -285,41 +308,62 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 	}
 	messages := []openrouter.Message{
 		{Role: "system", Content: promptConfig.Prompt},
+		{Role: "developer", Content: maAtecoToolInstructions()},
 		{Role: "user", Content: prompt},
 	}
-	req := openrouter.ChatRequest{
-		Model:          modelConfig.Model,
-		Temperature:    0,
-		MaxTokens:      1800,
-		ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
-		Messages:       messages,
+	allowedAteco := map[string]AtecoCode{}
+	var response openrouter.ChatResponse
+	var responseRaw json.RawMessage
+	for round := 0; round <= maMaxToolRounds; round++ {
+		req := openrouter.ChatRequest{
+			Model:          modelConfig.Model,
+			Temperature:    0,
+			MaxTokens:      1800,
+			ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
+			Messages:       messages,
+			Tools:          []openrouter.Tool{maAtecoSearchTool()},
+			ToolChoice:     "auto",
+		}
+		response, err = s.ai.Chat(ctx, req)
+		if err != nil {
+			return MAStrategySpec{}, maModelAuditWrite{}, err
+		}
+		if len(response.ToolCalls) == 0 {
+			responseRaw = json.RawMessage([]byte(strings.TrimSpace(response.Content)))
+			break
+		}
+		if round == maMaxToolRounds {
+			return MAStrategySpec{}, maModelAuditWrite{}, fmt.Errorf("%w: ateco tool loop", errMAStrategyInvalid)
+		}
+		messages = append(messages, openrouter.Message{
+			Role:      "assistant",
+			Content:   response.Content,
+			ToolCalls: response.ToolCalls,
+		})
+		for _, call := range response.ToolCalls {
+			content := s.executeMAAtecoTool(ctx, call, allowedAteco)
+			messages = append(messages, openrouter.Message{
+				Role:       "tool",
+				ToolCallID: call.ID,
+				Content:    content,
+			})
+		}
 	}
-	promptRaw, _ := json.Marshal(map[string]any{
-		"model_id":  modelConfig.ID,
-		"prompt_id": promptConfig.ID,
-		"messages":  messages,
-	})
-	response, err := s.ai.Chat(ctx, req)
+	strategy, err := decodeMAStrategyResponse(responseRaw)
 	if err != nil {
 		return MAStrategySpec{}, maModelAuditWrite{}, err
 	}
-	responseRaw := json.RawMessage([]byte(strings.TrimSpace(response.Content)))
-	var envelope maStrategyDraftEnvelope
-	if err := json.Unmarshal(responseRaw, &envelope); err != nil || strings.TrimSpace(envelope.Strategy.SectorDescription) == "" {
-		var direct MAStrategySpec
-		if directErr := json.Unmarshal(responseRaw, &direct); directErr != nil {
-			if err != nil {
-				return MAStrategySpec{}, maModelAuditWrite{}, fmt.Errorf("decode ma strategy: %w", err)
-			}
-			return MAStrategySpec{}, maModelAuditWrite{}, fmt.Errorf("decode ma strategy: %w", directErr)
-		}
-		envelope.Strategy = direct
-	}
-	strategy, err := validateMAStrategy(envelope.Strategy)
+	strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategy, allowedAteco, true)
 	if err != nil {
 		return MAStrategySpec{}, maModelAuditWrite{}, err
 	}
 	usageRaw, _ := json.Marshal(response.Usage)
+	promptRaw, _ := json.Marshal(map[string]any{
+		"model_id":  modelConfig.ID,
+		"prompt_id": promptConfig.ID,
+		"messages":  messages,
+		"tools":     []openrouter.Tool{maAtecoSearchTool()},
+	})
 	return strategy, maModelAuditWrite{
 		Scope:    maModelScopeStrategy,
 		ModelID:  modelConfig.ID,
@@ -329,6 +373,157 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 		Response: responseRaw,
 		Usage:    usageRaw,
 	}, nil
+}
+
+func decodeMAStrategyResponse(responseRaw json.RawMessage) (MAStrategySpec, error) {
+	if len(strings.TrimSpace(string(responseRaw))) == 0 {
+		return MAStrategySpec{}, fmt.Errorf("%w: empty strategy response", errMAStrategyInvalid)
+	}
+	var envelope maStrategyDraftEnvelope
+	if err := json.Unmarshal(responseRaw, &envelope); err != nil || strings.TrimSpace(envelope.Strategy.SectorDescription) == "" {
+		var direct MAStrategySpec
+		if directErr := json.Unmarshal(responseRaw, &direct); directErr != nil {
+			if err != nil {
+				return MAStrategySpec{}, fmt.Errorf("decode ma strategy: %w", err)
+			}
+			return MAStrategySpec{}, fmt.Errorf("decode ma strategy: %w", directErr)
+		}
+		envelope.Strategy = direct
+	}
+	strategy, err := validateMAStrategy(envelope.Strategy)
+	if err != nil {
+		return MAStrategySpec{}, err
+	}
+	return strategy, nil
+}
+
+func maAtecoToolInstructions() string {
+	return strings.Join([]string{
+		"Per compilare atecoCandidates devi usare il tool search_ateco_2025.",
+		"Non inventare codici ATECO e non usare codici che non compaiono nei risultati del tool.",
+		"Se la prima ricerca e' troppo generica, fai piu' chiamate tool mirate con termini italiani come programmazione informatica, consulenza informatica, hosting, elaborazione dati.",
+		"La risposta finale deve restare JSON valido nel formato richiesto dal prompt di sistema.",
+	}, "\n")
+}
+
+func maAtecoSearchTool() openrouter.Tool {
+	return openrouter.Tool{
+		Type: "function",
+		Function: openrouter.ToolFunction{
+			Name:        maAtecoToolName,
+			Description: "Cerca codici ATECO 2025 reali nella tabella Binocolo. Restituisce solo codici validi per la selezione ATECO.",
+			Parameters: map[string]any{
+				"type":                 "object",
+				"additionalProperties": false,
+				"required":             []string{"query"},
+				"properties": map[string]any{
+					"query": map[string]any{
+						"type":        "string",
+						"description": "Termini di ricerca in italiano, per esempio 'programmazione consulenza informatica hosting'.",
+					},
+					"limit": map[string]any{
+						"type":        "integer",
+						"description": "Numero massimo di risultati. Default 50, hard cap backend 100.",
+						"minimum":     1,
+						"maximum":     atecoSearchHardLimit,
+					},
+				},
+			},
+		},
+	}
+}
+
+type maAtecoToolArgs struct {
+	Query string `json:"query"`
+	Limit int    `json:"limit,omitempty"`
+}
+
+func (s *maService) executeMAAtecoTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]AtecoCode) string {
+	if call.Function.Name != maAtecoToolName {
+		return maToolErrorJSON("unsupported_tool")
+	}
+	if s.ateco == nil {
+		return maToolErrorJSON("ateco_not_configured")
+	}
+	var args maAtecoToolArgs
+	if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
+		return maToolErrorJSON("invalid_arguments")
+	}
+	items, err := s.ateco.SearchAteco(ctx, args.Query, normalizeAtecoSearchLimit(args.Limit))
+	if err != nil {
+		return maToolErrorJSON("search_failed")
+	}
+	for _, item := range items {
+		rememberAllowedAteco(allowed, item)
+	}
+	raw, err := json.Marshal(map[string]any{"items": items})
+	if err != nil {
+		return maToolErrorJSON("encode_failed")
+	}
+	return string(raw)
+}
+
+func maToolErrorJSON(code string) string {
+	raw, _ := json.Marshal(map[string]string{"error": code})
+	return string(raw)
+}
+
+func rememberAllowedAteco(allowed map[string]AtecoCode, item AtecoCode) {
+	if allowed == nil {
+		return
+	}
+	if item.Codice != "" {
+		allowed[atecoSearchCode(item.Codice)] = item
+	}
+	if item.CodiceSearch != "" {
+		allowed[atecoSearchCode(item.CodiceSearch)] = item
+	}
+}
+
+func (s *maService) canonicalizeMAStrategyAteco(ctx context.Context, strategy MAStrategySpec, allowed map[string]AtecoCode, requireAllowed bool) (MAStrategySpec, error) {
+	if len(strategy.AtecoCandidates) == 0 {
+		return strategy, nil
+	}
+	candidates := make([]MAAtecoCandidate, 0, len(strategy.AtecoCandidates))
+	seen := map[string]struct{}{}
+	for _, candidate := range strategy.AtecoCandidates {
+		code := normalizeAtecoCode(candidate.Code)
+		if code == "" {
+			continue
+		}
+		var item AtecoCode
+		var ok bool
+		if requireAllowed {
+			item, ok = allowed[atecoSearchCode(code)]
+			if !ok {
+				return MAStrategySpec{}, fmt.Errorf("%w: ateco candidate not returned by tool", errMAStrategyInvalid)
+			}
+		} else {
+			if s.ateco == nil {
+				return MAStrategySpec{}, errAtecoStoreUnavailable
+			}
+			resolved, err := s.ateco.ResolveAtecoCode(ctx, code)
+			if err != nil {
+				return MAStrategySpec{}, err
+			}
+			item = resolved
+		}
+		if item.CodiceSearch == "" {
+			return MAStrategySpec{}, errAtecoCodeNotFound
+		}
+		if _, exists := seen[item.CodiceSearch]; exists {
+			continue
+		}
+		seen[item.CodiceSearch] = struct{}{}
+		candidates = append(candidates, MAAtecoCandidate{
+			Code:        item.Codice,
+			Description: item.Titolo,
+			Rationale:   cleanText(candidate.Rationale, 240),
+			SearchCode:  item.CodiceSearch,
+		})
+	}
+	strategy.AtecoCandidates = candidates
+	return strategy, nil
 }
 
 func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec, subject, email string) ([]MAEstimate, string, error) {
@@ -344,8 +539,8 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 			continue
 		}
 		query.params = baseMASearchParams(strategy, query.province, query.params.DryRun, queryLimit)
-		if query.atecoCode != "" {
-			query.params.AtecoCode = query.atecoCode
+		if query.atecoSearchCode != "" {
+			query.params.AtecoCode = query.atecoSearchCode
 		}
 		response, raw, err := s.cachedCompanySearch(ctx, query.params, subject, email)
 		if err != nil {
@@ -385,6 +580,7 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 type maSearchQuery struct {
 	strategyType     string
 	atecoCode        string
+	atecoSearchCode  string
 	atecoDescription string
 	province         string
 	params           openapiit.CompanyITSearchParams
@@ -399,11 +595,16 @@ func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 	queries := make([]maSearchQuery, 0, len(provinces)*(len(strategy.AtecoCandidates)+1))
 	for _, province := range provinces {
 		for _, candidate := range strategy.AtecoCandidates {
+			searchCode := candidate.SearchCode
+			if searchCode == "" {
+				searchCode = atecoSearchCode(candidate.Code)
+			}
 			params := baseMASearchParams(strategy, province, &dryRun, strategy.SearchLimit)
-			params.AtecoCode = candidate.Code
+			params.AtecoCode = searchCode
 			queries = append(queries, maSearchQuery{
 				strategyType:     maStrategyTypeATECO,
 				atecoCode:        candidate.Code,
+				atecoSearchCode:  searchCode,
 				atecoDescription: candidate.Description,
 				province:         province,
 				params:           params,
@@ -437,7 +638,11 @@ func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, s
 					break
 				}
 				params := baseMASearchParams(strategy, province, &dryRun, remaining)
-				params.AtecoCode = candidate.Code
+				if candidate.SearchCode != "" {
+					params.AtecoCode = candidate.SearchCode
+				} else {
+					params.AtecoCode = atecoSearchCode(candidate.Code)
+				}
 				targets, err := s.executeCompanySearch(ctx, params, subject, email)
 				if err != nil {
 					return nil, err
