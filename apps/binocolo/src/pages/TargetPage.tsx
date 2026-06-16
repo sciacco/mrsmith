@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import { useApiClient } from '../api/client';
 import type {
   MAAtecoCandidate,
+  MALLMModelOption,
   MALLMOptionsResponse,
   MAEstimate,
   MASessionDetail,
@@ -95,7 +96,8 @@ export function TargetPage() {
       .then((data) => {
         if (!active) return;
         setLLMOptions(data);
-        setSelectedModelId(defaultOptionID(data.models, 'ma_strategy'));
+        const filteredModels = filterStrategyModels(data.models);
+        setSelectedModelId(defaultOptionID(filteredModels, 'ma_strategy'));
         setSelectedPromptId(defaultOptionID(data.prompts, 'ma_strategy'));
       })
       .catch((err) => {
@@ -128,7 +130,7 @@ export function TargetPage() {
       ? strategyKey(strategy) === strategyKey(detail.strategy.strategy) &&
         estimatesMatchSearchLimit(detail.estimates, selectedEstimateType, normalizeSearchLimit(strategy.searchLimit))
       : false;
-  const strategyModels = llmOptions.models.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
+  const strategyModels = useMemo(() => filterStrategyModels(llmOptions.models), [llmOptions.models]);
   const strategyPrompts = llmOptions.prompts.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
   const canEstimate = hasStrategy && busy !== 'create' && busy !== 'estimate';
   const canExecute = hasStrategy && hasEstimate && estimateMatchesStrategy && busy !== 'execute';
@@ -665,6 +667,18 @@ function groupEstimates(estimates: MAEstimate[]): EstimateGroup[] {
     group.selected ||= estimate.selected;
   }
   return groups.filter((group) => group.rows.length > 0);
+}
+
+function filterStrategyModels(models: MALLMModelOption[]): MALLMModelOption[] {
+  return models.filter((item) => {
+    if (item.scope === 'ma_strategy') {
+      return true;
+    }
+    if (item.scope === 'default') {
+      return !models.some((m) => m.scope === 'ma_strategy' && m.model === item.model);
+    }
+    return false;
+  });
 }
 
 function defaultOptionID<T extends { id: string; isDefault: boolean; scope: string }>(options: T[], preferredScope: string): string {
