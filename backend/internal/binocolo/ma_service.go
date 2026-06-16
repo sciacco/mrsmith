@@ -29,6 +29,7 @@ var (
 
 const (
 	maAtecoToolName          = "search_ateco_2025"
+	maProvinceRegionToolName = "list_italian_provinces_regions"
 	maCompanySurfaceToolName = "probe_company_search_surface"
 	maMaxToolRounds          = 4
 )
@@ -55,22 +56,24 @@ type maAIClient interface {
 }
 
 type maService struct {
-	store       maWorkspaceStore
-	searchCache companySearchCacheStore
-	ateco       atecoStore
-	openapiit   *openapiit.Client
-	ai          maAIClient
-	now         func() time.Time
+	store         maWorkspaceStore
+	searchCache   companySearchCacheStore
+	provinceCache provinceCacheStore
+	ateco         atecoStore
+	openapiit     *openapiit.Client
+	ai            maAIClient
+	now           func() time.Time
 }
 
-func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, ateco atecoStore, openapiitClient *openapiit.Client, ai maAIClient) *maService {
+func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, provinceCache provinceCacheStore, ateco atecoStore, openapiitClient *openapiit.Client, ai maAIClient) *maService {
 	return &maService{
-		store:       store,
-		searchCache: searchCache,
-		ateco:       ateco,
-		openapiit:   openapiitClient,
-		ai:          ai,
-		now:         func() time.Time { return time.Now().UTC() },
+		store:         store,
+		searchCache:   searchCache,
+		provinceCache: provinceCache,
+		ateco:         ateco,
+		openapiit:     openapiitClient,
+		ai:            ai,
+		now:           func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -330,7 +333,8 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 		{Role: "user", Content: prompt},
 	}
 	allowedAteco := map[string]AtecoCode{}
-	tools := []openrouter.Tool{maAtecoSearchTool(), maCompanySurfaceProbeTool()}
+	allowedProvinces := map[string]openapiit.Province{}
+	tools := []openrouter.Tool{maAtecoSearchTool(), maProvinceRegionTool(), maCompanySurfaceProbeTool()}
 	var response openrouter.ChatResponse
 	var responseRaw json.RawMessage
 	for round := 0; round <= maMaxToolRounds; round++ {
@@ -360,7 +364,7 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			ToolCalls: response.ToolCalls,
 		})
 		for _, call := range response.ToolCalls {
-			content := s.executeMAStrategyTool(ctx, call, allowedAteco, subject, email)
+			content := s.executeMAStrategyTool(ctx, call, allowedAteco, allowedProvinces, subject, email)
 			messages = append(messages, openrouter.Message{
 				Role:       "tool",
 				ToolCallID: call.ID,
@@ -369,6 +373,10 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 		}
 	}
 	strategy, err := decodeMAStrategyResponse(responseRaw)
+	if err != nil {
+		return MAStrategySpec{}, maModelAuditWrite{}, err
+	}
+	strategy, err = s.canonicalizeMAStrategyProvinces(strategy, allowedProvinces, true)
 	if err != nil {
 		return MAStrategySpec{}, maModelAuditWrite{}, err
 	}
@@ -420,6 +428,9 @@ func maStrategyToolInstructions() string {
 	return strings.Join([]string{
 		"Per compilare atecoCandidates devi usare il tool search_ateco_2025.",
 		"Non inventare codici ATECO e non usare codici che non compaiono nei risultati del tool.",
+		"Per compilare provinces devi usare il tool list_italian_provinces_regions.",
+		"Usa solo sigle provincia restituite dal tool province/regioni; se l'utente indica una regione, espandila nelle province restituite dal tool.",
+		"Non inventare appartenenze provincia-regione, macro-aree o sigle non presenti nel tool.",
 		"Usa il tool probe_company_search_surface per verificare se una combinazione di provincia, ATECO, fatturato e dipendenti e' praticabile prima di proporla.",
 		"Il probe e' solo dry-run e misura la superficie potenziale: non usare searchLimit per restringere questa valutazione.",
 		"Se probe_company_search_surface restituisce surfaceStatus=too_broad, restringi territorio, settore o range economici prima della risposta finale.",
@@ -448,6 +459,30 @@ func maAtecoSearchTool() openrouter.Tool {
 						"description": "Numero massimo di risultati. Default 50, hard cap backend 100.",
 						"minimum":     1,
 						"maximum":     atecoSearchHardLimit,
+					},
+				},
+			},
+		},
+	}
+}
+
+func maProvinceRegionTool() openrouter.Tool {
+	return openrouter.Tool{
+		Type: "function",
+		Function: openrouter.ToolFunction{
+			Name:        maProvinceRegionToolName,
+			Description: "Restituisce province italiane reali e rispettive regioni dai dati OpenAPI.it cacheati in Binocolo.",
+			Parameters: map[string]any{
+				"type":                 "object",
+				"additionalProperties": false,
+				"properties": map[string]any{
+					"region": map[string]any{
+						"type":        "string",
+						"description": "Nome regione da filtrare, per esempio Lombardia. Ometti per tutte le regioni.",
+					},
+					"query": map[string]any{
+						"type":        "string",
+						"description": "Filtro opzionale su sigla, nome provincia o regione.",
 					},
 				},
 			},
@@ -508,6 +543,22 @@ type maAtecoToolArgs struct {
 	Limit int    `json:"limit,omitempty"`
 }
 
+type maProvinceRegionToolArgs struct {
+	Region string `json:"region,omitempty"`
+	Query  string `json:"query,omitempty"`
+}
+
+type maProvinceToolItem struct {
+	Code   string `json:"code"`
+	Name   string `json:"name"`
+	Region string `json:"region"`
+}
+
+type maRegionToolItem struct {
+	Name      string   `json:"name"`
+	Provinces []string `json:"provinces"`
+}
+
 type maCompanySurfaceToolArgs struct {
 	Province       string `json:"province,omitempty"`
 	AtecoCode      string `json:"atecoCode,omitempty"`
@@ -518,12 +569,14 @@ type maCompanySurfaceToolArgs struct {
 	MaxEmployees   *int   `json:"maxEmployees,omitempty"`
 }
 
-func (s *maService) executeMAStrategyTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]AtecoCode, subject, email string) string {
+func (s *maService) executeMAStrategyTool(ctx context.Context, call openrouter.ToolCall, allowedAteco map[string]AtecoCode, allowedProvinces map[string]openapiit.Province, subject, email string) string {
 	switch call.Function.Name {
 	case maAtecoToolName:
-		return s.executeMAAtecoTool(ctx, call, allowed)
+		return s.executeMAAtecoTool(ctx, call, allowedAteco)
+	case maProvinceRegionToolName:
+		return s.executeMAProvinceRegionTool(ctx, call, allowedProvinces)
 	case maCompanySurfaceToolName:
-		return s.executeMACompanySurfaceTool(ctx, call, allowed, subject, email)
+		return s.executeMACompanySurfaceTool(ctx, call, allowedAteco, allowedProvinces, subject, email)
 	default:
 		return maToolErrorJSON("unsupported_tool")
 	}
@@ -551,7 +604,70 @@ func (s *maService) executeMAAtecoTool(ctx context.Context, call openrouter.Tool
 	return string(raw)
 }
 
-func (s *maService) executeMACompanySurfaceTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]AtecoCode, subject, email string) string {
+func (s *maService) executeMAProvinceRegionTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]openapiit.Province) string {
+	var args maProvinceRegionToolArgs
+	if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
+		return maToolErrorJSON("invalid_arguments")
+	}
+	envelope, _, err := listProvincesWithCache(ctx, s.provinceCache, s.openapiit, s.now)
+	if err != nil {
+		return maToolErrorJSON("provinces_unavailable")
+	}
+
+	regionFilter := cleanText(args.Region, 80)
+	queryFilter := cleanText(args.Query, 80)
+	provinces := make([]maProvinceToolItem, 0, len(envelope.Data))
+	for _, item := range envelope.Data {
+		item.Sigla = strings.ToUpper(strings.TrimSpace(item.Sigla))
+		item.Provincia = strings.TrimSpace(item.Provincia)
+		item.Regione = strings.TrimSpace(item.Regione)
+		if item.Sigla == "" || item.Provincia == "" || item.Regione == "" {
+			continue
+		}
+		if !matchesProvinceToolFilter(item, regionFilter, queryFilter) {
+			continue
+		}
+		rememberAllowedProvince(allowed, item)
+		provinces = append(provinces, maProvinceToolItem{
+			Code:   item.Sigla,
+			Name:   item.Provincia,
+			Region: item.Regione,
+		})
+	}
+	sort.SliceStable(provinces, func(i, j int) bool {
+		if provinces[i].Region == provinces[j].Region {
+			return provinces[i].Code < provinces[j].Code
+		}
+		return provinces[i].Region < provinces[j].Region
+	})
+
+	regionsByName := map[string][]string{}
+	for _, item := range provinces {
+		regionsByName[item.Region] = append(regionsByName[item.Region], item.Code)
+	}
+	regionNames := make([]string, 0, len(regionsByName))
+	for name := range regionsByName {
+		regionNames = append(regionNames, name)
+	}
+	sort.Strings(regionNames)
+	regions := make([]maRegionToolItem, 0, len(regionNames))
+	for _, name := range regionNames {
+		codes := regionsByName[name]
+		sort.Strings(codes)
+		regions = append(regions, maRegionToolItem{Name: name, Provinces: codes})
+	}
+
+	raw, err := json.Marshal(map[string]any{
+		"regions":   regions,
+		"provinces": provinces,
+	})
+	if err != nil {
+		return maToolErrorJSON("encode_failed")
+	}
+	return string(raw)
+}
+
+func (s *maService) executeMACompanySurfaceTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]AtecoCode, allowedProvinces map[string]openapiit.Province, subject, email string) string {
 	var args maCompanySurfaceToolArgs
 	if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
 		return maToolErrorJSON("invalid_arguments")
@@ -559,6 +675,11 @@ func (s *maService) executeMACompanySurfaceTool(ctx context.Context, call openro
 	province, ok := normalizeProvince(args.Province)
 	if !ok {
 		return maToolErrorJSON("invalid_province")
+	}
+	if allowedProvinces != nil && province != "" {
+		if _, ok := allowedProvinces[province]; !ok {
+			return maToolErrorJSON("province_not_allowed")
+		}
 	}
 	activityStatus, ok := normalizeCompanyActivityStatus(args.ActivityStatus)
 	if !ok {
@@ -611,6 +732,24 @@ func (s *maService) executeMACompanySurfaceTool(ctx context.Context, call openro
 	return string(raw)
 }
 
+func matchesProvinceToolFilter(item openapiit.Province, regionFilter string, queryFilter string) bool {
+	if regionFilter != "" && !textContainsFold(item.Regione, regionFilter) {
+		return false
+	}
+	if queryFilter == "" {
+		return true
+	}
+	return textContainsFold(item.Sigla, queryFilter) ||
+		textContainsFold(item.Provincia, queryFilter) ||
+		textContainsFold(item.Regione, queryFilter)
+}
+
+func textContainsFold(value, query string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	query = strings.ToLower(strings.TrimSpace(query))
+	return query == "" || strings.Contains(value, query)
+}
+
 func maToolErrorJSON(code string) string {
 	raw, _ := json.Marshal(map[string]string{"error": code})
 	return string(raw)
@@ -626,6 +765,53 @@ func rememberAllowedAteco(allowed map[string]AtecoCode, item AtecoCode) {
 	if item.CodiceSearch != "" {
 		allowed[atecoSearchCode(item.CodiceSearch)] = item
 	}
+}
+
+func rememberAllowedProvince(allowed map[string]openapiit.Province, item openapiit.Province) {
+	if allowed == nil {
+		return
+	}
+	code := strings.ToUpper(strings.TrimSpace(item.Sigla))
+	if code == "" {
+		return
+	}
+	item.Sigla = code
+	item.Provincia = strings.TrimSpace(item.Provincia)
+	item.Regione = strings.TrimSpace(item.Regione)
+	allowed[code] = item
+}
+
+func (s *maService) canonicalizeMAStrategyProvinces(strategy MAStrategySpec, allowed map[string]openapiit.Province, requireAllowed bool) (MAStrategySpec, error) {
+	if len(strategy.Provinces) == 0 {
+		return strategy, nil
+	}
+	provinces := make([]string, 0, len(strategy.Provinces))
+	seen := map[string]struct{}{}
+	for _, raw := range strategy.Provinces {
+		province, ok := normalizeProvince(raw)
+		if !ok {
+			return MAStrategySpec{}, fmt.Errorf("%w: province", errMAStrategyInvalid)
+		}
+		if province == "" {
+			continue
+		}
+		if requireAllowed {
+			if _, ok := allowed[province]; !ok {
+				return MAStrategySpec{}, fmt.Errorf("%w: province not returned by tool", errMAStrategyInvalid)
+			}
+		}
+		if _, exists := seen[province]; exists {
+			continue
+		}
+		seen[province] = struct{}{}
+		provinces = append(provinces, province)
+	}
+	sort.Strings(provinces)
+	strategy.Provinces = provinces
+	if strategy.TerritoryLabel == "" && len(provinces) > 0 {
+		strategy.TerritoryLabel = strings.Join(provinces, ", ")
+	}
+	return strategy, nil
 }
 
 func (s *maService) canonicalizeMAStrategyAteco(ctx context.Context, strategy MAStrategySpec, allowed map[string]AtecoCode, requireAllowed bool) (MAStrategySpec, error) {

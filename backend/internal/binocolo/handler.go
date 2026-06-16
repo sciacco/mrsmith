@@ -48,7 +48,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		companySearchCache: cache,
 		provinceCache:      provinceCache,
 		ateco:              ateco,
-		ma:                 newMAService(maStore, cache, ateco, deps.OpenAPIIT, deps.OpenRouter),
+		ma:                 newMAService(maStore, cache, provinceCache, ateco, deps.OpenAPIIT, deps.OpenRouter),
 	}
 	protect := acl.RequireRole(applaunch.BinocoloAccessRoles()...)
 	handle := func(pattern string, handler http.HandlerFunc) {

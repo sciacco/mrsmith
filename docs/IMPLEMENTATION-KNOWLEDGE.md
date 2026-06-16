@@ -172,6 +172,15 @@ Alyante ERP ID
 - Used by: `apps/binocolo` `/target` and `/test` company search.
 - Open questions: none.
 
+### Binocolo Province Selection Is Tool-Gated
+
+- Context: Binocolo M&A territory selection and OpenAPI.it Company `IT-search` province filters.
+- Discovery: Italian province-to-region membership should be deterministic, not inferred by the LLM. Binocolo caches OpenAPI.it CAP `/province` responses in `binocolo.province_cache`, and those responses include province code, name, and region.
+- Practical rule: require M&A strategy drafting to select `provinces` only from the backend `list_italian_provinces_regions` tool results. When a prompt names a region, expand it to the province codes returned by that tool. Reject province codes that were not returned by the tool in the same strategy conversation.
+- Evidence: OpenAPI.it CAP province DTOs in `backend/internal/platform/openapiit`, Binocolo province cache/store in `backend/internal/binocolo`, and M&A tool wiring in `backend/internal/binocolo/ma_service.go`.
+- Used by: `apps/binocolo` `/target`.
+- Open questions: none.
+
 ### Training Directory Chips Are Action-First
 
 - Context: `apps/training` People directory (`/persone`) and backend `GET /api/training/v1/people/directory`.

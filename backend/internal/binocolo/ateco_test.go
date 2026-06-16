@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 )
 
@@ -78,7 +79,7 @@ func TestDraftStrategyUsesAtecoToolWhitelist(t *testing.T) {
 			Content: `{"strategy":{"sectorDescription":"servizi IT","provinces":[],"activityStatus":"ATTIVA","searchLimit":100,"atecoCandidates":[{"code":"62.10.00","description":"LLM","rationale":"trovato via tool"}],"keywords":[],"rationale":"ok","missingCriteria":[]}}`,
 		},
 	}}
-	service := newMAService(&fakeMAWorkspaceStore{}, nil, ateco, nil, ai)
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, ateco, nil, ai)
 
 	strategy, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "", "", "")
 	if err != nil {
@@ -87,8 +88,8 @@ func TestDraftStrategyUsesAtecoToolWhitelist(t *testing.T) {
 	if len(ai.requests) != 2 {
 		t.Fatalf("ai requests = %d, want 2", len(ai.requests))
 	}
-	if !hasTool(ai.requests[0].Tools, maAtecoToolName) || !hasTool(ai.requests[0].Tools, maCompanySurfaceToolName) {
-		t.Fatalf("first request tools = %#v, want ateco and surface tools", ai.requests[0].Tools)
+	if !hasTool(ai.requests[0].Tools, maAtecoToolName) || !hasTool(ai.requests[0].Tools, maProvinceRegionToolName) || !hasTool(ai.requests[0].Tools, maCompanySurfaceToolName) {
+		t.Fatalf("first request tools = %#v, want ateco, province, and surface tools", ai.requests[0].Tools)
 	}
 	if ateco.lastLimit != atecoSearchHardLimit {
 		t.Fatalf("tool limit = %d, want hard cap %d", ateco.lastLimit, atecoSearchHardLimit)
@@ -124,7 +125,7 @@ func TestDraftStrategyRejectsAtecoOutsideToolWhitelist(t *testing.T) {
 			Content: `{"strategy":{"sectorDescription":"servizi IT","provinces":[],"activityStatus":"ATTIVA","searchLimit":100,"atecoCandidates":[{"code":"63.10.10","description":"inventato","rationale":"non restituito"}],"keywords":[],"rationale":"ok","missingCriteria":[]}}`,
 		},
 	}}
-	service := newMAService(&fakeMAWorkspaceStore{}, nil, ateco, nil, ai)
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, ateco, nil, ai)
 
 	_, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "", "", "")
 	if !errors.Is(err, errMAStrategyInvalid) {
@@ -309,7 +310,7 @@ func TestMASurfaceProbeStopsAfterTwoSaturatedWindows(t *testing.T) {
 }
 
 func TestMACompanySurfaceToolRejectsAtecoOutsideWhitelist(t *testing.T) {
-	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, nil, nil)
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, nil, nil, nil)
 	call := openrouter.ToolCall{
 		ID:   "surface",
 		Type: "function",
@@ -318,7 +319,7 @@ func TestMACompanySurfaceToolRejectsAtecoOutsideWhitelist(t *testing.T) {
 			Arguments: `{"province":"MI","atecoCode":"62.10.00"}`,
 		},
 	}
-	content := service.executeMACompanySurfaceTool(context.Background(), call, map[string]AtecoCode{}, "", "")
+	content := service.executeMACompanySurfaceTool(context.Background(), call, map[string]AtecoCode{}, nil, "", "")
 	var got map[string]string
 	if err := json.Unmarshal([]byte(content), &got); err != nil {
 		t.Fatalf("unmarshal tool response: %v", err)
@@ -366,6 +367,135 @@ func TestCompanySearchNormalizesAtecoBeforeCacheAndUpstream(t *testing.T) {
 		if params["atecoCode"] != "621000" {
 			t.Fatalf("cache params atecoCode = %q, want 621000", params["atecoCode"])
 		}
+	}
+}
+
+func TestProvinceRegionToolReturnsRegionsAndWhitelistsProvinces(t *testing.T) {
+	cache := newFakeProvinceCache(t, []openapiit.Province{
+		{Sigla: "MI", Provincia: "Milano", Regione: "Lombardia"},
+		{Sigla: "BG", Provincia: "Bergamo", Regione: "Lombardia"},
+		{Sigla: "RM", Provincia: "Roma", Regione: "Lazio"},
+	})
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, cache, nil, nil, nil)
+	allowed := map[string]openapiit.Province{}
+	call := openrouter.ToolCall{
+		ID:   "province",
+		Type: "function",
+		Function: openrouter.ToolCallFunction{
+			Name:      maProvinceRegionToolName,
+			Arguments: `{"region":"lombardia"}`,
+		},
+	}
+
+	content := service.executeMAProvinceRegionTool(context.Background(), call, allowed)
+
+	var got struct {
+		Regions []maRegionToolItem   `json:"regions"`
+		Items   []maProvinceToolItem `json:"provinces"`
+		Error   string               `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(content), &got); err != nil {
+		t.Fatalf("unmarshal tool response: %v", err)
+	}
+	if got.Error != "" {
+		t.Fatalf("tool returned error %q", got.Error)
+	}
+	if len(got.Items) != 2 || got.Items[0].Code != "BG" || got.Items[1].Code != "MI" {
+		t.Fatalf("provinces = %#v, want BG and MI", got.Items)
+	}
+	if len(got.Regions) != 1 || got.Regions[0].Name != "Lombardia" || !slices.Equal(got.Regions[0].Provinces, []string{"BG", "MI"}) {
+		t.Fatalf("regions = %#v, want Lombardia with BG, MI", got.Regions)
+	}
+	if _, ok := allowed["BG"]; !ok {
+		t.Fatalf("BG was not whitelisted: %#v", allowed)
+	}
+	if _, ok := allowed["MI"]; !ok {
+		t.Fatalf("MI was not whitelisted: %#v", allowed)
+	}
+	if _, ok := allowed["RM"]; ok {
+		t.Fatalf("RM should not be whitelisted by Lombardia filter: %#v", allowed)
+	}
+}
+
+func TestDraftStrategyUsesProvinceToolWhitelist(t *testing.T) {
+	cache := newFakeProvinceCache(t, []openapiit.Province{
+		{Sigla: "MI", Provincia: "Milano", Regione: "Lombardia"},
+		{Sigla: "BG", Provincia: "Bergamo", Regione: "Lombardia"},
+	})
+	ai := &fakeMAAI{responses: []openrouter.ChatResponse{
+		{
+			ToolCalls: []openrouter.ToolCall{
+				{
+					ID:   "call_province",
+					Type: "function",
+					Function: openrouter.ToolCallFunction{
+						Name:      maProvinceRegionToolName,
+						Arguments: `{"query":"Milano"}`,
+					},
+				},
+			},
+		},
+		{
+			Content: `{"strategy":{"sectorDescription":"servizi IT","provinces":["MI"],"activityStatus":"ATTIVA","searchLimit":100,"atecoCandidates":[],"keywords":[],"rationale":"ok","missingCriteria":[]}}`,
+		},
+	}}
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, cache, nil, nil, ai)
+
+	strategy, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT a Milano", "", "", "", "")
+	if err != nil {
+		t.Fatalf("draftStrategy returned error: %v", err)
+	}
+	if !slices.Equal(strategy.Provinces, []string{"MI"}) {
+		t.Fatalf("provinces = %#v, want MI", strategy.Provinces)
+	}
+}
+
+func TestDraftStrategyRejectsProvinceOutsideToolWhitelist(t *testing.T) {
+	cache := newFakeProvinceCache(t, []openapiit.Province{
+		{Sigla: "MI", Provincia: "Milano", Regione: "Lombardia"},
+	})
+	ai := &fakeMAAI{responses: []openrouter.ChatResponse{
+		{
+			ToolCalls: []openrouter.ToolCall{
+				{
+					ID:   "call_province",
+					Type: "function",
+					Function: openrouter.ToolCallFunction{
+						Name:      maProvinceRegionToolName,
+						Arguments: `{"query":"Milano"}`,
+					},
+				},
+			},
+		},
+		{
+			Content: `{"strategy":{"sectorDescription":"servizi IT","provinces":["RM"],"activityStatus":"ATTIVA","searchLimit":100,"atecoCandidates":[],"keywords":[],"rationale":"ok","missingCriteria":[]}}`,
+		},
+	}}
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, cache, nil, nil, ai)
+
+	_, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT a Milano", "", "", "", "")
+	if !errors.Is(err, errMAStrategyInvalid) {
+		t.Fatalf("err = %v, want errMAStrategyInvalid", err)
+	}
+}
+
+func TestMACompanySurfaceToolRejectsProvinceOutsideWhitelist(t *testing.T) {
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, nil, nil, nil)
+	call := openrouter.ToolCall{
+		ID:   "surface",
+		Type: "function",
+		Function: openrouter.ToolCallFunction{
+			Name:      maCompanySurfaceToolName,
+			Arguments: `{"province":"MI"}`,
+		},
+	}
+	content := service.executeMACompanySurfaceTool(context.Background(), call, nil, map[string]openapiit.Province{}, "", "")
+	var got map[string]string
+	if err := json.Unmarshal([]byte(content), &got); err != nil {
+		t.Fatalf("unmarshal tool response: %v", err)
+	}
+	if got["error"] != "province_not_allowed" {
+		t.Fatalf("tool response = %#v, want province_not_allowed", got)
 	}
 }
 
@@ -499,6 +629,37 @@ func (f *fakeMAWorkspaceStore) RecordMAExport(context.Context, string, string, i
 	return errors.New("not implemented")
 }
 
+type fakeProvinceCache struct {
+	response json.RawMessage
+}
+
+func newFakeProvinceCache(t *testing.T, provinces []openapiit.Province) *fakeProvinceCache {
+	t.Helper()
+	raw, err := json.Marshal(openapiit.Envelope[[]openapiit.Province]{
+		Data:    provinces,
+		Success: true,
+		Message: "ok",
+	})
+	if err != nil {
+		t.Fatalf("marshal province cache: %v", err)
+	}
+	return &fakeProvinceCache{response: raw}
+}
+
+func (f *fakeProvinceCache) GetValidProvinceCache(context.Context, time.Time) (*provinceCacheEntry, error) {
+	return &provinceCacheEntry{Response: append(json.RawMessage(nil), f.response...)}, nil
+}
+
+func (f *fakeProvinceCache) WithProvinceCacheLock(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
+func (f *fakeProvinceCache) UpsertProvinceCache(_ context.Context, input provinceCacheWrite) error {
+	f.response = append(json.RawMessage(nil), input.Response...)
+	return nil
+}
+
 var _ atecoStore = (*fakeAtecoStore)(nil)
 var _ maAIClient = (*fakeMAAI)(nil)
 var _ maWorkspaceStore = (*fakeMAWorkspaceStore)(nil)
+var _ provinceCacheStore = (*fakeProvinceCache)(nil)
