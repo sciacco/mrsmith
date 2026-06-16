@@ -214,6 +214,7 @@ export interface MATarget {
   rationale: string;
   missingCriteria: string[];
   evidence: MATargetEvidence[];
+  vendorPayload?: any;
 }
 
 export interface MATargetFlag {

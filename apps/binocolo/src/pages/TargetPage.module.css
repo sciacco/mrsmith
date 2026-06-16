@@ -1107,3 +1107,370 @@
     min-width: 760px;
   }
 }
+
+/* Modal workspace & layout */
+.modalGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--space-6);
+  min-height: 550px;
+  align-items: start;
+}
+
+.modalMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.modalSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  position: sticky;
+  top: 0;
+}
+
+.scoreCircleCard {
+  background: linear-gradient(135deg, var(--color-bg-elevated) 0%, var(--color-surface) 100%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+}
+
+.scoreCircleCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-accent) 0%, #7c6cff 100%);
+}
+
+.scoreEyebrow {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scoreLargeNumber {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-accent);
+  letter-spacing: -0.04em;
+  margin: var(--space-1) 0;
+}
+
+.sidebarFactCard {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebarFactList {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sidebarFactList div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sidebarFactList dt {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sidebarFactList dd {
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Strategic Match Tab */
+.modalRationaleBlock {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  line-height: 1.5;
+}
+
+.modalRationaleBlock h4 {
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-bottom: var(--space-2);
+}
+
+.modalRationaleBlock p {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.modalEvidenceList {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-2);
+}
+
+.modalEvidenceGroup {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.modalEvidenceGroup h5 {
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1.5px solid var(--color-border-subtle);
+  padding-bottom: var(--space-1);
+  margin: 0;
+}
+
+/* Financials Tab */
+.finCardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.finCard {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.finCard span {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.finCard strong {
+  color: var(--color-text);
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.finCard small {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.finTrendPositive {
+  color: var(--color-success) !important;
+  font-weight: 600;
+}
+
+.finTrendNegative {
+  color: var(--color-danger) !important;
+  font-weight: 600;
+}
+
+.tableContainer {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.finTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.finTable th,
+.finTable td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.finTable th {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.finTable tr:last-child td {
+  border-bottom: none;
+}
+
+.finTable td {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.sparklineTd {
+  width: 80px;
+}
+
+/* Shareholders Tab */
+.shGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.shCard {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.shName {
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.shTaxCode {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.shShare {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
+}
+
+.shProgressBarBg {
+  height: 6px;
+  background: var(--color-surface);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+.shProgressBar {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+}
+
+/* Registry Tab */
+.registryList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.registryList div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.registryList dt {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.registryList dd {
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Drawer button action */
+.detailExpandBtn {
+  margin-top: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+@media (max-width: 900px) {
+  .modalGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .modalSidebar {
+    position: static;
+  }
+  .registryList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.chartContainer {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.chartTitle {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--space-3);
+}
+
+.chartSvg {
+  width: 100%;
+  height: auto;
+  max-height: 200px;
+}
+

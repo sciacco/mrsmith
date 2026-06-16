@@ -1,5 +1,5 @@
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, Skeleton } from '@mrsmith/ui';
+import { Button, Icon, Skeleton, Modal } from '@mrsmith/ui';
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useApiClient } from '../api/client';
 import type {
@@ -88,6 +88,8 @@ export function TargetPage() {
   const [error, setError] = useState<string | null>(null);
   const [acknowledgeCost, setAcknowledgeCost] = useState(false);
   const [activeTab, setActiveTab] = useState<'results' | 'config'>('results');
+  const [isFullDetailOpen, setIsFullDetailOpen] = useState(false);
+  const [modalActiveTab, setModalActiveTab] = useState<'overview' | 'financials' | 'shareholders' | 'registry'>('overview');
 
   useEffect(() => {
     if (detail) {
@@ -473,6 +475,16 @@ export function TargetPage() {
                       <h2>Dettaglio target</h2>
                       <p>{selectedTarget ? 'Evidenze e criteri mancanti' : 'Seleziona un target'}</p>
                     </div>
+                    {selectedTarget && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsFullDetailOpen(true)}
+                        leftIcon={<Icon name="external-link" size={14} />}
+                      >
+                        Espandi
+                      </Button>
+                    )}
                   </div>
                   {selectedTarget ? (
                     <TargetDetail target={selectedTarget} />
@@ -605,6 +617,492 @@ export function TargetPage() {
           </div>
         )}
       </div>
+
+      {isFullDetailOpen && selectedTarget && (
+        <Modal
+          open={isFullDetailOpen}
+          onClose={() => setIsFullDetailOpen(false)}
+          title={`Dettaglio Completo: ${selectedTarget.companyName}`}
+          size="fluid"
+        >
+          <div className={styles.modalGrid}>
+            <div className={styles.modalMain}>
+              <div className={styles.tabNav}>
+                <button
+                  type="button"
+                  className={`${styles.tabLink} ${modalActiveTab === 'overview' ? styles.tabLinkActive : ''}`}
+                  onClick={() => setModalActiveTab('overview')}
+                >
+                  <Icon name="external-link" size={16} />
+                  <span>Strategia &amp; Match</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.tabLink} ${modalActiveTab === 'financials' ? styles.tabLinkActive : ''}`}
+                  onClick={() => setModalActiveTab('financials')}
+                >
+                  <Icon name="circle-dollar-sign" size={16} />
+                  <span>Storico Finanziario</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.tabLink} ${modalActiveTab === 'shareholders' ? styles.tabLinkActive : ''}`}
+                  onClick={() => setModalActiveTab('shareholders')}
+                >
+                  <Icon name="user" size={16} />
+                  <span>Soci &amp; Cap Table</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.tabLink} ${modalActiveTab === 'registry' ? styles.tabLinkActive : ''}`}
+                  onClick={() => setModalActiveTab('registry')}
+                >
+                  <Icon name="file-text" size={16} />
+                  <span>Anagrafica Legale</span>
+                </button>
+              </div>
+
+              {/* Tab 1: Overview */}
+              {modalActiveTab === 'overview' && (
+                <div className={styles.evidenceList}>
+                  <div className={styles.modalRationaleBlock}>
+                    <h4>Razionale aderenza Strategia</h4>
+                    <p>{selectedTarget.rationale || 'Nessun razionale disponibile.'}</p>
+                  </div>
+
+                  {selectedTarget.missingCriteria.length > 0 ? (
+                    <div className={styles.missingBox}>
+                      <span>Criteri mancanti o parziali</span>
+                      <p>{selectedTarget.missingCriteria.join(', ')}</p>
+                    </div>
+                  ) : null}
+
+                  <div className={styles.modalEvidenceList}>
+                    {evidenceFamilies.map((family) => {
+                      const items = selectedTarget.evidence.filter((item) => item.family === family.key);
+                      if (items.length === 0) return null;
+                      return (
+                        <div key={family.key} className={styles.modalEvidenceGroup}>
+                          <h5>{family.label}</h5>
+                          {items.map((item) => (
+                            <EvidenceRow key={`${item.criterion}-${item.label}`} evidence={item} />
+                          ))}
+                        </div>
+                      );
+                    })}
+                    {selectedTarget.evidence.filter((item) => !item.family).length > 0 && (
+                      <div className={styles.modalEvidenceGroup}>
+                        <h5>Altre evidenze</h5>
+                        {selectedTarget.evidence
+                          .filter((item) => !item.family)
+                          .map((item) => (
+                            <EvidenceRow key={`${item.criterion}-${item.label}`} evidence={item} />
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Financials */}
+              {modalActiveTab === 'financials' && (() => {
+                const rawPayload = selectedTarget.vendorPayload;
+                const sheets = (() => {
+                  const allSheets = rawPayload?.balanceSheets?.all;
+                  if (Array.isArray(allSheets) && allSheets.length > 0) {
+                    return [...allSheets].sort((a, b) => (a.year ?? 0) - (b.year ?? 0));
+                  }
+                  if (selectedTarget.turnoverYear && (selectedTarget.turnover != null || selectedTarget.employees != null)) {
+                    return [{
+                      year: selectedTarget.turnoverYear,
+                      turnover: selectedTarget.turnover,
+                      employees: selectedTarget.employees,
+                      netWorth: null,
+                      totalAssets: null,
+                    }];
+                  }
+                  return [];
+                })();
+
+                const latestTurnoverSheet = [...sheets].reverse().find(s => s.turnover != null);
+                const latestNetWorthSheet = [...sheets].reverse().find(s => s.netWorth != null);
+                const latestTotalAssetsSheet = [...sheets].reverse().find(s => s.totalAssets != null);
+                const latestEmployeesSheet = [...sheets].reverse().find(s => s.employees != null);
+
+                const getTrend = (key: 'turnover' | 'netWorth' | 'employees' | 'totalAssets') => {
+                  const validSheets = sheets.filter(s => s[key] != null);
+                  if (validSheets.length < 2) return null;
+                  const lastIndex = validSheets.length - 1;
+                  const lastVal = validSheets[lastIndex][key];
+                  const prevVal = validSheets[lastIndex - 1][key];
+                  if (lastVal != null && prevVal != null && prevVal > 0) {
+                    return ((lastVal - prevVal) / prevVal) * 100;
+                  }
+                  return null;
+                };
+
+                const formatTrend = (pct: number | null) => {
+                  if (pct === null) return null;
+                  const sign = pct >= 0 ? '+' : '';
+                  const className = pct >= 0 ? styles.finTrendPositive : styles.finTrendNegative;
+                  return <small className={className}>{sign}{pct.toFixed(1)}% YoY</small>;
+                };
+
+                const turnoverSheets = sheets.filter(s => s.turnover != null);
+                const maxTurnover = Math.max(...turnoverSheets.map(s => s.turnover ?? 0), 1);
+
+                const renderBarChart = () => {
+                  if (turnoverSheets.length === 0) return null;
+
+                  const width = 600;
+                  const height = 200;
+                  const paddingLeft = 65;
+                  const paddingRight = 20;
+                  const paddingTop = 25;
+                  const paddingBottom = 35;
+
+                  const chartWidth = width - paddingLeft - paddingRight;
+                  const chartHeight = height - paddingTop - paddingBottom;
+
+                  const barSpacing = chartWidth / turnoverSheets.length;
+                  const barWidth = Math.min(barSpacing * 0.5, 45);
+
+                  return (
+                    <div className={styles.chartContainer}>
+                      <div className={styles.chartTitle}>Andamento Fatturato (€)</div>
+                      <svg viewBox={`0 0 ${width} ${height}`} className={styles.chartSvg}>
+                        <defs>
+                          <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--color-accent)" />
+                            <stop offset="100%" stopColor="#7c6cff" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* Grid lines (0%, 50%, 100%) */}
+                        <line
+                          x1={paddingLeft}
+                          y1={paddingTop}
+                          x2={width - paddingRight}
+                          y2={paddingTop}
+                          stroke="var(--color-border-subtle)"
+                          strokeDasharray="4 4"
+                        />
+                        <text
+                          x={paddingLeft - 10}
+                          y={paddingTop + 4}
+                          textAnchor="end"
+                          style={{ fontSize: '10px', fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
+                        >
+                          {moneyFormat.format(maxTurnover)}
+                        </text>
+
+                        <line
+                          x1={paddingLeft}
+                          y1={paddingTop + chartHeight / 2}
+                          x2={width - paddingRight}
+                          y2={paddingTop + chartHeight / 2}
+                          stroke="var(--color-border-subtle)"
+                          strokeDasharray="4 4"
+                        />
+                        <text
+                          x={paddingLeft - 10}
+                          y={paddingTop + chartHeight / 2 + 4}
+                          textAnchor="end"
+                          style={{ fontSize: '10px', fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
+                        >
+                          {moneyFormat.format(maxTurnover / 2)}
+                        </text>
+
+                        <line
+                          x1={paddingLeft}
+                          y1={paddingTop + chartHeight}
+                          x2={width - paddingRight}
+                          y2={paddingTop + chartHeight}
+                          stroke="var(--color-border)"
+                        />
+                        <text
+                          x={paddingLeft - 10}
+                          y={paddingTop + chartHeight + 4}
+                          textAnchor="end"
+                          style={{ fontSize: '10px', fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
+                        >
+                          0 €
+                        </text>
+
+                        {/* Bars and Labels */}
+                        {turnoverSheets.map((sheet, idx) => {
+                          const val = sheet.turnover ?? 0;
+                          const barHeight = (val / maxTurnover) * chartHeight;
+                          const x = paddingLeft + idx * barSpacing + (barSpacing - barWidth) / 2;
+                          const y = paddingTop + chartHeight - barHeight;
+
+                          return (
+                            <g key={sheet.year}>
+                              <rect
+                                x={x}
+                                y={y}
+                                width={barWidth}
+                                height={Math.max(barHeight, 2)}
+                                rx={4}
+                                ry={4}
+                                fill="url(#barGradient)"
+                              />
+                              <text
+                                x={x + barWidth / 2}
+                                y={y - 6}
+                                textAnchor="middle"
+                                style={{ fontSize: '11px', fill: 'var(--color-text)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}
+                              >
+                                {val >= 1000000
+                                  ? `${(val / 1000000).toFixed(2)}M`
+                                  : `${Math.round(val / 1000).toLocaleString('it-IT')}k`
+                                }
+                              </text>
+                              <text
+                                x={x + barWidth / 2}
+                                y={paddingTop + chartHeight + 18}
+                                textAnchor="middle"
+                                style={{ fontSize: '11px', fill: 'var(--color-text-secondary)', fontWeight: 600 }}
+                              >
+                                {sheet.year}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                  );
+                };
+
+                return (
+                  <div>
+                    <div className={styles.finCardsGrid}>
+                      <div className={styles.finCard}>
+                        <span>Fatturato {latestTurnoverSheet ? `(${latestTurnoverSheet.year})` : ''}</span>
+                        <strong>{latestTurnoverSheet?.turnover != null ? moneyFormat.format(latestTurnoverSheet.turnover) : '-'}</strong>
+                        {formatTrend(getTrend('turnover'))}
+                      </div>
+                      <div className={styles.finCard}>
+                        <span>Patrimonio Netto {latestNetWorthSheet ? `(${latestNetWorthSheet.year})` : ''}</span>
+                        <strong>{latestNetWorthSheet?.netWorth != null ? moneyFormat.format(latestNetWorthSheet.netWorth) : '-'}</strong>
+                        {formatTrend(getTrend('netWorth'))}
+                      </div>
+                      <div className={styles.finCard}>
+                        <span>Attivo Totale {latestTotalAssetsSheet ? `(${latestTotalAssetsSheet.year})` : ''}</span>
+                        <strong>{latestTotalAssetsSheet?.totalAssets != null ? moneyFormat.format(latestTotalAssetsSheet.totalAssets) : '-'}</strong>
+                        {formatTrend(getTrend('totalAssets'))}
+                      </div>
+                      <div className={styles.finCard}>
+                        <span>Dipendenti {latestEmployeesSheet ? `(${latestEmployeesSheet.year})` : ''}</span>
+                        <strong>{latestEmployeesSheet?.employees != null ? numberFormat.format(latestEmployeesSheet.employees) : '-'}</strong>
+                        {formatTrend(getTrend('employees'))}
+                      </div>
+                    </div>
+
+                    {renderBarChart()}
+
+                    {sheets.length > 0 ? (
+                      <div className={styles.tableContainer}>
+                        <table className={styles.finTable}>
+                          <thead>
+                            <tr>
+                              <th>Anno</th>
+                              <th>Fatturato</th>
+                              <th>Patrimonio Netto</th>
+                              <th>Attivo Totale</th>
+                              <th>Dipendenti</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...sheets].reverse().map((sheet) => (
+                              <tr key={sheet.year}>
+                                <td><strong>{sheet.year}</strong></td>
+                                <td>{sheet.turnover != null ? moneyFormat.format(sheet.turnover) : '-'}</td>
+                                <td>{sheet.netWorth != null ? moneyFormat.format(sheet.netWorth) : '-'}</td>
+                                <td>{sheet.totalAssets != null ? moneyFormat.format(sheet.totalAssets) : '-'}</td>
+                                <td>{sheet.employees != null ? numberFormat.format(sheet.employees) : '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <EmptyState icon="file-text" title="Dati finanziari non disponibili" text="Nessun dato di bilancio storico presente per questo target." />
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Tab 3: Shareholders */}
+              {modalActiveTab === 'shareholders' && (() => {
+                const rawPayload = selectedTarget.vendorPayload;
+                const shareholders = (() => {
+                  if (!rawPayload) return [];
+                  if (Array.isArray(rawPayload.shareHolders)) return rawPayload.shareHolders;
+                  if (Array.isArray(rawPayload.shareholders)) {
+                    const list: any[] = [];
+                    for (const item of rawPayload.shareholders) {
+                      const percent = item.percentShare ?? 0;
+                      const info = item.shareholdersInformation;
+                      if (Array.isArray(info) && info.length > 0) {
+                        for (const sub of info) {
+                          list.push({
+                            name: sub.name,
+                            surname: sub.surname,
+                            companyName: sub.companyName,
+                            percentShare: sub.percentShare ?? percent,
+                            taxCode: sub.taxCode,
+                          });
+                        }
+                      } else {
+                        list.push({
+                          name: item.name,
+                          surname: item.surname,
+                          companyName: item.companyName,
+                          percentShare: percent,
+                          taxCode: item.taxCode,
+                        });
+                      }
+                    }
+                    return list;
+                  }
+                  return [];
+                })();
+
+                return (
+                  <div>
+                    {shareholders.length > 0 ? (
+                      <div className={styles.shGrid}>
+                        {shareholders.map((sh: any, index: number) => {
+                          const displayName = [sh.name, sh.surname].filter(Boolean).join(' ') || sh.companyName || 'Socio Sconosciuto';
+                          const percent = sh.percentShare ?? 0;
+                          return (
+                            <div key={index} className={styles.shCard}>
+                              <div className={styles.shName}>{displayName}</div>
+                              {sh.taxCode && <div className={styles.shTaxCode}>{sh.taxCode}</div>}
+                              <div className={styles.shShare}>
+                                <span>Quota societaria:</span>
+                                <strong>{percent > 0 ? `${percent}%` : 'n.d.'}</strong>
+                              </div>
+                              {percent > 0 && (
+                                <div className={styles.shProgressBarBg}>
+                                  <div className={styles.shProgressBar} style={{ width: `${percent}%` }} />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <EmptyState icon="file-text" title="Cap Table non disponibile" text="Nessun dato relativo ai soci presente per questo target." />
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Tab 4: Registry */}
+              {modalActiveTab === 'registry' && (() => {
+                const rawPayload = selectedTarget.vendorPayload;
+                const detailedForm = rawPayload?.detailedLegalForm?.description || '-';
+                const startDate = rawPayload?.startDate || '-';
+                const regDate = rawPayload?.registrationDate || '-';
+                const pec = rawPayload?.pec || rawPayload?.PEC || '-';
+
+                return (
+                  <dl className={styles.registryList}>
+                    <div>
+                      <dt>Ragione Sociale</dt>
+                      <dd>{selectedTarget.companyName}</dd>
+                    </div>
+                    <div>
+                      <dt>Forma Giuridica</dt>
+                      <dd>{detailedForm}</dd>
+                    </div>
+                    <div>
+                      <dt>Partita IVA</dt>
+                      <dd>{selectedTarget.vatCode || '-'}</dd>
+                    </div>
+                    <div>
+                      <dt>Codice Fiscale</dt>
+                      <dd>{selectedTarget.taxCode || '-'}</dd>
+                    </div>
+                    <div>
+                      <dt>Inizio Attività</dt>
+                      <dd>{startDate}</dd>
+                    </div>
+                    <div>
+                      <dt>Data Registrazione</dt>
+                      <dd>{regDate}</dd>
+                    </div>
+                    <div>
+                      <dt>Stato Attività</dt>
+                      <dd>{selectedTarget.activityStatus || '-'}</dd>
+                    </div>
+                    <div>
+                      <dt>PEC</dt>
+                      <dd>{pec}</dd>
+                    </div>
+                    <div className={styles.fieldWide}>
+                      <dt>Sede Legale</dt>
+                      <dd>{[selectedTarget.town, selectedTarget.province].filter(Boolean).join(' · ') || '-'}</dd>
+                    </div>
+                  </dl>
+                );
+              })()}
+            </div>
+
+            {/* Sidebar Column (Option 2 Integration) */}
+            <div className={styles.modalSidebar}>
+              <div className={styles.scoreCircleCard}>
+                <span className={styles.scoreEyebrow}>Punteggio Match</span>
+                <span className={styles.scoreLargeNumber}>{selectedTarget.score}</span>
+                <span className={`${styles.statusPill} ${styles[`status_${selectedTarget.matchState === 'match' ? 'completed' : selectedTarget.matchState === 'match_parziale' ? 'running' : 'failed'}`]}`}>
+                  {matchLabel(selectedTarget.matchState)}
+                </span>
+                <span className={`${styles.confBadge} ${confidenceClass(selectedTarget.confidence)}`} style={{ marginTop: 'var(--space-2)' }}>
+                  {selectedTarget.confidence ? `confidenza ${selectedTarget.confidence}` : 'confidenza n.d.'}
+                </span>
+              </div>
+
+              <div className={styles.sidebarFactCard}>
+                <dl className={styles.sidebarFactList}>
+                  <div>
+                    <dt>Fatturato Recente</dt>
+                    <dd>{selectedTarget.turnover != null ? moneyFormat.format(selectedTarget.turnover) : '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>Dipendenti</dt>
+                    <dd>{selectedTarget.employees != null ? numberFormat.format(selectedTarget.employees) : '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>Codice ATECO</dt>
+                    <dd>{selectedTarget.atecoCode || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>Descrizione Settore</dt>
+                    <dd style={{ fontSize: '0.8rem', lineHeight: '1.3', fontWeight: 'normal' }}>
+                      {selectedTarget.atecoDescription || '-'}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              {selectedTarget.flags && selectedTarget.flags.length > 0 && (
+                <div className={styles.sidebarFactCard}>
+                  <div style={{ marginBottom: 'var(--space-2)', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.06em' }}>
+                    Alert di Rischio
+                  </div>
+                  <FlagChips flags={selectedTarget.flags} />
+                </div>
+              )}
+
+              <Button variant="secondary" onClick={() => setIsFullDetailOpen(false)} style={{ width: '100%', marginTop: 'var(--space-3)' }}>
+                Chiudi dettagli
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </main>
   );
 }
