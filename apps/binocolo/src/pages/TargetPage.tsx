@@ -84,6 +84,26 @@ export function TargetPage() {
   const [selectedPromptId, setSelectedPromptId] = useState('');
   const [busy, setBusy] = useState<BusyState>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'results' | 'config'>('results');
+
+  useEffect(() => {
+    if (detail) {
+      if ((detail.targets?.length ?? 0) > 0) {
+        setActiveTab('results');
+      } else {
+        setActiveTab('config');
+      }
+    }
+  }, [detail?.session.id]);
+
+  const startNewSearch = useCallback(() => {
+    setDetail(null);
+    setStrategy(emptyStrategy);
+    setPrompt('');
+    setChosenStrategy('');
+    setSelectedTargetId(null);
+    setError(null);
+  }, []);
 
   const loadSessions = useCallback(async () => {
     setBusy((current) => current ?? 'sessions');
@@ -271,6 +291,15 @@ export function TargetPage() {
               <h2>Ricerche salvate</h2>
               <p>{sessions.length > 0 ? `${sessions.length} sessioni` : 'Nessuna ricerca salvata'}</p>
             </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={startNewSearch}
+              disabled={detail === null}
+              leftIcon={<Icon name="plus" size={14} />}
+            >
+              Nuova
+            </Button>
           </div>
           {busy === 'sessions' && sessions.length === 0 ? (
             <div className={styles.skeletonBlock}>
@@ -299,187 +328,237 @@ export function TargetPage() {
           )}
         </aside>
 
-        <section className={styles.mainColumn}>
-          <section className={styles.requestPanel} aria-labelledby="request-title">
-            <div className={styles.panelHeader}>
-              <div>
-                <h2 id="request-title">Nuova richiesta</h2>
-                <p>Descrivi il target ideale e lascia che Binocolo prepari una strategia verificabile.</p>
-              </div>
-            </div>
-            <form className={styles.requestForm} onSubmit={createSession}>
-              <textarea
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                placeholder={emptyPrompt}
-                rows={4}
-              />
-              <div className={styles.formFooter}>
-                <span>{prompt.trim().length > 0 ? `${prompt.trim().length} caratteri` : 'Richiesta libera in linguaggio naturale'}</span>
-                <Button type="submit" loading={busy === 'create'} disabled={!prompt.trim()} leftIcon={<Icon name="sparkles" />}>
-                  Prepara strategia
-                </Button>
-              </div>
-              <div className={styles.aiOptions}>
-                <label>
-                  <span>Modello IA</span>
-                  <select value={selectedModelId} onChange={(event) => setSelectedModelId(event.target.value)}>
-                    {strategyModels.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}{item.isDefault ? ' (default)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Istruzioni</span>
-                  <select value={selectedPromptId} onChange={(event) => setSelectedPromptId(event.target.value)}>
-                    {strategyPrompts.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}{item.isDefault ? ' (default)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </form>
-          </section>
-
-          {hasStrategy ? (
-            <section className={styles.strategyPanel} aria-labelledby="strategy-title">
+        {detail === null ? (
+          <div className={styles.newSearchWorkspace}>
+            <section className={styles.requestPanel} aria-labelledby="request-title">
               <div className={styles.panelHeader}>
                 <div>
-                  <h2 id="strategy-title">Strategia</h2>
-                  <p>Rivedi criteri, territorio, fatturato e codici ATECO prima della stima.</p>
+                  <h2 id="request-title">Nuova ricerca Target M&amp;A</h2>
+                  <p>Descrivi il target ideale in linguaggio naturale e lascia che Binocolo prepari una strategia.</p>
                 </div>
-                <StatusPill status={detail?.session.status} />
               </div>
-              <StrategyEditor strategy={strategy} onChange={updateStrategy} />
-              <div className={styles.strategyActions}>
-                <Button
-                  variant="secondary"
-                  onClick={estimateSession}
-                  loading={busy === 'estimate'}
-                  disabled={!canEstimate}
-                  leftIcon={<Icon name="search" />}
-                >
-                  Stima ricerca
-                </Button>
-              </div>
+              <form className={styles.requestForm} onSubmit={createSession}>
+                <textarea
+                  value={prompt}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  placeholder={emptyPrompt}
+                  rows={6}
+                />
+                <div className={styles.formFooter}>
+                  <span>{prompt.trim().length > 0 ? `${prompt.trim().length} caratteri` : 'Richiesta libera in linguaggio naturale'}</span>
+                  <Button type="submit" loading={busy === 'create'} disabled={!prompt.trim()} leftIcon={<Icon name="sparkles" />}>
+                    Prepara strategia
+                  </Button>
+                </div>
+                <div className={styles.aiOptions}>
+                  <label>
+                    <span>Modello IA</span>
+                    <select value={selectedModelId} onChange={(event) => setSelectedModelId(event.target.value)}>
+                      {strategyModels.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}{item.isDefault ? ' (default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Istruzioni</span>
+                    <select value={selectedPromptId} onChange={(event) => setSelectedPromptId(event.target.value)}>
+                      {strategyPrompts.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}{item.isDefault ? ' (default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </form>
             </section>
-          ) : (
-            <section className={styles.blankPanel}>
-              <EmptyState icon="search" title="Strategia non ancora pronta" text="Inserisci una richiesta per generare criteri e stima." />
-            </section>
-          )}
-
-          {hasEstimate ? (
-            <section className={styles.estimatePanel} aria-labelledby="estimate-title">
-              <div className={styles.panelHeader}>
-                <div>
-                  <h2 id="estimate-title">Stima</h2>
-                  <p>Confronta strategia ATECO e ricerca espansa prima di confermare.</p>
-                </div>
-              </div>
-              <div className={styles.estimateGrid}>
-                {estimateGroups.map((group) => (
-                  <button
-                    type="button"
-                    key={group.type}
-                    className={[
-                      styles.estimateChoice,
-                      selectedEstimateType === group.type ? styles.estimateChoiceActive : '',
-                      group.blocked ? styles.estimateChoiceBlocked : '',
-                    ].filter(Boolean).join(' ')}
-                    onClick={() => setChosenStrategy(group.type)}
-                    aria-describedby={group.blocked ? `${group.type}-surface-status` : undefined}
-                  >
-                    <span>{group.label}</span>
-                    <strong>{formatEstimateCount(group.count, group.lowerBound)}</strong>
-                    <small id={`${group.type}-surface-status`}>
-                      {group.blocked ? 'superficie troppo ampia' : 'superficie stimata'}
-                    </small>
-                    <small>{estimateCostLabel(group.cost, group.probeCount)}</small>
-                    {group.selected ? <em>scelta proposta</em> : null}
-                  </button>
-                ))}
-              </div>
-              <div className={styles.estimateDetails}>
-                {(detail?.estimates ?? []).map((estimate) => (
-                  <span key={estimate.id} className={estimate.surfaceStatus === 'too_broad' ? styles.estimateDetailBlocked : undefined}>
-                    {estimateLabel(estimate)} · {formatEstimateCount(estimate.estimatedCount, estimate.surfaceStatus === 'too_broad')}
-                    {estimate.surfaceStatus === 'too_broad' ? ' · troppo ampia' : ''}
-                  </span>
-                ))}
-              </div>
-              {!estimateMatchesStrategy ? (
-                <div className={styles.estimateWarning}>
-                  La strategia e cambiata dopo la stima. Ricalcola prima di confermare la ricerca.
-                </div>
-              ) : null}
-              {selectedEstimateGroup?.blocked ? (
-                <div className={styles.estimateWarning}>
-                  Questa strategia satura due finestre di dry-run da 1.000 risultati: restringi i criteri prima di confermare.
-                </div>
-              ) : null}
-              <div className={styles.strategyActions}>
-                <Button
-                  onClick={executeSession}
-                  loading={busy === 'execute'}
-                  disabled={!canExecute || !selectedEstimateType}
-                  leftIcon={<Icon name="check" />}
-                >
-                  Conferma e cerca target
-                </Button>
-              </div>
-            </section>
-          ) : null}
-
-          <section className={styles.resultsPanel} aria-labelledby="results-title">
-            <div className={styles.panelHeader}>
-              <div>
-                <h2 id="results-title">Shortlist</h2>
-                <p>{hasTargets ? `${detail?.targets.length ?? 0} target ordinati per aderenza` : 'I target appariranno dopo la conferma.'}</p>
-              </div>
-              <div className={styles.exportActions}>
-                <Button variant="secondary" size="sm" onClick={exportCSV} disabled={!hasTargets}>
-                  CSV
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={exportXLSX}
-                  loading={busy === 'export'}
-                  disabled={!hasTargets}
-                  leftIcon={<Icon name="download" size={14} />}
-                >
-                  XLSX
-                </Button>
-              </div>
-            </div>
-            {busy === 'execute' ? (
-              <div className={styles.skeletonBlock}>
-                <Skeleton rows={8} />
-              </div>
-            ) : hasTargets ? (
-              <TargetShortlist rows={detail?.targets ?? []} selectedId={selectedTarget?.id} onSelect={setSelectedTargetId} />
-            ) : detail?.session.status === 'completed' ? (
-              <EmptyState icon="search" title="Nessun target emerso" text="Restringi o modifica i criteri e ripeti la stima." />
-            ) : (
-              <EmptyState icon="clipboard-check" title="In attesa di conferma" text="Completa la stima e avvia la ricerca dei target." />
-            )}
-          </section>
-        </section>
-
-        <aside className={styles.detailPanel} aria-label="Dettaglio target">
-          <div className={styles.panelHeader}>
-            <div>
-              <h2>Dettaglio</h2>
-              <p>{selectedTarget ? 'Evidenze e criteri mancanti' : 'Seleziona un target'}</p>
-            </div>
           </div>
-          {selectedTarget ? <TargetDetail target={selectedTarget} /> : <EmptyState icon="eye" title="Nessun target selezionato" text="Apri una riga della shortlist." />}
-        </aside>
+        ) : (
+          <div className={styles.activeSessionWorkspace}>
+            <header className={styles.sessionHeader}>
+              <div className={styles.sessionInfo}>
+                <div className={styles.sessionTitleBlock}>
+                  <Icon name="database" size={20} className={styles.sessionIcon} />
+                  <h2>{detail.session.title || 'Ricerca Senza Titolo'}</h2>
+                  <StatusPill status={detail.session.status} />
+                </div>
+                <p className={styles.sessionPromptText}>
+                  <strong>Prompt originale:</strong> &ldquo;{detail.session.prompt}&rdquo;
+                </p>
+              </div>
+
+              <div className={styles.tabNav}>
+                <button
+                  type="button"
+                  className={`${styles.tabLink} ${activeTab === 'results' ? styles.tabLinkActive : ''}`}
+                  onClick={() => setActiveTab('results')}
+                  disabled={!hasTargets}
+                  title={!hasTargets ? 'Completa la stima e cerca i target per sbloccare i risultati' : undefined}
+                >
+                  <Icon name="list" size={16} />
+                  <span>Risultati e Analisi ({detail.targets.length})</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.tabLink} ${activeTab === 'config' ? styles.tabLinkActive : ''}`}
+                  onClick={() => setActiveTab('config')}
+                >
+                  <Icon name="settings" size={16} />
+                  <span>Configurazione e Stima</span>
+                </button>
+              </div>
+            </header>
+
+            {activeTab === 'results' ? (
+              <div className={styles.resultsGrid}>
+                <section className={styles.resultsPanel} aria-labelledby="results-title">
+                  <div className={styles.panelHeader}>
+                    <div>
+                      <h2 id="results-title">Shortlist</h2>
+                      <p>{hasTargets ? `${detail.targets.length} target ordinati per aderenza` : 'I target appariranno dopo la conferma.'}</p>
+                    </div>
+                    <div className={styles.exportActions}>
+                      <Button variant="secondary" size="sm" onClick={exportCSV} disabled={!hasTargets}>
+                        CSV
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={exportXLSX}
+                        loading={busy === 'export'}
+                        disabled={!hasTargets}
+                        leftIcon={<Icon name="download" size={14} />}
+                      >
+                        XLSX
+                      </Button>
+                    </div>
+                  </div>
+                  {busy === 'execute' ? (
+                    <div className={styles.skeletonBlock}>
+                      <Skeleton rows={8} />
+                    </div>
+                  ) : hasTargets ? (
+                    <TargetShortlist rows={detail.targets} selectedId={selectedTarget?.id} onSelect={setSelectedTargetId} />
+                  ) : (
+                    <EmptyState icon="clipboard-check" title="In attesa di conferma" text="Completa la stima e avvia la ricerca dei target." />
+                  )}
+                </section>
+
+                <aside className={styles.detailPanel} aria-label="Dettaglio target">
+                  <div className={styles.panelHeader}>
+                    <div>
+                      <h2>Dettaglio target</h2>
+                      <p>{selectedTarget ? 'Evidenze e criteri mancanti' : 'Seleziona un target'}</p>
+                    </div>
+                  </div>
+                  {selectedTarget ? (
+                    <TargetDetail target={selectedTarget} />
+                  ) : (
+                    <EmptyState icon="eye" title="Nessun target selezionato" text="Apri una riga della shortlist per visualizzare i dettagli." />
+                  )}
+                </aside>
+              </div>
+            ) : (
+              <div className={styles.configGrid}>
+                <section className={styles.strategyPanel} aria-labelledby="strategy-title">
+                  <div className={styles.panelHeader}>
+                    <div>
+                      <h2 id="strategy-title">Strategia di Ricerca</h2>
+                      <p>Affina criteri geografici, finanziari e settoriali per la stima.</p>
+                    </div>
+                  </div>
+                  <StrategyEditor strategy={strategy} onChange={updateStrategy} />
+                  <div className={styles.strategyActions}>
+                    <Button
+                      variant="secondary"
+                      onClick={estimateSession}
+                      loading={busy === 'estimate'}
+                      disabled={!canEstimate}
+                      leftIcon={<Icon name="search" />}
+                    >
+                      Stima ricerca
+                    </Button>
+                  </div>
+                </section>
+
+                <section className={styles.estimatePanel} aria-labelledby="estimate-title">
+                  <div className={styles.panelHeader}>
+                    <div>
+                      <h2 id="estimate-title">Calcolo Stima &amp; Avvio</h2>
+                      <p>Confronta le superfici di ricerca e conferma per estrarre i target.</p>
+                    </div>
+                  </div>
+                  {hasEstimate ? (
+                    <>
+                      <div className={styles.estimateGrid}>
+                        {estimateGroups.map((group) => (
+                          <button
+                            type="button"
+                            key={group.type}
+                            className={[
+                              styles.estimateChoice,
+                              selectedEstimateType === group.type ? styles.estimateChoiceActive : '',
+                              group.blocked ? styles.estimateChoiceBlocked : '',
+                            ].filter(Boolean).join(' ')}
+                            onClick={() => setChosenStrategy(group.type)}
+                            aria-describedby={group.blocked ? `${group.type}-surface-status` : undefined}
+                          >
+                            <span>{group.label}</span>
+                            <strong>{formatEstimateCount(group.count, group.lowerBound)}</strong>
+                            <small id={`${group.type}-surface-status`}>
+                              {group.blocked ? 'superficie troppo ampia' : 'superficie stimata'}
+                            </small>
+                            <small>{estimateCostLabel(group.cost, group.probeCount)}</small>
+                            {group.selected ? <em>scelta proposta</em> : null}
+                          </button>
+                        ))}
+                      </div>
+                      <div className={styles.estimateDetails}>
+                        {(detail.estimates ?? []).map((estimate) => (
+                          <span key={estimate.id} className={estimate.surfaceStatus === 'too_broad' ? styles.estimateDetailBlocked : undefined}>
+                            {estimateLabel(estimate)} · {formatEstimateCount(estimate.estimatedCount, estimate.surfaceStatus === 'too_broad')}
+                            {estimate.surfaceStatus === 'too_broad' ? ' · troppo ampia' : ''}
+                          </span>
+                        ))}
+                      </div>
+                      {!estimateMatchesStrategy ? (
+                        <div className={styles.estimateWarning}>
+                          La strategia è cambiata dopo la stima. Ricalcola prima di confermare la ricerca.
+                        </div>
+                      ) : null}
+                      {selectedEstimateGroup?.blocked ? (
+                        <div className={styles.estimateWarning}>
+                          Questa strategia satura due finestre di dry-run da 1.000 risultati: restringi i criteri prima di confermare.
+                        </div>
+                      ) : null}
+                      <div className={styles.strategyActions}>
+                        <Button
+                          onClick={executeSession}
+                          loading={busy === 'execute'}
+                          disabled={!canExecute || !selectedEstimateType}
+                          leftIcon={<Icon name="check" />}
+                          style={{ width: '100%' }}
+                        >
+                          Conferma e cerca target
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className={styles.estimateEmptyContainer}>
+                      <EmptyState
+                        icon="search"
+                        title="Nessuna stima disponibile"
+                        text="Clicca su 'Stima ricerca' per calcolare la dimensione del target e i costi stimati."
+                      />
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );
@@ -618,6 +697,7 @@ function TargetTable({ rows, selectedId, onSelect }: { rows: MATarget[]; selecte
       <table className={styles.table}>
         <thead>
           <tr>
+            <th className={styles.accentCol}></th>
             <th>Target</th>
             <th>Provincia</th>
             <th>Settore</th>
@@ -634,6 +714,9 @@ function TargetTable({ rows, selectedId, onSelect }: { rows: MATarget[]; selecte
               style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
               onClick={() => onSelect(target.id)}
             >
+              <td className={styles.accentCell}>
+                <div className={styles.accentBar} />
+              </td>
               <td>
                 <button type="button" className={styles.targetButton} onClick={() => onSelect(target.id)}>
                   <span>{target.companyName}</span>
@@ -884,7 +967,7 @@ function strategyTypeLabel(type: MAStrategyType): string {
 function sessionStatusLabel(status: MASessionStatus): string {
   switch (status) {
     case 'draft':
-      return 'Strategia pronta';
+      return 'Bozza strategia';
     case 'estimated':
       return 'Stima pronta';
     case 'running':

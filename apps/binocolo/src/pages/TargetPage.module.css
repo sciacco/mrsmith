@@ -46,7 +46,7 @@
 .eyebrow {
   color: var(--color-text-muted);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -125,8 +125,8 @@
 
 .panelHeader h2 {
   color: var(--color-text);
-  font-size: 0.9375rem;
-  font-weight: 700;
+  font-size: 0.875rem;
+  font-weight: 600;
   letter-spacing: 0;
 }
 
@@ -270,7 +270,7 @@
 .aiOptions span {
   color: var(--color-text-muted);
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -292,7 +292,7 @@
 .strategyGrid label > span {
   color: var(--color-text-muted);
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -509,11 +509,40 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.accentCol {
+  width: 4px;
+  padding: 0 !important;
+}
+
+.accentCell {
+  width: 4px;
+  padding: 0 !important;
+  vertical-align: middle !important;
+}
+
+.accentBar {
+  width: 4px;
+  height: 0;
+  border-radius: 4px;
+  background: var(--color-accent);
+  transition: height var(--duration-normal) var(--ease-spring);
+  margin: 0 auto;
+}
+
+.table tbody tr:hover .accentBar {
+  height: 20px;
+}
+
+.rowSelected .accentBar {
+  height: 28px;
+  box-shadow: 0 0 8px var(--color-accent-glow);
 }
 
 .table td {
@@ -736,7 +765,7 @@
 .flagNeutral {
   background: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 .flagWarning {
   background: var(--color-warning-subtle);
@@ -844,12 +873,138 @@
   font-size: 0.8125rem;
 }
 
+.newSearchWorkspace {
+  grid-column: 2 / -1;
+  max-width: 800px;
+  width: 100%;
+}
+
+.activeSessionWorkspace {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sessionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.sessionInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sessionTitleBlock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.sessionTitleBlock h2 {
+  color: var(--color-text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.sessionIcon {
+  color: var(--color-accent);
+}
+
+.sessionPromptText {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.tabNav {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1.5px solid var(--color-border);
+  padding-top: var(--space-2);
+}
+
+.tabLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: -1.5px;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.tabLink:hover:not(:disabled) {
+  color: var(--color-text);
+  border-bottom-color: var(--color-border);
+}
+
+.tabLinkActive {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.tabLink:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.resultsGrid,
+.configGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.estimatePanel {
+  position: sticky;
+  top: 84px;
+}
+
+.estimateEmptyContainer {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 250px;
+}
+
 @media (max-width: 1180px) {
   .workspace {
     grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
   }
 
-  .detailPanel {
+  .resultsGrid,
+  .configGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detailPanel,
+  .estimatePanel {
     position: static;
     max-height: none;
     grid-column: 1 / -1;
