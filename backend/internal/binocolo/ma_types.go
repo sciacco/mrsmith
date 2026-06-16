@@ -31,9 +31,14 @@ const (
 	maModelScopeStrategy             = "ma_strategy"
 	maModelScopeSectorClassification = "ma_sector_classification"
 
-	maATECOSuccessThreshold = 10
-	maDefaultSearchLimit    = 100
-	maVendorLimit           = 1000
+	maEstimateSurfaceExact    = "exact"
+	maEstimateSurfaceTooBroad = "too_broad"
+
+	maATECOSuccessThreshold    = 10
+	maDefaultSearchLimit       = 100
+	maVendorLimit              = 1000
+	maSurfaceProbePageSize     = 1000
+	maSurfaceProbeMaxProbeRuns = 2
 )
 
 type MACreateSessionRequest struct {
@@ -180,6 +185,9 @@ type MAEstimate struct {
 	EstimatedCount    int             `json:"estimatedCount"`
 	EstimatedCost     float64         `json:"estimatedCost"`
 	Selected          bool            `json:"selected"`
+	SurfaceStatus     string          `json:"surfaceStatus"`
+	ExecutionLimit    int             `json:"executionLimit"`
+	ProbeCount        int             `json:"probeCount"`
 	Params            json.RawMessage `json:"params,omitempty"`
 	VendorResponse    json.RawMessage `json:"vendorResponse,omitempty"`
 	CreatedAt         time.Time       `json:"createdAt"`

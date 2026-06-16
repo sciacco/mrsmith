@@ -291,14 +291,17 @@ INSERT INTO binocolo.ma_dry_run_estimate (
   ateco_code,
   ateco_description,
   province,
-  estimated_count,
-  estimated_cost,
-  selected,
-  params,
-  vendor_response
-) VALUES (
-  $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb
-)
+	  estimated_count,
+	  estimated_cost,
+	  selected,
+	  surface_status,
+	  execution_limit,
+	  probe_count,
+	  params,
+	  vendor_response
+	) VALUES (
+	  $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15::jsonb
+	)
 `, id,
 			sessionID,
 			strategyVersionID,
@@ -309,6 +312,9 @@ INSERT INTO binocolo.ma_dry_run_estimate (
 			estimate.EstimatedCount,
 			estimate.EstimatedCost,
 			estimate.Selected,
+			defaultString(estimate.SurfaceStatus, maEstimateSurfaceExact),
+			positiveOrDefault(estimate.ExecutionLimit, maDefaultSearchLimit),
+			positiveOrDefault(estimate.ProbeCount, 1),
 			[]byte(params),
 			[]byte(response),
 		); err != nil {
@@ -872,7 +878,9 @@ func (s *SQLStore) loadMAEstimates(ctx context.Context, sessionID string) ([]MAE
 	rows, err := s.db.QueryContext(ctx, `
 SELECT id::text, session_id::text, strategy_version_id::text, strategy_type,
        COALESCE(ateco_code, ''), COALESCE(ateco_description, ''), COALESCE(province, ''),
-       estimated_count, estimated_cost, selected, params, vendor_response, created_at
+       estimated_count, estimated_cost, selected,
+       COALESCE(surface_status, 'exact'), execution_limit, probe_count,
+       params, vendor_response, created_at
 FROM binocolo.ma_dry_run_estimate
 WHERE session_id = $1::uuid
 ORDER BY selected DESC, strategy_type, province, ateco_code
@@ -895,6 +903,9 @@ ORDER BY selected DESC, strategy_type, province, ateco_code
 			&item.EstimatedCount,
 			&item.EstimatedCost,
 			&item.Selected,
+			&item.SurfaceStatus,
+			&item.ExecutionLimit,
+			&item.ProbeCount,
 			&item.Params,
 			&item.VendorResponse,
 			&item.CreatedAt,

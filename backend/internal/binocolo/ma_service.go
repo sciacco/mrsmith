@@ -28,9 +28,27 @@ var (
 )
 
 const (
-	maAtecoToolName = "search_ateco_2025"
-	maMaxToolRounds = 4
+	maAtecoToolName          = "search_ateco_2025"
+	maCompanySurfaceToolName = "probe_company_search_surface"
+	maMaxToolRounds          = 4
 )
+
+type maSurfaceProbeResult struct {
+	Status         string
+	EstimatedCount int
+	EstimatedCost  float64
+	ProbeCount     int
+	Params         json.RawMessage
+	VendorResponse json.RawMessage
+}
+
+type maSurfaceProbeAudit struct {
+	Skip     int             `json:"skip"`
+	Count    int             `json:"count"`
+	Cost     float64         `json:"cost"`
+	Params   json.RawMessage `json:"params"`
+	Response json.RawMessage `json:"response"`
+}
 
 type maAIClient interface {
 	Chat(context.Context, openrouter.ChatRequest) (openrouter.ChatResponse, error)
@@ -85,7 +103,7 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	if prompt == "" {
 		return MASessionDetail{}, fmt.Errorf("%w: prompt", errMAStrategyInvalid)
 	}
-	strategy, audit, err := s.draftStrategy(ctx, prompt, req.ModelID, req.PromptID)
+	strategy, audit, err := s.draftStrategy(ctx, prompt, req.ModelID, req.PromptID, subject, email)
 	if err != nil {
 		return MASessionDetail{}, err
 	}
@@ -205,13 +223,13 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 		strategyType = strategyVersion.Strategy.SelectedStrategy
 	}
 	if strategyType == "" {
-		strategyType = chooseSelectedStrategy(estimateTotal(detail.Estimates, maStrategyTypeATECO), len(strategyVersion.Strategy.AtecoCandidates) > 0)
+		strategyType = chooseSelectedStrategyFromEstimates(detail.Estimates, len(strategyVersion.Strategy.AtecoCandidates) > 0)
 	}
 	estimatedCount := estimateTotal(detail.Estimates, strategyType)
 	if len(detail.Estimates) == 0 || estimatedCount == 0 {
 		return MASessionDetail{}, fmt.Errorf("%w: estimate required", errMAStrategyInvalid)
 	}
-	if estimatedCount > maVendorLimit {
+	if estimatesTooBroad(detail.Estimates, strategyType) {
 		return MASessionDetail{}, errMAEstimateTooLarge
 	}
 	limit := normalizeMASearchLimit(req.Limit)
@@ -285,7 +303,7 @@ func (s *maService) exportSession(ctx context.Context, sessionID string, format 
 	return content, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", nil
 }
 
-func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID string, promptID string) (MAStrategySpec, maModelAuditWrite, error) {
+func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID string, promptID string, subject, email string) (MAStrategySpec, maModelAuditWrite, error) {
 	if s.ai == nil {
 		return MAStrategySpec{}, maModelAuditWrite{}, errMAOpenRouterUnavailable
 	}
@@ -308,10 +326,11 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 	}
 	messages := []openrouter.Message{
 		{Role: "system", Content: promptConfig.Prompt},
-		{Role: "developer", Content: maAtecoToolInstructions()},
+		{Role: "developer", Content: maStrategyToolInstructions()},
 		{Role: "user", Content: prompt},
 	}
 	allowedAteco := map[string]AtecoCode{}
+	tools := []openrouter.Tool{maAtecoSearchTool(), maCompanySurfaceProbeTool()}
 	var response openrouter.ChatResponse
 	var responseRaw json.RawMessage
 	for round := 0; round <= maMaxToolRounds; round++ {
@@ -321,7 +340,7 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			MaxTokens:      1800,
 			ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
 			Messages:       messages,
-			Tools:          []openrouter.Tool{maAtecoSearchTool()},
+			Tools:          tools,
 			ToolChoice:     "auto",
 		}
 		response, err = s.ai.Chat(ctx, req)
@@ -341,7 +360,7 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			ToolCalls: response.ToolCalls,
 		})
 		for _, call := range response.ToolCalls {
-			content := s.executeMAAtecoTool(ctx, call, allowedAteco)
+			content := s.executeMAStrategyTool(ctx, call, allowedAteco, subject, email)
 			messages = append(messages, openrouter.Message{
 				Role:       "tool",
 				ToolCallID: call.ID,
@@ -362,7 +381,7 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 		"model_id":  modelConfig.ID,
 		"prompt_id": promptConfig.ID,
 		"messages":  messages,
-		"tools":     []openrouter.Tool{maAtecoSearchTool()},
+		"tools":     tools,
 	})
 	return strategy, maModelAuditWrite{
 		Scope:    maModelScopeStrategy,
@@ -397,10 +416,13 @@ func decodeMAStrategyResponse(responseRaw json.RawMessage) (MAStrategySpec, erro
 	return strategy, nil
 }
 
-func maAtecoToolInstructions() string {
+func maStrategyToolInstructions() string {
 	return strings.Join([]string{
 		"Per compilare atecoCandidates devi usare il tool search_ateco_2025.",
 		"Non inventare codici ATECO e non usare codici che non compaiono nei risultati del tool.",
+		"Usa il tool probe_company_search_surface per verificare se una combinazione di provincia, ATECO, fatturato e dipendenti e' praticabile prima di proporla.",
+		"Il probe e' solo dry-run e misura la superficie potenziale: non usare searchLimit per restringere questa valutazione.",
+		"Se probe_company_search_surface restituisce surfaceStatus=too_broad, restringi territorio, settore o range economici prima della risposta finale.",
 		"Se la prima ricerca e' troppo generica, fai piu' chiamate tool mirate con termini italiani come programmazione informatica, consulenza informatica, hosting, elaborazione dati.",
 		"La risposta finale deve restare JSON valido nel formato richiesto dal prompt di sistema.",
 	}, "\n")
@@ -433,15 +455,81 @@ func maAtecoSearchTool() openrouter.Tool {
 	}
 }
 
+func maCompanySurfaceProbeTool() openrouter.Tool {
+	return openrouter.Tool{
+		Type: "function",
+		Function: openrouter.ToolFunction{
+			Name:        maCompanySurfaceToolName,
+			Description: "Esegue dry-run Company IT-search senza limit operativo e misura se la superficie e' esatta o troppo ampia.",
+			Parameters: map[string]any{
+				"type":                 "object",
+				"additionalProperties": false,
+				"properties": map[string]any{
+					"province": map[string]any{
+						"type":        "string",
+						"description": "Sigla provincia italiana, per esempio MI. Ometti per ricerca nazionale.",
+					},
+					"atecoCode": map[string]any{
+						"type":        "string",
+						"description": "Codice ATECO restituito prima da search_ateco_2025. Ometti per ricerca espansa.",
+					},
+					"activityStatus": map[string]any{
+						"type":        "string",
+						"description": "Stato attivita'. Default ATTIVA.",
+					},
+					"minTurnover": map[string]any{
+						"type":        "integer",
+						"description": "Fatturato minimo.",
+						"minimum":     0,
+					},
+					"maxTurnover": map[string]any{
+						"type":        "integer",
+						"description": "Fatturato massimo.",
+						"minimum":     0,
+					},
+					"minEmployees": map[string]any{
+						"type":        "integer",
+						"description": "Dipendenti minimi.",
+						"minimum":     0,
+					},
+					"maxEmployees": map[string]any{
+						"type":        "integer",
+						"description": "Dipendenti massimi.",
+						"minimum":     0,
+					},
+				},
+			},
+		},
+	}
+}
+
 type maAtecoToolArgs struct {
 	Query string `json:"query"`
 	Limit int    `json:"limit,omitempty"`
 }
 
-func (s *maService) executeMAAtecoTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]AtecoCode) string {
-	if call.Function.Name != maAtecoToolName {
+type maCompanySurfaceToolArgs struct {
+	Province       string `json:"province,omitempty"`
+	AtecoCode      string `json:"atecoCode,omitempty"`
+	ActivityStatus string `json:"activityStatus,omitempty"`
+	MinTurnover    *int   `json:"minTurnover,omitempty"`
+	MaxTurnover    *int   `json:"maxTurnover,omitempty"`
+	MinEmployees   *int   `json:"minEmployees,omitempty"`
+	MaxEmployees   *int   `json:"maxEmployees,omitempty"`
+}
+
+func (s *maService) executeMAStrategyTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]AtecoCode, subject, email string) string {
+	switch call.Function.Name {
+	case maAtecoToolName:
+		return s.executeMAAtecoTool(ctx, call, allowed)
+	case maCompanySurfaceToolName:
+		return s.executeMACompanySurfaceTool(ctx, call, allowed, subject, email)
+	default:
 		return maToolErrorJSON("unsupported_tool")
 	}
+}
+
+func (s *maService) executeMAAtecoTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]AtecoCode) string {
 	if s.ateco == nil {
 		return maToolErrorJSON("ateco_not_configured")
 	}
@@ -457,6 +545,66 @@ func (s *maService) executeMAAtecoTool(ctx context.Context, call openrouter.Tool
 		rememberAllowedAteco(allowed, item)
 	}
 	raw, err := json.Marshal(map[string]any{"items": items})
+	if err != nil {
+		return maToolErrorJSON("encode_failed")
+	}
+	return string(raw)
+}
+
+func (s *maService) executeMACompanySurfaceTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]AtecoCode, subject, email string) string {
+	var args maCompanySurfaceToolArgs
+	if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
+		return maToolErrorJSON("invalid_arguments")
+	}
+	province, ok := normalizeProvince(args.Province)
+	if !ok {
+		return maToolErrorJSON("invalid_province")
+	}
+	activityStatus, ok := normalizeCompanyActivityStatus(args.ActivityStatus)
+	if !ok {
+		return maToolErrorJSON("invalid_activity_status")
+	}
+	if activityStatus == "" {
+		activityStatus = "ATTIVA"
+	}
+	if err := validateOptionalRange(args.MinTurnover, args.MaxTurnover, "turnover"); err != nil {
+		return maToolErrorJSON("invalid_turnover_range")
+	}
+	if err := validateOptionalRange(args.MinEmployees, args.MaxEmployees, "employees"); err != nil {
+		return maToolErrorJSON("invalid_employees_range")
+	}
+
+	dryRun := 1
+	params := openapiit.CompanyITSearchParams{
+		DryRun:         &dryRun,
+		DataEnrichment: "advanced",
+		Province:       province,
+		ActivityStatus: activityStatus,
+		MinTurnover:    args.MinTurnover,
+		MaxTurnover:    args.MaxTurnover,
+		MinEmployees:   args.MinEmployees,
+		MaxEmployees:   args.MaxEmployees,
+	}
+	if strings.TrimSpace(args.AtecoCode) != "" {
+		item, ok := allowed[atecoSearchCode(args.AtecoCode)]
+		if !ok || item.CodiceSearch == "" {
+			return maToolErrorJSON("ateco_not_allowed")
+		}
+		params.AtecoCode = item.CodiceSearch
+	}
+	result, err := s.probeMASearchSurface(ctx, params, subject, email)
+	if err != nil {
+		return maToolErrorJSON("surface_probe_failed")
+	}
+	raw, err := json.Marshal(map[string]any{
+		"surfaceStatus":  result.Status,
+		"estimatedCount": result.EstimatedCount,
+		"lowerBound":     result.Status == maEstimateSurfaceTooBroad,
+		"tooBroad":       result.Status == maEstimateSurfaceTooBroad,
+		"estimatedCost":  result.EstimatedCost,
+		"probeCount":     result.ProbeCount,
+		"params":         result.Params,
+	})
 	if err != nil {
 		return maToolErrorJSON("encode_failed")
 	}
@@ -528,33 +676,16 @@ func (s *maService) canonicalizeMAStrategyAteco(ctx context.Context, strategy MA
 
 func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec, subject, email string) ([]MAEstimate, string, error) {
 	queries := buildMAEstimateQueries(strategy)
-	remaining := map[string]int{
-		maStrategyTypeATECO:    strategy.SearchLimit,
-		maStrategyTypeExpanded: strategy.SearchLimit,
-	}
 	estimates := make([]MAEstimate, 0, len(queries))
 	for _, query := range queries {
-		queryLimit := remaining[query.strategyType]
-		if queryLimit <= 0 {
-			continue
-		}
-		query.params = baseMASearchParams(strategy, query.province, query.params.DryRun, queryLimit)
+		query.params = baseMASurfaceParams(strategy, query.province, query.params.DryRun)
 		if query.atecoSearchCode != "" {
 			query.params.AtecoCode = query.atecoSearchCode
 		}
-		response, raw, err := s.cachedCompanySearch(ctx, query.params, subject, email)
+		surface, err := s.probeMASearchSurface(ctx, query.params, subject, email)
 		if err != nil {
 			return nil, "", err
 		}
-		paramsRaw, err := companySearchParamsJSON(query.params.Values())
-		if err != nil {
-			return nil, "", err
-		}
-		estimatedCount := envelopeCount(response)
-		if estimatedCount > queryLimit {
-			estimatedCount = queryLimit
-		}
-		remaining[query.strategyType] -= estimatedCount
 		estimates = append(estimates, MAEstimate{
 			ID:                uuid.NewString(),
 			SessionID:         sessionID,
@@ -563,16 +694,19 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 			AtecoCode:         query.atecoCode,
 			AtecoDescription:  query.atecoDescription,
 			Province:          query.province,
-			EstimatedCount:    estimatedCount,
-			EstimatedCost:     envelopeCost(response),
-			Params:            paramsRaw,
-			VendorResponse:    raw,
+			EstimatedCount:    surface.EstimatedCount,
+			EstimatedCost:     surface.EstimatedCost,
+			Selected:          false,
+			SurfaceStatus:     surface.Status,
+			ExecutionLimit:    strategy.SearchLimit,
+			ProbeCount:        surface.ProbeCount,
+			Params:            surface.Params,
+			VendorResponse:    surface.VendorResponse,
 		})
 	}
-	atecoTotal := estimateTotal(estimates, maStrategyTypeATECO)
-	selected := chooseSelectedStrategy(atecoTotal, len(strategy.AtecoCandidates) > 0)
+	selected := chooseSelectedStrategyFromEstimates(estimates, len(strategy.AtecoCandidates) > 0)
 	for index := range estimates {
-		estimates[index].Selected = estimates[index].StrategyType == selected
+		estimates[index].Selected = selected != "" && estimates[index].StrategyType == selected
 	}
 	return estimates, selected, nil
 }
@@ -599,7 +733,7 @@ func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 			if searchCode == "" {
 				searchCode = atecoSearchCode(candidate.Code)
 			}
-			params := baseMASearchParams(strategy, province, &dryRun, strategy.SearchLimit)
+			params := baseMASurfaceParams(strategy, province, &dryRun)
 			params.AtecoCode = searchCode
 			queries = append(queries, maSearchQuery{
 				strategyType:     maStrategyTypeATECO,
@@ -610,7 +744,7 @@ func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 				params:           params,
 			})
 		}
-		params := baseMASearchParams(strategy, province, &dryRun, strategy.SearchLimit)
+		params := baseMASurfaceParams(strategy, province, &dryRun)
 		queries = append(queries, maSearchQuery{
 			strategyType: maStrategyTypeExpanded,
 			province:     province,
@@ -618,6 +752,79 @@ func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 		})
 	}
 	return queries
+}
+
+func (s *maService) probeMASearchSurface(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) (maSurfaceProbeResult, error) {
+	dryRun := 1
+	params.DryRun = &dryRun
+	params.Limit = nil
+	params.Skip = nil
+
+	first, err := s.runMASurfaceProbe(ctx, params, subject, email)
+	if err != nil {
+		return maSurfaceProbeResult{}, err
+	}
+	probes := []maSurfaceProbeAudit{first}
+	status := maEstimateSurfaceExact
+	estimatedCount := first.Count
+	estimatedCost := first.Cost
+	if first.Count >= maSurfaceProbePageSize {
+		secondParams := params
+		skip := maSurfaceProbePageSize
+		secondParams.Skip = &skip
+		second, err := s.runMASurfaceProbe(ctx, secondParams, subject, email)
+		if err != nil {
+			return maSurfaceProbeResult{}, err
+		}
+		probes = append(probes, second)
+		estimatedCost += second.Cost
+		if second.Count >= maSurfaceProbePageSize {
+			status = maEstimateSurfaceTooBroad
+			estimatedCount = maSurfaceProbePageSize * maSurfaceProbeMaxProbeRuns
+		} else {
+			estimatedCount = maSurfaceProbePageSize + second.Count
+		}
+	}
+
+	paramsRaw, err := companySearchParamsJSON(params.Values())
+	if err != nil {
+		return maSurfaceProbeResult{}, err
+	}
+	responseRaw, err := json.Marshal(map[string]any{"probes": probes})
+	if err != nil {
+		return maSurfaceProbeResult{}, fmt.Errorf("marshal ma surface probe response: %w", err)
+	}
+	return maSurfaceProbeResult{
+		Status:         status,
+		EstimatedCount: estimatedCount,
+		EstimatedCost:  estimatedCost,
+		ProbeCount:     len(probes),
+		Params:         paramsRaw,
+		VendorResponse: responseRaw,
+	}, nil
+}
+
+func (s *maService) runMASurfaceProbe(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) (maSurfaceProbeAudit, error) {
+	params.Limit = nil
+	response, raw, err := s.cachedCompanySearch(ctx, params, subject, email)
+	if err != nil {
+		return maSurfaceProbeAudit{}, err
+	}
+	paramsRaw, err := companySearchParamsJSON(params.Values())
+	if err != nil {
+		return maSurfaceProbeAudit{}, err
+	}
+	skip := 0
+	if params.Skip != nil {
+		skip = *params.Skip
+	}
+	return maSurfaceProbeAudit{
+		Skip:     skip,
+		Count:    envelopeCount(response),
+		Cost:     envelopeCost(response),
+		Params:   paramsRaw,
+		Response: raw,
+	}, nil
 }
 
 func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, strategyType string, limit int, subject, email string) ([]MATarget, error) {
@@ -784,6 +991,19 @@ func baseMASearchParams(strategy MAStrategySpec, province string, dryRun *int, l
 	return params
 }
 
+func baseMASurfaceParams(strategy MAStrategySpec, province string, dryRun *int) openapiit.CompanyITSearchParams {
+	return openapiit.CompanyITSearchParams{
+		DryRun:         dryRun,
+		DataEnrichment: "advanced",
+		Province:       province,
+		ActivityStatus: strategy.ActivityStatus,
+		MinTurnover:    strategy.TurnoverMin,
+		MaxTurnover:    strategy.TurnoverMax,
+		MinEmployees:   strategy.EmployeeMin,
+		MaxEmployees:   strategy.EmployeeMax,
+	}
+}
+
 func envelopeCount(envelope openapiit.Envelope[openapiit.CompanyDataset]) int {
 	if envelope.Count != nil {
 		return *envelope.Count
@@ -808,23 +1028,48 @@ func estimateTotal(estimates []MAEstimate, strategyType string) int {
 	return total
 }
 
+func estimatesForStrategy(estimates []MAEstimate, strategyType string) int {
+	total := 0
+	for _, estimate := range estimates {
+		if estimate.StrategyType == strategyType {
+			total++
+		}
+	}
+	return total
+}
+
+func estimatesTooBroad(estimates []MAEstimate, strategyType string) bool {
+	for _, estimate := range estimates {
+		if estimate.StrategyType == strategyType && estimate.SurfaceStatus == maEstimateSurfaceTooBroad {
+			return true
+		}
+	}
+	return false
+}
+
 func estimatesMatchSearchLimit(estimates []MAEstimate, strategyType string, limit int) bool {
 	seen := false
-	maxLimit := 0
 	for _, estimate := range estimates {
 		if estimate.StrategyType != strategyType {
 			continue
 		}
 		seen = true
-		value := estimateParamLimit(estimate.Params)
+		value := estimateExecutionLimit(estimate)
 		if value <= 0 {
 			return false
 		}
-		if value > maxLimit {
-			maxLimit = value
+		if value != limit {
+			return false
 		}
 	}
-	return seen && maxLimit == limit
+	return seen
+}
+
+func estimateExecutionLimit(estimate MAEstimate) int {
+	if estimate.ExecutionLimit > 0 {
+		return estimate.ExecutionLimit
+	}
+	return estimateParamLimit(estimate.Params)
 }
 
 func estimateParamLimit(raw json.RawMessage) int {

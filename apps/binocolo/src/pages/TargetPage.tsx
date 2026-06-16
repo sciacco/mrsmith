@@ -56,6 +56,9 @@ interface EstimateGroup {
   cost: number;
   rows: MAEstimate[];
   selected: boolean;
+  blocked: boolean;
+  lowerBound: boolean;
+  probeCount: number;
 }
 
 export function TargetPage() {
@@ -122,6 +125,7 @@ export function TargetPage() {
 
   const estimateGroups = useMemo(() => groupEstimates(detail?.estimates ?? []), [detail?.estimates]);
   const selectedEstimateType = chosenStrategy || estimateGroups.find((group) => group.selected)?.type || '';
+  const selectedEstimateGroup = estimateGroups.find((group) => group.type === selectedEstimateType);
   const hasStrategy = Boolean(detail?.strategy);
   const hasEstimate = estimateGroups.length > 0;
   const hasTargets = (detail?.targets.length ?? 0) > 0;
@@ -133,7 +137,7 @@ export function TargetPage() {
   const strategyModels = useMemo(() => filterStrategyModels(llmOptions.models), [llmOptions.models]);
   const strategyPrompts = llmOptions.prompts.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
   const canEstimate = hasStrategy && busy !== 'create' && busy !== 'estimate';
-  const canExecute = hasStrategy && hasEstimate && estimateMatchesStrategy && busy !== 'execute';
+  const canExecute = hasStrategy && hasEstimate && estimateMatchesStrategy && !selectedEstimateGroup?.blocked && busy !== 'execute';
 
   async function openSession(id: string) {
     setBusy('sessions');
@@ -372,26 +376,40 @@ export function TargetPage() {
                   <button
                     type="button"
                     key={group.type}
-                    className={`${styles.estimateChoice} ${selectedEstimateType === group.type ? styles.estimateChoiceActive : ''}`}
+                    className={[
+                      styles.estimateChoice,
+                      selectedEstimateType === group.type ? styles.estimateChoiceActive : '',
+                      group.blocked ? styles.estimateChoiceBlocked : '',
+                    ].filter(Boolean).join(' ')}
                     onClick={() => setChosenStrategy(group.type)}
+                    aria-describedby={group.blocked ? `${group.type}-surface-status` : undefined}
                   >
                     <span>{group.label}</span>
-                    <strong>fino a {numberFormat.format(group.count)}</strong>
-                    <small>{group.cost > 0 ? `${costFormat.format(group.cost)} costo stimato` : 'costo non indicato'}</small>
+                    <strong>{formatEstimateCount(group.count, group.lowerBound)}</strong>
+                    <small id={`${group.type}-surface-status`}>
+                      {group.blocked ? 'superficie troppo ampia' : 'superficie stimata'}
+                    </small>
+                    <small>{estimateCostLabel(group.cost, group.probeCount)}</small>
                     {group.selected ? <em>scelta proposta</em> : null}
                   </button>
                 ))}
               </div>
               <div className={styles.estimateDetails}>
                 {(detail?.estimates ?? []).map((estimate) => (
-                  <span key={estimate.id}>
-                    {estimateLabel(estimate)} · fino a {numberFormat.format(estimate.estimatedCount)}
+                  <span key={estimate.id} className={estimate.surfaceStatus === 'too_broad' ? styles.estimateDetailBlocked : undefined}>
+                    {estimateLabel(estimate)} · {formatEstimateCount(estimate.estimatedCount, estimate.surfaceStatus === 'too_broad')}
+                    {estimate.surfaceStatus === 'too_broad' ? ' · troppo ampia' : ''}
                   </span>
                 ))}
               </div>
               {!estimateMatchesStrategy ? (
                 <div className={styles.estimateWarning}>
                   La strategia e cambiata dopo la stima. Ricalcola prima di confermare la ricerca.
+                </div>
+              ) : null}
+              {selectedEstimateGroup?.blocked ? (
+                <div className={styles.estimateWarning}>
+                  Questa strategia satura due finestre di dry-run da 1.000 risultati: restringi i criteri prima di confermare.
                 </div>
               ) : null}
               <div className={styles.strategyActions}>
@@ -655,8 +673,8 @@ function StatusPill({ status }: { status?: MASessionStatus }) {
 
 function groupEstimates(estimates: MAEstimate[]): EstimateGroup[] {
   const groups: EstimateGroup[] = [
-    { type: 'ateco', label: 'Strategia ATECO', count: 0, cost: 0, rows: [], selected: false },
-    { type: 'expanded', label: 'Ricerca espansa', count: 0, cost: 0, rows: [], selected: false },
+    { type: 'ateco', label: 'Strategia ATECO', count: 0, cost: 0, rows: [], selected: false, blocked: false, lowerBound: false, probeCount: 0 },
+    { type: 'expanded', label: 'Ricerca espansa', count: 0, cost: 0, rows: [], selected: false, blocked: false, lowerBound: false, probeCount: 0 },
   ];
   for (const estimate of estimates) {
     const group = groups.find((item) => item.type === estimate.strategyType);
@@ -665,6 +683,9 @@ function groupEstimates(estimates: MAEstimate[]): EstimateGroup[] {
     group.cost += estimate.estimatedCost;
     group.rows.push(estimate);
     group.selected ||= estimate.selected;
+    group.blocked ||= estimate.surfaceStatus === 'too_broad';
+    group.lowerBound ||= estimate.surfaceStatus === 'too_broad';
+    group.probeCount += estimate.probeCount ?? 1;
   }
   return groups.filter((group) => group.rows.length > 0);
 }
@@ -723,8 +744,10 @@ function strategyKey(strategy: MAStrategySpec): string {
 function estimatesMatchSearchLimit(estimates: MAEstimate[], strategyType: MAStrategyType, limit: number): boolean {
   const matching = estimates.filter((estimate) => estimate.strategyType === strategyType);
   if (matching.length === 0) return false;
-  const limits = matching.map((estimate) => Number(estimate.params?.limit ?? 0)).filter((value) => Number.isFinite(value) && value > 0);
-  return limits.length === matching.length && Math.max(...limits) === limit;
+  return matching.every((estimate) => {
+    const value = Number(estimate.executionLimit ?? estimate.params?.limit ?? 0);
+    return Number.isFinite(value) && value === limit;
+  });
 }
 
 function estimateLabel(estimate: MAEstimate): string {
@@ -732,6 +755,17 @@ function estimateLabel(estimate: MAEstimate): string {
   if (estimate.atecoCode) parts.push(estimate.atecoCode);
   if (estimate.province) parts.push(estimate.province);
   return parts.join(' · ');
+}
+
+function formatEstimateCount(count: number, lowerBound: boolean): string {
+  const formatted = numberFormat.format(count);
+  return lowerBound ? `>= ${formatted}` : formatted;
+}
+
+function estimateCostLabel(cost: number, probeCount: number): string {
+  const costText = cost > 0 ? `${costFormat.format(cost)} costo stimato` : 'costo non indicato';
+  if (probeCount > 1) return `${costText} · ${probeCount} dry-run`;
+  return `${costText} · 1 dry-run`;
 }
 
 function strategyTypeLabel(type: MAStrategyType): string {

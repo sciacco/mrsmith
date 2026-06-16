@@ -81,6 +81,7 @@ export interface MASessionDetail {
 export type MASessionStatus = 'draft' | 'estimated' | 'running' | 'completed' | 'failed';
 export type MAStrategyType = 'ateco' | 'expanded';
 export type MAMatchState = 'match' | 'match_parziale' | 'fuori_criterio';
+export type MAEstimateSurfaceStatus = 'exact' | 'too_broad';
 
 export interface MASession {
   id: string;
@@ -161,6 +162,9 @@ export interface MAEstimate {
   estimatedCount: number;
   estimatedCost: number;
   selected: boolean;
+  surfaceStatus?: MAEstimateSurfaceStatus;
+  executionLimit?: number;
+  probeCount?: number;
   params?: Record<string, string>;
   createdAt: string;
 }

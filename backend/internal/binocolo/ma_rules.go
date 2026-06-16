@@ -291,6 +291,22 @@ func chooseSelectedStrategy(atecoCount int, hasAteco bool) string {
 	return maStrategyTypeExpanded
 }
 
+func chooseSelectedStrategyFromEstimates(estimates []MAEstimate, hasAteco bool) string {
+	atecoCount := estimateTotal(estimates, maStrategyTypeATECO)
+	atecoBroad := estimatesTooBroad(estimates, maStrategyTypeATECO)
+	expandedBroad := estimatesTooBroad(estimates, maStrategyTypeExpanded)
+	if hasAteco && !atecoBroad && atecoCount >= maATECOSuccessThreshold {
+		return maStrategyTypeATECO
+	}
+	if !expandedBroad && estimatesForStrategy(estimates, maStrategyTypeExpanded) > 0 {
+		return maStrategyTypeExpanded
+	}
+	if hasAteco && !atecoBroad && atecoCount > 0 {
+		return maStrategyTypeATECO
+	}
+	return ""
+}
+
 func scoreMATarget(target MATarget, strategy MAStrategySpec, now time.Time) MATarget {
 	score := 0
 	missing := make([]string, 0)

@@ -69,6 +69,32 @@ func TestMAEstimateStrategyFallbackThreshold(t *testing.T) {
 	}
 }
 
+func TestMAEstimateStrategySelectionSkipsTooBroadSurfaces(t *testing.T) {
+	estimates := []MAEstimate{
+		{StrategyType: maStrategyTypeATECO, EstimatedCount: 2000, SurfaceStatus: maEstimateSurfaceTooBroad},
+		{StrategyType: maStrategyTypeExpanded, EstimatedCount: 80, SurfaceStatus: maEstimateSurfaceExact},
+	}
+	if got := chooseSelectedStrategyFromEstimates(estimates, true); got != maStrategyTypeExpanded {
+		t.Fatalf("strategy with broad ATECO = %q, want expanded", got)
+	}
+
+	estimates = []MAEstimate{
+		{StrategyType: maStrategyTypeATECO, EstimatedCount: 9, SurfaceStatus: maEstimateSurfaceExact},
+		{StrategyType: maStrategyTypeExpanded, EstimatedCount: 2000, SurfaceStatus: maEstimateSurfaceTooBroad},
+	}
+	if got := chooseSelectedStrategyFromEstimates(estimates, true); got != maStrategyTypeATECO {
+		t.Fatalf("strategy with broad expanded fallback = %q, want ateco", got)
+	}
+
+	estimates = []MAEstimate{
+		{StrategyType: maStrategyTypeATECO, EstimatedCount: 2000, SurfaceStatus: maEstimateSurfaceTooBroad},
+		{StrategyType: maStrategyTypeExpanded, EstimatedCount: 2000, SurfaceStatus: maEstimateSurfaceTooBroad},
+	}
+	if got := chooseSelectedStrategyFromEstimates(estimates, true); got != "" {
+		t.Fatalf("strategy with only broad options = %q, want empty selection", got)
+	}
+}
+
 func TestMATargetScoringMatchPartialAndOutsideRules(t *testing.T) {
 	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
 	strategy := validScoringStrategy()

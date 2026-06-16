@@ -80,15 +80,15 @@ func TestDraftStrategyUsesAtecoToolWhitelist(t *testing.T) {
 	}}
 	service := newMAService(&fakeMAWorkspaceStore{}, nil, ateco, nil, ai)
 
-	strategy, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "")
+	strategy, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "", "", "")
 	if err != nil {
 		t.Fatalf("draftStrategy returned error: %v", err)
 	}
 	if len(ai.requests) != 2 {
 		t.Fatalf("ai requests = %d, want 2", len(ai.requests))
 	}
-	if len(ai.requests[0].Tools) != 1 || ai.requests[0].Tools[0].Function.Name != maAtecoToolName {
-		t.Fatalf("first request tools = %#v, want ateco tool", ai.requests[0].Tools)
+	if !hasTool(ai.requests[0].Tools, maAtecoToolName) || !hasTool(ai.requests[0].Tools, maCompanySurfaceToolName) {
+		t.Fatalf("first request tools = %#v, want ateco and surface tools", ai.requests[0].Tools)
 	}
 	if ateco.lastLimit != atecoSearchHardLimit {
 		t.Fatalf("tool limit = %d, want hard cap %d", ateco.lastLimit, atecoSearchHardLimit)
@@ -126,7 +126,7 @@ func TestDraftStrategyRejectsAtecoOutsideToolWhitelist(t *testing.T) {
 	}}
 	service := newMAService(&fakeMAWorkspaceStore{}, nil, ateco, nil, ai)
 
-	_, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "")
+	_, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "", "", "")
 	if !errors.Is(err, errMAStrategyInvalid) {
 		t.Fatalf("err = %v, want errMAStrategyInvalid", err)
 	}
@@ -175,6 +175,157 @@ func TestMAEstimatesSendDotlessAtecoToOpenAPIIT(t *testing.T) {
 	if params["atecoCode"] != "621000" {
 		t.Fatalf("estimate params atecoCode = %q, want 621000", params["atecoCode"])
 	}
+	if params["limit"] != "" {
+		t.Fatalf("surface estimate params should not include limit, got %q", params["limit"])
+	}
+	if estimates[0].ExecutionLimit != 10 {
+		t.Fatalf("execution limit = %d, want 10", estimates[0].ExecutionLimit)
+	}
+	if estimates[0].SurfaceStatus != maEstimateSurfaceExact {
+		t.Fatalf("surface status = %q, want exact", estimates[0].SurfaceStatus)
+	}
+}
+
+func TestMASurfaceProbeExactRunsWithoutLimit(t *testing.T) {
+	var seenLimit string
+	var seenSkip string
+	client := newCompanySearchTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		seenLimit = r.URL.Query().Get("limit")
+		seenSkip = r.URL.Query().Get("skip")
+		if got := r.URL.Query().Get("dryRun"); got != "1" {
+			t.Fatalf("dryRun = %q, want 1", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data":    []map[string]any{},
+			"success": true,
+			"message": "ok",
+			"error":   nil,
+			"count":   42,
+			"cost":    0.01,
+		})
+	})
+	service := &maService{
+		openapiit: client,
+		now:       func() time.Time { return time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC) },
+	}
+	strategy := validSurfaceStrategy()
+	dryRun := 1
+	limit := 25
+	params := baseMASearchParams(strategy, "MI", &dryRun, limit)
+
+	result, err := service.probeMASearchSurface(context.Background(), params, "", "")
+	if err != nil {
+		t.Fatalf("probeMASearchSurface returned error: %v", err)
+	}
+	if seenLimit != "" || seenSkip != "" {
+		t.Fatalf("first surface probe query limit=%q skip=%q, want both empty", seenLimit, seenSkip)
+	}
+	if result.Status != maEstimateSurfaceExact || result.EstimatedCount != 42 || result.ProbeCount != 1 {
+		t.Fatalf("surface result = %#v, want exact 42 with one probe", result)
+	}
+	var storedParams map[string]string
+	if err := json.Unmarshal(result.Params, &storedParams); err != nil {
+		t.Fatalf("unmarshal surface params: %v", err)
+	}
+	if _, ok := storedParams["limit"]; ok {
+		t.Fatalf("stored surface params should not include limit: %#v", storedParams)
+	}
+}
+
+func TestMASurfaceProbeExtendsSaturatedFirstWindowWithSkip(t *testing.T) {
+	seen := []map[string]string{}
+	client := newCompanySearchTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		seen = append(seen, map[string]string{
+			"limit": query.Get("limit"),
+			"skip":  query.Get("skip"),
+		})
+		count := 1000
+		if query.Get("skip") == "1000" {
+			count = 37
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data":    []map[string]any{},
+			"success": true,
+			"message": "ok",
+			"error":   nil,
+			"count":   count,
+			"cost":    0.01,
+		})
+	})
+	service := &maService{
+		openapiit: client,
+		now:       func() time.Time { return time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC) },
+	}
+	strategy := validSurfaceStrategy()
+	dryRun := 1
+	result, err := service.probeMASearchSurface(context.Background(), baseMASurfaceParams(strategy, "MI", &dryRun), "", "")
+	if err != nil {
+		t.Fatalf("probeMASearchSurface returned error: %v", err)
+	}
+	if len(seen) != 2 {
+		t.Fatalf("probe calls = %#v, want two calls", seen)
+	}
+	if seen[0]["limit"] != "" || seen[0]["skip"] != "" || seen[1]["limit"] != "" || seen[1]["skip"] != "1000" {
+		t.Fatalf("probe queries = %#v, want no limit and second skip=1000", seen)
+	}
+	if result.Status != maEstimateSurfaceExact || result.EstimatedCount != 1037 || result.ProbeCount != 2 {
+		t.Fatalf("surface result = %#v, want exact 1037 with two probes", result)
+	}
+}
+
+func TestMASurfaceProbeStopsAfterTwoSaturatedWindows(t *testing.T) {
+	var calls int
+	client := newCompanySearchTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data":    []map[string]any{},
+			"success": true,
+			"message": "ok",
+			"error":   nil,
+			"count":   1000,
+			"cost":    0.01,
+		})
+	})
+	service := &maService{
+		openapiit: client,
+		now:       func() time.Time { return time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC) },
+	}
+	strategy := validSurfaceStrategy()
+	dryRun := 1
+	result, err := service.probeMASearchSurface(context.Background(), baseMASurfaceParams(strategy, "MI", &dryRun), "", "")
+	if err != nil {
+		t.Fatalf("probeMASearchSurface returned error: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("calls = %d, want two", calls)
+	}
+	if result.Status != maEstimateSurfaceTooBroad || result.EstimatedCount != 2000 || result.ProbeCount != 2 {
+		t.Fatalf("surface result = %#v, want too_broad lower bound 2000", result)
+	}
+}
+
+func TestMACompanySurfaceToolRejectsAtecoOutsideWhitelist(t *testing.T) {
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, nil, nil)
+	call := openrouter.ToolCall{
+		ID:   "surface",
+		Type: "function",
+		Function: openrouter.ToolCallFunction{
+			Name:      maCompanySurfaceToolName,
+			Arguments: `{"province":"MI","atecoCode":"62.10.00"}`,
+		},
+	}
+	content := service.executeMACompanySurfaceTool(context.Background(), call, map[string]AtecoCode{}, "", "")
+	var got map[string]string
+	if err := json.Unmarshal([]byte(content), &got); err != nil {
+		t.Fatalf("unmarshal tool response: %v", err)
+	}
+	if got["error"] != "ateco_not_allowed" {
+		t.Fatalf("tool response = %#v, want ateco_not_allowed", got)
+	}
 }
 
 func TestCompanySearchNormalizesAtecoBeforeCacheAndUpstream(t *testing.T) {
@@ -222,6 +373,27 @@ type fakeAtecoStore struct {
 	items     map[string]AtecoCode
 	lastQuery string
 	lastLimit int
+}
+
+func validSurfaceStrategy() MAStrategySpec {
+	strategy, err := validateMAStrategy(MAStrategySpec{
+		SectorDescription: "servizi IT",
+		ActivityStatus:    "ATTIVA",
+		SearchLimit:       100,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return strategy
+}
+
+func hasTool(tools []openrouter.Tool, name string) bool {
+	for _, tool := range tools {
+		if tool.Function.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func newFakeAtecoStore(items []AtecoCode) *fakeAtecoStore {
