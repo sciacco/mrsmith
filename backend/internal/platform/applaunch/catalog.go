@@ -302,7 +302,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			Description:   "Verifiche OpenAPI.it.",
 			Icon:          "database",
 			Href:          BinocoloAppHref,
-			Status:        "dev",
+			Status:        "test",
 			CategoryID:    "smart-apps",
 			CategoryTitle: "SMART APPS",
 			AccessRoles:   BinocoloAccessRoles(),

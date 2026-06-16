@@ -15,6 +15,14 @@ const (
 	maSessionStatusCompleted = "completed"
 	maSessionStatusFailed    = "failed"
 
+	maSessionVisibilityActive   = "active"
+	maSessionVisibilityArchived = "archived"
+	maSessionVisibilityDeleted  = "deleted"
+
+	maSessionLifecycleArchive = "archive"
+	maSessionLifecycleRestore = "restore"
+	maSessionLifecycleDelete  = "delete"
+
 	maRunStatusRunning   = "running"
 	maRunStatusCompleted = "completed"
 	maRunStatusFailed    = "failed"
@@ -109,6 +117,10 @@ type MASessionSummary struct {
 	CreatedAt        time.Time  `json:"createdAt"`
 	UpdatedAt        time.Time  `json:"updatedAt"`
 	LastRunAt        *time.Time `json:"lastRunAt,omitempty"`
+	ArchivedAt       *time.Time `json:"archivedAt,omitempty"`
+	ArchivedByEmail  string     `json:"archivedByEmail,omitempty"`
+	DeletedAt        *time.Time `json:"deletedAt,omitempty"`
+	DeletedByEmail   string     `json:"deletedByEmail,omitempty"`
 }
 
 type MASessionDetail struct {
@@ -125,18 +137,24 @@ type MASessionDetail struct {
 }
 
 type MASession struct {
-	ID               string     `json:"id"`
-	Title            string     `json:"title"`
-	Prompt           string     `json:"prompt"`
-	Status           string     `json:"status"`
-	SelectedStrategy string     `json:"selectedStrategy,omitempty"`
-	ActiveStrategyID string     `json:"activeStrategyId,omitempty"`
-	CreatedBySubject string     `json:"createdBySubject,omitempty"`
-	CreatedByEmail   string     `json:"createdByEmail,omitempty"`
-	LastEstimatedAt  *time.Time `json:"lastEstimatedAt,omitempty"`
-	LastExecutedAt   *time.Time `json:"lastExecutedAt,omitempty"`
-	CreatedAt        time.Time  `json:"createdAt"`
-	UpdatedAt        time.Time  `json:"updatedAt"`
+	ID                string     `json:"id"`
+	Title             string     `json:"title"`
+	Prompt            string     `json:"prompt"`
+	Status            string     `json:"status"`
+	SelectedStrategy  string     `json:"selectedStrategy,omitempty"`
+	ActiveStrategyID  string     `json:"activeStrategyId,omitempty"`
+	CreatedBySubject  string     `json:"createdBySubject,omitempty"`
+	CreatedByEmail    string     `json:"createdByEmail,omitempty"`
+	LastEstimatedAt   *time.Time `json:"lastEstimatedAt,omitempty"`
+	LastExecutedAt    *time.Time `json:"lastExecutedAt,omitempty"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
+	ArchivedAt        *time.Time `json:"archivedAt,omitempty"`
+	ArchivedBySubject string     `json:"archivedBySubject,omitempty"`
+	ArchivedByEmail   string     `json:"archivedByEmail,omitempty"`
+	DeletedAt         *time.Time `json:"deletedAt,omitempty"`
+	DeletedBySubject  string     `json:"deletedBySubject,omitempty"`
+	DeletedByEmail    string     `json:"deletedByEmail,omitempty"`
 }
 
 type MAStrategyVersion struct {

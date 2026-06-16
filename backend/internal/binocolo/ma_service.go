@@ -26,6 +26,9 @@ var (
 	errMALLMConfigUnavailable  = errors.New("ma llm config unavailable")
 	errMAEstimateTooLarge      = errors.New("estimate too large")
 	errMAEstimateOverBudget    = errors.New("estimate over budget")
+	errMAVisibilityInvalid     = errors.New("ma session visibility invalid")
+	errMASessionArchived       = errors.New("ma session archived")
+	errMASessionDeleted        = errors.New("ma session deleted")
 )
 
 const (
@@ -78,11 +81,15 @@ func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, p
 	}
 }
 
-func (s *maService) listSessions(ctx context.Context) ([]MASessionSummary, error) {
+func (s *maService) listSessions(ctx context.Context, visibility string) ([]MASessionSummary, error) {
 	if s.store == nil {
 		return nil, errMAStoreUnavailable
 	}
-	return s.store.ListMASessions(ctx)
+	normalized, err := normalizeMASessionVisibility(visibility)
+	if err != nil {
+		return nil, err
+	}
+	return s.store.ListMASessions(ctx, normalized)
 }
 
 func (s *maService) getSession(ctx context.Context, id string) (MASessionDetail, error) {
@@ -93,7 +100,59 @@ func (s *maService) getSession(ctx context.Context, id string) (MASessionDetail,
 	if err != nil {
 		return MASessionDetail{}, err
 	}
+	if detail.Session.DeletedAt != nil {
+		return MASessionDetail{}, errMASessionDeleted
+	}
 	return decorateMACost(detail), nil
+}
+
+func (s *maService) archiveSession(ctx context.Context, id, subject, email string) error {
+	return s.updateSessionLifecycle(ctx, id, maSessionLifecycleArchive, subject, email)
+}
+
+func (s *maService) restoreSession(ctx context.Context, id, subject, email string) error {
+	return s.updateSessionLifecycle(ctx, id, maSessionLifecycleRestore, subject, email)
+}
+
+func (s *maService) softDeleteSession(ctx context.Context, id, subject, email string) error {
+	return s.updateSessionLifecycle(ctx, id, maSessionLifecycleDelete, subject, email)
+}
+
+func (s *maService) updateSessionLifecycle(ctx context.Context, id, action, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	updated, err := s.store.UpdateMASessionLifecycle(ctx, id, action, subject, email)
+	if err != nil {
+		return err
+	}
+	if !updated {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func normalizeMASessionVisibility(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", maSessionVisibilityActive:
+		return maSessionVisibilityActive, nil
+	case maSessionVisibilityArchived:
+		return maSessionVisibilityArchived, nil
+	case maSessionVisibilityDeleted:
+		return maSessionVisibilityDeleted, nil
+	default:
+		return "", errMAVisibilityInvalid
+	}
+}
+
+func ensureMASessionOperational(session MASession) error {
+	if session.DeletedAt != nil {
+		return errMASessionDeleted
+	}
+	if session.ArchivedAt != nil {
+		return errMASessionArchived
+	}
+	return nil
 }
 
 // decorateMACost attaches the active enrichment budget and unit price so the UI
@@ -202,6 +261,9 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 	if err != nil {
 		return MASessionDetail{}, err
 	}
+	if err := ensureMASessionOperational(detail.Session); err != nil {
+		return MASessionDetail{}, err
+	}
 	strategyVersion := detail.Strategy
 	if req.Strategy != nil {
 		strategy, err := validateMAStrategy(*req.Strategy)
@@ -277,6 +339,9 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	}
 	detail, err := s.store.GetMASession(ctx, sessionID)
 	if err != nil {
+		return MASessionDetail{}, err
+	}
+	if err := ensureMASessionOperational(detail.Session); err != nil {
 		return MASessionDetail{}, err
 	}
 	strategyVersion := detail.Strategy
@@ -429,6 +494,9 @@ func (s *maService) exportSession(ctx context.Context, sessionID string, format 
 	detail, err := s.store.GetMASession(ctx, sessionID)
 	if err != nil {
 		return nil, "", "", err
+	}
+	if detail.Session.DeletedAt != nil {
+		return nil, "", "", errMASessionDeleted
 	}
 	if err := s.linkTrace(ctx, maTraceLink{SessionID: sessionID, StrategyVersionID: detail.Session.ActiveStrategyID}); err != nil {
 		return nil, "", "", err

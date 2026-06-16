@@ -68,6 +68,10 @@ export interface MASessionSummary {
   createdAt: string;
   updatedAt: string;
   lastRunAt?: string;
+  archivedAt?: string;
+  archivedByEmail?: string;
+  deletedAt?: string;
+  deletedByEmail?: string;
 }
 
 export interface MASessionDetail {
@@ -81,6 +85,7 @@ export interface MASessionDetail {
 }
 
 export type MASessionStatus = 'draft' | 'estimated' | 'running' | 'completed' | 'failed';
+export type MASessionVisibility = 'active' | 'archived' | 'deleted';
 export type MAStrategyType = 'ateco' | 'expanded';
 export type MAMatchState = 'match' | 'match_parziale' | 'fuori_criterio';
 export type MAEstimateSurfaceStatus = 'exact' | 'too_broad';
@@ -99,6 +104,12 @@ export interface MASession {
   lastExecutedAt?: string;
   createdAt: string;
   updatedAt: string;
+  archivedAt?: string;
+  archivedBySubject?: string;
+  archivedByEmail?: string;
+  deletedAt?: string;
+  deletedBySubject?: string;
+  deletedByEmail?: string;
 }
 
 export interface MAStrategyVersion {

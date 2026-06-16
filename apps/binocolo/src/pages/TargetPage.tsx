@@ -1,5 +1,5 @@
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, Skeleton, Modal } from '@mrsmith/ui';
+import { Button, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useApiClient } from '../api/client';
 import type {
@@ -11,6 +11,7 @@ import type {
   MASessionListResponse,
   MASessionStatus,
   MASessionSummary,
+  MASessionVisibility,
   MAStrategySpec,
   MAStrategyType,
   MATarget,
@@ -21,6 +22,11 @@ import type {
 import styles from './TargetPage.module.css';
 
 const numberFormat = new Intl.NumberFormat('it-IT');
+const dateFormat = new Intl.DateTimeFormat('it-IT', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
 const moneyFormat = new Intl.NumberFormat('it-IT', {
   style: 'currency',
   currency: 'EUR',
@@ -75,7 +81,9 @@ interface EstimateGroup {
 
 export function TargetPage() {
   const api = useApiClient();
+  const { toast } = useToast();
   const [sessions, setSessions] = useState<MASessionSummary[]>([]);
+  const [sessionVisibility, setSessionVisibility] = useState<MASessionVisibility>('active');
   const [llmOptions, setLLMOptions] = useState<MALLMOptionsResponse>({ models: [], prompts: [] });
   const [detail, setDetail] = useState<MASessionDetail | null>(null);
   const [strategy, setStrategy] = useState<MAStrategySpec>(emptyStrategy);
@@ -90,6 +98,28 @@ export function TargetPage() {
   const [activeTab, setActiveTab] = useState<'results' | 'config'>('results');
   const [isFullDetailOpen, setIsFullDetailOpen] = useState(false);
   const [modalActiveTab, setModalActiveTab] = useState<'overview' | 'financials' | 'shareholders' | 'registry'>('overview');
+  const [lifecycleBusyId, setLifecycleBusyId] = useState<string | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<MASessionSummary | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('mrsmith_binocolo_sidebar_collapsed');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('mrsmith_binocolo_sidebar_collapsed', String(next));
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (detail) {
@@ -101,20 +131,27 @@ export function TargetPage() {
     }
   }, [detail?.session.id]);
 
-  const startNewSearch = useCallback(() => {
+  const clearActiveDetail = useCallback(() => {
     setDetail(null);
     setStrategy(emptyStrategy);
-    setPrompt('');
     setChosenStrategy('');
     setSelectedTargetId(null);
-    setError(null);
+    setAcknowledgeCost(false);
+    setIsFullDetailOpen(false);
   }, []);
 
-  const loadSessions = useCallback(async () => {
+  const startNewSearch = useCallback(() => {
+    setSessionVisibility('active');
+    clearActiveDetail();
+    setPrompt('');
+    setError(null);
+  }, [clearActiveDetail]);
+
+  const loadSessionsFor = useCallback(async (visibility: MASessionVisibility) => {
     setBusy((current) => current ?? 'sessions');
     setError(null);
     try {
-      const data = await api.get<MASessionListResponse>('/binocolo/v1/ma/sessions');
+      const data = await api.get<MASessionListResponse>(`/binocolo/v1/ma/sessions?visibility=${visibility}`);
       setSessions(data.items);
     } catch (err) {
       setError(errorLabel(err));
@@ -122,6 +159,10 @@ export function TargetPage() {
       setBusy((current) => (current === 'sessions' ? null : current));
     }
   }, [api]);
+
+  const loadSessions = useCallback(async () => {
+    await loadSessionsFor(sessionVisibility);
+  }, [loadSessionsFor, sessionVisibility]);
 
   useEffect(() => {
     void loadSessions();
@@ -164,6 +205,9 @@ export function TargetPage() {
   const hasStrategy = Boolean(detail?.strategy);
   const hasEstimate = estimateGroups.length > 0;
   const hasTargets = (detail?.targets.length ?? 0) > 0;
+  const sessionIsArchived = Boolean(detail?.session.archivedAt);
+  const sessionIsDeleted = Boolean(detail?.session.deletedAt);
+  const canOperateOnSession = !sessionIsArchived && !sessionIsDeleted;
   const estimateMatchesStrategy =
     hasEstimate && detail?.strategy?.strategy && selectedEstimateType
       ? strategyKey(strategy) === strategyKey(detail.strategy.strategy) &&
@@ -171,7 +215,7 @@ export function TargetPage() {
       : false;
   const strategyModels = useMemo(() => filterStrategyModels(llmOptions.models), [llmOptions.models]);
   const strategyPrompts = llmOptions.prompts.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
-  const canEstimate = hasStrategy && busy !== 'create' && busy !== 'estimate';
+  const canEstimate = hasStrategy && canOperateOnSession && busy !== 'create' && busy !== 'estimate';
   const costPerCompanyEur = detail?.costPerCompanyEur ?? 0.1;
   const budgetEur = detail?.budgetEur ?? 0;
   const projectedFetched = selectedEstimateGroup
@@ -184,12 +228,21 @@ export function TargetPage() {
     hasEstimate &&
     estimateMatchesStrategy &&
     !selectedEstimateGroup?.blocked &&
+    canOperateOnSession &&
     (!overBudget || acknowledgeCost) &&
     busy !== 'execute';
 
   useEffect(() => {
     setAcknowledgeCost(false);
   }, [selectedEstimateType, detail?.strategy?.id, strategy.searchLimit]);
+
+  function switchSessionVisibility(visibility: MASessionVisibility) {
+    setSessionVisibility(visibility);
+    setError(null);
+    if (detail && sessionVisibilityFor(detail.session) !== visibility) {
+      clearActiveDetail();
+    }
+  }
 
   async function openSession(id: string) {
     setBusy('sessions');
@@ -216,9 +269,10 @@ export function TargetPage() {
         modelId: selectedModelId || undefined,
         promptId: selectedPromptId || undefined,
       });
+      setSessionVisibility('active');
       setDetail(data);
       setPrompt('');
-      await loadSessions();
+      await loadSessionsFor('active');
     } catch (err) {
       setError(errorLabel(err));
     } finally {
@@ -286,6 +340,63 @@ export function TargetPage() {
     setStrategy((current) => ({ ...current, ...patch }));
   }
 
+  async function archiveSession(item: MASessionSummary) {
+    setLifecycleBusyId(item.id);
+    setError(null);
+    try {
+      await api.post<void>(`/binocolo/v1/ma/sessions/${item.id}/archive`);
+      toast('Ricerca archiviata.', 'success');
+      if (detail?.session.id === item.id) {
+        clearActiveDetail();
+      }
+      setSessionVisibility('archived');
+      await loadSessionsFor('archived');
+    } catch (err) {
+      setError(errorLabel(err));
+      toast(errorLabel(err), 'error');
+    } finally {
+      setLifecycleBusyId(null);
+    }
+  }
+
+  async function restoreSession(item: MASessionSummary) {
+    setLifecycleBusyId(item.id);
+    setError(null);
+    try {
+      await api.post<void>(`/binocolo/v1/ma/sessions/${item.id}/restore`);
+      toast('Ricerca ripristinata.', 'success');
+      setSessionVisibility('active');
+      await loadSessionsFor('active');
+    } catch (err) {
+      setError(errorLabel(err));
+      toast(errorLabel(err), 'error');
+    } finally {
+      setLifecycleBusyId(null);
+    }
+  }
+
+  async function softDeleteSession() {
+    if (!deleteCandidate) return;
+    const candidate = deleteCandidate;
+    setLifecycleBusyId(candidate.id);
+    setError(null);
+    try {
+      await api.delete<void>(`/binocolo/v1/ma/sessions/${candidate.id}`);
+      toast('Ricerca spostata nel cestino.', 'success');
+      setDeleteCandidate(null);
+      if (detail?.session.id === candidate.id) {
+        clearActiveDetail();
+      }
+      setSessionVisibility('deleted');
+      await loadSessionsFor('deleted');
+    } catch (err) {
+      setError(errorLabel(err));
+      toast(errorLabel(err), 'error');
+    } finally {
+      setLifecycleBusyId(null);
+    }
+  }
+
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -307,48 +418,95 @@ export function TargetPage() {
         </div>
       ) : null}
 
-      <div className={styles.workspace}>
-        <aside className={styles.sessionsPanel} aria-label="Ricerche salvate">
-          <div className={styles.panelHeader}>
-            <div>
-              <h2>Ricerche salvate</h2>
-              <p>{sessions.length > 0 ? `${sessions.length} sessioni` : 'Nessuna ricerca salvata'}</p>
+      <div className={`${styles.workspace} ${isSidebarCollapsed ? styles.workspaceSidebarCollapsed : ''}`}>
+        <aside
+          className={`${styles.sessionsPanel} ${isSidebarCollapsed ? styles.sessionsPanelCollapsed : ''}`}
+          aria-label="Ricerche salvate"
+        >
+          <button
+            type="button"
+            className={styles.sidebarToggle}
+            onClick={toggleSidebar}
+            title={isSidebarCollapsed ? "Mostra ricerche salvate" : "Nascondi ricerche salvate"}
+            aria-label={isSidebarCollapsed ? "Mostra ricerche salvate" : "Nascondi ricerche salvate"}
+          >
+            <Icon name={isSidebarCollapsed ? "chevron-right" : "chevron-left"} size={14} />
+          </button>
+          <div className={styles.sessionsPanelContent}>
+            <div className={styles.panelHeader}>
+              <div>
+                <h2>Ricerche salvate</h2>
+                <p>{sessionPanelSummary(sessionVisibility, sessions.length)}</p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={startNewSearch}
+                disabled={detail === null && sessionVisibility === 'active'}
+                leftIcon={<Icon name="plus" size={14} />}
+              >
+                Nuova
+              </Button>
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={startNewSearch}
-              disabled={detail === null}
-              leftIcon={<Icon name="plus" size={14} />}
-            >
-              Nuova
-            </Button>
-          </div>
-          {busy === 'sessions' && sessions.length === 0 ? (
-            <div className={styles.skeletonBlock}>
-              <Skeleton rows={6} />
-            </div>
-          ) : sessions.length === 0 ? (
-            <EmptyState icon="file-text" title="Nessuna sessione" text="Prepara una nuova strategia dalla richiesta iniziale." />
-          ) : (
-            <div className={styles.sessionList}>
-              {sessions.map((item) => (
+            <div className={styles.visibilityTabs} role="tablist" aria-label="Visibilità ricerche salvate">
+              {sessionVisibilityOptions.map((option) => (
                 <button
+                  key={option.value}
                   type="button"
-                  key={item.id}
-                  className={`${styles.sessionItem} ${detail?.session.id === item.id ? styles.sessionItemActive : ''}`}
-                  onClick={() => void openSession(item.id)}
+                  role="tab"
+                  aria-selected={sessionVisibility === option.value}
+                  className={`${styles.visibilityTab} ${sessionVisibility === option.value ? styles.visibilityTabActive : ''}`}
+                  onClick={() => switchSessionVisibility(option.value)}
                 >
-                  <span className={styles.sessionTitle}>{item.title}</span>
-                  <span className={styles.sessionMeta}>
-                    {sessionStatusLabel(item.status)}
-                    {item.resultCount > 0 ? ` · ${numberFormat.format(item.resultCount)} target` : ''}
-                  </span>
-                  <span className={styles.sessionPrompt}>{item.prompt}</span>
+                  {option.label}
                 </button>
               ))}
             </div>
-          )}
+            {busy === 'sessions' && sessions.length === 0 ? (
+              <div className={styles.skeletonBlock}>
+                <Skeleton rows={6} />
+              </div>
+            ) : sessions.length === 0 ? (
+              <EmptyState
+                icon="file-text"
+                title={sessionEmptyState(sessionVisibility).title}
+                text={sessionEmptyState(sessionVisibility).text}
+              />
+            ) : (
+              <div className={styles.sessionList}>
+                {sessions.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`${styles.sessionItem} ${detail?.session.id === item.id ? styles.sessionItemActive : ''}`}
+                  >
+                    <button
+                      type="button"
+                      className={styles.sessionOpenButton}
+                      onClick={() => void openSession(item.id)}
+                      disabled={sessionVisibility === 'deleted'}
+                      title={sessionVisibility === 'deleted' ? 'Ripristina la ricerca prima di aprirla' : undefined}
+                    >
+                      <span className={styles.sessionTitle}>{item.title}</span>
+                      <span className={styles.sessionMeta}>
+                        {sessionStatusLabel(item.status)}
+                        {item.resultCount > 0 ? ` · ${numberFormat.format(item.resultCount)} target` : ''}
+                        {sessionLifecycleMeta(item, sessionVisibility)}
+                      </span>
+                      <span className={styles.sessionPrompt}>{item.prompt}</span>
+                    </button>
+                    <SessionActions
+                      item={item}
+                      visibility={sessionVisibility}
+                      busy={lifecycleBusyId === item.id}
+                      onArchive={archiveSession}
+                      onRestore={restoreSession}
+                      onDelete={setDeleteCandidate}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </aside>
 
         {detail === null ? (
@@ -410,6 +568,12 @@ export function TargetPage() {
                 <p className={styles.sessionPromptText}>
                   <strong>Prompt originale:</strong> &ldquo;{detail.session.prompt}&rdquo;
                 </p>
+                {sessionIsArchived ? (
+                  <div className={styles.lifecycleNotice}>
+                    <Icon name="archive" size={16} />
+                    <span>Ricerca archiviata. Ripristinala dalla lista per modificare stime o avviare nuove esecuzioni.</span>
+                  </div>
+                ) : null}
               </div>
 
               <div className={styles.tabNav}>
@@ -617,6 +781,34 @@ export function TargetPage() {
           </div>
         )}
       </div>
+
+      <Modal
+        open={deleteCandidate !== null}
+        onClose={() => setDeleteCandidate(null)}
+        title="Sposta nel cestino"
+        size="sm"
+        dismissible={lifecycleBusyId === null}
+      >
+        <div className={styles.confirmBody}>
+          <p>
+            La ricerca &ldquo;{deleteCandidate?.title ?? ''}&rdquo; sarà nascosta dalle ricerche attive. Potrai
+            ripristinarla dalla vista Cestino.
+          </p>
+          <div className={styles.confirmActions}>
+            <Button variant="secondary" onClick={() => setDeleteCandidate(null)} disabled={lifecycleBusyId !== null}>
+              Annulla
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => void softDeleteSession()}
+              loading={lifecycleBusyId === deleteCandidate?.id}
+              leftIcon={<Icon name="trash" size={16} />}
+            >
+              Sposta nel cestino
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {isFullDetailOpen && selectedTarget && (
         <Modal
@@ -1403,6 +1595,137 @@ function EmptyState({ icon, title, text }: { icon: 'search' | 'file-text' | 'cli
   );
 }
 
+const sessionVisibilityOptions: { value: MASessionVisibility; label: string }[] = [
+  { value: 'active', label: 'Attive' },
+  { value: 'archived', label: 'Archivio' },
+  { value: 'deleted', label: 'Cestino' },
+];
+
+function SessionActions({
+  item,
+  visibility,
+  busy,
+  onArchive,
+  onRestore,
+  onDelete,
+}: {
+  item: MASessionSummary;
+  visibility: MASessionVisibility;
+  busy: boolean;
+  onArchive: (item: MASessionSummary) => void;
+  onRestore: (item: MASessionSummary) => void;
+  onDelete: (item: MASessionSummary) => void;
+}) {
+  if (visibility === 'deleted') {
+    return (
+      <div className={styles.sessionActions} aria-label="Azioni ricerca">
+        <button
+          type="button"
+          className={styles.sessionIconAction}
+          onClick={() => onRestore(item)}
+          disabled={busy}
+          aria-label="Ripristina ricerca"
+          title="Ripristina ricerca"
+          aria-busy={busy || undefined}
+        >
+          <Icon name="refresh-cw" size={15} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.sessionActions} aria-label="Azioni ricerca">
+      {visibility === 'active' ? (
+        <button
+          type="button"
+          className={styles.sessionIconAction}
+          onClick={() => onArchive(item)}
+          disabled={busy}
+          aria-label="Archivia ricerca"
+          title="Archivia ricerca"
+          aria-busy={busy || undefined}
+        >
+          <Icon name="archive" size={15} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={styles.sessionIconAction}
+          onClick={() => onRestore(item)}
+          disabled={busy}
+          aria-label="Ripristina ricerca"
+          title="Ripristina ricerca"
+          aria-busy={busy || undefined}
+        >
+          <Icon name="refresh-cw" size={15} />
+        </button>
+      )}
+      <button
+        type="button"
+        className={`${styles.sessionIconAction} ${styles.sessionIconDanger}`}
+        onClick={() => onDelete(item)}
+        disabled={busy}
+        aria-label="Sposta nel cestino"
+        title="Sposta nel cestino"
+        aria-busy={busy || undefined}
+      >
+        <Icon name="trash" size={15} />
+      </button>
+    </div>
+  );
+}
+
+function sessionPanelSummary(visibility: MASessionVisibility, count: number): string {
+  if (count === 0) {
+    if (visibility === 'archived') return 'Nessuna ricerca archiviata';
+    if (visibility === 'deleted') return 'Cestino vuoto';
+    return 'Nessuna ricerca salvata';
+  }
+  if (count === 1) {
+    if (visibility === 'archived') return '1 ricerca archiviata';
+    if (visibility === 'deleted') return '1 ricerca nel cestino';
+    return '1 ricerca attiva';
+  }
+  if (visibility === 'archived') return `${count} ricerche archiviate`;
+  if (visibility === 'deleted') return `${count} ricerche nel cestino`;
+  return `${count} ricerche attive`;
+}
+
+function sessionEmptyState(visibility: MASessionVisibility): { title: string; text: string } {
+  if (visibility === 'archived') {
+    return { title: 'Archivio vuoto', text: 'Le ricerche archiviate appariranno qui e potranno essere ripristinate.' };
+  }
+  if (visibility === 'deleted') {
+    return { title: 'Cestino vuoto', text: 'Le ricerche spostate nel cestino resteranno recuperabili da questa vista.' };
+  }
+  return { title: 'Nessuna sessione', text: 'Prepara una nuova strategia dalla richiesta iniziale.' };
+}
+
+function sessionLifecycleMeta(item: MASessionSummary, visibility: MASessionVisibility): string {
+  if (visibility === 'archived' && item.archivedAt) {
+    const label = dateLabel(item.archivedAt);
+    return label ? ` · archiviata ${label}` : '';
+  }
+  if (visibility === 'deleted' && item.deletedAt) {
+    const label = dateLabel(item.deletedAt);
+    return label ? ` · cestinata ${label}` : '';
+  }
+  return '';
+}
+
+function sessionVisibilityFor(session: { archivedAt?: string; deletedAt?: string }): MASessionVisibility {
+  if (session.deletedAt) return 'deleted';
+  if (session.archivedAt) return 'archived';
+  return 'active';
+}
+
+function dateLabel(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return dateFormat.format(date);
+}
+
 function StatusPill({ status }: { status?: MASessionStatus }) {
   if (!status) return null;
   return <span className={`${styles.statusPill} ${styles[`status_${status}`]}`}>{sessionStatusLabel(status)}</span>;
@@ -1608,6 +1931,18 @@ function errorLabel(error: unknown): string {
     }
     if (code === 'estimate_over_budget') {
       return 'Il costo stimato supera il budget di sessione: restringi i criteri o conferma il costo prima di procedere.';
+    }
+    if (code === 'invalid_ma_visibility') {
+      return 'Vista ricerche non valida.';
+    }
+    if (code === 'ma_session_archived') {
+      return 'La ricerca è archiviata: ripristinala prima di modificarla o rieseguirla.';
+    }
+    if (code === 'ma_session_deleted') {
+      return 'La ricerca è nel cestino: ripristinala prima di aprirla.';
+    }
+    if (code === 'ma_session_not_found') {
+      return 'Ricerca non trovata.';
     }
     if (code === 'invalid_ma_request') {
       return 'Controlla i criteri della strategia e riprova.';

@@ -61,6 +61,9 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handle("GET /binocolo/v1/ma/sessions", h.handleListMASessions)
 	handle("POST /binocolo/v1/ma/sessions", h.handleCreateMASession)
 	handle("GET /binocolo/v1/ma/sessions/{id}", h.handleGetMASession)
+	handle("POST /binocolo/v1/ma/sessions/{id}/archive", h.handleArchiveMASession)
+	handle("POST /binocolo/v1/ma/sessions/{id}/restore", h.handleRestoreMASession)
+	handle("DELETE /binocolo/v1/ma/sessions/{id}", h.handleDeleteMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/estimate", h.handleEstimateMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/execute", h.handleExecuteMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/export", h.handleExportMASession)
@@ -103,7 +106,7 @@ func (h *Handler) handleListMALLMOptions(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) handleListMASessions(w http.ResponseWriter, r *http.Request) {
-	sessions, err := h.ma.listSessions(r.Context())
+	sessions, err := h.ma.listSessions(r.Context(), r.URL.Query().Get("visibility"))
 	if err != nil {
 		h.maFailure(w, r, "ma_sessions_list", err)
 		return
@@ -143,6 +146,45 @@ func (h *Handler) handleGetMASession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.JSON(w, http.StatusOK, detail)
+}
+
+func (h *Handler) handleArchiveMASession(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.archiveSession(r.Context(), id, subject, email); err != nil {
+		h.maFailure(w, r, "ma_session_archive", err, "session_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleRestoreMASession(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.restoreSession(r.Context(), id, subject, email); err != nil {
+		h.maFailure(w, r, "ma_session_restore", err, "session_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleDeleteMASession(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.softDeleteSession(r.Context(), id, subject, email); err != nil {
+		h.maFailure(w, r, "ma_session_delete", err, "session_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) handleEstimateMASession(w http.ResponseWriter, r *http.Request) {
@@ -292,6 +334,15 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMAEstimateOverBudget) {
 		return http.StatusConflict, "estimate_over_budget", "warn"
+	}
+	if errors.Is(err, errMAVisibilityInvalid) {
+		return http.StatusBadRequest, "invalid_ma_visibility", "warn"
+	}
+	if errors.Is(err, errMASessionArchived) {
+		return http.StatusConflict, "ma_session_archived", "warn"
+	}
+	if errors.Is(err, errMASessionDeleted) {
+		return http.StatusConflict, "ma_session_deleted", "warn"
 	}
 	if errors.Is(err, errAtecoCodeNotFound) {
 		return http.StatusBadRequest, "invalid_ateco_code", "warn"

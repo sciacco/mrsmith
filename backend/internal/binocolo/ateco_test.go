@@ -721,7 +721,7 @@ type fakeMAWorkspaceStore struct {
 	events []maTraceEventWrite
 }
 
-func (f *fakeMAWorkspaceStore) ListMASessions(context.Context) ([]MASessionSummary, error) {
+func (f *fakeMAWorkspaceStore) ListMASessions(context.Context, string) ([]MASessionSummary, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -731,6 +731,10 @@ func (f *fakeMAWorkspaceStore) CreateMASession(context.Context, maSessionCreate)
 
 func (f *fakeMAWorkspaceStore) GetMASession(context.Context, string) (MASessionDetail, error) {
 	return MASessionDetail{}, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) UpdateMASessionLifecycle(context.Context, string, string, string, string) (bool, error) {
+	return false, errors.New("not implemented")
 }
 
 func (f *fakeMAWorkspaceStore) AddMAStrategyVersion(context.Context, string, MAStrategySpec, string) (*MAStrategyVersion, error) {

@@ -13,9 +13,10 @@ import (
 )
 
 type maWorkspaceStore interface {
-	ListMASessions(ctx context.Context) ([]MASessionSummary, error)
+	ListMASessions(ctx context.Context, visibility string) ([]MASessionSummary, error)
 	CreateMASession(ctx context.Context, input maSessionCreate) (MASessionDetail, error)
 	GetMASession(ctx context.Context, id string) (MASessionDetail, error)
+	UpdateMASessionLifecycle(ctx context.Context, sessionID, action, subject, email string) (bool, error)
 	AddMAStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error)
 	ReplaceMAEstimates(ctx context.Context, sessionID, strategyVersionID, selectedStrategy string, estimates []MAEstimate) error
 	CreateMAExecutionRun(ctx context.Context, input maExecutionRunCreate) (MAExecutionRun, error)
@@ -32,10 +33,11 @@ type maWorkspaceStore interface {
 	RecordMAExport(ctx context.Context, sessionID, format string, rowCount int, createdByEmail string) error
 }
 
-func (s *SQLStore) ListMASessions(ctx context.Context) ([]MASessionSummary, error) {
+func (s *SQLStore) ListMASessions(ctx context.Context, visibility string) ([]MASessionSummary, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
+	where, orderBy := maSessionListClauses(visibility)
 	rows, err := s.db.QueryContext(ctx, `
 SELECT
   session.id::text,
@@ -48,9 +50,14 @@ SELECT
   COALESCE((SELECT COUNT(*) FROM binocolo.ma_target target WHERE target.session_id = session.id), 0) AS result_count,
   session.created_at,
   session.updated_at,
-  session.last_executed_at
+  session.last_executed_at,
+  session.archived_at,
+  session.archived_by_email,
+  session.deleted_at,
+  session.deleted_by_email
 FROM binocolo.ma_session session
-ORDER BY session.updated_at DESC, session.created_at DESC
+WHERE `+where+`
+ORDER BY `+orderBy+`
 LIMIT 80
 `)
 	if err != nil {
@@ -63,6 +70,10 @@ LIMIT 80
 		var item MASessionSummary
 		var selected sql.NullString
 		var lastRun sql.NullTime
+		var archivedAt sql.NullTime
+		var archivedByEmail sql.NullString
+		var deletedAt sql.NullTime
+		var deletedByEmail sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.Title,
@@ -75,6 +86,10 @@ LIMIT 80
 			&item.CreatedAt,
 			&item.UpdatedAt,
 			&lastRun,
+			&archivedAt,
+			&archivedByEmail,
+			&deletedAt,
+			&deletedByEmail,
 		); err != nil {
 			return nil, fmt.Errorf("scan ma session summary: %w", err)
 		}
@@ -82,12 +97,31 @@ LIMIT 80
 		if lastRun.Valid {
 			item.LastRunAt = &lastRun.Time
 		}
+		if archivedAt.Valid {
+			item.ArchivedAt = &archivedAt.Time
+		}
+		item.ArchivedByEmail = archivedByEmail.String
+		if deletedAt.Valid {
+			item.DeletedAt = &deletedAt.Time
+		}
+		item.DeletedByEmail = deletedByEmail.String
 		out = append(out, item)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate ma sessions: %w", err)
 	}
 	return out, nil
+}
+
+func maSessionListClauses(visibility string) (string, string) {
+	switch visibility {
+	case maSessionVisibilityArchived:
+		return "session.archived_at IS NOT NULL AND session.deleted_at IS NULL", "session.archived_at DESC, session.updated_at DESC"
+	case maSessionVisibilityDeleted:
+		return "session.deleted_at IS NOT NULL", "session.deleted_at DESC, session.updated_at DESC"
+	default:
+		return "session.archived_at IS NULL AND session.deleted_at IS NULL", "session.updated_at DESC, session.created_at DESC"
+	}
 }
 
 func (s *SQLStore) CreateMASession(ctx context.Context, input maSessionCreate) (MASessionDetail, error) {
@@ -207,6 +241,66 @@ func (s *SQLStore) GetMASession(ctx context.Context, id string) (MASessionDetail
 		detail.Strategy = &strategy
 	}
 	return detail, nil
+}
+
+func (s *SQLStore) UpdateMASessionLifecycle(ctx context.Context, sessionID, action, subject, email string) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	var query string
+	switch action {
+	case maSessionLifecycleArchive:
+		query = `
+UPDATE binocolo.ma_session
+SET archived_at = COALESCE(archived_at, now()),
+    archived_by_subject = CASE WHEN archived_at IS NULL THEN $2 ELSE archived_by_subject END,
+    archived_by_email = CASE WHEN archived_at IS NULL THEN $3 ELSE archived_by_email END,
+    deleted_at = NULL,
+    deleted_by_subject = NULL,
+    deleted_by_email = NULL,
+    updated_at = now()
+WHERE id = $1::uuid
+  AND deleted_at IS NULL
+RETURNING id::text
+`
+	case maSessionLifecycleRestore:
+		query = `
+UPDATE binocolo.ma_session
+SET archived_at = NULL,
+    archived_by_subject = NULL,
+    archived_by_email = NULL,
+    deleted_at = NULL,
+    deleted_by_subject = NULL,
+    deleted_by_email = NULL,
+    updated_at = now()
+WHERE id = $1::uuid
+  AND (archived_at IS NOT NULL OR deleted_at IS NOT NULL)
+RETURNING id::text
+`
+	case maSessionLifecycleDelete:
+		query = `
+UPDATE binocolo.ma_session
+SET deleted_at = COALESCE(deleted_at, now()),
+    deleted_by_subject = CASE WHEN deleted_at IS NULL THEN $2 ELSE deleted_by_subject END,
+    deleted_by_email = CASE WHEN deleted_at IS NULL THEN $3 ELSE deleted_by_email END,
+    archived_at = NULL,
+    archived_by_subject = NULL,
+    archived_by_email = NULL,
+    updated_at = now()
+WHERE id = $1::uuid
+RETURNING id::text
+`
+	default:
+		return false, fmt.Errorf("invalid ma session lifecycle action: %s", action)
+	}
+	var id string
+	if err := s.db.QueryRowContext(ctx, query, sessionID, nullString(subject), nullString(email)).Scan(&id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("update ma session lifecycle: %w", err)
+	}
+	return true, nil
 }
 
 func (s *SQLStore) AddMAStrategyVersion(ctx context.Context, sessionID string, strategySpec MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error) {
@@ -997,10 +1091,18 @@ func (s *SQLStore) loadMASession(ctx context.Context, q interface {
 	var email sql.NullString
 	var estimated sql.NullTime
 	var executed sql.NullTime
+	var archivedAt sql.NullTime
+	var archivedBySubject sql.NullString
+	var archivedByEmail sql.NullString
+	var deletedAt sql.NullTime
+	var deletedBySubject sql.NullString
+	var deletedByEmail sql.NullString
 	err := q.QueryRowContext(ctx, `
 SELECT id::text, title, prompt, status, selected_strategy, active_strategy_id::text,
        created_by_subject, created_by_email, last_estimated_at, last_executed_at,
-       created_at, updated_at
+       created_at, updated_at,
+       archived_at, archived_by_subject, archived_by_email,
+       deleted_at, deleted_by_subject, deleted_by_email
 FROM binocolo.ma_session
 WHERE id = $1::uuid
 `, id).Scan(
@@ -1016,6 +1118,12 @@ WHERE id = $1::uuid
 		&executed,
 		&session.CreatedAt,
 		&session.UpdatedAt,
+		&archivedAt,
+		&archivedBySubject,
+		&archivedByEmail,
+		&deletedAt,
+		&deletedBySubject,
+		&deletedByEmail,
 	)
 	if err != nil {
 		return MASession{}, fmt.Errorf("load ma session: %w", err)
@@ -1030,6 +1138,16 @@ WHERE id = $1::uuid
 	if executed.Valid {
 		session.LastExecutedAt = &executed.Time
 	}
+	if archivedAt.Valid {
+		session.ArchivedAt = &archivedAt.Time
+	}
+	session.ArchivedBySubject = archivedBySubject.String
+	session.ArchivedByEmail = archivedByEmail.String
+	if deletedAt.Valid {
+		session.DeletedAt = &deletedAt.Time
+	}
+	session.DeletedBySubject = deletedBySubject.String
+	session.DeletedByEmail = deletedByEmail.String
 	return session, nil
 }
 
