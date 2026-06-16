@@ -719,7 +719,7 @@ func maCompanySurfaceProbeTool() openrouter.Tool {
 		Type: "function",
 		Function: openrouter.ToolFunction{
 			Name:        maCompanySurfaceToolName,
-			Description: "Esegue dry-run Company IT-search senza limit operativo e misura se la superficie e' esatta o troppo ampia.",
+			Description: "Esegue un dry-run Company IT-search senza limit operativo e misura se la superficie e' esatta o troppo ampia.",
 			Parameters: map[string]any{
 				"type":                 "object",
 				"additionalProperties": false,
@@ -944,7 +944,7 @@ func (s *maService) executeMACompanySurfaceTool(ctx context.Context, call openro
 	raw, err := json.Marshal(map[string]any{
 		"surfaceStatus":  result.Status,
 		"estimatedCount": result.EstimatedCount,
-		"lowerBound":     result.Status == maEstimateSurfaceTooBroad,
+		"lowerBound":     false,
 		"tooBroad":       result.Status == maEstimateSurfaceTooBroad,
 		"estimatedCost":  result.EstimatedCost,
 		"probeCount":     result.ProbeCount,
@@ -1204,22 +1204,8 @@ func (s *maService) probeMASearchSurface(ctx context.Context, params openapiit.C
 	status := maEstimateSurfaceExact
 	estimatedCount := first.Count
 	estimatedCost := first.Cost
-	if first.Count >= maSurfaceProbePageSize {
-		secondParams := params
-		skip := maSurfaceProbePageSize
-		secondParams.Skip = &skip
-		second, err := s.runMASurfaceProbe(ctx, secondParams, subject, email)
-		if err != nil {
-			return maSurfaceProbeResult{}, err
-		}
-		probes = append(probes, second)
-		estimatedCost += second.Cost
-		if second.Count >= maSurfaceProbePageSize {
-			status = maEstimateSurfaceTooBroad
-			estimatedCount = maSurfaceProbePageSize * maSurfaceProbeMaxProbeRuns
-		} else {
-			estimatedCount = maSurfaceProbePageSize + second.Count
-		}
+	if first.Count > maVendorLimit {
+		status = maEstimateSurfaceTooBroad
 	}
 
 	paramsRaw, err := companySearchParamsJSON(params.Values())

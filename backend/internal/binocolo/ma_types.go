@@ -34,11 +34,9 @@ const (
 	maEstimateSurfaceExact    = "exact"
 	maEstimateSurfaceTooBroad = "too_broad"
 
-	maATECOSuccessThreshold    = 10
-	maDefaultSearchLimit       = 100
-	maVendorLimit              = 1000
-	maSurfaceProbePageSize     = 1000
-	maSurfaceProbeMaxProbeRuns = 2
+	maATECOSuccessThreshold = 10
+	maDefaultSearchLimit    = 100
+	maVendorLimit           = 1000
 )
 
 type MACreateSessionRequest struct {

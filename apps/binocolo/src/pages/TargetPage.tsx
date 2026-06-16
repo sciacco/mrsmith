@@ -347,7 +347,7 @@ export function TargetPage() {
                 <div className={styles.formFooter}>
                   <span>{prompt.trim().length > 0 ? `${prompt.trim().length} caratteri` : 'Richiesta libera in linguaggio naturale'}</span>
                   <Button type="submit" loading={busy === 'create'} disabled={!prompt.trim()} leftIcon={<Icon name="sparkles" />}>
-                    Prepara strategia
+                    Genera perimetro
                   </Button>
                 </div>
                 <div className={styles.aiOptions}>
@@ -518,7 +518,7 @@ export function TargetPage() {
                       <div className={styles.estimateDetails}>
                         {(detail.estimates ?? []).map((estimate) => (
                           <span key={estimate.id} className={estimate.surfaceStatus === 'too_broad' ? styles.estimateDetailBlocked : undefined}>
-                            {estimateLabel(estimate)} · {formatEstimateCount(estimate.estimatedCount, estimate.surfaceStatus === 'too_broad')}
+                            {estimateLabel(estimate)} · {formatEstimateCount(estimate.estimatedCount, estimateUsesLowerBound(estimate))}
                             {estimate.surfaceStatus === 'too_broad' ? ' · troppo ampia' : ''}
                           </span>
                         ))}
@@ -530,7 +530,7 @@ export function TargetPage() {
                       ) : null}
                       {selectedEstimateGroup?.blocked ? (
                         <div className={styles.estimateWarning}>
-                          Questa strategia satura due finestre di dry-run da 1.000 risultati: restringi i criteri prima di confermare.
+                          Questa strategia supera 1.000 risultati: restringi i criteri prima di confermare.
                         </div>
                       ) : null}
                       <div className={styles.strategyActions}>
@@ -583,6 +583,10 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
           rows={2}
         />
       </label>
+      <label className={styles.fieldWide}>
+        <span>Codici ATECO</span>
+        <textarea value={atecoText} onChange={(event) => onChange({ atecoCandidates: parseAtecoLines(event.target.value) })} rows={3} />
+      </label>
       <label>
         <span>Province</span>
         <input
@@ -607,26 +611,18 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
         <span>Fatturato max</span>
         <input type="number" min={0} value={strategy.turnoverMax ?? ''} onChange={updateNumber('turnoverMax')} />
       </label>
-      <label>
-        <span>Numero risultati</span>
-        <input
-          type="number"
-          min={1}
-          max={maxSearchLimit}
-          value={normalizeSearchLimit(strategy.searchLimit)}
-          onChange={(event) => onChange({ searchLimit: normalizeSearchLimit(optionalNumber(event.target.value) ?? defaultSearchLimit) })}
-        />
-      </label>
       <label className={styles.fieldWide}>
         <span>Tesi d'acquisizione</span>
-        <select value={strategy.thesis ?? 'generico'} onChange={(event) => onChange({ thesis: event.target.value as MAThesis })}>
-          <option value="generico">Generico</option>
-          <option value="successione">Successione</option>
-          <option value="crescita">Crescita</option>
-          <option value="consolidamento">Consolidamento</option>
-          <option value="tuck_in">Tuck-in</option>
-        </select>
-        <small className={styles.fieldHint}>{thesisDescriptions[strategy.thesis ?? 'generico']}</small>
+        <div className={styles.thesisContainer}>
+          <select value={strategy.thesis ?? 'generico'} onChange={(event) => onChange({ thesis: event.target.value as MAThesis })}>
+            <option value="generico">Generico</option>
+            <option value="successione">Successione</option>
+            <option value="crescita">Crescita</option>
+            <option value="consolidamento">Consolidamento</option>
+            <option value="tuck_in">Tuck-in</option>
+          </select>
+          <small className={styles.fieldHint}>{thesisDescriptions[strategy.thesis ?? 'generico']}</small>
+        </div>
       </label>
       <label>
         <span>Forme giuridiche</span>
@@ -636,9 +632,15 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
           placeholder="solo se richiesto (es. SR)"
         />
       </label>
-      <label className={styles.fieldWide}>
-        <span>Codici ATECO</span>
-        <textarea value={atecoText} onChange={(event) => onChange({ atecoCandidates: parseAtecoLines(event.target.value) })} rows={3} />
+      <label>
+        <span>Numero risultati</span>
+        <input
+          type="number"
+          min={1}
+          max={maxSearchLimit}
+          value={normalizeSearchLimit(strategy.searchLimit)}
+          onChange={(event) => onChange({ searchLimit: normalizeSearchLimit(optionalNumber(event.target.value) ?? defaultSearchLimit) })}
+        />
       </label>
       <label className={styles.fieldWide}>
         <span>Razionale</span>
@@ -876,10 +878,14 @@ function groupEstimates(estimates: MAEstimate[]): EstimateGroup[] {
     group.rows.push(estimate);
     group.selected ||= estimate.selected;
     group.blocked ||= estimate.surfaceStatus === 'too_broad';
-    group.lowerBound ||= estimate.surfaceStatus === 'too_broad';
+    group.lowerBound ||= estimateUsesLowerBound(estimate);
     group.probeCount += estimate.probeCount ?? 1;
   }
   return groups.filter((group) => group.rows.length > 0);
+}
+
+function estimateUsesLowerBound(estimate: MAEstimate): boolean {
+  return estimate.surfaceStatus === 'too_broad' && (estimate.probeCount ?? 1) > 1;
 }
 
 function filterStrategyModels(models: MALLMModelOption[]): MALLMModelOption[] {

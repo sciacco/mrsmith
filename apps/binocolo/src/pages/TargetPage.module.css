@@ -207,6 +207,7 @@
 .requestForm textarea,
 .strategyGrid textarea,
 .strategyGrid input,
+.strategyGrid select,
 .aiOptions select {
   width: 100%;
   border: 1.5px solid var(--color-border);
@@ -230,6 +231,7 @@
 }
 
 .strategyGrid input,
+.strategyGrid select,
 .aiOptions select {
   min-height: 44px;
   padding: 0 var(--space-3);
@@ -238,6 +240,7 @@
 .requestForm textarea:focus,
 .strategyGrid textarea:focus,
 .strategyGrid input:focus,
+.strategyGrid select:focus,
 .aiOptions select:focus {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-glow);
@@ -837,6 +840,23 @@
   line-height: 1.4;
 }
 
+.thesisContainer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.thesisContainer select {
+  width: 50% !important;
+  flex-shrink: 0;
+}
+
+.thesisContainer .fieldHint {
+  flex: 1;
+  margin: 0;
+}
+
 .emptyState {
   display: flex;
   min-height: 260px;
@@ -1031,6 +1051,16 @@
   .estimateGrid,
   .aiOptions {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .thesisContainer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .thesisContainer select {
+    width: 100% !important;
   }
 
   .formFooter {

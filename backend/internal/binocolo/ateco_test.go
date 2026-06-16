@@ -337,7 +337,7 @@ func TestMASurfaceProbeExactRunsWithoutLimit(t *testing.T) {
 	}
 }
 
-func TestMASurfaceProbeExtendsSaturatedFirstWindowWithSkip(t *testing.T) {
+func TestMASurfaceProbeTreatsThousandAsExactSingleDryRun(t *testing.T) {
 	seen := []map[string]string{}
 	client := newCompanySearchTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
@@ -345,45 +345,6 @@ func TestMASurfaceProbeExtendsSaturatedFirstWindowWithSkip(t *testing.T) {
 			"limit": query.Get("limit"),
 			"skip":  query.Get("skip"),
 		})
-		count := 1000
-		if query.Get("skip") == "1000" {
-			count = 37
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"data":    []map[string]any{},
-			"success": true,
-			"message": "ok",
-			"error":   nil,
-			"count":   count,
-			"cost":    0.01,
-		})
-	})
-	service := &maService{
-		openapiit: client,
-		now:       func() time.Time { return time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC) },
-	}
-	strategy := validSurfaceStrategy()
-	dryRun := 1
-	result, err := service.probeMASearchSurface(context.Background(), baseMASurfaceParams(strategy, "MI", &dryRun), "", "")
-	if err != nil {
-		t.Fatalf("probeMASearchSurface returned error: %v", err)
-	}
-	if len(seen) != 2 {
-		t.Fatalf("probe calls = %#v, want two calls", seen)
-	}
-	if seen[0]["limit"] != "" || seen[0]["skip"] != "" || seen[1]["limit"] != "" || seen[1]["skip"] != "1000" {
-		t.Fatalf("probe queries = %#v, want no limit and second skip=1000", seen)
-	}
-	if result.Status != maEstimateSurfaceExact || result.EstimatedCount != 1037 || result.ProbeCount != 2 {
-		t.Fatalf("surface result = %#v, want exact 1037 with two probes", result)
-	}
-}
-
-func TestMASurfaceProbeStopsAfterTwoSaturatedWindows(t *testing.T) {
-	var calls int
-	client := newCompanySearchTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		calls++
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"data":    []map[string]any{},
@@ -404,11 +365,46 @@ func TestMASurfaceProbeStopsAfterTwoSaturatedWindows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("probeMASearchSurface returned error: %v", err)
 	}
-	if calls != 2 {
-		t.Fatalf("calls = %d, want two", calls)
+	if len(seen) != 1 {
+		t.Fatalf("probe calls = %#v, want one call", seen)
 	}
-	if result.Status != maEstimateSurfaceTooBroad || result.EstimatedCount != 2000 || result.ProbeCount != 2 {
-		t.Fatalf("surface result = %#v, want too_broad lower bound 2000", result)
+	if seen[0]["limit"] != "" || seen[0]["skip"] != "" {
+		t.Fatalf("probe queries = %#v, want no limit or skip", seen)
+	}
+	if result.Status != maEstimateSurfaceExact || result.EstimatedCount != 1000 || result.ProbeCount != 1 {
+		t.Fatalf("surface result = %#v, want exact 1000 with one probe", result)
+	}
+}
+
+func TestMASurfaceProbeMarksAboveVendorLimitTooBroadWithExactCount(t *testing.T) {
+	var calls int
+	client := newCompanySearchTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data":    []map[string]any{},
+			"success": true,
+			"message": "ok",
+			"error":   nil,
+			"count":   3810,
+			"cost":    381,
+		})
+	})
+	service := &maService{
+		openapiit: client,
+		now:       func() time.Time { return time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC) },
+	}
+	strategy := validSurfaceStrategy()
+	dryRun := 1
+	result, err := service.probeMASearchSurface(context.Background(), baseMASurfaceParams(strategy, "MI", &dryRun), "", "")
+	if err != nil {
+		t.Fatalf("probeMASearchSurface returned error: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("calls = %d, want one", calls)
+	}
+	if result.Status != maEstimateSurfaceTooBroad || result.EstimatedCount != 3810 || result.EstimatedCost != 381 || result.ProbeCount != 1 {
+		t.Fatalf("surface result = %#v, want too_broad exact count 3810 with one probe", result)
 	}
 }
 
