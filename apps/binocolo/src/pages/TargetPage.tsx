@@ -27,19 +27,21 @@ const costFormat = new Intl.NumberFormat('it-IT', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 4,
 });
+const defaultSearchLimit = 100;
+const maxSearchLimit = 1000;
 
 const emptyPrompt =
-  'Es. target software B2B in Lombardia, fatturato intorno a 5 milioni, soci 50/50 prossimi al passaggio generazionale.';
+  'Es. target software B2B in Lombardia, fatturato intorno a 5 milioni, con condizioni specifiche da valutare sui risultati.';
 
 const emptyStrategy: MAStrategySpec = {
   sectorDescription: '',
   territoryLabel: '',
   provinces: [],
   activityStatus: 'ATTIVA',
+  searchLimit: defaultSearchLimit,
   atecoCandidates: [],
   keywords: [],
-  shareholder: { requiresEqualSplit: false, tolerance: 2 },
-  shareholderAge: { required: false },
+  scoringCriteria: [],
   rationale: '',
   missingCriteria: [],
 };
@@ -121,10 +123,15 @@ export function TargetPage() {
   const hasStrategy = Boolean(detail?.strategy);
   const hasEstimate = estimateGroups.length > 0;
   const hasTargets = (detail?.targets.length ?? 0) > 0;
+  const estimateMatchesStrategy =
+    hasEstimate && detail?.strategy?.strategy && selectedEstimateType
+      ? strategyKey(strategy) === strategyKey(detail.strategy.strategy) &&
+        estimatesMatchSearchLimit(detail.estimates, selectedEstimateType, normalizeSearchLimit(strategy.searchLimit))
+      : false;
   const strategyModels = llmOptions.models.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
   const strategyPrompts = llmOptions.prompts.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
   const canEstimate = hasStrategy && busy !== 'create' && busy !== 'estimate';
-  const canExecute = hasStrategy && hasEstimate && busy !== 'execute';
+  const canExecute = hasStrategy && hasEstimate && estimateMatchesStrategy && busy !== 'execute';
 
   async function openSession(id: string) {
     setBusy('sessions');
@@ -185,6 +192,7 @@ export function TargetPage() {
     try {
       const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/execute`, {
         strategyType: selectedEstimateType,
+        limit: normalizeSearchLimit(strategy.searchLimit),
       });
       setDetail(data);
       await loadSessions();
@@ -366,7 +374,7 @@ export function TargetPage() {
                     onClick={() => setChosenStrategy(group.type)}
                   >
                     <span>{group.label}</span>
-                    <strong>{numberFormat.format(group.count)}</strong>
+                    <strong>fino a {numberFormat.format(group.count)}</strong>
                     <small>{group.cost > 0 ? `${costFormat.format(group.cost)} costo stimato` : 'costo non indicato'}</small>
                     {group.selected ? <em>scelta proposta</em> : null}
                   </button>
@@ -375,10 +383,15 @@ export function TargetPage() {
               <div className={styles.estimateDetails}>
                 {(detail?.estimates ?? []).map((estimate) => (
                   <span key={estimate.id}>
-                    {estimateLabel(estimate)} · {numberFormat.format(estimate.estimatedCount)}
+                    {estimateLabel(estimate)} · fino a {numberFormat.format(estimate.estimatedCount)}
                   </span>
                 ))}
               </div>
+              {!estimateMatchesStrategy ? (
+                <div className={styles.estimateWarning}>
+                  La strategia e cambiata dopo la stima. Ricalcola prima di confermare la ricerca.
+                </div>
+              ) : null}
               <div className={styles.strategyActions}>
                 <Button
                   onClick={executeSession}
@@ -485,66 +498,41 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
         <span>Fatturato max</span>
         <input type="number" min={0} value={strategy.turnoverMax ?? ''} onChange={updateNumber('turnoverMax')} />
       </label>
+      <label>
+        <span>Massimo target</span>
+        <input
+          type="number"
+          min={1}
+          max={maxSearchLimit}
+          value={normalizeSearchLimit(strategy.searchLimit)}
+          onChange={(event) => onChange({ searchLimit: normalizeSearchLimit(optionalNumber(event.target.value) ?? defaultSearchLimit) })}
+        />
+      </label>
       <label className={styles.fieldWide}>
         <span>Codici ATECO</span>
         <textarea value={atecoText} onChange={(event) => onChange({ atecoCandidates: parseAtecoLines(event.target.value) })} rows={3} />
       </label>
-      <div className={styles.toggleRow}>
-        <label className={styles.checkField}>
-          <input
-            type="checkbox"
-            checked={strategy.shareholder.requiresEqualSplit}
-            onChange={(event) =>
-              onChange({ shareholder: { ...strategy.shareholder, requiresEqualSplit: event.target.checked } })
-            }
-          />
-          <span>Compagine 50/50</span>
-        </label>
-        <label className={styles.inlineNumber}>
-          <span>Tolleranza</span>
-          <input
-            type="number"
-            min={0}
-            max={10}
-            value={strategy.shareholder.tolerance ?? 2}
-            onChange={(event) =>
-              onChange({ shareholder: { ...strategy.shareholder, tolerance: optionalNumber(event.target.value) ?? 2 } })
-            }
-          />
-        </label>
-      </div>
-      <div className={styles.toggleRow}>
-        <label className={styles.checkField}>
-          <input
-            type="checkbox"
-            checked={strategy.shareholderAge.required}
-            onChange={(event) => onChange({ shareholderAge: { ...strategy.shareholderAge, required: event.target.checked } })}
-          />
-          <span>Eta soci da verificare</span>
-        </label>
-        <label className={styles.inlineNumber}>
-          <span>Da</span>
-          <input
-            type="number"
-            min={0}
-            value={strategy.shareholderAge.min ?? ''}
-            onChange={(event) => onChange({ shareholderAge: { ...strategy.shareholderAge, min: optionalNumber(event.target.value) } })}
-          />
-        </label>
-        <label className={styles.inlineNumber}>
-          <span>A</span>
-          <input
-            type="number"
-            min={0}
-            value={strategy.shareholderAge.max ?? ''}
-            onChange={(event) => onChange({ shareholderAge: { ...strategy.shareholderAge, max: optionalNumber(event.target.value) } })}
-          />
-        </label>
-      </div>
+      <ScoringCriteriaList criteria={strategy.scoringCriteria ?? []} />
       <label className={styles.fieldWide}>
         <span>Razionale</span>
         <textarea value={strategy.rationale} onChange={(event) => onChange({ rationale: event.target.value })} rows={2} />
       </label>
+    </div>
+  );
+}
+
+function ScoringCriteriaList({ criteria }: { criteria: NonNullable<MAStrategySpec['scoringCriteria']> }) {
+  if (criteria.length === 0) return null;
+  return (
+    <div className={styles.criteriaList}>
+      <span>Criteri di valutazione</span>
+      {criteria.map((criterion) => (
+        <div key={criterion.id || criterion.label} className={styles.criteriaItem}>
+          <strong>{criterion.label}</strong>
+          {criterion.description ? <p>{criterion.description}</p> : null}
+          <small>{criterion.evaluation?.sourcePath ? criterion.evaluation.sourcePath : 'verifica non automatica'}</small>
+        </div>
+      ))}
     </div>
   );
 }
@@ -689,6 +677,40 @@ function defaultOptionID<T extends { id: string; isDefault: boolean; scope: stri
     fallbackOptions[0]?.id ??
     ''
   );
+}
+
+function normalizeSearchLimit(value?: number): number {
+  if (!Number.isFinite(value) || !value || value < 1) return defaultSearchLimit;
+  return Math.min(maxSearchLimit, Math.trunc(value));
+}
+
+function strategyKey(strategy: MAStrategySpec): string {
+  return JSON.stringify({
+    title: strategy.title ?? '',
+    sectorDescription: strategy.sectorDescription,
+    territoryLabel: strategy.territoryLabel ?? '',
+    provinces: strategy.provinces,
+    activityStatus: strategy.activityStatus,
+    turnoverAround: strategy.turnoverAround ?? null,
+    turnoverMin: strategy.turnoverMin ?? null,
+    turnoverMax: strategy.turnoverMax ?? null,
+    employeeMin: strategy.employeeMin ?? null,
+    employeeMax: strategy.employeeMax ?? null,
+    searchLimit: normalizeSearchLimit(strategy.searchLimit),
+    atecoCandidates: strategy.atecoCandidates,
+    keywords: strategy.keywords,
+    scoringCriteria: strategy.scoringCriteria ?? [],
+    rationale: strategy.rationale,
+    missingCriteria: strategy.missingCriteria,
+    expandedClassification: strategy.expandedClassification ?? '',
+  });
+}
+
+function estimatesMatchSearchLimit(estimates: MAEstimate[], strategyType: MAStrategyType, limit: number): boolean {
+  const matching = estimates.filter((estimate) => estimate.strategyType === strategyType);
+  if (matching.length === 0) return false;
+  const limits = matching.map((estimate) => Number(estimate.params?.limit ?? 0)).filter((value) => Number.isFinite(value) && value > 0);
+  return limits.length === matching.length && Math.max(...limits) === limit;
 }
 
 function estimateLabel(estimate: MAEstimate): string {

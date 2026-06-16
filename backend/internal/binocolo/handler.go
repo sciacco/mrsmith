@@ -40,7 +40,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	h := &Handler{
 		openapiit:          deps.OpenAPIIT,
 		companySearchCache: cache,
-		ma:                 newMAService(maStore, deps.OpenAPIIT, deps.OpenRouter),
+		ma:                 newMAService(maStore, cache, deps.OpenAPIIT, deps.OpenRouter),
 	}
 	protect := acl.RequireRole(applaunch.BinocoloAccessRoles()...)
 	handle := func(pattern string, handler http.HandlerFunc) {
@@ -141,8 +141,8 @@ func (h *Handler) handleEstimateMASession(w http.ResponseWriter, r *http.Request
 		httputil.Error(w, http.StatusBadRequest, "invalid_json")
 		return
 	}
-	_, email := companySearchRefreshActor(r.Context())
-	detail, err := h.ma.estimateSession(r.Context(), id, body, email)
+	subject, email := companySearchRefreshActor(r.Context())
+	detail, err := h.ma.estimateSession(r.Context(), id, body, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_estimate", err, "session_id", id)
 		return
@@ -160,8 +160,8 @@ func (h *Handler) handleExecuteMASession(w http.ResponseWriter, r *http.Request)
 		httputil.Error(w, http.StatusBadRequest, "invalid_json")
 		return
 	}
-	_, email := companySearchRefreshActor(r.Context())
-	detail, err := h.ma.executeSession(r.Context(), id, body, email)
+	subject, email := companySearchRefreshActor(r.Context())
+	detail, err := h.ma.executeSession(r.Context(), id, body, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_execute", err, "session_id", id)
 		return

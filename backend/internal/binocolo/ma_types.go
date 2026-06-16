@@ -123,24 +123,24 @@ type MAStrategyVersion struct {
 }
 
 type MAStrategySpec struct {
-	Title                  string              `json:"title,omitempty"`
-	SectorDescription      string              `json:"sectorDescription"`
-	TerritoryLabel         string              `json:"territoryLabel,omitempty"`
-	Provinces              []string            `json:"provinces"`
-	ActivityStatus         string              `json:"activityStatus"`
-	TurnoverAround         *int                `json:"turnoverAround,omitempty"`
-	TurnoverMin            *int                `json:"turnoverMin,omitempty"`
-	TurnoverMax            *int                `json:"turnoverMax,omitempty"`
-	EmployeeMin            *int                `json:"employeeMin,omitempty"`
-	EmployeeMax            *int                `json:"employeeMax,omitempty"`
-	AtecoCandidates        []MAAtecoCandidate  `json:"atecoCandidates"`
-	Keywords               []string            `json:"keywords"`
-	Shareholder            MAShareholderSignal `json:"shareholder"`
-	ShareholderAge         MAAgeSignal         `json:"shareholderAge"`
-	Rationale              string              `json:"rationale"`
-	MissingCriteria        []string            `json:"missingCriteria"`
-	SelectedStrategy       string              `json:"selectedStrategy,omitempty"`
-	ExpandedClassification string              `json:"expandedClassification,omitempty"`
+	Title                  string               `json:"title,omitempty"`
+	SectorDescription      string               `json:"sectorDescription"`
+	TerritoryLabel         string               `json:"territoryLabel,omitempty"`
+	Provinces              []string             `json:"provinces"`
+	ActivityStatus         string               `json:"activityStatus"`
+	TurnoverAround         *int                 `json:"turnoverAround,omitempty"`
+	TurnoverMin            *int                 `json:"turnoverMin,omitempty"`
+	TurnoverMax            *int                 `json:"turnoverMax,omitempty"`
+	EmployeeMin            *int                 `json:"employeeMin,omitempty"`
+	EmployeeMax            *int                 `json:"employeeMax,omitempty"`
+	SearchLimit            int                  `json:"searchLimit"`
+	AtecoCandidates        []MAAtecoCandidate   `json:"atecoCandidates"`
+	Keywords               []string             `json:"keywords"`
+	ScoringCriteria        []MAScoringCriterion `json:"scoringCriteria,omitempty"`
+	Rationale              string               `json:"rationale"`
+	MissingCriteria        []string             `json:"missingCriteria"`
+	SelectedStrategy       string               `json:"selectedStrategy,omitempty"`
+	ExpandedClassification string               `json:"expandedClassification,omitempty"`
 }
 
 type MAAtecoCandidate struct {
@@ -149,15 +149,23 @@ type MAAtecoCandidate struct {
 	Rationale   string `json:"rationale"`
 }
 
-type MAShareholderSignal struct {
-	RequiresEqualSplit bool    `json:"requiresEqualSplit"`
-	Tolerance          float64 `json:"tolerance"`
+type MAScoringCriterion struct {
+	ID          string              `json:"id"`
+	Label       string              `json:"label"`
+	Description string              `json:"description,omitempty"`
+	Weight      int                 `json:"weight"`
+	Evaluation  MAScoringEvaluation `json:"evaluation"`
+	Source      string              `json:"source,omitempty"`
 }
 
-type MAAgeSignal struct {
-	Required bool `json:"required"`
-	Min      *int `json:"min,omitempty"`
-	Max      *int `json:"max,omitempty"`
+type MAScoringEvaluation struct {
+	SourcePath string   `json:"sourcePath,omitempty"`
+	Operator   string   `json:"operator,omitempty"`
+	Value      any      `json:"value,omitempty"`
+	Min        *float64 `json:"min,omitempty"`
+	Max        *float64 `json:"max,omitempty"`
+	Tolerance  *float64 `json:"tolerance,omitempty"`
+	Match      string   `json:"match,omitempty"`
 }
 
 type MAEstimate struct {

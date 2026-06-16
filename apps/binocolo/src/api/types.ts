@@ -115,10 +115,10 @@ export interface MAStrategySpec {
   turnoverMax?: number;
   employeeMin?: number;
   employeeMax?: number;
+  searchLimit: number;
   atecoCandidates: MAAtecoCandidate[];
   keywords: string[];
-  shareholder: MAShareholderSignal;
-  shareholderAge: MAAgeSignal;
+  scoringCriteria?: MAScoringCriterion[];
   rationale: string;
   missingCriteria: string[];
   selectedStrategy?: MAStrategyType;
@@ -131,15 +131,23 @@ export interface MAAtecoCandidate {
   rationale: string;
 }
 
-export interface MAShareholderSignal {
-  requiresEqualSplit: boolean;
-  tolerance: number;
+export interface MAScoringCriterion {
+  id: string;
+  label: string;
+  description?: string;
+  weight: number;
+  evaluation: MAScoringEvaluation;
+  source?: string;
 }
 
-export interface MAAgeSignal {
-  required: boolean;
+export interface MAScoringEvaluation {
+  sourcePath?: string;
+  operator?: string;
+  value?: string | number | boolean;
   min?: number;
   max?: number;
+  tolerance?: number;
+  match?: 'any' | 'all';
 }
 
 export interface MAEstimate {
@@ -153,6 +161,7 @@ export interface MAEstimate {
   estimatedCount: number;
   estimatedCost: number;
   selected: boolean;
+  params?: Record<string, string>;
   createdAt: string;
 }
 

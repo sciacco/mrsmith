@@ -73,6 +73,7 @@ Rispondi solo con JSON valido nel formato:
     "territoryLabel": "territorio in parole",
     "provinces": ["MI"],
     "activityStatus": "ATTIVA",
+    "searchLimit": 100,
     "turnoverAround": 5000000,
     "turnoverMin": 3500000,
     "turnoverMax": 6500000,
@@ -80,16 +81,35 @@ Rispondi solo con JSON valido nel formato:
     "employeeMax": null,
     "atecoCandidates": [{"code":"6201","description":"...","rationale":"..."}],
     "keywords": ["software"],
-    "shareholder": {"requiresEqualSplit": true, "tolerance": 2},
-    "shareholderAge": {"required": true, "min": 55, "max": null},
+    "scoringCriteria": [
+      {
+        "id": "criterio_stabile_in_snake_case",
+        "label": "condizione richiesta dall'utente",
+        "description": "come valutare la condizione",
+        "weight": 10,
+        "evaluation": {
+          "sourcePath": "campo target o percorso dati vendor",
+          "operator": "exists|contains|eq|not_equals|gt|gte|lt|lte|between",
+          "value": "valore atteso se serve",
+          "min": null,
+          "max": null,
+          "tolerance": null,
+          "match": "any"
+        },
+        "source": "richiesta utente"
+      }
+    ],
     "rationale": "sintesi della strategia",
     "missingCriteria": []
   }
 }
 Regole:
 - usa activityStatus ATTIVA se non richiesto diversamente;
+- searchLimit deve essere 100 salvo richiesta esplicita diversa; non superare mai 1000;
 - se l'utente dice "intorno a" un fatturato, imposta turnoverAround e anche min/max a +/-30%;
 - proponi codici ATECO plausibili con razionale, ma non inventare dati aziendali;
+- separa i filtri di ricerca vendor dai criteri di valutazione: ogni condizione particolare richiesta dall'utente deve entrare in scoringCriteria, non in campi permanenti;
+- usa sourcePath solo quando la condizione e' verificabile su un campo target o sul payload Company; se non e' verificabile, lascia sourcePath vuoto e spiega la condizione in description;
 - se un criterio non e' derivabile dalla richiesta, lascialo vuoto e aggiungilo a missingCriteria;
 - provinces deve contenere sigle italiane di due lettere quando il territorio e' provinciale.
 $prompt$,

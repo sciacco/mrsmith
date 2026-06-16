@@ -19,7 +19,6 @@ func TestMAStrategyValidationNormalizesBoundaries(t *testing.T) {
 			{Code: "62.01", Description: "Produzione software"},
 			{Code: "6201", Description: "duplicato"},
 		},
-		Shareholder: MAShareholderSignal{RequiresEqualSplit: true},
 	})
 	if err != nil {
 		t.Fatalf("validate strategy: %v", err)
@@ -39,8 +38,8 @@ func TestMAStrategyValidationNormalizesBoundaries(t *testing.T) {
 	if len(strategy.AtecoCandidates) != 1 || strategy.AtecoCandidates[0].Code != "62.01" {
 		t.Fatalf("ateco candidates = %#v, want one normalized candidate", strategy.AtecoCandidates)
 	}
-	if strategy.Shareholder.Tolerance != 2 {
-		t.Fatalf("default shareholder tolerance = %v, want 2", strategy.Shareholder.Tolerance)
+	if strategy.SearchLimit != maDefaultSearchLimit {
+		t.Fatalf("search limit = %d, want %d", strategy.SearchLimit, maDefaultSearchLimit)
 	}
 }
 
@@ -101,37 +100,23 @@ func TestMATargetScoringMatchPartialAndOutsideRules(t *testing.T) {
 	}
 }
 
-func TestMAShareholderEqualSplitTolerance(t *testing.T) {
-	if !hasEqualShareholders([]maShareholder{{PercentShare: 49.2}, {PercentShare: 50.8}}, 2) {
-		t.Fatal("expected 49.2/50.8 to match 50/50 tolerance")
-	}
-	if hasEqualShareholders([]maShareholder{{PercentShare: 60}, {PercentShare: 40}}, 2) {
-		t.Fatal("expected 60/40 not to match 50/50 tolerance")
-	}
-}
-
-func TestMATaxCodeAgeDerivationAndPartialLegalEntity(t *testing.T) {
+func TestMADynamicCriteriaUseVendorPaths(t *testing.T) {
 	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
-	age, ok := ageFromItalianTaxCode("RSSMRA70A01H501U", now)
-	if !ok || age != 56 {
-		t.Fatalf("age = %d/%v, want 56/true", age, ok)
-	}
-	if _, ok := ageFromItalianTaxCode("16935371001", now); ok {
-		t.Fatal("expected legal-entity tax code not to derive an age")
-	}
-
 	strategy := validScoringStrategy()
 	target := validScoringTarget(t)
 	target.VendorPayload = mustVendorPayload(t, []map[string]any{
-		{"taxCode": "RSSMRA70A01H501U", "percentShare": 50},
-		{"companyName": "Holding S.r.l.", "taxCode": "16935371001", "percentShare": 50},
+		{"taxCode": "RSSMRA70A01H501U", "percentShare": 65},
 	})
 	scored := scoreMATarget(target, strategy, now)
-	if scored.MatchState != maMatchStatePartial {
-		t.Fatalf("legal entity shareholder state = %q, want partial", scored.MatchState)
+	if statusForEvidence(scored.Evidence, "dynamic_quota_minima") != maEvidenceMatch {
+		t.Fatalf("dynamic evidence = %#v, want match", scored.Evidence)
 	}
-	if statusForEvidence(scored.Evidence, "shareholder_age") != maEvidencePartial {
-		t.Fatalf("age evidence = %#v, want partial", scored.Evidence)
+	target.VendorPayload = mustVendorPayload(t, []map[string]any{
+		{"taxCode": "RSSMRA70A01H501U", "percentShare": 20},
+	})
+	scored = scoreMATarget(target, strategy, now)
+	if statusForEvidence(scored.Evidence, "dynamic_quota_minima") != maEvidenceOutside {
+		t.Fatalf("dynamic evidence = %#v, want outside", scored.Evidence)
 	}
 }
 
@@ -178,8 +163,6 @@ func TestMAExportRows(t *testing.T) {
 func validScoringStrategy() MAStrategySpec {
 	minTurnover := 1_000_000
 	maxTurnover := 2_000_000
-	minAge := 50
-	maxAge := 65
 	strategy, err := validateMAStrategy(MAStrategySpec{
 		SectorDescription: "software gestionale",
 		Provinces:         []string{"MI"},
@@ -190,14 +173,18 @@ func validScoringStrategy() MAStrategySpec {
 			{Code: "6201", Description: "Produzione software"},
 		},
 		Keywords: []string{"software"},
-		Shareholder: MAShareholderSignal{
-			RequiresEqualSplit: true,
-			Tolerance:          2,
-		},
-		ShareholderAge: MAAgeSignal{
-			Required: true,
-			Min:      &minAge,
-			Max:      &maxAge,
+		ScoringCriteria: []MAScoringCriterion{
+			{
+				ID:     "quota_minima",
+				Label:  "Quota minima verificabile",
+				Weight: 30,
+				Evaluation: MAScoringEvaluation{
+					SourcePath: "shareHolders.percentShare",
+					Operator:   "gte",
+					Value:      60,
+					Match:      "any",
+				},
+			},
 		},
 	})
 	if err != nil {
@@ -218,8 +205,8 @@ func validScoringTarget(t *testing.T) MATarget {
 		AtecoCode:        "620100",
 		AtecoDescription: "Produzione di software non connesso all'edizione",
 		VendorPayload: mustVendorPayload(t, []map[string]any{
-			{"taxCode": "RSSMRA70A01H501U", "percentShare": 50},
-			{"taxCode": "VRDLGI65M01H501Q", "percentShare": 50},
+			{"taxCode": "RSSMRA70A01H501U", "percentShare": 65},
+			{"taxCode": "VRDLGI65M01H501Q", "percentShare": 35},
 		}),
 	}
 }

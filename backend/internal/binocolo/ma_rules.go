@@ -71,9 +71,7 @@ func validateMAStrategy(input MAStrategySpec) (MAStrategySpec, error) {
 	if err := validateOptionalRange(strategy.EmployeeMin, strategy.EmployeeMax, "employees"); err != nil {
 		return MAStrategySpec{}, err
 	}
-	if err := validateOptionalRange(strategy.ShareholderAge.Min, strategy.ShareholderAge.Max, "shareholder age"); err != nil {
-		return MAStrategySpec{}, err
-	}
+	strategy.SearchLimit = normalizeMASearchLimit(strategy.SearchLimit)
 
 	candidates := make([]MAAtecoCandidate, 0, len(strategy.AtecoCandidates))
 	seenAteco := map[string]struct{}{}
@@ -103,18 +101,115 @@ func validateMAStrategy(input MAStrategySpec) (MAStrategySpec, error) {
 	strategy.Rationale = cleanText(strategy.Rationale, 600)
 	strategy.ExpandedClassification = cleanText(strategy.ExpandedClassification, 240)
 	strategy.SelectedStrategy = normalizeMAStrategyType(strategy.SelectedStrategy)
-
-	if strategy.Shareholder.RequiresEqualSplit && strategy.Shareholder.Tolerance <= 0 {
-		strategy.Shareholder.Tolerance = 2
-	}
-	if strategy.Shareholder.Tolerance < 0 || strategy.Shareholder.Tolerance > 10 {
-		return MAStrategySpec{}, fmt.Errorf("%w: shareholder tolerance", errMAStrategyInvalid)
-	}
-	if strategy.ShareholderAge.Min != nil || strategy.ShareholderAge.Max != nil {
-		strategy.ShareholderAge.Required = true
-	}
+	strategy.ScoringCriteria = normalizeMAScoringCriteria(strategy.ScoringCriteria)
 
 	return strategy, nil
+}
+
+func normalizeMASearchLimit(value int) int {
+	if value <= 0 {
+		return maDefaultSearchLimit
+	}
+	if value > maVendorLimit {
+		return maVendorLimit
+	}
+	return value
+}
+
+func normalizeMAScoringCriteria(input []MAScoringCriterion) []MAScoringCriterion {
+	out := make([]MAScoringCriterion, 0, len(input))
+	seen := map[string]struct{}{}
+	for _, raw := range input {
+		label := cleanText(raw.Label, 120)
+		if label == "" {
+			continue
+		}
+		id := normalizeCriterionID(raw.ID)
+		if id == "" {
+			id = normalizeCriterionID(label)
+		}
+		if id == "" {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		weight := raw.Weight
+		if weight <= 0 {
+			weight = 10
+		}
+		if weight > 40 {
+			weight = 40
+		}
+		out = append(out, MAScoringCriterion{
+			ID:          id,
+			Label:       label,
+			Description: cleanText(raw.Description, 240),
+			Weight:      weight,
+			Evaluation: MAScoringEvaluation{
+				SourcePath: cleanText(raw.Evaluation.SourcePath, 120),
+				Operator:   normalizeCriterionOperator(raw.Evaluation.Operator),
+				Value:      raw.Evaluation.Value,
+				Min:        raw.Evaluation.Min,
+				Max:        raw.Evaluation.Max,
+				Tolerance:  raw.Evaluation.Tolerance,
+				Match:      normalizeCriterionMatch(raw.Evaluation.Match),
+			},
+			Source: cleanText(raw.Source, 80),
+		})
+		if len(out) >= 12 {
+			break
+		}
+	}
+	return out
+}
+
+func normalizeCriterionID(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	var b strings.Builder
+	lastUnderscore := false
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+			lastUnderscore = false
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastUnderscore = false
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			b.WriteRune(r)
+			lastUnderscore = false
+		default:
+			if !lastUnderscore && b.Len() > 0 {
+				b.WriteByte('_')
+				lastUnderscore = true
+			}
+		}
+		if b.Len() >= 64 {
+			break
+		}
+	}
+	return strings.Trim(b.String(), "_")
+}
+
+func normalizeCriterionOperator(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.ReplaceAll(value, "-", "_")
+	switch value {
+	case "", "exists", "eq", "equals", "not_equals", "neq", "contains", "starts_with", "gt", "gte", "lt", "lte", "between", "range", "min", "max":
+		return value
+	default:
+		return ""
+	}
+}
+
+func normalizeCriterionMatch(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "all" {
+		return "all"
+	}
+	return "any"
 }
 
 func turnoverAroundRange(value int) (int, int) {
@@ -235,43 +330,10 @@ func scoreMATarget(target MATarget, strategy MAStrategySpec, now time.Time) MATa
 		SourcePath: "balanceSheets.last.turnover",
 	})
 
-	shareStatus, shareValue := shareholderMatch(target, strategy)
-	switch shareStatus {
-	case maEvidenceMatch:
-		score += 20
-	case maEvidencePartial:
-		score += 10
-	case maEvidenceMissing:
-		if strategy.Shareholder.RequiresEqualSplit {
-			missing = append(missing, "compagine")
-		}
-	}
-	evidence = append(evidence, MATargetEvidence{
-		Criterion:  "shareholders",
-		Status:     shareStatus,
-		Label:      "Compagine",
-		Value:      shareValue,
-		SourcePath: "shareHolders",
-	})
-
-	ageStatus, ageValue := shareholderAgeMatch(target, strategy, now)
-	switch ageStatus {
-	case maEvidenceMatch:
-		score += 10
-	case maEvidencePartial:
-		score += 5
-	case maEvidenceMissing:
-		if strategy.ShareholderAge.Required {
-			missing = append(missing, "eta soci")
-		}
-	}
-	evidence = append(evidence, MATargetEvidence{
-		Criterion:  "shareholder_age",
-		Status:     ageStatus,
-		Label:      "Eta soci",
-		Value:      ageValue,
-		SourcePath: "shareHolders.taxCode",
-	})
+	dynamicScore, dynamicMissing, dynamicEvidence := scoreDynamicCriteria(target, strategy.ScoringCriteria)
+	score += dynamicScore
+	missing = append(missing, dynamicMissing...)
+	evidence = append(evidence, dynamicEvidence...)
 
 	completenessStatus := maEvidenceMatch
 	completenessValue := "dati principali presenti"
@@ -345,70 +407,289 @@ func turnoverMatch(target MATarget, strategy MAStrategySpec) (string, string) {
 	return maEvidenceMatch, label
 }
 
-func shareholderMatch(target MATarget, strategy MAStrategySpec) (string, string) {
-	if !strategy.Shareholder.RequiresEqualSplit {
-		return maEvidenceMatch, "criterio non richiesto"
+func scoreDynamicCriteria(target MATarget, criteria []MAScoringCriterion) (int, []string, []MATargetEvidence) {
+	if len(criteria) == 0 {
+		return 0, nil, nil
 	}
-	shareholders := targetShareholders(target)
-	if len(shareholders) == 0 {
-		return maEvidenceMissing, ""
+	totalWeight := 0
+	for _, criterion := range criteria {
+		totalWeight += criterion.Weight
 	}
-	if hasEqualShareholders(shareholders, strategy.Shareholder.Tolerance) {
-		return maEvidenceMatch, shareholderPercentsLabel(shareholders)
+	if totalWeight <= 0 {
+		return 0, nil, nil
 	}
-	return maEvidencePartial, shareholderPercentsLabel(shareholders)
+
+	score := 0
+	missing := make([]string, 0)
+	evidence := make([]MATargetEvidence, 0, len(criteria))
+	for _, criterion := range criteria {
+		status, value, sourcePath := evaluateDynamicCriterion(target, criterion)
+		normalizedWeight := int(math.Round(float64(criterion.Weight) / float64(totalWeight) * 30))
+		if normalizedWeight <= 0 {
+			normalizedWeight = 1
+		}
+		switch status {
+		case maEvidenceMatch:
+			score += normalizedWeight
+		case maEvidencePartial:
+			score += normalizedWeight / 2
+		case maEvidenceMissing:
+			missing = append(missing, criterion.Label)
+		}
+		evidence = append(evidence, MATargetEvidence{
+			Criterion:  "dynamic_" + criterion.ID,
+			Status:     status,
+			Label:      criterion.Label,
+			Value:      value,
+			SourcePath: sourcePath,
+		})
+	}
+	if score > 30 {
+		score = 30
+	}
+	return score, missing, evidence
 }
 
-func shareholderAgeMatch(target MATarget, strategy MAStrategySpec, now time.Time) (string, string) {
-	if !strategy.ShareholderAge.Required {
-		return maEvidenceMatch, "criterio non richiesto"
+func evaluateDynamicCriterion(target MATarget, criterion MAScoringCriterion) (string, string, string) {
+	sourcePath := strings.TrimSpace(criterion.Evaluation.SourcePath)
+	if sourcePath == "" {
+		return maEvidenceMissing, "non verificabile", ""
 	}
-	shareholders := targetShareholders(target)
-	if len(shareholders) == 0 {
-		return maEvidenceMissing, ""
+	values := dynamicCriterionValues(target, sourcePath)
+	if len(values) == 0 {
+		return maEvidenceMissing, "", sourcePath
 	}
-	ages := make([]int, 0, len(shareholders))
-	partial := false
-	for _, shareholder := range shareholders {
-		if shareholder.CompanyName != "" {
-			partial = true
-			continue
-		}
-		age, ok := ageFromItalianTaxCode(shareholder.TaxCode, now)
-		if !ok {
-			partial = true
-			continue
-		}
-		ages = append(ages, age)
-	}
-	if len(ages) == 0 {
-		return maEvidenceMissing, "non verificabile"
-	}
-	for _, age := range ages {
-		if strategy.ShareholderAge.Min != nil && age < *strategy.ShareholderAge.Min {
-			return maEvidenceOutside, agesLabel(ages, partial)
-		}
-		if strategy.ShareholderAge.Max != nil && age > *strategy.ShareholderAge.Max {
-			return maEvidenceOutside, agesLabel(ages, partial)
+	operator := criterion.Evaluation.Operator
+	if operator == "" {
+		if criterion.Evaluation.Min != nil || criterion.Evaluation.Max != nil {
+			operator = "between"
+		} else if criterion.Evaluation.Value != nil {
+			operator = "contains"
+		} else {
+			operator = "exists"
 		}
 	}
-	if partial {
-		return maEvidencePartial, agesLabel(ages, partial)
+	if operator == "range" {
+		operator = "between"
 	}
-	return maEvidenceMatch, agesLabel(ages, partial)
-}
-
-func hasEqualShareholders(shareholders []maShareholder, tolerance float64) bool {
-	if tolerance <= 0 {
-		tolerance = 2
+	if operator == "equals" {
+		operator = "eq"
+	}
+	if operator == "neq" {
+		operator = "not_equals"
 	}
 	matches := 0
-	for _, shareholder := range shareholders {
-		if math.Abs(shareholder.PercentShare-50) <= tolerance {
+	verifiable := 0
+	labels := make([]string, 0, len(values))
+	for _, value := range values {
+		label := dynamicValueLabel(value)
+		if label != "" {
+			labels = append(labels, label)
+		}
+		ok, canVerify := dynamicValueMatches(value, criterion.Evaluation, operator)
+		if !canVerify {
+			continue
+		}
+		verifiable++
+		if ok {
 			matches++
 		}
 	}
-	return matches >= 2
+	if verifiable == 0 {
+		return maEvidenceMissing, "non verificabile", sourcePath
+	}
+	valueLabel := cleanText(strings.Join(labels, ", "), 180)
+	if criterion.Evaluation.Match == "all" {
+		if matches == verifiable {
+			return maEvidenceMatch, valueLabel, sourcePath
+		}
+		if matches > 0 {
+			return maEvidencePartial, valueLabel, sourcePath
+		}
+		return maEvidenceOutside, valueLabel, sourcePath
+	}
+	if matches > 0 {
+		return maEvidenceMatch, valueLabel, sourcePath
+	}
+	return maEvidenceOutside, valueLabel, sourcePath
+}
+
+func dynamicCriterionValues(target MATarget, sourcePath string) []any {
+	path := strings.TrimPrefix(strings.TrimSpace(sourcePath), "target.")
+	switch path {
+	case "companyName":
+		return stringValues(target.CompanyName)
+	case "vatCode":
+		return stringValues(target.VATCode)
+	case "taxCode":
+		return stringValues(target.TaxCode)
+	case "province":
+		return stringValues(target.Province)
+	case "town":
+		return stringValues(target.Town)
+	case "activityStatus":
+		return stringValues(target.ActivityStatus)
+	case "turnover":
+		return intValues(target.Turnover)
+	case "turnoverYear":
+		return intValues(target.TurnoverYear)
+	case "employees":
+		return intValues(target.Employees)
+	case "atecoCode":
+		return stringValues(target.AtecoCode)
+	case "atecoDescription":
+		return stringValues(target.AtecoDescription)
+	}
+	if len(target.VendorPayload) == 0 {
+		return nil
+	}
+	object, err := decodeVendorObject(target.VendorPayload)
+	if err != nil {
+		return nil
+	}
+	return vendorValuesAtPath(object, path)
+}
+
+func stringValues(value string) []any {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return []any{value}
+}
+
+func intValues(value *int) []any {
+	if value == nil {
+		return nil
+	}
+	return []any{*value}
+}
+
+func vendorValuesAtPath(value any, path string) []any {
+	parts := strings.Split(strings.TrimSpace(path), ".")
+	if len(parts) == 0 || parts[0] == "" {
+		return nil
+	}
+	current := []any{value}
+	for _, part := range parts {
+		next := make([]any, 0)
+		for _, item := range current {
+			switch typed := item.(type) {
+			case map[string]any:
+				if nested, ok := typed[part]; ok {
+					next = append(next, nested)
+				}
+			case []any:
+				for _, nested := range typed {
+					next = append(next, vendorValuesAtPath(nested, part)...)
+				}
+			}
+		}
+		current = next
+		if len(current) == 0 {
+			return nil
+		}
+	}
+	return flattenDynamicValues(current)
+}
+
+func flattenDynamicValues(values []any) []any {
+	out := make([]any, 0, len(values))
+	for _, value := range values {
+		if list, ok := value.([]any); ok {
+			out = append(out, flattenDynamicValues(list)...)
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func dynamicValueMatches(value any, evaluation MAScoringEvaluation, operator string) (bool, bool) {
+	switch operator {
+	case "exists":
+		return dynamicValueLabel(value) != "", true
+	case "contains", "starts_with", "eq", "not_equals":
+		actual := strings.ToLower(dynamicValueLabel(value))
+		expected := strings.ToLower(dynamicValueLabel(evaluation.Value))
+		if actual == "" || expected == "" {
+			return false, false
+		}
+		switch operator {
+		case "contains":
+			return strings.Contains(actual, expected), true
+		case "starts_with":
+			return strings.HasPrefix(actual, expected), true
+		case "not_equals":
+			return actual != expected, true
+		default:
+			return actual == expected, true
+		}
+	case "gt", "gte", "lt", "lte", "between", "min", "max":
+		actual, ok := vendorNumber(value)
+		if !ok {
+			return false, false
+		}
+		tolerance := 0.0
+		if evaluation.Tolerance != nil && *evaluation.Tolerance > 0 {
+			tolerance = *evaluation.Tolerance
+		}
+		if operator == "min" || operator == "gte" {
+			if evaluation.Min != nil {
+				return actual+tolerance >= *evaluation.Min, true
+			}
+			expected, ok := vendorNumber(evaluation.Value)
+			return ok && actual+tolerance >= expected, ok
+		}
+		if operator == "max" || operator == "lte" {
+			if evaluation.Max != nil {
+				return actual-tolerance <= *evaluation.Max, true
+			}
+			expected, ok := vendorNumber(evaluation.Value)
+			return ok && actual-tolerance <= expected, ok
+		}
+		if operator == "gt" || operator == "lt" {
+			expected, ok := vendorNumber(evaluation.Value)
+			if !ok {
+				return false, false
+			}
+			if operator == "gt" {
+				return actual > expected, true
+			}
+			return actual < expected, true
+		}
+		if evaluation.Min != nil && actual+tolerance < *evaluation.Min {
+			return false, true
+		}
+		if evaluation.Max != nil && actual-tolerance > *evaluation.Max {
+			return false, true
+		}
+		return evaluation.Min != nil || evaluation.Max != nil, evaluation.Min != nil || evaluation.Max != nil
+	default:
+		return false, false
+	}
+}
+
+func dynamicValueLabel(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return strings.TrimSpace(typed)
+	case bool:
+		if typed {
+			return "true"
+		}
+		return "false"
+	case json.Number:
+		return typed.String()
+	case float64:
+		return strconv.FormatFloat(typed, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(typed)
+	default:
+		return vendorString(typed)
+	}
 }
 
 func buildTargetRationale(target MATarget, evidence []MATargetEvidence) string {

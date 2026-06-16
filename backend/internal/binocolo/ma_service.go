@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,18 +32,20 @@ type maAIClient interface {
 }
 
 type maService struct {
-	store     maWorkspaceStore
-	openapiit *openapiit.Client
-	ai        maAIClient
-	now       func() time.Time
+	store       maWorkspaceStore
+	searchCache companySearchCacheStore
+	openapiit   *openapiit.Client
+	ai          maAIClient
+	now         func() time.Time
 }
 
-func newMAService(store maWorkspaceStore, openapiitClient *openapiit.Client, ai maAIClient) *maService {
+func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, openapiitClient *openapiit.Client, ai maAIClient) *maService {
 	return &maService{
-		store:     store,
-		openapiit: openapiitClient,
-		ai:        ai,
-		now:       func() time.Time { return time.Now().UTC() },
+		store:       store,
+		searchCache: searchCache,
+		openapiit:   openapiitClient,
+		ai:          ai,
+		now:         func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -106,7 +109,7 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	return detail, nil
 }
 
-func (s *maService) estimateSession(ctx context.Context, sessionID string, req MAEstimateSessionRequest, email string) (MASessionDetail, error) {
+func (s *maService) estimateSession(ctx context.Context, sessionID string, req MAEstimateSessionRequest, subject, email string) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
@@ -132,7 +135,7 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 		return MASessionDetail{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
 	}
 
-	estimates, selected, err := s.runEstimates(ctx, sessionID, strategyVersion.ID, strategyVersion.Strategy)
+	estimates, selected, err := s.runEstimates(ctx, sessionID, strategyVersion.ID, strategyVersion.Strategy, subject, email)
 	if err != nil {
 		return MASessionDetail{}, err
 	}
@@ -142,7 +145,7 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 	return s.store.GetMASession(ctx, sessionID)
 }
 
-func (s *maService) executeSession(ctx context.Context, sessionID string, req MAExecuteSessionRequest, email string) (MASessionDetail, error) {
+func (s *maService) executeSession(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
@@ -188,12 +191,12 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	if estimatedCount > maVendorLimit {
 		return MASessionDetail{}, errMAEstimateTooLarge
 	}
-	limit := req.Limit
-	if limit <= 0 {
-		limit = maDefaultSearchLimit
+	limit := normalizeMASearchLimit(req.Limit)
+	if limit != strategyVersion.Strategy.SearchLimit {
+		return MASessionDetail{}, fmt.Errorf("%w: stale estimate", errMAStrategyInvalid)
 	}
-	if limit > maVendorLimit {
-		limit = maVendorLimit
+	if !estimatesMatchSearchLimit(detail.Estimates, strategyType, limit) {
+		return MASessionDetail{}, fmt.Errorf("%w: stale estimate", errMAStrategyInvalid)
 	}
 
 	run, err := s.store.CreateMAExecutionRun(ctx, maExecutionRunCreate{
@@ -206,7 +209,7 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 		return MASessionDetail{}, err
 	}
 
-	targets, execErr := s.runExecution(ctx, strategyVersion.Strategy, strategyType, limit)
+	targets, execErr := s.runExecution(ctx, strategyVersion.Strategy, strategyType, limit, subject, email)
 	if execErr != nil {
 		_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, maErrorCode(execErr))
 		return MASessionDetail{}, execErr
@@ -328,15 +331,23 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 	}, nil
 }
 
-func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec) ([]MAEstimate, string, error) {
+func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec, subject, email string) ([]MAEstimate, string, error) {
 	queries := buildMAEstimateQueries(strategy)
+	remaining := map[string]int{
+		maStrategyTypeATECO:    strategy.SearchLimit,
+		maStrategyTypeExpanded: strategy.SearchLimit,
+	}
 	estimates := make([]MAEstimate, 0, len(queries))
 	for _, query := range queries {
-		response, err := s.openapiit.Company().SearchITRaw(ctx, query.params)
-		if err != nil {
-			return nil, "", err
+		queryLimit := remaining[query.strategyType]
+		if queryLimit <= 0 {
+			continue
 		}
-		raw, err := json.Marshal(response)
+		query.params = baseMASearchParams(strategy, query.province, query.params.DryRun, queryLimit)
+		if query.atecoCode != "" {
+			query.params.AtecoCode = query.atecoCode
+		}
+		response, raw, err := s.cachedCompanySearch(ctx, query.params, subject, email)
 		if err != nil {
 			return nil, "", err
 		}
@@ -344,6 +355,11 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 		if err != nil {
 			return nil, "", err
 		}
+		estimatedCount := envelopeCount(response)
+		if estimatedCount > queryLimit {
+			estimatedCount = queryLimit
+		}
+		remaining[query.strategyType] -= estimatedCount
 		estimates = append(estimates, MAEstimate{
 			ID:                uuid.NewString(),
 			SessionID:         sessionID,
@@ -352,7 +368,7 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 			AtecoCode:         query.atecoCode,
 			AtecoDescription:  query.atecoDescription,
 			Province:          query.province,
-			EstimatedCount:    envelopeCount(response),
+			EstimatedCount:    estimatedCount,
 			EstimatedCost:     envelopeCost(response),
 			Params:            paramsRaw,
 			VendorResponse:    raw,
@@ -383,7 +399,7 @@ func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 	queries := make([]maSearchQuery, 0, len(provinces)*(len(strategy.AtecoCandidates)+1))
 	for _, province := range provinces {
 		for _, candidate := range strategy.AtecoCandidates {
-			params := baseMASearchParams(strategy, province, &dryRun, 1)
+			params := baseMASearchParams(strategy, province, &dryRun, strategy.SearchLimit)
 			params.AtecoCode = candidate.Code
 			queries = append(queries, maSearchQuery{
 				strategyType:     maStrategyTypeATECO,
@@ -393,7 +409,7 @@ func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 				params:           params,
 			})
 		}
-		params := baseMASearchParams(strategy, province, &dryRun, 1)
+		params := baseMASearchParams(strategy, province, &dryRun, strategy.SearchLimit)
 		queries = append(queries, maSearchQuery{
 			strategyType: maStrategyTypeExpanded,
 			province:     province,
@@ -403,42 +419,143 @@ func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 	return queries
 }
 
-func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, strategyType string, limit int) ([]MATarget, error) {
+func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, strategyType string, limit int, subject, email string) ([]MATarget, error) {
 	dryRun := 0
 	provinces := strategy.Provinces
 	if len(provinces) == 0 {
 		provinces = []string{""}
 	}
+	remaining := limit
 	rawTargets := []MATarget{}
 	for _, province := range provinces {
+		if remaining <= 0 {
+			break
+		}
 		if strategyType == maStrategyTypeATECO {
 			for _, candidate := range strategy.AtecoCandidates {
-				params := baseMASearchParams(strategy, province, &dryRun, limit)
+				if remaining <= 0 {
+					break
+				}
+				params := baseMASearchParams(strategy, province, &dryRun, remaining)
 				params.AtecoCode = candidate.Code
-				targets, err := s.executeCompanySearch(ctx, params)
+				targets, err := s.executeCompanySearch(ctx, params, subject, email)
 				if err != nil {
 					return nil, err
 				}
 				rawTargets = append(rawTargets, targets...)
+				remaining = limit - len(dedupeMATargets(rawTargets))
 			}
 			continue
 		}
-		params := baseMASearchParams(strategy, province, &dryRun, limit)
-		targets, err := s.executeCompanySearch(ctx, params)
+		params := baseMASearchParams(strategy, province, &dryRun, remaining)
+		targets, err := s.executeCompanySearch(ctx, params, subject, email)
 		if err != nil {
 			return nil, err
 		}
 		rawTargets = append(rawTargets, targets...)
+		remaining = limit - len(dedupeMATargets(rawTargets))
 	}
-	return dedupeMATargets(rawTargets), nil
+	targets := dedupeMATargets(rawTargets)
+	if len(targets) > limit {
+		targets = targets[:limit]
+	}
+	return targets, nil
 }
 
-func (s *maService) executeCompanySearch(ctx context.Context, params openapiit.CompanyITSearchParams) ([]MATarget, error) {
-	response, err := s.openapiit.Company().SearchITRaw(ctx, params)
+func (s *maService) executeCompanySearch(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) ([]MATarget, error) {
+	response, _, err := s.cachedCompanySearch(ctx, params, subject, email)
 	if err != nil {
 		return nil, err
 	}
 	return parseMATargetsFromVendorData(response.Data)
+}
+
+func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) (openapiit.Envelope[openapiit.CompanyDataset], json.RawMessage, error) {
+	cacheKey, paramsJSON, err := companySearchCacheKey(params)
+	if err != nil {
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+	}
+	now := s.now()
+	if s.searchCache != nil {
+		entry, err := s.searchCache.GetValidCompanySearch(ctx, cacheKey, now)
+		if err != nil {
+			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		}
+		if entry != nil {
+			envelope, err := decodeCompanySearchEnvelope(entry.Response)
+			return envelope, entry.Response, err
+		}
+	}
+	if s.openapiit == nil {
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, errMAOpenAPIITUnavailable
+	}
+
+	fetch := func(ctx context.Context) (openapiit.Envelope[openapiit.CompanyDataset], json.RawMessage, error) {
+		response, err := s.openapiit.Company().SearchITRaw(ctx, params)
+		if err != nil {
+			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		}
+		raw, err := json.Marshal(response)
+		if err != nil {
+			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		}
+		return response, raw, nil
+	}
+
+	if s.searchCache == nil {
+		response, raw, err := fetch(ctx)
+		return response, raw, err
+	}
+
+	var response openapiit.Envelope[openapiit.CompanyDataset]
+	var raw json.RawMessage
+	var upstreamErr error
+	err = s.searchCache.WithCompanySearchCacheLock(ctx, cacheKey, func(ctx context.Context) error {
+		entry, err := s.searchCache.GetValidCompanySearch(ctx, cacheKey, s.now())
+		if err != nil {
+			return err
+		}
+		if entry != nil {
+			response, err = decodeCompanySearchEnvelope(entry.Response)
+			raw = entry.Response
+			return err
+		}
+		response, raw, upstreamErr = fetch(ctx)
+		if upstreamErr != nil {
+			return nil
+		}
+		fetchedAt := s.now()
+		dryRun := params.DryRun != nil && *params.DryRun == 1
+		if err := s.searchCache.UpsertCompanySearch(ctx, companySearchCacheWrite{
+			CacheKey:           cacheKey,
+			Params:             paramsJSON,
+			Response:           raw,
+			DryRun:             dryRun,
+			DataEnrichment:     params.DataEnrichment,
+			FetchedAt:          fetchedAt,
+			ExpiresAt:          fetchedAt.Add(companySearchCacheTTL),
+			RefreshedBySubject: subject,
+			RefreshedByEmail:   email,
+		}); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+	}
+	if upstreamErr != nil {
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, upstreamErr
+	}
+	return response, raw, nil
+}
+
+func decodeCompanySearchEnvelope(raw json.RawMessage) (openapiit.Envelope[openapiit.CompanyDataset], error) {
+	var response openapiit.Envelope[openapiit.CompanyDataset]
+	if err := json.Unmarshal(raw, &response); err != nil {
+		return response, fmt.Errorf("decode cached company search: %w", err)
+	}
+	return response, nil
 }
 
 func baseMASearchParams(strategy MAStrategySpec, province string, dryRun *int, limit int) openapiit.CompanyITSearchParams {
@@ -466,12 +583,6 @@ func envelopeCount(envelope openapiit.Envelope[openapiit.CompanyDataset]) int {
 	if envelope.Count != nil {
 		return *envelope.Count
 	}
-	var payload any
-	if err := json.Unmarshal(envelope.Data, &payload); err == nil {
-		if value, ok := findNumericMetric(payload, []string{"count", "total", "results"}); ok {
-			return int(value)
-		}
-	}
 	return 0
 }
 
@@ -479,41 +590,7 @@ func envelopeCost(envelope openapiit.Envelope[openapiit.CompanyDataset]) float64
 	if envelope.Cost != nil {
 		return *envelope.Cost
 	}
-	var payload any
-	if err := json.Unmarshal(envelope.Data, &payload); err == nil {
-		if value, ok := findNumericMetric(payload, []string{"cost", "price", "amount", "prezzo"}); ok {
-			return value
-		}
-	}
 	return 0
-}
-
-func findNumericMetric(value any, hints []string) (float64, bool) {
-	switch typed := value.(type) {
-	case map[string]any:
-		for key, nested := range typed {
-			normalized := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(key, "_", ""), "-", ""))
-			for _, hint := range hints {
-				if strings.Contains(normalized, hint) {
-					if number, ok := vendorNumber(nested); ok {
-						return number, true
-					}
-				}
-			}
-		}
-		for _, nested := range typed {
-			if number, ok := findNumericMetric(nested, hints); ok {
-				return number, true
-			}
-		}
-	case []any:
-		for _, nested := range typed {
-			if number, ok := findNumericMetric(nested, hints); ok {
-				return number, true
-			}
-		}
-	}
-	return 0, false
 }
 
 func estimateTotal(estimates []MAEstimate, strategyType string) int {
@@ -524,6 +601,44 @@ func estimateTotal(estimates []MAEstimate, strategyType string) int {
 		}
 	}
 	return total
+}
+
+func estimatesMatchSearchLimit(estimates []MAEstimate, strategyType string, limit int) bool {
+	seen := false
+	maxLimit := 0
+	for _, estimate := range estimates {
+		if estimate.StrategyType != strategyType {
+			continue
+		}
+		seen = true
+		value := estimateParamLimit(estimate.Params)
+		if value <= 0 {
+			return false
+		}
+		if value > maxLimit {
+			maxLimit = value
+		}
+	}
+	return seen && maxLimit == limit
+}
+
+func estimateParamLimit(raw json.RawMessage) int {
+	if len(raw) == 0 {
+		return 0
+	}
+	var params map[string]string
+	if err := json.Unmarshal(raw, &params); err != nil {
+		return 0
+	}
+	value, ok := params["limit"]
+	if !ok {
+		return 0
+	}
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return 0
+	}
+	return parsed
 }
 
 func buildMAXLSX(rows [][]any) ([]byte, error) {

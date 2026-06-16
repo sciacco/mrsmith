@@ -289,8 +289,7 @@
   gap: var(--space-2);
 }
 
-.strategyGrid label > span,
-.inlineNumber span {
+.strategyGrid label > span {
   color: var(--color-text-muted);
   font-size: 0.6875rem;
   font-weight: 700;
@@ -302,32 +301,41 @@
   grid-column: 1 / -1;
 }
 
-.toggleRow {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+.criteriaList {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
 }
 
-.checkField {
-  display: inline-flex !important;
-  flex-direction: row !important;
-  align-items: center;
-  gap: var(--space-2) !important;
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
+.criteriaList > span {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.checkField input {
-  width: 18px;
-  min-height: 18px;
-  accent-color: var(--color-accent);
+.criteriaItem {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
-.inlineNumber {
-  width: 104px;
+.criteriaItem strong {
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.criteriaItem p,
+.criteriaItem small {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
 }
 
 .strategyActions {
@@ -444,6 +452,17 @@
   background: var(--color-surface);
   color: var(--color-text-secondary);
   font-size: 0.75rem;
+}
+
+.estimateWarning {
+  margin: 0 var(--space-5) var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+  font-size: 0.8125rem;
+  font-weight: 700;
 }
 
 .resultsPanel {
