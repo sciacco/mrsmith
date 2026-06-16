@@ -15,6 +15,8 @@ import type {
   MAStrategyType,
   MATarget,
   MATargetEvidence,
+  MATargetFlag,
+  MAThesis,
 } from '../api/types';
 import styles from './TargetPage.module.css';
 
@@ -30,6 +32,14 @@ const costFormat = new Intl.NumberFormat('it-IT', {
 });
 const defaultSearchLimit = 100;
 const maxSearchLimit = 1000;
+
+const thesisDescriptions: Record<string, string> = {
+  generico: 'Nessuna tesi: pesi bilanciati, età non valutata.',
+  successione: 'Proprietario vicino all’uscita: premia proprietà concentrata, azienda matura, forma acquisibile.',
+  crescita: 'Scale-up: premia trend di fatturato, produttività e aziende giovani.',
+  consolidamento: 'Quota di mercato: premia aderenza al profilo e dimensione vicina all’ideale.',
+  tuck_in: 'Competenza mirata: premia precisione di settore, accetta target piccoli.',
+};
 
 const emptyPrompt =
   'Es. target software B2B in Lombardia, fatturato intorno a 5 milioni, con condizioni specifiche da valutare sui risultati.';
@@ -452,7 +462,7 @@ export function TargetPage() {
                 <Skeleton rows={8} />
               </div>
             ) : hasTargets ? (
-              <TargetTable rows={detail?.targets ?? []} selectedId={selectedTarget?.id} onSelect={setSelectedTargetId} />
+              <TargetShortlist rows={detail?.targets ?? []} selectedId={selectedTarget?.id} onSelect={setSelectedTargetId} />
             ) : detail?.session.status === 'completed' ? (
               <EmptyState icon="search" title="Nessun target emerso" text="Restringi o modifica i criteri e ripeti la stima." />
             ) : (
@@ -519,7 +529,7 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
         <input type="number" min={0} value={strategy.turnoverMax ?? ''} onChange={updateNumber('turnoverMax')} />
       </label>
       <label>
-        <span>Massimo target</span>
+        <span>Numero risultati</span>
         <input
           type="number"
           min={1}
@@ -529,10 +539,28 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
         />
       </label>
       <label className={styles.fieldWide}>
+        <span>Tesi d'acquisizione</span>
+        <select value={strategy.thesis ?? 'generico'} onChange={(event) => onChange({ thesis: event.target.value as MAThesis })}>
+          <option value="generico">Generico</option>
+          <option value="successione">Successione</option>
+          <option value="crescita">Crescita</option>
+          <option value="consolidamento">Consolidamento</option>
+          <option value="tuck_in">Tuck-in</option>
+        </select>
+        <small className={styles.fieldHint}>{thesisDescriptions[strategy.thesis ?? 'generico']}</small>
+      </label>
+      <label>
+        <span>Forme giuridiche</span>
+        <input
+          value={(strategy.legalForms ?? []).join(', ')}
+          onChange={(event) => onChange({ legalForms: splitList(event.target.value).map((item) => item.toUpperCase()) })}
+          placeholder="solo se richiesto (es. SR)"
+        />
+      </label>
+      <label className={styles.fieldWide}>
         <span>Codici ATECO</span>
         <textarea value={atecoText} onChange={(event) => onChange({ atecoCandidates: parseAtecoLines(event.target.value) })} rows={3} />
       </label>
-      <ScoringCriteriaList criteria={strategy.scoringCriteria ?? []} />
       <label className={styles.fieldWide}>
         <span>Razionale</span>
         <textarea value={strategy.rationale} onChange={(event) => onChange({ rationale: event.target.value })} rows={2} />
@@ -541,18 +569,45 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
   );
 }
 
-function ScoringCriteriaList({ criteria }: { criteria: NonNullable<MAStrategySpec['scoringCriteria']> }) {
-  if (criteria.length === 0) return null;
+function TargetShortlist({ rows, selectedId, onSelect }: { rows: MATarget[]; selectedId?: string; onSelect: (id: string) => void }) {
+  const [activeFlags, setActiveFlags] = useState<string[]>([]);
+
+  const flagOptions: { code: string; label: string }[] = [];
+  const seen = new Set<string>();
+  for (const target of rows) {
+    for (const flag of target.flags ?? []) {
+      if (!seen.has(flag.code)) {
+        seen.add(flag.code);
+        flagOptions.push({ code: flag.code, label: flag.label });
+      }
+    }
+  }
+
+  const filtered =
+    activeFlags.length === 0
+      ? rows
+      : rows.filter((target) => activeFlags.every((code) => (target.flags ?? []).some((flag) => flag.code === code)));
+
+  const toggle = (code: string) =>
+    setActiveFlags((prev) => (prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]));
+
   return (
-    <div className={styles.criteriaList}>
-      <span>Criteri di valutazione</span>
-      {criteria.map((criterion) => (
-        <div key={criterion.id || criterion.label} className={styles.criteriaItem}>
-          <strong>{criterion.label}</strong>
-          {criterion.description ? <p>{criterion.description}</p> : null}
-          <small>{criterion.evaluation?.sourcePath ? criterion.evaluation.sourcePath : 'verifica non automatica'}</small>
+    <div className={styles.shortlist}>
+      {flagOptions.length > 0 ? (
+        <div className={styles.flagFilter}>
+          {flagOptions.map((option) => (
+            <button
+              key={option.code}
+              type="button"
+              className={`${styles.flagFilterChip} ${activeFlags.includes(option.code) ? styles.flagFilterActive : ''}`}
+              onClick={() => toggle(option.code)}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
-      ))}
+      ) : null}
+      <TargetTable rows={filtered} selectedId={selectedId} onSelect={onSelect} />
     </div>
   );
 }
@@ -568,7 +623,7 @@ function TargetTable({ rows, selectedId, onSelect }: { rows: MATarget[]; selecte
             <th>Settore</th>
             <th>Fatturato</th>
             <th>Punteggio</th>
-            <th>Esito</th>
+            <th>Confidenza</th>
           </tr>
         </thead>
         <tbody>
@@ -584,6 +639,7 @@ function TargetTable({ rows, selectedId, onSelect }: { rows: MATarget[]; selecte
                   <span>{target.companyName}</span>
                   <small>{[target.vatCode, target.taxCode].filter(Boolean).join(' · ') || '-'}</small>
                 </button>
+                <FlagChips flags={target.flags} />
               </td>
               <td>{[target.town, target.province].filter(Boolean).join(' · ') || '-'}</td>
               <td>
@@ -595,7 +651,7 @@ function TargetTable({ rows, selectedId, onSelect }: { rows: MATarget[]; selecte
                 <span className={styles.score}>{target.score}</span>
               </td>
               <td>
-                <span className={`${styles.matchBadge} ${matchClass(target.matchState)}`}>{matchLabel(target.matchState)}</span>
+                <span className={`${styles.confBadge} ${confidenceClass(target.confidence)}`}>{target.confidence ?? '-'}</span>
               </td>
             </tr>
           ))}
@@ -610,8 +666,11 @@ function TargetDetail({ target }: { target: MATarget }) {
     <div className={styles.targetDetail}>
       <div className={styles.detailTitleBlock}>
         <h3>{target.companyName}</h3>
-        <span className={`${styles.matchBadge} ${matchClass(target.matchState)}`}>{matchLabel(target.matchState)}</span>
+        <span className={`${styles.confBadge} ${confidenceClass(target.confidence)}`}>
+          {target.confidence ? `confidenza ${target.confidence}` : 'confidenza n.d.'}
+        </span>
       </div>
+      <FlagChips flags={target.flags} />
       <p className={styles.detailRationale}>{target.rationale || 'Motivazione non disponibile.'}</p>
       <dl className={styles.detailFacts}>
         <div>
@@ -634,20 +693,70 @@ function TargetDetail({ target }: { target: MATarget }) {
         </div>
       ) : null}
       <div className={styles.evidenceList}>
-        {target.evidence.map((item) => (
-          <EvidenceRow key={`${item.criterion}-${item.label}`} evidence={item} />
-        ))}
+        {evidenceFamilies.map((family) => {
+          const items = target.evidence.filter((item) => item.family === family.key);
+          if (items.length === 0) return null;
+          return (
+            <div key={family.key} className={styles.evidenceGroup}>
+              <span className={styles.evidenceGroupHead}>{family.label}</span>
+              {items.map((item) => (
+                <EvidenceRow key={`${item.criterion}-${item.label}`} evidence={item} />
+              ))}
+            </div>
+          );
+        })}
+        {target.evidence
+          .filter((item) => !item.family)
+          .map((item) => (
+            <EvidenceRow key={`${item.criterion}-${item.label}`} evidence={item} />
+          ))}
       </div>
     </div>
   );
 }
 
+const evidenceFamilies: { key: string; label: string }[] = [
+  { key: 'aderenza', label: 'Aderenza strategia' },
+  { key: 'opportunita', label: 'Opportunità deal' },
+  { key: 'economico', label: 'Profilo economico' },
+];
+
+function FlagChips({ flags }: { flags?: MATargetFlag[] }) {
+  if (!flags || flags.length === 0) return null;
+  return (
+    <div className={styles.flagRow}>
+      {flags.map((flag) => (
+        <span
+          key={flag.code}
+          className={`${styles.flagChip} ${flag.severity === 'warning' ? styles.flagWarning : styles.flagNeutral}`}
+        >
+          {flag.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function confidenceClass(value?: string) {
+  if (value === 'alta') return styles.confHigh;
+  if (value === 'bassa') return styles.confLow;
+  return styles.confMid;
+}
+
 function EvidenceRow({ evidence }: { evidence: MATargetEvidence }) {
+  const weight = evidence.weight ?? 0;
   return (
     <div className={styles.evidenceRow}>
       <span className={`${styles.evidenceDot} ${evidenceClass(evidence.status)}`} />
       <div>
-        <strong>{evidence.label}</strong>
+        <div className={styles.evidenceHead}>
+          <strong>{evidence.label}</strong>
+          {weight > 0 ? (
+            <small className={styles.evidencePoints}>
+              {Math.round(evidence.points ?? 0)} / {Math.round(weight)}
+            </small>
+          ) : null}
+        </div>
         <p>{evidence.value || evidenceStatusLabel(evidence.status)}</p>
       </div>
     </div>
@@ -800,12 +909,6 @@ function matchLabel(value: string): string {
     default:
       return value;
   }
-}
-
-function matchClass(value: string) {
-  if (value === 'match') return styles.matchStrong;
-  if (value === 'fuori_criterio') return styles.matchWeak;
-  return styles.matchPartial;
 }
 
 function evidenceClass(value: string) {

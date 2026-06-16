@@ -3,6 +3,7 @@ package binocolo
 import (
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -95,56 +96,121 @@ func TestMAEstimateStrategySelectionSkipsTooBroadSurfaces(t *testing.T) {
 	}
 }
 
-func TestMATargetScoringMatchPartialAndOutsideRules(t *testing.T) {
-	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
-	strategy := validScoringStrategy()
+// TestMAScoringThesisInversion locks the core promise of scoring v2 on two real
+// OpenAPI.it payloads: BFInformatica (strong growth, productive, solid) and
+// Prometeo (flat, single 60yo owner, mature, eroded equity). Same ATECO/size/
+// province, so the ranking inverts purely with the acquisition thesis.
+func TestMAScoringThesisInversion(t *testing.T) {
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
 
-	match := scoreMATarget(validScoringTarget(t), strategy, now)
-	if match.MatchState != maMatchStateMatch {
-		t.Fatalf("match state = %q, want match; evidence=%#v", match.MatchState, match.Evidence)
-	}
-	if match.Score != 100 {
-		t.Fatalf("score = %d, want 100", match.Score)
-	}
-
-	partial := validScoringTarget(t)
-	partial.Turnover = nil
-	partial = scoreMATarget(partial, strategy, now)
-	if partial.MatchState != maMatchStatePartial {
-		t.Fatalf("missing turnover state = %q, want partial", partial.MatchState)
-	}
-	if !slices.Contains(partial.MissingCriteria, "fatturato") {
-		t.Fatalf("missing criteria = %#v, want fatturato", partial.MissingCriteria)
+	run := func(thesis string) (int, int) {
+		strategy := thesisScoringStrategy(t, thesis)
+		targets := scoreMATargetsV2([]MATarget{bfInformaticaTarget(), prometeoTarget()}, strategy, now)
+		return scoreByCompany(targets, "BFINFORMATICA"), scoreByCompany(targets, "PROMETEO")
 	}
 
-	outside := validScoringTarget(t)
-	lowTurnover := 400_000
-	outside.Turnover = &lowTurnover
-	outside = scoreMATarget(outside, strategy, now)
-	if outside.MatchState != maMatchStateOutside {
-		t.Fatalf("outside turnover state = %q, want outside", outside.MatchState)
+	bfiGrowth, proGrowth := run(maThesisGrowth)
+	if bfiGrowth <= proGrowth {
+		t.Fatalf("crescita: atteso BFInformatica (%d) > Prometeo (%d)", bfiGrowth, proGrowth)
+	}
+
+	bfiSucc, proSucc := run(maThesisSuccession)
+	if proSucc <= bfiSucc {
+		t.Fatalf("successione: atteso Prometeo (%d) > BFInformatica (%d)", proSucc, bfiSucc)
 	}
 }
 
-func TestMADynamicCriteriaUseVendorPaths(t *testing.T) {
-	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
-	strategy := validScoringStrategy()
-	target := validScoringTarget(t)
-	target.VendorPayload = mustVendorPayload(t, []map[string]any{
-		{"taxCode": "RSSMRA70A01H501U", "percentShare": 65},
+func thesisScoringStrategy(t *testing.T, thesis string) MAStrategySpec {
+	t.Helper()
+	around := 1_200_000
+	strategy, err := validateMAStrategy(MAStrategySpec{
+		SectorDescription: "servizi informatici",
+		Provinces:         []string{"TV"},
+		ActivityStatus:    "ATTIVA",
+		TurnoverAround:    &around,
+		AtecoCandidates:   []MAAtecoCandidate{{Code: "6290", Description: "Servizi informatici"}},
+		Keywords:          []string{"informatica"},
+		Thesis:            thesis,
 	})
-	scored := scoreMATarget(target, strategy, now)
-	if statusForEvidence(scored.Evidence, "dynamic_quota_minima") != maEvidenceMatch {
-		t.Fatalf("dynamic evidence = %#v, want match", scored.Evidence)
+	if err != nil {
+		t.Fatalf("validate strategy: %v", err)
 	}
-	target.VendorPayload = mustVendorPayload(t, []map[string]any{
-		{"taxCode": "RSSMRA70A01H501U", "percentShare": 20},
-	})
-	scored = scoreMATarget(target, strategy, now)
-	if statusForEvidence(scored.Evidence, "dynamic_quota_minima") != maEvidenceOutside {
-		t.Fatalf("dynamic evidence = %#v, want outside", scored.Evidence)
+	return strategy
+}
+
+func scoreByCompany(targets []MATarget, name string) int {
+	for _, target := range targets {
+		if strings.Contains(target.CompanyName, name) {
+			return target.Score
+		}
+	}
+	return -1
+}
+
+func bfInformaticaTarget() MATarget {
+	return MATarget{
+		CompanyName:      "BFINFORMATICA SRL",
+		AtecoCode:        "629009",
+		AtecoDescription: "Altre attivita' dei servizi connessi alle tecnologie dell'informatica n.c.a.",
+		VendorPayload:    json.RawMessage(bfInformaticaPayload),
 	}
 }
+
+func prometeoTarget() MATarget {
+	return MATarget{
+		CompanyName:      "PROMETEO S.R.L.",
+		AtecoCode:        "629009",
+		AtecoDescription: "Altre attivita' dei servizi connessi alle tecnologie dell'informatica n.c.a.",
+		VendorPayload:    json.RawMessage(prometeoPayload),
+	}
+}
+
+const bfInformaticaPayload = `{
+  "companyName": "BFINFORMATICA SRL",
+  "vatCode": "04682240264",
+  "taxCode": "04682240264",
+  "activityStatus": "ATTIVA",
+  "taxCodeCeased": false,
+  "startDate": "2014-07-29",
+  "registrationDate": "2014-07-28",
+  "detailedLegalForm": {"code": "SR", "description": "SOCIETA' A RESPONSABILITA' LIMITATA"},
+  "atecoClassification": {"ateco": {"code": "629009"}},
+  "shareHolders": [
+    {"name": "BARBARA", "surname": "FRANCESCHINI", "taxCode": "FRNBBR76C55L378C", "percentShare": 80},
+    {"name": "ALESSIA", "surname": "MASE'", "taxCode": "MSALSS02M51L407L", "percentShare": 20}
+  ],
+  "balanceSheets": {
+    "all": [
+      {"year": 2022, "turnover": 831095, "netWorth": 52133, "employees": 9},
+      {"year": 2023, "turnover": 927803, "netWorth": 43559, "employees": 8, "totalAssets": 617237},
+      {"year": 2024, "turnover": 1211015, "netWorth": 73049, "employees": 9, "totalAssets": 722368}
+    ],
+    "last": {"year": 2024, "turnover": 1211015, "netWorth": 73049, "employees": 9, "totalAssets": 722368}
+  }
+}`
+
+const prometeoPayload = `{
+  "companyName": "PROMETEO S.R.L.",
+  "vatCode": "02062450263",
+  "taxCode": "02062450263",
+  "activityStatus": "ATTIVA",
+  "taxCodeCeased": false,
+  "startDate": "1988-06-30",
+  "registrationDate": "1988-04-21",
+  "detailedLegalForm": {"code": "SR", "description": "SOCIETA' A RESPONSABILITA' LIMITATA"},
+  "atecoClassification": {"ateco": {"code": "629009"}},
+  "shareHolders": [
+    {"name": "GIAMPAOLO", "surname": "LIONELLO", "taxCode": "LNLGPL65T16D157M", "percentShare": 100}
+  ],
+  "balanceSheets": {
+    "all": [
+      {"year": 2023, "turnover": 1226650, "netWorth": 44696, "employees": 19, "totalAssets": 2272968},
+      {"year": 2024, "turnover": 1217690, "netWorth": 40432, "employees": 15, "totalAssets": 2245815},
+      {"year": 2025, "turnover": 1234085, "netWorth": 3231, "employees": 16, "totalAssets": 2236197}
+    ],
+    "last": {"year": 2025, "turnover": 1234085, "netWorth": 3231, "employees": 16, "totalAssets": 2236197}
+  }
+}`
 
 func TestMADedupeTargetsAcrossAtecoSearches(t *testing.T) {
 	first := MATarget{CompanyName: "ACME S.r.l.", VATCode: "12345678901", AtecoCode: "6201"}
@@ -186,71 +252,3 @@ func TestMAExportRows(t *testing.T) {
 	}
 }
 
-func validScoringStrategy() MAStrategySpec {
-	minTurnover := 1_000_000
-	maxTurnover := 2_000_000
-	strategy, err := validateMAStrategy(MAStrategySpec{
-		SectorDescription: "software gestionale",
-		Provinces:         []string{"MI"},
-		ActivityStatus:    "ATTIVA",
-		TurnoverMin:       &minTurnover,
-		TurnoverMax:       &maxTurnover,
-		AtecoCandidates: []MAAtecoCandidate{
-			{Code: "6201", Description: "Produzione software"},
-		},
-		Keywords: []string{"software"},
-		ScoringCriteria: []MAScoringCriterion{
-			{
-				ID:     "quota_minima",
-				Label:  "Quota minima verificabile",
-				Weight: 30,
-				Evaluation: MAScoringEvaluation{
-					SourcePath: "shareHolders.percentShare",
-					Operator:   "gte",
-					Value:      60,
-					Match:      "any",
-				},
-			},
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
-	return strategy
-}
-
-func validScoringTarget(t *testing.T) MATarget {
-	t.Helper()
-	turnover := 1_500_000
-	return MATarget{
-		CompanyName:      "ACME S.r.l.",
-		VATCode:          "12345678901",
-		Province:         "MI",
-		ActivityStatus:   "ATTIVA",
-		Turnover:         &turnover,
-		AtecoCode:        "620100",
-		AtecoDescription: "Produzione di software non connesso all'edizione",
-		VendorPayload: mustVendorPayload(t, []map[string]any{
-			{"taxCode": "RSSMRA70A01H501U", "percentShare": 65},
-			{"taxCode": "VRDLGI65M01H501Q", "percentShare": 35},
-		}),
-	}
-}
-
-func mustVendorPayload(t *testing.T, shareholders []map[string]any) json.RawMessage {
-	t.Helper()
-	raw, err := json.Marshal(map[string]any{"shareHolders": shareholders})
-	if err != nil {
-		t.Fatalf("marshal vendor payload: %v", err)
-	}
-	return raw
-}
-
-func statusForEvidence(evidence []MATargetEvidence, criterion string) string {
-	for _, item := range evidence {
-		if item.Criterion == criterion {
-			return item.Status
-		}
-	}
-	return ""
-}

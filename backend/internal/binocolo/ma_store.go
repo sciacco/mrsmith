@@ -458,6 +458,14 @@ WHERE target_id IN (SELECT id FROM binocolo.ma_target WHERE session_id = $1::uui
 		if err != nil {
 			return fmt.Errorf("marshal ma target missing criteria: %w", err)
 		}
+		flagsRaw := []byte("[]")
+		if len(target.Flags) > 0 {
+			raw, err := json.Marshal(target.Flags)
+			if err != nil {
+				return fmt.Errorf("marshal ma target flags: %w", err)
+			}
+			flagsRaw = raw
+		}
 		payload := json.RawMessage(`{}`)
 		if len(target.VendorPayload) > 0 {
 			payload = target.VendorPayload
@@ -481,12 +489,15 @@ INSERT INTO binocolo.ma_target (
   ateco_description,
   score,
   match_state,
+  confidence,
+  flags,
   rationale,
   missing_criteria,
   vendor_payload
 ) VALUES (
   $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10,
-  $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb
+  $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20,
+  $21::jsonb, $22::jsonb
 )
 `, targetID,
 			sessionID,
@@ -505,6 +516,8 @@ INSERT INTO binocolo.ma_target (
 			nullString(target.AtecoDescription),
 			target.Score,
 			target.MatchState,
+			nullString(target.Confidence),
+			flagsRaw,
 			target.Rationale,
 			missingRaw,
 			[]byte(payload),
@@ -518,18 +531,24 @@ INSERT INTO binocolo.ma_evidence (
   target_id,
   criterion,
   status,
+  family,
   label,
   value,
+  points,
+  weight,
   source_path
 ) VALUES (
-  $1::uuid, $2::uuid, $3, $4, $5, $6, $7
+  $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10
 )
 `, uuid.NewString(),
 				targetID,
 				evidence.Criterion,
 				evidence.Status,
+				nullString(evidence.Family),
 				evidence.Label,
 				nullString(evidence.Value),
+				evidence.Points,
+				evidence.Weight,
 				nullString(evidence.SourcePath),
 			); err != nil {
 				return fmt.Errorf("insert ma evidence: %w", err)
@@ -1130,8 +1149,8 @@ func (s *SQLStore) loadMATargets(ctx context.Context, sessionID string) ([]MATar
 SELECT id::text, session_id::text, run_id::text, COALESCE(vendor_id, ''), company_name,
        COALESCE(vat_code, ''), COALESCE(tax_code, ''), COALESCE(province, ''), COALESCE(town, ''),
        COALESCE(activity_status, ''), turnover, turnover_year, employees, COALESCE(ateco_code, ''),
-       COALESCE(ateco_description, ''), score, match_state, rationale, missing_criteria,
-       vendor_payload, created_at
+       COALESCE(ateco_description, ''), score, match_state, COALESCE(confidence, ''), flags,
+       rationale, missing_criteria, vendor_payload, created_at
 FROM binocolo.ma_target
 WHERE session_id = $1::uuid
 ORDER BY score DESC, company_name
@@ -1147,6 +1166,7 @@ ORDER BY score DESC, company_name
 		var turnoverYear sql.NullInt64
 		var employees sql.NullInt64
 		var missingRaw []byte
+		var flagsRaw []byte
 		if err := rows.Scan(
 			&item.ID,
 			&item.SessionID,
@@ -1165,12 +1185,17 @@ ORDER BY score DESC, company_name
 			&item.AtecoDescription,
 			&item.Score,
 			&item.MatchState,
+			&item.Confidence,
+			&flagsRaw,
 			&item.Rationale,
 			&missingRaw,
 			&item.VendorPayload,
 			&item.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan ma target: %w", err)
+		}
+		if len(flagsRaw) > 0 {
+			_ = json.Unmarshal(flagsRaw, &item.Flags)
 		}
 		if turnover.Valid {
 			value := int(turnover.Int64)
@@ -1207,8 +1232,10 @@ ORDER BY score DESC, company_name
 
 func (s *SQLStore) loadMAEvidence(ctx context.Context, sessionID string) (map[string][]MATargetEvidence, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT evidence.target_id::text, evidence.criterion, evidence.status, evidence.label,
-       COALESCE(evidence.value, ''), COALESCE(evidence.source_path, '')
+SELECT evidence.target_id::text, evidence.criterion, evidence.status,
+       COALESCE(evidence.family, ''), evidence.label, COALESCE(evidence.value, ''),
+       COALESCE(evidence.points, 0)::float8, COALESCE(evidence.weight, 0)::float8,
+       COALESCE(evidence.source_path, '')
 FROM binocolo.ma_evidence evidence
 JOIN binocolo.ma_target target ON target.id = evidence.target_id
 WHERE target.session_id = $1::uuid
@@ -1222,7 +1249,7 @@ ORDER BY evidence.created_at, evidence.id
 	for rows.Next() {
 		var targetID string
 		var item MATargetEvidence
-		if err := rows.Scan(&targetID, &item.Criterion, &item.Status, &item.Label, &item.Value, &item.SourcePath); err != nil {
+		if err := rows.Scan(&targetID, &item.Criterion, &item.Status, &item.Family, &item.Label, &item.Value, &item.Points, &item.Weight, &item.SourcePath); err != nil {
 			return nil, fmt.Errorf("scan ma evidence: %w", err)
 		}
 		out[targetID] = append(out[targetID], item)

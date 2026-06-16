@@ -82,6 +82,9 @@ export type MASessionStatus = 'draft' | 'estimated' | 'running' | 'completed' | 
 export type MAStrategyType = 'ateco' | 'expanded';
 export type MAMatchState = 'match' | 'match_parziale' | 'fuori_criterio';
 export type MAEstimateSurfaceStatus = 'exact' | 'too_broad';
+export type MAThesis = 'successione' | 'crescita' | 'consolidamento' | 'tuck_in' | 'generico';
+export type MAConfidence = 'alta' | 'media' | 'bassa';
+export type MAFlagSeverity = 'neutral' | 'warning';
 
 export interface MASession {
   id: string;
@@ -124,6 +127,9 @@ export interface MAStrategySpec {
   missingCriteria: string[];
   selectedStrategy?: MAStrategyType;
   expandedClassification?: string;
+  thesis?: MAThesis;
+  legalForms?: string[];
+  signalWeights?: Record<string, number>;
 }
 
 export interface MAAtecoCandidate {
@@ -200,15 +206,26 @@ export interface MATarget {
   atecoDescription?: string;
   score: number;
   matchState: MAMatchState;
+  confidence?: MAConfidence;
+  flags?: MATargetFlag[];
   rationale: string;
   missingCriteria: string[];
   evidence: MATargetEvidence[];
 }
 
+export interface MATargetFlag {
+  code: string;
+  label: string;
+  severity: MAFlagSeverity;
+}
+
 export interface MATargetEvidence {
   criterion: string;
   status: 'match' | 'match_parziale' | 'criterio_mancante' | 'fuori_criterio';
+  family?: string;
   label: string;
   value?: string;
+  points?: number;
+  weight?: number;
   sourcePath?: string;
 }

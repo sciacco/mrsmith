@@ -348,13 +348,21 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	for index := range targets {
 		targets[index].SessionID = sessionID
 		targets[index].RunID = run.ID
-		targets[index] = scoreMATarget(targets[index], strategyVersion.Strategy, s.now())
 	}
-	sort.SliceStable(targets, func(i, j int) bool {
-		if targets[i].Score == targets[j].Score {
-			return targets[i].CompanyName < targets[j].CompanyName
+	targets = scoreMATargetsV2(targets, strategyVersion.Strategy, s.now())
+	missingFinancials := 0
+	for _, target := range targets {
+		for _, flag := range target.Flags {
+			if flag.Code == "bilancio_assente" {
+				missingFinancials++
+				break
+			}
 		}
-		return targets[i].Score > targets[j].Score
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_scoring_completed",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "run_id": run.ID, "result_count": len(targets), "missing_financials": missingFinancials, "thesis": normalizeMAThesis(strategyVersion.Strategy.Thesis)}),
 	})
 	if err := s.store.ReplaceMATargets(ctx, sessionID, run.ID, targets); err != nil {
 		_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, "store_error")
@@ -648,6 +656,9 @@ func maStrategyToolInstructions() string {
 		"Il probe e' solo dry-run e misura la superficie potenziale: non usare searchLimit per restringere questa valutazione.",
 		"Se probe_company_search_surface restituisce surfaceStatus=too_broad, restringi territorio, settore o range economici prima della risposta finale.",
 		"Se la prima ricerca e' troppo generica, fai piu' chiamate tool mirate con termini italiani come programmazione informatica, consulenza informatica, hosting, elaborazione dati.",
+		"Deduci la tesi d'acquisizione (thesis) dalla richiesta: successione, crescita, consolidamento, tuck_in oppure generico se non emerge.",
+		"Popola legalForms solo se l'utente richiede esplicitamente una forma societaria; e' un filtro, non un criterio di valutazione.",
+		"Non generare scoringCriteria. Per enfatizzare un segnale usa signalWeights solo con id del catalogo (ateco_precision, turnover_proximity, keyword_match, ownership_concentration, company_age, legal_form, turnover_trend, productivity, equity_solidity); non inventare id.",
 		"La risposta finale deve restare JSON valido nel formato richiesto dal prompt di sistema.",
 	}, "\n")
 }
@@ -1308,7 +1319,7 @@ func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, s
 		rawTargets = append(rawTargets, targets...)
 		remaining = limit - len(dedupeMATargets(rawTargets))
 	}
-	targets := dedupeMATargets(rawTargets)
+	targets := maFilterByLegalForms(dedupeMATargets(rawTargets), strategy.LegalForms)
 	if len(targets) > limit {
 		targets = targets[:limit]
 	}
@@ -1526,11 +1537,16 @@ func baseMASearchParams(strategy MAStrategySpec, province string, dryRun *int, l
 		MaxEmployees:   strategy.EmployeeMax,
 		Limit:          &limit,
 	}
+	// A single explicit legal-form constraint filters server-side; multiple forms
+	// are enforced by post-filtering the results (see maFilterByLegalForms).
+	if len(strategy.LegalForms) == 1 {
+		params.LegalFormCode = strategy.LegalForms[0]
+	}
 	return params
 }
 
 func baseMASurfaceParams(strategy MAStrategySpec, province string, dryRun *int) openapiit.CompanyITSearchParams {
-	return openapiit.CompanyITSearchParams{
+	params := openapiit.CompanyITSearchParams{
 		DryRun:         dryRun,
 		DataEnrichment: "advanced",
 		Province:       province,
@@ -1540,6 +1556,10 @@ func baseMASurfaceParams(strategy MAStrategySpec, province string, dryRun *int) 
 		MinEmployees:   strategy.EmployeeMin,
 		MaxEmployees:   strategy.EmployeeMax,
 	}
+	if len(strategy.LegalForms) == 1 {
+		params.LegalFormCode = strategy.LegalForms[0]
+	}
+	return params
 }
 
 func envelopeCount(envelope openapiit.Envelope[openapiit.CompanyDataset]) int {

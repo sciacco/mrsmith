@@ -141,11 +141,17 @@ type MAStrategySpec struct {
 	SearchLimit            int                  `json:"searchLimit"`
 	AtecoCandidates        []MAAtecoCandidate   `json:"atecoCandidates"`
 	Keywords               []string             `json:"keywords"`
-	ScoringCriteria        []MAScoringCriterion `json:"scoringCriteria,omitempty"`
+	ScoringCriteria        []MAScoringCriterion `json:"scoringCriteria,omitempty"` // deprecated: free-form criteria, no longer generated
 	Rationale              string               `json:"rationale"`
 	MissingCriteria        []string             `json:"missingCriteria"`
 	SelectedStrategy       string               `json:"selectedStrategy,omitempty"`
 	ExpandedClassification string               `json:"expandedClassification,omitempty"`
+	// Scoring v2: acquisition thesis (drives signal directions + family weights),
+	// explicit legal-form constraint (server-side filter, removed from ranking),
+	// and per-signal weight overrides selected from the scoring catalog.
+	Thesis        string         `json:"thesis,omitempty"`
+	LegalForms    []string       `json:"legalForms,omitempty"`
+	SignalWeights map[string]int `json:"signalWeights,omitempty"`
 }
 
 type MAAtecoCandidate struct {
@@ -224,6 +230,8 @@ type MATarget struct {
 	AtecoDescription string             `json:"atecoDescription,omitempty"`
 	Score            int                `json:"score"`
 	MatchState       string             `json:"matchState"`
+	Confidence       string             `json:"confidence,omitempty"`
+	Flags            []MATargetFlag     `json:"flags,omitempty"`
 	Rationale        string             `json:"rationale"`
 	MissingCriteria  []string           `json:"missingCriteria"`
 	Evidence         []MATargetEvidence `json:"evidence"`
@@ -232,11 +240,22 @@ type MATarget struct {
 }
 
 type MATargetEvidence struct {
-	Criterion  string `json:"criterion"`
-	Status     string `json:"status"`
-	Label      string `json:"label"`
-	Value      string `json:"value,omitempty"`
-	SourcePath string `json:"sourcePath,omitempty"`
+	Criterion  string  `json:"criterion"`
+	Status     string  `json:"status"`
+	Family     string  `json:"family,omitempty"`
+	Label      string  `json:"label"`
+	Value      string  `json:"value,omitempty"`
+	Points     float64 `json:"points"`
+	Weight     float64 `json:"weight"`
+	SourcePath string  `json:"sourcePath,omitempty"`
+}
+
+// MATargetFlag is a non-scoring annotation surfaced for manual triage.
+// Severity is "neutral" (deal profile) or "warning" (data/risk caveats).
+type MATargetFlag struct {
+	Code     string `json:"code"`
+	Label    string `json:"label"`
+	Severity string `json:"severity"`
 }
 
 type maStrategyDraftEnvelope struct {
