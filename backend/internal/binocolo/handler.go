@@ -26,23 +26,27 @@ type Deps struct {
 type Handler struct {
 	openapiit          *openapiit.Client
 	companySearchCache companySearchCacheStore
+	provinceCache      provinceCacheStore
 	ateco              atecoStore
 	ma                 *maService
 }
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	var cache companySearchCacheStore
+	var provinceCache provinceCacheStore
 	var maStore maWorkspaceStore
 	var ateco atecoStore
 	if deps.AnisettaDB != nil {
 		store := NewSQLStore(deps.AnisettaDB)
 		cache = store
+		provinceCache = store
 		maStore = store
 		ateco = store
 	}
 	h := &Handler{
 		openapiit:          deps.OpenAPIIT,
 		companySearchCache: cache,
+		provinceCache:      provinceCache,
 		ateco:              ateco,
 		ma:                 newMAService(maStore, cache, ateco, deps.OpenAPIIT, deps.OpenRouter),
 	}
