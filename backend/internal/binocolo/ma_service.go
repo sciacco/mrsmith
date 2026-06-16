@@ -127,11 +127,42 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	if err != nil {
 		return MASessionDetail{}, err
 	}
+	if detail.Strategy != nil {
+		if err := s.linkTrace(ctx, maTraceLink{SessionID: detail.Session.ID, StrategyVersionID: detail.Strategy.ID}); err != nil {
+			return MASessionDetail{}, err
+		}
+	} else if err := s.linkTrace(ctx, maTraceLink{SessionID: detail.Session.ID}); err != nil {
+		return MASessionDetail{}, err
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_session_created",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"session_id":          detail.Session.ID,
+			"strategy_version_id": nullableTraceString(detail.Session.ActiveStrategyID),
+			"title":               detail.Session.Title,
+		}),
+	}); err != nil {
+		return MASessionDetail{}, err
+	}
 	audit.SessionID = detail.Session.ID
 	if detail.Strategy != nil {
 		audit.StrategyVersionID = detail.Strategy.ID
 	}
 	if err := s.store.RecordMAModelAudit(ctx, audit); err != nil {
+		return MASessionDetail{}, err
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_model_audit_recorded",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"scope":               audit.Scope,
+			"model_id":            audit.ModelID,
+			"prompt_id":           audit.PromptID,
+			"session_id":          audit.SessionID,
+			"strategy_version_id": audit.StrategyVersionID,
+		}),
+	}); err != nil {
 		return MASessionDetail{}, err
 	}
 	return detail, nil
@@ -143,6 +174,13 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 	}
 	if s.openapiit == nil {
 		return MASessionDetail{}, errMAOpenAPIITUnavailable
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_estimate_started",
+		Status:    maTraceEventStarted,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "strategy_supplied": req.Strategy != nil}),
+	}); err != nil {
+		return MASessionDetail{}, err
 	}
 	detail, err := s.store.GetMASession(ctx, sessionID)
 	if err != nil {
@@ -162,9 +200,19 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 		if err != nil {
 			return MASessionDetail{}, err
 		}
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_strategy_version_created",
+			Status:    maTraceEventSucceeded,
+			Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "strategy_version_id": strategyVersion.ID, "version": strategyVersion.Version}),
+		}); err != nil {
+			return MASessionDetail{}, err
+		}
 	}
 	if strategyVersion == nil {
 		return MASessionDetail{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
+	}
+	if err := s.linkTrace(ctx, maTraceLink{SessionID: sessionID, StrategyVersionID: strategyVersion.ID}); err != nil {
+		return MASessionDetail{}, err
 	}
 	strategyVersion.Strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategyVersion.Strategy, nil, false)
 	if err != nil {
@@ -178,6 +226,18 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 	if err := s.store.ReplaceMAEstimates(ctx, sessionID, strategyVersion.ID, selected, estimates); err != nil {
 		return MASessionDetail{}, err
 	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_estimates_saved",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"session_id":          sessionID,
+			"strategy_version_id": strategyVersion.ID,
+			"selected_strategy":   selected,
+			"estimate_count":      len(estimates),
+		}),
+	}); err != nil {
+		return MASessionDetail{}, err
+	}
 	return s.store.GetMASession(ctx, sessionID)
 }
 
@@ -187,6 +247,13 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	}
 	if s.openapiit == nil {
 		return MASessionDetail{}, errMAOpenAPIITUnavailable
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_execute_started",
+		Status:    maTraceEventStarted,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "strategy_supplied": req.Strategy != nil, "requested_strategy_type": req.StrategyType, "limit": req.Limit}),
+	}); err != nil {
+		return MASessionDetail{}, err
 	}
 	detail, err := s.store.GetMASession(ctx, sessionID)
 	if err != nil {
@@ -206,6 +273,13 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 		if err != nil {
 			return MASessionDetail{}, err
 		}
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_strategy_version_created",
+			Status:    maTraceEventSucceeded,
+			Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "strategy_version_id": strategyVersion.ID, "version": strategyVersion.Version}),
+		}); err != nil {
+			return MASessionDetail{}, err
+		}
 		detail, err = s.store.GetMASession(ctx, sessionID)
 		if err != nil {
 			return MASessionDetail{}, err
@@ -213,6 +287,9 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	}
 	if strategyVersion == nil {
 		return MASessionDetail{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
+	}
+	if err := s.linkTrace(ctx, maTraceLink{SessionID: sessionID, StrategyVersionID: strategyVersion.ID}); err != nil {
+		return MASessionDetail{}, err
 	}
 	strategyVersion.Strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategyVersion.Strategy, nil, false)
 	if err != nil {
@@ -252,6 +329,16 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	if err != nil {
 		return MASessionDetail{}, err
 	}
+	if err := s.linkTrace(ctx, maTraceLink{SessionID: sessionID, StrategyVersionID: strategyVersion.ID, ExecutionRunID: run.ID}); err != nil {
+		return MASessionDetail{}, err
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_execution_run_created",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "strategy_version_id": strategyVersion.ID, "run_id": run.ID, "strategy_type": strategyType, "estimated_count": estimatedCount, "limit": limit}),
+	}); err != nil {
+		return MASessionDetail{}, err
+	}
 
 	targets, execErr := s.runExecution(ctx, strategyVersion.Strategy, strategyType, limit, subject, email)
 	if execErr != nil {
@@ -276,6 +363,13 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	if err := s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusCompleted, len(targets), ""); err != nil {
 		return MASessionDetail{}, err
 	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_execution_completed",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "run_id": run.ID, "result_count": len(targets)}),
+	}); err != nil {
+		return MASessionDetail{}, err
+	}
 	return s.store.GetMASession(ctx, sessionID)
 }
 
@@ -283,8 +377,18 @@ func (s *maService) exportSession(ctx context.Context, sessionID string, format 
 	if s.store == nil {
 		return nil, "", "", errMAStoreUnavailable
 	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_export_started",
+		Status:    maTraceEventStarted,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "format": format}),
+	}); err != nil {
+		return nil, "", "", err
+	}
 	detail, err := s.store.GetMASession(ctx, sessionID)
 	if err != nil {
+		return nil, "", "", err
+	}
+	if err := s.linkTrace(ctx, maTraceLink{SessionID: sessionID, StrategyVersionID: detail.Session.ActiveStrategyID}); err != nil {
 		return nil, "", "", err
 	}
 	format = strings.ToLower(strings.TrimSpace(format))
@@ -303,6 +407,13 @@ func (s *maService) exportSession(ctx context.Context, sessionID string, format 
 		return nil, "", "", err
 	}
 	filename := "target-ma-" + safeFilenamePart(detail.Session.Title) + ".xlsx"
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_export_recorded",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "format": "xlsx", "filename": filename, "row_count": len(detail.Targets)}),
+	}); err != nil {
+		return nil, "", "", err
+	}
 	return content, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", nil
 }
 
@@ -327,6 +438,21 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 	if err != nil {
 		return MAStrategySpec{}, maModelAuditWrite{}, llmConfigError(err)
 	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_strategy_draft_config",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"model_id":     modelConfig.ID,
+			"model_scope":  modelConfig.Scope,
+			"model":        modelConfig.Model,
+			"prompt_id":    promptConfig.ID,
+			"prompt_scope": promptConfig.Scope,
+			"prompt_name":  promptConfig.Name,
+			"prompt":       promptConfig.Prompt,
+		}),
+	}); err != nil {
+		return MAStrategySpec{}, maModelAuditWrite{}, err
+	}
 	messages := []openrouter.Message{
 		{Role: "system", Content: promptConfig.Prompt},
 		{Role: "developer", Content: maStrategyToolInstructions()},
@@ -347,8 +473,31 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			Tools:          tools,
 			ToolChoice:     "auto",
 		}
+		start := time.Now()
 		response, err = s.ai.Chat(ctx, req)
+		duration := maTraceDuration(start)
 		if err != nil {
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType:      "openrouter_chat",
+				Round:          maTraceRound(round),
+				ExternalSystem: "openrouter",
+				Status:         maTraceEventFailed,
+				DurationMS:     duration,
+				Request:        maTraceJSON(req),
+				Error:          err.Error(),
+			})
+			return MAStrategySpec{}, maModelAuditWrite{}, err
+		}
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType:      "openrouter_chat",
+			Round:          maTraceRound(round),
+			ExternalSystem: "openrouter",
+			Status:         maTraceEventSucceeded,
+			DurationMS:     duration,
+			Request:        maTraceJSON(req),
+			Response:       maTraceJSON(response),
+			Metadata:       maTraceJSON(map[string]any{"tool_call_count": len(response.ToolCalls), "response_id": response.ID, "response_model": response.Model}),
+		}); err != nil {
 			return MAStrategySpec{}, maModelAuditWrite{}, err
 		}
 		if len(response.ToolCalls) == 0 {
@@ -356,7 +505,15 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			break
 		}
 		if round == maMaxToolRounds {
-			return MAStrategySpec{}, maModelAuditWrite{}, fmt.Errorf("%w: ateco tool loop", errMAStrategyInvalid)
+			err := fmt.Errorf("%w: ateco tool loop", errMAStrategyInvalid)
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType: "ma_strategy_tool_loop_limit",
+				Round:     maTraceRound(round),
+				Status:    maTraceEventFailed,
+				Metadata:  maTraceJSON(map[string]any{"max_tool_rounds": maMaxToolRounds, "tool_call_count": len(response.ToolCalls)}),
+				Error:     err.Error(),
+			})
+			return MAStrategySpec{}, maModelAuditWrite{}, err
 		}
 		messages = append(messages, openrouter.Message{
 			Role:      "assistant",
@@ -364,7 +521,23 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			ToolCalls: response.ToolCalls,
 		})
 		for _, call := range response.ToolCalls {
+			start := time.Now()
 			content := s.executeMAStrategyTool(ctx, call, allowedAteco, allowedProvinces, subject, email)
+			if err := s.traceEvent(ctx, maTraceEventWrite{
+				EventType:  "ma_strategy_tool",
+				Round:      maTraceRound(round),
+				ToolName:   call.Function.Name,
+				Status:     maToolResultStatus(content),
+				DurationMS: maTraceDuration(start),
+				Request:    maTraceJSON(call),
+				Response:   maTraceRawJSON([]byte(content)),
+				Metadata: maTraceJSON(map[string]any{
+					"allowed_ateco_count":    len(allowedAteco),
+					"allowed_province_count": len(allowedProvinces),
+				}),
+			}); err != nil {
+				return MAStrategySpec{}, maModelAuditWrite{}, err
+			}
 			messages = append(messages, openrouter.Message{
 				Role:       "tool",
 				ToolCallID: call.ID,
@@ -374,14 +547,54 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 	}
 	strategy, err := decodeMAStrategyResponse(responseRaw)
 	if err != nil {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_strategy_decode",
+			Status:    maTraceEventFailed,
+			Response:  maTraceJSON(responseRaw),
+			Error:     err.Error(),
+		})
+		return MAStrategySpec{}, maModelAuditWrite{}, err
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_strategy_decode",
+		Status:    maTraceEventSucceeded,
+		Response:  maTraceJSON(strategy),
+	}); err != nil {
 		return MAStrategySpec{}, maModelAuditWrite{}, err
 	}
 	strategy, err = s.canonicalizeMAStrategyProvinces(strategy, allowedProvinces, true)
 	if err != nil {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_strategy_province_canonicalization",
+			Status:    maTraceEventFailed,
+			Metadata:  maTraceJSON(map[string]any{"allowed_province_count": len(allowedProvinces)}),
+			Error:     err.Error(),
+		})
+		return MAStrategySpec{}, maModelAuditWrite{}, err
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_strategy_province_canonicalization",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"allowed_province_count": len(allowedProvinces), "provinces": strategy.Provinces}),
+	}); err != nil {
 		return MAStrategySpec{}, maModelAuditWrite{}, err
 	}
 	strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategy, allowedAteco, true)
 	if err != nil {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_strategy_ateco_canonicalization",
+			Status:    maTraceEventFailed,
+			Metadata:  maTraceJSON(map[string]any{"allowed_ateco_count": len(allowedAteco)}),
+			Error:     err.Error(),
+		})
+		return MAStrategySpec{}, maModelAuditWrite{}, err
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_strategy_ateco_canonicalization",
+		Status:    maTraceEventSucceeded,
+		Response:  maTraceJSON(strategy.AtecoCandidates),
+		Metadata:  maTraceJSON(map[string]any{"allowed_ateco_count": len(allowedAteco), "candidate_count": len(strategy.AtecoCandidates)}),
+	}); err != nil {
 		return MAStrategySpec{}, maModelAuditWrite{}, err
 	}
 	usageRaw, _ := json.Marshal(response.Usage)
@@ -868,6 +1081,20 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 		if query.atecoSearchCode != "" {
 			query.params.AtecoCode = query.atecoSearchCode
 		}
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_estimate_query",
+			Status:    maTraceEventStarted,
+			Request:   maTraceJSON(query.params.Values()),
+			Metadata: maTraceJSON(map[string]any{
+				"session_id":          sessionID,
+				"strategy_version_id": strategyVersionID,
+				"strategy_type":       query.strategyType,
+				"province":            query.province,
+				"ateco_code":          query.atecoCode,
+			}),
+		}); err != nil {
+			return nil, "", err
+		}
 		surface, err := s.probeMASearchSurface(ctx, query.params, subject, email)
 		if err != nil {
 			return nil, "", err
@@ -893,6 +1120,18 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 	selected := chooseSelectedStrategyFromEstimates(estimates, len(strategy.AtecoCandidates) > 0)
 	for index := range estimates {
 		estimates[index].Selected = selected != "" && estimates[index].StrategyType == selected
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_estimates_completed",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"session_id":          sessionID,
+			"strategy_version_id": strategyVersionID,
+			"estimate_count":      len(estimates),
+			"selected_strategy":   selected,
+		}),
+	}); err != nil {
+		return nil, "", err
 	}
 	return estimates, selected, nil
 }
@@ -1036,6 +1275,14 @@ func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, s
 				} else {
 					params.AtecoCode = atecoSearchCode(candidate.Code)
 				}
+				if err := s.traceEvent(ctx, maTraceEventWrite{
+					EventType: "ma_execution_query",
+					Status:    maTraceEventStarted,
+					Request:   maTraceJSON(params.Values()),
+					Metadata:  maTraceJSON(map[string]any{"strategy_type": strategyType, "province": province, "ateco_code": candidate.Code, "remaining": remaining}),
+				}); err != nil {
+					return nil, err
+				}
 				targets, err := s.executeCompanySearch(ctx, params, subject, email)
 				if err != nil {
 					return nil, err
@@ -1046,6 +1293,14 @@ func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, s
 			continue
 		}
 		params := baseMASearchParams(strategy, province, &dryRun, remaining)
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_execution_query",
+			Status:    maTraceEventStarted,
+			Request:   maTraceJSON(params.Values()),
+			Metadata:  maTraceJSON(map[string]any{"strategy_type": strategyType, "province": province, "remaining": remaining}),
+		}); err != nil {
+			return nil, err
+		}
 		targets, err := s.executeCompanySearch(ctx, params, subject, email)
 		if err != nil {
 			return nil, err
@@ -1056,6 +1311,13 @@ func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, s
 	targets := dedupeMATargets(rawTargets)
 	if len(targets) > limit {
 		targets = targets[:limit]
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_execution_queries_completed",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"strategy_type": strategyType, "limit": limit, "raw_target_count": len(rawTargets), "deduped_target_count": len(targets)}),
+	}); err != nil {
+		return nil, err
 	}
 	return targets, nil
 }
@@ -1081,20 +1343,84 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 		}
 		if entry != nil {
 			envelope, err := decodeCompanySearchEnvelope(entry.Response)
+			status := maTraceEventSucceeded
+			errMessage := ""
+			if err != nil {
+				status = maTraceEventFailed
+				errMessage = err.Error()
+			}
+			if traceErr := s.traceEvent(ctx, maTraceEventWrite{
+				EventType:      "company_search_cache_hit",
+				ExternalSystem: "binocolo_cache",
+				Status:         status,
+				Request:        maTraceJSON(paramsJSON),
+				Response:       maTraceJSON(entry.Response),
+				Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey, "count": envelopeCount(envelope), "cost": envelopeCost(envelope)}),
+				Error:          errMessage,
+			}); traceErr != nil {
+				return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, traceErr
+			}
 			return envelope, entry.Response, err
 		}
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType:      "company_search_cache_miss",
+			ExternalSystem: "binocolo_cache",
+			Status:         maTraceEventInfo,
+			Request:        maTraceJSON(paramsJSON),
+			Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey}),
+		}); err != nil {
+			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		}
+	} else if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType:      "company_search_cache_disabled",
+		ExternalSystem: "binocolo_cache",
+		Status:         maTraceEventInfo,
+		Request:        maTraceJSON(paramsJSON),
+		Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey}),
+	}); err != nil {
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
 	}
 	if s.openapiit == nil {
 		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, errMAOpenAPIITUnavailable
 	}
 
 	fetch := func(ctx context.Context) (openapiit.Envelope[openapiit.CompanyDataset], json.RawMessage, error) {
+		start := time.Now()
 		response, err := s.openapiit.Company().SearchITRaw(ctx, params)
 		if err != nil {
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType:      "company_search_upstream",
+				ExternalSystem: "openapiit",
+				Status:         maTraceEventFailed,
+				DurationMS:     maTraceDuration(start),
+				Request:        maTraceJSON(paramsJSON),
+				Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey}),
+				Error:          err.Error(),
+			})
 			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
 		}
 		raw, err := json.Marshal(response)
 		if err != nil {
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType:      "company_search_upstream",
+				ExternalSystem: "openapiit",
+				Status:         maTraceEventFailed,
+				DurationMS:     maTraceDuration(start),
+				Request:        maTraceJSON(paramsJSON),
+				Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey}),
+				Error:          err.Error(),
+			})
+			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		}
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType:      "company_search_upstream",
+			ExternalSystem: "openapiit",
+			Status:         maTraceEventSucceeded,
+			DurationMS:     maTraceDuration(start),
+			Request:        maTraceJSON(paramsJSON),
+			Response:       maTraceJSON(raw),
+			Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey, "count": envelopeCount(response), "cost": envelopeCost(response)}),
+		}); err != nil {
 			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
 		}
 		return response, raw, nil
@@ -1116,6 +1442,23 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 		if entry != nil {
 			response, err = decodeCompanySearchEnvelope(entry.Response)
 			raw = entry.Response
+			status := maTraceEventSucceeded
+			errMessage := ""
+			if err != nil {
+				status = maTraceEventFailed
+				errMessage = err.Error()
+			}
+			if traceErr := s.traceEvent(ctx, maTraceEventWrite{
+				EventType:      "company_search_cache_hit_after_lock",
+				ExternalSystem: "binocolo_cache",
+				Status:         status,
+				Request:        maTraceJSON(paramsJSON),
+				Response:       maTraceJSON(entry.Response),
+				Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey, "count": envelopeCount(response), "cost": envelopeCost(response)}),
+				Error:          errMessage,
+			}); traceErr != nil {
+				return traceErr
+			}
 			return err
 		}
 		response, raw, upstreamErr = fetch(ctx)
@@ -1134,6 +1477,15 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 			ExpiresAt:          fetchedAt.Add(companySearchCacheTTL),
 			RefreshedBySubject: subject,
 			RefreshedByEmail:   email,
+		}); err != nil {
+			return err
+		}
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType:      "company_search_cache_write",
+			ExternalSystem: "binocolo_cache",
+			Status:         maTraceEventSucceeded,
+			Request:        maTraceJSON(paramsJSON),
+			Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey}),
 		}); err != nil {
 			return err
 		}

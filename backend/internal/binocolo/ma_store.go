@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -21,6 +22,10 @@ type maWorkspaceStore interface {
 	CompleteMAExecutionRun(ctx context.Context, runID, status string, resultCount int, errorCode string) error
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
 	RecordMAModelAudit(ctx context.Context, input maModelAuditWrite) error
+	StartMATrace(ctx context.Context, input maTraceStart) (string, error)
+	LinkMATrace(ctx context.Context, input maTraceLink) error
+	CompleteMATrace(ctx context.Context, input maTraceComplete) error
+	RecordMATraceEvent(ctx context.Context, input maTraceEventWrite) error
 	ListMALLMOptions(ctx context.Context) (MALLMOptionsResponse, error)
 	ResolveMAModel(ctx context.Context, scope string, modelID string) (maLLMModel, error)
 	ResolveMAPrompt(ctx context.Context, scope string, promptID string) (maLLMPrompt, error)
@@ -582,6 +587,169 @@ INSERT INTO binocolo.ma_model_audit (
 	return nil
 }
 
+func (s *SQLStore) StartMATrace(ctx context.Context, input maTraceStart) (string, error) {
+	if s == nil || s.db == nil {
+		return "", errors.New("binocolo ma store not configured")
+	}
+	id := input.ID
+	if id == "" {
+		id = uuid.NewString()
+	}
+	request := json.RawMessage(`{}`)
+	if len(input.Request) > 0 {
+		request = input.Request
+	}
+	startedAt := input.StartedAt
+	if startedAt.IsZero() {
+		startedAt = time.Now().UTC()
+	}
+	var out string
+	if err := s.db.QueryRowContext(ctx, `
+	INSERT INTO binocolo.ma_operation_trace (
+	  id,
+	  request_id,
+	  operation,
+	  method,
+	  path,
+	  status,
+	  session_id,
+	  created_by_subject,
+	  created_by_email,
+	  request,
+	  started_at
+	) VALUES (
+	  $1::uuid, $2, $3, $4, $5, $6, NULLIF($7, '')::uuid, $8, $9, $10::jsonb, $11
+	)
+	RETURNING id::text
+	`, id,
+		input.RequestID,
+		input.Operation,
+		input.Method,
+		input.Path,
+		maTraceStatusRunning,
+		input.SessionID,
+		input.CreatedBySubject,
+		input.CreatedByEmail,
+		[]byte(request),
+		startedAt,
+	).Scan(&out); err != nil {
+		return "", fmt.Errorf("start ma trace: %w", err)
+	}
+	return out, nil
+}
+
+func (s *SQLStore) LinkMATrace(ctx context.Context, input maTraceLink) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if input.ID == "" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, `
+	UPDATE binocolo.ma_operation_trace
+	SET session_id = COALESCE(NULLIF($2, '')::uuid, session_id),
+	    strategy_version_id = COALESCE(NULLIF($3, '')::uuid, strategy_version_id),
+	    execution_run_id = COALESCE(NULLIF($4, '')::uuid, execution_run_id)
+	WHERE id = $1::uuid
+	`, input.ID, input.SessionID, input.StrategyVersionID, input.ExecutionRunID)
+	if err != nil {
+		return fmt.Errorf("link ma trace: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLStore) CompleteMATrace(ctx context.Context, input maTraceComplete) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if input.ID == "" {
+		return nil
+	}
+	completedAt := input.CompletedAt
+	if completedAt.IsZero() {
+		completedAt = time.Now().UTC()
+	}
+	status := input.Status
+	if status == "" {
+		status = maTraceStatusSucceeded
+	}
+	_, err := s.db.ExecContext(ctx, `
+	UPDATE binocolo.ma_operation_trace
+	SET status = $2,
+	    http_status = $3,
+	    error_code = $4,
+	    error_message = $5,
+	    completed_at = $6,
+	    duration_ms = GREATEST(0, FLOOR(EXTRACT(EPOCH FROM ($6 - started_at)) * 1000)::integer)
+	WHERE id = $1::uuid
+	`, input.ID,
+		status,
+		nullIntValue(input.HTTPStatus),
+		input.ErrorCode,
+		input.ErrorMessage,
+		completedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("complete ma trace: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLStore) RecordMATraceEvent(ctx context.Context, input maTraceEventWrite) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if input.TraceID == "" {
+		return nil
+	}
+	request := json.RawMessage(`{}`)
+	if len(input.Request) > 0 {
+		request = input.Request
+	}
+	response := json.RawMessage(`{}`)
+	if len(input.Response) > 0 {
+		response = input.Response
+	}
+	metadata := json.RawMessage(`{}`)
+	if len(input.Metadata) > 0 {
+		metadata = input.Metadata
+	}
+	_, err := s.db.ExecContext(ctx, `
+	INSERT INTO binocolo.ma_operation_trace_event (
+	  trace_id,
+	  event_order,
+	  event_type,
+	  round,
+	  tool_name,
+	  external_system,
+	  status,
+	  duration_ms,
+	  request,
+	  response,
+	  metadata,
+	  error
+	) VALUES (
+	  $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12
+	)
+	`, input.TraceID,
+		input.EventOrder,
+		input.EventType,
+		nullInt(input.Round),
+		input.ToolName,
+		input.ExternalSystem,
+		defaultString(input.Status, maTraceEventInfo),
+		nullInt(input.DurationMS),
+		[]byte(request),
+		[]byte(response),
+		[]byte(metadata),
+		input.Error,
+	)
+	if err != nil {
+		return fmt.Errorf("record ma trace event: %w", err)
+	}
+	return nil
+}
+
 func (s *SQLStore) ListMALLMOptions(ctx context.Context) (MALLMOptionsResponse, error) {
 	if s == nil || s.db == nil {
 		return MALLMOptionsResponse{}, errors.New("binocolo ma store not configured")
@@ -1070,4 +1238,11 @@ func nullInt(value *int) sql.NullInt64 {
 		return sql.NullInt64{}
 	}
 	return sql.NullInt64{Int64: int64(*value), Valid: true}
+}
+
+func nullIntValue(value int) sql.NullInt64 {
+	if value <= 0 {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: int64(value), Valid: true}
 }

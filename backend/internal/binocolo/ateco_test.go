@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 )
@@ -130,6 +133,106 @@ func TestDraftStrategyRejectsAtecoOutsideToolWhitelist(t *testing.T) {
 	_, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "", "", "")
 	if !errors.Is(err, errMAStrategyInvalid) {
 		t.Fatalf("err = %v, want errMAStrategyInvalid", err)
+	}
+}
+
+func TestHandleCreateMASessionTracesPreSessionValidationFailure(t *testing.T) {
+	store := &fakeMAWorkspaceStore{}
+	h := &Handler{ma: newMAService(store, nil, nil, nil, nil, nil)}
+	req := httptest.NewRequest(http.MethodPost, "/binocolo/v1/ma/sessions", strings.NewReader(`{"prompt":"   "}`))
+	req = req.WithContext(logging.WithRequestID(req.Context(), "req-pre-session"))
+	rec := httptest.NewRecorder()
+
+	h.handleCreateMASession(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if len(store.traces) != 1 {
+		t.Fatalf("traces = %d, want 1", len(store.traces))
+	}
+	if store.traces[0].RequestID != "req-pre-session" || store.traces[0].Operation != "ma_session_create" {
+		t.Fatalf("trace start = %#v", store.traces[0])
+	}
+	if len(store.done) != 1 {
+		t.Fatalf("completed traces = %d, want 1", len(store.done))
+	}
+	if got := store.done[0]; got.Status != maTraceStatusFailed || got.HTTPStatus != http.StatusBadRequest || got.ErrorCode != "invalid_ma_request" {
+		t.Fatalf("trace completion = %#v, want failed invalid_ma_request", got)
+	}
+}
+
+func TestDraftStrategyTracesToolLoopFailure(t *testing.T) {
+	ateco := newFakeAtecoStore([]AtecoCode{{
+		Codice:       "62.10.00",
+		CodiceSearch: "621000",
+		Titolo:       "Attività di programmazione informatica",
+	}})
+	responses := make([]openrouter.ChatResponse, 0, maMaxToolRounds+1)
+	for i := 0; i <= maMaxToolRounds; i++ {
+		responses = append(responses, openrouter.ChatResponse{
+			ID:    "resp-loop",
+			Model: "test-model",
+			ToolCalls: []openrouter.ToolCall{{
+				ID:   "call_ateco",
+				Type: "function",
+				Function: openrouter.ToolCallFunction{
+					Name:      maAtecoToolName,
+					Arguments: `{"query":"servizi IT"}`,
+				},
+			}},
+		})
+	}
+	store := &fakeMAWorkspaceStore{}
+	service := newMAService(store, nil, nil, ateco, nil, &fakeMAAI{responses: responses})
+	trace, err := service.startTrace(context.Background(), maTraceStart{Operation: "ma_session_create", Request: maTraceJSON(map[string]string{"prompt": "trova aziende servizi IT"})})
+	if err != nil {
+		t.Fatalf("start trace: %v", err)
+	}
+	ctx := withMATrace(context.Background(), trace)
+
+	_, _, err = service.draftStrategy(ctx, "trova aziende servizi IT", "", "", "", "")
+
+	if !errors.Is(err, errMAStrategyInvalid) {
+		t.Fatalf("err = %v, want errMAStrategyInvalid", err)
+	}
+	if got := traceEventCount(store.events, "openrouter_chat"); got != maMaxToolRounds+1 {
+		t.Fatalf("openrouter events = %d, want %d", got, maMaxToolRounds+1)
+	}
+	if got := traceEventCount(store.events, "ma_strategy_tool"); got != maMaxToolRounds {
+		t.Fatalf("tool events = %d, want %d", got, maMaxToolRounds)
+	}
+	limitEvent := traceEvent(store.events, "ma_strategy_tool_loop_limit")
+	if limitEvent == nil || limitEvent.Status != maTraceEventFailed || !strings.Contains(limitEvent.Error, "ateco tool loop") {
+		t.Fatalf("loop limit event = %#v, want failed ateco tool loop", limitEvent)
+	}
+}
+
+func TestMATraceJSONRedactsOnlyTokenFields(t *testing.T) {
+	raw := maTraceJSON(map[string]any{
+		"authorization": "Bearer secret",
+		"prompt":        "keep this",
+		"nested": map[string]any{
+			"accessToken": "secret",
+			"password":    "keep password field by policy",
+		},
+	})
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal trace json: %v", err)
+	}
+	if got["authorization"] != "[redacted]" {
+		t.Fatalf("authorization = %#v, want redacted", got["authorization"])
+	}
+	if got["prompt"] != "keep this" {
+		t.Fatalf("prompt = %#v, want preserved", got["prompt"])
+	}
+	nested, _ := got["nested"].(map[string]any)
+	if nested["accessToken"] != "[redacted]" {
+		t.Fatalf("accessToken = %#v, want redacted", nested["accessToken"])
+	}
+	if nested["password"] != "keep password field by policy" {
+		t.Fatalf("password = %#v, want preserved", nested["password"])
 	}
 }
 
@@ -526,6 +629,25 @@ func hasTool(tools []openrouter.Tool, name string) bool {
 	return false
 }
 
+func traceEventCount(events []maTraceEventWrite, eventType string) int {
+	count := 0
+	for _, event := range events {
+		if event.EventType == eventType {
+			count++
+		}
+	}
+	return count
+}
+
+func traceEvent(events []maTraceEventWrite, eventType string) *maTraceEventWrite {
+	for index := range events {
+		if events[index].EventType == eventType {
+			return &events[index]
+		}
+	}
+	return nil
+}
+
 func newFakeAtecoStore(items []AtecoCode) *fakeAtecoStore {
 	store := &fakeAtecoStore{items: map[string]AtecoCode{}}
 	for _, item := range items {
@@ -575,7 +697,12 @@ func (f *fakeMAAI) Chat(_ context.Context, req openrouter.ChatRequest) (openrout
 	return response, nil
 }
 
-type fakeMAWorkspaceStore struct{}
+type fakeMAWorkspaceStore struct {
+	traces []maTraceStart
+	links  []maTraceLink
+	done   []maTraceComplete
+	events []maTraceEventWrite
+}
 
 func (f *fakeMAWorkspaceStore) ListMASessions(context.Context) ([]MASessionSummary, error) {
 	return nil, errors.New("not implemented")
@@ -610,6 +737,29 @@ func (f *fakeMAWorkspaceStore) ReplaceMATargets(context.Context, string, string,
 }
 
 func (f *fakeMAWorkspaceStore) RecordMAModelAudit(context.Context, maModelAuditWrite) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) StartMATrace(_ context.Context, input maTraceStart) (string, error) {
+	if input.ID == "" {
+		input.ID = "trace-id"
+	}
+	f.traces = append(f.traces, input)
+	return input.ID, nil
+}
+
+func (f *fakeMAWorkspaceStore) LinkMATrace(_ context.Context, input maTraceLink) error {
+	f.links = append(f.links, input)
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) CompleteMATrace(_ context.Context, input maTraceComplete) error {
+	f.done = append(f.done, input)
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) RecordMATraceEvent(_ context.Context, input maTraceEventWrite) error {
+	f.events = append(f.events, input)
 	return nil
 }
 

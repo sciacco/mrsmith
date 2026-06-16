@@ -118,11 +118,17 @@ func (h *Handler) handleCreateMASession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
+	var ok bool
+	r, ok = h.startMATrace(w, r, "ma_session_create", "", body, subject, email)
+	if !ok {
+		return
+	}
 	detail, err := h.ma.createSession(r.Context(), body, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_create", err)
 		return
 	}
+	h.completeMATraceSuccess(r, http.StatusCreated)
 	httputil.JSON(w, http.StatusCreated, detail)
 }
 
@@ -150,11 +156,17 @@ func (h *Handler) handleEstimateMASession(w http.ResponseWriter, r *http.Request
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_session_estimate", id, body, subject, email)
+	if !traceOK {
+		return
+	}
 	detail, err := h.ma.estimateSession(r.Context(), id, body, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_estimate", err, "session_id", id)
 		return
 	}
+	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, detail)
 }
 
@@ -169,11 +181,17 @@ func (h *Handler) handleExecuteMASession(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_session_execute", id, body, subject, email)
+	if !traceOK {
+		return
+	}
 	detail, err := h.ma.executeSession(r.Context(), id, body, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_execute", err, "session_id", id)
 		return
 	}
+	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, detail)
 }
 
@@ -189,20 +207,59 @@ func (h *Handler) handleExportMASession(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
-	_, email := companySearchRefreshActor(r.Context())
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_session_export", id, body, subject, email)
+	if !traceOK {
+		return
+	}
 	content, filename, contentType, err := h.ma.exportSession(r.Context(), id, body.Format, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_export", err, "session_id", id)
 		return
 	}
+	h.completeMATraceSuccess(r, http.StatusOK)
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(content)
 }
 
+func (h *Handler) startMATrace(w http.ResponseWriter, r *http.Request, operation string, sessionID string, request any, subject, email string) (*http.Request, bool) {
+	trace, err := h.ma.startTrace(r.Context(), maTraceStart{
+		RequestID:        logging.RequestID(r.Context()),
+		Operation:        operation,
+		Method:           r.Method,
+		Path:             r.URL.Path,
+		SessionID:        sessionID,
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+		Request:          maTraceJSON(request),
+	})
+	if err != nil {
+		h.maFailure(w, r, operation, err)
+		return r, false
+	}
+	logging.AddAccessLogAttrs(r.Context(), "ma_trace_id", trace.id)
+	return r.WithContext(withMATrace(r.Context(), trace)), true
+}
+
+func (h *Handler) completeMATraceSuccess(r *http.Request, status int) {
+	if err := h.ma.completeTrace(r.Context(), maTraceComplete{Status: maTraceStatusSucceeded, HTTPStatus: status}); err != nil {
+		logging.FromContext(r.Context()).Error("binocolo ma trace completion failed", "component", "binocolo", "operation", "ma_trace_complete", "trace_id", maTraceID(r.Context()), "error", err)
+	}
+}
+
 func (h *Handler) maFailure(w http.ResponseWriter, r *http.Request, operation string, err error, attrs ...any) {
 	status, code, logLevel := maHTTPError(err)
+	if completeErr := h.ma.completeTrace(r.Context(), maTraceComplete{
+		Status:       maTraceStatusFailed,
+		HTTPStatus:   status,
+		ErrorCode:    code,
+		ErrorMessage: err.Error(),
+	}); completeErr != nil {
+		logging.FromContext(r.Context()).Error("binocolo ma trace completion failed", "component", "binocolo", "operation", "ma_trace_complete", "trace_id", maTraceID(r.Context()), "error", completeErr)
+	}
 	logAttrs := []any{"component", "binocolo", "operation", operation, "error", err}
 	logAttrs = append(logAttrs, attrs...)
 	logger := logging.FromContext(r.Context())

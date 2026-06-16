@@ -203,6 +203,74 @@ func TestCompanySearchDryRunAndRealSearchDoNotCollide(t *testing.T) {
 	}
 }
 
+func TestCachedCompanySearchTraceDistinguishesCacheAndUpstream(t *testing.T) {
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	dryRun := 1
+	params := openapiit.CompanyITSearchParams{
+		DryRun:         &dryRun,
+		DataEnrichment: "advanced",
+		Province:       "MI",
+		ActivityStatus: "ATTIVA",
+	}
+	cacheKey, _, err := companySearchCacheKey(params)
+	if err != nil {
+		t.Fatalf("cache key: %v", err)
+	}
+
+	cacheStore := newMemoryCompanySearchCache()
+	cacheStore.entries[cacheKey] = memoryCompanySearchCacheEntry{
+		response:  json.RawMessage(`{"data":{},"success":true,"message":"cached","error":null,"count":3,"cost":0.01}`),
+		expiresAt: now.Add(time.Hour),
+	}
+	traceStore := &fakeMAWorkspaceStore{}
+	service := &maService{
+		store:       traceStore,
+		searchCache: cacheStore,
+		now:         func() time.Time { return now },
+	}
+	trace, err := service.startTrace(context.Background(), maTraceStart{Operation: "ma_session_estimate"})
+	if err != nil {
+		t.Fatalf("start cache trace: %v", err)
+	}
+	_, _, err = service.cachedCompanySearch(withMATrace(context.Background(), trace), params, "", "")
+	if err != nil {
+		t.Fatalf("cached search: %v", err)
+	}
+	if event := traceEvent(traceStore.events, "company_search_cache_hit"); event == nil || event.ExternalSystem != "binocolo_cache" {
+		t.Fatalf("cache hit event = %#v, want binocolo_cache", event)
+	}
+
+	upstreamStore := &fakeMAWorkspaceStore{}
+	upstreamCache := newMemoryCompanySearchCache()
+	client := newCompanySearchTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"success":true,"message":"fresh","error":null,"count":4,"cost":0.02}`))
+	})
+	upstreamService := &maService{
+		store:       upstreamStore,
+		searchCache: upstreamCache,
+		openapiit:   client,
+		now:         func() time.Time { return now },
+	}
+	upstreamTrace, err := upstreamService.startTrace(context.Background(), maTraceStart{Operation: "ma_session_estimate"})
+	if err != nil {
+		t.Fatalf("start upstream trace: %v", err)
+	}
+	_, _, err = upstreamService.cachedCompanySearch(withMATrace(context.Background(), upstreamTrace), params, "", "")
+	if err != nil {
+		t.Fatalf("upstream search: %v", err)
+	}
+	if event := traceEvent(upstreamStore.events, "company_search_cache_miss"); event == nil || event.ExternalSystem != "binocolo_cache" {
+		t.Fatalf("cache miss event = %#v, want binocolo_cache", event)
+	}
+	if event := traceEvent(upstreamStore.events, "company_search_upstream"); event == nil || event.ExternalSystem != "openapiit" {
+		t.Fatalf("upstream event = %#v, want openapiit", event)
+	}
+	if event := traceEvent(upstreamStore.events, "company_search_cache_write"); event == nil || event.ExternalSystem != "binocolo_cache" {
+		t.Fatalf("cache write event = %#v, want binocolo_cache", event)
+	}
+}
+
 func mustParseCompanySearchRequest(t *testing.T, rawQuery string) companySearchRequest {
 	t.Helper()
 	values, err := url.ParseQuery(rawQuery)
