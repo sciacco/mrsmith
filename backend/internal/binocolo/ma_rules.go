@@ -92,10 +92,10 @@ func validateMAStrategy(input MAStrategySpec) (MAStrategySpec, error) {
 			Code:        code,
 			Description: cleanText(raw.Description, 180),
 			Rationale:   cleanText(raw.Rationale, 240),
+			Fit:         normalizeMAFit(raw.Fit),
 		})
 	}
 	strategy.AtecoCandidates = candidates
-	strategy.ExcludedAteco = normalizeAtecoCodeList(strategy.ExcludedAteco, 16)
 
 	strategy.Keywords = cleanStringList(strategy.Keywords, 12, 80)
 	strategy.MissingCriteria = cleanStringList(strategy.MissingCriteria, 12, 120)
@@ -244,31 +244,44 @@ func normalizeAtecoCode(raw string) string {
 	return value
 }
 
-// normalizeAtecoCodeList keeps well-formed, deduped ATECO codes (by dot-stripped
-// key), capped at max. Unlike the candidate list it never errors on a malformed
-// entry — an exclusion is best-effort, so a bad code is simply dropped.
-func normalizeAtecoCodeList(values []string, max int) []string {
-	out := make([]string, 0, len(values))
-	seen := map[string]struct{}{}
-	for _, raw := range values {
-		code := normalizeAtecoCode(raw)
-		if code == "" || !atecoCodePattern.MatchString(code) {
+// normalizeMAFit clamps a candidate fit to the supported tiers, defaulting empty or
+// unknown to core (a listed candidate is an include unless told otherwise). neutral
+// is not a stored value — it is the resolved fit of an unlisted code.
+func normalizeMAFit(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case maFitWeak:
+		return maFitWeak
+	case maFitExcluded:
+		return maFitExcluded
+	default:
+		return maFitCore
+	}
+}
+
+// resolveAtecoFit returns the fit of the candidate that is the LONGEST code prefix
+// of the target's ATECO (so 631021 excluded beats 631 core for a 631021 target),
+// or neutral when no candidate is a prefix.
+func resolveAtecoFit(strategy MAStrategySpec, atecoCode string) string {
+	code := atecoSearchCode(atecoCode)
+	if code == "" {
+		return maFitNeutral
+	}
+	bestLen := -1
+	best := maFitNeutral
+	for _, candidate := range strategy.AtecoCandidates {
+		sc := candidate.SearchCode
+		if sc == "" {
+			sc = atecoSearchCode(candidate.Code)
+		}
+		if sc == "" || !strings.HasPrefix(code, sc) {
 			continue
 		}
-		key := strings.ReplaceAll(code, ".", "")
-		if _, exists := seen[key]; exists {
-			continue
-		}
-		seen[key] = struct{}{}
-		out = append(out, code)
-		if max > 0 && len(out) >= max {
-			break
+		if len(sc) > bestLen {
+			bestLen = len(sc)
+			best = normalizeMAFit(candidate.Fit)
 		}
 	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
+	return best
 }
 
 // atecoDivision returns the 2-digit division of an ATECO code (the dot-stripped
@@ -281,14 +294,18 @@ func atecoDivision(code string) string {
 	return sc[:2]
 }
 
-// atecoDivisions returns the distinct 2-digit divisions of the candidates, sorted.
-// This is the sector perimeter used both to widen the expanded search (the whole
-// division subtree) and to gate scoring (a target outside these divisions is
-// fuori_criterio).
+// atecoDivisions returns the distinct 2-digit divisions of the non-excluded
+// (core/weak) candidates, sorted. This is the sector perimeter used both to widen
+// the expanded search (the whole division subtree) and to gate scoring (a target
+// outside these divisions is fuori_criterio). Excluded candidates never define a
+// perimeter — excluding 63.10.21 must not make division 63 a sector on its own.
 func atecoDivisions(candidates []MAAtecoCandidate) []string {
 	seen := map[string]struct{}{}
 	out := []string{}
 	for _, candidate := range candidates {
+		if normalizeMAFit(candidate.Fit) == maFitExcluded {
+			continue
+		}
 		div := atecoDivision(candidate.Code)
 		if div == "" {
 			continue

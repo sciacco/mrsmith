@@ -215,13 +215,16 @@ export interface MAStrategySpec {
   signalWeights?: Record<string, number>;
   maxBudgetEur?: number;
   successionMinOwnerAge?: number;
-  excludedAteco?: string[];
 }
+
+export type MAAtecoFit = 'core' | 'weak' | 'excluded';
 
 export interface MAAtecoCandidate {
   code: string;
   description: string;
   rationale: string;
+  // Curated relevance tier (longest-prefix-wins). Empty defaults to core.
+  fit?: MAAtecoFit;
 }
 
 export interface MAScoringCriterion {

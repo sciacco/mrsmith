@@ -31,6 +31,13 @@ const (
 	maMatchStatePartial = "match_parziale"
 	maMatchStateOutside = "fuori_criterio"
 
+	// ATECO fit tiers (per-candidate relevance). neutral is never stored on a
+	// candidate — it is the resolved fit of a code matching no candidate prefix.
+	maFitCore     = "core"
+	maFitWeak     = "weak"
+	maFitExcluded = "excluded"
+	maFitNeutral  = "neutral"
+
 	// Veryshort rating preferiti: -1 escluso, 1..3 stelle, 0/assente = non valutato.
 	maRatingExcluded = -1
 	maRatingMax      = 3
@@ -256,25 +263,24 @@ type MAStrategySpec struct {
 	// thesis: it drives the succession_owner signal ramp and the ricambio flag.
 	// Extracted by the strategy LLM; nil falls back to maSuccessionDefaultMinAge.
 	SuccessionMinOwnerAge *int `json:"successionMinOwnerAge,omitempty"`
-	// ExcludedAteco lists ATECO codes (or whole subtrees) the analyst wants OUT of
-	// the perimeter even when they fall inside the sector divisions — e.g. "esclusi
-	// servizi di elaborazione dati contabili" (63.10.21) while keeping hosting
-	// (63.10.10) in the same group. Extracted by the strategy LLM; pruned from the
-	// expanded division net (retrieval) and enforced as a hard sector gate (scoring).
-	ExcludedAteco []string `json:"excludedAteco,omitempty"`
-
 	// --- Transient (json:"-"): computed in-flight from the persisted fields above,
 	// never stored. They survive only for the duration of one estimate/execute call.
 
-	// SectorDivisions holds the distinct 2-digit ATECO divisions of the ORIGINAL
-	// candidates (captured before expandStrategyAteco prunes empty leaves), so the
-	// sector perimeter keeps a division the analyst intended even if none of its
-	// leaf codes turned out populated. Drives the expanded net and the scoring gate.
+	// SectorDivisions holds the distinct 2-digit ATECO divisions of the non-excluded
+	// (core/weak) candidates. The curated candidate list stays intact for fit
+	// resolution; this is derived once at canonicalize so the perimeter keeps a
+	// division the analyst intended even if a leaf turns out unpopulated. Drives the
+	// expanded net and the scoring gate.
 	SectorDivisions []string `json:"-"`
-	// ExpandedAtecoCandidates is the "expanded" strategy's code set: the populated
-	// subtree of SectorDivisions minus ExcludedAteco. The expanded search iterates
-	// these codes instead of dropping the ATECO filter entirely (which retrieved the
-	// whole provincial economy). Empty for sector-less strategies (legacy fallback).
+	// AtecoQueryCandidates is the ATECO strategy's RETRIEVAL set: the populated
+	// subtree of the core/weak candidates minus the excluded subtrees. Kept separate
+	// from AtecoCandidates so the curated list (with fit) survives for scoring while
+	// retrieval queries the exact populated leaves.
+	AtecoQueryCandidates []MAAtecoCandidate `json:"-"`
+	// ExpandedAtecoCandidates is the "expanded" strategy's retrieval set: the
+	// populated subtree of SectorDivisions minus excluded. The expanded search
+	// iterates these codes instead of dropping the ATECO filter entirely (which
+	// retrieved the whole provincial economy). Empty for sector-less strategies.
 	ExpandedAtecoCandidates []MAAtecoCandidate `json:"-"`
 }
 
@@ -282,7 +288,13 @@ type MAAtecoCandidate struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
 	Rationale   string `json:"rationale"`
-	SearchCode  string `json:"-"`
+	// Fit is the curated relevance tier of this ATECO entry: "core" (bullseye),
+	// "weak" (adjacent, kept but discounted) or "excluded" (removed from perimeter,
+	// even inside an included group). Empty defaults to core. A target's fit is the
+	// fit of the candidate that is its longest code prefix; codes matching no
+	// candidate are "neutral". Drives ateco precision, the sector gate and retrieval.
+	Fit        string `json:"fit,omitempty"`
+	SearchCode string `json:"-"`
 }
 
 type MAScoringCriterion struct {

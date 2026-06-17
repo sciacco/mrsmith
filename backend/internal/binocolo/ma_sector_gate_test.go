@@ -30,7 +30,10 @@ func TestInSectorPerimeter(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			strategy := MAStrategySpec{SectorDivisions: tc.divisions, ExcludedAteco: tc.excluded}
+			strategy := MAStrategySpec{SectorDivisions: tc.divisions}
+			for _, code := range tc.excluded {
+				strategy.AtecoCandidates = append(strategy.AtecoCandidates, MAAtecoCandidate{Code: code, Fit: maFitExcluded})
+			}
 			if got := inSectorPerimeter(strategy, tc.ateco); got != tc.want {
 				t.Fatalf("inSectorPerimeter(ateco=%q, div=%v, excl=%v) = %v, want %v", tc.ateco, tc.divisions, tc.excluded, got, tc.want)
 			}
@@ -44,12 +47,68 @@ func TestInSectorPerimeter(t *testing.T) {
 func TestAtecoDivisions(t *testing.T) {
 	got := atecoDivisions([]MAAtecoCandidate{
 		{Code: "62.20.10"}, {Code: "62.09"}, {Code: "63.10.10"}, {Code: "63.11"},
+		{Code: "47.11", Fit: maFitExcluded}, // excluded must NOT make 47 a sector division
 	})
 	if want := []string{"62", "63"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("atecoDivisions = %v, want %v", got, want)
 	}
 	if got := atecoDivisions([]MAAtecoCandidate{{Code: "6"}, {Code: ""}}); len(got) != 0 {
 		t.Fatalf("atecoDivisions(short/empty) = %v, want empty", got)
+	}
+}
+
+// TestResolveAtecoFit locks longest-prefix-wins with the user's worked example:
+// 631 core, 631021 excluded, 631030 weak. A target takes the fit of its longest
+// matching candidate prefix; a code under no candidate is neutral.
+func TestResolveAtecoFit(t *testing.T) {
+	strategy := MAStrategySpec{AtecoCandidates: []MAAtecoCandidate{
+		{Code: "631", Fit: maFitCore},
+		{Code: "631021", Fit: maFitExcluded},
+		{Code: "631030", Fit: maFitWeak},
+	}}
+	cases := []struct{ ateco, want string }{
+		{"631010", maFitCore},       // longest prefix is 631
+		{"63.10.21", maFitExcluded}, // exact 631021 beats 631
+		{"631030", maFitWeak},
+		{"632000", maFitNeutral}, // 632 is not under 631
+		{"", maFitNeutral},
+	}
+	for _, tc := range cases {
+		if got := resolveAtecoFit(strategy, tc.ateco); got != tc.want {
+			t.Fatalf("resolveAtecoFit(%q) = %q, want %q", tc.ateco, got, tc.want)
+		}
+	}
+}
+
+// TestMeasureAtecoPrecisionByFit locks the fit→score mapping: core 1.0, weak 0.45,
+// neutral 0.25, excluded 0.0; a target with no ATECO code is not applicable.
+func TestMeasureAtecoPrecisionByFit(t *testing.T) {
+	strategy := MAStrategySpec{AtecoCandidates: []MAAtecoCandidate{
+		{Code: "631", Fit: maFitCore},
+		{Code: "631021", Fit: maFitExcluded},
+		{Code: "631030", Fit: maFitWeak},
+	}}
+	mk := func(ateco string) maSignalContext {
+		return maSignalContext{target: MATarget{AtecoCode: ateco}, strategy: strategy}
+	}
+	cases := []struct {
+		ateco string
+		want  float64
+	}{
+		{"631010", 1.0},
+		{"631030", 0.45},
+		{"631021", 0.0},
+		{"640000", 0.25},
+	}
+	for _, tc := range cases {
+		got := mk(tc.ateco)
+		sample := measureAtecoPrecision(got)
+		if !sample.Applicable || math.Abs(sample.Score-tc.want) > 1e-9 {
+			t.Fatalf("measureAtecoPrecision(%q) = %+v, want score %v", tc.ateco, sample, tc.want)
+		}
+	}
+	if sample := measureAtecoPrecision(mk("")); sample.Applicable {
+		t.Fatalf("empty ateco should be not applicable, got %+v", sample)
 	}
 }
 

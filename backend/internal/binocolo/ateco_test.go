@@ -262,6 +262,11 @@ func TestMAEstimatesSendDotlessAtecoToOpenAPIIT(t *testing.T) {
 		AtecoCandidates: []MAAtecoCandidate{
 			{Code: "62.10.00", SearchCode: "621000", Description: "Attività di programmazione informatica"},
 		},
+		// runEstimates queries the retrieval set, normally filled by expandStrategyAteco;
+		// this test drives runEstimates directly, so it is provided here.
+		AtecoQueryCandidates: []MAAtecoCandidate{
+			{Code: "62.10.00", SearchCode: "621000", Description: "Attività di programmazione informatica"},
+		},
 	}, "", "")
 	if err != nil {
 		t.Fatalf("runEstimates returned error: %v", err)

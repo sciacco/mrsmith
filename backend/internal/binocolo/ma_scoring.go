@@ -392,15 +392,10 @@ func inSectorPerimeter(strategy MAStrategySpec, atecoCode string) bool {
 	if len(strategy.SectorDivisions) == 0 {
 		return true
 	}
+	if resolveAtecoFit(strategy, atecoCode) == maFitExcluded {
+		return false
+	}
 	code := atecoSearchCode(atecoCode)
-	if code == "" {
-		return true
-	}
-	for _, ex := range strategy.ExcludedAteco {
-		if exc := atecoSearchCode(ex); exc != "" && strings.HasPrefix(code, exc) {
-			return false
-		}
-	}
 	if len(code) < 2 {
 		return true
 	}
@@ -416,33 +411,24 @@ func inSectorPerimeter(strategy MAStrategySpec, atecoCode string) bool {
 // --- Signal measures ---------------------------------------------------------
 
 func measureAtecoPrecision(c maSignalContext) maSignalSample {
-	code := normalizeAtecoCode(c.target.AtecoCode)
-	code = strings.ReplaceAll(code, ".", "")
-	if code == "" {
+	if atecoSearchCode(c.target.AtecoCode) == "" {
 		return maSignalSample{}
 	}
-	best := 0.0
-	for _, candidate := range c.strategy.AtecoCandidates {
-		cc := strings.ReplaceAll(normalizeAtecoCode(candidate.Code), ".", "")
-		if cc == "" {
-			continue
-		}
-		switch {
-		case strings.HasPrefix(code, cc):
-			n := len(cc)
-			if n > 6 {
-				n = 6
-			}
-			if score := float64(n) / 6.0; score > best {
-				best = score
-			}
-		case len(code) >= 2 && len(cc) >= 2 && code[:2] == cc[:2]:
-			if 0.3 > best {
-				best = 0.3
-			}
-		}
+	// The curated fit tier IS the precision judgment (longest-prefix wins): core is
+	// the bullseye, weak is adjacent-but-discounted, neutral is in-scope but
+	// unlisted, excluded scores zero (and is gated out of the results anyway).
+	var score float64
+	switch resolveAtecoFit(c.strategy, c.target.AtecoCode) {
+	case maFitCore:
+		score = 1.0
+	case maFitWeak:
+		score = 0.45
+	case maFitExcluded:
+		score = 0.0
+	default:
+		score = 0.25
 	}
-	return maSignalSample{Applicable: true, Score: best, Label: c.target.AtecoCode}
+	return maSignalSample{Applicable: true, Score: score, Label: c.target.AtecoCode}
 }
 
 func measureTurnoverProximity(c maSignalContext) maSignalSample {

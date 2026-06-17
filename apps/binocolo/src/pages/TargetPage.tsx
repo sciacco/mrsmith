@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import { useApiClient } from '../api/client';
 import type {
   MAAtecoCandidate,
+  MAAtecoFit,
   MALLMModelOption,
   MALLMOptionsResponse,
   MAEstimate,
@@ -1498,7 +1499,16 @@ export function TargetPage() {
 }
 
 function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onChange: (patch: Partial<MAStrategySpec>) => void }) {
-  const atecoText = strategy.atecoCandidates.map((item) => [item.code, item.description].filter(Boolean).join(' - ')).join('\n');
+  const atecoCandidates = strategy.atecoCandidates ?? [];
+  const coreList = atecoCandidates.filter((item) => (item.fit ?? 'core') === 'core');
+  const weakList = atecoCandidates.filter((item) => item.fit === 'weak');
+  const excludedList = atecoCandidates.filter((item) => item.fit === 'excluded');
+  const coreText = coreList.map((item) => [item.code, item.description].filter(Boolean).join(' - ')).join('\n');
+  const codesText = (items: MAAtecoCandidate[]) => items.map((item) => item.code).join(', ');
+  const codesToCandidates = (value: string, fit: MAAtecoFit): MAAtecoCandidate[] =>
+    splitList(value).map((code) => ({ code: code.toUpperCase(), description: '', rationale: '', fit }));
+  const commitAteco = (core: MAAtecoCandidate[], weak: MAAtecoCandidate[], excluded: MAAtecoCandidate[]) =>
+    onChange({ atecoCandidates: [...core, ...weak, ...excluded] });
 
   function updateNumber(field: keyof Pick<MAStrategySpec, 'turnoverMin' | 'turnoverMax' | 'employeeMin' | 'employeeMax' | 'successionMinOwnerAge'>) {
     return (event: ChangeEvent<HTMLInputElement>) => {
@@ -1517,18 +1527,38 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
         />
       </label>
       <label className={styles.fieldWide}>
-        <span>Codici ATECO</span>
-        <textarea value={atecoText} onChange={(event) => onChange({ atecoCandidates: parseAtecoLines(event.target.value) })} rows={3} />
+        <span>ATECO core</span>
+        <textarea
+          value={coreText}
+          onChange={(event) =>
+            commitAteco(
+              parseAtecoLines(event.target.value).map((item) => ({ ...item, fit: 'core' as MAAtecoFit })),
+              weakList,
+              excludedList,
+            )
+          }
+          rows={3}
+        />
+        <small className={styles.fieldHint}>Settore bullseye: piena aderenza. Una riga per codice (es. 62.20 - descrizione).</small>
+      </label>
+      <label className={styles.fieldWide}>
+        <span>ATECO secondari</span>
+        <input
+          value={codesText(weakList)}
+          onChange={(event) => commitAteco(coreList, codesToCandidates(event.target.value, 'weak'), excludedList)}
+          placeholder="es. 63.10.30 — adiacenti, tenuti ma declassati"
+        />
+        <small className={styles.fieldHint}>Adiacenti al settore: inclusi nella ricerca ma con aderenza ridotta.</small>
       </label>
       <label className={styles.fieldWide}>
         <span>ATECO esclusi</span>
         <input
-          value={(strategy.excludedAteco ?? []).join(', ')}
-          onChange={(event) => onChange({ excludedAteco: splitList(event.target.value).map((item) => item.toUpperCase()) })}
+          value={codesText(excludedList)}
+          onChange={(event) => commitAteco(coreList, weakList, codesToCandidates(event.target.value, 'excluded'))}
           placeholder="es. 63.10.21 — elaborazione dati contabili"
         />
         <small className={styles.fieldHint}>
-          Codici (o sottoalberi) rimossi dal perimetro anche se interni alle divisioni del settore: i risultati sotto questi codici sono fuori criterio.
+          Codici (o sottoalberi) rimossi dal perimetro anche se interni alle divisioni del settore: i risultati sono fuori criterio e nascosti.
         </small>
       </label>
       <label>
@@ -1664,11 +1694,11 @@ function buildPerimeterChips(strategy: MAStrategySpec): PerimeterChip[] {
   if (forms.length > 0) {
     chips.push({ key: 'forms', label: `${forms.length > 1 ? 'Forme' : 'Forma'} ${forms.join(', ')}` });
   }
-  const excluded = strategy.excludedAteco ?? [];
-  if (excluded.length > 0) {
+  const excludedCodes = (strategy.atecoCandidates ?? []).filter((item) => item.fit === 'excluded').map((item) => item.code);
+  if (excludedCodes.length > 0) {
     chips.push({
       key: 'excluded',
-      label: `Esclusi ${excluded.join(', ')}`,
+      label: `Esclusi ${excludedCodes.join(', ')}`,
       hint: 'ATECO rimossi dal perimetro: i risultati sotto questi codici sono fuori criterio e nascosti.',
     });
   }

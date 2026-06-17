@@ -473,7 +473,7 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 		strategyType = strategyVersion.Strategy.SelectedStrategy
 	}
 	if strategyType == "" {
-		strategyType = chooseSelectedStrategyFromEstimates(detail.Estimates, len(strategyVersion.Strategy.AtecoCandidates) > 0)
+		strategyType = chooseSelectedStrategyFromEstimates(detail.Estimates, len(strategyVersion.Strategy.AtecoQueryCandidates) > 0)
 	}
 	estimatedCount := estimateTotal(detail.Estimates, strategyType)
 	if len(detail.Estimates) == 0 || estimatedCount == 0 {
@@ -1387,6 +1387,28 @@ func (s *maService) canonicalizeMAStrategyAteco(ctx context.Context, strategy MA
 		if code == "" {
 			continue
 		}
+		fit := normalizeMAFit(candidate.Fit)
+		// Excluded entries are used only as subtree PREFIXES (pruning + gate), so they
+		// are normalized but NOT resolved against the DB — they may legitimately be a
+		// non-leaf prefix (e.g. 63.10.2) that is not an exact ATECO node.
+		if fit == maFitExcluded {
+			searchCode := atecoSearchCode(code)
+			if searchCode == "" {
+				continue
+			}
+			if _, exists := seen[searchCode]; exists {
+				continue
+			}
+			seen[searchCode] = struct{}{}
+			candidates = append(candidates, MAAtecoCandidate{
+				Code:        code,
+				Description: cleanText(candidate.Description, 180),
+				Rationale:   cleanText(candidate.Rationale, 240),
+				Fit:         maFitExcluded,
+				SearchCode:  searchCode,
+			})
+			continue
+		}
 		var item AtecoCode
 		var ok bool
 		if requireAllowed {
@@ -1415,14 +1437,14 @@ func (s *maService) canonicalizeMAStrategyAteco(ctx context.Context, strategy MA
 			Code:        item.Codice,
 			Description: item.Titolo,
 			Rationale:   cleanText(candidate.Rationale, 240),
+			Fit:         fit,
 			SearchCode:  item.CodiceSearch,
 		})
 	}
 	strategy.AtecoCandidates = candidates
-	// Capture the sector perimeter (2-digit divisions) from the canonical candidates
-	// NOW, before expandStrategyAteco prunes empty leaves — otherwise a division the
-	// analyst intended (e.g. 63 for hosting) would vanish from the gate if none of
-	// its leaf codes happened to be populated.
+	// Sector perimeter = the 2-digit divisions of the non-excluded candidates. The
+	// curated list (with fit) stays intact for resolveAtecoFit; only the retrieval
+	// sets are derived later (expandStrategyAteco / expandStrategyExpansion).
 	strategy.SectorDivisions = atecoDivisions(candidates)
 	return strategy, nil
 }
@@ -1437,18 +1459,97 @@ func (s *maService) canonicalizeMAStrategyAteco(ctx context.Context, strategy MA
 // It is deterministic and cache-backed, so estimate and execution derive the same
 // populated set without persisting it onto the stored strategy.
 func (s *maService) expandStrategyAteco(ctx context.Context, strategy MAStrategySpec, subject, email string) (MAStrategySpec, error) {
-	if s.ateco == nil || len(strategy.AtecoCandidates) == 0 {
+	// Fill the ATECO strategy's retrieval set (AtecoQueryCandidates), leaving the
+	// curated AtecoCandidates (with fit) intact for scoring. Default to the core/weak
+	// codes as-is; replace with the populated subtree when discovery succeeds.
+	strategy.AtecoQueryCandidates = coreWeakQueryFallback(strategy)
+	roots := make([]string, 0, len(strategy.AtecoCandidates))
+	for _, candidate := range strategy.AtecoCandidates {
+		if normalizeMAFit(candidate.Fit) != maFitExcluded {
+			roots = append(roots, candidate.Code)
+		}
+	}
+	if s.ateco == nil || len(roots) == 0 {
 		return strategy, nil
 	}
-	type subtreeCode struct {
-		code, searchCode, titolo string
+	populated, subtreeCount, err := s.probePopulatedSubtree(ctx, roots, strategyExcludedSearchCodes(strategy), strategy, subject, email)
+	if err != nil {
+		return MAStrategySpec{}, err
 	}
-	seen := map[string]struct{}{}
-	ordered := make([]subtreeCode, 0, len(strategy.AtecoCandidates)*4)
+	if subtreeCount > maAtecoSubtreeProbeCap {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_ateco_discovery_skipped",
+			Status:    maTraceEventInfo,
+			Metadata:  maTraceJSON(map[string]any{"subtree_codes": subtreeCount, "cap": maAtecoSubtreeProbeCap}),
+		})
+		return strategy, nil
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_ateco_discovery",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"selected_nodes":  len(roots),
+			"subtree_codes":   subtreeCount,
+			"populated_codes": len(populated),
+		}),
+	})
+	if len(populated) > 0 {
+		strategy.AtecoQueryCandidates = populated
+	}
+	return strategy, nil
+}
+
+// coreWeakQueryFallback returns the non-excluded candidates as a retrieval set
+// (their exact codes), used when subtree discovery is unavailable or over the cap.
+func coreWeakQueryFallback(strategy MAStrategySpec) []MAAtecoCandidate {
+	out := make([]MAAtecoCandidate, 0, len(strategy.AtecoCandidates))
 	for _, candidate := range strategy.AtecoCandidates {
-		descendants, err := s.ateco.SubtreeAtecoCodes(ctx, candidate.Code)
+		if normalizeMAFit(candidate.Fit) == maFitExcluded {
+			continue
+		}
+		searchCode := candidate.SearchCode
+		if searchCode == "" {
+			searchCode = atecoSearchCode(candidate.Code)
+		}
+		out = append(out, MAAtecoCandidate{Code: candidate.Code, Description: candidate.Description, SearchCode: searchCode})
+	}
+	return out
+}
+
+// strategyExcludedSearchCodes returns the dot-stripped search codes of the excluded
+// candidates. A descendant/target whose search code has any as a prefix is inside an
+// excluded subtree (e.g. excluding 63.10.21 removes it while hosting 63.10.10 stays).
+func strategyExcludedSearchCodes(strategy MAStrategySpec) []string {
+	out := []string{}
+	for _, candidate := range strategy.AtecoCandidates {
+		if normalizeMAFit(candidate.Fit) != maFitExcluded {
+			continue
+		}
+		searchCode := candidate.SearchCode
+		if searchCode == "" {
+			searchCode = atecoSearchCode(candidate.Code)
+		}
+		if searchCode != "" {
+			out = append(out, searchCode)
+		}
+	}
+	return out
+}
+
+// probePopulatedSubtree discovers, under the given roots (node + descendants), the
+// exact ATECO codes actually populated under the economic filters — dry-run probing
+// each (count only, €0.01, cache-backed; province/legal form omitted for cache
+// reuse), pruning any excluded subtree. Returns the populated candidates and the
+// pre-probe subtree size; when that size exceeds the cap it returns (nil, size, nil)
+// so the caller can trace a skip and keep its fallback.
+func (s *maService) probePopulatedSubtree(ctx context.Context, roots, excluded []string, strategy MAStrategySpec, subject, email string) ([]MAAtecoCandidate, int, error) {
+	type subtreeCode struct{ code, searchCode, titolo string }
+	seen := map[string]struct{}{}
+	ordered := make([]subtreeCode, 0, len(roots)*4)
+	for _, root := range roots {
+		descendants, err := s.ateco.SubtreeAtecoCodes(ctx, root)
 		if err != nil {
-			return MAStrategySpec{}, err
+			return nil, 0, err
 		}
 		for _, descendant := range descendants {
 			if descendant.CodiceSearch == "" {
@@ -1457,20 +1558,15 @@ func (s *maService) expandStrategyAteco(ctx context.Context, strategy MAStrategy
 			if _, exists := seen[descendant.CodiceSearch]; exists {
 				continue
 			}
+			if isExcludedSearchCode(descendant.CodiceSearch, excluded) {
+				continue
+			}
 			seen[descendant.CodiceSearch] = struct{}{}
 			ordered = append(ordered, subtreeCode{code: descendant.Codice, searchCode: descendant.CodiceSearch, titolo: descendant.Titolo})
 		}
 	}
-	if len(ordered) == 0 {
-		return strategy, nil
-	}
-	if len(ordered) > maAtecoSubtreeProbeCap {
-		_ = s.traceEvent(ctx, maTraceEventWrite{
-			EventType: "ma_ateco_discovery_skipped",
-			Status:    maTraceEventInfo,
-			Metadata:  maTraceJSON(map[string]any{"subtree_codes": len(ordered), "cap": maAtecoSubtreeProbeCap}),
-		})
-		return strategy, nil
+	if len(ordered) == 0 || len(ordered) > maAtecoSubtreeProbeCap {
+		return nil, len(ordered), nil
 	}
 	populated := make([]MAAtecoCandidate, 0, len(ordered))
 	for _, item := range ordered {
@@ -1485,48 +1581,14 @@ func (s *maService) expandStrategyAteco(ctx context.Context, strategy MAStrategy
 		}
 		surface, err := s.probeMASearchSurface(ctx, params, subject, email)
 		if err != nil {
-			return MAStrategySpec{}, err
+			return nil, 0, err
 		}
 		if surface.EstimatedCount <= 0 {
 			continue
 		}
-		populated = append(populated, MAAtecoCandidate{
-			Code:        item.code,
-			Description: item.titolo,
-			SearchCode:  item.searchCode,
-		})
+		populated = append(populated, MAAtecoCandidate{Code: item.code, Description: item.titolo, SearchCode: item.searchCode})
 	}
-	_ = s.traceEvent(ctx, maTraceEventWrite{
-		EventType: "ma_ateco_discovery",
-		Status:    maTraceEventSucceeded,
-		Metadata: maTraceJSON(map[string]any{
-			"selected_nodes":  len(strategy.AtecoCandidates),
-			"subtree_codes":   len(ordered),
-			"populated_codes": len(populated),
-		}),
-	})
-	if len(populated) == 0 {
-		// None of the subtree codes returned companies under the economic
-		// filters; keep the original selection so the estimate still runs (and
-		// reports zero) rather than silently emptying the strategy.
-		return strategy, nil
-	}
-	strategy.AtecoCandidates = populated
-	return strategy, nil
-}
-
-// excludedSearchCodes returns the dot-stripped search codes of the excluded ATECO
-// entries. A descendant/target whose search code has any of these as a prefix is
-// inside an excluded subtree (e.g. excluding 63.10.21 elaborazione dati contabili
-// removes that branch while hosting 63.10.10 stays).
-func excludedSearchCodes(excluded []string) []string {
-	out := make([]string, 0, len(excluded))
-	for _, ex := range excluded {
-		if code := atecoSearchCode(ex); code != "" {
-			out = append(out, code)
-		}
-	}
-	return out
+	return populated, len(ordered), nil
 }
 
 func isExcludedSearchCode(searchCode string, excluded []string) bool {
@@ -1552,71 +1614,24 @@ func (s *maService) expandStrategyExpansion(ctx context.Context, strategy MAStra
 	if s.ateco == nil || len(strategy.SectorDivisions) == 0 {
 		return strategy, nil
 	}
-	excluded := excludedSearchCodes(strategy.ExcludedAteco)
-	type subtreeCode struct{ code, searchCode, titolo string }
-	seen := map[string]struct{}{}
-	ordered := make([]subtreeCode, 0, 32)
-	for _, division := range strategy.SectorDivisions {
-		descendants, err := s.ateco.SubtreeAtecoCodes(ctx, division)
-		if err != nil {
-			return MAStrategySpec{}, err
-		}
-		for _, descendant := range descendants {
-			if descendant.CodiceSearch == "" {
-				continue
-			}
-			if _, exists := seen[descendant.CodiceSearch]; exists {
-				continue
-			}
-			if isExcludedSearchCode(descendant.CodiceSearch, excluded) {
-				continue
-			}
-			seen[descendant.CodiceSearch] = struct{}{}
-			ordered = append(ordered, subtreeCode{code: descendant.Codice, searchCode: descendant.CodiceSearch, titolo: descendant.Titolo})
-		}
+	populated, subtreeCount, err := s.probePopulatedSubtree(ctx, strategy.SectorDivisions, strategyExcludedSearchCodes(strategy), strategy, subject, email)
+	if err != nil {
+		return MAStrategySpec{}, err
 	}
-	if len(ordered) == 0 {
-		return strategy, nil
-	}
-	if len(ordered) > maAtecoSubtreeProbeCap {
+	if subtreeCount > maAtecoSubtreeProbeCap {
 		_ = s.traceEvent(ctx, maTraceEventWrite{
 			EventType: "ma_expansion_discovery_skipped",
 			Status:    maTraceEventInfo,
-			Metadata:  maTraceJSON(map[string]any{"divisions": strategy.SectorDivisions, "subtree_codes": len(ordered), "cap": maAtecoSubtreeProbeCap}),
+			Metadata:  maTraceJSON(map[string]any{"divisions": strategy.SectorDivisions, "subtree_codes": subtreeCount, "cap": maAtecoSubtreeProbeCap}),
 		})
 		return strategy, nil
-	}
-	populated := make([]MAAtecoCandidate, 0, len(ordered))
-	for _, item := range ordered {
-		params := openapiit.CompanyITSearchParams{
-			DataEnrichment: "advanced",
-			ActivityStatus: strategy.ActivityStatus,
-			MinTurnover:    strategy.TurnoverMin,
-			MaxTurnover:    strategy.TurnoverMax,
-			MinEmployees:   strategy.EmployeeMin,
-			MaxEmployees:   strategy.EmployeeMax,
-			AtecoCode:      item.searchCode,
-		}
-		surface, err := s.probeMASearchSurface(ctx, params, subject, email)
-		if err != nil {
-			return MAStrategySpec{}, err
-		}
-		if surface.EstimatedCount <= 0 {
-			continue
-		}
-		populated = append(populated, MAAtecoCandidate{
-			Code:        item.code,
-			Description: item.titolo,
-			SearchCode:  item.searchCode,
-		})
 	}
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_expansion_discovery",
 		Status:    maTraceEventSucceeded,
 		Metadata: maTraceJSON(map[string]any{
 			"divisions":       strategy.SectorDivisions,
-			"excluded":        strategy.ExcludedAteco,
-			"subtree_codes":   len(ordered),
+			"subtree_codes":   subtreeCount,
 			"populated_codes": len(populated),
 		}),
 	})
@@ -1671,7 +1686,7 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 		})
 	}
 	estimates = aggregateExpandedEstimates(estimates, strategy, pricing.CostAdvanced)
-	selected := chooseSelectedStrategyFromEstimates(estimates, len(strategy.AtecoCandidates) > 0)
+	selected := chooseSelectedStrategyFromEstimates(estimates, len(strategy.AtecoQueryCandidates) > 0)
 	for index := range estimates {
 		estimates[index].Selected = selected != "" && estimates[index].StrategyType == selected
 	}
@@ -1769,7 +1784,7 @@ func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 	queries := make([]maSearchQuery, 0, len(provinces)*(len(strategy.AtecoCandidates)+1)*len(forms))
 	for _, province := range provinces {
 		for _, form := range forms {
-			for _, candidate := range strategy.AtecoCandidates {
+			for _, candidate := range strategy.AtecoQueryCandidates {
 				searchCode := candidate.SearchCode
 				if searchCode == "" {
 					searchCode = atecoSearchCode(candidate.Code)
@@ -1906,7 +1921,7 @@ func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, s
 	for _, province := range provinces {
 		for _, form := range forms {
 			if strategyType == maStrategyTypeATECO {
-				for _, candidate := range strategy.AtecoCandidates {
+				for _, candidate := range strategy.AtecoQueryCandidates {
 					searchCode := candidate.SearchCode
 					if searchCode == "" {
 						searchCode = atecoSearchCode(candidate.Code)

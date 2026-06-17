@@ -64,7 +64,9 @@ func TestBuildMAEstimateQueriesCartesian(t *testing.T) {
 		ActivityStatus:    "ATTIVA",
 		Provinces:         []string{"MI", "BG"},
 		LegalForms:        []string{"SR", "SP"},
-		AtecoCandidates: []MAAtecoCandidate{
+		// buildMAEstimateQueries reads the retrieval set (filled by expandStrategyAteco);
+		// the curated AtecoCandidates are not queried directly.
+		AtecoQueryCandidates: []MAAtecoCandidate{
 			{Code: "62.20.1", SearchCode: "62201"},
 			{Code: "62.90", SearchCode: "6290"},
 		},
@@ -112,10 +114,10 @@ func TestBuildMAEstimateQueriesCartesian(t *testing.T) {
 // pass (no server-side legal-form filter).
 func TestBuildMAEstimateQueriesAnyFormWhenNoConstraint(t *testing.T) {
 	strategy := MAStrategySpec{
-		SectorDescription: "consulenza informatica",
-		ActivityStatus:    "ATTIVA",
-		Provinces:         []string{"MI"},
-		AtecoCandidates:   []MAAtecoCandidate{{Code: "62.20.1", SearchCode: "62201"}},
+		SectorDescription:    "consulenza informatica",
+		ActivityStatus:       "ATTIVA",
+		Provinces:            []string{"MI"},
+		AtecoQueryCandidates: []MAAtecoCandidate{{Code: "62.20.1", SearchCode: "62201"}},
 	}
 	queries := buildMAEstimateQueries(strategy)
 	for _, query := range queries {
