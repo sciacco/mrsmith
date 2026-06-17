@@ -256,6 +256,26 @@ type MAStrategySpec struct {
 	// thesis: it drives the succession_owner signal ramp and the ricambio flag.
 	// Extracted by the strategy LLM; nil falls back to maSuccessionDefaultMinAge.
 	SuccessionMinOwnerAge *int `json:"successionMinOwnerAge,omitempty"`
+	// ExcludedAteco lists ATECO codes (or whole subtrees) the analyst wants OUT of
+	// the perimeter even when they fall inside the sector divisions — e.g. "esclusi
+	// servizi di elaborazione dati contabili" (63.10.21) while keeping hosting
+	// (63.10.10) in the same group. Extracted by the strategy LLM; pruned from the
+	// expanded division net (retrieval) and enforced as a hard sector gate (scoring).
+	ExcludedAteco []string `json:"excludedAteco,omitempty"`
+
+	// --- Transient (json:"-"): computed in-flight from the persisted fields above,
+	// never stored. They survive only for the duration of one estimate/execute call.
+
+	// SectorDivisions holds the distinct 2-digit ATECO divisions of the ORIGINAL
+	// candidates (captured before expandStrategyAteco prunes empty leaves), so the
+	// sector perimeter keeps a division the analyst intended even if none of its
+	// leaf codes turned out populated. Drives the expanded net and the scoring gate.
+	SectorDivisions []string `json:"-"`
+	// ExpandedAtecoCandidates is the "expanded" strategy's code set: the populated
+	// subtree of SectorDivisions minus ExcludedAteco. The expanded search iterates
+	// these codes instead of dropping the ATECO filter entirely (which retrieved the
+	// whole provincial economy). Empty for sector-less strategies (legacy fallback).
+	ExpandedAtecoCandidates []MAAtecoCandidate `json:"-"`
 }
 
 type MAAtecoCandidate struct {

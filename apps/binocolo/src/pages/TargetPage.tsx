@@ -198,17 +198,30 @@ export function TargetPage() {
     };
   }, [api]);
 
+  const [showOutside, setShowOutside] = useState(false);
+
   useEffect(() => {
     if (!detail?.strategy?.strategy) return;
     setStrategy(detail.strategy.strategy);
     setChosenStrategy(detail.session.selectedStrategy ?? detail.strategy.strategy.selectedStrategy ?? '');
-    setSelectedTargetId(detail.targets[0]?.id ?? null);
+    const firstVisible = detail.targets.find((target) => target.matchState !== 'fuori_criterio') ?? detail.targets[0];
+    setSelectedTargetId(firstVisible?.id ?? null);
   }, [detail]);
+
+  // Sector gate (and viability knockout) land off-perimeter targets in
+  // fuori_criterio; they are hidden by default, revealable via a toggle so the
+  // filtering is never silent. Selection and the shortlist track the visible set.
+  const visibleTargets = useMemo(
+    () => (detail?.targets ?? []).filter((target) => target.matchState !== 'fuori_criterio'),
+    [detail?.targets],
+  );
+  const hiddenCount = (detail?.targets.length ?? 0) - visibleTargets.length;
+  const shortlistRows = showOutside ? (detail?.targets ?? []) : visibleTargets;
 
   const selectedTarget = useMemo(() => {
     if (!detail?.targets.length) return null;
-    return detail.targets.find((target) => target.id === selectedTargetId) ?? detail.targets[0];
-  }, [detail?.targets, selectedTargetId]);
+    return detail.targets.find((target) => target.id === selectedTargetId) ?? shortlistRows[0] ?? detail.targets[0];
+  }, [detail?.targets, selectedTargetId, shortlistRows]);
 
   const estimateGroups = useMemo(() => groupEstimates(detail?.estimates ?? []), [detail?.estimates]);
   const selectedEstimateType = chosenStrategy || estimateGroups.find((group) => group.selected)?.type || '';
@@ -682,7 +695,7 @@ export function TargetPage() {
                   <div className={styles.panelHeader}>
                     <div>
                       <h2 id="results-title">Shortlist</h2>
-                      <p>{hasTargets ? `${detail.targets.length} target ordinati per aderenza` : 'I target appariranno dopo la conferma.'}</p>
+                      <p>{hasTargets ? `${visibleTargets.length} target in perimetro ordinati per aderenza` : 'I target appariranno dopo la conferma.'}</p>
                     </div>
                     <div className={styles.exportActions}>
                       <Button
@@ -709,12 +722,24 @@ export function TargetPage() {
                     </div>
                   </div>
                   {hasTargets && detail.strategy?.strategy ? <AppliedPerimeter strategy={detail.strategy.strategy} /> : null}
+                  {hasTargets && hiddenCount > 0 ? (
+                    <button type="button" className={styles.outsideToggle} onClick={() => setShowOutside((prev) => !prev)}>
+                      <Icon name={showOutside ? 'x-circle' : 'eye'} size={13} />
+                      {showOutside ? `Nascondi ${hiddenCount} fuori perimetro` : `Mostra ${hiddenCount} fuori perimetro`}
+                    </button>
+                  ) : null}
                   {busy === 'execute' ? (
                     <div className={styles.skeletonBlock}>
                       <Skeleton rows={8} />
                     </div>
+                  ) : shortlistRows.length > 0 ? (
+                    <TargetShortlist rows={shortlistRows} selectedId={selectedTarget?.id} onSelect={setSelectedTargetId} onRate={rateTarget} />
                   ) : hasTargets ? (
-                    <TargetShortlist rows={detail.targets} selectedId={selectedTarget?.id} onSelect={setSelectedTargetId} onRate={rateTarget} />
+                    <EmptyState
+                      icon="eye"
+                      title="Tutti fuori perimetro"
+                      text={`${hiddenCount} target risultano fuori dal perimetro settoriale. Usa "Mostra fuori perimetro" per ispezionarli.`}
+                    />
                   ) : (
                     <EmptyState icon="clipboard-check" title="In attesa di conferma" text="Completa la stima e avvia la ricerca dei target." />
                   )}
@@ -1474,6 +1499,17 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
         <span>Codici ATECO</span>
         <textarea value={atecoText} onChange={(event) => onChange({ atecoCandidates: parseAtecoLines(event.target.value) })} rows={3} />
       </label>
+      <label className={styles.fieldWide}>
+        <span>ATECO esclusi</span>
+        <input
+          value={(strategy.excludedAteco ?? []).join(', ')}
+          onChange={(event) => onChange({ excludedAteco: splitList(event.target.value).map((item) => item.toUpperCase()) })}
+          placeholder="es. 63.10.21 — elaborazione dati contabili"
+        />
+        <small className={styles.fieldHint}>
+          Codici (o sottoalberi) rimossi dal perimetro anche se interni alle divisioni del settore: i risultati sotto questi codici sono fuori criterio.
+        </small>
+      </label>
       <label>
         <span>Province</span>
         <input
@@ -1606,6 +1642,14 @@ function buildPerimeterChips(strategy: MAStrategySpec): PerimeterChip[] {
   const forms = strategy.legalForms ?? [];
   if (forms.length > 0) {
     chips.push({ key: 'forms', label: `${forms.length > 1 ? 'Forme' : 'Forma'} ${forms.join(', ')}` });
+  }
+  const excluded = strategy.excludedAteco ?? [];
+  if (excluded.length > 0) {
+    chips.push({
+      key: 'excluded',
+      label: `Esclusi ${excluded.join(', ')}`,
+      hint: 'ATECO rimossi dal perimetro: i risultati sotto questi codici sono fuori criterio e nascosti.',
+    });
   }
   return chips;
 }

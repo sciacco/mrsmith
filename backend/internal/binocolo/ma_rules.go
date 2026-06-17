@@ -95,6 +95,7 @@ func validateMAStrategy(input MAStrategySpec) (MAStrategySpec, error) {
 		})
 	}
 	strategy.AtecoCandidates = candidates
+	strategy.ExcludedAteco = normalizeAtecoCodeList(strategy.ExcludedAteco, 16)
 
 	strategy.Keywords = cleanStringList(strategy.Keywords, 12, 80)
 	strategy.MissingCriteria = cleanStringList(strategy.MissingCriteria, 12, 120)
@@ -243,6 +244,92 @@ func normalizeAtecoCode(raw string) string {
 	return value
 }
 
+// normalizeAtecoCodeList keeps well-formed, deduped ATECO codes (by dot-stripped
+// key), capped at max. Unlike the candidate list it never errors on a malformed
+// entry — an exclusion is best-effort, so a bad code is simply dropped.
+func normalizeAtecoCodeList(values []string, max int) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, raw := range values {
+		code := normalizeAtecoCode(raw)
+		if code == "" || !atecoCodePattern.MatchString(code) {
+			continue
+		}
+		key := strings.ReplaceAll(code, ".", "")
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, code)
+		if max > 0 && len(out) >= max {
+			break
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// atecoDivision returns the 2-digit division of an ATECO code (the dot-stripped
+// leading pair), or "" if it has fewer than two leading characters.
+func atecoDivision(code string) string {
+	sc := atecoSearchCode(code)
+	if len(sc) < 2 {
+		return ""
+	}
+	return sc[:2]
+}
+
+// atecoDivisions returns the distinct 2-digit divisions of the candidates, sorted.
+// This is the sector perimeter used both to widen the expanded search (the whole
+// division subtree) and to gate scoring (a target outside these divisions is
+// fuori_criterio).
+func atecoDivisions(candidates []MAAtecoCandidate) []string {
+	seen := map[string]struct{}{}
+	out := []string{}
+	for _, candidate := range candidates {
+		div := atecoDivision(candidate.Code)
+		if div == "" {
+			continue
+		}
+		if _, exists := seen[div]; exists {
+			continue
+		}
+		seen[div] = struct{}{}
+		out = append(out, div)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// significantTokenMatches counts the DISTINCT meaningful tokens (>=4 runes, not a
+// generic filler stopword like "servizi"/"attività") drawn from needles that occur
+// in haystack. A single shared filler word no longer claims sector adherence: the
+// keyword signal requires >=2 such hits for a full match. Reuses the ATECO-search
+// stopword set so the bar is the same one the strategy builder already applies.
+func significantTokenMatches(haystack string, needles []string) int {
+	source := strings.ToLower(haystack)
+	seen := map[string]struct{}{}
+	count := 0
+	for _, needle := range needles {
+		for _, token := range strings.Fields(strings.ToLower(needle)) {
+			token = strings.TrimFunc(token, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+			if len([]rune(token)) < 4 || atecoSearchStopwords[token] {
+				continue
+			}
+			if _, exists := seen[token]; exists {
+				continue
+			}
+			if strings.Contains(source, token) {
+				seen[token] = struct{}{}
+				count++
+			}
+		}
+	}
+	return count
+}
+
 func normalizeMAStrategyType(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case maStrategyTypeATECO:
@@ -308,22 +395,6 @@ func chooseSelectedStrategyFromEstimates(estimates []MAEstimate, hasAteco bool) 
 		return maStrategyTypeATECO
 	}
 	return ""
-}
-
-func textIntersects(text string, needles []string) bool {
-	source := strings.ToLower(text)
-	for _, needle := range needles {
-		for _, token := range strings.Fields(strings.ToLower(needle)) {
-			token = strings.TrimFunc(token, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
-			if len([]rune(token)) < 4 {
-				continue
-			}
-			if strings.Contains(source, token) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func ageFromItalianTaxCode(taxCode string, now time.Time) (int, bool) {

@@ -373,6 +373,10 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 	if err != nil {
 		return MASessionDetail{}, err
 	}
+	strategyVersion.Strategy, err = s.expandStrategyExpansion(ctx, strategyVersion.Strategy, subject, email)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
 
 	estimates, selected, err := s.runEstimates(ctx, sessionID, strategyVersion.ID, strategyVersion.Strategy, subject, email)
 	if err != nil {
@@ -454,6 +458,10 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 		return MASessionDetail{}, err
 	}
 	strategyVersion.Strategy, err = s.expandStrategyAteco(ctx, strategyVersion.Strategy, subject, email)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	strategyVersion.Strategy, err = s.expandStrategyExpansion(ctx, strategyVersion.Strategy, subject, email)
 	if err != nil {
 		return MASessionDetail{}, err
 	}
@@ -1411,6 +1419,11 @@ func (s *maService) canonicalizeMAStrategyAteco(ctx context.Context, strategy MA
 		})
 	}
 	strategy.AtecoCandidates = candidates
+	// Capture the sector perimeter (2-digit divisions) from the canonical candidates
+	// NOW, before expandStrategyAteco prunes empty leaves — otherwise a division the
+	// analyst intended (e.g. 63 for hosting) would vanish from the gate if none of
+	// its leaf codes happened to be populated.
+	strategy.SectorDivisions = atecoDivisions(candidates)
 	return strategy, nil
 }
 
@@ -1502,6 +1515,115 @@ func (s *maService) expandStrategyAteco(ctx context.Context, strategy MAStrategy
 	return strategy, nil
 }
 
+// excludedSearchCodes returns the dot-stripped search codes of the excluded ATECO
+// entries. A descendant/target whose search code has any of these as a prefix is
+// inside an excluded subtree (e.g. excluding 63.10.21 elaborazione dati contabili
+// removes that branch while hosting 63.10.10 stays).
+func excludedSearchCodes(excluded []string) []string {
+	out := make([]string, 0, len(excluded))
+	for _, ex := range excluded {
+		if code := atecoSearchCode(ex); code != "" {
+			out = append(out, code)
+		}
+	}
+	return out
+}
+
+func isExcludedSearchCode(searchCode string, excluded []string) bool {
+	for _, ex := range excluded {
+		if strings.HasPrefix(searchCode, ex) {
+			return true
+		}
+	}
+	return false
+}
+
+// expandStrategyExpansion computes the "expanded" search's ATECO code set: the
+// populated subtree of the sector divisions, minus any excluded subtree. It
+// replaces the old expanded behaviour — drop the ATECO filter entirely, which
+// retrieved the whole provincial economy — with a sector-bounded net that still
+// catches mis-tagged siblings inside the IT divisions (a real MSP tagged 62.09
+// rather than 62.20). Like expandStrategyAteco it probes dry-run (count only,
+// €0.01, cache-backed) applying the economic filters but neither province nor
+// legal form, and respects the subtree probe cap. The result lives only on the
+// transient ExpandedAtecoCandidates field; an empty result leaves the legacy
+// province-only fallback in place (sector-less strategies).
+func (s *maService) expandStrategyExpansion(ctx context.Context, strategy MAStrategySpec, subject, email string) (MAStrategySpec, error) {
+	if s.ateco == nil || len(strategy.SectorDivisions) == 0 {
+		return strategy, nil
+	}
+	excluded := excludedSearchCodes(strategy.ExcludedAteco)
+	type subtreeCode struct{ code, searchCode, titolo string }
+	seen := map[string]struct{}{}
+	ordered := make([]subtreeCode, 0, 32)
+	for _, division := range strategy.SectorDivisions {
+		descendants, err := s.ateco.SubtreeAtecoCodes(ctx, division)
+		if err != nil {
+			return MAStrategySpec{}, err
+		}
+		for _, descendant := range descendants {
+			if descendant.CodiceSearch == "" {
+				continue
+			}
+			if _, exists := seen[descendant.CodiceSearch]; exists {
+				continue
+			}
+			if isExcludedSearchCode(descendant.CodiceSearch, excluded) {
+				continue
+			}
+			seen[descendant.CodiceSearch] = struct{}{}
+			ordered = append(ordered, subtreeCode{code: descendant.Codice, searchCode: descendant.CodiceSearch, titolo: descendant.Titolo})
+		}
+	}
+	if len(ordered) == 0 {
+		return strategy, nil
+	}
+	if len(ordered) > maAtecoSubtreeProbeCap {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_expansion_discovery_skipped",
+			Status:    maTraceEventInfo,
+			Metadata:  maTraceJSON(map[string]any{"divisions": strategy.SectorDivisions, "subtree_codes": len(ordered), "cap": maAtecoSubtreeProbeCap}),
+		})
+		return strategy, nil
+	}
+	populated := make([]MAAtecoCandidate, 0, len(ordered))
+	for _, item := range ordered {
+		params := openapiit.CompanyITSearchParams{
+			DataEnrichment: "advanced",
+			ActivityStatus: strategy.ActivityStatus,
+			MinTurnover:    strategy.TurnoverMin,
+			MaxTurnover:    strategy.TurnoverMax,
+			MinEmployees:   strategy.EmployeeMin,
+			MaxEmployees:   strategy.EmployeeMax,
+			AtecoCode:      item.searchCode,
+		}
+		surface, err := s.probeMASearchSurface(ctx, params, subject, email)
+		if err != nil {
+			return MAStrategySpec{}, err
+		}
+		if surface.EstimatedCount <= 0 {
+			continue
+		}
+		populated = append(populated, MAAtecoCandidate{
+			Code:        item.code,
+			Description: item.titolo,
+			SearchCode:  item.searchCode,
+		})
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_expansion_discovery",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"divisions":       strategy.SectorDivisions,
+			"excluded":        strategy.ExcludedAteco,
+			"subtree_codes":   len(ordered),
+			"populated_codes": len(populated),
+		}),
+	})
+	strategy.ExpandedAtecoCandidates = populated
+	return strategy, nil
+}
+
 func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec, subject, email string) ([]MAEstimate, string, error) {
 	queries := buildMAEstimateQueries(strategy)
 	estimates := make([]MAEstimate, 0, len(queries))
@@ -1548,6 +1670,7 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 			VendorResponse:    surface.VendorResponse,
 		})
 	}
+	estimates = aggregateExpandedEstimates(estimates, strategy, pricing.CostAdvanced)
 	selected := chooseSelectedStrategyFromEstimates(estimates, len(strategy.AtecoCandidates) > 0)
 	for index := range estimates {
 		estimates[index].Selected = selected != "" && estimates[index].StrategyType == selected
@@ -1588,6 +1711,54 @@ func maStrategyLegalForms(strategy MAStrategySpec) []string {
 	return strategy.LegalForms
 }
 
+// aggregateExpandedEstimates collapses the per-code expanded estimates into one
+// row per province: the sector-bounded net is presented as a single "expanded"
+// surface, not a wall of division-code chips. ATECO estimates pass through
+// unchanged. Count/probe are summed; cost is recomputed from the sum; the surface
+// is too_broad if any part was or the total exceeds the vendor limit.
+func aggregateExpandedEstimates(estimates []MAEstimate, strategy MAStrategySpec, costAdvanced float64) []MAEstimate {
+	out := make([]MAEstimate, 0, len(estimates))
+	byProvince := map[string]int{}
+	label := expandedSectorLabel(strategy)
+	for _, est := range estimates {
+		if est.StrategyType != maStrategyTypeExpanded {
+			out = append(out, est)
+			continue
+		}
+		if idx, ok := byProvince[est.Province]; ok {
+			out[idx].EstimatedCount += est.EstimatedCount
+			out[idx].ProbeCount += est.ProbeCount
+			if est.SurfaceStatus == maEstimateSurfaceTooBroad {
+				out[idx].SurfaceStatus = maEstimateSurfaceTooBroad
+			}
+			continue
+		}
+		merged := est
+		merged.AtecoCode = ""
+		merged.AtecoDescription = label
+		byProvince[est.Province] = len(out)
+		out = append(out, merged)
+	}
+	for i := range out {
+		if out[i].StrategyType != maStrategyTypeExpanded {
+			continue
+		}
+		out[i].EstimatedCost = float64(out[i].EstimatedCount) * costAdvanced
+		if out[i].EstimatedCount > maVendorLimit {
+			out[i].SurfaceStatus = maEstimateSurfaceTooBroad
+		}
+	}
+	return out
+}
+
+// expandedSectorLabel describes the expanded net's perimeter for the estimate UI.
+func expandedSectorLabel(strategy MAStrategySpec) string {
+	if len(strategy.SectorDivisions) == 0 {
+		return "Ricerca espansa"
+	}
+	return "Divisioni ATECO " + strings.Join(strategy.SectorDivisions, ", ")
+}
+
 func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 	dryRun := 1
 	provinces := strategy.Provinces
@@ -1615,13 +1786,37 @@ func buildMAEstimateQueries(strategy MAStrategySpec) []maSearchQuery {
 					params:           params,
 				})
 			}
-			params := baseMASurfaceParams(strategy, province, form, &dryRun)
-			queries = append(queries, maSearchQuery{
-				strategyType: maStrategyTypeExpanded,
-				province:     province,
-				legalForm:    form,
-				params:       params,
-			})
+			if len(strategy.ExpandedAtecoCandidates) > 0 {
+				// Sector-bounded expanded net: one dry-run per populated division
+				// code instead of a single ATECO-less query over the whole province.
+				for _, candidate := range strategy.ExpandedAtecoCandidates {
+					searchCode := candidate.SearchCode
+					if searchCode == "" {
+						searchCode = atecoSearchCode(candidate.Code)
+					}
+					params := baseMASurfaceParams(strategy, province, form, &dryRun)
+					params.AtecoCode = searchCode
+					queries = append(queries, maSearchQuery{
+						strategyType:     maStrategyTypeExpanded,
+						atecoCode:        candidate.Code,
+						atecoSearchCode:  searchCode,
+						atecoDescription: candidate.Description,
+						province:         province,
+						legalForm:        form,
+						params:           params,
+					})
+				}
+			} else {
+				// Legacy fallback for sector-less strategies (no divisions to widen):
+				// the province-only surface, kept so such searches still run.
+				params := baseMASurfaceParams(strategy, province, form, &dryRun)
+				queries = append(queries, maSearchQuery{
+					strategyType: maStrategyTypeExpanded,
+					province:     province,
+					legalForm:    form,
+					params:       params,
+				})
+			}
 		}
 	}
 	return queries
@@ -1718,7 +1913,19 @@ func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, s
 					}
 					combos = append(combos, maExecutionCombo{province: province, atecoCode: candidate.Code, searchCode: searchCode, legalForm: form})
 				}
+			} else if len(strategy.ExpandedAtecoCandidates) > 0 {
+				// Sector-bounded expanded net: enrich only companies under the
+				// populated division codes (minus exclusions), never the whole
+				// province. Dedup downstream collapses cross-code overlaps.
+				for _, candidate := range strategy.ExpandedAtecoCandidates {
+					searchCode := candidate.SearchCode
+					if searchCode == "" {
+						searchCode = atecoSearchCode(candidate.Code)
+					}
+					combos = append(combos, maExecutionCombo{province: province, atecoCode: candidate.Code, searchCode: searchCode, legalForm: form})
+				}
 			} else {
+				// Legacy province-only fallback (sector-less strategies).
 				combos = append(combos, maExecutionCombo{province: province, legalForm: form})
 			}
 		}

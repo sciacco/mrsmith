@@ -215,6 +215,7 @@ export interface MAStrategySpec {
   signalWeights?: Record<string, number>;
   maxBudgetEur?: number;
   successionMinOwnerAge?: number;
+  excludedAteco?: string[];
 }
 
 export interface MAAtecoCandidate {

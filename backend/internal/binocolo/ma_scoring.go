@@ -151,13 +151,17 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScor
 		flags := computeMAFlags(contexts[i])
 		viability, knockout := computeViability(contexts[i])
 		thesisFit := computeThesisFit(contexts[i], params.ThesisFitHoldingFactor)
+		sectorOut := !inSectorPerimeter(strategy, targets[i].AtecoCode)
 
 		targets[i].Score = int(math.Round(blended * viability * thesisFit * 100))
 		if targets[i].Score > 100 {
 			targets[i].Score = 100
 		}
 		targets[i].Confidence = confidence
-		if knockout {
+		// Sector gate and viability knockout both land the target in fuori_criterio
+		// (hidden by default in the UI). The gate is sector-only; it does not touch
+		// the score, so a revealed off-sector row still shows what it would score.
+		if knockout || sectorOut {
 			targets[i].MatchState = maMatchStateOutside
 		} else {
 			targets[i].MatchState = maMatchStateFromConfidence(confidence)
@@ -377,6 +381,38 @@ func maRationaleV2(thesis string, evidence []MATargetEvidence, flags []MATargetF
 	return cleanText(strings.Join(parts, ". "), 320)
 }
 
+// inSectorPerimeter reports whether a target's ATECO falls inside the strategy's
+// sector: within one of the declared 2-digit divisions and not under an excluded
+// subtree. It is the sector gate — a target outside the perimeter is demoted to
+// fuori_criterio (hidden in the UI) no matter how well it scores on the
+// sector-blind signals (size, ownership, economics). A sector-less strategy (no
+// divisions) gates nothing; a target with no ATECO code is not gated on sector
+// (missing data, left to the confidence/coverage measure).
+func inSectorPerimeter(strategy MAStrategySpec, atecoCode string) bool {
+	if len(strategy.SectorDivisions) == 0 {
+		return true
+	}
+	code := atecoSearchCode(atecoCode)
+	if code == "" {
+		return true
+	}
+	for _, ex := range strategy.ExcludedAteco {
+		if exc := atecoSearchCode(ex); exc != "" && strings.HasPrefix(code, exc) {
+			return false
+		}
+	}
+	if len(code) < 2 {
+		return true
+	}
+	division := code[:2]
+	for _, declared := range strategy.SectorDivisions {
+		if declared == division {
+			return true
+		}
+	}
+	return false
+}
+
 // --- Signal measures ---------------------------------------------------------
 
 func measureAtecoPrecision(c maSignalContext) maSignalSample {
@@ -406,9 +442,6 @@ func measureAtecoPrecision(c maSignalContext) maSignalSample {
 			}
 		}
 	}
-	if best == 0 && textIntersects(c.target.AtecoDescription, append([]string{c.strategy.SectorDescription}, c.strategy.Keywords...)) {
-		best = 0.15
-	}
 	return maSignalSample{Applicable: true, Score: best, Label: c.target.AtecoCode}
 }
 
@@ -437,10 +470,14 @@ func measureTurnoverProximity(c maSignalContext) maSignalSample {
 func measureKeywordMatch(c maSignalContext) maSignalSample {
 	haystack := strings.TrimSpace(c.target.AtecoDescription + " " + c.target.CompanyName)
 	needles := append([]string{c.strategy.SectorDescription}, c.strategy.Keywords...)
-	if textIntersects(haystack, needles) {
+	switch n := significantTokenMatches(haystack, needles); {
+	case n >= 2:
 		return maSignalSample{Applicable: true, Score: 1.0, Label: "settore coerente"}
+	case n == 1:
+		return maSignalSample{Applicable: true, Score: 0.6, Label: "settore parziale"}
+	default:
+		return maSignalSample{Applicable: true, Score: 0.2, Label: "settore debole"}
 	}
-	return maSignalSample{Applicable: true, Score: 0.2, Label: "settore debole"}
 }
 
 func measureOwnershipConcentration(c maSignalContext) maSignalSample {

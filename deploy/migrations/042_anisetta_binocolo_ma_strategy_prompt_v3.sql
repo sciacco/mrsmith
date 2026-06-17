@@ -1,8 +1,12 @@
--- Binocolo M&A strategy prompt v3 (succession owner-age threshold extraction).
+-- Binocolo M&A strategy prompt v3.
 -- Target database: Anisetta PostgreSQL. Apply after 034.
--- Adds successionMinOwnerAge: under the succession thesis the LLM extracts the
--- owner-age threshold the analyst asked for (e.g. "almeno 50 anni"); it drives
--- the succession_owner signal ramp and the ricambio_generazionale flag.
+-- Adds two extractions to the strategy:
+--  1. successionMinOwnerAge — under the succession thesis the LLM extracts the
+--     owner-age threshold the analyst asked for (e.g. "almeno 50 anni"); it drives
+--     the succession_owner signal ramp and the ricambio_generazionale flag.
+--  2. excludedAteco — ATECO codes/subtrees the analyst explicitly excludes (e.g.
+--     "esclusi i servizi di elaborazione dati contabili" -> 63.10.21), pruned from
+--     the expanded division net and enforced as a hard sector gate (fuori_criterio).
 -- Promotes a new ma_strategy default prompt; the v2 prompt is kept but de-defaulted.
 
 BEGIN;
@@ -35,6 +39,7 @@ Rispondi solo con JSON valido nel formato:
     "employeeMax": null,
     "legalForms": [],
     "atecoCandidates": [{"code":"6201","description":"...","rationale":"..."}],
+    "excludedAteco": [],
     "keywords": ["software"],
     "thesis": "generico",
     "successionMinOwnerAge": null,
@@ -48,6 +53,7 @@ Regole sui filtri di ricerca:
 - searchLimit deve essere 100 salvo richiesta esplicita diversa; non superare mai 1000;
 - se l'utente dice "intorno a" un fatturato, imposta turnoverAround e anche min/max a +/-30%;
 - proponi codici ATECO plausibili con razionale, ma non inventare dati aziendali;
+- excludedAteco: quando l'utente ESCLUDE esplicitamente un sotto-settore (es. "esclusi i servizi di elaborazione dati contabili", "niente societa' immobiliari"), inserisci in excludedAteco i codici ATECO da rimuovere dal perimetro, ANCHE se ricadono in una divisione inclusa (es. "elaborazione dati contabili" -> "63.10.21", mantenendo invece l'hosting "63.10.10"). Sono codici o interi sottoalberi: i risultati sotto questi codici vengono scartati. Lascia [] se non ci sono esclusioni esplicite;
 - provinces deve contenere sigle italiane di due lettere quando il territorio e' provinciale;
 - legalForms va popolato SOLO se l'utente richiede esplicitamente una o piu' forme societarie (es. cooperative, SRL); e' un filtro di ricerca con sigle di due lettere (es. SR per SRL, CL/SC per cooperative), non un criterio di valutazione. Se l'utente non indica la forma, lascia legalForms vuoto.
 Regole sulla valutazione (scoring):
