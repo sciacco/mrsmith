@@ -546,7 +546,7 @@ func main() {
 		appCatalog = filtered
 	}
 	portal.RegisterRoutes(api, appCatalog)
-	binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, OpenRouter: openrouterCli, AnisettaDB: anisettaDB})
+	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, OpenRouter: openrouterCli, AnisettaDB: anisettaDB})
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	rda.RegisterRoutes(api, rda.Deps{
@@ -744,6 +744,13 @@ func main() {
 		go func() {
 			defer workerWG.Done()
 			diagnosticSink.Run(appCtx)
+		}()
+	}
+	if binocoloDeepWorker != nil {
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			binocoloDeepWorker(appCtx)
 		}()
 	}
 

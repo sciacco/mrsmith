@@ -1033,6 +1033,217 @@
   color: var(--color-text);
 }
 
+/* Veryshort: rating preferiti */
+.rowExcluded {
+  opacity: 0.5;
+}
+.rowExcluded .targetButton span {
+  text-decoration: line-through;
+}
+.ratingControl {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ratingStars {
+  display: inline-flex;
+}
+.starButton {
+  border: 0;
+  background: transparent;
+  padding: 0 1px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-border);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+.starButton:hover {
+  color: var(--color-accent-muted);
+}
+.starOn {
+  color: var(--color-accent);
+}
+.excludeButton {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+.excludeButton:hover,
+.excludeOn {
+  color: var(--color-danger, #e5484d);
+}
+
+/* Veryshort: analisi approfondita (deep) */
+.deepChip {
+  display: inline-block;
+  margin-top: var(--space-1);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.deep_queued,
+.deep_running {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+.deep_ready {
+  background: rgba(21, 128, 61, 0.14);
+  color: var(--color-success-strong, #15803d);
+}
+.deep_failed {
+  background: rgba(229, 72, 77, 0.14);
+  color: var(--color-danger, #e5484d);
+}
+
+.deepTab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.deepHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.deepRag {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+.deepRawFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+.deepRawFacts strong {
+  color: var(--color-text);
+}
+.rag_green {
+  background: rgba(21, 128, 61, 0.14);
+  color: var(--color-success-strong, #15803d);
+}
+.rag_amber {
+  background: rgba(180, 83, 9, 0.16);
+  color: #b45309;
+}
+.rag_red {
+  background: rgba(229, 72, 77, 0.14);
+  color: var(--color-danger, #e5484d);
+}
+.rag_na {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+}
+.deepGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.deepGroup h5 {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+.deepMetrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2);
+}
+.deepMetric {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+.deepDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.deepDot.rag_green {
+  background: var(--color-success-strong, #15803d);
+}
+.deepDot.rag_amber {
+  background: #b45309;
+}
+.deepDot.rag_red {
+  background: var(--color-danger, #e5484d);
+}
+.deepDot.rag_na {
+  background: var(--color-border);
+}
+.deepMetricLabel {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+.deepMetricValue {
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.deepValuation,
+.deepBrief {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+}
+.deepValuation h5,
+.deepBrief h5 {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+.deepValBand {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.deepValBand strong {
+  font-family: var(--font-mono);
+}
+.deepValSource,
+.deepValCaveat {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+.deepVerdict {
+  font-weight: 600;
+  margin: 0;
+}
+.deepRedFlags {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+}
+
 /* Scoring v2: evidence families */
 .evidenceGroup {
   display: grid;

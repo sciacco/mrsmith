@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -103,7 +104,7 @@ func (s *maService) getSession(ctx context.Context, id string) (MASessionDetail,
 	if detail.Session.DeletedAt != nil {
 		return MASessionDetail{}, errMASessionDeleted
 	}
-	return decorateMACost(detail), nil
+	return decorateMACost(detail, s.loadPricing(ctx)), nil
 }
 
 func (s *maService) archiveSession(ctx context.Context, id, subject, email string) error {
@@ -155,13 +156,80 @@ func ensureMASessionOperational(session MASession) error {
 	return nil
 }
 
+// maPricing holds the business pricing/budget levers, sourced from the
+// ma_parameter table (migration 038) with the compiled constants as fallback.
+type maPricing struct {
+	CostAdvanced      float64
+	CostFull          float64
+	CostDryRun        float64
+	BudgetDefault     float64
+	SMEHaircutPct     float64
+	EBITDAFallbackPct float64
+}
+
+// loadPricing reads the configurable pricing levers; missing/unreadable values
+// fall back to the compiled defaults so the feature degrades gracefully.
+func (s *maService) loadPricing(ctx context.Context) maPricing {
+	pricing := maPricing{
+		CostAdvanced:      maCostPerCompanyEUR,
+		CostFull:          maCostPerFullEUR,
+		CostDryRun:        maCostPerDryRunEUR,
+		BudgetDefault:     maDefaultBudgetEUR,
+		SMEHaircutPct:     maSMEHaircutPctDefault,
+		EBITDAFallbackPct: maEBITDAFallbackPctDefault,
+	}
+	if s.store == nil {
+		return pricing
+	}
+	params, err := s.store.ListMAParameters(ctx)
+	if err != nil {
+		return pricing
+	}
+	values := make(map[string]string, len(params))
+	for _, param := range params {
+		values[param.Key] = param.Value
+	}
+	if v, ok := paramFloat(values, "cost_advanced_eur"); ok {
+		pricing.CostAdvanced = v
+	}
+	if v, ok := paramFloat(values, "cost_full_eur"); ok {
+		pricing.CostFull = v
+	}
+	if v, ok := paramFloat(values, "cost_dryrun_eur"); ok {
+		pricing.CostDryRun = v
+	}
+	if v, ok := paramFloat(values, "budget_default_eur"); ok {
+		pricing.BudgetDefault = v
+	}
+	if v, ok := paramFloat(values, "sme_haircut_pct"); ok {
+		pricing.SMEHaircutPct = v
+	}
+	if v, ok := paramFloat(values, "ebitda_fallback_threshold"); ok {
+		pricing.EBITDAFallbackPct = v
+	}
+	return pricing
+}
+
+func paramFloat(values map[string]string, key string) (float64, bool) {
+	raw, ok := values[key]
+	if !ok {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil || v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0, false
+	}
+	return v, true
+}
+
 // decorateMACost attaches the active enrichment budget and unit price so the UI
-// can show projected spend and the cost gate without duplicating the constant.
-func decorateMACost(detail MASessionDetail) MASessionDetail {
-	detail.CostPerCompanyEUR = maCostPerCompanyEUR
-	detail.BudgetEUR = maDefaultBudgetEUR
+// can show projected spend and the cost gate without duplicating the pricing.
+func decorateMACost(detail MASessionDetail, pricing maPricing) MASessionDetail {
+	detail.CostPerCompanyEUR = pricing.CostAdvanced
+	detail.CostFullEUR = pricing.CostFull
+	detail.BudgetEUR = pricing.BudgetDefault
 	if detail.Strategy != nil {
-		detail.BudgetEUR = maStrategyBudget(detail.Strategy.Strategy)
+		detail.BudgetEUR = maStrategyBudget(detail.Strategy.Strategy, pricing.BudgetDefault)
 	}
 	return detail
 }
@@ -240,7 +308,7 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	}); err != nil {
 		return MASessionDetail{}, err
 	}
-	return decorateMACost(detail), nil
+	return decorateMACost(detail, s.loadPricing(ctx)), nil
 }
 
 func (s *maService) estimateSession(ctx context.Context, sessionID string, req MAEstimateSessionRequest, subject, email string) (MASessionDetail, error) {
@@ -408,8 +476,9 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	if !estimatesMatchSearchLimit(detail.Estimates, strategyType, limit) {
 		return MASessionDetail{}, fmt.Errorf("%w: stale estimate", errMAStrategyInvalid)
 	}
-	budget := maStrategyBudget(strategyVersion.Strategy)
-	projectedCost := maProjectedSpend(estimatedCount, limit)
+	pricing := s.loadPricing(ctx)
+	budget := maStrategyBudget(strategyVersion.Strategy, pricing.BudgetDefault)
+	projectedCost := maProjectedSpend(estimatedCount, limit, pricing.CostAdvanced)
 	if projectedCost > budget && !req.AcknowledgeCost {
 		_ = s.traceEvent(ctx, maTraceEventWrite{
 			EventType: "ma_execution_over_budget",
@@ -525,6 +594,159 @@ func (s *maService) exportSession(ctx context.Context, sessionID string, format 
 		return nil, "", "", err
 	}
 	return content, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", nil
+}
+
+// setTargetRating salva il voto preferiti dell'analista su un'azienda della
+// sessione (memoria della preferenza + selezione per il deep-dive). Il voto è
+// agganciato a company_key, quindi sopravvive al re-execute della sessione.
+func (s *maService) setTargetRating(ctx context.Context, sessionID, companyKey string, rating int, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
+	}
+	if !validMARating(rating) {
+		return fmt.Errorf("%w: rating", errMAStrategyInvalid)
+	}
+	session, err := s.store.GetMASessionState(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if err := ensureMASessionOperational(session); err != nil {
+		return err
+	}
+	if err := s.store.UpsertMATargetRating(ctx, sessionID, companyKey, rating, subject, email); err != nil {
+		return err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_target_rated",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "company_key": companyKey, "rating": rating}),
+	})
+	return nil
+}
+
+func validMARating(rating int) bool {
+	return rating == 0 || rating == maRatingExcluded || (rating >= 1 && rating <= maRatingMax)
+}
+
+func normalizeMACompanyKey(value string) string {
+	return strings.ToUpper(strings.TrimSpace(value))
+}
+
+func (s *maService) listParameters(ctx context.Context) ([]MAParameter, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
+	return s.store.ListMAParameters(ctx)
+}
+
+// updateParameter validates and persists one configurable business parameter.
+// Only seeded keys are editable (the UPDATE matches an existing row); the value
+// must be a non-negative number. Each change is audited via a trace event.
+func (s *maService) updateParameter(ctx context.Context, key, value, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return fmt.Errorf("%w: parameter key", errMAStrategyInvalid)
+	}
+	value = strings.TrimSpace(value)
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || parsed < 0 || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+		return fmt.Errorf("%w: parameter value", errMAStrategyInvalid)
+	}
+	if err := s.store.UpdateMAParameter(ctx, key, value, email); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("%w: unknown parameter", errMAStrategyInvalid)
+		}
+		return err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_parameter_updated",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"key": key, "value": value, "by": email, "subject": subject}),
+	})
+	return nil
+}
+
+// deepDive enqueues the rated (>=1 star) companies of a session for IT-full deep
+// analysis. Companies already analysed (status=ready, cached globally) are skipped
+// and not charged. The projected incremental spend (chargeable x cost_full) gates
+// the batch unless the analyst acknowledges going over budget. The async worker
+// picks up the queued rows; the returned detail reflects the new statuses.
+func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, email string) (MASessionDetail, error) {
+	if s.store == nil {
+		return MASessionDetail{}, errMAStoreUnavailable
+	}
+	if s.openapiit == nil {
+		return MASessionDetail{}, errMAOpenAPIITUnavailable
+	}
+	detail, err := s.store.GetMASession(ctx, sessionID)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	if err := ensureMASessionOperational(detail.Session); err != nil {
+		return MASessionDetail{}, err
+	}
+	type candidate struct{ key, vat, tax string }
+	candidates := make([]candidate, 0)
+	keys := make([]string, 0)
+	for _, target := range detail.Targets {
+		if target.Rating != nil && *target.Rating >= 1 && target.CompanyKey != "" {
+			candidates = append(candidates, candidate{key: target.CompanyKey, vat: target.VATCode, tax: target.TaxCode})
+			keys = append(keys, target.CompanyKey)
+		}
+	}
+	if len(candidates) == 0 {
+		return MASessionDetail{}, fmt.Errorf("%w: nessun preferito da approfondire", errMAStrategyInvalid)
+	}
+	existing, err := s.store.ListMADeepAnalysis(ctx, keys)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	pricing := s.loadPricing(ctx)
+	budget := pricing.BudgetDefault
+	if detail.Strategy != nil {
+		budget = maStrategyBudget(detail.Strategy.Strategy, pricing.BudgetDefault)
+	}
+	chargeable := 0
+	for _, c := range candidates {
+		if record, ok := existing[c.key]; ok && record.Status != maDeepStatusFailed {
+			// ready/queued/running are not (re)charged nor (re)enqueued.
+			continue
+		}
+		chargeable++
+	}
+	projected := float64(chargeable) * pricing.CostFull
+	if projected > budget && !ack {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_deep_dive_over_budget",
+			Status:    maTraceEventInfo,
+			Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "chargeable": chargeable, "projected_cost": projected, "budget": budget}),
+		})
+		return MASessionDetail{}, errMAEstimateOverBudget
+	}
+	enqueued := 0
+	for _, c := range candidates {
+		if record, ok := existing[c.key]; ok && record.Status != maDeepStatusFailed {
+			// ready/queued/running are not (re)charged nor (re)enqueued.
+			continue
+		}
+		if err := s.store.EnqueueMADeepAnalysis(ctx, c.key, c.vat, c.tax, email); err != nil {
+			return MASessionDetail{}, err
+		}
+		enqueued++
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_deep_dive_started",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "candidates": len(candidates), "enqueued": enqueued, "projected_cost": projected}),
+	})
+	return s.getSession(ctx, sessionID)
 }
 
 func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID string, promptID string, subject, email string) (MAStrategySpec, maModelAuditWrite, error) {
@@ -1277,6 +1499,7 @@ func (s *maService) expandStrategyAteco(ctx context.Context, strategy MAStrategy
 func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec, subject, email string) ([]MAEstimate, string, error) {
 	queries := buildMAEstimateQueries(strategy)
 	estimates := make([]MAEstimate, 0, len(queries))
+	pricing := s.loadPricing(ctx)
 	for _, query := range queries {
 		query.params = baseMASurfaceParams(strategy, query.province, query.legalForm, query.params.DryRun)
 		if query.atecoSearchCode != "" {
@@ -1310,7 +1533,7 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 			AtecoDescription:  query.atecoDescription,
 			Province:          query.province,
 			EstimatedCount:    surface.EstimatedCount,
-			EstimatedCost:     surface.EstimatedCost,
+			EstimatedCost:     float64(surface.EstimatedCount) * pricing.CostAdvanced,
 			Selected:          false,
 			SurfaceStatus:     surface.Status,
 			ExecutionLimit:    strategy.SearchLimit,
@@ -1893,16 +2116,16 @@ func envelopeCost(envelope openapiit.Envelope[openapiit.CompanyDataset]) float64
 	return 0
 }
 
-func maStrategyBudget(strategy MAStrategySpec) float64 {
+func maStrategyBudget(strategy MAStrategySpec, defaultBudget float64) float64 {
 	if strategy.MaxBudgetEUR != nil && *strategy.MaxBudgetEUR > 0 {
 		return *strategy.MaxBudgetEUR
 	}
-	return maDefaultBudgetEUR
+	return defaultBudget
 }
 
 // maProjectedSpend is the advanced-enrichment cost of a run: at most `limit`
 // companies out of `available` are fetched, each priced at maCostPerCompanyEUR.
-func maProjectedSpend(available, limit int) float64 {
+func maProjectedSpend(available, limit int, costPerCompany float64) float64 {
 	fetched := available
 	if limit > 0 && fetched > limit {
 		fetched = limit
@@ -1910,7 +2133,7 @@ func maProjectedSpend(available, limit int) float64 {
 	if fetched < 0 {
 		fetched = 0
 	}
-	return float64(fetched) * maCostPerCompanyEUR
+	return float64(fetched) * costPerCompany
 }
 
 func estimateTotal(estimates []MAEstimate, strategyType string) int {

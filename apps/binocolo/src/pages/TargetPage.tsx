@@ -14,6 +14,9 @@ import type {
   MASessionVisibility,
   MAStrategySpec,
   MAStrategyType,
+  MADeepAnalysis,
+  MADeepMetric,
+  MADeepValuation,
   MATarget,
   MATargetEvidence,
   MATargetFlag,
@@ -65,7 +68,7 @@ const emptyStrategy: MAStrategySpec = {
   missingCriteria: [],
 };
 
-type BusyState = 'sessions' | 'create' | 'estimate' | 'execute' | 'export' | null;
+type BusyState = 'sessions' | 'create' | 'estimate' | 'execute' | 'export' | 'deepdive' | null;
 
 interface EstimateGroup {
   type: MAStrategyType;
@@ -97,7 +100,8 @@ export function TargetPage() {
   const [acknowledgeCost, setAcknowledgeCost] = useState(false);
   const [activeTab, setActiveTab] = useState<'results' | 'config'>('results');
   const [isFullDetailOpen, setIsFullDetailOpen] = useState(false);
-  const [modalActiveTab, setModalActiveTab] = useState<'overview' | 'financials' | 'shareholders' | 'registry'>('overview');
+  const [isDeepDiveOpen, setIsDeepDiveOpen] = useState(false);
+  const [modalActiveTab, setModalActiveTab] = useState<'overview' | 'deep' | 'financials' | 'shareholders' | 'registry'>('overview');
   const [lifecycleBusyId, setLifecycleBusyId] = useState<string | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<MASessionSummary | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -223,6 +227,13 @@ export function TargetPage() {
     : 0;
   const projectedSpendEur = projectedFetched * costPerCompanyEur;
   const overBudget = budgetEur > 0 && projectedSpendEur > budgetEur;
+  const costFullEur = detail?.costFullEur ?? 0;
+  const ratedCount = (detail?.targets ?? []).filter((target) => (target.rating ?? 0) >= 1).length;
+  const deepChargeable = (detail?.targets ?? []).filter(
+    (target) => (target.rating ?? 0) >= 1 && (!target.deep || target.deep.status === 'failed'),
+  ).length;
+  const deepProjectedEur = deepChargeable * costFullEur;
+  const deepOverBudget = budgetEur > 0 && deepProjectedEur > budgetEur;
   const canExecute =
     hasStrategy &&
     hasEstimate &&
@@ -235,6 +246,23 @@ export function TargetPage() {
   useEffect(() => {
     setAcknowledgeCost(false);
   }, [selectedEstimateType, detail?.strategy?.id, strategy.searchLimit]);
+
+  const deepPending = useMemo(
+    () => (detail?.targets ?? []).some((target) => target.deep?.status === 'queued' || target.deep?.status === 'running'),
+    [detail?.targets],
+  );
+
+  useEffect(() => {
+    const sessionId = detail?.session.id;
+    if (!sessionId || !deepPending) return;
+    const handle = setInterval(() => {
+      api
+        .get<MASessionDetail>(`/binocolo/v1/ma/sessions/${sessionId}`)
+        .then(setDetail)
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(handle);
+  }, [detail?.session.id, deepPending, api]);
 
   function switchSessionVisibility(visibility: MASessionVisibility) {
     setSessionVisibility(visibility);
@@ -338,6 +366,48 @@ export function TargetPage() {
 
   function updateStrategy(patch: Partial<MAStrategySpec>) {
     setStrategy((current) => ({ ...current, ...patch }));
+  }
+
+  async function rateTarget(companyKey: string, rating: number) {
+    if (!detail || !companyKey) return;
+    const sessionId = detail.session.id;
+    const previousRating = detail.targets.find((target) => target.companyKey === companyKey)?.rating;
+    // Functional updater so concurrent ratings on different rows don't clobber.
+    const apply = (value: number | undefined) =>
+      setDetail((current) =>
+        current
+          ? {
+              ...current,
+              targets: current.targets.map((target) =>
+                target.companyKey === companyKey ? { ...target, rating: value } : target,
+              ),
+            }
+          : current,
+      );
+    apply(rating === 0 ? undefined : rating);
+    try {
+      await api.post<void>(`/binocolo/v1/ma/sessions/${sessionId}/rating`, { companyKey, rating });
+    } catch (err) {
+      apply(previousRating);
+      toast(errorLabel(err), 'error');
+    }
+  }
+
+  async function runDeepDive(acknowledgeCost: boolean) {
+    if (!detail?.session.id) return;
+    setBusy('deepdive');
+    setError(null);
+    try {
+      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/deep-dive`, { acknowledgeCost });
+      setDetail(data);
+      setIsDeepDiveOpen(false);
+      toast('Analisi approfondita avviata.', 'success');
+    } catch (err) {
+      setError(errorLabel(err));
+      toast(errorLabel(err), 'error');
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function archiveSession(item: MASessionSummary) {
@@ -607,6 +677,14 @@ export function TargetPage() {
                       <p>{hasTargets ? `${detail.targets.length} target ordinati per aderenza` : 'I target appariranno dopo la conferma.'}</p>
                     </div>
                     <div className={styles.exportActions}>
+                      <Button
+                        size="sm"
+                        onClick={() => setIsDeepDiveOpen(true)}
+                        disabled={ratedCount === 0 || !canOperateOnSession}
+                        leftIcon={<Icon name="sparkles" size={14} />}
+                      >
+                        Approfondisci preferiti{ratedCount > 0 ? ` (${ratedCount})` : ''}
+                      </Button>
                       <Button variant="secondary" size="sm" onClick={exportCSV} disabled={!hasTargets}>
                         CSV
                       </Button>
@@ -627,7 +705,7 @@ export function TargetPage() {
                       <Skeleton rows={8} />
                     </div>
                   ) : hasTargets ? (
-                    <TargetShortlist rows={detail.targets} selectedId={selectedTarget?.id} onSelect={setSelectedTargetId} />
+                    <TargetShortlist rows={detail.targets} selectedId={selectedTarget?.id} onSelect={setSelectedTargetId} onRate={rateTarget} />
                   ) : (
                     <EmptyState icon="clipboard-check" title="In attesa di conferma" text="Completa la stima e avvia la ricerca dei target." />
                   )}
@@ -643,7 +721,10 @@ export function TargetPage() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => setIsFullDetailOpen(true)}
+                        onClick={() => {
+                          setModalActiveTab(selectedTarget?.deep?.status === 'ready' ? 'deep' : 'overview');
+                          setIsFullDetailOpen(true);
+                        }}
                         leftIcon={<Icon name="external-link" size={14} />}
                       >
                         Espandi
@@ -783,6 +864,55 @@ export function TargetPage() {
       </div>
 
       <Modal
+        open={isDeepDiveOpen}
+        onClose={() => setIsDeepDiveOpen(false)}
+        title="Analisi approfondita"
+        size="sm"
+        dismissible={busy !== 'deepdive'}
+      >
+        <div className={styles.confirmBody}>
+          {ratedCount === 0 ? (
+            <p>Assegna almeno una stella a un target per avviare l&rsquo;analisi approfondita (IT-full).</p>
+          ) : (
+            <>
+              <p>
+                {deepChargeable > 0
+                  ? `Verranno approfondite ${deepChargeable} aziende nuove`
+                  : 'Tutte le aziende preferite sono già state approfondite'}
+                {ratedCount - deepChargeable > 0 ? ` · ${ratedCount - deepChargeable} già analizzate (gratis).` : '.'}
+              </p>
+              {deepChargeable > 0 ? (
+                <div className={deepOverBudget ? styles.costSummaryOver : styles.costSummary}>
+                  <span>
+                    Costo stimato IT-full: <strong>{eurFormat.format(deepProjectedEur)}</strong>
+                  </span>
+                  <span>Budget sessione: {eurFormat.format(budgetEur)}</span>
+                </div>
+              ) : null}
+              {deepOverBudget ? (
+                <p className={styles.estimateWarning}>
+                  Il costo supera il budget di sessione. Confermando, procedi comunque.
+                </p>
+              ) : null}
+              <div className={styles.confirmActions}>
+                <Button variant="secondary" onClick={() => setIsDeepDiveOpen(false)} disabled={busy === 'deepdive'}>
+                  Annulla
+                </Button>
+                <Button
+                  onClick={() => void runDeepDive(deepOverBudget)}
+                  loading={busy === 'deepdive'}
+                  disabled={deepChargeable === 0}
+                  leftIcon={<Icon name="sparkles" size={16} />}
+                >
+                  {deepOverBudget ? 'Conferma e procedi' : 'Avvia analisi'}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
         open={deleteCandidate !== null}
         onClose={() => setDeleteCandidate(null)}
         title="Sposta nel cestino"
@@ -827,6 +957,14 @@ export function TargetPage() {
                 >
                   <Icon name="external-link" size={16} />
                   <span>Strategia &amp; Match</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.tabLink} ${modalActiveTab === 'deep' ? styles.tabLinkActive : ''}`}
+                  onClick={() => setModalActiveTab('deep')}
+                >
+                  <Icon name="bar-chart-2" size={16} />
+                  <span>Analisi approfondita</span>
                 </button>
                 <button
                   type="button"
@@ -895,6 +1033,9 @@ export function TargetPage() {
                   </div>
                 </div>
               )}
+
+              {/* Tab: Analisi approfondita (veryshort) */}
+              {modalActiveTab === 'deep' && <DeepAnalysisTab deep={selectedTarget.deep} />}
 
               {/* Tab 2: Financials */}
               {modalActiveTab === 'financials' && (() => {
@@ -1385,8 +1526,20 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
   );
 }
 
-function TargetShortlist({ rows, selectedId, onSelect }: { rows: MATarget[]; selectedId?: string; onSelect: (id: string) => void }) {
+function TargetShortlist({
+  rows,
+  selectedId,
+  onSelect,
+  onRate,
+}: {
+  rows: MATarget[];
+  selectedId?: string;
+  onSelect: (id: string) => void;
+  onRate: (companyKey: string, rating: number) => void;
+}) {
   const [activeFlags, setActiveFlags] = useState<string[]>([]);
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [hideExcluded, setHideExcluded] = useState(false);
 
   const flagOptions: { code: string; label: string }[] = [];
   const seen = new Set<string>();
@@ -1399,36 +1552,63 @@ function TargetShortlist({ rows, selectedId, onSelect }: { rows: MATarget[]; sel
     }
   }
 
-  const filtered =
-    activeFlags.length === 0
-      ? rows
-      : rows.filter((target) => activeFlags.every((code) => (target.flags ?? []).some((flag) => flag.code === code)));
+  const filtered = rows.filter((target) => {
+    const rating = target.rating ?? 0;
+    if (hideExcluded && rating === -1) return false;
+    if (onlyFavorites && rating < 1) return false;
+    if (activeFlags.length > 0 && !activeFlags.every((code) => (target.flags ?? []).some((flag) => flag.code === code))) {
+      return false;
+    }
+    return true;
+  });
 
-  const toggle = (code: string) =>
+  const toggleFlag = (code: string) =>
     setActiveFlags((prev) => (prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]));
 
   return (
     <div className={styles.shortlist}>
-      {flagOptions.length > 0 ? (
-        <div className={styles.flagFilter}>
-          {flagOptions.map((option) => (
-            <button
-              key={option.code}
-              type="button"
-              className={`${styles.flagFilterChip} ${activeFlags.includes(option.code) ? styles.flagFilterActive : ''}`}
-              onClick={() => toggle(option.code)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-      <TargetTable rows={filtered} selectedId={selectedId} onSelect={onSelect} />
+      <div className={styles.flagFilter}>
+        <button
+          type="button"
+          className={`${styles.flagFilterChip} ${onlyFavorites ? styles.flagFilterActive : ''}`}
+          onClick={() => setOnlyFavorites((value) => !value)}
+        >
+          Solo preferiti
+        </button>
+        <button
+          type="button"
+          className={`${styles.flagFilterChip} ${hideExcluded ? styles.flagFilterActive : ''}`}
+          onClick={() => setHideExcluded((value) => !value)}
+        >
+          Nascondi esclusi
+        </button>
+        {flagOptions.map((option) => (
+          <button
+            key={option.code}
+            type="button"
+            className={`${styles.flagFilterChip} ${activeFlags.includes(option.code) ? styles.flagFilterActive : ''}`}
+            onClick={() => toggleFlag(option.code)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <TargetTable rows={filtered} selectedId={selectedId} onSelect={onSelect} onRate={onRate} />
     </div>
   );
 }
 
-function TargetTable({ rows, selectedId, onSelect }: { rows: MATarget[]; selectedId?: string; onSelect: (id: string) => void }) {
+function TargetTable({
+  rows,
+  selectedId,
+  onSelect,
+  onRate,
+}: {
+  rows: MATarget[];
+  selectedId?: string;
+  onSelect: (id: string) => void;
+  onRate: (companyKey: string, rating: number) => void;
+}) {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
@@ -1441,13 +1621,18 @@ function TargetTable({ rows, selectedId, onSelect }: { rows: MATarget[]; selecte
             <th>Fatturato</th>
             <th>Punteggio</th>
             <th>Confidenza</th>
+            <th>Preferito</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((target, index) => (
             <tr
               key={target.id}
-              className={target.id === selectedId ? styles.rowSelected : undefined}
+              className={
+                [target.id === selectedId ? styles.rowSelected : '', (target.rating ?? 0) === -1 ? styles.rowExcluded : '']
+                  .filter(Boolean)
+                  .join(' ') || undefined
+              }
               style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
               onClick={() => onSelect(target.id)}
             >
@@ -1460,6 +1645,7 @@ function TargetTable({ rows, selectedId, onSelect }: { rows: MATarget[]; selecte
                   <small>{[target.vatCode, target.taxCode].filter(Boolean).join(' · ') || '-'}</small>
                 </button>
                 <FlagChips flags={target.flags} />
+                <DeepStatusChip deep={target.deep} />
               </td>
               <td>{[target.town, target.province].filter(Boolean).join(' · ') || '-'}</td>
               <td>
@@ -1473,10 +1659,45 @@ function TargetTable({ rows, selectedId, onSelect }: { rows: MATarget[]; selecte
               <td>
                 <span className={`${styles.confBadge} ${confidenceClass(target.confidence)}`}>{target.confidence ?? '-'}</span>
               </td>
+              <td onClick={(event) => event.stopPropagation()}>
+                <RatingStars value={target.rating} onRate={(rating) => onRate(target.companyKey ?? '', rating)} />
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function RatingStars({ value, onRate }: { value?: number; onRate: (rating: number) => void }) {
+  const rating = value ?? 0;
+  const excluded = rating === -1;
+  return (
+    <div className={styles.ratingControl}>
+      <div className={styles.ratingStars}>
+        {[1, 2, 3].map((star) => (
+          <button
+            key={star}
+            type="button"
+            className={`${styles.starButton} ${!excluded && rating >= star ? styles.starOn : ''}`}
+            title={`${star} ${star === 1 ? 'stella' : 'stelle'}`}
+            aria-label={`${star} stelle`}
+            onClick={() => onRate(rating === star ? 0 : star)}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        className={`${styles.excludeButton} ${excluded ? styles.excludeOn : ''}`}
+        title={excluded ? 'Rimuovi esclusione' : 'Escludi'}
+        aria-label="Escludi"
+        onClick={() => onRate(excluded ? 0 : -1)}
+      >
+        <Icon name="x-circle" size={15} />
+      </button>
     </div>
   );
 }
@@ -1540,6 +1761,193 @@ const evidenceFamilies: { key: string; label: string }[] = [
   { key: 'opportunita', label: 'Opportunità deal' },
   { key: 'economico', label: 'Profilo economico' },
 ];
+
+function DeepStatusChip({ deep }: { deep?: MADeepAnalysis }) {
+  if (!deep) return null;
+  return <span className={`${styles.deepChip} ${styles[`deep_${deep.status}`]}`}>{deepStatusLabel(deep.status)}</span>;
+}
+
+function deepStatusLabel(status: string): string {
+  switch (status) {
+    case 'queued':
+      return 'in coda';
+    case 'running':
+      return 'analisi in corso';
+    case 'ready':
+      return 'analisi pronta';
+    case 'failed':
+      return 'analisi non riuscita';
+    default:
+      return status;
+  }
+}
+
+function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
+  if (!deep) {
+    return (
+      <EmptyState
+        icon="search"
+        title="Non ancora approfondita"
+        text="Assegna almeno una stella e avvia &ldquo;Approfondisci preferiti&rdquo; per l'analisi IT-full."
+      />
+    );
+  }
+  if (deep.status === 'queued' || deep.status === 'running') {
+    return (
+      <EmptyState
+        icon="clipboard-check"
+        title={deep.status === 'queued' ? 'In coda' : 'Analisi in corso'}
+        text="L'analisi approfondita è in elaborazione. La pagina si aggiorna automaticamente."
+      />
+    );
+  }
+  if (deep.status === 'failed') {
+    return (
+      <EmptyState
+        icon="file-text"
+        title="Analisi non riuscita"
+        text={`Si è verificato un problema (${deep.errorCode || 'errore'}). Riprova ad avviare l'approfondimento.`}
+      />
+    );
+  }
+  const scorecard = deep.scorecard;
+  if (!scorecard) {
+    return <EmptyState icon="file-text" title="Dati non disponibili" text="L'analisi è pronta ma non contiene dati finanziari." />;
+  }
+  const groups: { key: string; label: string }[] = [
+    { key: 'redditivita', label: 'Redditività' },
+    { key: 'leva', label: 'Leva e struttura' },
+    { key: 'liquidita', label: 'Liquidità' },
+    { key: 'efficienza', label: 'Efficienza' },
+    { key: 'crescita', label: 'Crescita' },
+  ];
+  return (
+    <div className={styles.deepTab}>
+      <div className={styles.deepHeader}>
+        <span className={`${styles.deepRag} ${styles[`rag_${scorecard.overallRag}`]}`}>{ragLabel(scorecard.overallRag)}</span>
+        <div className={styles.deepRawFacts}>
+          {scorecard.turnover != null ? (
+            <span>
+              Fatturato{scorecard.turnoverYear ? ` (${scorecard.turnoverYear})` : ''}: <strong>{moneyFormat.format(scorecard.turnover)}</strong>
+            </span>
+          ) : null}
+          {scorecard.ebitda != null ? (
+            <span>
+              EBITDA: <strong>{moneyFormat.format(scorecard.ebitda)}</strong>
+            </span>
+          ) : null}
+          {scorecard.pfn != null ? (
+            <span>
+              PFN: <strong>{moneyFormat.format(scorecard.pfn)}</strong>
+            </span>
+          ) : null}
+          {scorecard.netWorth != null ? (
+            <span>
+              Patrimonio netto: <strong>{moneyFormat.format(scorecard.netWorth)}</strong>
+            </span>
+          ) : null}
+        </div>
+      </div>
+      {deep.valuation ? <DeepValuation valuation={deep.valuation} /> : null}
+      {deep.brief ? <DeepBriefBlock brief={deep.brief} /> : null}
+      {groups.map((group) => {
+        const metrics = scorecard.metrics.filter((metric) => metric.group === group.key);
+        if (metrics.length === 0) return null;
+        return (
+          <div key={group.key} className={styles.deepGroup}>
+            <h5>{group.label}</h5>
+            <div className={styles.deepMetrics}>
+              {metrics.map((metric) => (
+                <DeepMetricRow key={metric.key} metric={metric} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DeepMetricRow({ metric }: { metric: MADeepMetric }) {
+  return (
+    <div className={styles.deepMetric}>
+      <span className={`${styles.deepDot} ${styles[`rag_${metric.rag}`]}`} />
+      <span className={styles.deepMetricLabel}>{metric.label}</span>
+      <span className={styles.deepMetricValue}>{metric.value != null ? formatMetricValue(metric.value, metric.unit) : 'n.d.'}</span>
+    </div>
+  );
+}
+
+function DeepValuation({ valuation }: { valuation: MADeepValuation }) {
+  return (
+    <div className={styles.deepValuation}>
+      <h5>Inquadramento di valore</h5>
+      <div className={styles.deepValBand}>
+        <span>Enterprise Value stimato</span>
+        <strong>
+          {moneyFormat.format(valuation.evLow)} – {moneyFormat.format(valuation.evHigh)}
+        </strong>
+      </div>
+      {valuation.equityLow != null && valuation.equityHigh != null ? (
+        <div className={styles.deepValBand}>
+          <span>Equity implicito (EV − PFN)</span>
+          <strong>
+            {moneyFormat.format(valuation.equityLow)} – {moneyFormat.format(valuation.equityHigh)}
+          </strong>
+        </div>
+      ) : null}
+      <small className={styles.deepValSource}>
+        {valuation.method === 'ev_sales' ? 'EV/Sales' : 'EV/EBITDA'} {valuation.multiple}× · sconto PMI {valuation.haircutPct}%
+        {valuation.sector ? ` · ${valuation.sector}` : ''}
+        {valuation.source ? ` · ${valuation.source}` : ''}
+        {valuation.sourceDate ? ` ${valuation.sourceDate}` : ''}
+        {valuation.nFirms ? ` · ${valuation.nFirms} soc.` : ''}
+      </small>
+      {valuation.caveat ? <small className={styles.deepValCaveat}>{valuation.caveat}</small> : null}
+    </div>
+  );
+}
+
+function DeepBriefBlock({ brief }: { brief: NonNullable<MADeepAnalysis['brief']> }) {
+  return (
+    <div className={styles.deepBrief}>
+      <h5>Brief analista</h5>
+      {brief.verdict ? <p className={styles.deepVerdict}>{brief.verdict}</p> : null}
+      {brief.thesisReading ? <p>{brief.thesisReading}</p> : null}
+      {brief.redFlags && brief.redFlags.length > 0 ? (
+        <ul className={styles.deepRedFlags}>
+          {brief.redFlags.map((flag, index) => (
+            <li key={index}>
+              <strong>{flag.claim}</strong>
+              {flag.ddQuestion ? <span> — {flag.ddQuestion}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function formatMetricValue(value: number, unit: string): string {
+  const rounded = Math.round(value * 10) / 10;
+  if (unit === '%') return `${rounded}%`;
+  if (unit === 'x') return `${rounded}×`;
+  if (unit === 'gg') return `${Math.round(value)} gg`;
+  return String(rounded);
+}
+
+function ragLabel(rag: string): string {
+  switch (rag) {
+    case 'green':
+      return 'Solido';
+    case 'amber':
+      return 'Attenzione';
+    case 'red':
+      return 'Critico';
+    default:
+      return 'n.d.';
+  }
+}
 
 function FlagChips({ flags }: { flags?: MATargetFlag[] }) {
   if (!flags || flags.length === 0) return null;

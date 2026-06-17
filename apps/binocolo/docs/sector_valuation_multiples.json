@@ -1,0 +1,651 @@
+{
+  "source": "Damodaran NYU Stern - Europe",
+  "sourceDate": "2026-01-05",
+  "note": "ATECO prefix -> Damodaran Europe industry + EV/EBITDA (positive-EBITDA firms) and EV/Sales. Loaded by migration 039. EV/EBITDA null for financial sectors (use EV/Sales / TOTAL fallback).",
+  "rows": [
+    {
+      "atecoPrefix": "01",
+      "industry": "Farming/Agriculture",
+      "evEbitda": 12.31,
+      "evSales": 1.34,
+      "nFirms": 46
+    },
+    {
+      "atecoPrefix": "02",
+      "industry": "Paper/Forest Products",
+      "evEbitda": 11.13,
+      "evSales": 1.47,
+      "nFirms": 36
+    },
+    {
+      "atecoPrefix": "03",
+      "industry": "Farming/Agriculture",
+      "evEbitda": 12.31,
+      "evSales": 1.34,
+      "nFirms": 46
+    },
+    {
+      "atecoPrefix": "05",
+      "industry": "Coal & Related Energy",
+      "evEbitda": 2.49,
+      "evSales": 2.01,
+      "nFirms": 15
+    },
+    {
+      "atecoPrefix": "06",
+      "industry": "Oil/Gas (Production and Exploration)",
+      "evEbitda": 2.66,
+      "evSales": 1.78,
+      "nFirms": 83
+    },
+    {
+      "atecoPrefix": "07",
+      "industry": "Metals & Mining",
+      "evEbitda": 8.78,
+      "evSales": 1.1,
+      "nFirms": 118
+    },
+    {
+      "atecoPrefix": "08",
+      "industry": "Metals & Mining",
+      "evEbitda": 8.78,
+      "evSales": 1.1,
+      "nFirms": 118
+    },
+    {
+      "atecoPrefix": "09",
+      "industry": "Oilfield Svcs/Equip.",
+      "evEbitda": 5.7,
+      "evSales": 0.65,
+      "nFirms": 58
+    },
+    {
+      "atecoPrefix": "10",
+      "industry": "Food Processing",
+      "evEbitda": 12.43,
+      "evSales": 1.56,
+      "nFirms": 173
+    },
+    {
+      "atecoPrefix": "11",
+      "industry": "Beverage (Alcoholic)",
+      "evEbitda": 9.75,
+      "evSales": 2.42,
+      "nFirms": 52
+    },
+    {
+      "atecoPrefix": "12",
+      "industry": "Tobacco",
+      "evEbitda": 9.44,
+      "evSales": 3.4,
+      "nFirms": 5
+    },
+    {
+      "atecoPrefix": "13",
+      "industry": "Apparel",
+      "evEbitda": 15.23,
+      "evSales": 3.41,
+      "nFirms": 109
+    },
+    {
+      "atecoPrefix": "14",
+      "industry": "Apparel",
+      "evEbitda": 15.23,
+      "evSales": 3.41,
+      "nFirms": 109
+    },
+    {
+      "atecoPrefix": "15",
+      "industry": "Shoe",
+      "evEbitda": 18.18,
+      "evSales": 1.83,
+      "nFirms": 9
+    },
+    {
+      "atecoPrefix": "16",
+      "industry": "Paper/Forest Products",
+      "evEbitda": 11.13,
+      "evSales": 1.47,
+      "nFirms": 36
+    },
+    {
+      "atecoPrefix": "17",
+      "industry": "Paper/Forest Products",
+      "evEbitda": 11.13,
+      "evSales": 1.47,
+      "nFirms": 36
+    },
+    {
+      "atecoPrefix": "18",
+      "industry": "Publishing & Newspapers",
+      "evEbitda": 7.52,
+      "evSales": 0.96,
+      "nFirms": 59
+    },
+    {
+      "atecoPrefix": "19",
+      "industry": "Oil/Gas (Integrated)",
+      "evEbitda": 5.94,
+      "evSales": 1.66,
+      "nFirms": 12
+    },
+    {
+      "atecoPrefix": "20",
+      "industry": "Chemical (Diversified)",
+      "evEbitda": 9.34,
+      "evSales": 0.93,
+      "nFirms": 7
+    },
+    {
+      "atecoPrefix": "21",
+      "industry": "Drugs (Pharmaceutical)",
+      "evEbitda": 11.96,
+      "evSales": 3.95,
+      "nFirms": 115
+    },
+    {
+      "atecoPrefix": "22",
+      "industry": "Rubber& Tires",
+      "evEbitda": 6.06,
+      "evSales": 0.73,
+      "nFirms": 10
+    },
+    {
+      "atecoPrefix": "23",
+      "industry": "Building Materials",
+      "evEbitda": 14.34,
+      "evSales": 2.33,
+      "nFirms": 84
+    },
+    {
+      "atecoPrefix": "24",
+      "industry": "Steel",
+      "evEbitda": 8.27,
+      "evSales": 0.55,
+      "nFirms": 57
+    },
+    {
+      "atecoPrefix": "25",
+      "industry": "Machinery",
+      "evEbitda": 14.98,
+      "evSales": 2.26,
+      "nFirms": 210
+    },
+    {
+      "atecoPrefix": "26",
+      "industry": "Electronics (General)",
+      "evEbitda": 17.27,
+      "evSales": 3.25,
+      "nFirms": 142
+    },
+    {
+      "atecoPrefix": "27",
+      "industry": "Electrical Equipment",
+      "evEbitda": 18.94,
+      "evSales": 2.81,
+      "nFirms": 146
+    },
+    {
+      "atecoPrefix": "28",
+      "industry": "Machinery",
+      "evEbitda": 14.98,
+      "evSales": 2.26,
+      "nFirms": 210
+    },
+    {
+      "atecoPrefix": "29",
+      "industry": "Auto & Truck",
+      "evEbitda": 11.57,
+      "evSales": 0.89,
+      "nFirms": 31
+    },
+    {
+      "atecoPrefix": "30",
+      "industry": "Aerospace/Defense",
+      "evEbitda": 21.62,
+      "evSales": 2.95,
+      "nFirms": 67
+    },
+    {
+      "atecoPrefix": "31",
+      "industry": "Furn/Home Furnishings",
+      "evEbitda": 9.45,
+      "evSales": 0.69,
+      "nFirms": 53
+    },
+    {
+      "atecoPrefix": "32",
+      "industry": "Recreation",
+      "evEbitda": 13.52,
+      "evSales": 2.34,
+      "nFirms": 59
+    },
+    {
+      "atecoPrefix": "33",
+      "industry": "Machinery",
+      "evEbitda": 14.98,
+      "evSales": 2.26,
+      "nFirms": 210
+    },
+    {
+      "atecoPrefix": "35",
+      "industry": "Utility (General)",
+      "evEbitda": 7.58,
+      "evSales": 1.3,
+      "nFirms": 18
+    },
+    {
+      "atecoPrefix": "36",
+      "industry": "Utility (Water)",
+      "evEbitda": 14.66,
+      "evSales": 6.46,
+      "nFirms": 12
+    },
+    {
+      "atecoPrefix": "37",
+      "industry": "Environmental & Waste Services",
+      "evEbitda": 10.37,
+      "evSales": 1.17,
+      "nFirms": 48
+    },
+    {
+      "atecoPrefix": "38",
+      "industry": "Environmental & Waste Services",
+      "evEbitda": 10.37,
+      "evSales": 1.17,
+      "nFirms": 48
+    },
+    {
+      "atecoPrefix": "39",
+      "industry": "Environmental & Waste Services",
+      "evEbitda": 10.37,
+      "evSales": 1.17,
+      "nFirms": 48
+    },
+    {
+      "atecoPrefix": "41",
+      "industry": "Engineering/Construction",
+      "evEbitda": 9.71,
+      "evSales": 0.85,
+      "nFirms": 160
+    },
+    {
+      "atecoPrefix": "42",
+      "industry": "Engineering/Construction",
+      "evEbitda": 9.71,
+      "evSales": 0.85,
+      "nFirms": 160
+    },
+    {
+      "atecoPrefix": "43",
+      "industry": "Construction Supplies",
+      "evEbitda": 11.01,
+      "evSales": 1.51,
+      "nFirms": 119
+    },
+    {
+      "atecoPrefix": "45",
+      "industry": "Retail (Automotive)",
+      "evEbitda": 12.36,
+      "evSales": 0.45,
+      "nFirms": 22
+    },
+    {
+      "atecoPrefix": "46",
+      "industry": "Retail (Distributors)",
+      "evEbitda": 11.64,
+      "evSales": 1.3,
+      "nFirms": 117
+    },
+    {
+      "atecoPrefix": "47",
+      "industry": "Retail (General)",
+      "evEbitda": 23.64,
+      "evSales": 1.49,
+      "nFirms": 31
+    },
+    {
+      "atecoPrefix": "49",
+      "industry": "Trucking",
+      "evEbitda": 9.15,
+      "evSales": 0.62,
+      "nFirms": 7
+    },
+    {
+      "atecoPrefix": "50",
+      "industry": "Transportation",
+      "evEbitda": 12.6,
+      "evSales": 1.3,
+      "nFirms": 56
+    },
+    {
+      "atecoPrefix": "51",
+      "industry": "Air Transport",
+      "evEbitda": 7.65,
+      "evSales": 1.23,
+      "nFirms": 33
+    },
+    {
+      "atecoPrefix": "52",
+      "industry": "Transportation",
+      "evEbitda": 12.6,
+      "evSales": 1.3,
+      "nFirms": 56
+    },
+    {
+      "atecoPrefix": "53",
+      "industry": "Transportation",
+      "evEbitda": 12.6,
+      "evSales": 1.3,
+      "nFirms": 56
+    },
+    {
+      "atecoPrefix": "55",
+      "industry": "Hotel/Gaming",
+      "evEbitda": 10.92,
+      "evSales": 2.13,
+      "nFirms": 103
+    },
+    {
+      "atecoPrefix": "56",
+      "industry": "Restaurant/Dining",
+      "evEbitda": 12.15,
+      "evSales": 0.9,
+      "nFirms": 38
+    },
+    {
+      "atecoPrefix": "58",
+      "industry": "Publishing & Newspapers",
+      "evEbitda": 7.52,
+      "evSales": 0.96,
+      "nFirms": 59
+    },
+    {
+      "atecoPrefix": "59",
+      "industry": "Entertainment",
+      "evEbitda": 22.56,
+      "evSales": 3.59,
+      "nFirms": 199
+    },
+    {
+      "atecoPrefix": "60",
+      "industry": "Broadcasting",
+      "evEbitda": 7.51,
+      "evSales": 0.85,
+      "nFirms": 18
+    },
+    {
+      "atecoPrefix": "61",
+      "industry": "Telecom. Services",
+      "evEbitda": 7.19,
+      "evSales": 2.27,
+      "nFirms": 62
+    },
+    {
+      "atecoPrefix": "62",
+      "industry": "Software (System & Application)",
+      "evEbitda": 20.85,
+      "evSales": 5.31,
+      "nFirms": 290
+    },
+    {
+      "atecoPrefix": "63",
+      "industry": "Information Services",
+      "evEbitda": 5.35,
+      "evSales": 0.7,
+      "nFirms": 6
+    },
+    {
+      "atecoPrefix": "64",
+      "industry": "Banks (Regional)",
+      "evEbitda": null,
+      "evSales": 11.6,
+      "nFirms": 69
+    },
+    {
+      "atecoPrefix": "65",
+      "industry": "Insurance (General)",
+      "evEbitda": 8.07,
+      "evSales": 1.36,
+      "nFirms": 34
+    },
+    {
+      "atecoPrefix": "66",
+      "industry": "Investments & Asset Management",
+      "evEbitda": 10.43,
+      "evSales": 4.64,
+      "nFirms": 338
+    },
+    {
+      "atecoPrefix": "68",
+      "industry": "Real Estate (Operations & Services)",
+      "evEbitda": 24.55,
+      "evSales": 10.46,
+      "nFirms": 219
+    },
+    {
+      "atecoPrefix": "69",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "70",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "71",
+      "industry": "Engineering/Construction",
+      "evEbitda": 9.71,
+      "evSales": 0.85,
+      "nFirms": 160
+    },
+    {
+      "atecoPrefix": "72",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "73",
+      "industry": "Advertising",
+      "evEbitda": 8.41,
+      "evSales": 1.27,
+      "nFirms": 83
+    },
+    {
+      "atecoPrefix": "74",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "75",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "77",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "78",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "79",
+      "industry": "Recreation",
+      "evEbitda": 13.52,
+      "evSales": 2.34,
+      "nFirms": 59
+    },
+    {
+      "atecoPrefix": "80",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "81",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "82",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "85",
+      "industry": "Education",
+      "evEbitda": 10.45,
+      "evSales": 1.65,
+      "nFirms": 18
+    },
+    {
+      "atecoPrefix": "86",
+      "industry": "Hospitals/Healthcare Facilities",
+      "evEbitda": 10.23,
+      "evSales": 1.4,
+      "nFirms": 29
+    },
+    {
+      "atecoPrefix": "87",
+      "industry": "Healthcare Support Services",
+      "evEbitda": 12.59,
+      "evSales": 1.27,
+      "nFirms": 47
+    },
+    {
+      "atecoPrefix": "88",
+      "industry": "Healthcare Support Services",
+      "evEbitda": 12.59,
+      "evSales": 1.27,
+      "nFirms": 47
+    },
+    {
+      "atecoPrefix": "90",
+      "industry": "Entertainment",
+      "evEbitda": 22.56,
+      "evSales": 3.59,
+      "nFirms": 199
+    },
+    {
+      "atecoPrefix": "91",
+      "industry": "Recreation",
+      "evEbitda": 13.52,
+      "evSales": 2.34,
+      "nFirms": 59
+    },
+    {
+      "atecoPrefix": "92",
+      "industry": "Hotel/Gaming",
+      "evEbitda": 10.92,
+      "evSales": 2.13,
+      "nFirms": 103
+    },
+    {
+      "atecoPrefix": "93",
+      "industry": "Recreation",
+      "evEbitda": 13.52,
+      "evSales": 2.34,
+      "nFirms": 59
+    },
+    {
+      "atecoPrefix": "94",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "95",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "96",
+      "industry": "Business & Consumer Services",
+      "evEbitda": 12.81,
+      "evSales": 1.51,
+      "nFirms": 176
+    },
+    {
+      "atecoPrefix": "620",
+      "industry": "Software (System & Application)",
+      "evEbitda": 20.85,
+      "evSales": 5.31,
+      "nFirms": 290
+    },
+    {
+      "atecoPrefix": "6201",
+      "industry": "Software (System & Application)",
+      "evEbitda": 20.85,
+      "evSales": 5.31,
+      "nFirms": 290
+    },
+    {
+      "atecoPrefix": "6202",
+      "industry": "Computer Services",
+      "evEbitda": 12.03,
+      "evSales": 1.29,
+      "nFirms": 210
+    },
+    {
+      "atecoPrefix": "6203",
+      "industry": "Computer Services",
+      "evEbitda": 12.03,
+      "evSales": 1.29,
+      "nFirms": 210
+    },
+    {
+      "atecoPrefix": "6209",
+      "industry": "Computer Services",
+      "evEbitda": 12.03,
+      "evSales": 1.29,
+      "nFirms": 210
+    },
+    {
+      "atecoPrefix": "631",
+      "industry": "Information Services",
+      "evEbitda": 5.35,
+      "evSales": 0.7,
+      "nFirms": 6
+    },
+    {
+      "atecoPrefix": "639",
+      "industry": "Information Services",
+      "evEbitda": 5.35,
+      "evSales": 0.7,
+      "nFirms": 6
+    },
+    {
+      "atecoPrefix": "TOTAL",
+      "industry": "Total Market (without financials)",
+      "evEbitda": 10.77,
+      "evSales": 1.86,
+      "nFirms": 5757
+    }
+  ]
+}

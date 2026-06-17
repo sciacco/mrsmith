@@ -1,0 +1,5055 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Company Legend</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
+		integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65"
+		crossorigin="anonymous">
+	<script>(function (w, d, s, l, i) { w[l] = w[l] || []; w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' }); var f = d.getElementsByTagName(s)[0], j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f); })(window, document, 'script', 'dataLayer', 'GTM-P89VHVB');</script>
+	<link rel="stylesheet" href="https://static.openapi.com/cookie/cookieconsent.min.css">
+</head>
+
+<body>
+	<iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P89VHVB" height="0" width="0"
+		style="display:none;visibility:hidden"></iframe>
+	<main class="p-5">
+		<section class="mb-5 text-uppercase" style="border-bottom: solid 1px rgba(0, 0, 0, 0.125)">
+			<h1 class="text-center"><strong>Service Company legend</strong></h1>
+		</section>
+		<section class="mb-5">
+			<h2 class="text-center"><strong>Table of Contents</strong></h2>
+			<div class="row">
+				<div class="col-md-3">
+					<ul class="list-group">
+						<a href="#1" class="list-group-item list-group-item-action">Assets
+							aggregate values</a> <a href="#2"
+							class="list-group-item list-group-item-action">Credits to
+							Shareholders</a> <a href="#3"
+							class="list-group-item list-group-item-action">Intangible Fixed
+							Assets</a> <a href="#4"
+							class="list-group-item list-group-item-action">Tangible</a> <a
+							href="#5"
+							class="list-group-item list-group-item-action">Financial Fixed
+							Assets</a><a href="#6"
+							class="list-group-item list-group-item-action">Inventory</a>
+					</ul>
+				</div>
+				<div class="col-md-3">
+					<ul class="list-group">
+						<a href="#7" class="list-group-item list-group-item-action">Credits</a>
+						<a href="#8" class="list-group-item list-group-item-action">Financial
+							Assets</a> <a href="#9"
+							class="list-group-item list-group-item-action">Cash
+							Equivalents</a> <a href="#10"
+							class="list-group-item list-group-item-action">Liabilities
+							Aggregate Values</a> <a href="#11"
+							class="list-group-item list-group-item-action">Net Worth</a>
+					</ul>
+				</div>
+				<div class="col-md-3">
+					<ul class="list-group">
+						<a href="#12" class="list-group-item list-group-item-action">Risk
+							Provisions</a> <a href="#13"
+							class="list-group-item list-group-item-action">Debts</a> <a
+							href="#14" class="list-group-item list-group-item-action">Income
+							Statement Aggregate Values</a> <a href="#15"
+							class="list-group-item list-group-item-action">Production
+							Value</a> <a href="#16"
+							class="list-group-item list-group-item-action">Production
+							Costs</a>
+					</ul>
+				</div>
+				<div class="col-md-3">
+					<ul class="list-group">
+						<a href="#17" class="list-group-item list-group-item-action">Revenues
+							Financial Charges</a> <a href="#18"
+							class="list-group-item list-group-item-action">Adjustments</a>
+						<a href="#19" class="list-group-item list-group-item-action">Annual
+							Result</a>
+						<a href="#20" class="list-group-item list-group-item-action">Detailed
+							Legal Form Code </a> <a href="#21"
+							class="list-group-item list-group-item-action">Managers Role
+							Descriptions </a>
+					</ul>
+				</div>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="1">
+				<h2 class="text-center"><strong>Assets aggregate values</strong></h2>
+			</a>
+			<p>The subset <strong>assetsAggregateValues</strong> contains the main aggregate values of the
+				Asset side of the balance sheet. In the API response two fields will be provided for
+				each item: the first which identifies the code of the balance sheet item based on the
+				balance sheet division presented (see column for balance sheet division IC or PL), the
+				second the value associated with it. A company might deposit only one balance sheet
+				division each year. If a company has deposited a balance sheet of IC division, the API
+				response will provide the balance sheet items includ in the subset but that refer only
+				codes of IC division. If balance sheet refers to PL division, the API will provide the
+				balance sheet items includ in the subset but that refer only codes of PL division.</p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<tr>
+							<th width="25%"> Balance sheet divion IC </th>
+							<th width="25%"> Balance sheet divion PL </th>
+							<th width="40%"> Description </th>
+							<th width="10%"> Type</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC001">IIC001</th>
+							<td>IPL001 </td>
+							<td>A. CREDITS TO SHAREHOLDERS </td>
+							<td>Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC039">IIC039</th>
+							<td>IPL039 </td>
+							<td>B. TOTAL FIXED ASSETS </td>
+							<td>Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC071">IIC071</th>
+							<td>IPL071 </td>
+							<td>C. CURRENT ASSETS </td>
+							<td>Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC072">IIC072</th>
+							<td>IPL072</td>
+							<td>D. Accruals and deferrals </td>
+							<td>Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC073">IIC073</th>
+							<td>IPL073</td>
+							<td>Accruals and deferrals of which loan discounts</td>
+							<td>Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC074">IIC074</th>
+							<td>IPL074 </td>
+							<td>TOTAL ASSETS</td>
+							<td>Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="2">
+				<h2 class="text-center"><strong>Credits to Shareholders</strong></h2>
+			</a>
+			<p>The subset <strong>creditsToShareholders</strong> contains the main items of the Credits to
+				Shareholders' group. In the API response two fields will be provided for each item: the
+				first which identifies the code of the balance sheet item based on the balance sheet
+				division presented (see column for balance sheet division IC or PL), the second the
+				value associated with it. A company might deposit only one balance sheet division each
+				year. If a company has deposited a balance sheet of IC division, the API response will
+				provide the balance sheet items includ in the subset but that refer only codes of IC
+				division. If balance sheet refers to PL division, the API will provide the balance sheet
+				items includ in the subset but that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC193">IIC193</th>
+							<td> IPL193 </td>
+							<td> Credits to shareholders part of which is to reported </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC002">IIC002</th>
+							<td>IPL002</td>
+							<td>Credits to shareholders part of which is carried over</td>
+							<td>Decimal</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="3">
+				<h2 class="text-center"><strong>Intangible Fixed Assets</strong></h2>
+			</a>
+			<p>The subset <strong>intangibleFixedAssets</strong> contains the main items of the Intangible
+				Fixed Assets' group. In the API response two fields will be provided for each item: the
+				first which identifies the code of the balance sheet item based on the balance sheet
+				division presented (see column for balance sheet division IC or PL), the second the
+				value associated with it. A company might deposit only one balance sheet division each
+				year. If a company has deposited a balance sheet of IC division, the API response will
+				provide the balance sheet items includ in the subset but that refer only codes of IC
+				division. If balance sheet refers to PL division, the API will provide the balance sheet
+				items includ in the subset but that refer only codes of PL division.</p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC011"> IIC011 </th>
+							<td> IPL011 </td>
+							<td> B.I. TOTAL INTANGIBLE FIXED ASSETS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC003"> IIC003 </th>
+							<td> IPL003 </td>
+							<td> B.I.1. Startup/Expansions </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC004"> IIC004 </th>
+							<td> IPL004 </td>
+							<td> B.I.2. Research and development </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC005"> IIC005 </th>
+							<td> IPL005 </td>
+							<td> B.I.3. Patents </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC006"> IIC006 </th>
+							<td> IPL006 </td>
+							<td> B.I.4. Permits and licenses </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC007"> IIC007 </th>
+							<td> IPL007 </td>
+							<td> B.I.5. Goodwill </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC008"> IIC008 </th>
+							<td> IPL008 </td>
+							<td> B.I.6. Assets under construction and payments in account
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC009"> IIC009 </th>
+							<td> IPL009 </td>
+							<td> B.I.7. Others </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC010"> IIC010 </th>
+							<td> IPL010 </td>
+							<td> Depreciation provisions intangible fixed assets </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="4">
+				<h2 class="text-center"><strong>Tangible Fixed Assets</strong></h2>
+			</a>
+			<p>The subset <strong>tangibleFixedAssets</strong> contains the main items of the Tangible Fixed
+				Assets' group. In the API response two fields will be provided for each item: the first
+				which identifies the code of the balance sheet item based on the balance sheet division
+				presented (see column for balance sheet division IC or PL), the second the value
+				associated with it. A company might deposit only one balance sheet division each year.
+				If a company has deposited a balance sheet of IC division, the API response will provide
+				the balance sheet items includ in the subset but that refer only codes of IC division.
+				If balance sheet refers to PL division, the API will provide the balance sheet items
+				includ in the subset but that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC018">IIC018 </th>
+							<td> IPL018 </td>
+							<td> B.II. TOTAL TANGIBLE FIXED ASSETS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC012">IIC012 </th>
+							<td> IPL012 </td>
+							<td> B.II.1. Land and buildings </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC013">IIC013 </th>
+							<td> IPL013 </td>
+							<td> B.II.2. Plants and machinery </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC014">IIC014 </th>
+							<td> IPL014 </td>
+							<td> B.II.3.Industrial equipment </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC015">IIC015 </th>
+							<td> IPL015 </td>
+							<td> B.II.4. Other goods </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC016">IIC016 </th>
+							<td> IPL016 </td>
+							<td> B.II.5. Assets under construction and payments on account
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC017">IIC017 </th>
+							<td> IPL017 </td>
+							<td> Depreciation provisions tangible fixed assets </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="5">
+				<h2 class="text-center"><strong>Financial Fixed Assets</strong></h2>
+			</a>
+			<p>The subset <strong>financialFixedAssets</strong> contains the main items of the Financial
+				Fixed Assets' group. In the API response two fields will be provided for each item: the
+				first which identifies the code of the balance sheet item based on the balance sheet
+				division presented (see column for balance sheet division IC or PL), the second the
+				value associated with it. A company might deposit only one balance sheet division each
+				year. If a company has deposited a balance sheet of IC division, the API response will
+				provide the balance sheet items includ in the subset but that refer only codes of IC
+				division. If balance sheet refers to PL division, the API will provide the balance sheet
+				items includ in the subset but that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC038"> IIC038 </th>
+							<td> IPL038 </td>
+							<td> B.III. TOTAL FINANCIAL FIXED ASSETS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC032"> IIC032 </th>
+							<td> IPL032 </td>
+							<td> B.III.>> SHORT TERM FINANCIAL CREDITS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC033"> IIC033 </th>
+							<td> IPL033 </td>
+							<td> B.III.>> LONG TERM FINANCIAL CREDITS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC023"> IIC023 </th>
+							<td> IPL023 </td>
+							<td> B.III.1. TOTAL PARTICIPATING INTERESTS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC019"> IIC019 </th>
+							<td> IPL019 </td>
+							<td> B.III.1.a. Participating interests in subsidiaries </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC020"> IIC020 </th>
+							<td> IPL020 </td>
+							<td> B.III.1.b.Participating interests in affiliated companies
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC021"> IIC021 </th>
+							<td> IPL021 </td>
+							<td> B.III.1.c. Participating interests in parent companies
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC194"> IIC194 </th>
+							<td> IPL194 </td>
+							<td> B.III.1.d. Equity investments controlled by parent
+								companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC022"> IIC022 </th>
+							<td> IPL022 </td>
+							<td> B.III.1.d-bis. Participating interests in other companies
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC034"> IIC034 </th>
+							<td> IPL034 </td>
+							<td> B.III.2. TOTAL CREDITS FINANCIAL FIXED ASSETS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC024"> IIC024 </th>
+							<td> IPL024 </td>
+							<td> B.III.2.a. Credits to Subsidiaries </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC025"> IIC025 </th>
+							<td> IPL025 </td>
+							<td> B.III.2.a. Credits to Subsidiaries due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC316"> IIC316 </th>
+							<td> IPL316 </td>
+							<td> B.III.2.a. Total credits to Subsidiaries </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC026"> IIC026 </th>
+							<td> IPL026 </td>
+							<td> B.III.2.b. Credits to affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC027"> IIC027 </th>
+							<td> IPL027 </td>
+							<td> B.III.2.b. Credits to affiliated companies due beyond the
+								next financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC317"> IIC317 </th>
+							<td> IPL317 </td>
+							<td> B.III.2.b. Total credits to affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC028"> IIC028 </th>
+							<td> IPL028 </td>
+							<td> B.III.2.c. Credits to parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC029"> IIC029 </th>
+							<td> IPL029 </td>
+							<td> B.III.2.c. Credits to parent companies due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC318"> IIC318 </th>
+							<td> IPL318 </td>
+							<td> B.III.2.c. Total credits to parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC195"> IIC195 </th>
+							<td> IPL195 </td>
+							<td> B.III.2.d. Receivables due from companies controlled by
+								parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC196"> IIC196 </th>
+							<td> IPL196 </td>
+							<td> B.III.2.d. Receivables due from companies controlled by
+								parent companies due beyond the next financial year
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC319"> IIC319 </th>
+							<td> IPL319 </td>
+							<td> B.III.2.d. Total receivables due from companies controlled
+								by parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC030"> IIC030 </th>
+							<td> IPL030 </td>
+							<td> B.III.2.d-bis. Credits to others </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC031"> IIC031 </th>
+							<td> IPL031 </td>
+							<td> B.III.2.d-bis. Credits to others due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC320"> IIC320 </th>
+							<td> IPL320 </td>
+							<td> B.III.2.d-bis. Total credits to others </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC035"> IIC035 </th>
+							<td> IPL035 </td>
+							<td> B.III.3. Other credities </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC036"> IIC036 </th>
+							<td> IPL036 </td>
+							<td> B.III.4. Own shares </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC037"> IIC037 </th>
+							<td> IPL037 </td>
+							<td> Own shares at their nominal value </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC197"> IIC197 </th>
+							<td> IPL197 </td>
+							<td> B.III.4. Derivative active financial instruments </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC344"> IIC344 </th>
+							<td> IPL344 </td>
+							<td> Other financial fixed assets </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="6">
+				<h2 class="text-center"><strong>Inventory</strong></h2>
+			</a>
+			<p>The subset <strong>inventory</strong> contains the main items of the Inventory group. In the
+				API response two fields will be provided for each item: the first which identifies the
+				code of the balance sheet item based on the balance sheet division presented (see column
+				for balance sheet division IC or PL), the second the value associated with it. A company
+				might deposit only one balance sheet division each year. If a company has deposited a
+				balance sheet of IC division, the API response will provide the balance sheet items
+				includ in the subset but that refer only codes of IC division. If balance sheet refers
+				to PL division, the API will provide the balance sheet items includ in the subset but
+				that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC045"> IIC045 </th>
+							<td> IPL045 </td>
+							<td> C.I. TOTAL INVENTORY </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC040"> IIC040 </th>
+							<td> IPL040 </td>
+							<td> C.I.1. Ra materials </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC041"> IIC041 </th>
+							<td> IPL041 </td>
+							<td> C.I.2. Semi-finished products and products in progress
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC042"> IIC042 </th>
+							<td> IPL042 </td>
+							<td> C.I.3. Work in progress </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC043"> IIC043 </th>
+							<td> IPL043 </td>
+							<td> C.I.4. Finished products </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC044"> IIC044 </th>
+							<td> IPL044 </td>
+							<td> C.I.5. Payments on account </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC349"> IIC349 </th>
+							<td> IPL349 </td>
+							<td> Tangible fixed assets aimed at selling </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="7">
+				<h2 class="text-center"><strong>Credits</strong></h2>
+			</a>
+			<p>The subset <strong>credits</strong> contains the main items of the Credits group. In the API
+				response two fields will be provided for each item: the first which identifies the code
+				of the balance sheet item based on the balance sheet division presented (see column for
+				balance sheet division IC or PL), the second the value associated with it. A company
+				might deposit only one balance sheet division each year. If a company has deposited a
+				balance sheet of IC division, the API response will provide the balance sheet items
+				includ in the subset but that refer only codes of IC division. If balance sheet refers
+				to PL division, the API will provide the balance sheet items includ in the subset but
+				that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC058"> IIC058 </th>
+							<td> IPL058 </td>
+							<td> C.II. TOTAL CREDITS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC056"> IIC056 </th>
+							<td> IPL056 </td>
+							<td> C.II.>> SHORT TERM CREDITS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC057"> IIC057 </th>
+							<td> IPL057 </td>
+							<td> C.II.>> CREDITS DUE BEYOND THE NEXT FINANCIAL YEAR </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC046"> IIC046 </th>
+							<td> IPL046 </td>
+							<td> C.II.1. Credits to customers </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC047"> IIC047 </th>
+							<td> IPL047 </td>
+							<td> C.II.1. Credits to customers due beyond the next financial
+								year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC321"> IIC321 </th>
+							<td> IPL321 </td>
+							<td> C.II.1. Total credits to customers </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC048"> IIC048 </th>
+							<td> IPL048 </td>
+							<td> C.II.2. Credits to subsidiaries </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC049"> IIC049 </th>
+							<td> IPL049 </td>
+							<td> C.II.2. Credits to subsidiaries due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC322"> IIC322 </th>
+							<td> IPL322 </td>
+							<td> C.II.2. Total credits to subsidiaries </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC050"> IIC050 </th>
+							<td> IPL050 </td>
+							<td> C.II.3. Credits to affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC051"> IIC051 </th>
+							<td> IPL051 </td>
+							<td> C.II.3. Credits to affiliated companies due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC323"> IIC323 </th>
+							<td> IPL323 </td>
+							<td> C.II.3. Total credits to affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC052"> IIC052 </th>
+							<td> IPL052 </td>
+							<td> C.II.4. Credits to parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC053"> IIC053 </th>
+							<td> IPL053 </td>
+							<td> C.II.4. Credits to parent companies due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC324"> IIC324 </th>
+							<td> IPL324 </td>
+							<td> C.II.4. Total credits to parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC198"> IIC198 </th>
+							<td> IPL198 </td>
+							<td> C.II.5. Receivables due from companies controlled by parent
+								companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC199"> IIC199 </th>
+							<td> IPL199 </td>
+							<td> C.II.5. Receivables due from companies controlled by parent
+								companies due beyond the next financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC325"> IIC325 </th>
+							<td> IPL325 </td>
+							<td> C.II.5. Total receivables due from companies controlled by
+								parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC180"> IIC180 </th>
+							<td> IPL180 </td>
+							<td> C.II.4.bis. Tax assets </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC181"> IIC181 </th>
+							<td> IPL181 </td>
+							<td> C.II.4.bis. Tax assets due beyond the next financial year
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC326"> IIC326 </th>
+							<td> IPL326 </td>
+							<td> C.II.4.bis. Total tax assets </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC054"> IIC054 </th>
+							<td> IPL054 </td>
+							<td> C.II.5. Credits to others </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC055"> IIC055 </th>
+							<td> IPL055 </td>
+							<td> C.II.5. Credits to others due beyond the next financial
+								year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC328"> IIC328 </th>
+							<td> IPL328 </td>
+							<td> C.II.5. Total credits to others </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC182"> IIC182 </th>
+							<td> IPL182 </td>
+							<td> C.II.5.ter. Credits for prepaid taxes </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC183"> IIC183 </th>
+							<td> IPL183 </td>
+							<td> C.II.5.ter. Credits for prepaid taxes due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC327"> IIC327 </th>
+							<td> IPL327 </td>
+							<td> C.II.5.ter. Total credits for prepaid taxes </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="8">
+				<h2 class="text-center"><strong>Financial Assets</strong></h2>
+			</a>
+			<p>The subset <strong>financialAssets</strong> contains the main items of the Financial Assets'
+				group. In the API response two fields will be provided for each item: the first which
+				identifies the code of the balance sheet item based on the balance sheet division
+				presented (see column for balance sheet division IC or PL), the second the value
+				associated with it. A company might deposit only one balance sheet division each year.
+				If a company has deposited a balance sheet of IC division, the API response will provide
+				the balance sheet items includ in the subset but that refer only codes of IC division.
+				If balance sheet refers to PL division, the API will provide the balance sheet items
+				includ in the subset but that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC066"> IIC066 </th>
+							<td> IPL066 </td>
+							<td> C.III. TOTAL FINANCIAL ASSETS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC059"> IIC059 </th>
+							<td> IPL059 </td>
+							<td> C.III.1. Participating interests in subsidiaries </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC060"> IIC060 </th>
+							<td> IPL060 </td>
+							<td> C.III.2. Participating interests in affiliated companies
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC061"> IIC061 </th>
+							<td> IPL061 </td>
+							<td> C.III.3. Participating interests in parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC200"> IIC200 </th>
+							<td> IPL200 </td>
+							<td> C.III.3.bis Investments in companies controlled by parent
+								companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC062"> IIC062 </th>
+							<td> IPL062 </td>
+							<td> C.III.4. Other participating interests </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC063"> IIC063 </th>
+							<td> IPL063 </td>
+							<td> C.III.5. Own shares </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC064"> IIC064 </th>
+							<td> IPL064 </td>
+							<td> Own shares at their nominal value </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC201"> IIC201 </th>
+							<td> IPL201 </td>
+							<td> C.III.5. Derivative active financial instruments </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC065"> IIC065 </th>
+							<td> IPL065 </td>
+							<td> C.III.6. Other securities </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC202"> IIC202 </th>
+							<td> IPL202 </td>
+							<td> Financial assets for central pool management </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="9">
+				<h2 class="text-center"><strong>Cash Equivalents</strong></h2>
+			</a>
+			<p>The subset <strong>cashEquivalents</strong> contains the main items of the Cash Equivalents'
+				group. In the API response two fields will be provided for each item: the first which
+				identifies the code of the balance sheet item based on the balance sheet division
+				presented (see column for balance sheet division IC or PL), the second the value
+				associated with it. A company might deposit only one balance sheet division each year.
+				If a company has deposited a balance sheet of IC division, the API response will provide
+				the balance sheet items includ in the subset but that refer only codes of IC division.
+				If balance sheet refers to PL division, the API will provide the balance sheet items
+				includ in the subset but that refer only codes of PL division.</p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC070"> IIC070 </th>
+							<td> IPL070 </td>
+							<td> C.IV. Cash equivalents </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC067"> IIC067 </th>
+							<td> IPL067 </td>
+							<td> C.IV.1. Bank deposits </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC068"> IIC068 </th>
+							<td> IPL068 </td>
+							<td> C.IV.2. Cheques </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC069"> IIC069 </th>
+							<td> IPL069 </td>
+							<td> C.IV.3. Cash in hand </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="10">
+				<h2 class="text-center"><strong>Liabilities Aggregate Values</strong></h2>
+			</a>
+			<p>The subset <strong>liabilitiesAggregateValues</strong> contains the main aggregate values of
+				the Liability side of the balance sheet. In the API response two fields will be provided
+				for each item: the first which identifies the code of the balance sheet item based on
+				the balance sheet division presented (see column for balance sheet division IC or PL),
+				the second the value associated with it. A company might deposit only one balance sheet
+				division each year. If a company has deposited a balance sheet of IC division, the API
+				response will provide the balance sheet items includ in the subset but that refer only
+				codes of IC division. If balance sheet refers to PL division, the API will provide the
+				balance sheet items includ in the subset but that refer only codes of PL division.</p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC084"> IIC084 </th>
+							<td> IPL084 </td>
+							<td> A. TOTAL NET WORTH </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC088"> IIC088 </th>
+							<td> IPL088 </td>
+							<td> B. TOTAL RISK PROVISIONS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC089"> IIC089 </th>
+							<td> IPL089 </td>
+							<td> C. Severance payments </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC118"> IIC118 </th>
+							<td> IPL118 </td>
+							<td> D. TOTAL DEBTS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC119"> IIC119 </th>
+							<td> IPL119 </td>
+							<td> E. ACCRUALS AND DEFERRALS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC120"> IIC120 </th>
+							<td> IPL120 </td>
+							<td> Accruals and deferrals of which: premiums on loans </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC121"> IIC121 </th>
+							<td> IPL121 </td>
+							<td> TOTAL LIABILITIES </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC122"> IIC122 </th>
+							<td> IPL122 </td>
+							<td> TOTAL MEMORANDUM ACCOUNTS (**) </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC123"> IIC123 </th>
+							<td> IPL123 </td>
+							<td> Memorandum accounts of which guarantees pledged </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="11">
+				<h2 class="text-center"><strong>Net Worth</strong></h2>
+			</a>
+			<p>The subset <strong>netWorth</strong> contains the main items of the Net Worth group. In the
+				API response two fields will be provided for each item: the first which identifies the
+				code of the balance sheet item based on the balance sheet division presented (see column
+				for balance sheet division IC or PL), the second the value associated with it. A company
+				might deposit only one balance sheet division each year. If a company has deposited a
+				balance sheet of IC division, the API response will provide the balance sheet items
+				includ in the subset but that refer only codes of IC division. If balance sheet refers
+				to PL division, the API will provide the balance sheet items includ in the subset but
+				that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC075"> IIC075 </th>
+							<td> IPL075 </td>
+							<td> A.I. Share capital </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC076"> IIC076 </th>
+							<td> IPL076 </td>
+							<td> A.II. Share premium reserve </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC077"> IIC077 </th>
+							<td> IPL077 </td>
+							<td> A.III. Revaluation reserve </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC078"> IIC078 </th>
+							<td> IPL078 </td>
+							<td> A.IV. Legal reserve </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC079"> IIC079 </th>
+							<td> IPL079 </td>
+							<td> A.VI. Reserve for own shares </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC080"> IIC080 </th>
+							<td> IPL080 </td>
+							<td> A.V. Statutory reserve </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC081"> IIC081 </th>
+							<td> IPL081 </td>
+							<td> A.VI. Other reserves </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC082"> IIC082 </th>
+							<td> IPL082 </td>
+							<td> A.VIII. Profit/Loss carried forward </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC083"> IIC083 </th>
+							<td> IPL083 </td>
+							<td> A.IX. Profit/Loss for the year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC203"> IIC203 </th>
+							<td> IPL203 </td>
+							<td> Extraordinary reserve </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC204"> IIC204 </th>
+							<td> IPL204 </td>
+							<td> Reserves from exceptions as per art. 2423 civil code </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC205"> IIC205 </th>
+							<td> IPL205 </td>
+							<td> Shares reserve of the parent entity</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC206"> IIC206 </th>
+							<td> IPL206 </td>
+							<td> Investment revaluation reserve </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC207"> IIC207 </th>
+							<td> IPL207 </td>
+							<td> Contributions for capital increase</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC208"> IIC208 </th>
+							<td> IPL208 </td>
+							<td> Contributions for future capital increase </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC209"> IIC209 </th>
+							<td> IPL209 </td>
+							<td> Contributions to capital account</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC210"> IIC210 </th>
+							<td> IPL210 </td>
+							<td> Contributions to cover losses </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC211"> IIC211 </th>
+							<td> IPL211 </td>
+							<td> Capital reduction reserve</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC212"> IIC212 </th>
+							<td> IPL212 </td>
+							<td> Merger surplus reserve </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC212"> IIC212 </th>
+							<td> IPL212</td>
+							<td> Merger surplus reserve</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC213"> IIC213 </th>
+							<td> IPL213 </td>
+							<td> Reserve from exchange gains not redeemed</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC345"> IIC345 </th>
+							<td> IPL345 </td>
+							<td> Reserve from current profit adjustments </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC214"> IIC214 </th>
+							<td> IPL214</td>
+							<td> Miscellaneous other reserves</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC215"> IIC215 </th>
+							<td> IIC215 </td>
+							<td> A.VII. Reserve for hedging expected cash flow operations
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC216"> IIC216</th>
+							<td> IPL216</td>
+							<td> Minimised loss for the year</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC218"> IIC218 </th>
+							<td> IPL218</td>
+							<td> A.X. Negative reserve for own portfolio shares</td>
+							<td> Decimal </td>
+						</tr>
+
+
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="12">
+				<h2 class="text-center"><strong>Risk Provisions</strong></h2>
+			</a>
+			<p>The subset <strong>riskProvisions</strong> contains the main items of the Risk Provisions'
+				group. In the API response two fields will be provided for each item: the first which
+				identifies the code of the balance sheet item based on the balance sheet division
+				presented (see column for balance sheet division IC or PL), the second the value
+				associated with it. A company might deposit only one balance sheet division each year.
+				If a company has deposited a balance sheet of IC division, the API response will provide
+				the balance sheet items includ in the subset but that refer only codes of IC division.
+				If balance sheet refers to PL division, the API will provide the balance sheet items
+				includ in the subset but that refer only codes of PL division.</p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC085"> IIC085 </th>
+							<td> IPL085 </td>
+							<td> B.1. Pension fund </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC086"> IIC086 </th>
+							<td> IPL086 </td>
+							<td> B.2. Tax fund </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC219"> IIC219 </th>
+							<td> IPL219 </td>
+							<td> B.3. Passive derivative financial instruments </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC087"> IIC087 </th>
+							<td> IPL087 </td>
+							<td> B.3. Other funds </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="13">
+				<h2 class="text-center"><strong>Debts</strong></h2>
+			</a>
+			<p>The subset <strong>debts</strong> contains the main items of the Debts' group. In the API
+				response two fields will be provided for each item: the first which identifies the code
+				of the balance sheet item based on the balance sheet division presented (see column for
+				balance sheet division IC or PL), the second the value associated with it. A company
+				might deposit only one balance sheet division each year. If a company has deposited a
+				balance sheet of IC division, the API response will provide the balance sheet items
+				includ in the subset but that refer only codes of IC division. If balance sheet refers
+				to PL division, the API will provide the balance sheet items includ in the subset but
+				that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<tr>
+							<th width="25%"> Balance sheet divion IC </th>
+							<th width="25%"> Balance sheet divion PL </th>
+							<th width="40%"> Description </th>
+							<th width="10%"> Type</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IPL116">IIC116</th>
+							<td>IPL116</td>
+							<td>D.>> SHORT TERMS DEBTS</td>
+							<td>Decimal</td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC116">IIC116</th>
+							<td> IPL116 </td>
+							<td> D.>> SHORT TERMS DEBTS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC117">IIC117</th>
+							<td> IPL117 </td>
+							<td> D.>> DEBTS DUE BEYOND THE NEXT FINANCIAL YEAR </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC090">IIC090</th>
+							<td> IPL090 </td>
+							<td> D.1. Bonds </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC091">IIC091</th>
+							<td> IPL091 </td>
+							<td> D.1. Bonds due beyond the next financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC329">IIC329</th>
+							<td> IPL329 </td>
+							<td> D.1. Total Bonds </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC092">IIC092</th>
+							<td> IPL092 </td>
+							<td> D.2. Convertible bonds </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC093">IIC093</th>
+							<td> IPL093 </td>
+							<td> D.2. convertible bonds due beyond the next financial year
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC330">IIC330</th>
+							<td> IPL330 </td>
+							<td> D.2. Total convertible bonds </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC184">IIC184</th>
+							<td> IPL184 </td>
+							<td> D.3. Debts owed to shareholders </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC185">IIC185</th>
+							<td> IPL185 </td>
+							<td> D.3. Debts owed to shareholders due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC331">IIC331</th>
+							<td> IPL331 </td>
+							<td> D.3. Total debts due to partners for financing </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC094">IIC094</th>
+							<td> IPL094 </td>
+							<td> D.4. Debts owed to banks </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC095">IIC095</th>
+							<td> IPL095 </td>
+							<td> D.4. Debts owed to banks due beyond the next financial year
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC332">IIC332</th>
+							<td> IPL332 </td>
+							<td> D.4. Totale debts owed to banks </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC096">IIC096</th>
+							<td> IPL096 </td>
+							<td> D.5. Debts owed to other lenders </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC097">IIC097</th>
+							<td> IPL097 </td>
+							<td> D.5. Debts owed to other lenders due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC333">IIC333</th>
+							<td> IPL333 </td>
+							<td> D.5. Total debts due to other providers of finance </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC098">IIC098</th>
+							<td> IPL098 </td>
+							<td> D.6. Account/Advances </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC099">IIC099</th>
+							<td> IPL099 </td>
+							<td> D.6. Account/advances due beyond the next financial year
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC334">IIC334</th>
+							<td> IPL334 </td>
+							<td> D.6. Total account/advances </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC100">IIC100</th>
+							<td> IPL100 </td>
+							<td> D.7. Debts owed to suppliers </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC101">IIC101</th>
+							<td> IPL101 </td>
+							<td> D.7. Debts owed to suppliers due beyond the next financial
+								year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC335">IIC335</th>
+							<td> IPL335 </td>
+							<td> D.7. Total trade debts </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC102">IIC102</th>
+							<td> IPL102 </td>
+							<td> D.8. Credit instruments </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC103">IIC103</th>
+							<td> IPL103 </td>
+							<td> D.8. Credit instruments due beyond the next financial year
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC336">IIC336</th>
+							<td> IPL336 </td>
+							<td> D.8. Total credit instruments </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC104">IIC104</th>
+							<td> IPL104 </td>
+							<td> D.9. Debts owed to subsidiaries </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC105">IIC105</th>
+							<td> IPL105 </td>
+							<td> D.9. Debts owed to subsidiaries due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC337">IIC337</th>
+							<td> IPL337 </td>
+							<td> D.9. Total debts owed to subsidiary companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC106">IIC106</th>
+							<td> IPL106 </td>
+							<td> D.10. Debts owed to affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC107">IIC107</th>
+							<td> IPL107 </td>
+							<td> D.10. Debts owed to affiliated companies due beyond the
+								next financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC338">IIC338</th>
+							<td> IPL338 </td>
+							<td> D.10. Total debts owed to affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC108">IIC108</th>
+							<td> IPL108 </td>
+							<td> D.11. Debts owed to parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC109">IIC109</th>
+							<td> IPL109 </td>
+							<td> D.11. Debts owed to parent companies due beyond the next
+								financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC339">IIC339</th>
+							<td> IPL339 </td>
+							<td> D.11. Total debts due to parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC220">IIC220</th>
+							<td> IPL220 </td>
+							<td> D.11.bis. Debts due to companies controlled by parent
+								companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC221">IIC221</th>
+							<td> IPL221 </td>
+							<td> D.11.bis. Debts due to companies controlled by parent
+								companies due beyond the next financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC340">IIC340</th>
+							<td> IPL340 </td>
+							<td> D.11.bis. Total debts due to companies controlled by parent
+								companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC110">IIC110</th>
+							<td> IPL110 </td>
+							<td> D.12. Tax liabilities </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC111">IIC111</th>
+							<td> IPL111 </td>
+							<td> D.12. Tax liabilities due beyond the next financial year
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC341">IIC341</th>
+							<td> IPL341 </td>
+							<td> D.12. Total tax liabilities </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC112">IIC112</th>
+							<td> IPL112 </td>
+							<td> D.13. Debts owed to social security agencies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC113">IIC113</th>
+							<td> IPL113 </td>
+							<td> D.13. Debts owed to social security agencies due beyond the
+								next financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC342">IIC342</th>
+							<td> IPL342 </td>
+							<td> D.13. Total debts due to social security and welfare
+								institutions </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC114">IIC114</th>
+							<td> IPL114 </td>
+							<td> D.14. Other debts </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC115">IIC115</th>
+							<td> IPL115 </td>
+							<td> D.14. Other debts due beyond the next financial year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC343">IIC343</th>
+							<td> IPL343 </td>
+							<td> D.14. Total other debts </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="14">
+				<h2 class="text-center"><strong>Income Statement Aggregate Values</strong></h2>
+			</a>
+			<p>The subset <strong>incomeStatementAggregateValues</strong> contains the main aggregate values
+				of the Income statement of the balance sheet. In the API response two fields will be
+				provided for each item: the first which identifies the code of the balance sheet item
+				based on the balance sheet division presented (see column for balance sheet division IC
+				or PL), the second the value associated with it. A company might deposit only one
+				balance sheet division each year. If a company has deposited a balance sheet of IC
+				division, the API response will provide the balance sheet items includ in the subset but
+				that refer only codes of IC division. If balance sheet refers to PL division, the API
+				will provide the balance sheet items includ in the subset but that refer only codes of
+				PL division.</p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC130"> IIC130 </th>
+							<td> IPL130 </td>
+							<td> A. TOTAL PRODUCTION VALUE </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC149"> IIC149 </th>
+							<td> IPL149 </td>
+							<td> B. PRODUCTION COSTS </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC224"> IIC224 </th>
+							<td> IPL224 </td>
+							<td> Difference between value and cost of production (a - b)
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC161"> IIC161 </th>
+							<td> IPL161 </td>
+							<td> C. TOTAL REVENUES AND FINANCIAL CHARGES </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC170"> IIC170 </th>
+							<td> IPL170 </td>
+							<td> D. TOTAL VALUE ADJUSTMENTS TO FINANCIAL ASSETS AND
+								LIABILITIES (*) </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC176"> IIC176 </th>
+							<td> IPL176 </td>
+							<td> E. TOTAL EXTRAORDINARY REVENUES AND CHARGES </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="15">
+				<h2 class="text-center"><strong>Production Value</strong></h2>
+			</a>
+			<p>The subset <strong>productionValue</strong> contains the main items of the Production Value's
+				group. In the API response two fields will be provided for each item: the first which
+				identifies the code of the balance sheet item based on the balance sheet division
+				presented (see column for balance sheet division IC or PL), the second the value
+				associated with it. A company might deposit only one balance sheet division each year.
+				If a company has deposited a balance sheet of IC division, the API response will provide
+				the balance sheet items includ in the subset but that refer only codes of IC division.
+				If balance sheet refers to PL division, the API will provide the balance sheet items
+				includ in the subset but that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC124"> IIC124 </th>
+							<td> IPL124 </td>
+							<td> A.1. Revenues from sales and services </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC125"> IIC125 </th>
+							<td> IPL125 </td>
+							<td> A.2. Product inventory variations </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC126"> IIC126 </th>
+							<td> IPL126 </td>
+							<td> A.3. Work variations </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC186"> IIC186 </th>
+							<td> IPL186 </td>
+							<td> A.2. + A.3. Total variations </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC127"> IIC127 </th>
+							<td> IPL127 </td>
+							<td> A.4. Increases in fixed assets </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC128"> IIC128 </th>
+							<td> IPL128 </td>
+							<td> A.5. Total other revenues </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC129"> IIC129 </th>
+							<td> IPL129 </td>
+							<td> -- > other revenues of which contributions for operating
+								expenses </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC223"> IIC223 </th>
+							<td> IPL223 </td>
+							<td> Other revenues </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="16">
+				<h2 class="text-center"><strong>Production Costs</strong></h2>
+			</a>
+			<p>The subset <strong>productionCosts</strong> contains the main items of the Production Costs'
+				group. In the API response two fields will be provided for each item: the first which
+				identifies the code of the balance sheet item based on the balance sheet division
+				presented (see column for balance sheet division IC or PL), the second the value
+				associated with it. A company might deposit only one balance sheet division each year.
+				If a company has deposited a balance sheet of IC division, the API response will provide
+				the balance sheet items includ in the subset but that refer only codes of IC division.
+				If balance sheet refers to PL division, the API will provide the balance sheet items
+				includ in the subset but that refer only codes of IC division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC131"> IIC131 </th>
+							<td> IPL131 </td>
+							<td> B.6. Purchase of materials </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC132"> IIC132 </th>
+							<td> IPL132 </td>
+							<td> B.7. Services </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC133"> IIC133 </th>
+							<td> IPL133 </td>
+							<td> B.8. Leased assets </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC139"> IIC139 </th>
+							<td> IPL139 </td>
+							<td> B.9. TOT staff costs </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC134"> IIC134 </th>
+							<td> IPL134 </td>
+							<td> B.9. A wages/salaries </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC135"> IIC135 </th>
+							<td> IPL135 </td>
+							<td> B.9.b. Social security costs </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC136"> IIC136 </th>
+							<td> IPL136 </td>
+							<td> B.9.c. Severance payments </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC137"> IIC137 </th>
+							<td> IPL137 </td>
+							<td> B.9.d. Pensions </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC138"> IIC138 </th>
+							<td> IPL138 </td>
+							<td> B.9.e. Other costs </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC187"> IIC187 </th>
+							<td> IPL187 </td>
+							<td> B.9. c+d+e severance payments + pensions + other costs
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC144"> IIC144 </th>
+							<td> IPL144 </td>
+							<td> B.10. TOT depreciation and impairment </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC140"> IIC140 </th>
+							<td> IPL140 </td>
+							<td> B.10.a. Depreciation of intangibles </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC141"> IIC141 </th>
+							<td> IPL141 </td>
+							<td> B.10.b. Depreciation of tangibles </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC142"> IIC142 </th>
+							<td> IPL142 </td>
+							<td> B.10.c. Fixed asset impairment </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC188"> IIC188 </th>
+							<td> IPL188 </td>
+							<td> B.10.a.+b.+c. Depreciation and impairment of fixed assets
+							</td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC143"> IIC143 </th>
+							<td> IPL143 </td>
+							<td> B.10.d. Impairment of credits and disp. </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC145"> IIC145 </th>
+							<td> IPL145 </td>
+							<td> B.11. Variation in materials </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC146"> IIC146 </th>
+							<td> IPL146 </td>
+							<td> B.12. Risk provisions </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC147"> IIC147 </th>
+							<td> IPL147 </td>
+							<td> B.13. Other provisions </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC148"> IIC148 </th>
+							<td> IPL148 </td>
+							<td> B.14. Other operating charges </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="17">
+				<h2 class="text-center"><strong>Revenues Financial Charges</strong></h2>
+			</a>
+			<p>The subset <strong>revenuesFinancialCharges</strong> contains the main items of the Revenues
+				Financial Charges' group. In the API response two fields will be provided for each item:
+				the first which identifies the code of the balance sheet item based on the balance sheet
+				division presented (see column for balance sheet division IC or PL), the second the
+				value associated with it. A company might deposit only one balance sheet division each
+				year. If a company has deposited a balance sheet of IC division, the API response will
+				provide the balance sheet items includ in the subset but that refer only codes of IC
+				division. If balance sheet refers to PL division, the API will provide the balance sheet
+				items includ in the subset but that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC150"> IIC150 </th>
+							<td> IPL150 </td>
+							<td> C.15. Revenues from participating interests </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC151"> IIC151 </th>
+							<td> IPL151 </td>
+							<td> Of which in subsidiaries/affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC225"> IIC225 </th>
+							<td> IPL225 </td>
+							<td> C.15. By subsidiary companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC226"> IIC226 </th>
+							<td> IPL226 </td>
+							<td> C.15. By affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC227"> IIC227 </th>
+							<td> IPL227 </td>
+							<td> C.15. By parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC228"> IIC228 </th>
+							<td> IPL228 </td>
+							<td> C.15. Companies subjected to parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC229"> IIC229 </th>
+							<td> IPL229 </td>
+							<td> C.15. Other </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC158"> IIC158 </th>
+							<td> IPL158 </td>
+							<td> C.16. Total other revenues </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC152"> IIC152 </th>
+							<td> IPL152 </td>
+							<td> C.16.a. Revenues from credits financial fixed assets </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC153"> IIC153 </th>
+							<td> IPL153 </td>
+							<td> Revenues from credits financial fixed assets of which in
+								subsidiaries/affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC230"> IIC230 </th>
+							<td> IPL230 </td>
+							<td> C.16.a. By subsidiary companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IPL231"> IPL231 </th>
+							<td> IPL231 </td>
+							<td> C.16.a. By affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IPL232"> IPL232 </th>
+							<td> IPL232 </td>
+							<td> C.16.a. By parent companies </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC233"> IIC233 </th>
+							<td> IPL233 </td>
+							<td> C.16.a. Companies subjected to parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC234"> IIC234 </th>
+							<td> IPL234 </td>
+							<td> C.16.a. Other </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC154"> IIC154 </th>
+							<td> IPL154 </td>
+							<td> C.16.b. Revenues from fix securities </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC155"> IIC155 </th>
+							<td> IPL155 </td>
+							<td> C.16.c. Revenues from current securities </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC189"> IIC189 </th>
+							<td> IPL189 </td>
+							<td> C.16.b.+c. Revenues from securities </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC156"> IIC156 </th>
+							<td> IPL156 </td>
+							<td> C.16.d. Other revenues </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC157"> IIC157 </th>
+							<td> IPL157 </td>
+							<td> Other revenues of which in subsidiaries/affiliated
+								companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC235"> IIC235 </th>
+							<td> IPL235 </td>
+							<td> C.16.d. By subsidiary companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC236"> IIC236 </th>
+							<td> IPL236 </td>
+							<td> C.16.d. By affiliated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC237"> IIC237 </th>
+							<td> IPL237 </td>
+							<td> C.16.d. By parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC238"> IIC238 </th>
+							<td> IPL238 </td>
+							<td> C.16.d. Companies subjected to parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC239"> IIC239 </th>
+							<td> IPL239 </td>
+							<td> C.16.d. Other </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC159"> IIC159 </th>
+							<td> IPL159 </td>
+							<td> C.17. Total financial charges </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC160"> IIC160 </th>
+							<td> IPL160 </td>
+							<td> Financial charges of which in subsidiaries/affiliated
+								companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC240"> IIC240 </th>
+							<td> IPL240 </td>
+							<td> C.17. To subsidiary companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC241"> IIC241 </th>
+							<td> IPL241 </td>
+							<td> C.17. To associated companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC242"> IIC242 </th>
+							<td> IPL242 </td>
+							<td> C.17. To parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC243"> IIC243 </th>
+							<td> IPL243 </td>
+							<td> C.17. To companies controlled by parent companies </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC244"> IIC244 </th>
+							<td> IPL244 </td>
+							<td> C.17. To other </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC190"> IIC190 </th>
+							<td> IPL190 </td>
+							<td> C.17.bis. Profit and loss from foreign-exchange </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="18">
+				<h2 class="text-center"><strong>Adjustments</strong></h2>
+			</a>
+			<p>The subset <strong>adjustments</strong> contains the main items of the Adjustments' group. In
+				the API response two fields will be provided for each item: the first which identifies
+				the code of the balance sheet item based on the balance sheet division presented (see
+				column for balance sheet division IC or PL), the second the value associated with it. A
+				company might deposit only one balance sheet division each year. If a company has
+				deposited a balance sheet of IC division, the API response will provide the balance
+				sheet items includ in the subset but that refer only codes of IC division. If balance
+				sheet refers to PL division, the API will provide the balance sheet items includ in the
+				subset but that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC165"> IIC165 </th>
+							<td> IPL165 </td>
+							<td> D.18. Total appreciation </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC162"> IIC162 </th>
+							<td> IPL162 </td>
+							<td> D.18.a. Appreciation of participating interests </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC163"> IIC163 </th>
+							<td> IPL163 </td>
+							<td> D.18.b. Appreciation of other financial fixed assets </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC164"> IIC164 </th>
+							<td> IPL164 </td>
+							<td> D.18.c. Appreciation of securities </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC245"> IIC245 </th>
+							<td> IPL245 </td>
+							<td> D.18.d. Derivative financial instruments </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC350"> IIC350 </th>
+							<td> IPL350 </td>
+							<td> .Financial assets for central pool management </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC169"> IIC169 </th>
+							<td> IPL169 </td>
+							<td> D.19. Total impairment </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC166"> IIC166 </th>
+							<td> IPL166 </td>
+							<td> D.19.a. Impairment of participating interests </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC167"> IIC167 </th>
+							<td> IPL167 </td>
+							<td> D.19.b. Impairment of other financial fixed assets </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC168"> IIC168 </th>
+							<td> IPL168 </td>
+							<td> D.19.c. Impairment of securities </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC246"> IIC246 </th>
+							<td> IPL246 </td>
+							<td> D.19.d. Derivative financial instruments </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IICC351"> IICC351 </th>
+							<td> IPL351 </td>
+							<td> .Financial assets for central pool management </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="19">
+				<h2 class="text-center"><strong>Annual Result</strong></h2>
+			</a>
+			<p>The subset <strong>annualResult</strong> contains the main items of the Annual Result's
+				group. In the API response two fields will be provided for each item: the first which
+				identifies the code of the balance sheet item based on the balance sheet division
+				presented (see column for balance sheet division IC or PL), the second the value
+				associated with it. A company might deposit only one balance sheet division each year.
+				If a company has deposited a balance sheet of IC division, the API response will provide
+				the balance sheet items includ in the subset but that refer only codes of IC division.
+				If balance sheet refers to PL division, the API will provide the balance sheet items
+				includ in the subset but that refer only codes of PL division. </p>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="25%"> Balance sheet divion IC </th>
+						<th width="25%"> Balance sheet divion PL </th>
+						<th width="40%"> Description </th>
+						<th width="10%"> Type</th>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="IIC171"> IIC171 </th>
+							<td> IPL171 </td>
+							<td> E.20. Extraordinary revenues </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC172"> IIC172 </th>
+							<td> IPL172 </td>
+							<td> Extraordinary revenues of which capital gains </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC173"> IIC173 </th>
+							<td> IPL173 </td>
+							<td> E.21. Ordinary charges </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC175"> IIC175 </th>
+							<td> IPL175 </td>
+							<td> Ordinary charges of which taxes from previous financial
+								year </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC174"> IIC174 </th>
+							<td> IPL174 </td>
+							<td> Ordinary charges of which capital losses </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC177"> IIC177 </th>
+							<td> IPL177 </td>
+							<td> Result before taxes </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC178"> IIC178 </th>
+							<td> IPL178 </td>
+							<td> 20. Total current, deferred and prepaid income tax </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC191"> IIC191 </th>
+							<td> IPL191 </td>
+							<td> 20.a. Current taxes </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC347"> IIC347 </th>
+							<td> IPL347 </td>
+							<td> 20.b. Tax related to previous years </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC192"> IIC192 </th>
+							<td> IPL192 </td>
+							<td> 20.c. Deferred and prepaid tax </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC250"> IIC250 </th>
+							<td> IPL250 </td>
+							<td> 20.d. Income (expense) arising from the adoption of the
+								fiscal consolidated system/fiscal transparency </td>
+							<td> Decimal </td>
+						</tr>
+						<tr>
+							<th scope="row" id="IIC179"> IIC179 </th>
+							<td> IPL179 </td>
+							<td> 21. PROFIT/LOSS FOR THE YEAR </td>
+							<td> Decimal </td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="20">
+				<h2 class="text-center"><strong>Detailed Legal Form Code </strong></h2>
+			</a>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<th width="20%">Legal Form Code </th>
+						<th width="40%">Detailed Legal Form Description (IT) </th>
+						<th width="40%">Detailed Legal Form Description (EN) </th>
+					</thead>
+					<tbody>
+						<tr>
+							<th>AA</th>
+							<td>SOCIETA&#39; IN ACCOMANDITA PER AZIONI</td>
+							<td>LIMITED PARTNERSHIP</td>
+						</tr>
+						<tr>
+							<th>AC</th>
+							<td>ASSOCIAZIONE</td>
+							<td>ASSOCIATION</td>
+						</tr>
+						<tr>
+							<th>AE</th>
+							<td>SOCIETA&#39; CONSORTILE IN ACCOMANDITA SEMPLICE</td>
+							<td>SIMPLE PARTNERSHIP CONSORTIUM</td>
+						</tr>
+						<tr>
+							<th>AF</th>
+							<td>ALTRE FORME</td>
+							<td>OTHER FORMS</td>
+						</tr>
+						<tr>
+							<th>AI</th>
+							<td>ASSOCIAZIONE IMPRESA</td>
+							<td>BUSINESS ASSOCIATION</td>
+						</tr>
+						<tr>
+							<th>AL</th>
+							<td>AZIENDA SPECIALE DI ENTE LOCALE</td>
+							<td>LOCAL AUTHORITY SPECIAL COMPANY</td>
+						</tr>
+						<tr>
+							<th>AM</th>
+							<td>AZIENDA MUNICIPALE</td>
+							<td>MUNICIPAL COMPANY</td>
+						</tr>
+						<tr>
+							<th>AN</th>
+							<td>SOCIETA&#39; CONSORTILE IN NOME COLLETTIVO</td>
+							<td>CONSORTIUM IN COLLECTIVE NAME/ GENERAL CONSORTIUM
+								PARTNERSHIP</td>
+						</tr>
+						<tr>
+							<th>AP</th>
+							<td>AZIENDA PROVINCIALE</td>
+							<td>PROVINCIAL COMPANY</td>
+						</tr>
+						<tr>
+							<th>AR</th>
+							<td>AZIENDA REGIONALE</td>
+							<td>REGIONAL COMPANY</td>
+						</tr>
+						<tr>
+							<th>AS</th>
+							<td>SOCIETA&#39; IN ACCOMANDITA SEMPLICE</td>
+							<td>SIMPLE LIMITED PARTNERSHIP</td>
+						</tr>
+						<tr>
+							<th>AT</th>
+							<td>AZIENDA AUTONOMA STATALE</td>
+							<td>AUTONOMOUS STATE COMPANY</td>
+						</tr>
+						<tr>
+							<th>AU</th>
+							<td>SOCIETA&#39; PER AZIONI CON SOCIO UNICO</td>
+							<td>LIMITED COMPANY WITH ONE SHAREHOLDER</td>
+						</tr>
+						<tr>
+							<th>AZ</th>
+							<td>AZIENDA SPECIALE</td>
+							<td>SPECIAL COMPANY</td>
+						</tr>
+						<tr>
+							<th>CC</th>
+							<td>CONSORZIO CON ATTIVITA&#39; ESTERNA</td>
+							<td>CONSORTIUM WITH EXTERNAL ACTIVITIES</td>
+						</tr>
+						<tr>
+							<th>CE</th>
+							<td>COMUNIONE EREDITARIA</td>
+							<td>JOINT HEIRS</td>
+						</tr>
+						<tr>
+							<th>CF</th>
+							<td>CONSORZIO FIDI</td>
+							<td>CONSORTIUM IN THE CREDIT SECTOR</td>
+						</tr>
+						<tr>
+							<th>CI</th>
+							<td>SOCIETA&#39; COOPERATIVA A RESPONSABILITA ILLIMITATA</td>
+							<td>UNLIMITED MUTUAL COMPANY</td>
+						</tr>
+						<tr>
+							<th>CL</th>
+							<td>SOCIETA&#39; COOPERATIVA A RESPONSABILITA LIMITATA</td>
+							<td>LIMITED MUTUAL COMPANY</td>
+						</tr>
+						<tr>
+							<th>CM</th>
+							<td>CONSORZIO MUNICIPALE</td>
+							<td>MUNICIPAL CONSORTIUM</td>
+						</tr>
+						<tr>
+							<th>CN</th>
+							<td>SOCIETA&#39; CONSORTILE</td>
+							<td>CONSORTIUM COMPANY</td>
+						</tr>
+						<tr>
+							<th>CO</th>
+							<td>CONSORZIO</td>
+							<td>CONSORTIUM</td>
+						</tr>
+						<tr>
+							<th>CR</th>
+							<td>CONSORZIO INTERCOMUNALE</td>
+							<td>INTERCOMMUNAL CONSORTIUM</td>
+						</tr>
+						<tr>
+							<th>CS</th>
+							<td>CONSORZIO SENZA ATTIVITA&#39; ESTERNA</td>
+							<td>CONSORTIUM WITHOUT EXTERNAL ACTIVITIES</td>
+						</tr>
+						<tr>
+							<th>CZ</th>
+							<td>CONSORZIO DI CUI AL DLGS 267/2000</td>
+							<td>CONSORTIUM ACCORDING TO L.142/90</td>
+						</tr>
+						<tr>
+							<th>DI</th>
+							<td>IMPRESA INDIVIDUALE</td>
+							<td>INDIVIDUAL BUSINESS</td>
+						</tr>
+						<tr>
+							<th>EC</th>
+							<td>ENTE PUBBLICO COMMERCIALE</td>
+							<td>PUBLIC COMMERCIAL INSTITUTION/CORPORATION</td>
+						</tr>
+						<tr>
+							<th>ED</th>
+							<td>ENTE DIRITTO PUBBLICO</td>
+							<td>PUBLIC INSTITUTION/CORPORATION</td>
+						</tr>
+						<tr>
+							<th>EE</th>
+							<td>ENTE ECCLESIASTICO</td>
+							<td>CHURCH INSTITUTION/CORPORATION</td>
+						</tr>
+						<tr>
+							<th>EI</th>
+							<td>ENTE IMPRESA</td>
+							<td>BUSINESS CORPORATION/COMPANY/AUTHORITY</td>
+						</tr>
+						<tr>
+							<th>EL</th>
+							<td>ENTE SOCIALE</td>
+							<td>SOCIAL INSTITUTION</td>
+						</tr>
+						<tr>
+							<th>EM</th>
+							<td>ENTE MORALE</td>
+							<td>INSTITUTION/CORPORATION</td>
+						</tr>
+						<tr>
+							<th>EN</th>
+							<td>ENTE</td>
+							<td>CORPORATION/COMPANY/AUTHORITY</td>
+						</tr>
+						<tr>
+							<th>EP</th>
+							<td>ENTE PUBBLICO ECONOMICO</td>
+							<td>PUBLIC BODY</td>
+						</tr>
+						<tr>
+							<th>ER</th>
+							<td>ENTE ECCLESIASTICO CIVILMENTE RICONOSCIUTO</td>
+							<td>CHURCH INSTITUTION/CORPORATION RECOGNISED UNDER CIVIL LAW
+							</td>
+						</tr>
+						<tr>
+							<th>ES</th>
+							<td>ENTE DI CUI ALLA L.R. 21-12-93, N.88</td>
+							<td>CORPORATION/COMPANY/AUTHORITY ACCORDING TO L.R. 21-12-93,
+								N.88</td>
+						</tr>
+						<tr>
+							<th>FI</th>
+							<td>FONDAZIONE IMPRESA</td>
+							<td>BUSINESS START-UP</td>
+						</tr>
+						<tr>
+							<th>FO</th>
+							<td>FONDAZIONE</td>
+							<td>START-UP/ FOUNDATION</td>
+						</tr>
+						<tr>
+							<th>GE</th>
+							<td>GRUPPO EUROPEO DI INTERESSE ECONOMICO</td>
+							<td>EUROPEAN ECONOMIC INTEREST GROUP</td>
+						</tr>
+						<tr>
+							<th>IC</th>
+							<td>ISTITUTO DI CREDITO</td>
+							<td>FINANCIAL SERVICES INSTITUTION</td>
+						</tr>
+						<tr>
+							<th>ID</th>
+							<td>ISTITUTO DI CREDITO DI DIRITTO PUBBLICO</td>
+							<td>JOINT STOCK BUSINESS</td>
+						</tr>
+						<tr>
+							<th>IF</th>
+							<td>IMPRESA FAMILIARE</td>
+							<td>FAMILY BUSINESS</td>
+						</tr>
+						<tr>
+							<th>IR</th>
+							<td>ISTITUTO RELIGIOSO</td>
+							<td>RELIGIOUS INSTITUTION</td>
+						</tr>
+						<tr>
+							<th>LL</th>
+							<td>AZIENDA SPECIALE DI CUI AL DLGS 267/2000</td>
+							<td>SPECIAL COMPANY ACCORDING TO L. 142/90</td>
+						</tr>
+						<tr>
+							<th>MA</th>
+							<td>MUTUA ASSICURAZIONE</td>
+							<td>MUTUAL ASSURANCE</td>
+						</tr>
+						<tr>
+							<th>OC</th>
+							<td>SOCIETA&#39; COOPERATIVA CONSORTILE</td>
+							<td>MUTUAL CONSORTIUM</td>
+						</tr>
+						<tr>
+							<th>OO</th>
+							<td>COOPERATIVA SOCIALE</td>
+							<td>SOCIAL MUTUAL</td>
+						</tr>
+						<tr>
+							<th>OS</th>
+							<td>SOCIETA&#39; CONSORTILE COOPERATIVA A RESPONSABILITA&#39;
+								LIMITATA</td>
+							<td>LIMITED MUTUAL CONSORTIUM</td>
+						</tr>
+						<tr>
+							<th>PA</th>
+							<td>ASSOCIAZIONE IN PARTECIPAZIONE</td>
+							<td>SHAREHOLDING ASSOCIATION</td>
+						</tr>
+						<tr>
+							<th>PC</th>
+							<td>PICCOLA SOCIETA&#39; COOPERATIVA</td>
+							<td>SMALL MUTUAL COMPANY</td>
+						</tr>
+						<tr>
+							<th>PF</th>
+							<td>PERSONA FISICA</td>
+							<td>NATURAL PERSON</td>
+						</tr>
+						<tr>
+							<th>PS</th>
+							<td>PICCOLA SOCIETA&#39; COOPERATIVA A RESPONSABILITA&#39;
+								LIMITATA</td>
+							<td>SMALL LIMITED MUTUAL COMPANY</td>
+						</tr>
+						<tr>
+							<th>RC</th>
+							<td>CONTRATTO DI RETE DOTATO DI SOGGETTIVITA&#39; GIURIDICA</td>
+							<td>NETWORK CONTRACT EQUIPPED WITH LEGAL SUBJECTIVITY</td>
+						</tr>
+						<tr>
+							<th>RR</th>
+							<td>SOCIETA&#39; A RESPONSABILITA&#39; LIMITATA A CAPITALE
+								RIDOTTO</td>
+							<td>LIMITED LIABILITY COMPANY/LIMITED COMPANY</td>
+						</tr>
+						<tr>
+							<th>RS</th>
+							<td>SOCIETA&#39; A RESPONSABILITA&#39; LIMITATA SEMPLIFICATA
+							</td>
+							<td>LIMITED LIABILITY COMPANY/LIMITED COMPANY</td>
+						</tr>
+						<tr>
+							<th>SA</th>
+							<td>SOCIETA&#39; ANONIMA</td>
+							<td>ANONYMOUS COMPANY</td>
+						</tr>
+						<tr>
+							<th>SC</th>
+							<td>SOCIETA&#39; COOPERATIVA</td>
+							<td>MUTUAL COMPANY LIMITED BY SHARES</td>
+						</tr>
+						<tr>
+							<th>SD</th>
+							<td>SOCIETA&#39; EUROPEA</td>
+							<td>EUROPEAN COMPANY</td>
+						</tr>
+						<tr>
+							<th>SE</th>
+							<td>SOCIETA&#39; SEMPLICE</td>
+							<td>SIMPLE COMPANY</td>
+						</tr>
+						<tr>
+							<th>SF</th>
+							<td>SOCIETA&#39; DI FATTO</td>
+							<td>DE FACTO COMPANY</td>
+						</tr>
+						<tr>
+							<th>SG</th>
+							<td>SOCIETA&#39; COOPERATIVA EUROPEA</td>
+							<td>EUROPEAN MUTUAL COMPANY LIMITED BY SHARES</td>
+						</tr>
+						<tr>
+							<th>SI</th>
+							<td>SOCIETA&#39; IRREGOLARE</td>
+							<td>IRREGULAR COMPANY</td>
+						</tr>
+						<tr>
+							<th>SL</th>
+							<td>SOCIETA&#39; CONSORTILE A RESPONSABILITA&#39; LIMITATA</td>
+							<td>CONSORTIUM LIMITED BY SHARES</td>
+						</tr>
+						<tr>
+							<th>SM</th>
+							<td>SOCIETA&#39; DI MUTUO SOCCORSO</td>
+							<td>MUTUAL AID COMPANY</td>
+						</tr>
+						<tr>
+							<th>SN</th>
+							<td>SOCIETA&#39; IN NOME COLLETTIVO</td>
+							<td>COLLECTIVE NAME COMPANY/ GENERAL PARTNERSHIP</td>
+						</tr>
+						<tr>
+							<th>SO</th>
+							<td>SOCIETA&#39; CONSORTILE PER AZIONI</td>
+							<td>CONSORTIUM LIMITED BY SHARES</td>
+						</tr>
+						<tr>
+							<th>SP</th>
+							<td>SOCIETA&#39; PER AZIONI</td>
+							<td>LIMITED COMPANY</td>
+						</tr>
+						<tr>
+							<th>SR</th>
+							<td>SOCIETA&#39; A RESPONSABILITA&#39; LIMITATA</td>
+							<td>Limited Liability Company/ LIMITED COMPANY</td>
+						</tr>
+						<tr>
+							<th>SS</th>
+							<td>SOCIETA&#39; COSTITUITA IN BASE A LEGGI DI ALTRO STATO</td>
+							<td>COMPANY FOUNDED ON THE BASIS OF THE LAWS OF ANOTHER STATE
+							</td>
+						</tr>
+						<tr>
+							<th>ST</th>
+							<td>SOGGETTO ESTERO</td>
+							<td>FOREIGN SUBJECT</td>
+						</tr>
+						<tr>
+							<th>SU</th>
+							<td>SOCIETA&#39; A RESPONSABILITA&#39; LIMITATA CON UNICO SOCIO
+							</td>
+							<td>LIMITED COMPANY WITH ONE SHAREHOLDER</td>
+						</tr>
+						<tr>
+							<th>SV</th>
+							<td>SOCIETA&#39; TRA PROFESSIONISTI</td>
+							<td>PROFESSIONAL COMPANY</td>
+						</tr>
+						<tr>
+							<th>SZ</th>
+							<td>SOCIETA&#39; NON PREVISTA DALLA LEGISLAZIONE ITALIANA</td>
+							<td>COMPANY NOT ENVISAGED BY ITALIAN LEGISLATION</td>
+						</tr>
+						<tr>
+							<th>XX</th>
+							<td>NON PRECISATA</td>
+							<td>UNSPECIFIED</td>
+						</tr>
+					</tbody>
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section class="mb-5"> <a name="21">
+				<h2 class="text-center"><strong>Roles of Managers (Codes and Descriptions)</strong></h2>
+			</a>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead>
+						<tr>
+							<th width="10%"> Role Code </th>
+							<th width="45%"> Role Description (EN) </th>
+							<th width="45%"> Role Description (IT) </th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<th scope="row" id="888">888</th>
+							<td>N. a.</td>
+							<td>N. d.</td>
+						</tr>
+						<tr>
+							<th scope="row" id="992">992</th>
+							<td>Powers to manage (company) and represent partners</td>
+							<td>Poteri di amministrazione e rappresentanza dei soci</td>
+						</tr>
+						<tr>
+							<th scope="row" id="996">996</th>
+							<td>Allocation of profits and losses to partners</td>
+							<td>Ripartizione degli utili e delle perdite tra i soci</td>
+						</tr>
+						<tr>
+							<th scope="row" id="997">997</th>
+							<td>Limitation of partners' responsibilities</td>
+							<td>Limitazione di responsabilita' dei soci</td>
+						</tr>
+						<tr>
+							<th scope="row" id="998">998</th>
+							<td>Statutory or company-endowed powers</td>
+							<td>Poteri da statuto o da patti sociali</td>
+						</tr>
+						<tr>
+							<th scope="row" id="999">999</th>
+							<td>Statutory powers</td>
+							<td>Statutory powers</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ACP">ACP</th>
+							<td>Director with (limiting) rider</td>
+							<td>Amministratore con postilla</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ACR">ACR</th>
+							<td>Director fulfilling conditions</td>
+							<td>Amministratore con requisiti</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ADP">ADP</th>
+							<td>Managing director and leader</td>
+							<td>Amministratore delegato e preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="AF">AF</th>
+							<td>Leaseholder or lessee</td>
+							<td>Affittuario o conduttore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="AFF">AFF</th>
+							<td>Leaseholder</td>
+							<td>Affittuario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ALLC">ALLC</th>
+							<td>Coach</td>
+							<td>Allenatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="AMBC">AMBC</th>
+							<td>Ambassador</td>
+							<td>Ambasciatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="AMD">AMD</th>
+							<td>Managing director</td>
+							<td>Amministratore delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="AMG">AMG</th>
+							<td>Receiver</td>
+							<td>Amministratore giudiziario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="AMM">AMM</th>
+							<td>Director</td>
+							<td>Amministratore</td>
+						</tr>
+						<th scope="row" id="AMMIRC">AMMIRC</th>
+						<td>Admiral</td>
+						<td>Ammiraglio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="AMP">AMP</th>
+							<td>Temporary director</td>
+							<td>Amministratore provvisorio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="AMS">AMS</th>
+							<td>Special director</td>
+							<td>Amministratore straordinario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="APR">APR</th>
+							<td>Director and manager</td>
+							<td>Amministratore e preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ART">ART</th>
+							<td>Technical director and manager</td>
+							<td>Amministratore e responsabile tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ARVC">ARVC</th>
+							<td>Archbishop</td>
+							<td>Arcivescovo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ASO">ASO</th>
+							<td>Partner in artisan enterprise</td>
+							<td>Partner in artisan enterprise</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ASSC">ASSC</th>
+							<td>Council memeber/assessor</td>
+							<td>Assessore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ASSSC">ASSSC</th>
+							<td>Welfare/social worker </td>
+							<td>Assistente sociale </td>
+						</tr>
+						<tr>
+							<th scope="row" id="ATI">ATI</th>
+							<td>Owner of artisan enterprise</td>
+							<td>Titolare dell'impresa artigiana</td>
+						</tr>
+						<tr>
+							<th scope="row" id="AUN">AUN</th>
+							<td>Managing director</td>
+							<td>Amministratore unico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="AUP">AUP</th>
+							<td>Sole managing director</td>
+							<td>Amministratore unico e preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C01">C01</th>
+							<td>Appointment as managing director</td>
+							<td>Nomina ad amministratore delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C02">C02</th>
+							<td>Appointment as receiver</td>
+							<td>Nomina ad amministratore giudiziario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C03">C03</th>
+							<td>Appointment as director</td>
+							<td>Nomina ad amministratore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C07">C07</th>
+							<td>Appointment as sole director</td>
+							<td>Nomina ad amministratore unico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C08">C08</th>
+							<td>Appointment as director</td>
+							<td>Nomina a consigliere delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C09">C09</th>
+							<td>Appointment as official receiver</td>
+							<td>Nomina a commissario giudiziario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C11">C11</th>
+							<td>Appointment as trustee in bankruptcy</td>
+							<td>Nomina a commissario liquidatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C12">C12</th>
+							<td>Appointment as director</td>
+							<td>Nomina a consigliere</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C13">C13</th>
+							<td>Appointment as legal representative of the company</td>
+							<td>Nomina a legale rappresentante di societa'</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C14">C14</th>
+							<td>Appointment as receiver</td>
+							<td>Nomina a liquidatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C15">C15</th>
+							<td>Appointment as official receiver</td>
+							<td>Nomina a liquidatore giudiziario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C16">C16</th>
+							<td>Appointment to wind up local unit</td>
+							<td>Nomina a liquidatore di unita' locale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C17">C17</th>
+							<td>Appointment as member of the management committee</td>
+							<td>Nomina a membro comitato direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C18">C18</th>
+							<td>Appointment as member of the executive committee</td>
+							<td>Nomina a membro comitato esecutivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C19">C19</th>
+							<td>Appointment as chairman of the management committee</td>
+							<td>Nomina a presidente consiglio amministrazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C20">C20</th>
+							<td>Appointment as chairman of the board of directors</td>
+							<td>Nomina a presidente comitato direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C21">C21</th>
+							<td>Appointment as chairman of the executive committee</td>
+							<td>Appointment as chairman of the executive committee</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C22">C22</th>
+							<td>Appointment as chairman of the board of auditors</td>
+							<td>Nomina a presidente del collegio sindacale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C23">C23</th>
+							<td>Appointment as manager</td>
+							<td>Nomina a preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C26">C26</th>
+							<td>Appointment as legal representative of branch offices</td>
+							<td>Nomina a rappresentante legale delle sedi secondarie</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C28">C28</th>
+							<td>Appointment as permanent auditor</td>
+							<td>Nomina a sindaco effettivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C29">C29</th>
+							<td>Appointment as temporary auditor</td>
+							<td>Nomina a sindaco supplente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C32">C32</th>
+							<td>Appointment as vice director</td>
+							<td>Nomina a vice amministratore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="C34">C34</th>
+							<td>Appointment as vice chairman of the board</td>
+							<td>Nomina a vice presidente consiglio amministrazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CA">CA</th>
+							<td>Joint administrative manager</td>
+							<td>Condirettore amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CAD">CAD</th>
+							<td>Delegation head</td>
+							<td>Capo delegazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CAG">CAG</th>
+							<td>Head of agency </td>
+							<td>Capo agenzia </td>
+						</tr>
+						<tr>
+							<th scope="row" id="CAPC">CAPC</th>
+							<td>Captain/commander</td>
+							<td>Capitano</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CC">CC</th>
+							<td>Joint central manager</td>
+							<td>Condirettore centrale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CCG">CCG</th>
+							<td>Management control committee</td>
+							<td>Comitato di controllo gestione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CD">CD</th>
+							<td>Joint manager</td>
+							<td>Condirettore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CDG">CDG</th>
+							<td>General manager and director</td>
+							<td>Consigliere e direttore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CDP">CDP</th>
+							<td>Managing director</td>
+							<td>Consigliere delegato e preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CDS">CDS</th>
+							<td>Supervision director</td>
+							<td>Consigliere di sorveglianza</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CDT">CDT</th>
+							<td>Managing director and technical manager</td>
+							<td>Consigliere delegato e responsabile tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CE">CE</th>
+							<td>Joint commercial manager</td>
+							<td>Joint commercial manager</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CEP">CEP</th>
+							<td>Director and manager</td>
+							<td>Consigliere e preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CES">CES</th>
+							<td>External help </td>
+							<td>Collaboratore esterno </td>
+						</tr>
+						<tr>
+							<th scope="row" id="CF">CF</th>
+							<td>Joint branch manager</td>
+							<td>Condirettore di filiale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CG">CG</th>
+							<td>Joint general manager</td>
+							<td>Condirettore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CGE">CGE</th>
+							<td>Administration director</td>
+							<td>Consigliere di gestione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CGS">CGS</th>
+							<td>Management committee</td>
+							<td>Consiglio di gestione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CI">CI</th>
+							<td>Acting co-manager</td>
+							<td>Condirettore interinale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CLD">CLD</th>
+							<td>Inspector</td>
+							<td>Collaudatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CLR">CLR</th>
+							<td>Director and legal representative</td>
+							<td>Consigliere e legale rappresentante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CLT">CLT</th>
+							<td>Direct farmer</td>
+							<td>Coltivatore diretto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CM">CM</th>
+							<td>Ministerial provisional administrator</td>
+							<td>Commissario ministeriale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CMS">CMS</th>
+							<td>Special provisional administrator</td>
+							<td>Commissario straordinario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CNG">CNG</th>
+							<td>Spouse</td>
+							<td>Coniuge</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COA">COA</th>
+							<td>Co-director</td>
+							<td>Coamministratore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COD">COD</th>
+							<td>Managing director</td>
+							<td>Consigliere delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COE">COE</th>
+							<td>Co-heir</td>
+							<td>Coerede</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COF">COF</th>
+							<td>Home help</td>
+							<td>Collaboratore familiare</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COG">COG</th>
+							<td>Magistrate</td>
+							<td>Commissario giudiziario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COL">COL</th>
+							<td>Receiver</td>
+							<td>Commissario liquidatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COLLC">COLLC</th>
+							<td>Coworker/associate</td>
+							<td>Collaboratore/td>
+						</tr>
+						<tr>
+							<th scope="row" id="COLLDC">COLLDC</th>
+							<td>Domestic assistant/worker</td>
+							<td>Collaboratore domestico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COM">COM</th>
+							<td>Partner</td>
+							<td>Socio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COMAC">COMAC</th>
+							<td>Commander</td>
+							<td>Comandante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COMC">COMC</th>
+							<td>Commissioner</td>
+							<td>Commissario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CON">CON</th>
+							<td>Director</td>
+							<td>Consigliere</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CONC">CONC</th>
+							<td>Consul</td>
+							<td>Console</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COO">COO</th>
+							<td>Honorary director</td>
+							<td>Consigliere onorario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COP">COP</th>
+							<td>Prefectorial advisor</td>
+							<td>Commissario prefettizio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COS">COS</th>
+							<td>Director and secretary of the board</td>
+							<td>Consigliere segretario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COT">COT</th>
+							<td>Operator</td>
+							<td>Conduttore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COV">COV</th>
+							<td>Governing provisional administrator</td>
+							<td>Commissario governativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="COZ">COZ</th>
+							<td>Judicial commissioner</td>
+							<td>Commissario giudiziale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CPC">CPC</th>
+							<td>Site manager</td>
+							<td>Capocantiere</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CPR">CPR</th>
+							<td>Joint owner and partner</td>
+							<td>Socio comproprietario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CRT">CRT</th>
+							<td>Curator</td>
+							<td>Curatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CS">CS</th>
+							<td>Joint plant manager</td>
+							<td>Joint plant manager</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CSA">CSA</th>
+							<td>Administrative service head</td>
+							<td>Capo servizio amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CSG">CSG</th>
+							<td>Official receiver</td>
+							<td>Custode sequestro giudiziario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CSMC">CSMC</th>
+							<td>Chief head of state/supreme commander</td>
+							<td>Chief head of state/supreme commander</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CSS">CSS</th>
+							<td>Substitute supervision director</td>
+							<td>Consigliere di sorveglianza supplente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CST">CST</th>
+							<td>Extraordinary government administrator</td>
+							<td>Commissario straordinario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CT">CT</th>
+							<td>Joint technical manager</td>
+							<td>Condirettore tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CTE">CTE</th>
+							<td>Technical manager and director</td>
+							<td>Consigliere e responsabile tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CU">CU</th>
+							<td>Office manager</td>
+							<td>Capo ufficio</td>
+						</tr>
+						<th scope="row" id="CUE">CUE</th>
+						<td>Guardian</td>
+						<td>Curatore dello emancipato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CUF">CUF</th>
+							<td>Official receiver</td>
+							<td>Curatore fallimentare</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CUM">CUM</th>
+							<td>Guardian ad litem</td>
+							<td>Curatore speciale di minore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CUV">CUV</th>
+							<td>Sales office manager</td>
+							<td>Capufficio vendite</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CVE">CVE</th>
+							<td>Cve=supervisory committee</td>
+							<td>Consiglio di sorveglianza</td>
+						</tr>
+						<tr>
+							<th scope="row" id="CZ">CZ</th>
+							<td>Joint operating manager</td>
+							<td>Condirettore di esercizio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DA">DA</th>
+							<td>Managing director</td>
+							<td>Direttore amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DAC">DAC</th>
+							<td>Managing director</td>
+							<td>Direttore amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DAM">DAM</th>
+							<td>Executive manager</td>
+							<td>Dirigente amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DAQ">DAQ</th>
+							<td>Purchasing manager</td>
+							<td>Direttore acquisti</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DAQC">DAQC</th>
+							<td>Purchasing manager</td>
+							<td>Direttore acquisti</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DC">DC</th>
+							<td>Central manager</td>
+							<td>Direttore centrale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DCO">DCO</th>
+							<td>Sales manager</td>
+							<td>Dirigente commerciale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DCP">DCP</th>
+							<td>Manager with powers</td>
+							<td>Dirigente con potere</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DE">DE</th>
+							<td>Sales manager</td>
+							<td>Direttore commerciale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DEC">DEC</th>
+							<td>Sales manager</td>
+							<td>Direttore commerciale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DEP">DEP</th>
+							<td>E.d.p. manager</td>
+							<td>Direttore e.d.p.</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DEPC">DEPC</th>
+							<td>E.d.p. manager</td>
+							<td>Direttore e.d.p.</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DES">DES</th>
+							<td>Administration manager</td>
+							<td>Delegato alla somministrazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DF">DF</th>
+							<td>Branch manager</td>
+							<td>Direttore di filiale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DG">DG</th>
+							<td>General manager</td>
+							<td>Direttore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DGC">DGC</th>
+							<td>General manager</td>
+							<td>Direttore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DI">DI</th>
+							<td>Interim manager</td>
+							<td>Direttore interinale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DIA">DIA</th>
+							<td>Artistic director</td>
+							<td>Direttore artistico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DIP">DIP</th>
+							<td>Employee</td>
+							<td>Dipendente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DIR">DIR</th>
+							<td>(senior) manager</td>
+							<td>Dirigente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DIV">DIV</th>
+							<td>Sales manager</td>
+							<td>Direttore vendite</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DIVC">DIVC</th>
+							<td>Sales manager</td>
+							<td>Direttore vendite</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DL2">DL2</th>
+							<td>Manager as per art.2 law 287 of 25/8/91</td>
+							<td>Delegato di cui art. 2 legge 25/8/91 n.287</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DLF">DLF</th>
+							<td>Manager with signing powers</td>
+							<td>Delegato alla firma</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DMK">DMK</th>
+							<td>Marketing director</td>
+							<td>Direttore marketing</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DMKC">DMKC</th>
+							<td>Marketing director</td>
+							<td>Direttore marketing</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DNC">DNC</th>
+							<td>Employee of authorized vehicle rental company with driver
+							</td>
+							<td>Dip. di impresa autoriz. al serv. noleg. con conducente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DP">DP</th>
+							<td>Personnel director</td>
+							<td>Direttore del personale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DPC">DPC</th>
+							<td>Personnel director</td>
+							<td>Direttore del personale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DR">DR</th>
+							<td>Director</td>
+							<td>Direttore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DRC">DRC</th>
+							<td>Director</td>
+							<td>Director</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DRE">DRE</th>
+							<td>Rec registration delegate</td>
+							<td>Delegato iscrizione rec</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DRG">DRG</th>
+							<td>Regional director</td>
+							<td>Direttore regionale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DRR">DRR</th>
+							<td>Managing director</td>
+							<td>Direttore responsabile</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DS">DS</th>
+							<td>Plant / works manager</td>
+							<td>Direttore di stabilimento</td>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DSA">DSA</th>
+							<td>Manager as per art.2 law 287 of 25/8/91</td>
+							<td>Delegato di cui all'art. 2 della legge 287 del 25.8.1991
+							</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DSC">DSC</th>
+							<td>Plant / works manager</td>
+							<td>Direttore di stabilimento</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DT">DT</th>
+							<td>Technical director</td>
+							<td>Direttore tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DTC">DTC</th>
+							<td>Technical director</td>
+							<td>Direttore tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DTD">DTD</th>
+							<td>Delegate for salary advances</td>
+							<td>Delegato al ritiro capitale versato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="DZ">DZ</th>
+							<td>Operating manager</td>
+							<td>Direttore di esercizio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ELE">ELE</th>
+							<td>Elector</td>
+							<td>Elettore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="EXS">EXS</th>
+							<td>Ex-partner in partnership</td>
+							<td>Ex socio di societa' di persone</td>
+						</tr>
+						<tr>
+							<th scope="row" id="FAT">FAT</th>
+							<td>Estate manager</td>
+							<td>Fattore di campagna</td>
+						</tr>
+						<tr>
+							<th scope="row" id="FC">FC</th>
+							<td>Family member</td>
+							<td>Familiare componente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="FU">FU</th>
+							<td>Functionary</td>
+							<td>Funzionario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="GE">GE</th>
+							<td>Enterprise manager</td>
+							<td>Gestore dell'esercizio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="GER">GER</th>
+							<td>Manager/director</td>
+							<td>Gerente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="GID">GID</th>
+							<td>Official receiver</td>
+							<td>Giudice delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="GOV">GOV</th>
+							<td>Governor</td>
+							<td>Governatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="GSG">GSG</th>
+							<td>Official receiver</td>
+							<td>Gestore sequestro giudiziario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="IG">IG</th>
+							<td>General inspector</td>
+							<td>Ispettore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="IMN">IMN</th>
+							<td>Principal enterprise</td>
+							<td>Impresa mandante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="IMR">IMR</th>
+							<td>Agent enterprise</td>
+							<td>Impresa mandataria</td>
+						</tr>
+						<tr>
+							<th scope="row" id="IN">IN</th>
+							<td>Broker/agent</td>
+							<td>Institore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="IS">IS</th>
+							<td>Inspector</td>
+							<td>Ispettore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="KY">KY</th>
+							<td>Honorary governor</td>
+							<td>Governatore onorario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="KV">KV</th>
+							<td>Statutory auditor</td>
+							<td>Sindaco</td>
+						</tr>
+						<tr>
+							<th scope="row" id="LER">LER</th>
+							<td>Legal representative</td>
+							<td>Legale rappresentante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="LGR">LGR</th>
+							<td>Company legal representative</td>
+							<td>Legale rappresentante di societa'</td>
+						</tr>
+						<tr>
+							<th scope="row" id="LGT">LGT</th>
+							<td>Legal representative and card holder</td>
+							<td>Legale rappresentante intestatario del tesserino</td>
+						</tr>
+						<tr>
+							<th scope="row" id="LI">LI</th>
+							<td>Receiver</td>
+							<td>Liquidatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="LIG">LIG</th>
+							<td>Official receiver</td>
+							<td>Liquidatore giudiziario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="LR2">LR2</th>
+							<td>Legal representative as per art. 2 law 287 of 25/8/91</td>
+							<td>Legale rappresentante art.2 l. 25/8/91 n.287</td>
+						</tr>
+						<tr>
+							<th scope="row" id="LRF">LRF</th>
+							<td>Lrf=legal representative with signatory powers</td>
+							<td>Legale rappresentante / firmatario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="LRT">LRT</th>
+							<td>Legal representative and technical manager</td>
+							<td>Legale rappresentante e responsabile tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="LSA">LSA</th>
+							<td>Legal representative as per art. 2 law 287 of 25/8/91</td>
+							<td>Legale rappresentante di cui all'art. 2 della legge 287 del
+								25.8.1991</td>
+						</tr>
+						</tr>
+						<tr>
+							<th scope="row" id="LUL">LUL</th>
+							<td>Branch receiver</td>
+							<td>Liquidatore di unita' locale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MA">MA</th>
+							<td>Agent</td>
+							<td>Mandatario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MA_">MA_</th>
+							<td>Agent</td>
+							<td>Mandatario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MASC">MASC</th>
+							<td>Mother superior</td>
+							<td>Madre superiora</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MCA">MCA</th>
+							<td>Member of administrative commission</td>
+							<td>Membro commiss. amministrativa</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MCD">MCD</th>
+							<td>Member of managing committee</td>
+							<td>Membro comitato direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MCE">MCE</th>
+							<td>Member of executive committee</td>
+							<td>Membro comitato esecutivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MCG">MCG</th>
+							<td>Member of managing committee</td>
+							<td>Membro comitato di gestione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MCS">MCS</th>
+							<td>Member of supervisory committee</td>
+							<td>Membro comitato di sorveglianza</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MCT">MCT</th>
+							<td>Member of strategy committee</td>
+							<td>Membro del comitato strategico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MDC">MDC</th>
+							<td>Joint heir</td>
+							<td>Membro di comunione ereditaria</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MED">MED</th>
+							<td>Permanent member of board of management</td>
+							<td>Membro effettivo consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MGC">MGC</th>
+							<td>Mother general</td>
+							<td>Madre generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MGD">MGD</th>
+							<td>Member of board of management</td>
+							<td>Membro consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MGE">MGE</th>
+							<td>Member of executive team</td>
+							<td>Membro giunta esecutiva</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MGS">MGS</th>
+							<td>Member of management control committee</td>
+							<td>Membro del comitato di controllo sulla gestione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MI">MI</th>
+							<td>Minor represented by guardian</td>
+							<td>Minore rappresentato dal tutore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MINC">MINC</th>
+							<td>Minister</td>
+							<td>Ministro</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MP">MP</th>
+							<td>Tit*tmi*tps</td>
+							<td>Tit*tmi*tps</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MPP">MPP</th>
+							<td>Mother exercising parental authority</td>
+							<td>Madre esercente la patria potesta'</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MS">MS</th>
+							<td>Special mandate</td>
+							<td>Mandato speciale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="MSD">MSD</th>
+							<td>Temporary member of board of management</td>
+							<td>Membro supplente consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ND99">ND99</th>
+							<td>N.a.</td>
+							<td>N.d.</td>
+						</tr>
+						<tr>
+							<th scope="row" id="NE">NE</th>
+							<td>Non-elector</td>
+							<td>Non elettore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="OAS">OAS</th>
+							<td>General partner of shareholding partnership</td>
+							<td>Accomandatario di sapa</td>
+						</tr>
+						<tr>
+							<th scope="row" id="OCA">OCA</th>
+							<td>Board of directors</td>
+							<td>Consiglio d'amministrazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="OCO">OCO</th>
+							<td>Board of management</td>
+							<td>Consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="ODI">ODI</th>
+							<td>Management committee</td>
+							<td>Comitato direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="OES">OES</th>
+							<td>Executive committee</td>
+							<td>Comitato esecutivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="OPA">OPA</th>
+							<td>Directors</td>
+							<td>Piu' amministratori</td>
+						</tr>
+						<tr>
+							<th scope="row" id="OPC">OPC</th>
+							<td>Person acting on behalf of the company</td>
+							<td>Persona operante per conto della societa'</td>
+						</tr>
+						<tr>
+							<th scope="row" id="OPN">OPN</th>
+							<td>Chairman of consortium</td>
+							<td>Presidente di consorzio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA">PA</th>
+							<td>Administrative representative</td>
+							<td>Procuratore amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0001">PA0001</th>
+							<td>Director</td>
+							<td>Amministratore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0002">PA0002</th>
+							<td>Managing director</td>
+							<td>Amministratore delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0003">PA0003</th>
+							<td>Special director</td>
+							<td>Amministratore straordinario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0004">PA0004</th>
+							<td>Managing director</td>
+							<td>Amministratore unico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0005">PA0005</th>
+							<td>Council memeber/assessor</td>
+							<td>Assessore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0006">PA0006</th>
+							<td>State lawyer</td>
+							<td>Avvocato generale dello stato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0007">PA0007</th>
+							<td>Commander</td>
+							<td>Comandante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0008">PA0008</th>
+							<td>Commander</td>
+							<td>Comandante generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0009">PA0009</th>
+							<td>Chairman of board of auditors</td>
+							<td>Commissario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0010">PA0010</th>
+							<td>Receiver</td>
+							<td>Commissario liquidatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0011">PA0011</th>
+							<td>Prefectorial advisor</td>
+							<td>Commissario prefettizio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0012">PA0012</th>
+							<td>Commissario straordinario</td>
+							<td>Assessore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0013">PA0013</th>
+							<td>Director</td>
+							<td>Consigliere</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0014">PA0014</th>
+							<td>Coordinatore generale</td>
+							<td>Coordinatore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0015">PA0015</th>
+							<td>Director</td>
+							<td>Direttore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0016">PA0016</th>
+							<td>Managing director</td>
+							<td>Direttore amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0017">PA0017</th>
+							<td>Director</td>
+							<td>Direttore comandante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0018">PA0018</th>
+							<td>Director</td>
+							<td>Direttore e comandante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0019">PA0019</th>
+							<td>General manager</td>
+							<td>Direttore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0020">PA0020</th>
+							<td>General manager</td>
+							<td>Direttore generale e amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0021">PA0021</th>
+							<td>Director</td>
+							<td>Direttore operativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0022">PA0022</th>
+							<td>Director</td>
+							<td>Direttore segretario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0023">PA0023</th>
+							<td>Director</td>
+							<td>Direttore segretario generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0024">PA0024</th>
+							<td>Director</td>
+							<td>Direttore servizi generali e amministrativi</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0025">PA0025</th>
+							<td>Senior manager</td>
+							<td>Dirigente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0026">PA0026</th>
+							<td>Executive manager</td>
+							<td>Dirigente amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0027">PA0027</th>
+							<td>General manager</td>
+							<td>Dirigente generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0028">PA0028</th>
+							<td>Director</td>
+							<td>Dirigente responsabile</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0029">PA0029</th>
+							<td>Principal</td>
+							<td>Dirigente scolastico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0010">PA0010</th>
+							<td>Receiver</td>
+							<td>Commissario liquidatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0011">PA0011</th>
+							<td>Prefectorial advisor</td>
+							<td>Commissario prefettizio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0012">PA0012</th>
+							<td>Commissario straordinario</td>
+							<td>Assessore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0013">PA0013</th>
+							<td>Director</td>
+							<td>Consigliere</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0014">PA0014</th>
+							<td>Coordinatore generale</td>
+							<td>Coordinatore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0015">PA0015</th>
+							<td>Director</td>
+							<td>Direttore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0016">PA0016</th>
+							<td>Managing director</td>
+							<td>Direttore amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0017">PA0017</th>
+							<td>Director</td>
+							<td>Direttore comandante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0018">PA0018</th>
+							<td>Director</td>
+							<td>Direttore e comandante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0019">PA0019</th>
+							<td>General manager</td>
+							<td>Direttore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0020">PA0020</th>
+							<td>General manager</td>
+							<td>Direttore generale e amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0021">PA0021</th>
+							<td>Director</td>
+							<td>Direttore operativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0022">PA0022</th>
+							<td>Director</td>
+							<td>Direttore segretario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0023">PA0023</th>
+							<td>Director</td>
+							<td>Direttore segretario generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0024">PA0024</th>
+							<td>Director</td>
+							<td>Direttore servizi generali e amministrativi</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0025">PA0025</th>
+							<td>Senior manager</td>
+							<td>Dirigente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0026">PA0026</th>
+							<td>Executive manager</td>
+							<td>Dirigente amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0027">PA0027</th>
+							<td>General manager</td>
+							<td>Dirigente generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0028">PA0028</th>
+							<td>Director</td>
+							<td>Dirigente responsabile</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0029">PA0029</th>
+							<td>Principal</td>
+							<td>Dirigente scolastico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0030">PA0030</th>
+							<td>Receiver</td>
+							<td>Liquidatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0031">PA0031</th>
+							<td>Minister</td>
+							<td>Ministro</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0032">PA0032</th>
+							<td>President</td>
+							<td>Presidente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0033">PA0033</th>
+							<td>Commissioner</td>
+							<td>Presidente del collegio commissariale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0034">PA0034</th>
+							<td>Receiver</td>
+							<td>Presidente del collegio dei liquidatori</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0035">PA0035</th>
+							<td>Chairman</td>
+							<td>Presidente del comitato di amministrazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0036">PA0036</th>
+							<td>President</td>
+							<td>Presidente del consiglio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0037">PA0037</th>
+							<td>Prime minister</td>
+							<td>Presidente del consiglio dei ministri</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0038">PA0038</th>
+							<td>President</td>
+							<td>Presidente del consiglio di amministrazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0039">PA0039</th>
+							<td>Director</td>
+							<td>Presidente del consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0040">PA0040</th>
+							<td>Receiver</td>
+							<td>Presidente della commissione di liquidazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0041">PA0041</th>
+							<td>Procuratore del rappresentante legale</td>
+							<td>Procuratore del rappresentante legale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0042">PA0042</th>
+							<td>Legal representative</td>
+							<td>Rappresentante legale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0043">PA0043</th>
+							<td>Dean/rector</td>
+							<td>Rettore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0044">PA0044</th>
+							<td>Secretary</td>
+							<td>Segretario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0045">PA0045</th>
+							<td>Secretary director</td>
+							<td>Segretario direttore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0046">PA0046</th>
+							<td>Secretary managing director</td>
+							<td>Segretario direttore amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0047">PA0047</th>
+							<td>Secretary general manager</td>
+							<td>Segretario direttore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0048">PA0048</th>
+							<td>Secretary and manager</td>
+							<td>Segretario e dirigente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0049">PA0049</th>
+							<td>General secretary</td>
+							<td>Segretario generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0050">PA0050</th>
+							<td>Statutory auditor</td>
+							<td>Sindaco</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0051">PA0051</th>
+							<td>Statutory auditor</td>
+							<td>Sindaco metropolitano</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0052">PA0052</th>
+							<td>Superintendent</td>
+							<td>Sovrintendente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0053">PA0053</th>
+							<td>Assistant prefectorial advisor</td>
+							<td>Vice commissario prefettizio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0054">PA0054</th>
+							<td>Assistant extraordinary administrator</td>
+							<td>Vice commissario straordinario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0055">PA0055</th>
+							<td>Vice manager</td>
+							<td>Vice direttore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0056">PA0056</th>
+							<td>Assistant general manager</td>
+							<td>Vice direttore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0057">PA0057</th>
+							<td>Vice chairman</td>
+							<td>Vice presidente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0058">PA0058</th>
+							<td>Deputy president</td>
+							<td>Vice presidente del consiglio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0059">PA0059</th>
+							<td>Deputy mayor</td>
+							<td>Vice sindaco</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0060">PA0060</th>
+							<td>Deputy mayor</td>
+							<td>Vice sindaco metropolitano</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0061">PA0061</th>
+							<td>Subcommissioner</td>
+							<td>Subcommissario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0062">PA0062</th>
+							<td>Vice chairman</td>
+							<td>Vice presidente reggente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PA0063">PA0063</th>
+							<td>Deputy mayor</td>
+							<td>Vice sindaco reggente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PAD">PAD</th>
+							<td>Chairman and managing director</td>
+							<td>Presidente e amministratore delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PADC">PADC</th>
+							<td>Chairman and managing director</td>
+							<td>Chairman and managing director</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PAF">PAF</th>
+							<td>Person authorised to sign</td>
+							<td>Persona autorizzata alla firma</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PAR">PAR</th>
+							<td>Sales agent/representative responsible</td>
+							<td>Sales agent/representative responsible</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PARC">PARC</th>
+							<td>Parish/parson</td>
+							<td>Parroco</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PASC">PASC</th>
+							<td>Pastor</td>
+							<td>Pastore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PB">PB</th>
+							<td>Stock exchange representative</td>
+							<td>Procuratore di borsa</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PC">PC</th>
+							<td>Procurator/attorney/representative</td>
+							<td>Procuratore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PCA">PCA</th>
+							<td>Chairman of board of directors</td>
+							<td>Presidente consiglio amministrazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PCD">PCD</th>
+							<td>Chairman of management committee</td>
+							<td>Presidente comitato direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PCE">PCE</th>
+							<td>Chairman of executive committee</td>
+							<td>Presidente comitato esecutivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PCG">PCG</th>
+							<td>Chairman of management committee</td>
+							<td>Presidente del comitato di gestione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PCM">PCM</th>
+							<td>Chairman of administration commission</td>
+							<td>Presidente commiss. amministrativa</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PCO">PCO</th>
+							<td>Chairman of consortium</td>
+							<td>Presidente consorzio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PCP">PCP</th>
+							<td>Representative with powers</td>
+							<td>Procuratore con postilla</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PCS">PCS</th>
+							<td>Chairman of board of auditors</td>
+							<td>Presidente del collegio sindacale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PCT">PCT</th>
+							<td>President of management control committee</td>
+							<td>Presidente del comitato di controllo sulla gestione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PCV">PCV</th>
+							<td>President of supervisory committee</td>
+							<td>Presidente del consiglio di sorveglianza</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PDC">PDC</th>
+							<td>Chairman and managing director</td>
+							<td>Presidente e consigliere delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PDI">PDI</th>
+							<td>Representative with powers in italy</td>
+							<td>Rappresentante preposto alla dipendenza in italia</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PDS">PDS</th>
+							<td>Company representative with administration</td>
+							<td>Procuratore di societa' con somministrazione
+						<tr>
+						<tr>
+							<th scope="row" id="PE">PE</th>
+							<td>Commercial agent</td>
+							<td>Procuratore commerciale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PED">PED</th>
+							<td>Permanent chairman of management committee</td>
+							<td>Presidente effettivo consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PEO">PEO</th>
+							<td>Chairman and manager</td>
+							<td>Presidente e preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PEP">PEP</th>
+							<td>Persona preposta un dipend.</td>
+							<td>Persona preposta un dipend.</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PES">PES</th>
+							<td>Enterprise manager</td>
+							<td>Preposto esercizio</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PF">PF</th>
+							<td>Branch agent/representative</td>
+							<td>Procuratore di filiale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PFT">PFT</th>
+							<td>Appointed department manager l. 4/8/2006 n.248</td>
+							<td>Preposto alla gestione di reparto l. 4/8/2006 n.248</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PG">PG</th>
+							<td>General agent/representative</td>
+							<td>Procuratore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PGC">PGC</th>
+							<td>Responsible for wholesale trading food industry</td>
+							<td>Preposto al commercio ingrosso settore alimentare</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PGD">PGD</th>
+							<td>Chairman of management committee</td>
+							<td>Presidente consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PGE">PGE</th>
+							<td>Chairman of executive team</td>
+							<td>Presidente giunta esecutiva</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PGF">PGF</th>
+							<td>Appointed for technical management (d.m. n.221/2003)</td>
+							<td>Preposto alla gestione tecnica (d.m. n.221/2003)</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PGM">PGM</th>
+							<td>Appointed mediator according to art. 11 d.m. 452/90</td>
+							<td>Preposto alla mediazione di cui art. 11 d.m. 452/90</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PGS">PGS</th>
+							<td>President of management committee</td>
+							<td>Presidente del consiglio di gestione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PGT">PGT</th>
+							<td>Technical manager as per m.d. 274/97</td>
+							<td>Preposto alla gestione tecnica ai sensi del d.m. 274/97</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PL">PL</th>
+							<td>Central agent/representative</td>
+							<td>Procuratore centrale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PM">PM</th>
+							<td>Parent exercising parental authority</td>
+							<td>Padre o madre esercente la patria potesta'</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PN">PN</th>
+							<td>Representative for negotiations</td>
+							<td>Procuratore ad negotia</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PP">PP</th>
+							<td>Special representative/agent</td>
+							<td>Procuratore speciale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PPP">PPP</th>
+							<td>Father exercising parental authority</td>
+							<td>Padre esercente la patria potesta'</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PPR">PPR</th>
+							<td>Temporary principal</td>
+							<td>Preside protempore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PR">PR</th>
+							<td>Acting guardian</td>
+							<td>Protutore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PRA">PRA</th>
+							<td>Supplementary chairman</td>
+							<td>Presidente aggiunto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PRC">PRC</th>
+							<td>Chairman of board of auditors</td>
+							<td>Chairman of board of auditors</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PRE">PRE</th>
+							<td>Chairman</td>
+							<td>Presidente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PREC">PREC</th>
+							<td>Prefect/magistrate</td>
+							<td>Prefetto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PRO">PRO</th>
+							<td>Honorary chairman</td>
+							<td>Presidente onorario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PROVC">PROVC</th>
+							<td>Proveditor/surveyor</td>
+							<td>Provveditore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PRP">PRP</th>
+							<td>Owner</td>
+							<td>Proprietario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PRQ">PRQ</th>
+							<td>Owner authorised to collect and settle</td>
+							<td>Proprietario autorizzato a riscuotere e quietanzare</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PRS">PRS</th>
+							<td>Person responsible</td>
+							<td>Preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PRSD">PRSD</th>
+							<td>Principal</td>
+							<td>Preside</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PRT">PRT</th>
+							<td>Technical supervisor for the deliveries department</td>
+							<td>Procuratore responsabile tecnico settore spedizione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PS">PS</th>
+							<td>Superior agent/representative</td>
+							<td>Procuratore superiore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PSC">PSC</th>
+							<td>Father superior</td>
+							<td>Padre superiore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PSD">PSD</th>
+							<td>Temporary chairman of management committee</td>
+							<td>Presidente supplente consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PSE">PSE</th>
+							<td>Representative/agent responsible for branch in italy</td>
+							<td>Rappresentante preposto a sede secondaria in italia</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PSS">PSS</th>
+							<td>Person responsible for branch</td>
+							<td>Preposto della sede secondaria</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PT">PT</th>
+							<td>Technical agent/representative</td>
+							<td>Procuratore tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PTE">PTE</th>
+							<td>President and technical manager</td>
+							<td>Presidente e responsabile tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PTR">PTR</th>
+							<td>Responsible for technical management as per art. 7 law 122
+								of 5/2/1992</td>
+							<td>Preposto alla gestione tecnica ai sensi dell'art. 7, legge
+								n.122 del 5/2/1992</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PTS">PTS</th>
+							<td>Responsible for technical management (d.m. 37/2008)</td>
+							<td>Preposto alla gestione tecnica ai sensi d.m. 37/2008</td>
+						</tr>
+						<tr>
+							<th scope="row" id="PTT">PTT</th>
+							<td>Appointed for technical management according to l. 46/90
+							</td>
+							<td>Preposto alla gestione tecnica ai sensi l. 46/90</td>
+						</tr>
+						<tr>
+							<th scope="row" id="QUEC">QUEC</th>
+							<td>Questor</td>
+							<td>Questore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RA">RA</th>
+							<td>Procurement manager</td>
+							<td>Responsabile agli acquisti</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RABBC">RABBC</th>
+							<td>Rabbi</td>
+							<td>Rabbino</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RAF">RAF</th>
+							<td>Manager as per art. 93 of r.d. 773 of 18/6/1931</td>
+							<td>Rappresentate legale di cui all'art. 93 del r.d. 18/6/1931
+								n. 773</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RAP">RAP</th>
+							<td>Legal representative as per art. 93 of r.d. 773 of 18/6/1931
+							</td>
+							<td>Rappresentante legale di cui all'art. 93 del r.d. 18/6/1931
+								n. 773</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RAS">RAS</th>
+							<td>Plant representative</td>
+							<td>Rappresentante stabile</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RAZ">RAZ</th>
+							<td>Shareholders' representative</td>
+							<td>Rappresentante degli azionisti</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RC">RC</th>
+							<td>Auditor</td>
+							<td>Revisore dei conti</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RCD">RCD</th>
+							<td>Withdrawn</td>
+							<td>Receduto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RCF">RCF</th>
+							<td>Assets/loans representative</td>
+							<td>Rappresentante comune patrimoni/finanziamenti</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RCO">RCO</th>
+							<td>Common bondholders' representative/agent</td>
+							<td>Rappresentante comune obbligazionisti</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RCS">RCS</th>
+							<td>Temporary auditor</td>
+							<td>Revisore dei conti supplente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RDF">RDF</th>
+							<td>Branch manager</td>
+							<td>Responsabile di filiale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RE">RE</th>
+							<td>Manager</td>
+							<td>Responsabile</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RECC">RECC</th>
+							<td>Statutory auditor</td>
+							<td>Revisore dei conti</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RES">RES</th>
+							<td>Representative of foreign company</td>
+							<td>Rappresentante societa' estera</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RETC">RETC</th>
+							<td>Dean/rector</td>
+							<td>Rettore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RETEC">RETEC</th>
+							<td>Chairman of board of auditors</td>
+							<td>Responsabile tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RFM">RFM</th>
+							<td>Legal guardian</td>
+							<td>Legale rappresentante figlio minore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RG">RG</th>
+							<td>Proclaimed representative</td>
+							<td>Rappresentante alle grida</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RIN">RIN</th>
+							<td>Legal guardian</td>
+							<td>Legale rappresentante di incapace</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RIT">RIT</th>
+							<td>Representative in italy</td>
+							<td>Rappresentante in italia</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RPS">RPS</th>
+							<td>P.s. law representative</td>
+							<td>Rappresentante legge p.s.</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RSS">RSS</th>
+							<td>Legal representative of branches</td>
+							<td>Rappresentante legale delle sedi secondarie</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RSU">RSU</th>
+							<td>Single auditor</td>
+							<td>Revisore unico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RTA">RTA</th>
+							<td>Technical hairdresser manager</td>
+							<td>Technical hairdresser manager</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RTC">RTC</th>
+							<td>Technical manager</td>
+							<td>Responsabile tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RTE">RTE</th>
+							<td>Technical beautician manager</td>
+							<td>Technical beautician manager</td>
+						</tr>
+						<tr>
+							<th scope="row" id="RV">RV</th>
+							<td>Sales manager</td>
+							<td>Responsabile alle vendite</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SA">SA</th>
+							<td>Unlimited work partner</td>
+							<td>Socio accomandatario d'opera</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SAB">SAB</th>
+							<td>Authorised partner</td>
+							<td>Socio abilitato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SAP">SAP</th>
+							<td>Unlimited and responsible partner</td>
+							<td>Socio accomandatario e preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SCA">SCA</th>
+							<td>Company secretary</td>
+							<td>Segretario del consiglio di amministrazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SCR">SCR</th>
+							<td>Representative partner</td>
+							<td>Socio rappresentante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SDR">SDR</th>
+							<td>Auditing company</td>
+							<td>Societa' di revisione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SDRC">SDRC</th>
+							<td>Auditing company</td>
+							<td>Societa' di revisione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SEGC">SEGC</th>
+							<td>Secretary/assistant</td>
+							<td>Segretario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SEP">SEP</th>
+							<td>Partner and director</td>
+							<td>Socio e preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SFC">SFC</th>
+							<td>Partner with joint signature</td>
+							<td>Socio con firma congiunta</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SFI">SFI</th>
+							<td>Financing partner/shareholder</td>
+							<td>Socio finanziatore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SIE">SIE</th>
+							<td>Permanent auditor</td>
+							<td>Sindaco effettivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SIP">SIP</th>
+							<td>Pro tempore auditor</td>
+							<td>Sindaco protempore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SIS">SIS</th>
+							<td>Temporary auditor</td>
+							<td>Sindaco supplente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SLA">SLA</th>
+							<td>Working partner/shareholder</td>
+							<td>Socio lavorante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SLR">SLR</th>
+							<td>Partner and legal representative</td>
+							<td>Socio e legale rappresentante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SNA">SNA</th>
+							<td>Unauthorised partner/shareholder</td>
+							<td>Socio non abilitato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SNC">SNC</th>
+							<td>Substitute employee of authorized vehicle rental company
+								with driver</td>
+							<td>Sost. dip. di impresa autoriz. al serv. noleg. con
+								conducente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SNP">SNP</th>
+							<td>Sleeping partner/shareholder</td>
+							<td>Socio che non partecipa alle lavorazioni</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SNQ">SNQ</th>
+							<td>Unqualified partner/shareholder</td>
+							<td>Socio non qualificato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SOA">SOA</th>
+							<td>Active partner/shareholder</td>
+							<td>Socio amministratore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SOC">SOC</th>
+							<td>Limited / sleeping partner/shareholder</td>
+							<td>Socio accomandante</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SOF">SOF</th>
+							<td>De facto company/partnership</td>
+							<td>Socio di societa' di fatto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SOL">SOL</th>
+							<td>Unlimited partner and legal representative</td>
+							<td>Socio accomandatario e rappresentante legale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SON">SON</th>
+							<td>Partner in ordinary partnership</td>
+							<td>Socio di societa' in nome collettivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SOP">SOP</th>
+							<td>Working partner</td>
+							<td>Socio di opera</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SOR">SOR</th>
+							<td>General partner</td>
+							<td>Socio accomandatario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SOS">SOS</th>
+							<td>Substitute owner</td>
+							<td>Sostituto del titolare</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SOT">SOT</th>
+							<td>Joint owner partner</td>
+							<td>Socio contitolare</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SOU">SOU</th>
+							<td>Sole owner</td>
+							<td>Socio unico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SOVRC">SOVRC</th>
+							<td>Superintendent</td>
+							<td>Sovrintendente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SPR">SPR</th>
+							<td>Partner in ordinary partnership</td>
+							<td>Socio di societa' di persone rappres.</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SQ">SQ</th>
+							<td>Sequestrator</td>
+							<td>Sequestratario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="SQU">SQU</th>
+							<td>Qualified partner</td>
+							<td>Socio qualificato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="STE">STE</th>
+							<td>Partner and technical manager</td>
+							<td>Socio e responsabile tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="TES">TES</th>
+							<td>Treasurer</td>
+							<td>Tesoriere</td>
+						</tr>
+						<tr>
+							<th scope="row" id="TESC">TESC</th>
+							<td>Treasurer</td>
+							<td>Tesoriere</td>
+						</tr>
+						<tr>
+							<th scope="row" id="TI">TI</th>
+							<td>Owner</td>
+							<td>Titolare</td>
+						</tr>
+						<tr>
+							<th scope="row" id="TI2">TI2</th>
+							<td>Owner as per art. 2 law 287 of 25/8/91</td>
+							<td>Titolare di cui art. 2 legge 25/8/91 n.287</td>
+						</tr>
+						<tr>
+							<th scope="row" id="TIT">TIT</th>
+							<td>Owner with signatory powers</td>
+							<td>Titolare firmatario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="TPS">TPS</th>
+							<td>Owner of p.s. licence</td>
+							<td>Titolare di licenza p.s.</td>
+						</tr>
+						<tr>
+							<th scope="row" id="TTE">TTE</th>
+							<td>Owner and technical manager</td>
+							<td>Titolare e responsabile tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="TU">TU</th>
+							<td>Guardian</td>
+							<td>Tutore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="UM1">UM1</th>
+							<td>Legal representative as per art. 2 of regional law 37 of
+								30/8/1988</td>
+							<td>Rappresentante legale di cui all'art. 2 legge reg. n. 37 del
+								30/8/1988</td>
+						</tr>
+						<tr>
+							<th scope="row" id="UM2">UM2</th>
+							<td>Responsible person as per art. 2 of regional law 37 of
+								30/8/1988</td>
+							<td>Preposto di cui all'art. 2 legge re. n. 37 del 30/8/1988
+							</td>
+						</tr>
+						<tr>
+							<th scope="row" id="US">US</th>
+							<td>Usofructuary</td>
+							<td>Usufruttuario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VAD">VAD</th>
+							<td>Assistant managing director</td>
+							<td>Vice amministratore delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VCA">VCA</th>
+							<td>Assistant director</td>
+							<td>Vice amministratore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VCD">VCD</th>
+							<td>Assistant managing director</td>
+							<td>Vice consigliere delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VCG">VCG</th>
+							<td>Assistant government administrator</td>
+							<td>Vice commissario governativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VCO">VCO</th>
+							<td>Assistant extraordinary administrator</td>
+							<td>Vice commissario straordinario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VDA">VDA</th>
+							<td>Assistant managing director</td>
+							<td>Vice direttore amministrativo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VDC">VDC</th>
+							<td>Assistant central manager</td>
+							<td>Vice direttore centrale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VDE">VDE</th>
+							<td>Assistant commercial/sales manager</td>
+							<td>Vice direttore commerciale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VDG">VDG</th>
+							<td>Assistant general manager</td>
+							<td>Vice direttore generale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VDI">VDI</th>
+							<td>Assistant interim manager</td>
+							<td>Vice direttore interinale</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VDS">VDS</th>
+							<td>Assistant plant manager</td>
+							<td>Vice direttore di stabilimento</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VDT">VDT</th>
+							<td>Assistant technical manager</td>
+							<td>Vice direttore tecnico</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VED">VED</th>
+							<td>Permanent assistant vice chairman of management committee
+							</td>
+							<td>Vicepresidente effettivo consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VESC">VESC</th>
+							<td>Bishop</td>
+							<td>Vescovo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VGD">VGD</th>
+							<td>Vice chairman of management committee</td>
+							<td>Vicepresidente consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VGE">VGE</th>
+							<td>Vice manager</td>
+							<td>Vice gerente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VGO">VGO</th>
+							<td>Vice governor</td>
+							<td>Vice governatore</td>
+						</tr>
+						<th scope="row" id="VIC">VIC</th>
+						<td>Vice chairman</td>
+						<td>Vice presidente</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VICC">VICC</th>
+							<td>Vicar/assistant</td>
+							<td>Vicario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VICPRC">VICPRC</th>
+							<td>Vice principal</td>
+							<td>Vice preside</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VICPREFC">VICPREFC</th>
+							<td>Vice prefect</td>
+							<td>Vice prefetto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VID">VID</th>
+							<td>Vice manager</td>
+							<td>Vice direttore</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VIV">VIV</th>
+							<td>Substitute vice chairman</td>
+							<td>Vice presidente vicario</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VPA">VPA</th>
+							<td>Vice chairman board of directors</td>
+							<td>Vice presidente consiglio amministrazione</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VPE">VPE</th>
+							<td>Vice chairman executive team</td>
+							<td>Vice presid. giunta esecutiva</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VPP">VPP</th>
+							<td>Vice chairman and principal</td>
+							<td>Vice presidente e preposto</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VSC">VSC</th>
+							<td>Deputy mayor</td>
+							<td>Vice presidente e consigliere delegato</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VSD">VSD</th>
+							<td>Temporary vice chairman of management committee</td>
+							<td>Vicepresidente supplente consiglio direttivo</td>
+						</tr>
+						<tr>
+							<th scope="row" id="VSG">VSG</th>
+							<td>Vice general secretary</td>
+							<td>Vice segretario generale</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+	</main>
+	<script src="https://static.openapi.com/cookie/cookieconsent.min.js" defer></script>
+	<script src="https://static.openapi.com/cookie/cookie-init.js" defer></script>
+</body>

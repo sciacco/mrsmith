@@ -36,6 +36,20 @@ export interface MASessionListResponse {
   items: MASessionSummary[];
 }
 
+export interface MAParameter {
+  key: string;
+  value: string;
+  valueType: string;
+  label: string;
+  description?: string;
+  updatedByEmail?: string;
+  updatedAt?: string;
+}
+
+export interface MAParametersResponse {
+  items: MAParameter[];
+}
+
 export interface MALLMOptionsResponse {
   models: MALLMModelOption[];
   prompts: MALLMPromptOption[];
@@ -82,6 +96,62 @@ export interface MASessionDetail {
   targets: MATarget[];
   budgetEur: number;
   costPerCompanyEur: number;
+  costFullEur: number;
+}
+
+export interface MADeepAnalysis {
+  companyKey: string;
+  status: 'queued' | 'running' | 'ready' | 'failed';
+  scorecard?: MADeepScorecard;
+  valuation?: MADeepValuation;
+  brief?: MADeepBrief;
+  costEur?: number;
+  errorCode?: string;
+  updatedAt?: string;
+}
+
+export interface MADeepScorecard {
+  metrics: MADeepMetric[];
+  overallRag: string;
+  turnover?: number;
+  turnoverYear?: number;
+  ebitda?: number;
+  netWorth?: number;
+  pfn?: number;
+  atecoCode?: string;
+}
+
+export interface MADeepMetric {
+  group: string;
+  key: string;
+  label: string;
+  value?: number;
+  unit: string;
+  rag: string;
+}
+
+export interface MADeepValuation {
+  method: string;
+  multiple: number;
+  haircutPct: number;
+  evLow: number;
+  evHigh: number;
+  equityLow?: number;
+  equityHigh?: number;
+  pfn?: number;
+  sector?: string;
+  nFirms?: number;
+  source?: string;
+  sourceDate?: string;
+  caveat?: string;
+}
+
+export interface MADeepBrief {
+  verdict?: string;
+  rag?: string;
+  thesisFit?: string;
+  thesisReading?: string;
+  redFlags?: { severity: string; claim: string; ddQuestion?: string }[];
 }
 
 export type MASessionStatus = 'draft' | 'estimated' | 'running' | 'completed' | 'failed';
@@ -207,6 +277,7 @@ export interface MATarget {
   sessionId: string;
   runId: string;
   vendorId?: string;
+  companyKey?: string;
   companyName: string;
   vatCode?: string;
   taxCode?: string;
@@ -221,10 +292,12 @@ export interface MATarget {
   score: number;
   matchState: MAMatchState;
   confidence?: MAConfidence;
+  rating?: number;
   flags?: MATargetFlag[];
   rationale: string;
   missingCriteria: string[];
   evidence: MATargetEvidence[];
+  deep?: MADeepAnalysis;
   vendorPayload?: any;
 }
 

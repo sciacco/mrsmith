@@ -6,6 +6,7 @@ import { useOptionalAuth } from './hooks/useOptionalAuth';
 
 const navItems = [
   { label: 'Target M&A', path: '/target' },
+  { label: 'Configurazione', path: '/config' },
   { label: 'Test', path: '/test' },
 ];
 

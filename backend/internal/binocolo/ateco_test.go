@@ -757,6 +757,30 @@ func (f *fakeMAWorkspaceStore) ReplaceMATargets(context.Context, string, string,
 	return errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) UpsertMATargetRating(context.Context, string, string, int, string, string) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) GetMASessionState(context.Context, string) (MASession, error) {
+	return MASession{}, nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMAParameters(context.Context) ([]MAParameter, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpdateMAParameter(context.Context, string, string, string) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMADeepAnalysis(context.Context, []string) (map[string]MADeepAnalysis, error) {
+	return map[string]MADeepAnalysis{}, nil
+}
+
+func (f *fakeMAWorkspaceStore) EnqueueMADeepAnalysis(context.Context, string, string, string, string) error {
+	return nil
+}
+
 func (f *fakeMAWorkspaceStore) RecordMAModelAudit(context.Context, maModelAuditWrite) error {
 	return nil
 }

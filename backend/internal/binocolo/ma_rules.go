@@ -445,14 +445,24 @@ func maExportRows(targets []MATarget) [][]any {
 		"Descrizione ATECO",
 		"Punteggio",
 		"Esito",
+		"Preferito",
+		"Analisi",
+		"EV stimato",
+		"Equity stimato",
+		"Multiplo",
+		"Margine EBITDA",
+		"PFN/EBITDA",
+		"RAG",
 		"Criteri mancanti",
 		"Motivazione",
+		"Verdetto",
 	})
 	for _, target := range targets {
 		turnover := ""
 		if target.Turnover != nil {
 			turnover = strconv.Itoa(*target.Turnover)
 		}
+		deep := maDeepExportFields(target.Deep)
 		rows = append(rows, []any{
 			target.CompanyName,
 			target.VATCode,
@@ -465,11 +475,112 @@ func maExportRows(targets []MATarget) [][]any {
 			target.AtecoDescription,
 			target.Score,
 			matchStateLabel(target.MatchState),
+			maRatingExportLabel(target.Rating),
+			deep.analysis,
+			deep.ev,
+			deep.equity,
+			deep.multiple,
+			deep.ebitdaMargin,
+			deep.pfnEbitda,
+			deep.rag,
 			strings.Join(target.MissingCriteria, ", "),
 			target.Rationale,
+			deep.verdict,
 		})
 	}
 	return rows
+}
+
+func maRatingExportLabel(rating *int) string {
+	if rating == nil {
+		return ""
+	}
+	switch {
+	case *rating == maRatingExcluded:
+		return "escluso"
+	case *rating >= 1 && *rating <= maRatingMax:
+		return strings.Repeat("★", *rating)
+	default:
+		return ""
+	}
+}
+
+type maDeepExportRow struct {
+	analysis, ev, equity, multiple, ebitdaMargin, pfnEbitda, rag, verdict string
+}
+
+// maDeepExportFields flattens the deep analysis into export cells, populated only
+// when the analysis is ready; pending/absent rows leave the deep columns blank.
+func maDeepExportFields(deep *MADeepAnalysis) maDeepExportRow {
+	var out maDeepExportRow
+	if deep == nil {
+		return out
+	}
+	out.analysis = maDeepStatusExportLabel(deep.Status)
+	if deep.Status != maDeepStatusReady {
+		return out
+	}
+	if deep.Scorecard != nil {
+		out.rag = maRAGExportLabel(deep.Scorecard.OverallRAG)
+		if v := scorecardMetricValue(deep.Scorecard, "ebitda_margin"); v != nil {
+			out.ebitdaMargin = fmt.Sprintf("%.1f%%", *v)
+		}
+		if v := scorecardMetricValue(deep.Scorecard, "pfn_ebitda"); v != nil {
+			out.pfnEbitda = fmt.Sprintf("%.1fx", *v)
+		}
+	}
+	if deep.Valuation != nil {
+		out.ev = fmt.Sprintf("%.0f - %.0f", deep.Valuation.EVLow, deep.Valuation.EVHigh)
+		if deep.Valuation.EquityLow != nil && deep.Valuation.EquityHigh != nil {
+			out.equity = fmt.Sprintf("%.0f - %.0f", *deep.Valuation.EquityLow, *deep.Valuation.EquityHigh)
+		}
+		method := "EV/EBITDA"
+		if deep.Valuation.Method == "ev_sales" {
+			method = "EV/Sales"
+		}
+		out.multiple = fmt.Sprintf("%s %.2fx", method, deep.Valuation.Multiple)
+	}
+	if deep.Brief != nil {
+		out.verdict = deep.Brief.Verdict
+	}
+	return out
+}
+
+func scorecardMetricValue(scorecard *MADeepScorecard, key string) *float64 {
+	for i := range scorecard.Metrics {
+		if scorecard.Metrics[i].Key == key {
+			return scorecard.Metrics[i].Value
+		}
+	}
+	return nil
+}
+
+func maRAGExportLabel(rag string) string {
+	switch rag {
+	case maRAGGreen:
+		return "solido"
+	case maRAGAmber:
+		return "attenzione"
+	case maRAGRed:
+		return "critico"
+	default:
+		return ""
+	}
+}
+
+func maDeepStatusExportLabel(status string) string {
+	switch status {
+	case maDeepStatusQueued:
+		return "in coda"
+	case maDeepStatusRunning:
+		return "in corso"
+	case maDeepStatusReady:
+		return "pronta"
+	case maDeepStatusFailed:
+		return "non riuscita"
+	default:
+		return ""
+	}
 }
 
 func matchStateLabel(value string) string {

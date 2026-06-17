@@ -1,6 +1,7 @@
 package binocolo
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -31,17 +32,21 @@ type Handler struct {
 	ma                 *maService
 }
 
-func RegisterRoutes(mux *http.ServeMux, deps Deps) {
+// RegisterRoutes wires the binocolo HTTP routes and returns the deep-dive worker
+// run function (or nil) so the caller can run it under the app context + worker
+// WaitGroup for graceful shutdown. Callers that don't need it may ignore it.
+func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	var cache companySearchCacheStore
 	var provinceCache provinceCacheStore
 	var maStore maWorkspaceStore
 	var ateco atecoStore
+	var sqlStore *SQLStore
 	if deps.AnisettaDB != nil {
-		store := NewSQLStore(deps.AnisettaDB)
-		cache = store
-		provinceCache = store
-		maStore = store
-		ateco = store
+		sqlStore = NewSQLStore(deps.AnisettaDB)
+		cache = sqlStore
+		provinceCache = sqlStore
+		maStore = sqlStore
+		ateco = sqlStore
 	}
 	h := &Handler{
 		openapiit:          deps.OpenAPIIT,
@@ -49,6 +54,12 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		provinceCache:      provinceCache,
 		ateco:              ateco,
 		ma:                 newMAService(maStore, cache, provinceCache, ateco, deps.OpenAPIIT, deps.OpenRouter),
+	}
+	// Veryshort deep-dive worker: drains queued IT-full jobs and resumes pending
+	// ones on restart. Returned so main.go runs it under appCtx + workerWG.
+	var runDeepWorker func(context.Context)
+	if sqlStore != nil && deps.OpenAPIIT != nil {
+		runDeepWorker = newMADeepWorker(sqlStore, deps.OpenAPIIT, deps.OpenRouter, h.ma.loadPricing).run
 	}
 	protect := acl.RequireRole(applaunch.BinocoloAccessRoles()...)
 	handle := func(pattern string, handler http.HandlerFunc) {
@@ -58,15 +69,20 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handle("GET /binocolo/v1/provinces", h.handleListProvinces)
 	handle("GET /binocolo/v1/companies/search", h.handleSearchCompanies)
 	handle("GET /binocolo/v1/ma/llm-options", h.handleListMALLMOptions)
+	handle("GET /binocolo/v1/ma/parameters", h.handleListMAParameters)
+	handle("PUT /binocolo/v1/ma/parameters", h.handleUpdateMAParameter)
 	handle("GET /binocolo/v1/ma/sessions", h.handleListMASessions)
 	handle("POST /binocolo/v1/ma/sessions", h.handleCreateMASession)
 	handle("GET /binocolo/v1/ma/sessions/{id}", h.handleGetMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/archive", h.handleArchiveMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/restore", h.handleRestoreMASession)
 	handle("DELETE /binocolo/v1/ma/sessions/{id}", h.handleDeleteMASession)
+	handle("POST /binocolo/v1/ma/sessions/{id}/rating", h.handleRateMATarget)
+	handle("POST /binocolo/v1/ma/sessions/{id}/deep-dive", h.handleDeepDiveMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/estimate", h.handleEstimateMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/execute", h.handleExecuteMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/export", h.handleExportMASession)
+	return runDeepWorker
 }
 
 func (h *Handler) requireOpenAPIIT(w http.ResponseWriter) bool {
@@ -103,6 +119,35 @@ func (h *Handler) handleListMALLMOptions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	httputil.JSON(w, http.StatusOK, options)
+}
+
+func (h *Handler) handleListMAParameters(w http.ResponseWriter, r *http.Request) {
+	items, err := h.ma.listParameters(r.Context())
+	if err != nil {
+		h.maFailure(w, r, "ma_parameters_list", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (h *Handler) handleUpdateMAParameter(w http.ResponseWriter, r *http.Request) {
+	var body MAParameterUpdateRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var ok bool
+	r, ok = h.startMATrace(w, r, "ma_parameter_update", "", body, subject, email)
+	if !ok {
+		return
+	}
+	if err := h.ma.updateParameter(r.Context(), body.Key, body.Value, subject, email); err != nil {
+		h.maFailure(w, r, "ma_parameter_update", err)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusNoContent)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) handleListMASessions(w http.ResponseWriter, r *http.Request) {
@@ -185,6 +230,49 @@ func (h *Handler) handleDeleteMASession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleRateMATarget(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	var body MATargetRatingRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.setTargetRating(r.Context(), id, body.CompanyKey, body.Rating, subject, email); err != nil {
+		h.maFailure(w, r, "ma_target_rate", err, "session_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleDeepDiveMASession(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	var body MADeepDiveRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_session_deep_dive", id, body, subject, email)
+	if !traceOK {
+		return
+	}
+	detail, err := h.ma.deepDive(r.Context(), id, body.AcknowledgeCost, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_session_deep_dive", err, "session_id", id)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, detail)
 }
 
 func (h *Handler) handleEstimateMASession(w http.ResponseWriter, r *http.Request) {

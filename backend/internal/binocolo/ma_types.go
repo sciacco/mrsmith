@@ -31,6 +31,22 @@ const (
 	maMatchStatePartial = "match_parziale"
 	maMatchStateOutside = "fuori_criterio"
 
+	// Veryshort rating preferiti: -1 escluso, 1..3 stelle, 0/assente = non valutato.
+	maRatingExcluded = -1
+	maRatingMax      = 3
+
+	// Veryshort analisi approfondita (IT-full) lifecycle.
+	maDeepStatusQueued  = "queued"
+	maDeepStatusRunning = "running"
+	maDeepStatusReady   = "ready"
+	maDeepStatusFailed  = "failed"
+
+	// maDeepMaxAttempts bounds how many worker ticks poll a running IT-full job
+	// before it is marked failed (timeout guard for the async vendor request).
+	// At the 5s tick interval this is ~5 minutes of polling; the attempt counter
+	// is reset when a job is claimed (queued->running), so it is a pure poll budget.
+	maDeepMaxAttempts = 60
+
 	maEvidenceMatch   = "match"
 	maEvidencePartial = "match_parziale"
 	maEvidenceMissing = "criterio_mancante"
@@ -38,6 +54,7 @@ const (
 
 	maModelScopeStrategy             = "ma_strategy"
 	maModelScopeSectorClassification = "ma_sector_classification"
+	maModelScopeDeepBrief            = "ma_deep_brief"
 
 	maEstimateSurfaceExact    = "exact"
 	maEstimateSurfaceTooBroad = "too_broad"
@@ -56,6 +73,15 @@ const (
 	// returned company; maCostPerDryRunEUR is the dry-run (count-only) price.
 	maCostPerCompanyEUR = 0.10
 	maCostPerDryRunEUR  = 0.01
+	// maCostPerFullEUR is the IT-full (veryshort deep-dive) price per company;
+	// the runtime value is overridable via the ma_parameter table (migration 038).
+	maCostPerFullEUR = 0.30
+
+	// Valuation defaults (Fase 4), overridable via ma_parameter (sme_haircut_pct,
+	// ebitda_fallback_threshold). Haircut is a percent applied to sector multiples;
+	// below the EBITDA-margin threshold (or EBITDA<=0) valuation falls back to EV/Sales.
+	maSMEHaircutPctDefault     = 30.0
+	maEBITDAFallbackPctDefault = 5.0
 
 	// maDefaultBudgetEUR caps the projected enrichment spend of a single run
 	// unless the analyst explicitly acknowledges a higher cost.
@@ -83,6 +109,26 @@ type MAExecuteSessionRequest struct {
 
 type MAExportRequest struct {
 	Format string `json:"format,omitempty"`
+}
+
+type MATargetRatingRequest struct {
+	CompanyKey string `json:"companyKey"`
+	Rating     int    `json:"rating"`
+}
+
+type MAParameter struct {
+	Key            string     `json:"key"`
+	Value          string     `json:"value"`
+	ValueType      string     `json:"valueType"`
+	Label          string     `json:"label"`
+	Description    string     `json:"description,omitempty"`
+	UpdatedByEmail string     `json:"updatedByEmail,omitempty"`
+	UpdatedAt      *time.Time `json:"updatedAt,omitempty"`
+}
+
+type MAParameterUpdateRequest struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 type MALLMOptionsResponse struct {
@@ -134,6 +180,7 @@ type MASessionDetail struct {
 	// projected spend and the cost gate without duplicating the pricing constant.
 	BudgetEUR         float64 `json:"budgetEur"`
 	CostPerCompanyEUR float64 `json:"costPerCompanyEur"`
+	CostFullEUR       float64 `json:"costFullEur"`
 }
 
 type MASession struct {
@@ -259,6 +306,7 @@ type MATarget struct {
 	SessionID        string             `json:"sessionId"`
 	RunID            string             `json:"runId"`
 	VendorID         string             `json:"vendorId,omitempty"`
+	CompanyKey       string             `json:"companyKey,omitempty"`
 	CompanyName      string             `json:"companyName"`
 	VATCode          string             `json:"vatCode,omitempty"`
 	TaxCode          string             `json:"taxCode,omitempty"`
@@ -273,10 +321,12 @@ type MATarget struct {
 	Score            int                `json:"score"`
 	MatchState       string             `json:"matchState"`
 	Confidence       string             `json:"confidence,omitempty"`
+	Rating           *int               `json:"rating,omitempty"`
 	Flags            []MATargetFlag     `json:"flags,omitempty"`
 	Rationale        string             `json:"rationale"`
 	MissingCriteria  []string           `json:"missingCriteria"`
 	Evidence         []MATargetEvidence `json:"evidence"`
+	Deep             *MADeepAnalysis    `json:"deep,omitempty"`
 	VendorPayload    json.RawMessage    `json:"vendorPayload,omitempty"`
 	CreatedAt        time.Time          `json:"createdAt"`
 }
@@ -298,6 +348,90 @@ type MATargetFlag struct {
 	Code     string `json:"code"`
 	Label    string `json:"label"`
 	Severity string `json:"severity"`
+}
+
+// MADeepAnalysis is the veryshort deep-dive artifact for one company (global,
+// cached across sessions). Status drives the worker; Scorecard is filled in
+// Fase 3, Valuation in Fase 4, Brief in Fase 5.
+type MADeepAnalysis struct {
+	CompanyKey string           `json:"companyKey"`
+	Status     string           `json:"status"`
+	Scorecard  *MADeepScorecard `json:"scorecard,omitempty"`
+	Valuation  *MADeepValuation `json:"valuation,omitempty"`
+	Brief      *MADeepBrief     `json:"brief,omitempty"`
+	CostEUR    float64          `json:"costEur,omitempty"`
+	ErrorCode  string           `json:"errorCode,omitempty"`
+	UpdatedAt  *time.Time       `json:"updatedAt,omitempty"`
+}
+
+// MADeepScorecard is the deterministic financial reading of the IT-full payload:
+// pre-computed KPIs read verbatim + RAG semaphores. Raw values (turnover, ebitda,
+// netWorth, pfn) are carried for the valuation (Fase 4) and brief (Fase 5).
+type MADeepScorecard struct {
+	Metrics      []MADeepMetric `json:"metrics"`
+	OverallRAG   string         `json:"overallRag"`
+	Turnover     *float64       `json:"turnover,omitempty"`
+	TurnoverYear *int           `json:"turnoverYear,omitempty"`
+	Ebitda       *float64       `json:"ebitda,omitempty"`
+	NetWorth     *float64       `json:"netWorth,omitempty"`
+	PFN          *float64       `json:"pfn,omitempty"`
+	AtecoCode    string         `json:"atecoCode,omitempty"`
+}
+
+type MADeepMetric struct {
+	Group string   `json:"group"`
+	Key   string   `json:"key"`
+	Label string   `json:"label"`
+	Value *float64 `json:"value,omitempty"`
+	Unit  string   `json:"unit"`
+	RAG   string   `json:"rag"`
+}
+
+// MADeepValuation is populated in Fase 4 (Damodaran sector multiples).
+type MADeepValuation struct {
+	Method     string   `json:"method"`
+	Multiple   float64  `json:"multiple"`
+	HaircutPct float64  `json:"haircutPct"`
+	EVLow      float64  `json:"evLow"`
+	EVHigh     float64  `json:"evHigh"`
+	EquityLow  *float64 `json:"equityLow,omitempty"`
+	EquityHigh *float64 `json:"equityHigh,omitempty"`
+	PFN        *float64 `json:"pfn,omitempty"`
+	Sector     string   `json:"sector,omitempty"`
+	NFirms     int      `json:"nFirms,omitempty"`
+	Source     string   `json:"source,omitempty"`
+	SourceDate string   `json:"sourceDate,omitempty"`
+	Caveat     string   `json:"caveat,omitempty"`
+}
+
+// MADeepBrief is populated in Fase 5 (LLM narrative; numbers stay in scorecard/valuation).
+type MADeepBrief struct {
+	Verdict       string            `json:"verdict,omitempty"`
+	RAG           string            `json:"rag,omitempty"`
+	ThesisFit     string            `json:"thesisFit,omitempty"`
+	ThesisReading string            `json:"thesisReading,omitempty"`
+	RedFlags      []MADeepBriefFlag `json:"redFlags,omitempty"`
+}
+
+type MADeepBriefFlag struct {
+	Severity   string `json:"severity"`
+	Claim      string `json:"claim"`
+	DDQuestion string `json:"ddQuestion,omitempty"`
+}
+
+// maDeepResult bundles what the worker persists when an IT-full job completes.
+type maDeepResult struct {
+	Payload   json.RawMessage
+	Scorecard *MADeepScorecard
+	Valuation *MADeepValuation
+	Brief     *MADeepBrief
+	ModelID   string
+	PromptID  string
+	CostEUR   float64
+}
+
+type MADeepDiveRequest struct {
+	AcknowledgeCost bool `json:"acknowledgeCost,omitempty"`
 }
 
 type maStrategyDraftEnvelope struct {

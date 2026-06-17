@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -16,12 +17,14 @@ type maWorkspaceStore interface {
 	ListMASessions(ctx context.Context, visibility string) ([]MASessionSummary, error)
 	CreateMASession(ctx context.Context, input maSessionCreate) (MASessionDetail, error)
 	GetMASession(ctx context.Context, id string) (MASessionDetail, error)
+	GetMASessionState(ctx context.Context, id string) (MASession, error)
 	UpdateMASessionLifecycle(ctx context.Context, sessionID, action, subject, email string) (bool, error)
 	AddMAStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error)
 	ReplaceMAEstimates(ctx context.Context, sessionID, strategyVersionID, selectedStrategy string, estimates []MAEstimate) error
 	CreateMAExecutionRun(ctx context.Context, input maExecutionRunCreate) (MAExecutionRun, error)
 	CompleteMAExecutionRun(ctx context.Context, runID, status string, resultCount int, errorCode string) error
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
+	UpsertMATargetRating(ctx context.Context, sessionID, companyKey string, rating int, subject, email string) error
 	RecordMAModelAudit(ctx context.Context, input maModelAuditWrite) error
 	StartMATrace(ctx context.Context, input maTraceStart) (string, error)
 	LinkMATrace(ctx context.Context, input maTraceLink) error
@@ -31,6 +34,10 @@ type maWorkspaceStore interface {
 	ResolveMAModel(ctx context.Context, scope string, modelID string) (maLLMModel, error)
 	ResolveMAPrompt(ctx context.Context, scope string, promptID string) (maLLMPrompt, error)
 	RecordMAExport(ctx context.Context, sessionID, format string, rowCount int, createdByEmail string) error
+	ListMAParameters(ctx context.Context) ([]MAParameter, error)
+	UpdateMAParameter(ctx context.Context, key, value, email string) error
+	ListMADeepAnalysis(ctx context.Context, companyKeys []string) (map[string]MADeepAnalysis, error)
+	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
 }
 
 func (s *SQLStore) ListMASessions(ctx context.Context, visibility string) ([]MASessionSummary, error) {
@@ -241,6 +248,15 @@ func (s *SQLStore) GetMASession(ctx context.Context, id string) (MASessionDetail
 		detail.Strategy = &strategy
 	}
 	return detail, nil
+}
+
+// GetMASessionState loads only the session row (no strategy/estimates/runs/targets),
+// for cheap lifecycle checks such as the rating endpoint.
+func (s *SQLStore) GetMASessionState(ctx context.Context, id string) (MASession, error) {
+	if s == nil || s.db == nil {
+		return MASession{}, errors.New("binocolo ma store not configured")
+	}
+	return s.loadMASession(ctx, s.db, id)
 }
 
 func (s *SQLStore) UpdateMASessionLifecycle(ctx context.Context, sessionID, action, subject, email string) (bool, error) {
@@ -1330,6 +1346,7 @@ ORDER BY score DESC, company_name
 		if len(missingRaw) > 0 {
 			_ = json.Unmarshal(missingRaw, &item.MissingCriteria)
 		}
+		item.CompanyKey = maTargetDedupeKey(item)
 		targets = append(targets, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -1342,10 +1359,108 @@ ORDER BY score DESC, company_name
 	if err != nil {
 		return nil, err
 	}
+	ratings, err := s.loadMARatings(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]string, 0, len(targets))
+	for index := range targets {
+		keys = append(keys, targets[index].CompanyKey)
+	}
+	deep, err := s.ListMADeepAnalysis(ctx, keys)
+	if err != nil {
+		return nil, err
+	}
 	for index := range targets {
 		targets[index].Evidence = evidence[targets[index].ID]
+		if rating, ok := ratings[targets[index].CompanyKey]; ok {
+			value := rating
+			targets[index].Rating = &value
+		}
+		if analysis, ok := deep[targets[index].CompanyKey]; ok {
+			record := analysis
+			targets[index].Deep = &record
+		}
 	}
+	sortMATargetsByRating(targets)
 	return targets, nil
+}
+
+// sortMATargetsByRating ordina i target con la classifica utente in testa
+// (rating DESC), poi per punteggio dello scoring (campo secondario), poi per
+// nome. I non valutati (rating nil -> 0) stanno tra le stelle e gli esclusi (-1).
+func sortMATargetsByRating(targets []MATarget) {
+	sort.SliceStable(targets, func(i, j int) bool {
+		ri, rj := maRatingValue(targets[i].Rating), maRatingValue(targets[j].Rating)
+		if ri != rj {
+			return ri > rj
+		}
+		if targets[i].Score != targets[j].Score {
+			return targets[i].Score > targets[j].Score
+		}
+		return targets[i].CompanyName < targets[j].CompanyName
+	})
+}
+
+func maRatingValue(rating *int) int {
+	if rating == nil {
+		return 0
+	}
+	return *rating
+}
+
+func (s *SQLStore) loadMARatings(ctx context.Context, sessionID string) (map[string]int, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT company_key, rating
+FROM binocolo.ma_target_rating
+WHERE session_id = $1::uuid
+`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("load ma ratings: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var key string
+		var rating int
+		if err := rows.Scan(&key, &rating); err != nil {
+			return nil, fmt.Errorf("scan ma rating: %w", err)
+		}
+		out[key] = rating
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma ratings: %w", err)
+	}
+	return out, nil
+}
+
+// UpsertMATargetRating salva (o azzera) il voto su un'azienda nella sessione.
+// rating == 0 cancella la riga (torna "non valutato"); -1/1..3 fanno upsert.
+func (s *SQLStore) UpsertMATargetRating(ctx context.Context, sessionID, companyKey string, rating int, subject, email string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if rating == 0 {
+		if _, err := s.db.ExecContext(ctx, `
+DELETE FROM binocolo.ma_target_rating
+WHERE session_id = $1::uuid AND company_key = $2
+`, sessionID, companyKey); err != nil {
+			return fmt.Errorf("clear ma target rating: %w", err)
+		}
+		return nil
+	}
+	if _, err := s.db.ExecContext(ctx, `
+INSERT INTO binocolo.ma_target_rating (session_id, company_key, rating, rated_by_subject, rated_by_email, rated_at)
+VALUES ($1::uuid, $2, $3, $4, $5, now())
+ON CONFLICT (session_id, company_key) DO UPDATE
+SET rating = EXCLUDED.rating,
+    rated_by_subject = EXCLUDED.rated_by_subject,
+    rated_by_email = EXCLUDED.rated_by_email,
+    rated_at = now()
+`, sessionID, companyKey, rating, nullString(subject), nullString(email)); err != nil {
+		return fmt.Errorf("upsert ma target rating: %w", err)
+	}
+	return nil
 }
 
 func (s *SQLStore) loadMAEvidence(ctx context.Context, sessionID string) (map[string][]MATargetEvidence, error) {
@@ -1376,6 +1491,354 @@ ORDER BY evidence.created_at, evidence.id
 		return nil, fmt.Errorf("iterate ma evidence: %w", err)
 	}
 	return out, nil
+}
+
+func (s *SQLStore) ListMAParameters(ctx context.Context) ([]MAParameter, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT key, value, value_type, label, COALESCE(description, ''), COALESCE(updated_by_email, ''), updated_at
+FROM binocolo.ma_parameter
+ORDER BY key
+`)
+	if err != nil {
+		return nil, fmt.Errorf("list ma parameters: %w", err)
+	}
+	defer rows.Close()
+	out := []MAParameter{}
+	for rows.Next() {
+		var item MAParameter
+		var updatedAt time.Time
+		if err := rows.Scan(&item.Key, &item.Value, &item.ValueType, &item.Label, &item.Description, &item.UpdatedByEmail, &updatedAt); err != nil {
+			return nil, fmt.Errorf("scan ma parameter: %w", err)
+		}
+		ts := updatedAt
+		item.UpdatedAt = &ts
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma parameters: %w", err)
+	}
+	return out, nil
+}
+
+// UpdateMAParameter updates one existing parameter. It returns sql.ErrNoRows when
+// the key does not exist, so callers can reject unknown keys (no implicit insert).
+func (s *SQLStore) UpdateMAParameter(ctx context.Context, key, value, email string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	result, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_parameter
+SET value = $2, updated_by_email = $3, updated_at = now()
+WHERE key = $1
+`, key, value, nullString(email))
+	if err != nil {
+		return fmt.Errorf("update ma parameter: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update ma parameter rows: %w", err)
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// --- Deep analysis (veryshort IT-full) -------------------------------------
+
+type maDeepJob struct {
+	CompanyKey      string
+	VATCode         string
+	TaxCode         string
+	Status          string
+	VendorRequestID string
+	Attempts        int
+}
+
+func (s *SQLStore) ListMADeepAnalysis(ctx context.Context, companyKeys []string) (map[string]MADeepAnalysis, error) {
+	out := map[string]MADeepAnalysis{}
+	if s == nil || s.db == nil || len(companyKeys) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(companyKeys))
+	args := make([]any, len(companyKeys))
+	for i, key := range companyKeys {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = key
+	}
+	query := `
+SELECT company_key, status, scorecard, valuation, brief, cost_eur, COALESCE(error_code, ''), updated_at
+FROM binocolo.ma_deep_analysis
+WHERE company_key IN (` + strings.Join(placeholders, ", ") + `)`
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list ma deep analysis: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item MADeepAnalysis
+		var scorecardRaw, valuationRaw, briefRaw []byte
+		var updatedAt time.Time
+		if err := rows.Scan(&item.CompanyKey, &item.Status, &scorecardRaw, &valuationRaw, &briefRaw, &item.CostEUR, &item.ErrorCode, &updatedAt); err != nil {
+			return nil, fmt.Errorf("scan ma deep analysis: %w", err)
+		}
+		if len(scorecardRaw) > 0 {
+			var scorecard MADeepScorecard
+			if json.Unmarshal(scorecardRaw, &scorecard) == nil {
+				item.Scorecard = &scorecard
+			}
+		}
+		if len(valuationRaw) > 0 {
+			var valuation MADeepValuation
+			if json.Unmarshal(valuationRaw, &valuation) == nil {
+				item.Valuation = &valuation
+			}
+		}
+		if len(briefRaw) > 0 {
+			var brief MADeepBrief
+			if json.Unmarshal(briefRaw, &brief) == nil {
+				item.Brief = &brief
+			}
+		}
+		ts := updatedAt
+		item.UpdatedAt = &ts
+		out[item.CompanyKey] = item
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma deep analysis: %w", err)
+	}
+	return out, nil
+}
+
+// EnqueueMADeepAnalysis queues a company for IT-full. New companies are inserted
+// queued; previously failed ones are re-queued; ready/running/queued rows are left
+// untouched (the ON CONFLICT WHERE only matches failed) so paid analyses are reused.
+func (s *SQLStore) EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO binocolo.ma_deep_analysis (company_key, vat_code, tax_code, status, refreshed_by_email)
+VALUES ($1, $2, $3, 'queued', $4)
+ON CONFLICT (company_key) DO UPDATE
+SET status = 'queued', attempts = 0, error_code = NULL, vendor_request_id = NULL, requested_at = NULL,
+    vat_code = EXCLUDED.vat_code, tax_code = EXCLUDED.tax_code,
+    refreshed_by_email = EXCLUDED.refreshed_by_email, updated_at = now()
+WHERE binocolo.ma_deep_analysis.status = 'failed'
+`, companyKey, nullString(vatCode), nullString(taxCode), nullString(email))
+	if err != nil {
+		return fmt.Errorf("enqueue ma deep analysis: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLStore) ListMADeepJobs(ctx context.Context, limit int) ([]maDeepJob, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	if limit <= 0 {
+		limit = 16
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT company_key, COALESCE(vat_code, ''), COALESCE(tax_code, ''), status, COALESCE(vendor_request_id, ''), attempts
+FROM binocolo.ma_deep_analysis
+WHERE status IN ('queued', 'running')
+ORDER BY updated_at
+LIMIT $1
+`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list ma deep jobs: %w", err)
+	}
+	defer rows.Close()
+	out := []maDeepJob{}
+	for rows.Next() {
+		var job maDeepJob
+		if err := rows.Scan(&job.CompanyKey, &job.VATCode, &job.TaxCode, &job.Status, &job.VendorRequestID, &job.Attempts); err != nil {
+			return nil, fmt.Errorf("scan ma deep job: %w", err)
+		}
+		out = append(out, job)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma deep jobs: %w", err)
+	}
+	return out, nil
+}
+
+// ClaimMADeepQueued atomically transitions a row from queued to running. It returns
+// true only for the worker/replica that won the claim (rows affected == 1), so with
+// multiple replicas the IT-full POST — and its €0.30 charge — happens exactly once.
+// Resets the poll attempt budget for the running phase.
+func (s *SQLStore) ClaimMADeepQueued(ctx context.Context, companyKey string) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	result, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_deep_analysis
+SET status = 'running', attempts = 0, error_code = NULL, requested_at = now(), updated_at = now()
+WHERE company_key = $1 AND status = 'queued'
+`, companyKey)
+	if err != nil {
+		return false, fmt.Errorf("claim ma deep queued: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("claim ma deep queued rows: %w", err)
+	}
+	return affected == 1, nil
+}
+
+func (s *SQLStore) SetMADeepVendorRequest(ctx context.Context, companyKey, vendorRequestID string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	_, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_deep_analysis
+SET vendor_request_id = $2, updated_at = now()
+WHERE company_key = $1
+`, companyKey, vendorRequestID)
+	if err != nil {
+		return fmt.Errorf("set ma deep vendor request: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLStore) SaveMADeepReady(ctx context.Context, companyKey string, result maDeepResult) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	marshalJSON := func(value any, label string) ([]byte, error) {
+		if value == nil {
+			return []byte("null"), nil
+		}
+		raw, err := json.Marshal(value)
+		if err != nil {
+			return nil, fmt.Errorf("marshal ma deep %s: %w", label, err)
+		}
+		return raw, nil
+	}
+	scorecardRaw, err := marshalJSON(result.Scorecard, "scorecard")
+	if err != nil {
+		return err
+	}
+	valuationRaw, err := marshalJSON(result.Valuation, "valuation")
+	if err != nil {
+		return err
+	}
+	briefRaw, err := marshalJSON(result.Brief, "brief")
+	if err != nil {
+		return err
+	}
+	payloadRaw := json.RawMessage("null")
+	if len(result.Payload) > 0 {
+		payloadRaw = result.Payload
+	}
+	_, err = s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_deep_analysis
+SET status = 'ready', itfull_payload = $2::jsonb, scorecard = $3::jsonb, valuation = $4::jsonb, brief = $5::jsonb,
+    model_id = $6::uuid, prompt_id = $7::uuid, cost_eur = $8, error_code = NULL, updated_at = now()
+WHERE company_key = $1
+`, companyKey, []byte(payloadRaw), scorecardRaw, valuationRaw, briefRaw, nullString(result.ModelID), nullString(result.PromptID), result.CostEUR)
+	if err != nil {
+		return fmt.Errorf("save ma deep ready: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLStore) MarkMADeepFailed(ctx context.Context, companyKey, errorCode string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	_, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_deep_analysis
+SET status = 'failed', error_code = $2, updated_at = now()
+WHERE company_key = $1
+`, companyKey, nullString(errorCode))
+	if err != nil {
+		return fmt.Errorf("mark ma deep failed: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLStore) BumpMADeepAttempt(ctx context.Context, companyKey string) (int, error) {
+	if s == nil || s.db == nil {
+		return 0, errors.New("binocolo ma store not configured")
+	}
+	var attempts int
+	if err := s.db.QueryRowContext(ctx, `
+UPDATE binocolo.ma_deep_analysis
+SET attempts = attempts + 1, updated_at = now()
+WHERE company_key = $1
+RETURNING attempts
+`, companyKey).Scan(&attempts); err != nil {
+		return 0, fmt.Errorf("bump ma deep attempt: %w", err)
+	}
+	return attempts, nil
+}
+
+type sectorMultiple struct {
+	Prefix     string
+	Industry   string
+	EVEbitda   *float64
+	EVSales    *float64
+	NFirms     int
+	Source     string
+	SourceDate string
+}
+
+// ResolveSectorMultiple finds the Damodaran sector multiple for an ATECO code by
+// longest-prefix match (4 -> 3 -> 2 digits), falling back to the TOTAL market row.
+func (s *SQLStore) ResolveSectorMultiple(ctx context.Context, ateco string) (*sectorMultiple, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	code := strings.ReplaceAll(normalizeAtecoCode(ateco), ".", "")
+	prefixes := make([]string, 0, 4)
+	for _, n := range []int{4, 3, 2} {
+		if len(code) >= n {
+			prefixes = append(prefixes, code[:n])
+		}
+	}
+	prefixes = append(prefixes, "TOTAL")
+	for _, prefix := range prefixes {
+		multiple, err := s.loadSectorMultiple(ctx, prefix)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			return nil, err
+		}
+		return multiple, nil
+	}
+	return nil, nil
+}
+
+func (s *SQLStore) loadSectorMultiple(ctx context.Context, prefix string) (*sectorMultiple, error) {
+	var multiple sectorMultiple
+	var evEbitda, evSales sql.NullFloat64
+	var nFirms sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `
+SELECT ateco_prefix, damodaran_industry, ev_ebitda, ev_sales, n_firms, source, source_date
+FROM binocolo.sector_valuation_multiple
+WHERE ateco_prefix = $1
+`, prefix).Scan(&multiple.Prefix, &multiple.Industry, &evEbitda, &evSales, &nFirms, &multiple.Source, &multiple.SourceDate)
+	if err != nil {
+		return nil, err
+	}
+	if evEbitda.Valid {
+		v := evEbitda.Float64
+		multiple.EVEbitda = &v
+	}
+	if evSales.Valid {
+		v := evSales.Float64
+		multiple.EVSales = &v
+	}
+	if nFirms.Valid {
+		multiple.NFirms = int(nFirms.Int64)
+	}
+	return &multiple, nil
 }
 
 func nullInt(value *int) sql.NullInt64 {
