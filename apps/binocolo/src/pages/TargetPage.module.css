@@ -1539,18 +1539,13 @@
 
 .thesisContainer {
   display: flex;
-  align-items: center;
-  gap: var(--space-4);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
   width: 100%;
 }
 
-.thesisContainer select {
-  width: 50% !important;
-  flex-shrink: 0;
-}
-
 .thesisContainer .fieldHint {
-  flex: 1;
   margin: 0;
 }
 
@@ -2227,3 +2222,82 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Compact styling for thesis pills */
+.thesisPillGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.thesisPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-3);
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.thesisPill:hover {
+  border-color: var(--thesis-border-hover);
+  color: var(--color-text);
+}
+
+.thesisPillActive {
+  border-color: var(--thesis-color) !important;
+  background-color: var(--thesis-bg) !important;
+  color: var(--thesis-color-strong) !important;
+  box-shadow: var(--thesis-shadow);
+}
+
+/* Individual thesis color mappings (from Clean palette) */
+.thesis_generico {
+  --thesis-color: var(--color-text-muted);
+  --thesis-color-strong: var(--color-text-secondary);
+  --thesis-bg: var(--color-surface);
+  --thesis-border-hover: var(--color-text-faint);
+  --thesis-shadow: 0 0 0 1px var(--color-text-faint);
+}
+
+.thesis_successione {
+  --thesis-color: var(--color-warning);
+  --thesis-color-strong: var(--color-warning-strong);
+  --thesis-bg: var(--color-warning-subtle);
+  --thesis-border-hover: var(--color-warning);
+  --thesis-shadow: 0 0 0 1px var(--color-warning);
+}
+
+.thesis_crescita {
+  --thesis-color: var(--color-success);
+  --thesis-color-strong: var(--color-success-strong);
+  --thesis-bg: var(--color-success-bg);
+  --thesis-border-hover: var(--color-success);
+  --thesis-shadow: 0 0 0 1px var(--color-success);
+}
+
+.thesis_consolidamento {
+  --thesis-color: var(--color-accent);
+  --thesis-color-strong: var(--color-accent-hover);
+  --thesis-bg: var(--color-accent-subtle);
+  --thesis-border-hover: var(--color-accent);
+  --thesis-shadow: var(--shadow-accent);
+}
+
+.thesis_tuck_in {
+  --thesis-color: var(--color-info);
+  --thesis-color-strong: var(--color-info-strong);
+  --thesis-bg: var(--color-info-subtle);
+  --thesis-border-hover: var(--color-info);
+  --thesis-shadow: 0 0 0 1px var(--color-info);
+}
+

@@ -60,6 +60,15 @@ const thesisDescriptions: Record<string, string> = {
   tuck_in: 'Competenza mirata: premia precisione di settore, accetta target piccoli.',
 };
 
+const thesisOptions: { value: MAThesis; label: string }[] = [
+  { value: 'generico', label: 'Generico' },
+  { value: 'successione', label: 'Successione' },
+  { value: 'crescita', label: 'Crescita' },
+  { value: 'consolidamento', label: 'Consolidamento' },
+  { value: 'tuck_in', label: 'Competenze' },
+];
+
+
 const emptyPrompt =
   'Es. target software B2B in Lombardia, fatturato intorno a 5 milioni, con condizioni specifiche da valutare sui risultati.';
 
@@ -1601,13 +1610,25 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
           <label className={styles.fieldWide}>
             <span>Tesi d'acquisizione</span>
             <div className={styles.thesisContainer}>
-              <select value={thesis} onChange={(event) => onChange({ thesis: event.target.value as MAThesis })}>
-                <option value="generico">Generico</option>
-                <option value="successione">Successione</option>
-                <option value="crescita">Crescita</option>
-                <option value="consolidamento">Consolidamento</option>
-                <option value="tuck_in">Tuck-in</option>
-              </select>
+              <div className={styles.thesisPillGroup}>
+                {thesisOptions.map((opt) => {
+                  const isActive = thesis === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={[
+                        styles.thesisPill,
+                        styles[`thesis_${opt.value}`],
+                        isActive ? styles.thesisPillActive : '',
+                      ].filter(Boolean).join(' ')}
+                      onClick={() => onChange({ thesis: opt.value })}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
               <small className={styles.fieldHint}>{thesisDescriptions[thesis]}</small>
             </div>
           </label>
