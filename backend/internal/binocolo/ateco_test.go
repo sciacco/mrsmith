@@ -854,6 +854,14 @@ func (f *fakeMAWorkspaceStore) EnqueueMADeepAnalysis(context.Context, string, st
 	return nil
 }
 
+func (f *fakeMAWorkspaceStore) ListMADeepReadyPayloads(context.Context) ([]maDeepPayloadRow, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpdateMADeepScorecard(context.Context, string, *MADeepScorecard) error {
+	return nil
+}
+
 func (f *fakeMAWorkspaceStore) RecordMAModelAudit(context.Context, maModelAuditWrite) error {
 	return nil
 }

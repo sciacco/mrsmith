@@ -38,6 +38,8 @@ type maWorkspaceStore interface {
 	UpdateMAParameter(ctx context.Context, key, value, email string) error
 	ListMADeepAnalysis(ctx context.Context, companyKeys []string) (map[string]MADeepAnalysis, error)
 	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
+	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
+	UpdateMADeepScorecard(ctx context.Context, companyKey string, scorecard *MADeepScorecard) error
 }
 
 func (s *SQLStore) ListMASessions(ctx context.Context, visibility string) ([]MASessionSummary, error) {
@@ -1776,6 +1778,68 @@ RETURNING attempts
 		return 0, fmt.Errorf("bump ma deep attempt: %w", err)
 	}
 	return attempts, nil
+}
+
+type maDeepPayloadRow struct {
+	CompanyKey string
+	Payload    json.RawMessage
+}
+
+// ListMADeepReadyPayloads returns the cached IT-full payload of every ready deep
+// analysis, so the scorecard can be rebuilt deterministically without a vendor call.
+func (s *SQLStore) ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT company_key, itfull_payload
+FROM binocolo.ma_deep_analysis
+WHERE status = 'ready' AND itfull_payload IS NOT NULL AND itfull_payload <> 'null'::jsonb
+ORDER BY updated_at
+`)
+	if err != nil {
+		return nil, fmt.Errorf("list ma deep ready payloads: %w", err)
+	}
+	defer rows.Close()
+	out := []maDeepPayloadRow{}
+	for rows.Next() {
+		var row maDeepPayloadRow
+		var payload []byte
+		if err := rows.Scan(&row.CompanyKey, &payload); err != nil {
+			return nil, fmt.Errorf("scan ma deep ready payload: %w", err)
+		}
+		row.Payload = json.RawMessage(payload)
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma deep ready payloads: %w", err)
+	}
+	return out, nil
+}
+
+// UpdateMADeepScorecard overwrites only the scorecard column; valuation and brief
+// are untouched. Used by the deterministic recompute after an engine calibration
+// (the scorecard fixes do not change the valuation inputs).
+func (s *SQLStore) UpdateMADeepScorecard(ctx context.Context, companyKey string, scorecard *MADeepScorecard) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	raw := json.RawMessage("null")
+	if scorecard != nil {
+		b, err := json.Marshal(scorecard)
+		if err != nil {
+			return fmt.Errorf("marshal ma deep scorecard: %w", err)
+		}
+		raw = b
+	}
+	if _, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_deep_analysis
+SET scorecard = $2::jsonb, updated_at = now()
+WHERE company_key = $1
+`, companyKey, []byte(raw)); err != nil {
+		return fmt.Errorf("update ma deep scorecard: %w", err)
+	}
+	return nil
 }
 
 type sectorMultiple struct {

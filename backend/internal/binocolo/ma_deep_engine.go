@@ -15,9 +15,10 @@ import (
 // (PFN = leverageRatios.pfnEbitda * operatingResults.ebitda), both needed by the
 // valuation (Fase 4) and the brief (Fase 5). No LLM, no network.
 //
-// RAG thresholds and the percent convention for ros/roe/roi follow the common
-// OpenAPI.it presentation; they are heuristic and tunable once calibrated on the
-// first real payload. Missing values yield RAG "na" (never a wrong number).
+// RAG thresholds are heuristic and tunable; they were calibrated against the first
+// real IT-full payloads. Mind OpenAPI.it's mixed scale: ros/roe/roi and the trend
+// fields arrive as percentages, but capitalizationDegree and ebitVariation arrive as
+// fractions and are scaled x100 below. Missing values yield RAG "na" (never wrong).
 
 const (
 	maRAGGreen = "green"
@@ -46,19 +47,24 @@ func buildMADeepScorecard(payload json.RawMessage) *MADeepScorecard {
 		sc.PFN = &v
 	}
 
-	add := func(group, key, label, path, unit string, rag func(float64) string) {
+	// scale converts the vendor field to the unit the RAG thresholds and the UI
+	// expect (1 for already-percent or ratio fields, 100 for fraction fields).
+	// Getting this wrong made "capitalizzazione" red for every company and pinned
+	// "ebit_variation" to amber.
+	add := func(group, key, label, path, unit string, scale float64, rag func(float64) string) {
 		metric := MADeepMetric{Group: group, Key: key, Label: label, Unit: unit, RAG: maRAGNone}
 		if v := deepFloatPtr(root, path); v != nil {
-			metric.Value = v
-			metric.RAG = rag(*v)
+			scaled := *v * scale
+			metric.Value = &scaled
+			metric.RAG = rag(scaled)
 		}
 		sc.Metrics = append(sc.Metrics, metric)
 	}
 
 	// Redditività
-	add("redditivita", "ros", "ROS (margine operativo)", "profitability.ros", "%", ragHigher(5, 10))
-	add("redditivita", "roe", "ROE", "profitability.roe", "%", ragHigher(5, 12))
-	add("redditivita", "roi", "ROI", "profitability.roi", "%", ragHigher(5, 10))
+	add("redditivita", "ros", "ROS (margine operativo)", "profitability.ros", "%", 1, ragHigher(5, 10))
+	add("redditivita", "roe", "ROE", "profitability.roe", "%", 1, ragHigher(5, 12))
+	add("redditivita", "roi", "ROI", "profitability.roi", "%", 1, ragHigher(5, 10))
 	if sc.Ebitda != nil && sc.Turnover != nil && *sc.Turnover > 0 {
 		margin := *sc.Ebitda / *sc.Turnover * 100
 		sc.Metrics = append(sc.Metrics, MADeepMetric{
@@ -67,22 +73,34 @@ func buildMADeepScorecard(payload json.RawMessage) *MADeepScorecard {
 		})
 	}
 
-	// Leva e struttura finanziaria
-	add("leva", "pfn_ebitda", "PFN / EBITDA", "leverageRatios.pfnEbitda", "x", ragLower(3, 5))
-	add("leva", "leverage", "Leverage (attivo / PN)", "indebtedness.leverage", "x", ragLower(3, 6))
-	add("leva", "debt_ratio", "Debt ratio", "indebtedness.debtRatio", "%", ragLower(60, 80))
-	add("leva", "capitalizzazione", "Grado di capitalizzazione", "indebtedness.capitalizationDegree", "%", ragHigher(20, 40))
+	// Leva e struttura finanziaria. debt_ratio is intentionally omitted: IT-full's
+	// indebtedness.debtRatio duplicates leverage (attivo/PN), its scale is undefined
+	// across simple vs complex balance sheets, and it read green for every company.
+	add("leva", "pfn_ebitda", "PFN / EBITDA", "leverageRatios.pfnEbitda", "x", 1, ragLower(3, 5))
+	add("leva", "leverage", "Leverage (attivo / PN)", "indebtedness.leverage", "x", 1, ragLower(3, 6))
+	add("leva", "capitalizzazione", "Grado di capitalizzazione", "indebtedness.capitalizationDegree", "%", 100, ragHigher(20, 40))
 
 	// Liquidità
-	add("liquidita", "current_ratio", "Current ratio", "financialStability.currentRatio", "x", ragHigher(1, 1.5))
-	add("liquidita", "acid_test", "Acid test (quick ratio)", "financialStability.acidTest", "x", ragHigher(0.8, 1))
+	add("liquidita", "current_ratio", "Current ratio", "financialStability.currentRatio", "x", 1, ragHigher(1, 1.5))
+	add("liquidita", "acid_test", "Acid test (quick ratio)", "financialStability.acidTest", "x", 1, ragHigher(0.8, 1))
 
 	// Efficienza / ciclo
-	add("efficienza", "financial_cycle", "Ciclo finanziario", "financialCycle.financialCycleDuration", "gg", ragLower(60, 120))
+	add("efficienza", "financial_cycle", "Ciclo finanziario", "financialCycle.financialCycleDuration", "gg", 1, ragLower(60, 120))
 
-	// Crescita
-	add("crescita", "turnover_trend", "Trend fatturato", "ecofin.turnoverTrend", "%", ragHigher(0, 8))
-	add("crescita", "ebit_variation", "Variazione EBIT", "development.ebitVariation", "%", ragHigher(0, 8))
+	// Crescita (turnoverTrend is already a percentage; ebitVariation is a fraction)
+	add("crescita", "turnover_trend", "Trend fatturato", "ecofin.turnoverTrend", "%", 1, ragHigher(0, 8))
+	add("crescita", "ebit_variation", "Variazione EBIT", "development.ebitVariation", "%", 100, ragHigher(0, 8))
+
+	// Equity-denominated ratios invert sign when equity is eroded: leverage
+	// (attivo/PN) goes negative with PN<=0 and ragLower would read it as healthy.
+	// Force red so an insolvent capital structure never shows green.
+	if sc.NetWorth != nil && *sc.NetWorth <= 0 {
+		for i := range sc.Metrics {
+			if sc.Metrics[i].Key == "leverage" && sc.Metrics[i].Value != nil {
+				sc.Metrics[i].RAG = maRAGRed
+			}
+		}
+	}
 
 	sc.OverallRAG = deepOverallRAG(sc.Metrics)
 	return sc

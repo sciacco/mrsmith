@@ -692,6 +692,34 @@ func (s *maService) updateParameter(ctx context.Context, key, value, subject, em
 // and not charged. The projected incremental spend (chargeable x cost_full) gates
 // the batch unless the analyst acknowledges going over budget. The async worker
 // picks up the queued rows; the returned detail reflects the new statuses.
+// recomputeMADeepScorecards rebuilds the deterministic scorecard for every cached
+// deep analysis straight from its stored IT-full payload — no vendor call, no LLM,
+// no charge. It rolls out an engine calibration to already-analyzed companies (the
+// funnel and the dossier share this global cache). Valuation is intentionally left
+// as-is: it derives from ebitda/turnover/PFN/sector-multiple, which the scorecard
+// fixes do not touch. The brief is regenerated separately (it needs the LLM).
+func (s *maService) recomputeMADeepScorecards(ctx context.Context) (int, error) {
+	if s.store == nil {
+		return 0, errMAStoreUnavailable
+	}
+	rows, err := s.store.ListMADeepReadyPayloads(ctx)
+	if err != nil {
+		return 0, err
+	}
+	recomputed := 0
+	for _, row := range rows {
+		scorecard := buildMADeepScorecard(row.Payload)
+		if scorecard == nil {
+			continue
+		}
+		if err := s.store.UpdateMADeepScorecard(ctx, row.CompanyKey, scorecard); err != nil {
+			return recomputed, err
+		}
+		recomputed++
+	}
+	return recomputed, nil
+}
+
 func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, email string) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable

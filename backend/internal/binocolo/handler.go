@@ -83,6 +83,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/estimate", h.handleEstimateMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/execute", h.handleExecuteMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/export", h.handleExportMASession)
+	handle("POST /binocolo/v1/ma/deep/recompute", h.handleRecomputeMADeep)
 	return runDeepWorker
 }
 
@@ -274,6 +275,25 @@ func (h *Handler) handleDeepDiveMASession(w http.ResponseWriter, r *http.Request
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, detail)
+}
+
+// handleRecomputeMADeep rebuilds the deterministic scorecard for every cached deep
+// analysis from its stored IT-full payload (no vendor call, no charge). Used to roll
+// out engine calibration fixes. Gated by the standard binocolo access role.
+func (h *Handler) handleRecomputeMADeep(w http.ResponseWriter, r *http.Request) {
+	subject, email := companySearchRefreshActor(r.Context())
+	var ok bool
+	r, ok = h.startMATrace(w, r, "ma_deep_recompute", "", nil, subject, email)
+	if !ok {
+		return
+	}
+	count, err := h.ma.recomputeMADeepScorecards(r.Context())
+	if err != nil {
+		h.maFailure(w, r, "ma_deep_recompute", err)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, map[string]any{"recomputed": count})
 }
 
 func (h *Handler) handleEstimateMASession(w http.ResponseWriter, r *http.Request) {
