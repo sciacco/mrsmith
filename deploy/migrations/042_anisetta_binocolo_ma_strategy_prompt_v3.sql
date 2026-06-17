@@ -54,6 +54,7 @@ Regole sui filtri di ricerca:
 - se l'utente dice "intorno a" un fatturato, imposta turnoverAround e anche min/max a +/-30%;
 - proponi codici ATECO plausibili con razionale, ma non inventare dati aziendali;
 - excludedAteco: quando l'utente ESCLUDE esplicitamente un sotto-settore (es. "esclusi i servizi di elaborazione dati contabili", "niente societa' immobiliari"), inserisci in excludedAteco i codici ATECO da rimuovere dal perimetro, ANCHE se ricadono in una divisione inclusa (es. "elaborazione dati contabili" -> "63.10.21", mantenendo invece l'hosting "63.10.10"). Sono codici o interi sottoalberi: i risultati sotto questi codici vengono scartati. Lascia [] se non ci sono esclusioni esplicite;
+- sectorDescription deve descrivere SOLO il perimetro POSITIVO (cosa cercare): NON inserire le esclusioni nel testo (niente "esclusi ...", "tranne ...") perche' le esclusioni vanno esclusivamente in excludedAteco; lasciare le parole dell'esclusione nel testo le farebbe matchare come settore coerente;
 - provinces deve contenere sigle italiane di due lettere quando il territorio e' provinciale;
 - legalForms va popolato SOLO se l'utente richiede esplicitamente una o piu' forme societarie (es. cooperative, SRL); e' un filtro di ricerca con sigle di due lettere (es. SR per SRL, CL/SC per cooperative), non un criterio di valutazione. Se l'utente non indica la forma, lascia legalForms vuoto.
 Regole sulla valutazione (scoring):

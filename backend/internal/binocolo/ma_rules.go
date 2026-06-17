@@ -303,6 +303,22 @@ func atecoDivisions(candidates []MAAtecoCandidate) []string {
 	return out
 }
 
+// positiveSectorText returns the positive part of a sector description, dropping a
+// trailing exclusion clause ("… esclusi/escluse/tranne/eccetto …"). The exclusion
+// belongs in excludedAteco, not in the keyword needles — otherwise the excluded
+// activity matches the sector on its own words. If no marker is present the text is
+// returned unchanged.
+func positiveSectorText(text string) string {
+	lower := strings.ToLower(text)
+	cut := len(text)
+	for _, marker := range []string{"esclus", "esclud", "tranne", "eccetto", "ad eccezione", "salvo"} {
+		if idx := strings.Index(lower, marker); idx >= 0 && idx < cut {
+			cut = idx
+		}
+	}
+	return strings.TrimRight(strings.TrimSpace(text[:cut]), ",;:-– ")
+}
+
 // significantTokenMatches counts the DISTINCT meaningful tokens (>=4 runes, not a
 // generic filler stopword like "servizi"/"attività") drawn from needles that occur
 // in haystack. A single shared filler word no longer claims sector adherence: the

@@ -469,7 +469,10 @@ func measureTurnoverProximity(c maSignalContext) maSignalSample {
 
 func measureKeywordMatch(c maSignalContext) maSignalSample {
 	haystack := strings.TrimSpace(c.target.AtecoDescription + " " + c.target.CompanyName)
-	needles := append([]string{c.strategy.SectorDescription}, c.strategy.Keywords...)
+	// Only the POSITIVE perimeter feeds the keyword match: an exclusion clause left
+	// in sectorDescription ("…esclusi servizi di elaborazione dati contabili") must
+	// not let the excluded activity score a full sector match against its own words.
+	needles := append([]string{positiveSectorText(c.strategy.SectorDescription)}, c.strategy.Keywords...)
 	switch n := significantTokenMatches(haystack, needles); {
 	case n >= 2:
 		return maSignalSample{Applicable: true, Score: 1.0, Label: "settore coerente"}

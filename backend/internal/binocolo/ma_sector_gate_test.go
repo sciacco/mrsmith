@@ -57,8 +57,11 @@ func TestAtecoDivisions(t *testing.T) {
 // ("servizi" is a stopword) no longer claims sector adherence — a real-estate firm
 // scores the floor; one significant token is a partial match; two or more is full.
 func TestMeasureKeywordMatch(t *testing.T) {
+	// SectorDescription deliberately carries the exclusion clause inline, as the LLM
+	// sometimes leaves it: positiveSectorText must strip it so the excluded activity
+	// cannot match the sector on its own words.
 	strategy := MAStrategySpec{
-		SectorDescription: "servizi IT gestiti e assistenza sistemistica",
+		SectorDescription: "servizi IT gestiti, assistenza sistemistica, hosting; esclusi servizi di elaborazione dati contabili",
 		Keywords:          []string{"managed services", "sistemistica", "hosting"},
 	}
 	mk := func(desc, name string) maSignalContext {
@@ -69,6 +72,11 @@ func TestMeasureKeywordMatch(t *testing.T) {
 	if got := measureKeywordMatch(mk("Attività di servizi di intermediazione immobiliare", "ARTEKASA NOVARA SRL")); got.Score != 0.2 {
 		t.Fatalf("immobiliare keyword score = %v, want 0.2 (filler 'servizi' must not count)", got.Score)
 	}
+	// The excluded activity itself ("Elaborazione dati contabili") must NOT match the
+	// sector — its words live only in the stripped exclusion clause.
+	if got := measureKeywordMatch(mk("Elaborazione dati contabili", "SEA SERVIZI SRL")); got.Score != 0.2 {
+		t.Fatalf("excluded-activity keyword score = %v, want 0.2 (exclusion words must be stripped)", got.Score)
+	}
 	// Exactly one significant token ("hosting") → partial.
 	if got := measureKeywordMatch(mk("Gestione hosting e datacenter", "X SRL")); got.Score != 0.6 {
 		t.Fatalf("single-token keyword score = %v, want 0.6", got.Score)
@@ -76,6 +84,22 @@ func TestMeasureKeywordMatch(t *testing.T) {
 	// Two+ significant tokens (assistenza, sistemistica, hosting) → full match.
 	if got := measureKeywordMatch(mk("Assistenza sistemistica e gestione infrastrutture, hosting", "ACME SRL")); got.Score != 1.0 {
 		t.Fatalf("multi-token keyword score = %v, want 1.0", got.Score)
+	}
+}
+
+// TestPositiveSectorText locks the exclusion-clause stripping: the positive
+// perimeter is kept, the trailing "esclusi/tranne …" clause is dropped, and a
+// description with no exclusion marker is returned unchanged.
+func TestPositiveSectorText(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"servizi IT gestiti, hosting; esclusi servizi di elaborazione dati contabili", "servizi IT gestiti, hosting"},
+		{"consulenza informatica tranne elaborazione dati", "consulenza informatica"},
+		{"servizi IT gestiti e hosting", "servizi IT gestiti e hosting"},
+	}
+	for _, tc := range cases {
+		if got := positiveSectorText(tc.in); got != tc.want {
+			t.Fatalf("positiveSectorText(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }
 
