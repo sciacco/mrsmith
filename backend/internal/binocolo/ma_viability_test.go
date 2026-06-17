@@ -117,7 +117,7 @@ func TestScoreMATargetsViabilityKnockout(t *testing.T) {
 		t.Fatalf("validate strategy: %v", err)
 	}
 
-	targets := scoreMATargetsV2([]MATarget{bfInformaticaTarget(), distressedTarget()}, strategy, now)
+	targets := scoreMATargetsV2([]MATarget{bfInformaticaTarget(), distressedTarget()}, strategy, maScoringParams{ThesisFitHoldingFactor: 1.0}, now)
 
 	healthy := targetByName(targets, "BFINFORMATICA")
 	distressed := targetByName(targets, "DISTRESSED")

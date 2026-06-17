@@ -14,9 +14,8 @@ const (
 	maFlagNeutral = "neutral"
 	maFlagWarning = "warning"
 
-	maRicambioAgeThreshold     = 60
-	maBilancioStaleYears       = 2
-	maPatrimonioErosionFactor  = 0.3
+	maBilancioStaleYears      = 2
+	maPatrimonioErosionFactor = 0.3
 )
 
 func computeMAFlags(c maSignalContext) []MATargetFlag {
@@ -63,7 +62,7 @@ func computeMAFlags(c maSignalContext) []MATargetFlag {
 	if companyHolder {
 		add("controllo_holding", "Controllo holding", maFlagNeutral)
 	}
-	if age, ok := dominantOwnerAge(c); ok && age >= maRicambioAgeThreshold {
+	if age, ok := dominantOwnerAge(c); ok && age >= successionMinAge(c.strategy) {
 		add("ricambio_generazionale", "Ricambio generazionale", maFlagNeutral)
 	}
 

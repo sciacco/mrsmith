@@ -105,7 +105,7 @@ func TestMAScoringThesisInversion(t *testing.T) {
 
 	run := func(thesis string) (int, int) {
 		strategy := thesisScoringStrategy(t, thesis)
-		targets := scoreMATargetsV2([]MATarget{bfInformaticaTarget(), prometeoTarget()}, strategy, now)
+		targets := scoreMATargetsV2([]MATarget{bfInformaticaTarget(), prometeoTarget()}, strategy, maScoringParams{ThesisFitHoldingFactor: 1.0}, now)
 		return scoreByCompany(targets, "BFINFORMATICA"), scoreByCompany(targets, "PROMETEO")
 	}
 
@@ -258,4 +258,3 @@ func TestMAExportRows(t *testing.T) {
 		t.Fatalf("missing criteria = %#v, want eta soci", rows[1][19])
 	}
 }
-

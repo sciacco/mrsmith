@@ -18,6 +18,7 @@ import type {
   MADeepMetric,
   MADeepValuation,
   MATarget,
+  MATargetAdjustment,
   MATargetEvidence,
   MATargetFlag,
   MAThesis,
@@ -1040,6 +1041,7 @@ export function TargetPage() {
                       </div>
                     )}
                   </div>
+                  <ScoreAdjustments adjustments={selectedTarget.adjustments} />
                 </div>
               )}
 
@@ -1452,7 +1454,7 @@ export function TargetPage() {
 function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onChange: (patch: Partial<MAStrategySpec>) => void }) {
   const atecoText = strategy.atecoCandidates.map((item) => [item.code, item.description].filter(Boolean).join(' - ')).join('\n');
 
-  function updateNumber(field: keyof Pick<MAStrategySpec, 'turnoverMin' | 'turnoverMax' | 'employeeMin' | 'employeeMax'>) {
+  function updateNumber(field: keyof Pick<MAStrategySpec, 'turnoverMin' | 'turnoverMax' | 'employeeMin' | 'employeeMax' | 'successionMinOwnerAge'>) {
     return (event: ChangeEvent<HTMLInputElement>) => {
       onChange({ [field]: optionalNumber(event.target.value) } as Partial<MAStrategySpec>);
     };
@@ -1522,6 +1524,22 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
           <small className={styles.fieldHint}>{thesisDescriptions[strategy.thesis ?? 'generico']}</small>
         </div>
       </label>
+      {(strategy.thesis ?? 'generico') === 'successione' ? (
+        <label>
+          <span>Età minima proprietario</span>
+          <input
+            type="number"
+            min={30}
+            max={90}
+            value={strategy.successionMinOwnerAge ?? ''}
+            onChange={updateNumber('successionMinOwnerAge')}
+            placeholder="default 60"
+          />
+          <small className={styles.fieldHint}>
+            Premia i soci-persona vicini all'uscita; le aziende controllate da holding sono comunque penalizzate.
+          </small>
+        </label>
+      ) : null}
       <label>
         <span>Forme giuridiche</span>
         <input
@@ -1854,6 +1872,7 @@ function TargetDetail({ target }: { target: MATarget }) {
             <EvidenceRow key={`${item.criterion}-${item.label}`} evidence={item} />
           ))}
       </div>
+      <ScoreAdjustments adjustments={target.adjustments} />
     </div>
   );
 }
@@ -2114,6 +2133,26 @@ function ConfidenceCaveat({ confidence, missing }: { confidence?: string; missin
       <Icon name={isLow ? 'triangle-alert' : 'info'} size={12} />
       {label}
     </span>
+  );
+}
+
+// ScoreAdjustments surfaces the multiplicative malus (viability, thesis-fit) that
+// scale the blended signal score, so the displayed number reconstructs from the
+// breakdown. Shown only when a factor bites (<1); the specific "why" is carried
+// by the warning flags. Rendered as a reduction ("−60%"), the haircut idiom.
+function ScoreAdjustments({ adjustments }: { adjustments?: MATargetAdjustment[] }) {
+  const items = (adjustments ?? []).filter((adj) => adj.factor < 1);
+  if (items.length === 0) return null;
+  return (
+    <div className={styles.adjustmentBlock}>
+      <span className={styles.adjustmentHead}>Rettifiche al punteggio</span>
+      {items.map((adj) => (
+        <div key={adj.code} className={styles.adjustmentRow}>
+          <span className={styles.adjustmentLabel}>{adj.label}</span>
+          <span className={styles.adjustmentFactor}>−{Math.round((1 - adj.factor) * 100)}%</span>
+        </div>
+      ))}
+    </div>
   );
 }
 

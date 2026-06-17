@@ -38,6 +38,7 @@ const (
 	maSignalTurnoverTrend          = "turnover_trend"
 	maSignalProductivity           = "productivity"
 	maSignalEquitySolidity         = "equity_solidity"
+	maSignalSuccessionOwner        = "succession_owner"
 )
 
 // maScoringSignal is one catalog entry. Base is the signal's share within its
@@ -78,6 +79,7 @@ func maSignalCatalog() []maScoringSignal {
 		{ID: maSignalOwnershipConcentration, Family: maFamilyDeal, Label: "Concentrazione proprietà", Base: 12, Measure: measureOwnershipConcentration},
 		{ID: maSignalCompanyAge, Family: maFamilyDeal, Label: "Anzianità", Base: 10, Measure: measureCompanyAge},
 		{ID: maSignalLegalForm, Family: maFamilyDeal, Label: "Forma giuridica", Base: 8, Measure: measureLegalForm, intended: func(s MAStrategySpec) bool { return len(s.LegalForms) == 0 }},
+		{ID: maSignalSuccessionOwner, Family: maFamilyDeal, Label: "Ricambio generazionale", Base: 12, Measure: measureSuccessionOwner, intended: func(s MAStrategySpec) bool { return normalizeMAThesis(s.Thesis) == maThesisSuccession }},
 		{ID: maSignalTurnoverTrend, Family: maFamilyEconomic, Label: "Trend fatturato", Base: 12, Percentile: true, Measure: measureTurnoverTrend},
 		{ID: maSignalProductivity, Family: maFamilyEconomic, Label: "Produttività", Base: 8, Percentile: true, Measure: measureProductivity},
 		{ID: maSignalEquitySolidity, Family: maFamilyEconomic, Label: "Solidità patrimoniale", Base: 10, Measure: measureEquitySolidity},
@@ -264,6 +266,18 @@ func maTurnoverIdeal(strategy MAStrategySpec) int {
 	return 0
 }
 
+// successionMinAge returns the owner-age threshold for the succession thesis,
+// from the strategy when set to a sane value (LLM-extracted), else the default.
+// Shared by the succession_owner signal and the ricambio_generazionale flag.
+func successionMinAge(strategy MAStrategySpec) int {
+	if strategy.SuccessionMinOwnerAge != nil {
+		if v := *strategy.SuccessionMinOwnerAge; v >= 30 && v <= 90 {
+			return v
+		}
+	}
+	return maSuccessionDefaultMinAge
+}
+
 // maBalanceSheet is one year of the vendor balanceSheets.all[] series.
 type maBalanceSheet struct {
 	Year        int
@@ -275,12 +289,12 @@ type maBalanceSheet struct {
 
 // maFinancials is the per-target financial view extracted from the vendor payload.
 type maFinancials struct {
-	Series      []maBalanceSheet // ascending by year, only years with a filed turnover
-	LastYear    int
-	Turnover    *int
-	NetWorth    *int
-	TotalAssets *int
-	Employees   *int
+	Series       []maBalanceSheet // ascending by year, only years with a filed turnover
+	LastYear     int
+	Turnover     *int
+	NetWorth     *int
+	TotalAssets  *int
+	Employees    *int
 	PrevNetWorth *int
 }
 

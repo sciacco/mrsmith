@@ -214,6 +214,7 @@ export interface MAStrategySpec {
   legalForms?: string[];
   signalWeights?: Record<string, number>;
   maxBudgetEur?: number;
+  successionMinOwnerAge?: number;
 }
 
 export interface MAAtecoCandidate {
@@ -297,6 +298,7 @@ export interface MATarget {
   rationale: string;
   missingCriteria: string[];
   evidence: MATargetEvidence[];
+  adjustments?: MATargetAdjustment[];
   deep?: MADeepAnalysis;
   vendorPayload?: any;
 }
@@ -316,4 +318,12 @@ export interface MATargetEvidence {
   points?: number;
   weight?: number;
   sourcePath?: string;
+}
+
+// Multiplicative score factor applied outside the additive evidence blend
+// (viability, thesis-fit). Surfaced only when factor < 1 so the score reconstructs.
+export interface MATargetAdjustment {
+  code: string;
+  label: string;
+  factor: number;
 }

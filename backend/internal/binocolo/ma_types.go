@@ -86,6 +86,17 @@ const (
 	// maDefaultBudgetEUR caps the projected enrichment spend of a single run
 	// unless the analyst explicitly acknowledges a higher cost.
 	maDefaultBudgetEUR = 50.0
+
+	// maThesisFitHoldingHaircutPctDefault is the score haircut applied to a
+	// holding-controlled company under the succession thesis (a clear corporate
+	// majority owner is the antithesis of an exiting individual). Overridable via
+	// ma_parameter (thesis_fit_holding_haircut_pct); mirrors sme_haircut_pct.
+	// A haircut, not a knockout: the company stays visible, just demoted.
+	maThesisFitHoldingHaircutPctDefault = 60.0
+
+	// maSuccessionDefaultMinAge is the owner-age threshold used by the succession
+	// signal/flag when the strategy does not specify SuccessionMinOwnerAge.
+	maSuccessionDefaultMinAge = 60
 )
 
 type MACreateSessionRequest struct {
@@ -241,6 +252,10 @@ type MAStrategySpec struct {
 	// MaxBudgetEUR overrides the per-run enrichment budget ceiling; nil uses
 	// maDefaultBudgetEUR. Stored in the strategy JSONB blob (migration-free).
 	MaxBudgetEUR *float64 `json:"maxBudgetEur,omitempty"`
+	// SuccessionMinOwnerAge is the owner-age threshold (years) for the succession
+	// thesis: it drives the succession_owner signal ramp and the ricambio flag.
+	// Extracted by the strategy LLM; nil falls back to maSuccessionDefaultMinAge.
+	SuccessionMinOwnerAge *int `json:"successionMinOwnerAge,omitempty"`
 }
 
 type MAAtecoCandidate struct {
@@ -302,33 +317,34 @@ type MAExecutionRun struct {
 }
 
 type MATarget struct {
-	ID               string             `json:"id"`
-	SessionID        string             `json:"sessionId"`
-	RunID            string             `json:"runId"`
-	VendorID         string             `json:"vendorId,omitempty"`
-	CompanyKey       string             `json:"companyKey,omitempty"`
-	CompanyName      string             `json:"companyName"`
-	VATCode          string             `json:"vatCode,omitempty"`
-	TaxCode          string             `json:"taxCode,omitempty"`
-	Province         string             `json:"province,omitempty"`
-	Town             string             `json:"town,omitempty"`
-	ActivityStatus   string             `json:"activityStatus,omitempty"`
-	Turnover         *int               `json:"turnover,omitempty"`
-	TurnoverYear     *int               `json:"turnoverYear,omitempty"`
-	Employees        *int               `json:"employees,omitempty"`
-	AtecoCode        string             `json:"atecoCode,omitempty"`
-	AtecoDescription string             `json:"atecoDescription,omitempty"`
-	Score            int                `json:"score"`
-	MatchState       string             `json:"matchState"`
-	Confidence       string             `json:"confidence,omitempty"`
-	Rating           *int               `json:"rating,omitempty"`
-	Flags            []MATargetFlag     `json:"flags,omitempty"`
-	Rationale        string             `json:"rationale"`
-	MissingCriteria  []string           `json:"missingCriteria"`
-	Evidence         []MATargetEvidence `json:"evidence"`
-	Deep             *MADeepAnalysis    `json:"deep,omitempty"`
-	VendorPayload    json.RawMessage    `json:"vendorPayload,omitempty"`
-	CreatedAt        time.Time          `json:"createdAt"`
+	ID               string               `json:"id"`
+	SessionID        string               `json:"sessionId"`
+	RunID            string               `json:"runId"`
+	VendorID         string               `json:"vendorId,omitempty"`
+	CompanyKey       string               `json:"companyKey,omitempty"`
+	CompanyName      string               `json:"companyName"`
+	VATCode          string               `json:"vatCode,omitempty"`
+	TaxCode          string               `json:"taxCode,omitempty"`
+	Province         string               `json:"province,omitempty"`
+	Town             string               `json:"town,omitempty"`
+	ActivityStatus   string               `json:"activityStatus,omitempty"`
+	Turnover         *int                 `json:"turnover,omitempty"`
+	TurnoverYear     *int                 `json:"turnoverYear,omitempty"`
+	Employees        *int                 `json:"employees,omitempty"`
+	AtecoCode        string               `json:"atecoCode,omitempty"`
+	AtecoDescription string               `json:"atecoDescription,omitempty"`
+	Score            int                  `json:"score"`
+	MatchState       string               `json:"matchState"`
+	Confidence       string               `json:"confidence,omitempty"`
+	Rating           *int                 `json:"rating,omitempty"`
+	Flags            []MATargetFlag       `json:"flags,omitempty"`
+	Rationale        string               `json:"rationale"`
+	MissingCriteria  []string             `json:"missingCriteria"`
+	Evidence         []MATargetEvidence   `json:"evidence"`
+	Adjustments      []MATargetAdjustment `json:"adjustments,omitempty"`
+	Deep             *MADeepAnalysis      `json:"deep,omitempty"`
+	VendorPayload    json.RawMessage      `json:"vendorPayload,omitempty"`
+	CreatedAt        time.Time            `json:"createdAt"`
 }
 
 type MATargetEvidence struct {
@@ -348,6 +364,17 @@ type MATargetFlag struct {
 	Code     string `json:"code"`
 	Label    string `json:"label"`
 	Severity string `json:"severity"`
+}
+
+// MATargetAdjustment is a multiplicative score factor applied OUTSIDE the
+// additive signal blend (viability, thesis-fit). It is surfaced so the displayed
+// score reconstructs from the breakdown: sum(evidence.points) x prod(factors).
+// Only emitted when Factor < 1 (a no-op factor stays silent, like the confidence
+// caveat). Factor is in (0,1]; Code links to the explaining flag (e.g. controllo_holding).
+type MATargetAdjustment struct {
+	Code   string  `json:"code"`
+	Label  string  `json:"label"`
+	Factor float64 `json:"factor"`
 }
 
 // MADeepAnalysis is the veryshort deep-dive artifact for one company (global,

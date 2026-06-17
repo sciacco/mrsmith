@@ -1031,6 +1031,40 @@
   opacity: 0.75;
 }
 
+/* Scoring v2: score adjustments (malus) — multiplicative factors (viability,
+   thesis-fit) shown after the additive breakdown so the score reconstructs.
+   A reduction, visually distinct from the additive evidence rows. */
+.adjustmentBlock {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.adjustmentHead {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+.adjustmentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+}
+.adjustmentLabel {
+  color: var(--color-text);
+}
+.adjustmentFactor {
+  font-weight: 700;
+  color: var(--color-danger);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Scoring v2: flag chips */
 .flagRow {
   display: flex;

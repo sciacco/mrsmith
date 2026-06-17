@@ -85,7 +85,7 @@ func TestMARescoreReport(t *testing.T) {
 		t.Fatalf("validate strategy: %v", err)
 	}
 
-	scored := scoreMATargetsV2(targets, strategy, time.Now())
+	scored := scoreMATargetsV2(targets, strategy, maScoringParams{ThesisFitHoldingFactor: 1 - maThesisFitHoldingHaircutPctDefault/100}, time.Now())
 
 	t.Logf("Tesi: %s — %d target", maThesisLabel(strategy.Thesis), len(scored))
 	for i, target := range scored {

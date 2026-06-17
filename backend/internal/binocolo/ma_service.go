@@ -159,24 +159,26 @@ func ensureMASessionOperational(session MASession) error {
 // maPricing holds the business pricing/budget levers, sourced from the
 // ma_parameter table (migration 038) with the compiled constants as fallback.
 type maPricing struct {
-	CostAdvanced      float64
-	CostFull          float64
-	CostDryRun        float64
-	BudgetDefault     float64
-	SMEHaircutPct     float64
-	EBITDAFallbackPct float64
+	CostAdvanced               float64
+	CostFull                   float64
+	CostDryRun                 float64
+	BudgetDefault              float64
+	SMEHaircutPct              float64
+	EBITDAFallbackPct          float64
+	ThesisFitHoldingHaircutPct float64
 }
 
 // loadPricing reads the configurable pricing levers; missing/unreadable values
 // fall back to the compiled defaults so the feature degrades gracefully.
 func (s *maService) loadPricing(ctx context.Context) maPricing {
 	pricing := maPricing{
-		CostAdvanced:      maCostPerCompanyEUR,
-		CostFull:          maCostPerFullEUR,
-		CostDryRun:        maCostPerDryRunEUR,
-		BudgetDefault:     maDefaultBudgetEUR,
-		SMEHaircutPct:     maSMEHaircutPctDefault,
-		EBITDAFallbackPct: maEBITDAFallbackPctDefault,
+		CostAdvanced:               maCostPerCompanyEUR,
+		CostFull:                   maCostPerFullEUR,
+		CostDryRun:                 maCostPerDryRunEUR,
+		BudgetDefault:              maDefaultBudgetEUR,
+		SMEHaircutPct:              maSMEHaircutPctDefault,
+		EBITDAFallbackPct:          maEBITDAFallbackPctDefault,
+		ThesisFitHoldingHaircutPct: maThesisFitHoldingHaircutPctDefault,
 	}
 	if s.store == nil {
 		return pricing
@@ -206,6 +208,9 @@ func (s *maService) loadPricing(ctx context.Context) maPricing {
 	}
 	if v, ok := paramFloat(values, "ebitda_fallback_threshold"); ok {
 		pricing.EBITDAFallbackPct = v
+	}
+	if v, ok := paramFloat(values, "thesis_fit_holding_haircut_pct"); ok && v < 100 {
+		pricing.ThesisFitHoldingHaircutPct = v
 	}
 	return pricing
 }
@@ -517,7 +522,8 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 		targets[index].SessionID = sessionID
 		targets[index].RunID = run.ID
 	}
-	targets = scoreMATargetsV2(targets, strategyVersion.Strategy, s.now())
+	scoringParams := maScoringParams{ThesisFitHoldingFactor: 1 - pricing.ThesisFitHoldingHaircutPct/100}
+	targets = scoreMATargetsV2(targets, strategyVersion.Strategy, scoringParams, s.now())
 	missingFinancials := 0
 	for _, target := range targets {
 		for _, flag := range target.Flags {

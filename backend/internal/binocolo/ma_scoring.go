@@ -20,12 +20,26 @@ type maSignalContext struct {
 	thesis   string
 }
 
+// maScoringParams carries the configurable (ma_parameter) levers that influence
+// scoring. Kept separate from the additive signal catalog so scoreMATargetsV2
+// stays a pure, deterministic function of its inputs: the call site reads the
+// values from the parameter store, tests pass them explicitly.
+type maScoringParams struct {
+	// ThesisFitHoldingFactor in (0,1]: the multiplier applied to a
+	// holding-controlled company under the succession thesis. 1.0 disables it.
+	ThesisFitHoldingFactor float64
+}
+
 // scoreMATargetsV2 scores and ranks a run's targets with the catalog/thesis model.
 // Two passes are required because percentile signals (trend, productivity) rank
 // each target against the whole population. Weights are re-normalized per target
 // over the signals that actually have data (missing data lowers confidence, never
-// penalizes the score). Returns the targets sorted by score desc, company name.
-func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, now time.Time) []MATarget {
+// penalizes the score). The blended fit is then scaled by two multiplicative
+// factors that live OUTSIDE the re-normalization — viability (distress) and
+// thesisFit (structural contradiction of the thesis) — each surfaced as an
+// Adjustment so the displayed score reconstructs from the breakdown. Returns the
+// targets sorted by score desc, company name.
+func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScoringParams, now time.Time) []MATarget {
 	catalog := maSignalCatalog()
 	nominal := maSignalNominalWeights(strategy)
 	thesis := normalizeMAThesis(strategy.Thesis)
@@ -136,8 +150,9 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, now time.Time
 		confidence := maConfidenceLabel(coverage)
 		flags := computeMAFlags(contexts[i])
 		viability, knockout := computeViability(contexts[i])
+		thesisFit := computeThesisFit(contexts[i], params.ThesisFitHoldingFactor)
 
-		targets[i].Score = int(math.Round(blended * viability * 100))
+		targets[i].Score = int(math.Round(blended * viability * thesisFit * 100))
 		if targets[i].Score > 100 {
 			targets[i].Score = 100
 		}
@@ -148,6 +163,7 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, now time.Time
 			targets[i].MatchState = maMatchStateFromConfidence(confidence)
 		}
 		targets[i].Evidence = evidence
+		targets[i].Adjustments = maScoreAdjustments(viability, thesisFit)
 		targets[i].Flags = flags
 		targets[i].MissingCriteria = cleanStringList(missing, 20, 80)
 		targets[i].Rationale = maRationaleV2(thesis, evidence, flags)
@@ -256,6 +272,72 @@ func computeViability(c maSignalContext) (factor float64, knockout bool) {
 
 	factor = statusFactor * balanceFactor * equityFactor
 	return factor, factor < maViabilityKnockoutFloor
+}
+
+// computeThesisFit returns a multiplicative demotion factor in (0,1] for a target
+// that structurally contradicts the acquisition thesis. Like viability it lives
+// OUTSIDE the additive blend: missing/ambiguous ownership is neutral (1.0), only
+// a clear contradiction demotes — a haircut, never a knockout, so the company
+// stays visible and simply ranks lower. Currently only the succession thesis
+// defines a contradiction: a company (holding) controls the capital, the
+// antithesis of an exiting individual owner. Owner AGE is handled separately by
+// the succession_owner signal; this factor reads only the owner TYPE.
+func computeThesisFit(c maSignalContext, holdingFactor float64) float64 {
+	if c.thesis != maThesisSuccession {
+		return 1.0
+	}
+	holder, ok := dominantHolder(c)
+	if !ok {
+		return 1.0 // no clear controller (or no shareholder data) → neutral
+	}
+	if isPersonShareholder(holder) {
+		return 1.0 // a natural person controls → on-thesis
+	}
+	// A company/holding controls. Clamp defensively to (0,1] so a misconfigured
+	// parameter can never turn the haircut into a knockout or a bonus.
+	if holdingFactor <= 0 || holdingFactor > 1 || math.IsNaN(holdingFactor) {
+		holdingFactor = 1 - maThesisFitHoldingHaircutPctDefault/100
+	}
+	return holdingFactor
+}
+
+// dominantHolder returns the controlling shareholder — the sole holder, or the
+// one holding >=50% — and whether such a controller was found.
+func dominantHolder(c maSignalContext) (maShareholder, bool) {
+	if len(c.holders) == 1 {
+		return c.holders[0], true
+	}
+	var best maShareholder
+	found := false
+	for _, holder := range c.holders {
+		if holder.PercentShare >= 50 && (!found || holder.PercentShare > best.PercentShare) {
+			best, found = holder, true
+		}
+	}
+	return best, found
+}
+
+// maScoreAdjustments surfaces the score multipliers as breakdown rows so the
+// displayed score reconstructs from the evidence. Only factors below 1 are
+// emitted (a no-op factor stays silent, like the confidence caveat); the
+// specific "why" is carried by the warning flags.
+func maScoreAdjustments(viability, thesisFit float64) []MATargetAdjustment {
+	adjustments := make([]MATargetAdjustment, 0, 2)
+	if viability < 1.0 {
+		adjustments = append(adjustments, MATargetAdjustment{
+			Code:   "viability",
+			Label:  "Vitalità ridotta",
+			Factor: math.Round(viability*100) / 100,
+		})
+	}
+	if thesisFit < 1.0 {
+		adjustments = append(adjustments, MATargetAdjustment{
+			Code:   "controllo_holding",
+			Label:  "Controllo holding (successione)",
+			Factor: math.Round(thesisFit*100) / 100,
+		})
+	}
+	return adjustments
 }
 
 func maThesisLabel(thesis string) string {
@@ -503,4 +585,31 @@ func measureEquitySolidity(c maSignalContext) maSignalSample {
 		score = 1.0
 	}
 	return maSignalSample{Applicable: true, Score: score, Label: fmt.Sprintf("%.0f%% PN", ratio*100)}
+}
+
+// measureSuccessionOwner scores the succession readiness of the controlling owner
+// by AGE. Applicable only when a natural person controls (>=50%) and the age
+// decodes from the tax code; otherwise it drops out and re-normalizes — a
+// holding-controlled company is demoted by computeThesisFit, not penalized here.
+// The ramp peaks above the threshold and tapers below it, never to zero (a person
+// owner always carries some succession relevance). Threshold comes from the
+// strategy (LLM-extracted), falling back to maSuccessionDefaultMinAge.
+func measureSuccessionOwner(c maSignalContext) maSignalSample {
+	age, ok := dominantOwnerAge(c)
+	if !ok {
+		return maSignalSample{}
+	}
+	threshold := successionMinAge(c.strategy)
+	var score float64
+	switch d := age - threshold; {
+	case d >= 20:
+		score = 1.0
+	case d >= 0:
+		score = 0.7 + 0.3*float64(d)/20.0
+	case d >= -15:
+		score = 0.7 + 0.5*float64(d)/15.0 // d<0 → tapers from 0.7 down to 0.2
+	default:
+		score = 0.1
+	}
+	return maSignalSample{Applicable: true, Score: score, Label: fmt.Sprintf("socio %d anni", age)}
 }
