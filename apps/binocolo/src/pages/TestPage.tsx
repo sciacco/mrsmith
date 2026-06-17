@@ -257,6 +257,13 @@ export function TestPage() {
     },
   });
 
+  const recompute = useMutation({
+    mutationFn: () => api.post<{ recomputed: number }>('/binocolo/v1/ma/deep/recompute', {}),
+  });
+  const regenerateBriefs = useMutation({
+    mutationFn: () => api.post<{ regenerated: number }>('/binocolo/v1/ma/deep/regenerate-briefs', {}),
+  });
+
   const companyData = companySearch.data?.data;
   const companyRows: CompanySearchRow[] = Array.isArray(companyData)
     ? (companyData as CompanySearchRow[])
@@ -497,6 +504,54 @@ export function TestPage() {
             </div>
           </>
         )}
+      </section>
+
+      <section className={styles.panel} aria-labelledby="maint-title">
+        <div className={styles.panelHeader}>
+          <div>
+            <div className={styles.endpointLine}>
+              <span className={styles.method}>POST</span>
+              <span className={styles.path}>/binocolo/v1/ma/deep/recompute · /regenerate-briefs</span>
+            </div>
+            <h2 id="maint-title" className={styles.sectionTitle}>Manutenzione deep analysis</h2>
+          </div>
+          <div className={styles.formActions}>
+            <Button
+              variant="secondary"
+              loading={recompute.isPending}
+              onClick={() => recompute.mutate()}
+              leftIcon={<Icon name="refresh-cw" />}
+            >
+              Ricalcola scorecard
+            </Button>
+            <Button
+              variant="secondary"
+              loading={regenerateBriefs.isPending}
+              onClick={() => regenerateBriefs.mutate()}
+              leftIcon={<Icon name="file-text" />}
+            >
+              Rigenera brief (LLM)
+            </Button>
+          </div>
+        </div>
+        {recompute.isSuccess || recompute.isError ? (
+          <div className={styles.responseBar}>
+            <span>
+              {recompute.isError
+                ? errorLabel(recompute.error)
+                : `Ricalcolate ${recompute.data?.recomputed ?? 0} scorecard dalla cache (nessuna chiamata IT-full, €0).`}
+            </span>
+          </div>
+        ) : null}
+        {regenerateBriefs.isSuccess || regenerateBriefs.isError ? (
+          <div className={styles.responseBar}>
+            <span>
+              {regenerateBriefs.isError
+                ? errorLabel(regenerateBriefs.error)
+                : `Rigenerati ${regenerateBriefs.data?.regenerated ?? 0} brief via LLM (nessuna chiamata IT-full).`}
+            </span>
+          </div>
+        ) : null}
       </section>
     </div>
   );

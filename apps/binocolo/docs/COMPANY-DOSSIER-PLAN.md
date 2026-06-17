@@ -140,7 +140,28 @@ Deve precedere 0.3b.
 MaxTokens 900→2200; `parseMADeepBrief` ripulisce/limita i nuovi campi. Migration `045`
 aggiorna **in place** il prompt di default (id `…402`, `prompt_id` stabile). Sblocca 0.3b.
 
-## Fase 2 — Pagina (frontend)
+## Fase 2 — Pagina (frontend) ✅ FATTO
+
+Direzione scelta: **Variant A** (hero verdict-first + rail sticky + sezioni; fatti
+sotto, raggiungibili dalla rail). Implementato:
+- `pages/CompanyDossierPage.tsx` + `CompanyDossierPage.module.css` (clean theme/tokens);
+  rotta `/azienda` in `routes.tsx`, voce nav "Dossier azienda" in `App.tsx`.
+- **State machine lookup**: POST cache-first → `ready` mostra subito · `cost_required`
+  → pannello inline conferma 0,30 € · `queued/running` → stato "Analisi in corso" +
+  polling GET ogni 3s · `failed` → retry.
+- **Dossier**: hero (RAG pill, banda equity in mono, KPI con trend, verdetto), rail a
+  8 sezioni, tag provenienza Elaborazione/Fonte, brief ricco (profilo, lettura, forza,
+  red flag categorizzate con DD, cosa indagare), valutazione, scorecard a gruppi con
+  dot RAG, **bilancio riclassificato** via `iicLegend.json`, soci/gruppo/sedi/cariche/
+  gare, anagrafica, pavimento **Dati completi** (raw collassabile).
+- `tsc --noEmit` 0 errori. **Smoke test superato**: render reale di MFT ITALIA
+  (`01522380193`) verificato in browser via `playwright-cli` su istanza dev dedicata
+  (screenshot `artifacts/claude/dossier-mft.png`); nessun errore di render (solo
+  favicon 404). Aggiunto `apps/binocolo/.env.local` (`VITE_DEV_AUTH_BYPASS=true`, come
+  gli altri app) per lo smoke; il dev di binocolo ora bypassa l'auth come gli altri.
+- Nota: lo smoke mostra ancora i **valori vecchi** (debt_ratio presente,
+  capitalizzazione 0,11%) perché il recompute (0.3a) non è stato invocato sui dati live
+  — il rendering è corretto, i valori si raddrizzano dopo l'azione ops.
 
 ### 2.1 Wiring
 Rotta in `routes.tsx` + voce in `App.tsx navItems` + page + CSS module. **Nessun
