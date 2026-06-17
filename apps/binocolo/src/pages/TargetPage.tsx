@@ -111,6 +111,7 @@ export function TargetPage() {
   const [modalActiveTab, setModalActiveTab] = useState<'overview' | 'deep' | 'financials' | 'shareholders' | 'registry'>('overview');
   const [lifecycleBusyId, setLifecycleBusyId] = useState<string | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<MASessionSummary | null>(null);
+  const [lastSessionId, setLastSessionId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('mrsmith_binocolo_sidebar_collapsed');
@@ -149,6 +150,7 @@ export function TargetPage() {
     setSelectedTargetId(null);
     setAcknowledgeCost(false);
     setIsFullDetailOpen(false);
+    setLastSessionId(null);
   }, []);
 
   const startNewSearch = useCallback(() => {
@@ -198,30 +200,49 @@ export function TargetPage() {
     };
   }, [api]);
 
+  const sortedTargets = useMemo(() => {
+    if (!detail?.targets) return [];
+    return [...detail.targets].sort((a, b) => {
+      const ra = a.rating ?? 0;
+      const rb = b.rating ?? 0;
+      if (ra !== rb) {
+        return rb - ra; // Stars (3, 2, 1) > unrated (0) > excluded (-1)
+      }
+      if (a.score !== b.score) {
+        return b.score - a.score;
+      }
+      return a.companyName.localeCompare(b.companyName);
+    });
+  }, [detail?.targets]);
+
   const [showOutside, setShowOutside] = useState(false);
 
   useEffect(() => {
     if (!detail?.strategy?.strategy) return;
     setStrategy(detail.strategy.strategy);
     setChosenStrategy(detail.session.selectedStrategy ?? detail.strategy.strategy.selectedStrategy ?? '');
-    const firstVisible = detail.targets.find((target) => target.matchState !== 'fuori_criterio') ?? detail.targets[0];
-    setSelectedTargetId(firstVisible?.id ?? null);
-  }, [detail]);
+    
+    if (detail.session.id !== lastSessionId) {
+      setLastSessionId(detail.session.id);
+      const firstVisible = sortedTargets.find((target) => target.matchState !== 'fuori_criterio') ?? sortedTargets[0];
+      setSelectedTargetId(firstVisible?.id ?? null);
+    }
+  }, [detail, lastSessionId, sortedTargets]);
 
   // Sector gate (and viability knockout) land off-perimeter targets in
   // fuori_criterio; they are hidden by default, revealable via a toggle so the
   // filtering is never silent. Selection and the shortlist track the visible set.
   const visibleTargets = useMemo(
-    () => (detail?.targets ?? []).filter((target) => target.matchState !== 'fuori_criterio'),
-    [detail?.targets],
+    () => sortedTargets.filter((target) => target.matchState !== 'fuori_criterio'),
+    [sortedTargets],
   );
   const hiddenCount = (detail?.targets.length ?? 0) - visibleTargets.length;
-  const shortlistRows = showOutside ? (detail?.targets ?? []) : visibleTargets;
+  const shortlistRows = showOutside ? sortedTargets : visibleTargets;
 
   const selectedTarget = useMemo(() => {
     if (!detail?.targets.length) return null;
-    return detail.targets.find((target) => target.id === selectedTargetId) ?? shortlistRows[0] ?? detail.targets[0];
-  }, [detail?.targets, selectedTargetId, shortlistRows]);
+    return detail.targets.find((target) => target.id === selectedTargetId) ?? shortlistRows[0] ?? sortedTargets[0];
+  }, [detail?.targets, selectedTargetId, shortlistRows, sortedTargets]);
 
   const estimateGroups = useMemo(() => groupEstimates(detail?.estimates ?? []), [detail?.estimates]);
   const selectedEstimateType = chosenStrategy || estimateGroups.find((group) => group.selected)?.type || '';
@@ -380,8 +401,8 @@ export function TargetPage() {
   }
 
   function exportCSV() {
-    if (!detail?.targets.length) return;
-    const blob = new Blob([targetsToCSV(detail.targets)], { type: 'text/csv;charset=utf-8' });
+    if (!sortedTargets.length || !detail) return;
+    const blob = new Blob([targetsToCSV(sortedTargets)], { type: 'text/csv;charset=utf-8' });
     downloadBlob(blob, `target-ma-${safeFilename(detail.session.title)}.csv`);
   }
 
