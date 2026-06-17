@@ -1630,6 +1630,7 @@ INSERT INTO binocolo.ma_deep_analysis (company_key, vat_code, tax_code, status, 
 VALUES ($1, $2, $3, 'queued', $4)
 ON CONFLICT (company_key) DO UPDATE
 SET status = 'queued', attempts = 0, error_code = NULL, vendor_request_id = NULL, requested_at = NULL,
+    lease_until = NULL, locked_by = NULL,
     vat_code = EXCLUDED.vat_code, tax_code = EXCLUDED.tax_code,
     refreshed_by_email = EXCLUDED.refreshed_by_email, updated_at = now()
 WHERE binocolo.ma_deep_analysis.status = 'failed'
@@ -1640,20 +1641,23 @@ WHERE binocolo.ma_deep_analysis.status = 'failed'
 	return nil
 }
 
-func (s *SQLStore) ListMADeepJobs(ctx context.Context, limit int) ([]maDeepJob, error) {
+func (s *SQLStore) ListMADeepJobs(ctx context.Context, limit int, workerID string) ([]maDeepJob, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
 	if limit <= 0 {
 		limit = 16
 	}
+	// Only surface rows that are free or already owned by this worker, so workers do
+	// not even fetch rows another worker is actively processing.
 	rows, err := s.db.QueryContext(ctx, `
 SELECT company_key, COALESCE(vat_code, ''), COALESCE(tax_code, ''), status, COALESCE(vendor_request_id, ''), attempts
 FROM binocolo.ma_deep_analysis
 WHERE status IN ('queued', 'running')
+  AND (lease_until IS NULL OR lease_until < now() OR locked_by = $2)
 ORDER BY updated_at
 LIMIT $1
-`, limit)
+`, limit, workerID)
 	if err != nil {
 		return nil, fmt.Errorf("list ma deep jobs: %w", err)
 	}
@@ -1691,6 +1695,32 @@ WHERE company_key = $1 AND status = 'queued'
 	affected, err := result.RowsAffected()
 	if err != nil {
 		return false, fmt.Errorf("claim ma deep queued rows: %w", err)
+	}
+	return affected == 1, nil
+}
+
+// AcquireMADeepLease grants the calling worker exclusive ownership of a row for
+// leaseSeconds (measured on the DB clock, so it is immune to clock skew across worker
+// machines). Returns true only for the worker that wins the atomic update; others skip.
+// A worker renews its own lease (locked_by match); a crashed worker's lease simply
+// expires and the row becomes reclaimable. This is what makes the worker correct with
+// multiple instances on one DB (shared staging, k8s replicas, rolling-deploy overlap).
+func (s *SQLStore) AcquireMADeepLease(ctx context.Context, companyKey, workerID string, leaseSeconds int) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	result, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_deep_analysis
+SET lease_until = now() + ($3::int * interval '1 second'), locked_by = $2
+WHERE company_key = $1 AND status IN ('queued', 'running')
+  AND (lease_until IS NULL OR lease_until < now() OR locked_by = $2)
+`, companyKey, workerID, leaseSeconds)
+	if err != nil {
+		return false, fmt.Errorf("acquire ma deep lease: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("acquire ma deep lease rows: %w", err)
 	}
 	return affected == 1, nil
 }

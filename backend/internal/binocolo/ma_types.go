@@ -54,6 +54,11 @@ const (
 	// is reset when a job is claimed (queued->running), so it is a pure poll budget.
 	maDeepMaxAttempts = 60
 
+	// maDeepLeaseSeconds is how long a worker owns a deep-analysis row after acquiring
+	// its lease. Longer than the slowest single process() (the IT-full POST plus the
+	// LLM brief), short enough that a crashed worker's rows are reclaimed promptly.
+	maDeepLeaseSeconds = 60
+
 	maEvidenceMatch   = "match"
 	maEvidencePartial = "match_parziale"
 	maEvidenceMissing = "criterio_mancante"

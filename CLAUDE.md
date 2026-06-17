@@ -1,5 +1,9 @@
 @AGENTS.md
 
+## Database safety (ABSOLUTE)
+- NEVER run any operation — DDL, DML, migrations, `psql`, or even read-only queries — directly against a database whose connection string is configured in an env file (`backend/.env`: `ANISETTA_DSN`, `MISTRA_DSN`, `MANUTENZIONI_DSN`, grappa/alyante/coperture DSNs, etc.). Never connect with those DSNs and never offer to. They are shared staging/production databases owned by the team — a direct operation risks data loss, breaking colleagues, or an outage.
+- Deliver schema changes only as migration `.sql` files in `deploy/migrations/` for the user to apply through their own process. For data inspection, ask the user to run the query and paste the result. Reading the `.env` file is fine; connecting to the database it points to is not.
+
 ## Type-checking
 - Always use `pnpm --filter <app> exec tsc --noEmit` to type-check, never bare `npx tsc`. The global TS is 4.x; workspaces depend on TS 5.x.
 

@@ -691,14 +691,14 @@ export function CompanyDossierPage() {
           </div>
           <p className={styles.stateTitle}>Prima analisi di {costPrompt.vat}</p>
           <p className={styles.stateText}>
-            Questa azienda non è ancora in archivio. Una nuova analisi IT-full costa {COST_LABEL}.
+            Questa azienda non è ancora in archivio. Confermi l'acquisizione del fascicolo?
           </p>
           <div className={styles.costActions}>
             <Button variant="secondary" onClick={() => setCostPrompt(null)}>
               Annulla
             </Button>
             <Button loading={start.isPending} onClick={() => start.mutate({ v: costPrompt.vat, ack: true })}>
-              Analizza ({COST_LABEL})
+              Analizza
             </Button>
           </div>
         </div>

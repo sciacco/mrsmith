@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 	"github.com/sciacco/mrsmith/internal/platform/openrouter"
@@ -16,7 +17,8 @@ import (
 // maDeepWorkerStore is the persistence the deep-dive worker needs. *SQLStore
 // satisfies it; kept narrow so the worker stays testable and decoupled.
 type maDeepWorkerStore interface {
-	ListMADeepJobs(ctx context.Context, limit int) ([]maDeepJob, error)
+	ListMADeepJobs(ctx context.Context, limit int, workerID string) ([]maDeepJob, error)
+	AcquireMADeepLease(ctx context.Context, companyKey, workerID string, leaseSeconds int) (bool, error)
 	ClaimMADeepQueued(ctx context.Context, companyKey string) (bool, error)
 	SetMADeepVendorRequest(ctx context.Context, companyKey, vendorRequestID string) error
 	ResolveSectorMultiple(ctx context.Context, ateco string) (*sectorMultiple, error)
@@ -32,6 +34,7 @@ type maDeepWorkerStore interface {
 // State lives in ma_deep_analysis, so a process restart resumes naturally — the
 // first tick picks up any queued/running rows. No in-memory queue to lose.
 type maDeepWorker struct {
+	id        string
 	store     maDeepWorkerStore
 	openapiit *openapiit.Client
 	ai        maAIClient
@@ -42,6 +45,7 @@ type maDeepWorker struct {
 
 func newMADeepWorker(store maDeepWorkerStore, client *openapiit.Client, ai *openrouter.Client, pricing func(context.Context) maPricing) *maDeepWorker {
 	worker := &maDeepWorker{
+		id:        uuid.NewString(),
 		store:     store,
 		openapiit: client,
 		pricing:   pricing,
@@ -71,7 +75,7 @@ func (w *maDeepWorker) run(ctx context.Context) {
 }
 
 func (w *maDeepWorker) tick(ctx context.Context) {
-	jobs, err := w.store.ListMADeepJobs(ctx, w.batch)
+	jobs, err := w.store.ListMADeepJobs(ctx, w.batch, w.id)
 	if err != nil {
 		logging.FromContext(ctx).Warn("binocolo deep worker list jobs failed", "component", "binocolo", "operation", "ma_deep_worker", "error", err)
 		return
@@ -82,6 +86,19 @@ func (w *maDeepWorker) tick(ctx context.Context) {
 }
 
 func (w *maDeepWorker) process(ctx context.Context, job maDeepJob) {
+	// Per-row lease: only the owning worker advances a row. Without it, a worker that
+	// is NOT the claimer would see a just-claimed row as running-without-id and wrongly
+	// fail it (missing_request_id), and several workers would regenerate the LLM brief
+	// in parallel. This is what makes the worker correct with multiple instances on one
+	// DB (shared staging across devs, k8s replicas, rolling-deploy overlap).
+	owned, err := w.store.AcquireMADeepLease(ctx, job.CompanyKey, w.id, maDeepLeaseSeconds)
+	if err != nil {
+		logging.FromContext(ctx).Warn("binocolo deep worker lease failed", "component", "binocolo", "company_key", job.CompanyKey, "error", err)
+		return
+	}
+	if !owned {
+		return // another worker owns this row right now
+	}
 	switch job.Status {
 	case maDeepStatusQueued:
 		ident := strings.TrimSpace(job.VATCode)
