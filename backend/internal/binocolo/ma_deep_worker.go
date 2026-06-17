@@ -190,15 +190,27 @@ func (w *maDeepWorker) generateBrief(ctx context.Context, rawPayload json.RawMes
 	if err != nil {
 		return nil, "", "", err
 	}
+	brief, err := buildMADeepBriefLLM(ctx, w.ai, model, prompt, rawPayload, scorecard, valuation)
+	if err != nil {
+		return nil, "", "", err
+	}
+	return brief, model.ID, prompt.ID, nil
+}
+
+// buildMADeepBriefLLM runs the rich-brief LLM call for a single company. Shared by the
+// deep-dive worker (fresh analyses) and service-level brief regeneration (rolling out a
+// new prompt to already-cached companies). Numbers come from scorecard/valuation; the
+// curated raw payload supplies qualitative facts. No IT-full call.
+func buildMADeepBriefLLM(ctx context.Context, ai maAIClient, model maLLMModel, prompt maLLMPrompt, rawPayload json.RawMessage, scorecard *MADeepScorecard, valuation *MADeepValuation) (*MADeepBrief, error) {
 	briefInput := map[string]any{"scorecard": scorecard, "valuation": valuation}
 	if company := curateITFullForBrief(rawPayload); company != nil {
 		briefInput["company"] = company
 	}
 	input, err := json.Marshal(briefInput)
 	if err != nil {
-		return nil, "", "", err
+		return nil, err
 	}
-	resp, err := w.ai.Chat(ctx, openrouter.ChatRequest{
+	resp, err := ai.Chat(ctx, openrouter.ChatRequest{
 		Model:          model.Model,
 		Temperature:    0,
 		MaxTokens:      2200,
@@ -209,13 +221,9 @@ func (w *maDeepWorker) generateBrief(ctx context.Context, rawPayload json.RawMes
 		},
 	})
 	if err != nil {
-		return nil, "", "", err
+		return nil, err
 	}
-	brief, err := parseMADeepBrief(resp.Content)
-	if err != nil {
-		return nil, "", "", err
-	}
-	return brief, model.ID, prompt.ID, nil
+	return parseMADeepBrief(resp.Content)
 }
 
 func parseMADeepBrief(content string) (*MADeepBrief, error) {

@@ -84,6 +84,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/execute", h.handleExecuteMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/export", h.handleExportMASession)
 	handle("POST /binocolo/v1/ma/deep/recompute", h.handleRecomputeMADeep)
+	handle("POST /binocolo/v1/ma/deep/regenerate-briefs", h.handleRegenerateMADeepBriefs)
 	handle("GET /binocolo/v1/companies/{vat}/dossier", h.handleGetCompanyDossier)
 	handle("POST /binocolo/v1/companies/{vat}/dossier", h.handleCreateCompanyDossier)
 	return runDeepWorker
@@ -296,6 +297,25 @@ func (h *Handler) handleRecomputeMADeep(w http.ResponseWriter, r *http.Request) 
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, map[string]any{"recomputed": count})
+}
+
+// handleRegenerateMADeepBriefs re-runs the LLM brief for every cached analysis from its
+// stored payload (no IT-full call). Used to roll out a new brief prompt after a prompt
+// change. Gated by the standard binocolo access role.
+func (h *Handler) handleRegenerateMADeepBriefs(w http.ResponseWriter, r *http.Request) {
+	subject, email := companySearchRefreshActor(r.Context())
+	var ok bool
+	r, ok = h.startMATrace(w, r, "ma_deep_regenerate_briefs", "", nil, subject, email)
+	if !ok {
+		return
+	}
+	count, err := h.ma.regenerateMADeepBriefs(r.Context())
+	if err != nil {
+		h.maFailure(w, r, "ma_deep_regenerate_briefs", err)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, map[string]any{"regenerated": count})
 }
 
 // handleGetCompanyDossier returns the cached dossier state for a P.IVA (poll target);

@@ -41,6 +41,8 @@ type maWorkspaceStore interface {
 	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
 	UpdateMADeepScorecard(ctx context.Context, companyKey string, scorecard *MADeepScorecard) error
 	GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRecord, error)
+	ListMADeepReadyForBrief(ctx context.Context) ([]maDeepBriefRow, error)
+	UpdateMADeepBrief(ctx context.Context, companyKey string, brief *MADeepBrief, modelID, promptID string) error
 }
 
 func (s *SQLStore) ListMASessions(ctx context.Context, visibility string) ([]MASessionSummary, error) {
@@ -1901,6 +1903,74 @@ LIMIT 1
 		rec.Payload = json.RawMessage(payloadRaw)
 	}
 	return &rec, nil
+}
+
+type maDeepBriefRow struct {
+	CompanyKey string
+	Payload    json.RawMessage
+	Valuation  *MADeepValuation
+}
+
+// ListMADeepReadyForBrief returns ready rows with their cached payload + valuation, for
+// LLM brief regeneration (the scorecard is rebuilt from the payload). No vendor call.
+func (s *SQLStore) ListMADeepReadyForBrief(ctx context.Context) ([]maDeepBriefRow, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT company_key, itfull_payload, valuation
+FROM binocolo.ma_deep_analysis
+WHERE status = 'ready' AND itfull_payload IS NOT NULL AND itfull_payload <> 'null'::jsonb
+ORDER BY updated_at
+`)
+	if err != nil {
+		return nil, fmt.Errorf("list ma deep ready for brief: %w", err)
+	}
+	defer rows.Close()
+	out := []maDeepBriefRow{}
+	for rows.Next() {
+		var row maDeepBriefRow
+		var payload, valuationRaw []byte
+		if err := rows.Scan(&row.CompanyKey, &payload, &valuationRaw); err != nil {
+			return nil, fmt.Errorf("scan ma deep brief row: %w", err)
+		}
+		row.Payload = json.RawMessage(payload)
+		if len(valuationRaw) > 0 {
+			var v MADeepValuation
+			if json.Unmarshal(valuationRaw, &v) == nil {
+				row.Valuation = &v
+			}
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma deep brief rows: %w", err)
+	}
+	return out, nil
+}
+
+// UpdateMADeepBrief overwrites the brief column and its model/prompt provenance, leaving
+// scorecard/valuation/payload untouched. Used by brief regeneration.
+func (s *SQLStore) UpdateMADeepBrief(ctx context.Context, companyKey string, brief *MADeepBrief, modelID, promptID string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	raw := json.RawMessage("null")
+	if brief != nil {
+		b, err := json.Marshal(brief)
+		if err != nil {
+			return fmt.Errorf("marshal ma deep brief: %w", err)
+		}
+		raw = b
+	}
+	if _, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_deep_analysis
+SET brief = $2::jsonb, model_id = $3::uuid, prompt_id = $4::uuid, updated_at = now()
+WHERE company_key = $1
+`, companyKey, []byte(raw), nullString(modelID), nullString(promptID)); err != nil {
+		return fmt.Errorf("update ma deep brief: %w", err)
+	}
+	return nil
 }
 
 type sectorMultiple struct {

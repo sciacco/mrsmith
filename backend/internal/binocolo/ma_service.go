@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 	"github.com/xuri/excelize/v2"
@@ -698,6 +699,48 @@ func (s *maService) updateParameter(ctx context.Context, key, value, subject, em
 // funnel and the dossier share this global cache). Valuation is intentionally left
 // as-is: it derives from ebitda/turnover/PFN/sector-multiple, which the scorecard
 // fixes do not touch. The brief is regenerated separately (it needs the LLM).
+// regenerateMADeepBriefs re-runs the LLM brief for every cached analysis from its stored
+// payload + valuation (scorecard rebuilt deterministically). No IT-full call — used to
+// roll out a new brief prompt to already-analyzed companies. Per-row LLM failures are
+// skipped (best-effort), so one bad row never aborts the batch.
+func (s *maService) regenerateMADeepBriefs(ctx context.Context) (int, error) {
+	if s.store == nil {
+		return 0, errMAStoreUnavailable
+	}
+	if s.ai == nil {
+		return 0, errMAOpenRouterUnavailable
+	}
+	model, err := s.store.ResolveMAModel(ctx, maModelScopeDeepBrief, "")
+	if err != nil {
+		return 0, err
+	}
+	prompt, err := s.store.ResolveMAPrompt(ctx, maModelScopeDeepBrief, "")
+	if err != nil {
+		return 0, err
+	}
+	rows, err := s.store.ListMADeepReadyForBrief(ctx)
+	if err != nil {
+		return 0, err
+	}
+	regenerated := 0
+	for _, row := range rows {
+		scorecard := buildMADeepScorecard(row.Payload)
+		if scorecard == nil {
+			continue
+		}
+		brief, err := buildMADeepBriefLLM(ctx, s.ai, model, prompt, row.Payload, scorecard, row.Valuation)
+		if err != nil {
+			logging.FromContext(ctx).Warn("binocolo brief regenerate failed", "component", "binocolo", "operation", "ma_deep_regenerate_briefs", "company_key", row.CompanyKey, "error", err)
+			continue
+		}
+		if err := s.store.UpdateMADeepBrief(ctx, row.CompanyKey, brief, model.ID, prompt.ID); err != nil {
+			return regenerated, err
+		}
+		regenerated++
+	}
+	return regenerated, nil
+}
+
 func (s *maService) recomputeMADeepScorecards(ctx context.Context) (int, error) {
 	if s.store == nil {
 		return 0, errMAStoreUnavailable

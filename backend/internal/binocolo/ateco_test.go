@@ -866,6 +866,14 @@ func (f *fakeMAWorkspaceStore) GetMADeepByVAT(context.Context, string) (*maDeepV
 	return nil, nil
 }
 
+func (f *fakeMAWorkspaceStore) ListMADeepReadyForBrief(context.Context) ([]maDeepBriefRow, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpdateMADeepBrief(context.Context, string, *MADeepBrief, string, string) error {
+	return nil
+}
+
 func (f *fakeMAWorkspaceStore) RecordMAModelAudit(context.Context, maModelAuditWrite) error {
 	return nil
 }
