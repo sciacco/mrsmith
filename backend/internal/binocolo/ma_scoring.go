@@ -135,13 +135,18 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, now time.Time
 		}
 		confidence := maConfidenceLabel(coverage)
 		flags := computeMAFlags(contexts[i])
+		viability, knockout := computeViability(contexts[i])
 
-		targets[i].Score = int(math.Round(blended * 100))
+		targets[i].Score = int(math.Round(blended * viability * 100))
 		if targets[i].Score > 100 {
 			targets[i].Score = 100
 		}
 		targets[i].Confidence = confidence
-		targets[i].MatchState = maMatchStateFromConfidence(confidence)
+		if knockout {
+			targets[i].MatchState = maMatchStateOutside
+		} else {
+			targets[i].MatchState = maMatchStateFromConfidence(confidence)
+		}
 		targets[i].Evidence = evidence
 		targets[i].Flags = flags
 		targets[i].MissingCriteria = cleanStringList(missing, 20, 80)
@@ -192,6 +197,65 @@ func maMatchStateFromConfidence(confidence string) string {
 		return maMatchStateMatch
 	}
 	return maMatchStatePartial
+}
+
+const (
+	maViabilityKnockoutFloor  = 0.25
+	maBalancePhysiologicalGap = 2 // years; a filing lag up to here is normal, no penalty
+)
+
+// computeViability collapses the fit blend toward zero for distressed / dormant
+// companies and reports whether the target should be knocked out to
+// fuori_criterio. Unlike the fit signals it lives OUTSIDE the coverage
+// re-normalization: missing or zero financial health is a penalty here, not a
+// neutral drop — so a company that lacks the data to compute solidity (e.g. no
+// revenue) can no longer have that weight quietly redistributed onto the signals
+// it scores well on. Confidence stays a pure coverage measure; viability drives
+// the score. Reads the same payload signals as computeMAFlags, whose warning
+// flags are the human-readable "why" behind a low score.
+func computeViability(c maSignalContext) (factor float64, knockout bool) {
+	// Activity status — ceased is a hard knockout.
+	if vendorBool(c.object, "taxCodeCeased") {
+		return 0, true
+	}
+	statusFactor := 1.0
+	if status := strings.ToUpper(strings.TrimSpace(c.target.ActivityStatus)); status != "" && status != "ATTIVA" {
+		statusFactor = 0.2
+	}
+
+	// Balance freshness/presence — a filing lag up to maBalancePhysiologicalGap
+	// years is physiological (in 2026 a 2024 balance is normal) and not penalized;
+	// the bilancio_datato flag still surfaces it as information.
+	balanceFactor := 1.0
+	if c.fin.Turnover == nil {
+		balanceFactor = 0.3
+	} else if c.fin.LastYear > 0 {
+		switch gap := c.now.Year() - c.fin.LastYear; {
+		case gap <= maBalancePhysiologicalGap:
+			balanceFactor = 1.0
+		case gap == 3:
+			balanceFactor = 0.8
+		case gap == 4:
+			balanceFactor = 0.6
+		case gap == 5:
+			balanceFactor = 0.4
+		default:
+			balanceFactor = 0.25
+		}
+	}
+
+	// Equity soundness — mirrors the patrimonio_netto flags.
+	equityFactor := 1.0
+	switch {
+	case c.fin.NetWorth != nil && *c.fin.NetWorth < 0:
+		equityFactor = 0.3
+	case c.fin.NetWorth != nil && c.fin.PrevNetWorth != nil &&
+		*c.fin.PrevNetWorth > 0 && float64(*c.fin.NetWorth) < maPatrimonioErosionFactor*float64(*c.fin.PrevNetWorth):
+		equityFactor = 0.6
+	}
+
+	factor = statusFactor * balanceFactor * equityFactor
+	return factor, factor < maViabilityKnockoutFloor
 }
 
 func maThesisLabel(thesis string) string {

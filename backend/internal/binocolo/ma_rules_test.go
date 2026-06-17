@@ -206,9 +206,9 @@ const prometeoPayload = `{
     "all": [
       {"year": 2023, "turnover": 1226650, "netWorth": 44696, "employees": 19, "totalAssets": 2272968},
       {"year": 2024, "turnover": 1217690, "netWorth": 40432, "employees": 15, "totalAssets": 2245815},
-      {"year": 2025, "turnover": 1234085, "netWorth": 3231, "employees": 16, "totalAssets": 2236197}
+      {"year": 2025, "turnover": 1234085, "netWorth": 42000, "employees": 16, "totalAssets": 2236197}
     ],
-    "last": {"year": 2025, "turnover": 1234085, "netWorth": 3231, "employees": 16, "totalAssets": 2236197}
+    "last": {"year": 2025, "turnover": 1234085, "netWorth": 42000, "employees": 16, "totalAssets": 2236197}
   }
 }`
 

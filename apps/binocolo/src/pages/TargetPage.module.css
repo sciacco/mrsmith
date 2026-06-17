@@ -1004,29 +1004,31 @@
   font-size: 0.8125rem;
 }
 
-/* Scoring v2: confidence badge */
-.confBadge {
+/* Scoring v2: confidence caveat — only shown for partial/insufficient coverage.
+   Dashed outline + icon marks it as a reliability note, distinct from the filled
+   "finding" flag chips (which describe the company, not our data coverage). */
+.confCaveat {
   display: inline-flex;
-  min-height: 26px;
   align-items: center;
-  padding: 0 var(--space-2);
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
   border-radius: var(--radius-full);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: capitalize;
+  font-size: 0.6875rem;
+  font-weight: 600;
   white-space: nowrap;
+  cursor: help;
 }
-.confHigh {
-  background: var(--color-success-bg);
-  color: #047857;
+.confCaveatMid {
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
 }
-.confMid {
-  background: var(--color-warning-subtle);
+.confCaveatLow {
+  border: 1px dashed var(--color-warning);
   color: var(--color-warning-strong);
 }
-.confLow {
-  background: var(--color-danger-subtle);
-  color: var(--color-danger);
+.scoreUnsure {
+  color: var(--color-text-muted);
+  opacity: 0.75;
 }
 
 /* Scoring v2: flag chips */
@@ -1286,17 +1288,35 @@
   color: var(--color-text-muted);
   font-size: 0.75rem;
 }
+.deepBrief p,
+.deepBrief li {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
 .deepVerdict {
+  font-size: 0.875rem !important;
   font-weight: 600;
   margin: 0;
+  color: var(--color-text) !important;
 }
+
+.deepThesisReading {
+  margin: 0;
+}
+
 .deepRedFlags {
   margin: 0;
   padding-left: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  font-size: 0.85rem;
+  gap: var(--space-2);
+}
+
+.deepRedFlags li strong {
+  color: var(--color-text);
+  font-weight: 600;
 }
 
 /* Scoring v2: evidence families */
@@ -1999,4 +2019,25 @@
   color: var(--color-text-muted);
   font-size: 0.75rem;
   font-family: var(--font-mono);
+}
+
+.deepLayoutGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.deepLeftCol,
+.deepRightCol,
+.deepMetricsStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  .deepLayoutGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

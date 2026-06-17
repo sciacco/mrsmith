@@ -1396,13 +1396,13 @@ export function TargetPage() {
             <div className={styles.modalSidebar}>
               <div className={styles.scoreCircleCard}>
                 <span className={styles.scoreEyebrow}>Punteggio Match</span>
-                <span className={styles.scoreLargeNumber}>{selectedTarget.score}</span>
+                <span className={`${styles.scoreLargeNumber} ${isUnsureConfidence(selectedTarget.confidence) ? styles.scoreUnsure : ''}`}>
+                  {selectedTarget.score}
+                </span>
                 <span className={`${styles.statusPill} ${styles[`status_${selectedTarget.matchState === 'match' ? 'completed' : selectedTarget.matchState === 'match_parziale' ? 'running' : 'failed'}`]}`}>
                   {matchLabel(selectedTarget.matchState)}
                 </span>
-                <span className={`${styles.confBadge} ${confidenceClass(selectedTarget.confidence)}`} style={{ marginTop: 'var(--space-2)' }}>
-                  {selectedTarget.confidence ? `confidenza ${selectedTarget.confidence}` : 'confidenza n.d.'}
-                </span>
+                <ConfidenceCaveat confidence={selectedTarget.confidence} missing={selectedTarget.missingCriteria} />
               </div>
 
               <div className={styles.sidebarFactCard}>
@@ -1737,11 +1737,6 @@ function TargetTable({
                       <RatingStars value={target.rating} onRate={(rating) => onRate(target.companyKey ?? '', rating)} />
                     </div>
                     <span className={styles.companyName}>{target.companyName}</span>
-                    {target.confidence && (
-                      <span className={`${styles.confBadge} ${confidenceClass(target.confidence)}`}>
-                        {target.confidence}
-                      </span>
-                    )}
                   </div>
                 </td>
               </tr>
@@ -1753,7 +1748,9 @@ function TargetTable({
                 </td>
                 <td>{target.turnover != null ? moneyFormat.format(target.turnover) : '-'}</td>
                 <td>
-                  <span className={styles.score}>{target.score}</span>
+                  <span className={`${styles.score} ${isUnsureConfidence(target.confidence) ? styles.scoreUnsure : ''}`}>
+                    {target.score}
+                  </span>
                 </td>
               </tr>
               <tr style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}>
@@ -1762,6 +1759,7 @@ function TargetTable({
                     {deduplicatedCodes && (
                       <span className={styles.vatTaxCodes}>{deduplicatedCodes}</span>
                     )}
+                    <ConfidenceCaveat confidence={target.confidence} missing={target.missingCriteria} />
                     <FlagChips flags={target.flags} />
                     <DeepStatusChip deep={target.deep} />
                   </div>
@@ -1812,9 +1810,7 @@ function TargetDetail({ target }: { target: MATarget }) {
     <div className={styles.targetDetail}>
       <div className={styles.detailTitleBlock}>
         <h3>{target.companyName}</h3>
-        <span className={`${styles.confBadge} ${confidenceClass(target.confidence)}`}>
-          {target.confidence ? `confidenza ${target.confidence}` : 'confidenza n.d.'}
-        </span>
+        <ConfidenceCaveat confidence={target.confidence} missing={target.missingCriteria} />
       </div>
       <FlagChips flags={target.flags} />
       <p className={styles.detailRationale}>{target.rationale || 'Motivazione non disponibile.'}</p>
@@ -1953,22 +1949,33 @@ function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
           ) : null}
         </div>
       </div>
-      {deep.valuation ? <DeepValuation valuation={deep.valuation} /> : null}
-      {deep.brief ? <DeepBriefBlock brief={deep.brief} /> : null}
-      {groups.map((group) => {
-        const metrics = scorecard.metrics.filter((metric) => metric.group === group.key);
-        if (metrics.length === 0) return null;
-        return (
-          <div key={group.key} className={styles.deepGroup}>
-            <h5>{group.label}</h5>
-            <div className={styles.deepMetrics}>
-              {metrics.map((metric) => (
-                <DeepMetricRow key={metric.key} metric={metric} />
-              ))}
-            </div>
+
+      <div className={styles.deepLayoutGrid}>
+        <div className={styles.deepLeftCol}>
+          {deep.brief ? <DeepBriefBlock brief={deep.brief} /> : null}
+        </div>
+
+        <div className={styles.deepRightCol}>
+          {deep.valuation ? <DeepValuation valuation={deep.valuation} /> : null}
+          
+          <div className={styles.deepMetricsStack}>
+            {groups.map((group) => {
+              const metrics = scorecard.metrics.filter((metric) => metric.group === group.key);
+              if (metrics.length === 0) return null;
+              return (
+                <div key={group.key} className={styles.deepGroup}>
+                  <h5>{group.label}</h5>
+                  <div className={styles.deepMetrics}>
+                    {metrics.map((metric) => (
+                      <DeepMetricRow key={metric.key} metric={metric} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2017,20 +2024,35 @@ function DeepBriefBlock({ brief }: { brief: NonNullable<MADeepAnalysis['brief']>
   return (
     <div className={styles.deepBrief}>
       <h5>Brief analista</h5>
-      {brief.verdict ? <p className={styles.deepVerdict}>{brief.verdict}</p> : null}
-      {brief.thesisReading ? <p>{brief.thesisReading}</p> : null}
+      {brief.verdict ? (
+        <p className={styles.deepVerdict}>
+          {formatPercentagesInText(brief.verdict)}
+        </p>
+      ) : null}
+      {brief.thesisReading ? (
+        <p className={styles.deepThesisReading}>
+          {formatPercentagesInText(brief.thesisReading)}
+        </p>
+      ) : null}
       {brief.redFlags && brief.redFlags.length > 0 ? (
         <ul className={styles.deepRedFlags}>
           {brief.redFlags.map((flag, index) => (
             <li key={index}>
-              <strong>{flag.claim}</strong>
-              {flag.ddQuestion ? <span> — {flag.ddQuestion}</span> : null}
+              <strong>{formatPercentagesInText(flag.claim)}</strong>
+              {flag.ddQuestion ? <span> — {formatPercentagesInText(flag.ddQuestion)}</span> : null}
             </li>
           ))}
         </ul>
       ) : null}
     </div>
   );
+}
+
+function formatPercentagesInText(text: string): string {
+  return text.replace(/(\d+)\.(\d{2,})%/g, (_, p1, p2) => {
+    const num = parseFloat(`${p1}.${p2}`);
+    return `${num.toFixed(1)}%`;
+  });
 }
 
 function formatMetricValue(value: number, unit: string): string {
@@ -2070,10 +2092,28 @@ function FlagChips({ flags }: { flags?: MATargetFlag[] }) {
   );
 }
 
-function confidenceClass(value?: string) {
-  if (value === 'alta') return styles.confHigh;
-  if (value === 'bassa') return styles.confLow;
-  return styles.confMid;
+// Confidence = data coverage, not a quality verdict. High coverage is the
+// expected baseline, so it stays silent; only partial/insufficient coverage is
+// surfaced — as a caveat that the score rests on incomplete data, never as a badge.
+function isUnsureConfidence(confidence?: string) {
+  return confidence === 'media' || confidence === 'bassa';
+}
+
+function ConfidenceCaveat({ confidence, missing }: { confidence?: string; missing?: string[] }) {
+  if (!isUnsureConfidence(confidence)) return null;
+  const isLow = confidence === 'bassa';
+  const label = isLow ? 'Dati insufficienti' : 'Dati parziali';
+  const list = (missing ?? []).filter(Boolean);
+  const detail =
+    list.length > 0
+      ? `Indicatori non disponibili: ${list.join(', ')}. Il punteggio considera solo i dati presenti.`
+      : 'Il punteggio si basa su dati parziali: alcuni indicatori non sono disponibili.';
+  return (
+    <span className={`${styles.confCaveat} ${isLow ? styles.confCaveatLow : styles.confCaveatMid}`} title={detail}>
+      <Icon name={isLow ? 'triangle-alert' : 'info'} size={12} />
+      {label}
+    </span>
+  );
 }
 
 function EvidenceRow({ evidence }: { evidence: MATargetEvidence }) {
