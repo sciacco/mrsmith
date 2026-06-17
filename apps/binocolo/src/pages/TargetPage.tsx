@@ -343,6 +343,7 @@ export function TargetPage() {
       });
       setDetail(data);
       await loadSessions();
+      setActiveTab('results');
     } catch (err) {
       setError(errorLabel(err));
     } finally {
