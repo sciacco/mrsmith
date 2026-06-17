@@ -714,6 +714,41 @@
   margin-top: 2px;
 }
 
+.perimeter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) var(--space-5);
+}
+
+.perimeterLabel {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.perimeterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.perimeterChipHint {
+  cursor: help;
+  opacity: 0.7;
+}
+
 .resultsPanel {
   min-height: 420px;
 }
@@ -764,20 +799,40 @@
   margin: 0 auto;
 }
 
-.table tbody tr:hover .accentBar {
+.table tbody:hover .accentBar {
   height: 20px;
 }
 
-.rowSelected .accentBar {
+.tbodySelected .accentBar {
   height: 28px;
   box-shadow: 0 0 8px var(--color-accent-glow);
 }
 
 .table td {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding: var(--space-1) var(--space-4);
+  border-bottom: none;
   color: var(--color-text-secondary);
   vertical-align: top;
+}
+
+.table tbody tr:first-child td {
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-1);
+}
+
+.table tbody tr:nth-child(2) td {
+  padding-top: 0;
+  padding-bottom: var(--space-1);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding-top: 0;
+  padding-bottom: var(--space-2);
+}
+
+.table td.accentCell {
+  border-bottom: 1px solid var(--color-border-subtle) !important;
 }
 
 .table tbody tr {
@@ -785,8 +840,8 @@
   animation: rowEnter 0.35s var(--ease-out) both;
 }
 
-.table tbody tr:hover,
-.rowSelected {
+.table tbody:hover tr,
+.tbodySelected tr {
   background: var(--color-accent-subtle);
 }
 
@@ -1034,10 +1089,10 @@
 }
 
 /* Veryshort: rating preferiti */
-.rowExcluded {
+.tbodyExcluded {
   opacity: 0.5;
 }
-.rowExcluded .targetButton span {
+.tbodyExcluded .companyName {
   text-decoration: line-through;
 }
 .ratingControl {
@@ -1907,4 +1962,41 @@
   width: 100%;
   height: auto;
   max-height: 200px;
+}
+
+.companyHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0;
+}
+
+.ratingStarsWrap {
+  display: flex;
+  align-items: center;
+}
+
+.companyName {
+  color: var(--color-text);
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: 0;
+}
+
+.metaRow .flagRow,
+.metaRow .deepChip {
+  margin-top: 0 !important;
+}
+
+.vatTaxCodes {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
 }

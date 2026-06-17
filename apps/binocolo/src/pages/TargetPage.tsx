@@ -41,6 +41,12 @@ const eurFormat = new Intl.NumberFormat('it-IT', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
+const moneyCompact = new Intl.NumberFormat('it-IT', {
+  style: 'currency',
+  currency: 'EUR',
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
 const defaultSearchLimit = 100;
 const maxSearchLimit = 1000;
 
@@ -700,6 +706,7 @@ export function TargetPage() {
                       </Button>
                     </div>
                   </div>
+                  {hasTargets && detail.strategy?.strategy ? <AppliedPerimeter strategy={detail.strategy.strategy} /> : null}
                   {busy === 'execute' ? (
                     <div className={styles.skeletonBlock}>
                       <Skeleton rows={8} />
@@ -770,6 +777,7 @@ export function TargetPage() {
                   </div>
                   {hasEstimate ? (
                     <>
+                      {detail.strategy?.strategy ? <AppliedPerimeter strategy={detail.strategy.strategy} /> : null}
                       <div className={styles.estimateGrid}>
                         {estimateGroups.map((group) => (
                           <button
@@ -1487,6 +1495,19 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
         <span>Fatturato max</span>
         <input type="number" min={0} value={strategy.turnoverMax ?? ''} onChange={updateNumber('turnoverMax')} />
       </label>
+      <label>
+        <span>Dipendenti min</span>
+        <input type="number" min={0} value={strategy.employeeMin ?? ''} onChange={updateNumber('employeeMin')} />
+      </label>
+      <label>
+        <span>Dipendenti max</span>
+        <input type="number" min={0} value={strategy.employeeMax ?? ''} onChange={updateNumber('employeeMax')} />
+      </label>
+      {strategy.employeeMin != null || strategy.employeeMax != null ? (
+        <small className={`${styles.fieldHint} ${styles.fieldWide}`}>
+          Filtro applicato alla ricerca OpenAPI.it: le aziende senza dato addetti vengono escluse dai risultati.
+        </small>
+      ) : null}
       <label className={styles.fieldWide}>
         <span>Tesi d'acquisizione</span>
         <div className={styles.thesisContainer}>
@@ -1522,6 +1543,70 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
         <span>Razionale</span>
         <textarea value={strategy.rationale} onChange={(event) => onChange({ rationale: event.target.value })} rows={2} />
       </label>
+    </div>
+  );
+}
+
+interface PerimeterChip {
+  key: string;
+  label: string;
+  hint?: string;
+}
+
+function rangeChipLabel(
+  prefix: string,
+  min: number | null | undefined,
+  max: number | null | undefined,
+  format: (value: number) => string,
+): string | null {
+  if (min != null && max != null) return `${prefix} ${format(min)}–${format(max)}`;
+  if (min != null) return `${prefix} ≥ ${format(min)}`;
+  if (max != null) return `${prefix} ≤ ${format(max)}`;
+  return null;
+}
+
+function buildPerimeterChips(strategy: MAStrategySpec): PerimeterChip[] {
+  const chips: PerimeterChip[] = [];
+  chips.push({
+    key: 'geo',
+    label: strategy.provinces.length > 0 ? `Province ${strategy.provinces.join(', ')}` : 'Nazionale',
+  });
+  if (strategy.activityStatus) {
+    chips.push({ key: 'stato', label: `Stato ${strategy.activityStatus}` });
+  }
+  const turnover = rangeChipLabel('Fatturato', strategy.turnoverMin, strategy.turnoverMax, (value) => moneyCompact.format(value));
+  if (turnover) chips.push({ key: 'turnover', label: turnover });
+  const employees = rangeChipLabel('Addetti', strategy.employeeMin, strategy.employeeMax, (value) => numberFormat.format(value));
+  if (employees) {
+    chips.push({
+      key: 'employees',
+      label: employees,
+      hint: 'Filtro applicato alla ricerca: le aziende senza dato addetti vengono escluse.',
+    });
+  }
+  const forms = strategy.legalForms ?? [];
+  if (forms.length > 0) {
+    chips.push({ key: 'forms', label: `${forms.length > 1 ? 'Forme' : 'Forma'} ${forms.join(', ')}` });
+  }
+  return chips;
+}
+
+// AppliedPerimeter surfaces the hard filters that produced a count / result set
+// — the perimeter is applied server-side at OpenAPI.it, so this is the only place
+// the operator sees what was (silently) excluded. Feed it the persisted strategy
+// version that generated the numbers, not the editable draft.
+function AppliedPerimeter({ strategy }: { strategy: MAStrategySpec }) {
+  const chips = buildPerimeterChips(strategy);
+  if (chips.length === 0) return null;
+  return (
+    <div className={styles.perimeter} aria-label="Perimetro applicato">
+      <span className={styles.perimeterLabel}>Perimetro applicato</span>
+      {chips.map((chip) => (
+        <span key={chip.key} className={styles.perimeterChip} title={chip.hint}>
+          {chip.label}
+          {chip.hint ? <Icon name="info" size={12} className={styles.perimeterChipHint} /> : null}
+        </span>
+      ))}
     </div>
   );
 }
@@ -1615,56 +1700,76 @@ function TargetTable({
         <thead>
           <tr>
             <th className={styles.accentCol}></th>
-            <th>Target</th>
-            <th>Provincia</th>
+            <th>Sede</th>
             <th>Settore</th>
             <th>Fatturato</th>
             <th>Punteggio</th>
-            <th>Confidenza</th>
-            <th>Preferito</th>
           </tr>
         </thead>
-        <tbody>
-          {rows.map((target, index) => (
-            <tr
+        {rows.map((target, index) => {
+          const isSelected = target.id === selectedId;
+          const isExcluded = (target.rating ?? 0) === -1;
+          
+          const deduplicatedCodes = Array.from(
+            new Set([target.vatCode, target.taxCode].filter(Boolean))
+          ).join(' · ');
+
+          return (
+            <tbody
               key={target.id}
               className={
-                [target.id === selectedId ? styles.rowSelected : '', (target.rating ?? 0) === -1 ? styles.rowExcluded : '']
+                [
+                  isSelected ? styles.tbodySelected : '',
+                  isExcluded ? styles.tbodyExcluded : ''
+                ]
                   .filter(Boolean)
                   .join(' ') || undefined
               }
-              style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
               onClick={() => onSelect(target.id)}
             >
-              <td className={styles.accentCell}>
-                <div className={styles.accentBar} />
-              </td>
-              <td>
-                <button type="button" className={styles.targetButton} onClick={() => onSelect(target.id)}>
-                  <span>{target.companyName}</span>
-                  <small>{[target.vatCode, target.taxCode].filter(Boolean).join(' · ') || '-'}</small>
-                </button>
-                <FlagChips flags={target.flags} />
-                <DeepStatusChip deep={target.deep} />
-              </td>
-              <td>{[target.town, target.province].filter(Boolean).join(' · ') || '-'}</td>
-              <td>
-                <span className={styles.ateco}>{target.atecoCode || '-'}</span>
-                <small className={styles.tableSubtext}>{target.atecoDescription || 'Settore non indicato'}</small>
-              </td>
-              <td>{target.turnover != null ? moneyFormat.format(target.turnover) : '-'}</td>
-              <td>
-                <span className={styles.score}>{target.score}</span>
-              </td>
-              <td>
-                <span className={`${styles.confBadge} ${confidenceClass(target.confidence)}`}>{target.confidence ?? '-'}</span>
-              </td>
-              <td onClick={(event) => event.stopPropagation()}>
-                <RatingStars value={target.rating} onRate={(rating) => onRate(target.companyKey ?? '', rating)} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
+              <tr style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}>
+                <td className={styles.accentCell} rowSpan={3}>
+                  <div className={styles.accentBar} />
+                </td>
+                <td colSpan={4}>
+                  <div className={styles.companyHeader}>
+                    <div className={styles.ratingStarsWrap} onClick={(event) => event.stopPropagation()}>
+                      <RatingStars value={target.rating} onRate={(rating) => onRate(target.companyKey ?? '', rating)} />
+                    </div>
+                    <span className={styles.companyName}>{target.companyName}</span>
+                    {target.confidence && (
+                      <span className={`${styles.confBadge} ${confidenceClass(target.confidence)}`}>
+                        {target.confidence}
+                      </span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+              <tr style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}>
+                <td>{[target.town, target.province].filter(Boolean).join(' · ') || '-'}</td>
+                <td>
+                  <span className={styles.ateco}>{target.atecoCode || '-'}</span>
+                  <small className={styles.tableSubtext}>{target.atecoDescription || 'Settore non indicato'}</small>
+                </td>
+                <td>{target.turnover != null ? moneyFormat.format(target.turnover) : '-'}</td>
+                <td>
+                  <span className={styles.score}>{target.score}</span>
+                </td>
+              </tr>
+              <tr style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}>
+                <td colSpan={4}>
+                  <div className={styles.metaRow}>
+                    {deduplicatedCodes && (
+                      <span className={styles.vatTaxCodes}>{deduplicatedCodes}</span>
+                    )}
+                    <FlagChips flags={target.flags} />
+                    <DeepStatusChip deep={target.deep} />
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          );
+        })}
       </table>
     </div>
   );
