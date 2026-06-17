@@ -27,10 +27,12 @@ export function AtecoFitEditor({
   value,
   onChange,
   disabled,
+  hideHeader,
 }: {
   value: MAAtecoCandidate[];
   onChange: (next: MAAtecoCandidate[]) => void;
   disabled?: boolean;
+  hideHeader?: boolean;
 }) {
   const api = useApiClient();
   const [query, setQuery] = useState('');
@@ -92,12 +94,14 @@ export function AtecoFitEditor({
 
   return (
     <div className={styles.editor}>
-      <div className={styles.header}>
-        <span className={styles.title}>Codici ATECO &amp; rilevanza</span>
-        <span className={styles.counts}>
-          {value.length} codici · {counts.core} core · {counts.weak} adiacenti · {counts.excluded} esclusi
-        </span>
-      </div>
+      {!hideHeader && (
+        <div className={styles.header}>
+          <span className={styles.title}>Codici ATECO &amp; rilevanza</span>
+          <span className={styles.counts}>
+            {value.length} codici ATECO · {counts.core} core · {counts.weak} adiacenti · {counts.excluded} esclusi
+          </span>
+        </div>
+      )}
 
       <div className={styles.searchWrap}>
         <Icon name="search" size={14} />

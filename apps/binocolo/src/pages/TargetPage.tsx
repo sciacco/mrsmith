@@ -1521,6 +1521,11 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const thesis = strategy.thesis ?? 'generico';
 
+  const atecoCandidates = strategy.atecoCandidates ?? [];
+  const coreCount = atecoCandidates.filter((item) => (item.fit ?? 'core') === 'core').length;
+  const weakCount = atecoCandidates.filter((item) => item.fit === 'weak').length;
+  const excludedCount = atecoCandidates.filter((item) => item.fit === 'excluded').length;
+
   function updateNumber(field: keyof Pick<MAStrategySpec, 'turnoverMin' | 'turnoverMax' | 'employeeMin' | 'employeeMax' | 'successionMinOwnerAge'>) {
     return (event: ChangeEvent<HTMLInputElement>) => {
       onChange({ [field]: optionalNumber(event.target.value) } as Partial<MAStrategySpec>);
@@ -1550,11 +1555,20 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
     <div className={styles.editorSections}>
       <section className={styles.editorSection}>
         <div className={styles.editorSectionTitle}>
-          Perimetro <small>superficie di ricerca — guida count e costo</small>
+          <span>Perimetro <small>superficie di ricerca — guida count e costo</small></span>
+          {atecoCandidates.length > 0 && (
+            <span className={styles.sectionHeaderBadge}>
+              {atecoCandidates.length} codici ATECO · {coreCount} core · {weakCount} adiacenti · {excludedCount} esclusi
+            </span>
+          )}
         </div>
         <div className={styles.strategyGrid}>
           <div className={styles.fieldWide}>
-            <AtecoFitEditor value={strategy.atecoCandidates ?? []} onChange={(atecoCandidates) => onChange({ atecoCandidates })} />
+            <AtecoFitEditor
+              hideHeader
+              value={strategy.atecoCandidates ?? []}
+              onChange={(atecoCandidates) => onChange({ atecoCandidates })}
+            />
           </div>
           <label className={styles.fieldWide}>
             <span>Province</span>
@@ -1604,7 +1618,7 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
 
       <section className={styles.editorSection}>
         <div className={styles.editorSectionTitle}>
-          Scoring <small>ordina i risultati, non cambia la superficie</small>
+          <span>Scoring <small>ordina i risultati, non cambia la superficie</small></span>
         </div>
         <div className={styles.strategyGrid}>
           <label className={styles.fieldWide}>
@@ -1649,7 +1663,9 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
       </section>
 
       <section className={styles.editorSection}>
-        <div className={styles.editorSectionTitle}>Output</div>
+        <div className={styles.editorSectionTitle}>
+          <span>Output</span>
+        </div>
         <div className={styles.strategyGrid}>
           <label>
             <span>Numero risultati</span>

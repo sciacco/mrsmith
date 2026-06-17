@@ -3,6 +3,8 @@ package binocolo
 import (
 	"context"
 	"encoding/json"
+	"math"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -221,13 +223,52 @@ func maTraceRawJSON(raw []byte) json.RawMessage {
 	return json.RawMessage(out)
 }
 
+// maTraceRedacted is the placeholder substituted for a redacted secret.
+const maTraceRedacted = "[redacted]"
+
+// maTraceSecretKeys is the exact set of object keys whose value is a credential
+// and must be redacted from traces. Lookup is on the normalized key (lowercased,
+// separators stripped — so access_token / accessToken / access-token all match)
+// and EXACT, never substring. This is the deliberate fix for the old
+// strings.Contains(key, "token") rule, which also nuked usage/cost fields that
+// merely contain the word: prompt_tokens, completion_tokens, total_tokens (the
+// response usage) and max_tokens (the request budget) are NOT secrets and are
+// preserved. password is intentionally absent (kept by policy; see
+// TestMATraceJSONRedactsOnlyTokenFields) — a credential-shaped password value is
+// still caught by looksLikeMATraceSecretValue.
+var maTraceSecretKeys = map[string]struct{}{
+	"authorization": {},
+	"apikey":        {},
+	"xapikey":       {},
+	"accesstoken":   {},
+	"refreshtoken":  {},
+	"idtoken":       {},
+	"bearertoken":   {},
+}
+
+var (
+	// A Bearer authorization header is the one credential format that contains a
+	// space, so it is matched before the whitespace gate below.
+	maTraceBearerRE = regexp.MustCompile(`(?i)^bearer\s+[a-z0-9._\-+/=]{12,}$`)
+	// OpenAI/OpenRouter-style API keys (sk-..., sk-or-v1-...).
+	maTraceAPIKeyRE = regexp.MustCompile(`^sk-[A-Za-z0-9_-]{12,}$`)
+	// Compact JWT (header.payload.signature).
+	maTraceJWTRE = regexp.MustCompile(`^eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}$`)
+	// Standard UUID — high-entropy but never a secret (response/session ids).
+	maTraceUUIDRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	// Opaque single-token charset (base64/hex/api-key shape). The entropy fallback
+	// only fires on strings made ENTIRELY of these chars, so JSON ("{", "\"", ":")
+	// and prose never qualify.
+	maTraceOpaqueRE = regexp.MustCompile(`^[A-Za-z0-9._+/=-]+$`)
+)
+
 func redactMATraceTokens(value any) any {
 	switch typed := value.(type) {
 	case map[string]any:
 		out := make(map[string]any, len(typed))
 		for key, val := range typed {
-			if isMATraceTokenKey(key) {
-				out[key] = "[redacted]"
+			if isMATraceSecretKey(key) {
+				out[key] = maTraceRedacted
 				continue
 			}
 			out[key] = redactMATraceTokens(val)
@@ -239,21 +280,78 @@ func redactMATraceTokens(value any) any {
 			out = append(out, redactMATraceTokens(item))
 		}
 		return out
+	case string:
+		if looksLikeMATraceSecretValue(typed) {
+			return maTraceRedacted
+		}
+		return typed
 	default:
 		return value
 	}
 }
 
-func isMATraceTokenKey(key string) bool {
-	key = strings.ToLower(strings.TrimSpace(key))
-	key = strings.ReplaceAll(key, "-", "_")
-	return key == "authorization" ||
-		key == "api_key" ||
-		key == "apikey" ||
-		key == "access_token" ||
-		key == "refresh_token" ||
-		key == "id_token" ||
-		strings.Contains(key, "token")
+func isMATraceSecretKey(key string) bool {
+	_, ok := maTraceSecretKeys[normalizeMATraceKey(key)]
+	return ok
+}
+
+// normalizeMATraceKey lowercases and strips every non-alphanumeric rune, so a
+// secret key matches regardless of its naming style (snake_case, camelCase,
+// kebab-case, header form).
+func normalizeMATraceKey(key string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(strings.TrimSpace(key)) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// looksLikeMATraceSecretValue redacts a string VALUE shaped like a credential,
+// whatever its key — defense in depth against a secret stored under an
+// unexpected name. Deliberately conservative so audit data survives: it matches
+// only specific credential formats (Bearer headers, sk- API keys, JWTs) plus
+// long, whitespace-free, opaque, high-entropy blobs. Natural-language content
+// (prompts/messages contain spaces), JSON payloads (contain "{"/"\""/":"), short
+// values (ateco codes, model ids) and UUIDs are never touched.
+func looksLikeMATraceSecretValue(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return false
+	}
+	if maTraceBearerRE.MatchString(trimmed) {
+		return true
+	}
+	if strings.ContainsAny(trimmed, " \t\r\n") {
+		return false
+	}
+	if maTraceAPIKeyRE.MatchString(trimmed) || maTraceJWTRE.MatchString(trimmed) {
+		return true
+	}
+	if maTraceUUIDRE.MatchString(trimmed) {
+		return false
+	}
+	return len(trimmed) >= 48 && maTraceOpaqueRE.MatchString(trimmed) && shannonEntropyBits(trimmed) >= 4.0
+}
+
+// shannonEntropyBits returns the Shannon entropy (bits per character) of value.
+func shannonEntropyBits(value string) float64 {
+	runes := []rune(value)
+	if len(runes) == 0 {
+		return 0
+	}
+	counts := make(map[rune]int, len(runes))
+	for _, r := range runes {
+		counts[r]++
+	}
+	total := float64(len(runes))
+	entropy := 0.0
+	for _, c := range counts {
+		p := float64(c) / total
+		entropy -= p * math.Log2(p)
+	}
+	return entropy
 }
 
 func maTraceRound(round int) *int {

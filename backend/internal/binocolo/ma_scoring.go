@@ -120,9 +120,17 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScor
 		for _, contrib := range contributions {
 			status := maEvidenceMissing
 			points := 0.0
+			// Active rows report the EFFECTIVE weight: the criterion's share of the
+			// re-normalized 100-point budget once the weight of any missing criteria
+			// has been redistributed onto the survivors. Since points = effectiveWeight
+			// * score, the displayed points can never exceed the displayed weight.
+			// Inactive rows keep the nominal weight so the UI shows the foregone
+			// budget as "0 / N" rather than a meaningless "0 / 0".
+			weight := contrib.weight
 			if contrib.active && activeWeight > 0 {
 				final := contrib.weight / activeWeight
 				points = final * contrib.score * 100
+				weight = final * 100
 				blended += final * contrib.score
 				if contrib.score >= 0.66 {
 					status = maEvidenceMatch
@@ -139,7 +147,7 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScor
 				Label:     contrib.signal.Label,
 				Value:     contrib.label,
 				Points:    math.Round(points*10) / 10,
-				Weight:    math.Round(contrib.weight*10) / 10,
+				Weight:    math.Round(weight*10) / 10,
 			})
 		}
 

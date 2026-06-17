@@ -386,6 +386,9 @@ type MATargetEvidence struct {
 	Label      string  `json:"label"`
 	Value      string  `json:"value,omitempty"`
 	Points     float64 `json:"points"`
+	// Weight is the criterion's effective share of the re-normalized 100-point
+	// budget for active rows (so Points <= Weight), and the nominal weight for
+	// missing rows (Points is 0, shown as the foregone budget). See ma_scoring.go.
 	Weight     float64 `json:"weight"`
 	SourcePath string  `json:"sourcePath,omitempty"`
 }

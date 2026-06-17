@@ -236,6 +236,74 @@ func TestMATraceJSONRedactsOnlyTokenFields(t *testing.T) {
 	}
 }
 
+// TestMATraceJSONRedactionPreservesUsageAndCatchesValueSecrets locks the 2026-06-17
+// fix: the old substring rule (Contains(key,"token")) destroyed usage/cost fields.
+// Token counts and max_tokens must survive as numbers; a credential-shaped VALUE
+// under an innocent key must still be caught by the value guard; prose stays.
+func TestMATraceJSONRedactionPreservesUsageAndCatchesValueSecrets(t *testing.T) {
+	raw := maTraceJSON(map[string]any{
+		"max_tokens": 1800,
+		"usage": map[string]any{
+			"prompt_tokens":     1234,
+			"completion_tokens": 56,
+			"total_tokens":      1290,
+		},
+		"echoedHeader": "Bearer sk-or-v1-0123456789abcdef0123456789abcd",
+		"prompt":       "Trova aziende a Novara",
+	})
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal trace json: %v", err)
+	}
+	if got["max_tokens"] != float64(1800) {
+		t.Errorf("max_tokens = %#v, want 1800 preserved", got["max_tokens"])
+	}
+	usage, ok := got["usage"].(map[string]any)
+	if !ok {
+		t.Fatalf("usage = %#v, want object", got["usage"])
+	}
+	for key, want := range map[string]float64{"prompt_tokens": 1234, "completion_tokens": 56, "total_tokens": 1290} {
+		if usage[key] != want {
+			t.Errorf("usage[%q] = %#v, want %v preserved", key, usage[key], want)
+		}
+	}
+	if got["echoedHeader"] != "[redacted]" {
+		t.Errorf("echoedHeader = %#v, want redacted (Bearer value)", got["echoedHeader"])
+	}
+	if got["prompt"] != "Trova aziende a Novara" {
+		t.Errorf("prompt = %#v, want preserved", got["prompt"])
+	}
+}
+
+// TestLooksLikeMATraceSecretValue pins the value-shape guard: specific credential
+// formats are redacted regardless of key, while audit data (JSON, UUIDs, model
+// ids, prose, short codes) is preserved.
+func TestLooksLikeMATraceSecretValue(t *testing.T) {
+	cases := []struct {
+		name   string
+		value  string
+		secret bool
+	}{
+		{"bearer header", "Bearer sk-or-v1-0123456789abcdef0123456789abcd", true},
+		{"api key sk", "sk-abcdef0123456789ABCDEF", true},
+		{"jwt", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c", true},
+		{"long opaque blob", "Zk8xQ2pLb1BqVnNZd0RmR2hUbk1iUXdFclR5VWlPcEFzRGZHaEpr", true},
+		{"prose with spaces", "Sei un analista M&A. Trova aziende a Novara.", false},
+		{"compact json", `{"province":"NO","atecoCode":"6201","activityStatus":"ATTIVA"}`, false},
+		{"uuid", "550e8400-e29b-41d4-a716-446655440000", false},
+		{"model id", "openai/gpt-5.5", false},
+		{"ateco code", "62.01", false},
+		{"empty", "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := looksLikeMATraceSecretValue(tc.value); got != tc.secret {
+				t.Errorf("looksLikeMATraceSecretValue(%q) = %v, want %v", tc.value, got, tc.secret)
+			}
+		})
+	}
+}
+
 func TestMAEstimatesSendDotlessAtecoToOpenAPIIT(t *testing.T) {
 	upstreamAteco := []string{}
 	client := newCompanySearchTestClient(t, func(w http.ResponseWriter, r *http.Request) {
