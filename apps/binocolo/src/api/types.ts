@@ -219,6 +219,16 @@ export interface MAStrategySpec {
 
 export type MAAtecoFit = 'core' | 'weak' | 'excluded';
 
+export interface MAAtecoSearchItem {
+  code: string;
+  description: string;
+  hierarchy?: number;
+}
+
+export interface MAAtecoSearchResponse {
+  items: MAAtecoSearchItem[];
+}
+
 export interface MAAtecoCandidate {
   code: string;
   description: string;

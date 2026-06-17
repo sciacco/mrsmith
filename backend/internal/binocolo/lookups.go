@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
@@ -23,4 +25,46 @@ func (h *Handler) handleListProvinces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.JSON(w, http.StatusOK, json.RawMessage(raw))
+}
+
+// maAtecoSearchItem is one ATECO typeahead hit for the strategy editor.
+type maAtecoSearchItem struct {
+	Code        string `json:"code"`
+	Description string `json:"description"`
+	Hierarchy   *int   `json:"hierarchy,omitempty"`
+}
+
+type maAtecoSearchResponse struct {
+	Items []maAtecoSearchItem `json:"items"`
+}
+
+// handleSearchAteco exposes the ATECO catalog search (SearchAteco) to the frontend
+// so the strategy editor can offer a code/description typeahead — codes are picked
+// from the real catalog (descriptions attached, format normalized) rather than typed.
+func (h *Handler) handleSearchAteco(w http.ResponseWriter, r *http.Request) {
+	if h.ateco == nil {
+		httputil.Error(w, http.StatusServiceUnavailable, "binocolo_ateco_not_configured")
+		return
+	}
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if query == "" {
+		httputil.JSON(w, http.StatusOK, maAtecoSearchResponse{Items: []maAtecoSearchItem{}})
+		return
+	}
+	limit := 0
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil {
+			limit = n
+		}
+	}
+	results, err := h.ateco.SearchAteco(r.Context(), query, limit)
+	if err != nil {
+		h.maFailure(w, r, "ma_ateco_search", err)
+		return
+	}
+	items := make([]maAtecoSearchItem, 0, len(results))
+	for _, item := range results {
+		items = append(items, maAtecoSearchItem{Code: item.Codice, Description: item.Titolo, Hierarchy: item.Gerarchia})
+	}
+	httputil.JSON(w, http.StatusOK, maAtecoSearchResponse{Items: items})
 }

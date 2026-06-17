@@ -70,6 +70,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("GET /binocolo/v1/companies/search", h.handleSearchCompanies)
 	handle("GET /binocolo/v1/ma/llm-options", h.handleListMALLMOptions)
 	handle("GET /binocolo/v1/ma/parameters", h.handleListMAParameters)
+	handle("GET /binocolo/v1/ma/ateco/search", h.handleSearchAteco)
 	handle("PUT /binocolo/v1/ma/parameters", h.handleUpdateMAParameter)
 	handle("GET /binocolo/v1/ma/sessions", h.handleListMASessions)
 	handle("POST /binocolo/v1/ma/sessions", h.handleCreateMASession)

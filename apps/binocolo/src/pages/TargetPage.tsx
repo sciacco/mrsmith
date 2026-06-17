@@ -1,10 +1,10 @@
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, MultiSelect, provinces, Skeleton, useToast } from '@mrsmith/ui';
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useApiClient } from '../api/client';
+import { AtecoFitEditor } from './AtecoFitEditor';
+import { TokenInput } from './TokenInput';
 import type {
-  MAAtecoCandidate,
-  MAAtecoFit,
   MALLMModelOption,
   MALLMOptionsResponse,
   MAEstimate,
@@ -1498,17 +1498,19 @@ export function TargetPage() {
   );
 }
 
+const PROVINCE_OPTIONS = provinces.map((item) => ({ value: item.code, label: `${item.name} (${item.code})` }));
+
+const OPTIONAL_PERIMETER: { key: string; label: string }[] = [
+  { key: 'turnover', label: 'Fatturato' },
+  { key: 'employees', label: 'Dipendenti' },
+  { key: 'legalForms', label: 'Forme giuridiche' },
+];
+
 function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onChange: (patch: Partial<MAStrategySpec>) => void }) {
-  const atecoCandidates = strategy.atecoCandidates ?? [];
-  const coreList = atecoCandidates.filter((item) => (item.fit ?? 'core') === 'core');
-  const weakList = atecoCandidates.filter((item) => item.fit === 'weak');
-  const excludedList = atecoCandidates.filter((item) => item.fit === 'excluded');
-  const coreText = coreList.map((item) => [item.code, item.description].filter(Boolean).join(' - ')).join('\n');
-  const codesText = (items: MAAtecoCandidate[]) => items.map((item) => item.code).join(', ');
-  const codesToCandidates = (value: string, fit: MAAtecoFit): MAAtecoCandidate[] =>
-    splitList(value).map((code) => ({ code: code.toUpperCase(), description: '', rationale: '', fit }));
-  const commitAteco = (core: MAAtecoCandidate[], weak: MAAtecoCandidate[], excluded: MAAtecoCandidate[]) =>
-    onChange({ atecoCandidates: [...core, ...weak, ...excluded] });
+  const [contextOpen, setContextOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
+  const thesis = strategy.thesis ?? 'generico';
 
   function updateNumber(field: keyof Pick<MAStrategySpec, 'turnoverMin' | 'turnoverMax' | 'employeeMin' | 'employeeMax' | 'successionMinOwnerAge'>) {
     return (event: ChangeEvent<HTMLInputElement>) => {
@@ -1516,139 +1518,174 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
     };
   }
 
+  const fieldHasValue = (key: string): boolean => {
+    switch (key) {
+      case 'turnover':
+        return strategy.turnoverMin != null || strategy.turnoverMax != null;
+      case 'employees':
+        return strategy.employeeMin != null || strategy.employeeMax != null;
+      case 'legalForms':
+        return (strategy.legalForms ?? []).length > 0;
+      default:
+        return false;
+    }
+  };
+  const isShown = (key: string) => fieldHasValue(key) || revealed.has(key);
+  const hiddenFields = OPTIONAL_PERIMETER.filter((field) => !isShown(field.key));
+  const reveal = (key: string) => {
+    setRevealed((prev) => new Set(prev).add(key));
+    setAddOpen(false);
+  };
+
   return (
-    <div className={styles.strategyGrid}>
-      <label className={styles.fieldWide}>
-        <span>Settore</span>
-        <textarea
-          value={strategy.sectorDescription}
-          onChange={(event) => onChange({ sectorDescription: event.target.value })}
-          rows={2}
-        />
-      </label>
-      <label className={styles.fieldWide}>
-        <span>ATECO core</span>
-        <textarea
-          value={coreText}
-          onChange={(event) =>
-            commitAteco(
-              parseAtecoLines(event.target.value).map((item) => ({ ...item, fit: 'core' as MAAtecoFit })),
-              weakList,
-              excludedList,
-            )
-          }
-          rows={3}
-        />
-        <small className={styles.fieldHint}>Settore bullseye: piena aderenza. Una riga per codice (es. 62.20 - descrizione).</small>
-      </label>
-      <label className={styles.fieldWide}>
-        <span>ATECO secondari</span>
-        <input
-          value={codesText(weakList)}
-          onChange={(event) => commitAteco(coreList, codesToCandidates(event.target.value, 'weak'), excludedList)}
-          placeholder="es. 63.10.30 — adiacenti, tenuti ma declassati"
-        />
-        <small className={styles.fieldHint}>Adiacenti al settore: inclusi nella ricerca ma con aderenza ridotta.</small>
-      </label>
-      <label className={styles.fieldWide}>
-        <span>ATECO esclusi</span>
-        <input
-          value={codesText(excludedList)}
-          onChange={(event) => commitAteco(coreList, weakList, codesToCandidates(event.target.value, 'excluded'))}
-          placeholder="es. 63.10.21 — elaborazione dati contabili"
-        />
-        <small className={styles.fieldHint}>
-          Codici (o sottoalberi) rimossi dal perimetro anche se interni alle divisioni del settore: i risultati sono fuori criterio e nascosti.
-        </small>
-      </label>
-      <label>
-        <span>Province</span>
-        <input
-          value={strategy.provinces.join(', ')}
-          onChange={(event) => onChange({ provinces: splitList(event.target.value).map((item) => item.toUpperCase()) })}
-          placeholder="MI, BG"
-        />
-      </label>
-      <label>
-        <span>Parole chiave</span>
-        <input
-          value={strategy.keywords.join(', ')}
-          onChange={(event) => onChange({ keywords: splitList(event.target.value) })}
-          placeholder="software, gestionale"
-        />
-      </label>
-      <label>
-        <span>Fatturato min</span>
-        <input type="number" min={0} value={strategy.turnoverMin ?? ''} onChange={updateNumber('turnoverMin')} />
-      </label>
-      <label>
-        <span>Fatturato max</span>
-        <input type="number" min={0} value={strategy.turnoverMax ?? ''} onChange={updateNumber('turnoverMax')} />
-      </label>
-      <label>
-        <span>Dipendenti min</span>
-        <input type="number" min={0} value={strategy.employeeMin ?? ''} onChange={updateNumber('employeeMin')} />
-      </label>
-      <label>
-        <span>Dipendenti max</span>
-        <input type="number" min={0} value={strategy.employeeMax ?? ''} onChange={updateNumber('employeeMax')} />
-      </label>
-      {strategy.employeeMin != null || strategy.employeeMax != null ? (
-        <small className={`${styles.fieldHint} ${styles.fieldWide}`}>
-          Filtro applicato alla ricerca OpenAPI.it: le aziende senza dato addetti vengono escluse dai risultati.
-        </small>
-      ) : null}
-      <label className={styles.fieldWide}>
-        <span>Tesi d'acquisizione</span>
-        <div className={styles.thesisContainer}>
-          <select value={strategy.thesis ?? 'generico'} onChange={(event) => onChange({ thesis: event.target.value as MAThesis })}>
-            <option value="generico">Generico</option>
-            <option value="successione">Successione</option>
-            <option value="crescita">Crescita</option>
-            <option value="consolidamento">Consolidamento</option>
-            <option value="tuck_in">Tuck-in</option>
-          </select>
-          <small className={styles.fieldHint}>{thesisDescriptions[strategy.thesis ?? 'generico']}</small>
+    <div className={styles.editorSections}>
+      <section className={styles.editorSection}>
+        <div className={styles.editorSectionTitle}>
+          Perimetro <small>superficie di ricerca — guida count e costo</small>
         </div>
-      </label>
-      {(strategy.thesis ?? 'generico') === 'successione' ? (
-        <label>
-          <span>Età minima proprietario</span>
-          <input
-            type="number"
-            min={30}
-            max={90}
-            value={strategy.successionMinOwnerAge ?? ''}
-            onChange={updateNumber('successionMinOwnerAge')}
-            placeholder="default 60"
-          />
-          <small className={styles.fieldHint}>
-            Premia i soci-persona vicini all'uscita; le aziende controllate da holding sono comunque penalizzate.
-          </small>
-        </label>
-      ) : null}
-      <label>
-        <span>Forme giuridiche</span>
-        <input
-          value={(strategy.legalForms ?? []).join(', ')}
-          onChange={(event) => onChange({ legalForms: splitList(event.target.value).map((item) => item.toUpperCase()) })}
-          placeholder="solo se richiesto (es. SR)"
-        />
-      </label>
-      <label>
-        <span>Numero risultati</span>
-        <input
-          type="number"
-          min={1}
-          max={maxSearchLimit}
-          value={normalizeSearchLimit(strategy.searchLimit)}
-          onChange={(event) => onChange({ searchLimit: normalizeSearchLimit(optionalNumber(event.target.value) ?? defaultSearchLimit) })}
-        />
-      </label>
-      <label className={styles.fieldWide}>
-        <span>Razionale</span>
-        <textarea value={strategy.rationale} onChange={(event) => onChange({ rationale: event.target.value })} rows={2} />
-      </label>
+        <div className={styles.strategyGrid}>
+          <div className={styles.fieldWide}>
+            <AtecoFitEditor value={strategy.atecoCandidates ?? []} onChange={(atecoCandidates) => onChange({ atecoCandidates })} />
+          </div>
+          <label className={styles.fieldWide}>
+            <span>Province</span>
+            <MultiSelect
+              options={PROVINCE_OPTIONS}
+              selected={strategy.provinces}
+              onChange={(next) => onChange({ provinces: next })}
+              placeholder="Seleziona province"
+            />
+          </label>
+          {isShown('turnover') ? (
+            <label>
+              <span>Fatturato (€)</span>
+              <RangeInput minValue={strategy.turnoverMin} maxValue={strategy.turnoverMax} onMin={updateNumber('turnoverMin')} onMax={updateNumber('turnoverMax')} />
+            </label>
+          ) : null}
+          {isShown('employees') ? (
+            <label>
+              <span>Dipendenti</span>
+              <RangeInput minValue={strategy.employeeMin} maxValue={strategy.employeeMax} onMin={updateNumber('employeeMin')} onMax={updateNumber('employeeMax')} />
+            </label>
+          ) : null}
+          {isShown('legalForms') ? (
+            <label>
+              <span>Forme giuridiche</span>
+              <TokenInput value={strategy.legalForms ?? []} onChange={(legalForms) => onChange({ legalForms })} upper placeholder="es. SR" />
+            </label>
+          ) : null}
+          {hiddenFields.length > 0 ? (
+            <div className={styles.addConstraint}>
+              <button type="button" className={styles.addConstraintBtn} onClick={() => setAddOpen((open) => !open)}>
+                <Icon name="plus" size={13} /> aggiungi vincolo
+              </button>
+              {addOpen ? (
+                <div className={styles.addMenu}>
+                  {hiddenFields.map((field) => (
+                    <button key={field.key} type="button" className={styles.addMenuItem} onClick={() => reveal(field.key)}>
+                      {field.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className={styles.editorSection}>
+        <div className={styles.editorSectionTitle}>
+          Scoring <small>ordina i risultati, non cambia la superficie</small>
+        </div>
+        <div className={styles.strategyGrid}>
+          <label className={styles.fieldWide}>
+            <span>Tesi d'acquisizione</span>
+            <div className={styles.thesisContainer}>
+              <select value={thesis} onChange={(event) => onChange({ thesis: event.target.value as MAThesis })}>
+                <option value="generico">Generico</option>
+                <option value="successione">Successione</option>
+                <option value="crescita">Crescita</option>
+                <option value="consolidamento">Consolidamento</option>
+                <option value="tuck_in">Tuck-in</option>
+              </select>
+              <small className={styles.fieldHint}>{thesisDescriptions[thesis]}</small>
+            </div>
+          </label>
+          {thesis === 'successione' ? (
+            <label>
+              <span>Età minima proprietario</span>
+              <input
+                type="number"
+                min={30}
+                max={90}
+                value={strategy.successionMinOwnerAge ?? ''}
+                onChange={updateNumber('successionMinOwnerAge')}
+                placeholder="default 60"
+              />
+            </label>
+          ) : null}
+        </div>
+      </section>
+
+      <section className={styles.editorSection}>
+        <div className={styles.editorSectionTitle}>Output</div>
+        <div className={styles.strategyGrid}>
+          <label>
+            <span>Numero risultati</span>
+            <input
+              type="number"
+              min={1}
+              max={maxSearchLimit}
+              value={normalizeSearchLimit(strategy.searchLimit)}
+              onChange={(event) => onChange({ searchLimit: normalizeSearchLimit(optionalNumber(event.target.value) ?? defaultSearchLimit) })}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className={styles.editorSection}>
+        <button type="button" className={styles.contextToggle} onClick={() => setContextOpen((open) => !open)} aria-expanded={contextOpen}>
+          <Icon name={contextOpen ? 'chevron-down' : 'chevron-right'} size={14} />
+          Contesto <small>settore e razionale — proposti dall'IA</small>
+        </button>
+        {contextOpen ? (
+          <div className={styles.strategyGrid}>
+            <label className={styles.fieldWide}>
+              <span>Settore</span>
+              <textarea value={strategy.sectorDescription} onChange={(event) => onChange({ sectorDescription: event.target.value })} rows={2} />
+            </label>
+            <label className={styles.fieldWide}>
+              <span>Razionale</span>
+              <textarea value={strategy.rationale} onChange={(event) => onChange({ rationale: event.target.value })} rows={2} />
+            </label>
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+// RangeInput renders a min–max pair as one control (R5): two number inputs joined
+// by an en-dash, with an optional unit adornment.
+function RangeInput({
+  minValue,
+  maxValue,
+  onMin,
+  onMax,
+  unit,
+}: {
+  minValue?: number;
+  maxValue?: number;
+  onMin: (event: ChangeEvent<HTMLInputElement>) => void;
+  onMax: (event: ChangeEvent<HTMLInputElement>) => void;
+  unit?: string;
+}) {
+  return (
+    <div className={styles.rangeRow}>
+      <input type="number" min={0} value={minValue ?? ''} onChange={onMin} placeholder="min" />
+      <span className={styles.rangeDash}>–</span>
+      <input type="number" min={0} value={maxValue ?? ''} onChange={onMax} placeholder="max" />
+      {unit ? <span className={styles.rangeUnit}>{unit}</span> : null}
     </div>
   );
 }
@@ -2574,27 +2611,6 @@ function optionalNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function splitList(value: string): string[] {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function parseAtecoLines(value: string): MAAtecoCandidate[] {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [code, ...description] = line.split(/\s+-\s+/);
-      return {
-        code: (code ?? '').trim(),
-        description: description.join(' - ').trim(),
-        rationale: '',
-      };
-    });
-}
 
 function errorLabel(error: unknown): string {
   if (error instanceof ApiError) {

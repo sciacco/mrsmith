@@ -1,0 +1,65 @@
+.wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  min-height: 38px;
+}
+
+.wrap:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle, rgba(99, 102, 241, 0.18));
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px var(--space-1) 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.06));
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.chipRemove {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.chipRemove:hover:not(:disabled) {
+  color: var(--color-danger, #dc2626);
+}
+
+/* Scoped to .wrap so it outweighs the editor's global `.strategyGrid input`
+   styling (which would otherwise add a second border, a 44px min-height and a
+   focus glow to this inner input). */
+.wrap .input {
+  flex: 1;
+  min-width: 6rem;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: var(--space-1) 0;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  outline: none;
+}
+
+.wrap .input:focus {
+  border: 0;
+  box-shadow: none;
+}
