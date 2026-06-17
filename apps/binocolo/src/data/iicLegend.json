@@ -1,0 +1,1106 @@
+{
+  "IIC001": {
+    "description": "A. CREDITS TO SHAREHOLDERS",
+    "section": "Assets aggregate values"
+  },
+  "IIC039": {
+    "description": "B. TOTAL FIXED ASSETS",
+    "section": "Assets aggregate values"
+  },
+  "IIC071": {
+    "description": "C. CURRENT ASSETS",
+    "section": "Assets aggregate values"
+  },
+  "IIC072": {
+    "description": "D. Accruals and deferrals",
+    "section": "Assets aggregate values"
+  },
+  "IIC073": {
+    "description": "Accruals and deferrals of which loan discounts",
+    "section": "Assets aggregate values"
+  },
+  "IIC074": {
+    "description": "TOTAL ASSETS",
+    "section": "Assets aggregate values"
+  },
+  "IIC193": {
+    "description": "Credits to shareholders part of which is to reported",
+    "section": "Credits to Shareholders"
+  },
+  "IIC002": {
+    "description": "Credits to shareholders part of which is carried over",
+    "section": "Credits to Shareholders"
+  },
+  "IIC011": {
+    "description": "B.I. TOTAL INTANGIBLE FIXED ASSETS",
+    "section": "Intangible Fixed Assets"
+  },
+  "IIC003": {
+    "description": "B.I.1. Startup/Expansions",
+    "section": "Intangible Fixed Assets"
+  },
+  "IIC004": {
+    "description": "B.I.2. Research and development",
+    "section": "Intangible Fixed Assets"
+  },
+  "IIC005": {
+    "description": "B.I.3. Patents",
+    "section": "Intangible Fixed Assets"
+  },
+  "IIC006": {
+    "description": "B.I.4. Permits and licenses",
+    "section": "Intangible Fixed Assets"
+  },
+  "IIC007": {
+    "description": "B.I.5. Goodwill",
+    "section": "Intangible Fixed Assets"
+  },
+  "IIC008": {
+    "description": "B.I.6. Assets under construction and payments in account",
+    "section": "Intangible Fixed Assets"
+  },
+  "IIC009": {
+    "description": "B.I.7. Others",
+    "section": "Intangible Fixed Assets"
+  },
+  "IIC010": {
+    "description": "Depreciation provisions intangible fixed assets",
+    "section": "Intangible Fixed Assets"
+  },
+  "IIC018": {
+    "description": "B.II. TOTAL TANGIBLE FIXED ASSETS",
+    "section": "Tangible Fixed Assets"
+  },
+  "IIC012": {
+    "description": "B.II.1. Land and buildings",
+    "section": "Tangible Fixed Assets"
+  },
+  "IIC013": {
+    "description": "B.II.2. Plants and machinery",
+    "section": "Tangible Fixed Assets"
+  },
+  "IIC014": {
+    "description": "B.II.3.Industrial equipment",
+    "section": "Tangible Fixed Assets"
+  },
+  "IIC015": {
+    "description": "B.II.4. Other goods",
+    "section": "Tangible Fixed Assets"
+  },
+  "IIC016": {
+    "description": "B.II.5. Assets under construction and payments on account",
+    "section": "Tangible Fixed Assets"
+  },
+  "IIC017": {
+    "description": "Depreciation provisions tangible fixed assets",
+    "section": "Tangible Fixed Assets"
+  },
+  "IIC038": {
+    "description": "B.III. TOTAL FINANCIAL FIXED ASSETS",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC032": {
+    "description": "B.III.>> SHORT TERM FINANCIAL CREDITS",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC033": {
+    "description": "B.III.>> LONG TERM FINANCIAL CREDITS",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC023": {
+    "description": "B.III.1. TOTAL PARTICIPATING INTERESTS",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC019": {
+    "description": "B.III.1.a. Participating interests in subsidiaries",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC020": {
+    "description": "B.III.1.b.Participating interests in affiliated companies",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC021": {
+    "description": "B.III.1.c. Participating interests in parent companies",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC194": {
+    "description": "B.III.1.d. Equity investments controlled by parent companies",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC022": {
+    "description": "B.III.1.d-bis. Participating interests in other companies",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC034": {
+    "description": "B.III.2. TOTAL CREDITS FINANCIAL FIXED ASSETS",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC024": {
+    "description": "B.III.2.a. Credits to Subsidiaries",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC025": {
+    "description": "B.III.2.a. Credits to Subsidiaries due beyond the next financial year",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC316": {
+    "description": "B.III.2.a. Total credits to Subsidiaries",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC026": {
+    "description": "B.III.2.b. Credits to affiliated companies",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC027": {
+    "description": "B.III.2.b. Credits to affiliated companies due beyond the next financial year",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC317": {
+    "description": "B.III.2.b. Total credits to affiliated companies",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC028": {
+    "description": "B.III.2.c. Credits to parent companies",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC029": {
+    "description": "B.III.2.c. Credits to parent companies due beyond the next financial year",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC318": {
+    "description": "B.III.2.c. Total credits to parent companies",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC195": {
+    "description": "B.III.2.d. Receivables due from companies controlled by parent companies",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC196": {
+    "description": "B.III.2.d. Receivables due from companies controlled by parent companies due beyond the next financial year",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC319": {
+    "description": "B.III.2.d. Total receivables due from companies controlled by parent companies",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC030": {
+    "description": "B.III.2.d-bis. Credits to others",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC031": {
+    "description": "B.III.2.d-bis. Credits to others due beyond the next financial year",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC320": {
+    "description": "B.III.2.d-bis. Total credits to others",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC035": {
+    "description": "B.III.3. Other credities",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC036": {
+    "description": "B.III.4. Own shares",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC037": {
+    "description": "Own shares at their nominal value",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC197": {
+    "description": "B.III.4. Derivative active financial instruments",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC344": {
+    "description": "Other financial fixed assets",
+    "section": "Financial Fixed Assets"
+  },
+  "IIC045": {
+    "description": "C.I. TOTAL INVENTORY",
+    "section": "Inventory"
+  },
+  "IIC040": {
+    "description": "C.I.1. Ra materials",
+    "section": "Inventory"
+  },
+  "IIC041": {
+    "description": "C.I.2. Semi-finished products and products in progress",
+    "section": "Inventory"
+  },
+  "IIC042": {
+    "description": "C.I.3. Work in progress",
+    "section": "Inventory"
+  },
+  "IIC043": {
+    "description": "C.I.4. Finished products",
+    "section": "Inventory"
+  },
+  "IIC044": {
+    "description": "C.I.5. Payments on account",
+    "section": "Inventory"
+  },
+  "IIC349": {
+    "description": "Tangible fixed assets aimed at selling",
+    "section": "Inventory"
+  },
+  "IIC058": {
+    "description": "C.II. TOTAL CREDITS",
+    "section": "Credits"
+  },
+  "IIC056": {
+    "description": "C.II.>> SHORT TERM CREDITS",
+    "section": "Credits"
+  },
+  "IIC057": {
+    "description": "C.II.>> CREDITS DUE BEYOND THE NEXT FINANCIAL YEAR",
+    "section": "Credits"
+  },
+  "IIC046": {
+    "description": "C.II.1. Credits to customers",
+    "section": "Credits"
+  },
+  "IIC047": {
+    "description": "C.II.1. Credits to customers due beyond the next financial year",
+    "section": "Credits"
+  },
+  "IIC321": {
+    "description": "C.II.1. Total credits to customers",
+    "section": "Credits"
+  },
+  "IIC048": {
+    "description": "C.II.2. Credits to subsidiaries",
+    "section": "Credits"
+  },
+  "IIC049": {
+    "description": "C.II.2. Credits to subsidiaries due beyond the next financial year",
+    "section": "Credits"
+  },
+  "IIC322": {
+    "description": "C.II.2. Total credits to subsidiaries",
+    "section": "Credits"
+  },
+  "IIC050": {
+    "description": "C.II.3. Credits to affiliated companies",
+    "section": "Credits"
+  },
+  "IIC051": {
+    "description": "C.II.3. Credits to affiliated companies due beyond the next financial year",
+    "section": "Credits"
+  },
+  "IIC323": {
+    "description": "C.II.3. Total credits to affiliated companies",
+    "section": "Credits"
+  },
+  "IIC052": {
+    "description": "C.II.4. Credits to parent companies",
+    "section": "Credits"
+  },
+  "IIC053": {
+    "description": "C.II.4. Credits to parent companies due beyond the next financial year",
+    "section": "Credits"
+  },
+  "IIC324": {
+    "description": "C.II.4. Total credits to parent companies",
+    "section": "Credits"
+  },
+  "IIC198": {
+    "description": "C.II.5. Receivables due from companies controlled by parent companies",
+    "section": "Credits"
+  },
+  "IIC199": {
+    "description": "C.II.5. Receivables due from companies controlled by parent companies due beyond the next financial year",
+    "section": "Credits"
+  },
+  "IIC325": {
+    "description": "C.II.5. Total receivables due from companies controlled by parent companies",
+    "section": "Credits"
+  },
+  "IIC180": {
+    "description": "C.II.4.bis. Tax assets",
+    "section": "Credits"
+  },
+  "IIC181": {
+    "description": "C.II.4.bis. Tax assets due beyond the next financial year",
+    "section": "Credits"
+  },
+  "IIC326": {
+    "description": "C.II.4.bis. Total tax assets",
+    "section": "Credits"
+  },
+  "IIC054": {
+    "description": "C.II.5. Credits to others",
+    "section": "Credits"
+  },
+  "IIC055": {
+    "description": "C.II.5. Credits to others due beyond the next financial year",
+    "section": "Credits"
+  },
+  "IIC328": {
+    "description": "C.II.5. Total credits to others",
+    "section": "Credits"
+  },
+  "IIC182": {
+    "description": "C.II.5.ter. Credits for prepaid taxes",
+    "section": "Credits"
+  },
+  "IIC183": {
+    "description": "C.II.5.ter. Credits for prepaid taxes due beyond the next financial year",
+    "section": "Credits"
+  },
+  "IIC327": {
+    "description": "C.II.5.ter. Total credits for prepaid taxes",
+    "section": "Credits"
+  },
+  "IIC066": {
+    "description": "C.III. TOTAL FINANCIAL ASSETS",
+    "section": "Financial Assets"
+  },
+  "IIC059": {
+    "description": "C.III.1. Participating interests in subsidiaries",
+    "section": "Financial Assets"
+  },
+  "IIC060": {
+    "description": "C.III.2. Participating interests in affiliated companies",
+    "section": "Financial Assets"
+  },
+  "IIC061": {
+    "description": "C.III.3. Participating interests in parent companies",
+    "section": "Financial Assets"
+  },
+  "IIC200": {
+    "description": "C.III.3.bis Investments in companies controlled by parent companies",
+    "section": "Financial Assets"
+  },
+  "IIC062": {
+    "description": "C.III.4. Other participating interests",
+    "section": "Financial Assets"
+  },
+  "IIC063": {
+    "description": "C.III.5. Own shares",
+    "section": "Financial Assets"
+  },
+  "IIC064": {
+    "description": "Own shares at their nominal value",
+    "section": "Financial Assets"
+  },
+  "IIC201": {
+    "description": "C.III.5. Derivative active financial instruments",
+    "section": "Financial Assets"
+  },
+  "IIC065": {
+    "description": "C.III.6. Other securities",
+    "section": "Financial Assets"
+  },
+  "IIC202": {
+    "description": "Financial assets for central pool management",
+    "section": "Financial Assets"
+  },
+  "IIC070": {
+    "description": "C.IV. Cash equivalents",
+    "section": "Cash Equivalents"
+  },
+  "IIC067": {
+    "description": "C.IV.1. Bank deposits",
+    "section": "Cash Equivalents"
+  },
+  "IIC068": {
+    "description": "C.IV.2. Cheques",
+    "section": "Cash Equivalents"
+  },
+  "IIC069": {
+    "description": "C.IV.3. Cash in hand",
+    "section": "Cash Equivalents"
+  },
+  "IIC084": {
+    "description": "A. TOTAL NET WORTH",
+    "section": "Liabilities Aggregate Values"
+  },
+  "IIC088": {
+    "description": "B. TOTAL RISK PROVISIONS",
+    "section": "Liabilities Aggregate Values"
+  },
+  "IIC089": {
+    "description": "C. Severance payments",
+    "section": "Liabilities Aggregate Values"
+  },
+  "IIC118": {
+    "description": "D. TOTAL DEBTS",
+    "section": "Liabilities Aggregate Values"
+  },
+  "IIC119": {
+    "description": "E. ACCRUALS AND DEFERRALS",
+    "section": "Liabilities Aggregate Values"
+  },
+  "IIC120": {
+    "description": "Accruals and deferrals of which: premiums on loans",
+    "section": "Liabilities Aggregate Values"
+  },
+  "IIC121": {
+    "description": "TOTAL LIABILITIES",
+    "section": "Liabilities Aggregate Values"
+  },
+  "IIC122": {
+    "description": "TOTAL MEMORANDUM ACCOUNTS (**)",
+    "section": "Liabilities Aggregate Values"
+  },
+  "IIC123": {
+    "description": "Memorandum accounts of which guarantees pledged",
+    "section": "Liabilities Aggregate Values"
+  },
+  "IIC075": {
+    "description": "A.I. Share capital",
+    "section": "Net Worth"
+  },
+  "IIC076": {
+    "description": "A.II. Share premium reserve",
+    "section": "Net Worth"
+  },
+  "IIC077": {
+    "description": "A.III. Revaluation reserve",
+    "section": "Net Worth"
+  },
+  "IIC078": {
+    "description": "A.IV. Legal reserve",
+    "section": "Net Worth"
+  },
+  "IIC079": {
+    "description": "A.VI. Reserve for own shares",
+    "section": "Net Worth"
+  },
+  "IIC080": {
+    "description": "A.V. Statutory reserve",
+    "section": "Net Worth"
+  },
+  "IIC081": {
+    "description": "A.VI. Other reserves",
+    "section": "Net Worth"
+  },
+  "IIC082": {
+    "description": "A.VIII. Profit/Loss carried forward",
+    "section": "Net Worth"
+  },
+  "IIC083": {
+    "description": "A.IX. Profit/Loss for the year",
+    "section": "Net Worth"
+  },
+  "IIC203": {
+    "description": "Extraordinary reserve",
+    "section": "Net Worth"
+  },
+  "IIC204": {
+    "description": "Reserves from exceptions as per art. 2423 civil code",
+    "section": "Net Worth"
+  },
+  "IIC205": {
+    "description": "Shares reserve of the parent entity",
+    "section": "Net Worth"
+  },
+  "IIC206": {
+    "description": "Investment revaluation reserve",
+    "section": "Net Worth"
+  },
+  "IIC207": {
+    "description": "Contributions for capital increase",
+    "section": "Net Worth"
+  },
+  "IIC208": {
+    "description": "Contributions for future capital increase",
+    "section": "Net Worth"
+  },
+  "IIC209": {
+    "description": "Contributions to capital account",
+    "section": "Net Worth"
+  },
+  "IIC210": {
+    "description": "Contributions to cover losses",
+    "section": "Net Worth"
+  },
+  "IIC211": {
+    "description": "Capital reduction reserve",
+    "section": "Net Worth"
+  },
+  "IIC212": {
+    "description": "Merger surplus reserve",
+    "section": "Net Worth"
+  },
+  "IIC213": {
+    "description": "Reserve from exchange gains not redeemed",
+    "section": "Net Worth"
+  },
+  "IIC345": {
+    "description": "Reserve from current profit adjustments",
+    "section": "Net Worth"
+  },
+  "IIC214": {
+    "description": "Miscellaneous other reserves",
+    "section": "Net Worth"
+  },
+  "IIC215": {
+    "description": "A.VII. Reserve for hedging expected cash flow operations",
+    "section": "Net Worth"
+  },
+  "IIC216": {
+    "description": "Minimised loss for the year",
+    "section": "Net Worth"
+  },
+  "IIC218": {
+    "description": "A.X. Negative reserve for own portfolio shares",
+    "section": "Net Worth"
+  },
+  "IIC085": {
+    "description": "B.1. Pension fund",
+    "section": "Risk Provisions"
+  },
+  "IIC086": {
+    "description": "B.2. Tax fund",
+    "section": "Risk Provisions"
+  },
+  "IIC219": {
+    "description": "B.3. Passive derivative financial instruments",
+    "section": "Risk Provisions"
+  },
+  "IIC087": {
+    "description": "B.3. Other funds",
+    "section": "Risk Provisions"
+  },
+  "IIC116": {
+    "description": "D.>> SHORT TERMS DEBTS",
+    "section": "Debts"
+  },
+  "IIC117": {
+    "description": "D.>> DEBTS DUE BEYOND THE NEXT FINANCIAL YEAR",
+    "section": "Debts"
+  },
+  "IIC090": {
+    "description": "D.1. Bonds",
+    "section": "Debts"
+  },
+  "IIC091": {
+    "description": "D.1. Bonds due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC329": {
+    "description": "D.1. Total Bonds",
+    "section": "Debts"
+  },
+  "IIC092": {
+    "description": "D.2. Convertible bonds",
+    "section": "Debts"
+  },
+  "IIC093": {
+    "description": "D.2. convertible bonds due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC330": {
+    "description": "D.2. Total convertible bonds",
+    "section": "Debts"
+  },
+  "IIC184": {
+    "description": "D.3. Debts owed to shareholders",
+    "section": "Debts"
+  },
+  "IIC185": {
+    "description": "D.3. Debts owed to shareholders due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC331": {
+    "description": "D.3. Total debts due to partners for financing",
+    "section": "Debts"
+  },
+  "IIC094": {
+    "description": "D.4. Debts owed to banks",
+    "section": "Debts"
+  },
+  "IIC095": {
+    "description": "D.4. Debts owed to banks due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC332": {
+    "description": "D.4. Totale debts owed to banks",
+    "section": "Debts"
+  },
+  "IIC096": {
+    "description": "D.5. Debts owed to other lenders",
+    "section": "Debts"
+  },
+  "IIC097": {
+    "description": "D.5. Debts owed to other lenders due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC333": {
+    "description": "D.5. Total debts due to other providers of finance",
+    "section": "Debts"
+  },
+  "IIC098": {
+    "description": "D.6. Account/Advances",
+    "section": "Debts"
+  },
+  "IIC099": {
+    "description": "D.6. Account/advances due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC334": {
+    "description": "D.6. Total account/advances",
+    "section": "Debts"
+  },
+  "IIC100": {
+    "description": "D.7. Debts owed to suppliers",
+    "section": "Debts"
+  },
+  "IIC101": {
+    "description": "D.7. Debts owed to suppliers due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC335": {
+    "description": "D.7. Total trade debts",
+    "section": "Debts"
+  },
+  "IIC102": {
+    "description": "D.8. Credit instruments",
+    "section": "Debts"
+  },
+  "IIC103": {
+    "description": "D.8. Credit instruments due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC336": {
+    "description": "D.8. Total credit instruments",
+    "section": "Debts"
+  },
+  "IIC104": {
+    "description": "D.9. Debts owed to subsidiaries",
+    "section": "Debts"
+  },
+  "IIC105": {
+    "description": "D.9. Debts owed to subsidiaries due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC337": {
+    "description": "D.9. Total debts owed to subsidiary companies",
+    "section": "Debts"
+  },
+  "IIC106": {
+    "description": "D.10. Debts owed to affiliated companies",
+    "section": "Debts"
+  },
+  "IIC107": {
+    "description": "D.10. Debts owed to affiliated companies due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC338": {
+    "description": "D.10. Total debts owed to affiliated companies",
+    "section": "Debts"
+  },
+  "IIC108": {
+    "description": "D.11. Debts owed to parent companies",
+    "section": "Debts"
+  },
+  "IIC109": {
+    "description": "D.11. Debts owed to parent companies due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC339": {
+    "description": "D.11. Total debts due to parent companies",
+    "section": "Debts"
+  },
+  "IIC220": {
+    "description": "D.11.bis. Debts due to companies controlled by parent companies",
+    "section": "Debts"
+  },
+  "IIC221": {
+    "description": "D.11.bis. Debts due to companies controlled by parent companies due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC340": {
+    "description": "D.11.bis. Total debts due to companies controlled by parent companies",
+    "section": "Debts"
+  },
+  "IIC110": {
+    "description": "D.12. Tax liabilities",
+    "section": "Debts"
+  },
+  "IIC111": {
+    "description": "D.12. Tax liabilities due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC341": {
+    "description": "D.12. Total tax liabilities",
+    "section": "Debts"
+  },
+  "IIC112": {
+    "description": "D.13. Debts owed to social security agencies",
+    "section": "Debts"
+  },
+  "IIC113": {
+    "description": "D.13. Debts owed to social security agencies due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC342": {
+    "description": "D.13. Total debts due to social security and welfare institutions",
+    "section": "Debts"
+  },
+  "IIC114": {
+    "description": "D.14. Other debts",
+    "section": "Debts"
+  },
+  "IIC115": {
+    "description": "D.14. Other debts due beyond the next financial year",
+    "section": "Debts"
+  },
+  "IIC343": {
+    "description": "D.14. Total other debts",
+    "section": "Debts"
+  },
+  "IIC130": {
+    "description": "A. TOTAL PRODUCTION VALUE",
+    "section": "Income Statement Aggregate Values"
+  },
+  "IIC149": {
+    "description": "B. PRODUCTION COSTS",
+    "section": "Income Statement Aggregate Values"
+  },
+  "IIC224": {
+    "description": "Difference between value and cost of production (a - b)",
+    "section": "Income Statement Aggregate Values"
+  },
+  "IIC161": {
+    "description": "C. TOTAL REVENUES AND FINANCIAL CHARGES",
+    "section": "Income Statement Aggregate Values"
+  },
+  "IIC170": {
+    "description": "D. TOTAL VALUE ADJUSTMENTS TO FINANCIAL ASSETS AND LIABILITIES (*)",
+    "section": "Income Statement Aggregate Values"
+  },
+  "IIC176": {
+    "description": "E. TOTAL EXTRAORDINARY REVENUES AND CHARGES",
+    "section": "Income Statement Aggregate Values"
+  },
+  "IIC124": {
+    "description": "A.1. Revenues from sales and services",
+    "section": "Production Value"
+  },
+  "IIC125": {
+    "description": "A.2. Product inventory variations",
+    "section": "Production Value"
+  },
+  "IIC126": {
+    "description": "A.3. Work variations",
+    "section": "Production Value"
+  },
+  "IIC186": {
+    "description": "A.2. + A.3. Total variations",
+    "section": "Production Value"
+  },
+  "IIC127": {
+    "description": "A.4. Increases in fixed assets",
+    "section": "Production Value"
+  },
+  "IIC128": {
+    "description": "A.5. Total other revenues",
+    "section": "Production Value"
+  },
+  "IIC129": {
+    "description": "-- > other revenues of which contributions for operating expenses",
+    "section": "Production Value"
+  },
+  "IIC223": {
+    "description": "Other revenues",
+    "section": "Production Value"
+  },
+  "IIC131": {
+    "description": "B.6. Purchase of materials",
+    "section": "Production Costs"
+  },
+  "IIC132": {
+    "description": "B.7. Services",
+    "section": "Production Costs"
+  },
+  "IIC133": {
+    "description": "B.8. Leased assets",
+    "section": "Production Costs"
+  },
+  "IIC139": {
+    "description": "B.9. TOT staff costs",
+    "section": "Production Costs"
+  },
+  "IIC134": {
+    "description": "B.9. A wages/salaries",
+    "section": "Production Costs"
+  },
+  "IIC135": {
+    "description": "B.9.b. Social security costs",
+    "section": "Production Costs"
+  },
+  "IIC136": {
+    "description": "B.9.c. Severance payments",
+    "section": "Production Costs"
+  },
+  "IIC137": {
+    "description": "B.9.d. Pensions",
+    "section": "Production Costs"
+  },
+  "IIC138": {
+    "description": "B.9.e. Other costs",
+    "section": "Production Costs"
+  },
+  "IIC187": {
+    "description": "B.9. c+d+e severance payments + pensions + other costs",
+    "section": "Production Costs"
+  },
+  "IIC144": {
+    "description": "B.10. TOT depreciation and impairment",
+    "section": "Production Costs"
+  },
+  "IIC140": {
+    "description": "B.10.a. Depreciation of intangibles",
+    "section": "Production Costs"
+  },
+  "IIC141": {
+    "description": "B.10.b. Depreciation of tangibles",
+    "section": "Production Costs"
+  },
+  "IIC142": {
+    "description": "B.10.c. Fixed asset impairment",
+    "section": "Production Costs"
+  },
+  "IIC188": {
+    "description": "B.10.a.+b.+c. Depreciation and impairment of fixed assets",
+    "section": "Production Costs"
+  },
+  "IIC143": {
+    "description": "B.10.d. Impairment of credits and disp.",
+    "section": "Production Costs"
+  },
+  "IIC145": {
+    "description": "B.11. Variation in materials",
+    "section": "Production Costs"
+  },
+  "IIC146": {
+    "description": "B.12. Risk provisions",
+    "section": "Production Costs"
+  },
+  "IIC147": {
+    "description": "B.13. Other provisions",
+    "section": "Production Costs"
+  },
+  "IIC148": {
+    "description": "B.14. Other operating charges",
+    "section": "Production Costs"
+  },
+  "IIC150": {
+    "description": "C.15. Revenues from participating interests",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC151": {
+    "description": "Of which in subsidiaries/affiliated companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC225": {
+    "description": "C.15. By subsidiary companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC226": {
+    "description": "C.15. By affiliated companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC227": {
+    "description": "C.15. By parent companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC228": {
+    "description": "C.15. Companies subjected to parent companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC229": {
+    "description": "C.15. Other",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC158": {
+    "description": "C.16. Total other revenues",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC152": {
+    "description": "C.16.a. Revenues from credits financial fixed assets",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC153": {
+    "description": "Revenues from credits financial fixed assets of which in subsidiaries/affiliated companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC230": {
+    "description": "C.16.a. By subsidiary companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC233": {
+    "description": "C.16.a. Companies subjected to parent companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC234": {
+    "description": "C.16.a. Other",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC154": {
+    "description": "C.16.b. Revenues from fix securities",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC155": {
+    "description": "C.16.c. Revenues from current securities",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC189": {
+    "description": "C.16.b.+c. Revenues from securities",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC156": {
+    "description": "C.16.d. Other revenues",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC157": {
+    "description": "Other revenues of which in subsidiaries/affiliated companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC235": {
+    "description": "C.16.d. By subsidiary companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC236": {
+    "description": "C.16.d. By affiliated companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC237": {
+    "description": "C.16.d. By parent companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC238": {
+    "description": "C.16.d. Companies subjected to parent companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC239": {
+    "description": "C.16.d. Other",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC159": {
+    "description": "C.17. Total financial charges",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC160": {
+    "description": "Financial charges of which in subsidiaries/affiliated companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC240": {
+    "description": "C.17. To subsidiary companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC241": {
+    "description": "C.17. To associated companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC242": {
+    "description": "C.17. To parent companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC243": {
+    "description": "C.17. To companies controlled by parent companies",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC244": {
+    "description": "C.17. To other",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC190": {
+    "description": "C.17.bis. Profit and loss from foreign-exchange",
+    "section": "Revenues Financial Charges"
+  },
+  "IIC165": {
+    "description": "D.18. Total appreciation",
+    "section": "Adjustments"
+  },
+  "IIC162": {
+    "description": "D.18.a. Appreciation of participating interests",
+    "section": "Adjustments"
+  },
+  "IIC163": {
+    "description": "D.18.b. Appreciation of other financial fixed assets",
+    "section": "Adjustments"
+  },
+  "IIC164": {
+    "description": "D.18.c. Appreciation of securities",
+    "section": "Adjustments"
+  },
+  "IIC245": {
+    "description": "D.18.d. Derivative financial instruments",
+    "section": "Adjustments"
+  },
+  "IIC350": {
+    "description": ".Financial assets for central pool management",
+    "section": "Adjustments"
+  },
+  "IIC169": {
+    "description": "D.19. Total impairment",
+    "section": "Adjustments"
+  },
+  "IIC166": {
+    "description": "D.19.a. Impairment of participating interests",
+    "section": "Adjustments"
+  },
+  "IIC167": {
+    "description": "D.19.b. Impairment of other financial fixed assets",
+    "section": "Adjustments"
+  },
+  "IIC168": {
+    "description": "D.19.c. Impairment of securities",
+    "section": "Adjustments"
+  },
+  "IIC246": {
+    "description": "D.19.d. Derivative financial instruments",
+    "section": "Adjustments"
+  },
+  "IIC171": {
+    "description": "E.20. Extraordinary revenues",
+    "section": "Annual Result"
+  },
+  "IIC172": {
+    "description": "Extraordinary revenues of which capital gains",
+    "section": "Annual Result"
+  },
+  "IIC173": {
+    "description": "E.21. Ordinary charges",
+    "section": "Annual Result"
+  },
+  "IIC175": {
+    "description": "Ordinary charges of which taxes from previous financial year",
+    "section": "Annual Result"
+  },
+  "IIC174": {
+    "description": "Ordinary charges of which capital losses",
+    "section": "Annual Result"
+  },
+  "IIC177": {
+    "description": "Result before taxes",
+    "section": "Annual Result"
+  },
+  "IIC178": {
+    "description": "20. Total current, deferred and prepaid income tax",
+    "section": "Annual Result"
+  },
+  "IIC191": {
+    "description": "20.a. Current taxes",
+    "section": "Annual Result"
+  },
+  "IIC347": {
+    "description": "20.b. Tax related to previous years",
+    "section": "Annual Result"
+  },
+  "IIC192": {
+    "description": "20.c. Deferred and prepaid tax",
+    "section": "Annual Result"
+  },
+  "IIC250": {
+    "description": "20.d. Income (expense) arising from the adoption of the fiscal consolidated system/fiscal transparency",
+    "section": "Annual Result"
+  },
+  "IIC179": {
+    "description": "21. PROFIT/LOSS FOR THE YEAR",
+    "section": "Annual Result"
+  }
+}

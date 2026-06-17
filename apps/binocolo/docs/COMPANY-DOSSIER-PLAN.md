@@ -102,12 +102,24 @@ Route sotto `RequireRole(BinocoloAccessRoles())`, `r.PathValue("vat")`, trace
 (chiave=VendorID) → riga doppia + un ri-addebito. Mitigazione: check `vat_code`
 nell'enqueue del funnel (piccolo).
 
+**✅ FATTO**: store `GetMADeepByVAT` (ready-wins, poi più recente), service
+`companyDossier`/`getCompanyDossier`, handler + route (`GET`/`POST`, trace
+`ma_company_dossier`, `BinocoloAccessRoles`), validazione P.IVA 11 cifre / CF 16,
+risposta `MACompanyDossier` (`absent|cost_required|queued|running|ready|failed`) con
+il payload raw incluso (facts layer). L'hardening del funnel-enqueue resta come edge
+aperto. `go vet` + suite verdi.
+
 ### 1.2 Legenda IIC → bilancio riclassificato
 Parsing una-tantum di `company-legend.html` → `apps/binocolo/src/data/iicLegend.json`
 (`codice → {descrizione, sezione, IC/PL}`) + decode `detailedLegalForm` e ruoli
 manager. Backend resta passthrough del raw; il frontend mappa codici→etichette a
 render. Riferimenti chiave già verificati: `IIC074`=TOTAL ASSETS, `IIC179`=utile
 d'esercizio, `IIC177`=risultato ante imposte, `IIC178`=imposte.
+
+**✅ FATTO**: `apps/binocolo/src/data/iicLegend.json` (276 codici → `{description,
+section}`) generato da `company-legend.html` (parser in `artifacts/claude/`).
+Correzione: `detailedLegalForm` e ruoli manager NON servono dalla legenda — il payload
+IT-full li porta già decodificati; la legenda serve solo per i codici IIC del bilancio.
 
 ### 1.3 Brief ricco (decisione 1)
 Riscrittura prompt `ma_deep_brief` (sezioni: sintesi esecutiva, profilo azienda,
@@ -116,6 +128,12 @@ razionale valutazione, cosa indagare) alimentato col **raw ricco** (gruppo,
 controllate, gare pubbliche, cariche, sedi, mix dipendenti, delta 2 anni, web).
 Schema output esteso. **Migration** per la nuova versione del prompt (come la 040).
 Deve precedere 0.3b.
+
+**✅ FATTO**: `MADeepBrief` esteso (Go + TS) — `businessProfile`, `strengths[]`,
+`redFlags[].category`, `valuationRationale`, `ddQuestions[]`. Worker:
+`curateITFullForBrief` (rimuove gli array IIC opachi) alimenta il blocco `company`;
+MaxTokens 900→2200; `parseMADeepBrief` ripulisce/limita i nuovi campi. Migration `045`
+aggiorna **in place** il prompt di default (id `…402`, `prompt_id` stabile). Sblocca 0.3b.
 
 ## Fase 2 — Pagina (frontend)
 

@@ -40,6 +40,7 @@ type maWorkspaceStore interface {
 	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
 	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
 	UpdateMADeepScorecard(ctx context.Context, companyKey string, scorecard *MADeepScorecard) error
+	GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRecord, error)
 }
 
 func (s *SQLStore) ListMASessions(ctx context.Context, visibility string) ([]MASessionSummary, error) {
@@ -1840,6 +1841,66 @@ WHERE company_key = $1
 		return fmt.Errorf("update ma deep scorecard: %w", err)
 	}
 	return nil
+}
+
+// maDeepVATRecord is a single cached deep analysis resolved by partita IVA, carrying
+// the raw IT-full payload (facts layer) alongside the derived scorecard/valuation/brief.
+type maDeepVATRecord struct {
+	CompanyKey string
+	Status     string
+	Scorecard  *MADeepScorecard
+	Valuation  *MADeepValuation
+	Brief      *MADeepBrief
+	Payload    json.RawMessage
+	CostEUR    float64
+	ErrorCode  string
+	UpdatedAt  time.Time
+}
+
+// GetMADeepByVAT resolves a deep analysis by vat_code regardless of how its row was
+// keyed (the funnel keys by vendor id, the standalone lookup by VAT). A ready row
+// wins over an in-flight/failed one, then most recent. Returns (nil, nil) when absent.
+func (s *SQLStore) GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRecord, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	var rec maDeepVATRecord
+	var scorecardRaw, valuationRaw, briefRaw, payloadRaw []byte
+	err := s.db.QueryRowContext(ctx, `
+SELECT company_key, status, scorecard, valuation, brief, itfull_payload, cost_eur, COALESCE(error_code, ''), updated_at
+FROM binocolo.ma_deep_analysis
+WHERE vat_code = $1
+ORDER BY (status = 'ready') DESC, updated_at DESC
+LIMIT 1
+`, vat).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.CostEUR, &rec.ErrorCode, &rec.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get ma deep by vat: %w", err)
+	}
+	if len(scorecardRaw) > 0 {
+		var v MADeepScorecard
+		if json.Unmarshal(scorecardRaw, &v) == nil {
+			rec.Scorecard = &v
+		}
+	}
+	if len(valuationRaw) > 0 {
+		var v MADeepValuation
+		if json.Unmarshal(valuationRaw, &v) == nil {
+			rec.Valuation = &v
+		}
+	}
+	if len(briefRaw) > 0 {
+		var v MADeepBrief
+		if json.Unmarshal(briefRaw, &v) == nil {
+			rec.Brief = &v
+		}
+	}
+	if len(payloadRaw) > 0 && string(payloadRaw) != "null" {
+		rec.Payload = json.RawMessage(payloadRaw)
+	}
+	return &rec, nil
 }
 
 type sectorMultiple struct {

@@ -149,9 +149,26 @@ export interface MADeepValuation {
 export interface MADeepBrief {
   verdict?: string;
   rag?: string;
-  thesisFit?: string;
+  businessProfile?: string;
   thesisReading?: string;
-  redFlags?: { severity: string; claim: string; ddQuestion?: string }[];
+  strengths?: string[];
+  redFlags?: { severity: string; category?: string; claim: string; ddQuestion?: string }[];
+  valuationRationale?: string;
+  ddQuestions?: string[];
+  thesisFit?: string;
+}
+
+// Standalone P.IVA dossier: our elaborations plus the raw IT-full payload (facts layer).
+export interface MACompanyDossier {
+  vatCode: string;
+  status: 'absent' | 'cost_required' | 'queued' | 'running' | 'ready' | 'failed';
+  scorecard?: MADeepScorecard;
+  valuation?: MADeepValuation;
+  brief?: MADeepBrief;
+  raw?: unknown;
+  costEur?: number;
+  errorCode?: string;
+  updatedAt?: string;
 }
 
 export type MASessionStatus = 'draft' | 'estimated' | 'running' | 'completed' | 'failed';

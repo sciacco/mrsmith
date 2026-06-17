@@ -468,15 +468,20 @@ type MADeepValuation struct {
 
 // MADeepBrief is populated in Fase 5 (LLM narrative; numbers stay in scorecard/valuation).
 type MADeepBrief struct {
-	Verdict       string            `json:"verdict,omitempty"`
-	RAG           string            `json:"rag,omitempty"`
-	ThesisFit     string            `json:"thesisFit,omitempty"`
-	ThesisReading string            `json:"thesisReading,omitempty"`
-	RedFlags      []MADeepBriefFlag `json:"redFlags,omitempty"`
+	Verdict            string            `json:"verdict,omitempty"`
+	RAG                string            `json:"rag,omitempty"`
+	BusinessProfile    string            `json:"businessProfile,omitempty"`
+	ThesisReading      string            `json:"thesisReading,omitempty"`
+	Strengths          []string          `json:"strengths,omitempty"`
+	RedFlags           []MADeepBriefFlag `json:"redFlags,omitempty"`
+	ValuationRationale string            `json:"valuationRationale,omitempty"`
+	DDQuestions        []string          `json:"ddQuestions,omitempty"`
+	ThesisFit          string            `json:"thesisFit,omitempty"`
 }
 
 type MADeepBriefFlag struct {
 	Severity   string `json:"severity"`
+	Category   string `json:"category,omitempty"`
 	Claim      string `json:"claim"`
 	DDQuestion string `json:"ddQuestion,omitempty"`
 }
@@ -494,6 +499,21 @@ type maDeepResult struct {
 
 type MADeepDiveRequest struct {
 	AcknowledgeCost bool `json:"acknowledgeCost,omitempty"`
+}
+
+// MACompanyDossier is the standalone P.IVA lookup response: our elaborations
+// (scorecard/valuation/brief) plus the raw IT-full payload for the facts layer.
+// Status drives the frontend: absent | cost_required | queued | running | ready | failed.
+type MACompanyDossier struct {
+	VATCode   string           `json:"vatCode"`
+	Status    string           `json:"status"`
+	Scorecard *MADeepScorecard `json:"scorecard,omitempty"`
+	Valuation *MADeepValuation `json:"valuation,omitempty"`
+	Brief     *MADeepBrief     `json:"brief,omitempty"`
+	Raw       json.RawMessage  `json:"raw,omitempty"`
+	CostEUR   float64          `json:"costEur,omitempty"`
+	ErrorCode string           `json:"errorCode,omitempty"`
+	UpdatedAt *time.Time       `json:"updatedAt,omitempty"`
 }
 
 type maStrategyDraftEnvelope struct {

@@ -150,7 +150,7 @@ func (w *maDeepWorker) process(ctx context.Context, job maDeepJob) {
 		}
 		result := maDeepResult{Payload: resp.Data, Scorecard: scorecard, Valuation: valuation, CostEUR: pricing.CostFull}
 		if w.ai != nil && scorecard != nil {
-			brief, modelID, promptID, err := w.generateBrief(ctx, scorecard, valuation)
+			brief, modelID, promptID, err := w.generateBrief(ctx, resp.Data, scorecard, valuation)
 			if err != nil {
 				// Brief is best-effort: a failure must not lose the paid scorecard.
 				logging.FromContext(ctx).Warn("binocolo deep worker brief failed", "component", "binocolo", "company_key", job.CompanyKey, "error", err)
@@ -181,7 +181,7 @@ func scorecardHasMetric(scorecard *MADeepScorecard) bool {
 // generateBrief asks the LLM (scope ma_deep_brief) to narrate the already-computed
 // scorecard + valuation. The model receives only the computed numbers and must not
 // invent any (thesis-neutral, since the deep analysis is cached globally per company).
-func (w *maDeepWorker) generateBrief(ctx context.Context, scorecard *MADeepScorecard, valuation *MADeepValuation) (*MADeepBrief, string, string, error) {
+func (w *maDeepWorker) generateBrief(ctx context.Context, rawPayload json.RawMessage, scorecard *MADeepScorecard, valuation *MADeepValuation) (*MADeepBrief, string, string, error) {
 	model, err := w.store.ResolveMAModel(ctx, maModelScopeDeepBrief, "")
 	if err != nil {
 		return nil, "", "", err
@@ -190,18 +190,22 @@ func (w *maDeepWorker) generateBrief(ctx context.Context, scorecard *MADeepScore
 	if err != nil {
 		return nil, "", "", err
 	}
-	payload, err := json.Marshal(map[string]any{"scorecard": scorecard, "valuation": valuation})
+	briefInput := map[string]any{"scorecard": scorecard, "valuation": valuation}
+	if company := curateITFullForBrief(rawPayload); company != nil {
+		briefInput["company"] = company
+	}
+	input, err := json.Marshal(briefInput)
 	if err != nil {
 		return nil, "", "", err
 	}
 	resp, err := w.ai.Chat(ctx, openrouter.ChatRequest{
 		Model:          model.Model,
 		Temperature:    0,
-		MaxTokens:      900,
+		MaxTokens:      2200,
 		ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
 		Messages: []openrouter.Message{
 			{Role: "system", Content: prompt.Prompt},
-			{Role: "user", Content: string(payload)},
+			{Role: "user", Content: string(input)},
 		},
 	})
 	if err != nil {
@@ -228,18 +232,60 @@ func parseMADeepBrief(content string) (*MADeepBrief, error) {
 		return nil, fmt.Errorf("decode deep brief: %w", err)
 	}
 	brief.Verdict = cleanText(brief.Verdict, 600)
-	brief.ThesisReading = cleanText(brief.ThesisReading, 800)
+	brief.BusinessProfile = cleanText(brief.BusinessProfile, 800)
+	brief.ThesisReading = cleanText(brief.ThesisReading, 1000)
+	brief.ValuationRationale = cleanText(brief.ValuationRationale, 600)
 	brief.ThesisFit = cleanText(brief.ThesisFit, 200)
 	brief.RAG = strings.ToLower(strings.TrimSpace(brief.RAG))
-	if len(brief.RedFlags) > 5 {
-		brief.RedFlags = brief.RedFlags[:5]
+	if len(brief.Strengths) > 6 {
+		brief.Strengths = brief.Strengths[:6]
+	}
+	for i := range brief.Strengths {
+		brief.Strengths[i] = cleanText(brief.Strengths[i], 300)
+	}
+	if len(brief.DDQuestions) > 8 {
+		brief.DDQuestions = brief.DDQuestions[:8]
+	}
+	for i := range brief.DDQuestions {
+		brief.DDQuestions[i] = cleanText(brief.DDQuestions[i], 300)
+	}
+	if len(brief.RedFlags) > 8 {
+		brief.RedFlags = brief.RedFlags[:8]
 	}
 	for i := range brief.RedFlags {
 		brief.RedFlags[i].Severity = strings.ToLower(strings.TrimSpace(brief.RedFlags[i].Severity))
+		brief.RedFlags[i].Category = strings.ToLower(strings.TrimSpace(brief.RedFlags[i].Category))
 		brief.RedFlags[i].Claim = cleanText(brief.RedFlags[i].Claim, 300)
 		brief.RedFlags[i].DDQuestion = cleanText(brief.RedFlags[i].DDQuestion, 300)
 	}
 	return &brief, nil
+}
+
+// curateITFullForBrief strips the opaque IIC-coded balance-sheet arrays from the raw
+// payload, leaving the human-readable facts (registry, group, governance, public
+// tenders, sector, employees, ratios) for the LLM to narrate. Returns nil on bad input.
+func curateITFullForBrief(payload json.RawMessage) any {
+	if len(payload) == 0 {
+		return nil
+	}
+	var obj map[string]any
+	if err := json.Unmarshal(payload, &obj); err != nil {
+		return nil
+	}
+	if inner, ok := obj["data"].(map[string]any); ok {
+		obj = inner
+	}
+	for _, key := range []string{
+		"debts", "credits", "netWorth", "inventory", "financialAssets",
+		"financialFixedAssets", "tangibleFixedAssets", "intangibleFixedAssets",
+		"assetsAggregateValues", "liabilitiesAggregateValues", "riskProvisions",
+		"productionCosts", "productionValue", "annualResult", "revenuesFinancialCharges",
+		"adjustments", "creditsToShareholders", "incomeStatementAggregateValues",
+		"cashEquivalents",
+	} {
+		delete(obj, key)
+	}
+	return obj
 }
 
 // retryOrFail bumps the attempt counter and marks the job failed once it exceeds

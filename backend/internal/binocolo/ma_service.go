@@ -720,6 +720,67 @@ func (s *maService) recomputeMADeepScorecards(ctx context.Context) (int, error) 
 	return recomputed, nil
 }
 
+// companyDossier is the standalone P.IVA lookup (POST). Cache-first by vat_code: a
+// ready or in-flight analysis is served as-is (no charge, no enqueue). A miss or a
+// previously failed row needs an explicit cost acknowledgement before a fresh IT-full
+// call (~€0.30) is queued; without it the caller gets status "cost_required".
+func (s *maService) companyDossier(ctx context.Context, vat string, ack bool, email string) (MACompanyDossier, error) {
+	if s.store == nil {
+		return MACompanyDossier{}, errMAStoreUnavailable
+	}
+	rec, err := s.store.GetMADeepByVAT(ctx, vat)
+	if err != nil {
+		return MACompanyDossier{}, err
+	}
+	if rec != nil && (rec.Status == maDeepStatusReady || rec.Status == maDeepStatusQueued || rec.Status == maDeepStatusRunning) {
+		return mapMACompanyDossier(vat, rec), nil
+	}
+	if !ack {
+		dossier := mapMACompanyDossier(vat, rec)
+		dossier.Status = "cost_required"
+		dossier.CostEUR = s.loadPricing(ctx).CostFull
+		return dossier, nil
+	}
+	if err := s.store.EnqueueMADeepAnalysis(ctx, vat, vat, "", email); err != nil {
+		return MACompanyDossier{}, err
+	}
+	return MACompanyDossier{VATCode: vat, Status: maDeepStatusQueued}, nil
+}
+
+// getCompanyDossier returns the current cached state for a P.IVA without ever
+// triggering a paid lookup; the frontend polls it until ready/failed.
+func (s *maService) getCompanyDossier(ctx context.Context, vat string) (MACompanyDossier, error) {
+	if s.store == nil {
+		return MACompanyDossier{}, errMAStoreUnavailable
+	}
+	rec, err := s.store.GetMADeepByVAT(ctx, vat)
+	if err != nil {
+		return MACompanyDossier{}, err
+	}
+	return mapMACompanyDossier(vat, rec), nil
+}
+
+func mapMACompanyDossier(vat string, rec *maDeepVATRecord) MACompanyDossier {
+	if rec == nil {
+		return MACompanyDossier{VATCode: vat, Status: "absent"}
+	}
+	dossier := MACompanyDossier{
+		VATCode:   vat,
+		Status:    rec.Status,
+		Scorecard: rec.Scorecard,
+		Valuation: rec.Valuation,
+		Brief:     rec.Brief,
+		Raw:       rec.Payload,
+		CostEUR:   rec.CostEUR,
+		ErrorCode: rec.ErrorCode,
+	}
+	if !rec.UpdatedAt.IsZero() {
+		ts := rec.UpdatedAt
+		dossier.UpdatedAt = &ts
+	}
+	return dossier
+}
+
 func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, email string) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable

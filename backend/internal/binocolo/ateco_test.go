@@ -862,6 +862,10 @@ func (f *fakeMAWorkspaceStore) UpdateMADeepScorecard(context.Context, string, *M
 	return nil
 }
 
+func (f *fakeMAWorkspaceStore) GetMADeepByVAT(context.Context, string) (*maDeepVATRecord, error) {
+	return nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) RecordMAModelAudit(context.Context, maModelAuditWrite) error {
 	return nil
 }

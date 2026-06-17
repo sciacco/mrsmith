@@ -84,6 +84,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/execute", h.handleExecuteMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/export", h.handleExportMASession)
 	handle("POST /binocolo/v1/ma/deep/recompute", h.handleRecomputeMADeep)
+	handle("GET /binocolo/v1/companies/{vat}/dossier", h.handleGetCompanyDossier)
+	handle("POST /binocolo/v1/companies/{vat}/dossier", h.handleCreateCompanyDossier)
 	return runDeepWorker
 }
 
@@ -294,6 +296,82 @@ func (h *Handler) handleRecomputeMADeep(w http.ResponseWriter, r *http.Request) 
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, map[string]any{"recomputed": count})
+}
+
+// handleGetCompanyDossier returns the cached dossier state for a P.IVA (poll target);
+// it never triggers a paid lookup.
+func (h *Handler) handleGetCompanyDossier(w http.ResponseWriter, r *http.Request) {
+	vat, ok := maVATParam(w, r)
+	if !ok {
+		return
+	}
+	dossier, err := h.ma.getCompanyDossier(r.Context(), vat)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_dossier_get", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, dossier)
+}
+
+// handleCreateCompanyDossier is the standalone P.IVA lookup: cache-first, and on a
+// miss it queues a fresh IT-full deep-dive once the caller acknowledges the cost.
+func (h *Handler) handleCreateCompanyDossier(w http.ResponseWriter, r *http.Request) {
+	vat, ok := maVATParam(w, r)
+	if !ok {
+		return
+	}
+	var body MADeepDiveRequest
+	if r.Body != nil && r.ContentLength != 0 {
+		if err := decodeMABody(r, &body); err != nil {
+			httputil.Error(w, http.StatusBadRequest, "invalid_json")
+			return
+		}
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_company_dossier", "", body, subject, email)
+	if !traceOK {
+		return
+	}
+	dossier, err := h.ma.companyDossier(r.Context(), vat, body.AcknowledgeCost, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_dossier", err)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, dossier)
+}
+
+// maVATParam reads and validates the {vat} path segment: an 11-digit partita IVA /
+// codice fiscale, or a 16-char individual codice fiscale.
+func maVATParam(w http.ResponseWriter, r *http.Request) (string, bool) {
+	vat := strings.ToUpper(strings.TrimSpace(r.PathValue("vat")))
+	if !isValidVATOrTax(vat) {
+		httputil.Error(w, http.StatusBadRequest, "invalid_vat")
+		return "", false
+	}
+	return vat, true
+}
+
+func isValidVATOrTax(v string) bool {
+	switch len(v) {
+	case 11:
+		for _, c := range v {
+			if c < '0' || c > '9' {
+				return false
+			}
+		}
+		return true
+	case 16:
+		for _, c := range v {
+			if !((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z')) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *Handler) handleEstimateMASession(w http.ResponseWriter, r *http.Request) {
