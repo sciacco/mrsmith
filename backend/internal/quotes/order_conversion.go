@@ -807,7 +807,7 @@ func buildVodkaOrderHeader(source *quoteOrderSource, categoryNames map[int]strin
 		ProfileSDI:            stringPtr(""),
 		ProfileLang:           normalizeLegacyQuoteLanguage(nullStringValue(source.TemplateLang)),
 		CdlanClienteID:        nil,
-		ServiceType:           serviceNamesForLegacy(source.Services, categoryNames),
+		ServiceType:           serviceNamesForLegacy(source.Services, categoryNames, source.TemplateIsColo),
 		DataDecorrenza:        "",
 		CdlanTacitoRinInPDF:   "0",
 		IsColo:                legacyIsColo(source.TemplateIsColo),
@@ -1081,13 +1081,20 @@ func parseServiceCategoryIDs(raw string) []int {
 	return out
 }
 
-func serviceNamesForLegacy(services sql.NullString, categoryNames map[int]string) string {
+func serviceNamesForLegacy(services sql.NullString, categoryNames map[int]string, isColo bool) string {
 	ids := parseServiceCategoryIDs(nullStringValue(services))
 	names := make([]string, 0, len(ids))
 	for _, id := range ids {
-		if name := strings.TrimSpace(categoryNames[id]); name != "" {
-			names = append(names, name)
+		name := strings.TrimSpace(categoryNames[id])
+		if name == "" {
+			continue
 		}
+		// Non-colo quotes must not advertise a COLOCATION service line; the
+		// legacy order contract expects the short "COLO" label in that case.
+		if !isColo && strings.EqualFold(name, "COLOCATION") {
+			name = "COLO"
+		}
+		names = append(names, name)
 	}
 	return strings.Join(names, ", ")
 }
