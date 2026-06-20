@@ -1,4 +1,4 @@
-import { Button, Icon, Drawer, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -61,16 +61,8 @@ export function ModificaPreventivoPage() {
   const createProspectMutation = useCreateProspect();
   const downloadPdf = usePdfExportDownload();
 
-  // Split-Pane Draggability State
-  const [leftWidth, setLeftWidth] = useState(50);
-  const [isDragging, setIsDragging] = useState(false);
-
-  // Tab State in Preview Panel
-  const [activeTab, setActiveTab] = useState<'preview' | 'logs' | 'pdf'>('preview');
-
-  // Mobile/Laptop (<1200px) Responsive State
-  const [isMobileScreen, setIsMobileScreen] = useState(window.innerWidth < 1200);
-  const [previewDrawerOpen, setPreviewDrawerOpen] = useState(false);
+  // Tab State at Workspace level
+  const [activeTab, setActiveTab] = useState<'edit' | 'preview' | 'logs' | 'pdf'>('edit');
 
   // Local Quote States
   const [hubspotCompanyId, setHubspotCompanyId] = useState<string | null>(null);
@@ -104,7 +96,7 @@ export function ModificaPreventivoPage() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [articleSearch, setArticleSearch] = useState('');
-  const [showArticleDropdown, setShowArticleDropdown] = useState(false);
+  const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   const [paymentSearch, setPaymentSearch] = useState('');
   const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
 
@@ -120,15 +112,6 @@ export function ModificaPreventivoPage() {
   // Search Queries Triggered on min characters
   const customersQuery = useQuoteCustomers(customerSearch, customerSearch.length >= 2);
   const articlesQuery = useQuoteArticles(articleSearch, articleSearch.length >= 2);
-
-  // Resize listener
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobileScreen(window.innerWidth < 1200);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   // Sync loaded quote to local states
   useEffect(() => {
@@ -197,50 +180,9 @@ export function ModificaPreventivoPage() {
   // Set default values for new quote
   useEffect(() => {
     if (isNew && defaultsQuery.data) {
-      // Setup initial defaults
       setDocumentDate(new Date().toISOString().slice(0, 10));
     }
   }, [isNew, defaultsQuery.data]);
-
-  // Shortcut key Cmd+P to toggle preview drawer
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
-        e.preventDefault();
-        setPreviewDrawerOpen((open) => !open);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Split-pane dragging logic
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const percentage = (e.clientX / window.innerWidth) * 100;
-      if (percentage >= 30 && percentage <= 70) {
-        setLeftWidth(percentage);
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]);
 
   // Detect commercial/structural modifications for Demotion Warning
   const isCommercialModified = useMemo(() => {
@@ -326,7 +268,6 @@ export function ModificaPreventivoPage() {
     const command = cliCommand.trim();
     if (!command) return;
 
-    // Parser
     let parsed: QuoteLineInput;
     const defaultIva = defaultsQuery.data?.line?.cod_iva ?? '22';
 
@@ -396,7 +337,6 @@ export function ModificaPreventivoPage() {
         purchase_unit_price: null,
       };
 
-      // Enrich with live alyante description if item matches code
       if (item_code) {
         try {
           const res = await api.get<ArticleLineInitializer[]>(
@@ -419,7 +359,7 @@ export function ModificaPreventivoPage() {
 
     setLines((prev) => [...prev, parsed]);
     setCliCommand('');
-    toast('Riga aggiunta con successo via riga di comando.', 'success');
+    toast('Riga aggiunta con successo.', 'success');
   };
 
   // Autocomplete Selectors
@@ -448,7 +388,7 @@ export function ModificaPreventivoPage() {
   const handleCreateProspectSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prospectForm.email || !prospectForm.company_name) {
-      toast('Email e Nome Azienda sono obbligatori per il prospect!', 'error');
+      toast('Email e Nome Azienda sono obbligatori!', 'error');
       return;
     }
 
@@ -542,7 +482,7 @@ export function ModificaPreventivoPage() {
     }
     handleUpdateLineField(index, 'cod_iva', article.cod_iva);
     setArticleSearch('');
-    setShowArticleDropdown(false);
+    setActiveRowIndex(null);
   };
 
   // Local calculations for real-time preview
@@ -559,7 +499,6 @@ export function ModificaPreventivoPage() {
       const mult = calculateDiscountMultiplier(l.discounts);
       const lineNet = q * p * mult;
 
-      // Local VAT rate estimation (extract digits from cod_iva, default 22)
       let vatRate = 22;
       if (l.cod_iva) {
         const digits = l.cod_iva.replace(/\D/g, '');
@@ -590,7 +529,7 @@ export function ModificaPreventivoPage() {
   // Saving the document
   const handleSave = (onSuccessCallback?: (newId: number) => void) => {
     if (!customer.name) {
-      toast('Il nome del cliente è obbligatorio per salvare!', 'error');
+      toast('Il nome del cliente è obbligatorio!', 'error');
       return;
     }
 
@@ -667,7 +606,6 @@ export function ModificaPreventivoPage() {
   // Transition to Ready
   const handleMarkAsReady = () => {
     if (isNew) {
-      // Must save first
       handleSave((newId) => {
         readyMutation.mutate(newId, {
           onSuccess: () => {
@@ -683,7 +621,6 @@ export function ModificaPreventivoPage() {
         });
       });
     } else {
-      // Save current state first
       handleSave((savedId) => {
         readyMutation.mutate(savedId, {
           onSuccess: () => {
@@ -827,311 +764,481 @@ export function ModificaPreventivoPage() {
         </div>
       )}
 
-      {/* Main Split Layout */}
-      <div className={styles.splitLayout}>
-        {/* Left Editing Pane */}
-        <div className={styles.leftPane} style={{ width: isMobileScreen ? '100%' : `${leftWidth}%` }}>
-          {/* Customer Resolution Field */}
-          <div className={styles.formSection}>
-            <h3>Risoluzione Cliente & Contatto</h3>
-            <div className={styles.clientSearchWrapper}>
-              <span className={styles.formFieldLabel}>
-                Cerca Cliente (Rag. Sociale, P.IVA, Email...) <span className={styles.requiredDot}>*</span>
-              </span>
-              <div className={styles.paymentInputWrapper}>
-                <input
-                  type="text"
-                  className={styles.formFieldInput}
-                  value={customerSearch}
-                  onChange={(e) => {
-                    setCustomerSearch(e.target.value);
-                    setShowCustomerDropdown(true);
-                  }}
-                  onFocus={() => setShowCustomerDropdown(true)}
-                  placeholder="Scrivi per cercare..."
-                />
-                {customerSearch.length > 0 && (
-                  <button
-                    type="button"
-                    className={styles.rowBtn}
-                    onClick={() => {
-                      setCustomerSearch('');
-                      setHubspotCompanyId(null);
+      {/* Main Single Column Workspace Layout */}
+      <div className={styles.workspaceLayout}>
+        {/* Tab Navigation at top of workspace */}
+        <div className={styles.tabsNav}>
+          <button
+            className={`${styles.tabBtn} ${activeTab === 'edit' ? styles.tabBtnActive : ''}`}
+            onClick={() => setActiveTab('edit')}
+          >
+            Compilazione
+          </button>
+          <button
+            className={`${styles.tabBtn} ${activeTab === 'preview' ? styles.tabBtnActive : ''}`}
+            onClick={() => setActiveTab('preview')}
+          >
+            Anteprima Documento
+          </button>
+          <button
+            className={`${styles.tabBtn} ${activeTab === 'logs' ? styles.tabBtnActive : ''}`}
+            onClick={() => setActiveTab('logs')}
+            disabled={isNew}
+          >
+            HubSpot Sync Log
+          </button>
+          <button
+            className={`${styles.tabBtn} ${activeTab === 'pdf' ? styles.tabBtnActive : ''}`}
+            onClick={() => setActiveTab('pdf')}
+            disabled={isNew}
+          >
+            Revisioni PDF
+          </button>
+        </div>
+
+        {/* Tab 1: Compilazione (Full Width) */}
+        {activeTab === 'edit' && (
+          <div className={styles.leftPane}>
+            {/* Customer Search Section */}
+            <div className={styles.formSection}>
+              <h3>Risoluzione Cliente & Contatto</h3>
+              <div className={styles.clientSearchWrapper}>
+                <span className={styles.formFieldLabel}>
+                  Cerca Cliente (Rag. Sociale, P.IVA, Email...) <span className={styles.requiredDot}>*</span>
+                </span>
+                <div className={styles.paymentInputWrapper}>
+                  <input
+                    type="text"
+                    className={styles.formFieldInput}
+                    value={customerSearch}
+                    onChange={(e) => {
+                      setCustomerSearch(e.target.value);
+                      setShowCustomerDropdown(true);
                     }}
-                  >
-                    <Icon name="x" size={16} />
-                  </button>
+                    onFocus={() => setShowCustomerDropdown(true)}
+                    placeholder="Scrivi per cercare..."
+                  />
+                  {customerSearch.length > 0 && (
+                    <button
+                      type="button"
+                      className={styles.rowBtn}
+                      onClick={() => {
+                        setCustomerSearch('');
+                        setHubspotCompanyId(null);
+                      }}
+                    >
+                      <Icon name="x" size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Customer dropdown results */}
+                {showCustomerDropdown && (customerSearch.length >= 2 || customersQuery.data) && (
+                  <div className={styles.autocompletePopover}>
+                    {customersQuery.isLoading ? (
+                      <div style={{ padding: '8px', fontSize: '0.75rem' }}>Ricerca in corso...</div>
+                    ) : customersQuery.data && customersQuery.data.length > 0 ? (
+                      customersQuery.data.map((c) => (
+                        <button
+                          key={c.hubspot_company_id}
+                          type="button"
+                          className={styles.autocompleteItem}
+                          onClick={() => handleSelectCustomer(c)}
+                        >
+                          <span className={styles.autocompleteItemName}>
+                            {c.customer.name}
+                            {c.customer.numero_azienda_snapshot ? ` (${c.customer.numero_azienda_snapshot})` : ''}
+                          </span>
+                          <span className={styles.autocompleteItemMeta}>
+                            {c.domain || 'Nessun dominio'} | {c.customer.city || 'Nessuna città'}{c.customer.province ? ` (${c.customer.province})` : ''}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div style={{ padding: '8px' }}>
+                        <p style={{ fontSize: '0.75rem', margin: '0 0 6px 0' }}>Nessun cliente trovato.</p>
+                        {emailRegex.test(customerSearch) ? (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setProspectForm({
+                                email: customerSearch,
+                                first_name: '',
+                                last_name: '',
+                                company_name: '',
+                                domain: customerSearch.split('@')[1] || '',
+                              });
+                              setShowProspectForm(true);
+                              setShowCustomerDropdown(false);
+                            }}
+                          >
+                            Crea Prospect con "{customerSearch}"
+                          </Button>
+                        ) : (
+                          <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                            Inserisci una mail valida per abilitare la creazione rapida Prospect.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
-              {/* Customer search results drop-down */}
-              {showCustomerDropdown && (customerSearch.length >= 2 || customersQuery.data) && (
-                <div className={styles.autocompletePopover}>
-                  {customersQuery.isLoading ? (
-                    <div style={{ padding: '8px', fontSize: '0.75rem' }}>Ricerca in corso...</div>
-                  ) : customersQuery.data && customersQuery.data.length > 0 ? (
-                    customersQuery.data.map((c) => (
-                      <button
-                        key={c.hubspot_company_id}
-                        type="button"
-                        className={styles.autocompleteItem}
-                        onClick={() => handleSelectCustomer(c)}
-                      >
-                        <span className={styles.autocompleteItemName}>{c.customer.name}</span>
-                        <span className={styles.autocompleteItemMeta}>
-                          {c.customer.email || 'Nessuna mail'} | {c.customer.city || 'Nessuna città'} (
-                          {c.customer.province || '-'})
-                        </span>
-                      </button>
-                    ))
-                  ) : (
-                    <div style={{ padding: '8px' }}>
-                      <p style={{ fontSize: '0.75rem', margin: '0 0 6px 0' }}>Nessun cliente trovato.</p>
-                      {emailRegex.test(customerSearch) ? (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setProspectForm({
-                              email: customerSearch,
-                              first_name: '',
-                              last_name: '',
-                              company_name: '',
-                              domain: customerSearch.split('@')[1] || '',
-                            });
-                            setShowProspectForm(true);
-                            setShowCustomerDropdown(false);
-                          }}
-                        >
-                          Crea Prospect con "{customerSearch}"
-                        </Button>
-                      ) : (
-                        <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                          Inserisci una mail valida per abilitare la creazione rapida Prospect.
-                        </p>
-                      )}
+              {/* Prospect Form */}
+              {showProspectForm && (
+                <form onSubmit={handleCreateProspectSubmit} className={styles.prospectForm}>
+                  <div className={styles.prospectFormTitle}>
+                    <Icon name="user" size={16} /> Creazione Prospect HubSpot Live
+                  </div>
+                  <div className={styles.formGrid}>
+                    <div className={styles.formField}>
+                      <span className={styles.formFieldLabel}>Email <span className={styles.requiredDot}>*</span></span>
+                      <input
+                        type="email"
+                        className={styles.formFieldInput}
+                        value={prospectForm.email}
+                        onChange={(e) => setProspectForm({ ...prospectForm, email: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className={styles.formField}>
+                      <span className={styles.formFieldLabel}>Nome Azienda <span className={styles.requiredDot}>*</span></span>
+                      <input
+                        type="text"
+                        className={styles.formFieldInput}
+                        value={prospectForm.company_name}
+                        onChange={(e) => setProspectForm({ ...prospectForm, company_name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className={styles.formField}>
+                      <span className={styles.formFieldLabel}>Sito Web/Domain</span>
+                      <input
+                        type="text"
+                        className={styles.formFieldInput}
+                        value={prospectForm.domain}
+                        onChange={(e) => setProspectForm({ ...prospectForm, domain: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className={styles.formGrid}>
+                    <div className={styles.formField}>
+                      <span className={styles.formFieldLabel}>Nome Referente</span>
+                      <input
+                        type="text"
+                        className={styles.formFieldInput}
+                        value={prospectForm.first_name}
+                        onChange={(e) => setProspectForm({ ...prospectForm, first_name: e.target.value })}
+                      />
+                    </div>
+                    <div className={styles.formField}>
+                      <span className={styles.formFieldLabel}>Cognome Referente</span>
+                      <input
+                        type="text"
+                        className={styles.formFieldInput}
+                        value={prospectForm.last_name}
+                        onChange={(e) => setProspectForm({ ...prospectForm, last_name: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                    <Button size="sm" variant="secondary" onClick={() => setShowProspectForm(false)}>
+                      Annulla
+                    </Button>
+                    <Button size="sm" type="submit" disabled={createProspectMutation.isPending}>
+                      {createProspectMutation.isPending ? 'Creazione...' : 'Salva su HubSpot'}
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {/* Customer summary card */}
+              {customer.name && (
+                <div style={{ background: 'var(--color-surface)', padding: '12px', borderRadius: '8px', fontSize: '0.8rem' }}>
+                  <strong>{customer.name}</strong>
+                  {customer.email && <div>Email: {customer.email}</div>}
+                  {customer.address && (
+                    <div>
+                      Indirizzo: {customer.address} - {customer.zip} {customer.city} ({customer.province})
+                    </div>
+                  )}
+                  {contact.full_name && (
+                    <div style={{ marginTop: '6px', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '6px' }}>
+                      Referente: {contact.full_name} ({contact.email || 'nessuna mail'}) {contact.role && `- ${contact.role}`}
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            {/* Inline Prospect Form Card */}
-            {showProspectForm && (
-              <form onSubmit={handleCreateProspectSubmit} className={styles.prospectForm}>
-                <div className={styles.prospectFormTitle}>
-                  <Icon name="user" size={16} /> Creazione Prospect HubSpot Live
+            {/* Document Details Section */}
+            <div className={styles.formSection}>
+              <h3>Dati Documento</h3>
+              <div className={styles.formGrid}>
+                <div className={styles.formField}>
+                  <span className={styles.formFieldLabel}>Data Preventivo</span>
+                  <input
+                    type="date"
+                    className={styles.formFieldInput}
+                    value={documentDate}
+                    onChange={(e) => setDocumentDate(e.target.value)}
+                  />
                 </div>
-                <div className={styles.formGrid}>
-                  <div className={styles.formField}>
-                    <span className={styles.formFieldLabel}>Email <span className={styles.requiredDot}>*</span></span>
-                    <input
-                      type="email"
-                      className={styles.formFieldInput}
-                      value={prospectForm.email}
-                      onChange={(e) => setProspectForm({ ...prospectForm, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className={styles.formField}>
-                    <span className={styles.formFieldLabel}>Nome Azienda <span className={styles.requiredDot}>*</span></span>
+                <div className={styles.formField}>
+                  <span className={styles.formFieldLabel}>Metodo Pagamento</span>
+                  <div className={styles.paymentInputWrapper} style={{ position: 'relative' }}>
                     <input
                       type="text"
                       className={styles.formFieldInput}
-                      value={prospectForm.company_name}
-                      onChange={(e) => setProspectForm({ ...prospectForm, company_name: e.target.value })}
-                      required
+                      value={paymentSearch || payment.method_label || ''}
+                      onChange={(e) => {
+                        setPaymentSearch(e.target.value);
+                        setShowPaymentDropdown(true);
+                        setPayment((prev) => ({ ...prev, method_label: e.target.value }));
+                      }}
+                      onFocus={() => setShowPaymentDropdown(true)}
+                      placeholder="Seleziona pagamento..."
                     />
-                  </div>
-                  <div className={styles.formField}>
-                    <span className={styles.formFieldLabel}>Sito Web/Domain</span>
-                    <input
-                      type="text"
-                      className={styles.formFieldInput}
-                      value={prospectForm.domain}
-                      onChange={(e) => setProspectForm({ ...prospectForm, domain: e.target.value })}
-                    />
+                    {showPaymentDropdown && filteredPaymentMethods.length > 0 && (
+                      <div className={styles.autocompletePopover}>
+                        {filteredPaymentMethods
+                          .filter((pm) =>
+                            pm.desc_pagamento.toLowerCase().includes(paymentSearch.toLowerCase())
+                          )
+                          .map((pm) => (
+                            <button
+                              key={pm.cod_pagamento}
+                              type="button"
+                              className={styles.autocompleteItem}
+                              onClick={() => handleSelectPayment(pm)}
+                            >
+                              <span className={styles.autocompleteItemName}>{pm.desc_pagamento}</span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className={styles.formGrid}>
-                  <div className={styles.formField}>
-                    <span className={styles.formFieldLabel}>Nome Referente</span>
-                    <input
-                      type="text"
-                      className={styles.formFieldInput}
-                      value={prospectForm.first_name}
-                      onChange={(e) => setProspectForm({ ...prospectForm, first_name: e.target.value })}
-                    />
-                  </div>
-                  <div className={styles.formField}>
-                    <span className={styles.formFieldLabel}>Cognome Referente</span>
-                    <input
-                      type="text"
-                      className={styles.formFieldInput}
-                      value={prospectForm.last_name}
-                      onChange={(e) => setProspectForm({ ...prospectForm, last_name: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
-                  <Button size="sm" variant="secondary" onClick={() => setShowProspectForm(false)}>
-                    Annulla
-                  </Button>
-                  <Button size="sm" type="submit" disabled={createProspectMutation.isPending}>
-                    {createProspectMutation.isPending ? 'Creazione...' : 'Salva su HubSpot'}
-                  </Button>
-                </div>
-              </form>
-            )}
-
-            {/* Display selected customer info snapshot */}
-            {customer.name && (
-              <div style={{ background: 'var(--color-surface)', padding: '12px', borderRadius: '8px', fontSize: '0.8rem' }}>
-                <strong>{customer.name}</strong>
-                {customer.email && <div>Email: {customer.email}</div>}
-                {customer.address && (
-                  <div>
-                    Indirizzo: {customer.address}, {customer.zip} {customer.city} ({customer.province})
-                  </div>
-                )}
-                {contact.full_name && (
-                  <div style={{ marginTop: '6px', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '6px' }}>
-                    Referente: {contact.full_name} ({contact.email || 'no email'}) {contact.role && `- ${contact.role}`}
-                  </div>
-                )}
               </div>
-            )}
-          </div>
-
-          {/* Document header properties */}
-          <div className={styles.formSection}>
-            <h3>Dati Documento</h3>
-            <div className={styles.formGrid}>
               <div className={styles.formField}>
-                <span className={styles.formFieldLabel}>Data Preventivo</span>
+                <span className={styles.formFieldLabel}>Oggetto / Descrizione Breve</span>
                 <input
-                  type="date"
+                  type="text"
                   className={styles.formFieldInput}
-                  value={documentDate}
-                  onChange={(e) => setDocumentDate(e.target.value)}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="es. Offerta Cloud..."
                 />
               </div>
               <div className={styles.formField}>
-                <span className={styles.formFieldLabel}>Metodo Pagamento</span>
-                <div className={styles.paymentInputWrapper} style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    className={styles.formFieldInput}
-                    value={paymentSearch || payment.method_label || ''}
-                    onChange={(e) => {
-                      setPaymentSearch(e.target.value);
-                      setShowPaymentDropdown(true);
-                      setPayment((prev) => ({ ...prev, method_label: e.target.value }));
-                    }}
-                    onFocus={() => setShowPaymentDropdown(true)}
-                    placeholder="Seleziona pagamento..."
-                  />
-                  {showPaymentDropdown && filteredPaymentMethods.length > 0 && (
-                    <div className={styles.autocompletePopover}>
-                      {filteredPaymentMethods
-                        .filter((pm) =>
-                          pm.desc_pagamento.toLowerCase().includes(paymentSearch.toLowerCase())
-                        )
-                        .map((pm) => (
-                          <button
-                            key={pm.cod_pagamento}
-                            type="button"
-                            className={styles.autocompleteItem}
-                            onClick={() => handleSelectPayment(pm)}
-                          >
-                            <span className={styles.autocompleteItemName}>{pm.desc_pagamento}</span>
-                          </button>
-                        ))}
-                    </div>
-                  )}
+                <span className={styles.formFieldLabel}>Note Interne (Non stampate)</span>
+                <textarea
+                  className={styles.formFieldTextarea}
+                  value={internalNotes}
+                  onChange={(e) => setInternalNotes(e.target.value)}
+                  placeholder="Note ad uso interno..."
+                />
+              </div>
+            </div>
+
+            {/* Righe Offerta Section (Full Width Table) */}
+            <div className={styles.formSection}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3>Righe Offerta</h3>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <Button size="sm" variant="secondary" onClick={() => handleAddLine('item')}>
+                    + Riga Prodotto
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleAddLine('description')}>
+                    + Nota Testo
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleAddLine('spacer')}>
+                    + Separatore
+                  </Button>
                 </div>
               </div>
-            </div>
-            <div className={styles.formField}>
-              <span className={styles.formFieldLabel}>Oggetto / Descrizione Breve</span>
-              <input
-                type="text"
-                className={styles.formFieldInput}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="es. Offerta server Cloud per sviluppo..."
-              />
-            </div>
-            <div className={styles.formField}>
-              <span className={styles.formFieldLabel}>Note Interne (Non stampate)</span>
-              <textarea
-                className={styles.formFieldTextarea}
-                value={internalNotes}
-                onChange={(e) => setInternalNotes(e.target.value)}
-                placeholder="Note ad uso interno commerciale..."
-              />
-            </div>
-          </div>
 
-          {/* Table of lines and Command bar */}
-          <div className={styles.formSection}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3>Righe Offerta</h3>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <Button size="sm" variant="secondary" onClick={() => handleAddLine('item')}>
-                  + Riga Prodotto
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => handleAddLine('description')}>
-                  + Nota Testo
-                </Button>
-              </div>
-            </div>
+              <div className={styles.rowsTableWrap}>
+                <table className={styles.rowsTable}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '40px' }}>Pos</th>
+                      <th style={{ width: '120px' }}>Codice</th>
+                      <th>Descrizione</th>
+                      <th style={{ width: '70px', textAlign: 'right' }}>Qta</th>
+                      <th style={{ width: '60px' }}>U.M.</th>
+                      <th style={{ width: '90px', textAlign: 'right' }}>Prezzo Unit.</th>
+                      <th style={{ width: '70px', textAlign: 'right' }}>Sconti</th>
+                      <th style={{ width: '60px' }}>IVA</th>
+                      <th style={{ width: '80px', textAlign: 'right' }}>Totale</th>
+                      <th style={{ width: '80px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.map((l, index) => {
+                      const localLine = localTotals.lines[index]!;
+                      if (l.line_type === 'spacer') {
+                        return (
+                          <tr key={index} className={styles.spacerRow}>
+                            <td colSpan={9} className={styles.spacerCell}>
+                              --- Separatore Visivo ---
+                            </td>
+                            <td>
+                              <div className={styles.rowActions}>
+                                <button className={styles.rowBtn} onClick={() => handleMoveLine(index, 'up')}>
+                                  <Icon name="chevron-up" size={12} />
+                                </button>
+                                <button className={styles.rowBtn} onClick={() => handleMoveLine(index, 'down')}>
+                                  <Icon name="chevron-down" size={12} />
+                                </button>
+                                <button className={styles.rowBtnDelete} onClick={() => handleDeleteLine(index)}>
+                                  <Icon name="trash" size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+                      if (l.line_type === 'description') {
+                        return (
+                          <tr key={index} className={styles.descRow}>
+                            <td style={{ fontStyle: 'italic', color: 'var(--color-text-muted)' }}>{index + 1}</td>
+                            <td colSpan={8}>
+                              <input
+                                type="text"
+                                className={styles.cellInputCompact}
+                                style={{ fontStyle: 'italic' }}
+                                value={l.description || ''}
+                                onChange={(e) => handleUpdateLineField(index, 'description', e.target.value)}
+                                placeholder="Testo descrittivo o nota..."
+                              />
+                            </td>
+                            <td>
+                              <div className={styles.rowActions}>
+                                <button className={styles.rowBtn} onClick={() => handleMoveLine(index, 'up')}>
+                                  <Icon name="chevron-up" size={12} />
+                                </button>
+                                <button className={styles.rowBtn} onClick={() => handleMoveLine(index, 'down')}>
+                                  <Icon name="chevron-down" size={12} />
+                                </button>
+                                <button className={styles.rowBtnDelete} onClick={() => handleDeleteLine(index)}>
+                                  <Icon name="trash" size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
 
-            <div className={styles.rowsTableWrap}>
-              <table className={styles.rowsTable}>
-                <thead>
-                  <tr>
-                    <th style={{ width: '40px' }}>Pos</th>
-                    <th style={{ width: '120px' }}>Codice</th>
-                    <th>Descrizione</th>
-                    <th style={{ width: '70px', textAlign: 'right' }}>Qta</th>
-                    <th style={{ width: '60px' }}>U.M.</th>
-                    <th style={{ width: '90px', textAlign: 'right' }}>Prezzo Unit.</th>
-                    <th style={{ width: '70px', textAlign: 'right' }}>Sconti</th>
-                    <th style={{ width: '60px' }}>IVA</th>
-                    <th style={{ width: '80px', textAlign: 'right' }}>Totale</th>
-                    <th style={{ width: '80px' }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((l, index) => {
-                    const localLine = localTotals.lines[index]!;
-                    if (l.line_type === 'spacer') {
                       return (
-                        <tr key={index} className={styles.spacerRow}>
-                          <td colSpan={9} className={styles.spacerCell}>
-                            --- Separatore Visivo ---
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <button className={styles.rowBtnDelete} onClick={() => handleDeleteLine(index)}>
-                              <Icon name="trash" size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    }
-                    if (l.line_type === 'description') {
-                      return (
-                        <tr key={index} className={styles.descRow}>
-                          <td style={{ fontStyle: 'italic', color: 'var(--color-text-muted)' }}>{index + 1}</td>
-                          <td colSpan={8}>
+                        <tr key={index}>
+                          <td>{index + 1}</td>
+                          <td style={{ position: 'relative' }}>
                             <input
                               type="text"
                               className={styles.cellInputCompact}
-                              style={{ fontStyle: 'italic' }}
-                              value={l.description || ''}
-                              onChange={(e) => handleUpdateLineField(index, 'description', e.target.value)}
-                              placeholder="Testo descrittivo o nota..."
+                              value={l.item_code || ''}
+                              onChange={(e) => {
+                                handleUpdateLineField(index, 'item_code', e.target.value);
+                                setArticleSearch(e.target.value);
+                              }}
+                              onFocus={() => {
+                                setArticleSearch(l.item_code || '');
+                                setActiveRowIndex(index);
+                              }}
+                              onBlur={() => {
+                                setActiveRowIndex(null);
+                              }}
+                              placeholder="Cod. Articolo"
                             />
+                            {activeRowIndex === index && (
+                              <div className={styles.autocompletePopover} style={{ minWidth: '320px' }}>
+                                {articleSearch.length < 2 ? (
+                                  <div style={{ padding: '8px', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                    Digita almeno 2 caratteri per cercare nel database...
+                                  </div>
+                                ) : articlesQuery.isLoading ? (
+                                  <div style={{ padding: '8px', fontSize: '0.75rem' }}>Ricerca articoli...</div>
+                                ) : articlesQuery.data && articlesQuery.data.length > 0 ? (
+                                  articlesQuery.data.map((art) => (
+                                    <button
+                                      key={art.item_code}
+                                      type="button"
+                                      className={styles.autocompleteItem}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleSelectArticle(index, art);
+                                      }}
+                                    >
+                                      <span className={styles.autocompleteItemName}>{art.item_code}</span>
+                                      <span className={styles.autocompleteItemMeta}>
+                                        {art.item_description} | {formatMoney(art.unit_price)}
+                                      </span>
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div style={{ padding: '8px', fontSize: '0.75rem' }}>Nessun articolo trovato</div>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              className={styles.cellInputCompact}
+                              value={l.item_description || l.description || ''}
+                              onChange={(e) => handleUpdateLineField(index, 'item_description', e.target.value)}
+                              placeholder="Descrizione articolo..."
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              className={styles.cellInputCompact}
+                              style={{ textAlign: 'right' }}
+                              value={l.qta || '0'}
+                              onChange={(e) => handleUpdateLineField(index, 'qta', e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              className={styles.cellInputCompact}
+                              value={l.unit_of_measure || ''}
+                              onChange={(e) => handleUpdateLineField(index, 'unit_of_measure', e.target.value)}
+                              placeholder="PZ"
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              className={styles.cellInputCompact}
+                              style={{ textAlign: 'right' }}
+                              value={l.unit_price || '0'}
+                              onChange={(e) => handleUpdateLineField(index, 'unit_price', e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              className={styles.cellInputCompact}
+                              style={{ textAlign: 'right' }}
+                              value={l.discounts || ''}
+                              onChange={(e) => handleUpdateLineField(index, 'discounts', e.target.value)}
+                              placeholder="es. 10+5"
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              className={styles.cellInputCompact}
+                              value={l.cod_iva || ''}
+                              onChange={(e) => handleUpdateLineField(index, 'cod_iva', e.target.value)}
+                            />
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                            {formatMoney(localLine.lineNet)}
                           </td>
                           <td>
                             <div className={styles.rowActions}>
@@ -1148,615 +1255,354 @@ export function ModificaPreventivoPage() {
                           </td>
                         </tr>
                       );
-                    }
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                    return (
-                      <tr key={index}>
-                        <td>{index + 1}</td>
-                        <td style={{ position: 'relative' }}>
-                          <input
-                            type="text"
-                            className={styles.cellInputCompact}
-                            value={l.item_code || ''}
-                            onChange={(e) => {
-                              handleUpdateLineField(index, 'item_code', e.target.value);
-                              setArticleSearch(e.target.value);
-                              setShowArticleDropdown(true);
-                            }}
-                            onFocus={() => {
-                              setArticleSearch(l.item_code || '');
-                              setShowArticleDropdown(true);
-                            }}
-                            placeholder="Cod. Articolo"
-                          />
-                          {showArticleDropdown && articleSearch.length >= 2 && (
-                            <div className={styles.autocompletePopover} style={{ minWidth: '320px' }}>
-                              {articlesQuery.isLoading ? (
-                                <div style={{ padding: '8px', fontSize: '0.75rem' }}>Ricerca articoli...</div>
-                              ) : articlesQuery.data && articlesQuery.data.length > 0 ? (
-                                articlesQuery.data.map((art) => (
-                                  <button
-                                    key={art.item_code}
-                                    type="button"
-                                    className={styles.autocompleteItem}
-                                    onClick={() => handleSelectArticle(index, art)}
-                                  >
-                                    <span className={styles.autocompleteItemName}>{art.item_code}</span>
-                                    <span className={styles.autocompleteItemMeta}>
-                                      {art.item_description} | {formatMoney(art.unit_price)}
-                                    </span>
-                                  </button>
-                                ))
-                              ) : (
-                                <div style={{ padding: '8px', fontSize: '0.75rem' }}>Nessun articolo trovato</div>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            className={styles.cellInputCompact}
-                            value={l.item_description || l.description || ''}
-                            onChange={(e) => handleUpdateLineField(index, 'item_description', e.target.value)}
-                            placeholder="Descrizione articolo..."
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            className={styles.cellInputCompact}
-                            style={{ textAlign: 'right' }}
-                            value={l.qta || '0'}
-                            onChange={(e) => handleUpdateLineField(index, 'qta', e.target.value)}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            className={styles.cellInputCompact}
-                            value={l.unit_of_measure || ''}
-                            onChange={(e) => handleUpdateLineField(index, 'unit_of_measure', e.target.value)}
-                            placeholder="PZ"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            className={styles.cellInputCompact}
-                            style={{ textAlign: 'right' }}
-                            value={l.unit_price || '0'}
-                            onChange={(e) => handleUpdateLineField(index, 'unit_price', e.target.value)}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            className={styles.cellInputCompact}
-                            style={{ textAlign: 'right' }}
-                            value={l.discounts || ''}
-                            onChange={(e) => handleUpdateLineField(index, 'discounts', e.target.value)}
-                            placeholder="es. 10+5"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            className={styles.cellInputCompact}
-                            value={l.cod_iva || ''}
-                            onChange={(e) => handleUpdateLineField(index, 'cod_iva', e.target.value)}
-                          />
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                          {formatMoney(localLine.lineNet)}
-                        </td>
-                        <td>
-                          <div className={styles.rowActions}>
-                            <button className={styles.rowBtn} onClick={() => handleMoveLine(index, 'up')}>
-                              <Icon name="chevron-up" size={12} />
-                            </button>
-                            <button className={styles.rowBtn} onClick={() => handleMoveLine(index, 'down')}>
-                              <Icon name="chevron-down" size={12} />
-                              </button>
-                            <button className={styles.rowBtnDelete} onClick={() => handleDeleteLine(index)}>
-                              <Icon name="trash" size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              {/* CLI Command Input bar */}
+              <form onSubmit={handleCLISubmit} className={styles.cliInputWrapper}>
+                <span className={styles.cliPrompt}>$</span>
+                <input
+                  type="text"
+                  className={styles.cliInput}
+                  value={cliCommand}
+                  onChange={(e) => setCliCommand(e.target.value)}
+                  placeholder="CLI: es. ABC123 5x100 -10+5 #22 | // Nota testo | --- per separatore"
+                />
+                <span className={styles.cliHelp}>Invio per aggiungere</span>
+              </form>
             </div>
-
-            {/* CLI Prompt Bar */}
-            <form onSubmit={handleCLISubmit} className={styles.cliInputWrapper}>
-              <span className={styles.cliPrompt}>$</span>
-              <input
-                type="text"
-                className={styles.cliInput}
-                value={cliCommand}
-                onChange={(e) => setCliCommand(e.target.value)}
-                placeholder="CLI: es. ABC123 5x100 -10+5 #22   |   // Nota di testo   |   --- per separatore"
-              />
-              <span className={styles.cliHelp}>Invio per aggiungere</span>
-            </form>
           </div>
-        </div>
-
-        {/* Divider splitter */}
-        {!isMobileScreen && (
-          <div
-            className={`${styles.divider} ${isDragging ? styles.dividerActive : ''}`}
-            onMouseDown={handleMouseDown}
-          />
         )}
 
-        {/* Right Preview Pane (collapses under 1200px) */}
-        {!isMobileScreen && (
-          <div className={styles.rightPane}>
-            <PreviewPaneContent
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              customer={customer}
-              contact={contact}
-              payment={payment}
-              description={description}
-              documentDate={documentDate}
-              localTotals={localTotals}
-              quoteData={quoteQuery.data}
-              retrySync={handleRetrySync}
-              retryPending={retrySyncMutation.isPending}
-              stages={stagesQuery.data}
-              onStageChange={handleStageChange}
-              pdfExports={pdfExportsQuery.data}
-              onGeneratePdf={handleGeneratePdf}
-              onDownloadPdf={handleDownloadPdfExport}
-              onAttachPdf={handleAttachPdf}
-              isNew={isNew}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Floating preview button and drawer for Mobile/Laptop */}
-      {isMobileScreen && (
-        <>
-          <div className={styles.floatPreviewBtn}>
-            <Button onClick={() => setPreviewDrawerOpen(true)}>
-              <Icon name="eye" size={16} /> Anteprima (Cmd+P)
-            </Button>
-          </div>
-          <Drawer
-            open={previewDrawerOpen}
-            onClose={() => setPreviewDrawerOpen(false)}
-            size="xl"
-            title="Anteprima e Sync Log"
-          >
-            <div style={{ padding: 'var(--space-4) var(--space-6)' }}>
-              <PreviewPaneContent
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                customer={customer}
-                contact={contact}
-                payment={payment}
-                description={description}
-                documentDate={documentDate}
-                localTotals={localTotals}
-                quoteData={quoteQuery.data}
-                retrySync={handleRetrySync}
-                retryPending={retrySyncMutation.isPending}
-                stages={stagesQuery.data}
-                onStageChange={handleStageChange}
-                pdfExports={pdfExportsQuery.data}
-                onGeneratePdf={handleGeneratePdf}
-                onDownloadPdf={handleDownloadPdfExport}
-                onAttachPdf={handleAttachPdf}
-                isNew={isNew}
-              />
-            </div>
-          </Drawer>
-        </>
-      )}
-    </main>
-  );
-}
-
-// Sub-component for preview content to avoid repeating in drawer and pane
-function PreviewPaneContent({
-  activeTab,
-  setActiveTab,
-  customer,
-  contact,
-  payment,
-  description,
-  documentDate,
-  localTotals,
-  quoteData,
-  retrySync,
-  retryPending,
-  stages,
-  onStageChange,
-  pdfExports,
-  onGeneratePdf,
-  onDownloadPdf,
-  onAttachPdf,
-  isNew,
-}: {
-  activeTab: 'preview' | 'logs' | 'pdf';
-  setActiveTab: (tab: 'preview' | 'logs' | 'pdf') => void;
-  customer: CustomerSnapshotInput;
-  contact: ContactSnapshotInput;
-  payment: PaymentSnapshot;
-  description: string;
-  documentDate: string;
-  localTotals: {
-    lines: any[];
-    subtotalNet: number;
-    subtotalVat: number;
-    totalGross: number;
-  };
-  quoteData: any;
-  retrySync: () => void;
-  retryPending: boolean;
-  stages: any;
-  onStageChange: (expectedId: string, targetId: string) => void;
-  pdfExports: any;
-  onGeneratePdf: () => void;
-  onDownloadPdf: (exportId: number, filename: string) => void;
-  onAttachPdf: (exportId: number) => void;
-  isNew: boolean;
-}) {
-  return (
-    <>
-      <div className={styles.tabsNav}>
-        <button
-          className={`${styles.tabBtn} ${activeTab === 'preview' ? styles.tabBtnActive : ''}`}
-          onClick={() => setActiveTab('preview')}
-        >
-          Anteprima Documento
-        </button>
-        <button
-          className={`${styles.tabBtn} ${activeTab === 'logs' ? styles.tabBtnActive : ''}`}
-          onClick={() => setActiveTab('logs')}
-          disabled={isNew}
-        >
-          HubSpot Sync Log
-        </button>
-        <button
-          className={`${styles.tabBtn} ${activeTab === 'pdf' ? styles.tabBtnActive : ''}`}
-          onClick={() => setActiveTab('pdf')}
-          disabled={isNew}
-        >
-          Revisioni PDF
-        </button>
-      </div>
-
-      {activeTab === 'preview' && (
-        <div className={styles.stripeInvoice}>
-          <div className={styles.invoiceHeader}>
-            <div className={styles.invoiceBrand}>
-              <h2>{customer.name || 'Nome Cliente'}</h2>
-              <p>{customer.email || 'Nessun indirizzo email'}</p>
-            </div>
-            <div className={styles.invoiceMeta}>
-              <span className={styles.invoiceMetaTitle}>PREVENTIVO DIGITAL</span>
-              <div className={styles.invoiceMetaText}>
-                Data: {documentDate ? new Date(documentDate).toLocaleDateString('it-IT') : '-'}
+        {/* Tab 2: Stripe Digital Preview */}
+        {activeTab === 'preview' && (
+          <div className={styles.stripeInvoice}>
+            <div className={styles.invoiceHeader}>
+              <div className={styles.invoiceBrand}>
+                <h2>{customer.name || 'Nome Cliente'}</h2>
+                <p>{customer.email || 'Nessun indirizzo email'}</p>
               </div>
-            </div>
-          </div>
-
-          <div className={styles.invoiceDetails}>
-            <div className={styles.invoiceCol}>
-              <h4>Destinatario Fattura</h4>
-              <p>
-                <strong>{customer.name || '-'}</strong>
-                {customer.address && (
-                  <>
-                    <br />
-                    {customer.address}
-                    <br />
-                    {customer.zip} {customer.city} ({customer.province})
-                  </>
-                )}
-                {customer.vat && (
-                  <>
-                    <br />
-                    P.IVA: {customer.vat}
-                  </>
-                )}
-                {contact.full_name && (
-                  <>
-                    <br />
-                    <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                      C.A.: {contact.full_name} ({contact.email || 'nessuna mail'})
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-            <div className={styles.invoiceCol}>
-              <h4>Metodo Pagamento</h4>
-              <p>
-                {payment.method_label || 'Non selezionato'}
-                {payment.bank_details && (
-                  <>
-                    <br />
-                    <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                      Coordinate: {payment.bank_details}
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {description && (
-            <div style={{ marginBottom: 'var(--space-6)', fontSize: '0.875rem' }}>
-              <strong>Oggetto:</strong> {description}
-            </div>
-          )}
-
-          <table className={styles.invoiceTable}>
-            <thead>
-              <tr>
-                <th style={{ width: '60%' }}>Descrizione</th>
-                <th style={{ textAlign: 'right', width: '15%' }}>Qta</th>
-                <th style={{ textAlign: 'right', width: '25%' }}>Prezzo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {localTotals.lines.map((l, idx) => {
-                if (l.line_type === 'spacer') {
-                  return (
-                    <tr key={idx}>
-                      <td colSpan={3} style={{ borderBottom: '1px dashed #e5e7eb', height: '10px' }} />
-                    </tr>
-                  );
-                }
-                if (l.line_type === 'description') {
-                  return (
-                    <tr key={idx}>
-                      <td colSpan={3} style={{ fontStyle: 'italic', color: '#6b7280', fontSize: '0.75rem' }}>
-                        {l.description}
-                      </td>
-                    </tr>
-                  );
-                }
-                return (
-                  <tr key={idx}>
-                    <td data-label="Descrizione">
-                      <div className={styles.invoiceTableTextPrimary}>{l.item_description || l.item_code}</div>
-                      {l.description && (
-                        <div className={styles.invoiceTableTextSecondary}>{l.description}</div>
-                      )}
-                    </td>
-                    <td data-label="Qta" style={{ textAlign: 'right' }}>
-                      {l.qta} {l.unit_of_measure}
-                    </td>
-                    <td data-label="Prezzo" style={{ textAlign: 'right', fontWeight: 600 }}>
-                      {formatMoney(l.lineNet)}
-                      {l.discounts && (
-                        <div style={{ fontSize: '0.7rem', color: '#ef4444' }}>Sconto: -{l.discounts}%</div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          <div className={styles.invoiceTotals}>
-            <div className={styles.invoiceTotalsRow}>
-              <span>Imponibile</span>
-              <span>{formatMoney(localTotals.subtotalNet)}</span>
-            </div>
-            <div className={styles.invoiceTotalsRow}>
-              <span>IVA</span>
-              <span>{formatMoney(localTotals.subtotalVat)}</span>
-            </div>
-            <div className={`${styles.invoiceTotalsRow} ${styles.invoiceTotalsGrand}`}>
-              <span>Totale</span>
-              <span>{formatMoney(localTotals.totalGross)}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'logs' && quoteData && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Status logs */}
-          <div className={styles.syncStatusCard}>
-            <div className={styles.syncStatusHeader}>
-              <div className={styles.syncStatusTitle}>Stato HubSpot Sync</div>
-              <div>
-                {quoteData.hubspot_sync_status === 'pending' && (
-                  <span className={`${styles.badge} ${styles.badgeHubSpotPending}`}>In Coda</span>
-                )}
-                {quoteData.hubspot_sync_status === 'succeeded' && (
-                  <span className={`${styles.badge} ${styles.badgeHubSpotSucceeded}`}>Sincronizzato</span>
-                )}
-                {quoteData.hubspot_sync_status === 'failed' && (
-                  <span className={`${styles.badge} ${styles.badgeHubSpotFailed}`}>Fallito</span>
-                )}
-              </div>
-            </div>
-            {quoteData.hubspot_synced_at && (
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                Ultimo sync: {new Date(quoteData.hubspot_synced_at).toLocaleString('it-IT')}
-              </div>
-            )}
-            {quoteData.hubspot_sync_error && (
-              <div className={styles.syncErrorAlert}>
-                <strong>Dettaglio errore:</strong> {quoteData.hubspot_sync_error}
-              </div>
-            )}
-            {quoteData.hubspot_sync_status === 'failed' && (
-              <Button size="sm" onClick={retrySync} disabled={retryPending}>
-                <Icon name="loader" size={14} /> Riprova Sincronizzazione Ora
-              </Button>
-            )}
-          </div>
-
-          {/* HubSpot Deal Stage Timeline and Selector */}
-          {stages && (
-            <div className={styles.syncStatusCard}>
-              <div className={styles.syncStatusTitle}>HubSpot Deal Stage Timeline</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                Clicca su uno stato per effettuare una transizione del Deal.
-              </div>
-              <div className={styles.stageSelectorWrapper}>
-                <div className={styles.stagesTimeline}>
-                  {stages.items.map((st: any) => {
-                    const isCurrent = st.id === quoteData.hubspot_dealstage_id;
-                    const isActive =
-                      st.display_order != null &&
-                      stages.items.find((item: any) => item.id === quoteData.hubspot_dealstage_id)?.display_order !=
-                        null &&
-                      st.display_order <=
-                        stages.items.find((item: any) => item.id === quoteData.hubspot_dealstage_id).display_order;
-
-                    return (
-                      <div
-                        key={st.id}
-                        className={`${styles.stageTimelineNode} ${
-                          isCurrent
-                            ? styles.stageTimelineNodeCurrent
-                            : isActive
-                            ? styles.stageTimelineNodeActive
-                            : ''
-                        }`}
-                        onClick={() => {
-                          if (st.id !== quoteData.hubspot_dealstage_id) {
-                            onStageChange(quoteData.hubspot_dealstage_id, st.id);
-                          }
-                        }}
-                        title={`Sposta in: ${st.label}`}
-                      >
-                        <div className={styles.stageTimelineNodeLabel}>{st.label || st.id}</div>
-                      </div>
-                    );
-                  })}
+              <div className={styles.invoiceMeta}>
+                <span className={styles.invoiceMetaTitle}>PREVENTIVO DIGITAL</span>
+                <div className={styles.invoiceMetaText}>
+                  Data: {documentDate ? new Date(documentDate).toLocaleDateString('it-IT') : '-'}
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Events log list */}
-          <div className={styles.logsTimeline}>
-            {quoteData.events && quoteData.events.length > 0 ? (
-              quoteData.events.map((evt: any) => {
-                const isFailed = evt.event_type.includes('failed') || evt.event_type.includes('error');
-                const isSuccess = evt.event_type.includes('success') || evt.event_type.includes('ready');
+            <div className={styles.invoiceDetails}>
+              <div className={styles.invoiceCol}>
+                <h4>Destinatario Fattura</h4>
+                <p>
+                  <strong>{customer.name || '-'}</strong>
+                  {customer.address && (
+                    <>
+                      <br />
+                      {customer.address}
+                      <br />
+                      {customer.zip} {customer.city} ({customer.province})
+                    </>
+                  )}
+                  {customer.vat && (
+                    <>
+                      <br />
+                      P.IVA: {customer.vat}
+                    </>
+                  )}
+                  {contact.full_name && (
+                    <>
+                      <br />
+                      <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        C.A.: {contact.full_name} ({contact.email || 'nessuna mail'})
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className={styles.invoiceCol}>
+                <h4>Metodo Pagamento</h4>
+                <p>
+                  {payment.method_label || 'Non selezionato'}
+                  {payment.bank_details && (
+                    <>
+                      <br />
+                      <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        Coordinate: {payment.bank_details}
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
 
-                return (
-                  <div key={evt.id} className={styles.logItem}>
-                    <div
-                      className={`${styles.logIcon} ${
-                        isSuccess ? styles.logIconSuccess : isFailed ? styles.logIconFailed : ''
-                      }`}
-                    >
-                      <Icon
-                        name={isSuccess ? 'check-circle' : isFailed ? 'x-circle' : 'info'}
-                        size={16}
-                      />
-                    </div>
-                    <div className={styles.logContent}>
-                      <div className={styles.logHeader}>
-                        <div className={styles.logTitle}>{evt.event_type}</div>
-                        <div className={styles.logTime}>
-                          {new Date(evt.created_at).toLocaleString('it-IT')}
-                        </div>
-                      </div>
-                      <div className={styles.logActor}>Operatore: {evt.actor_subject}</div>
-                      {evt.payload && Object.keys(evt.payload).length > 0 && (
-                        <pre className={styles.logPayload}>
-                          {JSON.stringify(evt.payload, null, 2)}
-                        </pre>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div style={{ textAlign: 'center', padding: '16px', color: 'var(--color-text-muted)' }}>
-                Nessun evento registrato per questo preventivo.
+            {description && (
+              <div style={{ marginBottom: 'var(--space-6)', fontSize: '0.875rem' }}>
+                <strong>Oggetto:</strong> {description}
               </div>
             )}
+
+            <table className={styles.invoiceTable}>
+              <thead>
+                <tr>
+                  <th style={{ width: '60%' }}>Descrizione</th>
+                  <th style={{ textAlign: 'right', width: '15%' }}>Qta</th>
+                  <th style={{ textAlign: 'right', width: '25%' }}>Prezzo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {localTotals.lines.map((l, idx) => {
+                  if (l.line_type === 'spacer') {
+                    return (
+                      <tr key={idx}>
+                        <td colSpan={3} style={{ borderBottom: '1px dashed #e5e7eb', height: '10px' }} />
+                      </tr>
+                    );
+                  }
+                  if (l.line_type === 'description') {
+                    return (
+                      <tr key={idx}>
+                        <td colSpan={3} style={{ fontStyle: 'italic', color: '#6b7280', fontSize: '0.75rem' }}>
+                          {l.description}
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return (
+                    <tr key={idx}>
+                      <td data-label="Descrizione">
+                        <div className={styles.invoiceTableTextPrimary}>{l.item_description || l.item_code}</div>
+                        {l.description && (
+                          <div className={styles.invoiceTableTextSecondary}>{l.description}</div>
+                        )}
+                      </td>
+                      <td data-label="Qta" style={{ textAlign: 'right' }}>
+                        {l.qta} {l.unit_of_measure}
+                      </td>
+                      <td data-label="Prezzo" style={{ textAlign: 'right', fontWeight: 600 }}>
+                        {formatMoney(l.lineNet)}
+                        {l.discounts && (
+                          <div style={{ fontSize: '0.7rem', color: '#ef4444' }}>Sconto: -{l.discounts}%</div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <div className={styles.invoiceTotals}>
+              <div className={styles.invoiceTotalsRow}>
+                <span>Imponibile</span>
+                <span>{formatMoney(localTotals.subtotalNet)}</span>
+              </div>
+              <div className={styles.invoiceTotalsRow}>
+                <span>IVA</span>
+                <span>{formatMoney(localTotals.subtotalVat)}</span>
+              </div>
+              <div className={`${styles.invoiceTotalsRow} ${styles.invoiceTotalsGrand}`}>
+                <span>Totale</span>
+                <span>{formatMoney(localTotals.totalGross)}</span>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {activeTab === 'pdf' && (
-        <div className={styles.pdfExportsCard}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className={styles.syncStatusTitle}>Revisioni ed Esportazioni PDF</div>
-            <Button size="sm" onClick={onGeneratePdf}>
-              Genera Nuova Revisione
-            </Button>
-          </div>
+        {/* Tab 3: HubSpot logs Timeline & stages */}
+        {activeTab === 'logs' && quoteQuery.data && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className={styles.syncStatusCard}>
+              <div className={styles.syncStatusHeader}>
+                <div className={styles.syncStatusTitle}>Stato HubSpot Sync</div>
+                <div>
+                  {quoteQuery.data.hubspot_sync_status === 'pending' && (
+                    <span className={`${styles.badge} ${styles.badgeHubSpotPending}`}>In Coda</span>
+                  )}
+                  {quoteQuery.data.hubspot_sync_status === 'succeeded' && (
+                    <span className={`${styles.badge} ${styles.badgeHubSpotSucceeded}`}>Sincronizzato</span>
+                  )}
+                  {quoteQuery.data.hubspot_sync_status === 'failed' && (
+                    <span className={`${styles.badge} ${styles.badgeHubSpotFailed}`}>Fallito</span>
+                  )}
+                </div>
+              </div>
+              {quoteQuery.data.hubspot_synced_at && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  Ultimo sync: {new Date(quoteQuery.data.hubspot_synced_at).toLocaleString('it-IT')}
+                </div>
+              )}
+              {quoteQuery.data.hubspot_sync_error && (
+                <div className={styles.syncErrorAlert}>
+                  <strong>Dettaglio errore:</strong> {quoteQuery.data.hubspot_sync_error}
+                </div>
+              )}
+              {quoteQuery.data.hubspot_sync_status === 'failed' && (
+                <Button size="sm" onClick={handleRetrySync} disabled={retrySyncMutation.isPending}>
+                  <Icon name="loader" size={14} /> Riprova Sincronizzazione Ora
+                </Button>
+              )}
+            </div>
 
-          <div className={styles.pdfExportsList}>
-            {pdfExports && pdfExports.length > 0 ? (
-              pdfExports.map((exportItem: any) => {
-                const hsAttached = exportItem.hubspot_attachment_status === 'succeeded';
-                const hsFailed = exportItem.hubspot_attachment_status === 'failed';
-                const hsPending = exportItem.hubspot_attachment_status === 'pending';
+            {stagesQuery.data && (
+              <div className={styles.syncStatusCard}>
+                <div className={styles.syncStatusTitle}>HubSpot Deal Stage Timeline</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  Clicca su uno stato per effettuare una transizione del Deal.
+                </div>
+                <div className={styles.stageSelectorWrapper}>
+                  <div className={styles.stagesTimeline}>
+                    {stagesQuery.data.items.map((st: any) => {
+                      const currentStageItem = stagesQuery.data.items.find(
+                        (item: any) => item.id === quoteQuery.data?.hubspot_dealstage_id
+                      );
+                      const isCurrent = st.id === quoteQuery.data?.hubspot_dealstage_id;
+                      const isActive =
+                        st.display_order != null &&
+                        currentStageItem?.display_order != null &&
+                        st.display_order <= currentStageItem.display_order;
 
-                return (
-                  <div key={exportItem.id} className={styles.pdfExportItem}>
-                    <div className={styles.pdfExportMeta}>
-                      <span className={styles.pdfExportTitle}>Revisione N. {exportItem.revision}</span>
-                      <span className={styles.pdfExportDate}>
-                        Data: {new Date(exportItem.created_at).toLocaleString('it-IT')}
-                      </span>
-                      {exportItem.hubspot_attachment_status && (
-                        <span style={{ fontSize: '0.725rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          HubSpot:
-                          {hsAttached && (
-                            <span style={{ color: 'var(--color-success)', fontWeight: 700 }}>Inviato</span>
-                          )}
-                          {hsFailed && (
-                            <span style={{ color: 'var(--color-error)', fontWeight: 700 }}>Invio Fallito</span>
-                          )}
-                          {hsPending && (
-                            <span style={{ color: 'var(--color-warning-strong)', fontWeight: 700 }}>In Coda</span>
-                          )}
-                        </span>
-                      )}
-                    </div>
+                      return (
+                        <div
+                          key={st.id}
+                          className={`${styles.stageTimelineNode} ${
+                            isCurrent
+                              ? styles.stageTimelineNodeCurrent
+                              : isActive
+                              ? styles.stageTimelineNodeActive
+                              : ''
+                          }`}
+                          onClick={() => {
+                            if (quoteQuery.data?.hubspot_dealstage_id && st.id !== quoteQuery.data.hubspot_dealstage_id) {
+                              handleStageChange(quoteQuery.data.hubspot_dealstage_id || '', st.id);
+                            }
+                          }}
+                          title={`Sposta in: ${st.label}`}
+                        >
+                          <div className={styles.stageTimelineNodeLabel}>{st.label || st.id}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
-                    <div className={styles.pdfExportActions}>
-                      <button
-                        className={styles.rowBtn}
-                        onClick={() => onDownloadPdf(exportItem.id, exportItem.filename)}
-                        title="Scarica PDF"
+            <div className={styles.logsTimeline}>
+              {quoteQuery.data.events && quoteQuery.data.events.length > 0 ? (
+                quoteQuery.data.events.map((evt: any) => {
+                  const isFailed = evt.event_type.includes('failed') || evt.event_type.includes('error');
+                  const isSuccess = evt.event_type.includes('success') || evt.event_type.includes('ready');
+
+                  return (
+                    <div key={evt.id} className={styles.logItem}>
+                      <div
+                        className={`${styles.logIcon} ${
+                          isSuccess ? styles.logIconSuccess : isFailed ? styles.logIconFailed : ''
+                        }`}
                       >
-                        <Icon name="download" size={16} />
-                      </button>
-                      {!hsAttached && (
+                        <Icon
+                          name={isSuccess ? 'check-circle' : isFailed ? 'x-circle' : 'info'}
+                          size={16}
+                        />
+                      </div>
+                      <div className={styles.logContent}>
+                        <div className={styles.logHeader}>
+                          <div className={styles.logTitle}>{evt.event_type}</div>
+                          <div className={styles.logTime}>
+                            {new Date(evt.created_at).toLocaleString('it-IT')}
+                          </div>
+                        </div>
+                        <div className={styles.logActor}>Operatore: {evt.actor_subject}</div>
+                        {evt.payload && Object.keys(evt.payload).length > 0 && (
+                          <pre className={styles.logPayload}>
+                            {JSON.stringify(evt.payload, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ textAlign: 'center', padding: '16px', color: 'var(--color-text-muted)' }}>
+                  Nessun evento registrato.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: PDF Export Panel */}
+        {activeTab === 'pdf' && (
+          <div className={styles.pdfExportsCard}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className={styles.syncStatusTitle}>Revisioni ed Esportazioni PDF</div>
+              <Button size="sm" onClick={handleGeneratePdf} disabled={createPdfMutation.isPending}>
+                Genera Nuova Revisione
+              </Button>
+            </div>
+
+            <div className={styles.pdfExportsList}>
+              {pdfExportsQuery.data && pdfExportsQuery.data.length > 0 ? (
+                pdfExportsQuery.data.map((exportItem: any) => {
+                  const hsAttached = exportItem.hubspot_attachment_status === 'succeeded';
+                  const hsFailed = exportItem.hubspot_attachment_status === 'failed';
+                  const hsPending = exportItem.hubspot_attachment_status === 'pending';
+
+                  return (
+                    <div key={exportItem.id} className={styles.pdfExportItem}>
+                      <div className={styles.pdfExportMeta}>
+                        <span className={styles.pdfExportTitle}>Revisione N. {exportItem.revision}</span>
+                        <span className={styles.pdfExportDate}>
+                          Data: {new Date(exportItem.created_at).toLocaleString('it-IT')}
+                        </span>
+                        {exportItem.hubspot_attachment_status && (
+                          <span style={{ fontSize: '0.725rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            HubSpot:
+                            {hsAttached && (
+                              <span style={{ color: 'var(--color-success)', fontWeight: 700 }}>Inviato</span>
+                            )}
+                            {hsFailed && (
+                              <span style={{ color: 'var(--color-error)', fontWeight: 700 }}>Invio Fallito</span>
+                            )}
+                            {hsPending && (
+                              <span style={{ color: 'var(--color-warning-strong)', fontWeight: 700 }}>In Coda</span>
+                            )}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className={styles.pdfExportActions}>
                         <button
                           className={styles.rowBtn}
-                          onClick={() => onAttachPdf(exportItem.id)}
-                          title="Invia allegato a Deal HubSpot"
+                          onClick={() => handleDownloadPdfExport(exportItem.id, exportItem.filename)}
+                          title="Scarica PDF"
                         >
-                          <Icon name="external-link" size={16} />
+                          <Icon name="download" size={16} />
                         </button>
-                      )}
+                        {!hsAttached && (
+                          <button
+                            className={styles.rowBtn}
+                            onClick={() => handleAttachPdf(exportItem.id)}
+                            disabled={attachPdfMutation.isPending}
+                            title="Invia allegato a Deal HubSpot"
+                          >
+                            <Icon name="external-link" size={16} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div style={{ textAlign: 'center', padding: '16px', color: 'var(--color-text-muted)' }}>
-                Nessuna revisione PDF generata. Clicca su "Genera Nuova Revisione".
-              </div>
-            )}
+                  );
+                })
+              ) : (
+                <div style={{ textAlign: 'center', padding: '16px', color: 'var(--color-text-muted)' }}>
+                  Nessuna revisione PDF generata. Clicca su "Genera Nuova Revisione".
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </>
+        )}
+      </div>
+    </main>
   );
 }

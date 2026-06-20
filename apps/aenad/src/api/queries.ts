@@ -246,7 +246,7 @@ export function useQuoteCustomers(search: string, enabled: boolean) {
   const api = useApiClient();
   return useQuery({
     queryKey: aenadQuoteKeys.customers(search),
-    queryFn: () => api.get<CustomerSelection[]>(`/aenad/v1/quotes/customers?q=${encodeURIComponent(search)}&limit=15`),
+    queryFn: () => api.get<CustomerSelection[]>(`/aenad/v1/quotes/customers?q=${encodeURIComponent(search)}&limit=100&include_without_numero_azienda=true`),
     enabled,
     retry: shouldRetry,
   });

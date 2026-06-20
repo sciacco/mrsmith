@@ -189,10 +189,8 @@ func (h *Handler) handleQuoteCustomers(w http.ResponseWriter, r *http.Request) {
 			OR c.name ILIKE '%' || $2 || '%'
 			OR c.numero_azienda ILIKE '%' || $2 || '%'
 			OR c.partita_iva ILIKE '%' || $2 || '%'
-			OR c.codice_fiscale ILIKE '%' || $2 || '%'
 			OR c.domain ILIKE '%' || $2 || '%'
 			OR c.email ILIKE '%' || $2 || '%'
-			OR c.pec ILIKE '%' || $2 || '%'
 		  )
 		ORDER BY
 			CASE WHEN NULLIF(BTRIM(COALESCE(c.numero_azienda, '')), '') IS NULL THEN 1 ELSE 0 END,
