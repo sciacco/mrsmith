@@ -1049,9 +1049,7 @@ func (s *raenadTestState) companyRows(args []driver.NamedValue) driver.Rows {
 func (s *raenadTestState) paymentMethodRows() driver.Rows {
 	filtered := make([]raenadTestPaymentMethod, 0)
 	for _, method := range s.paymentMethods {
-		if method.Selectable {
-			filtered = append(filtered, method)
-		}
+		filtered = append(filtered, method)
 	}
 	sort.Slice(filtered, func(i, j int) bool {
 		if filtered[i].Description != filtered[j].Description {
@@ -1156,7 +1154,7 @@ func (s *raenadTestState) articleRows(args []driver.NamedValue) driver.Rows {
 func (s *raenadTestState) paymentMethodValidateRows(args []driver.NamedValue) driver.Rows {
 	code := strings.TrimSpace(fmt.Sprint(args[0].Value))
 	for _, method := range s.paymentMethods {
-		if method.Selectable && strings.TrimSpace(method.Code) == code {
+		if strings.TrimSpace(method.Code) == code {
 			return &raenadTestRows{
 				columns: []string{"cod_pagamento", "desc_pagamento"},
 				values:  [][]driver.Value{{method.Code, method.Description}},
@@ -1876,10 +1874,8 @@ func companyMatchesSearch(company raenadTestCompany, search string) bool {
 		stringValue(company.Name),
 		stringValue(company.NumeroAzienda),
 		stringValue(company.VAT),
-		stringValue(company.TaxCode),
 		stringValue(company.Domain),
 		stringValue(company.Email),
-		stringValue(company.PEC),
 	} {
 		if strings.Contains(strings.ToLower(value), needle) {
 			return true

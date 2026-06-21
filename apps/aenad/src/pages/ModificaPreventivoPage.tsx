@@ -1,4 +1,4 @@
-import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -97,8 +97,6 @@ export function ModificaPreventivoPage() {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [articleSearch, setArticleSearch] = useState('');
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
-  const [paymentSearch, setPaymentSearch] = useState('');
-  const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
 
   // Prospect Form State
   const [showProspectForm, setShowProspectForm] = useState(false);
@@ -461,14 +459,18 @@ export function ModificaPreventivoPage() {
   };
 
   // Payment Method Selection
-  const handleSelectPayment = (pm: any) => {
+  const handleSelectPayment = (codPagamento: string | null) => {
+    if (!codPagamento) {
+      setPayment({ method_code: '', method_label: '', bank_details: '' });
+      return;
+    }
+    const pm = paymentMethodsQuery.data?.find((p) => p.cod_pagamento === codPagamento);
+    if (!pm) return;
     setPayment({
       method_code: pm.cod_pagamento,
       method_label: pm.desc_pagamento,
       bank_details: '',
     });
-    setPaymentSearch(pm.desc_pagamento);
-    setShowPaymentDropdown(false);
   };
 
   // Article selection helper
@@ -720,7 +722,10 @@ export function ModificaPreventivoPage() {
     );
   }
 
-  const filteredPaymentMethods = paymentMethodsQuery.data ?? [];
+  const paymentOptions = (paymentMethodsQuery.data ?? []).map((pm) => ({
+    value: pm.cod_pagamento,
+    label: pm.cod_pagamento ? `${pm.desc_pagamento} (${pm.cod_pagamento})` : pm.desc_pagamento,
+  }));
 
   return (
     <main className={styles.page}>
@@ -801,7 +806,7 @@ export function ModificaPreventivoPage() {
           <div className={styles.leftPane}>
             {/* Customer Search Section */}
             <div className={styles.formSection}>
-              <h3>Risoluzione Cliente & Contatto</h3>
+              <h3>Cliente</h3>
               <div className={styles.clientSearchWrapper}>
                 <span className={styles.formFieldLabel}>
                   Cerca Cliente (Rag. Sociale, P.IVA, Email...) <span className={styles.requiredDot}>*</span>
@@ -956,7 +961,7 @@ export function ModificaPreventivoPage() {
               {/* Customer summary card */}
               {customer.name && (
                 <div style={{ background: 'var(--color-surface)', padding: '12px', borderRadius: '8px', fontSize: '0.8rem' }}>
-                  <strong>{customer.name}</strong>
+                  <strong>{customer.name}{customer.numero_azienda_snapshot ? ` (${customer.numero_azienda_snapshot})` : ''}</strong>
                   {customer.email && <div>Email: {customer.email}</div>}
                   {customer.address && (
                     <div>
@@ -987,38 +992,14 @@ export function ModificaPreventivoPage() {
                 </div>
                 <div className={styles.formField}>
                   <span className={styles.formFieldLabel}>Metodo Pagamento</span>
-                  <div className={styles.paymentInputWrapper} style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      className={styles.formFieldInput}
-                      value={paymentSearch || payment.method_label || ''}
-                      onChange={(e) => {
-                        setPaymentSearch(e.target.value);
-                        setShowPaymentDropdown(true);
-                        setPayment((prev) => ({ ...prev, method_label: e.target.value }));
-                      }}
-                      onFocus={() => setShowPaymentDropdown(true)}
-                      placeholder="Seleziona pagamento..."
-                    />
-                    {showPaymentDropdown && filteredPaymentMethods.length > 0 && (
-                      <div className={styles.autocompletePopover}>
-                        {filteredPaymentMethods
-                          .filter((pm) =>
-                            pm.desc_pagamento.toLowerCase().includes(paymentSearch.toLowerCase())
-                          )
-                          .map((pm) => (
-                            <button
-                              key={pm.cod_pagamento}
-                              type="button"
-                              className={styles.autocompleteItem}
-                              onClick={() => handleSelectPayment(pm)}
-                            >
-                              <span className={styles.autocompleteItemName}>{pm.desc_pagamento}</span>
-                            </button>
-                          ))}
-                      </div>
-                    )}
-                  </div>
+                  <SingleSelect
+                    options={paymentOptions}
+                    selected={payment.method_code || null}
+                    onChange={handleSelectPayment}
+                    placeholder="Seleziona pagamento..."
+                    allowClear
+                    clearLabel="Nessun pagamento"
+                  />
                 </div>
               </div>
               <div className={styles.formField}>
@@ -1281,7 +1262,7 @@ export function ModificaPreventivoPage() {
           <div className={styles.stripeInvoice}>
             <div className={styles.invoiceHeader}>
               <div className={styles.invoiceBrand}>
-                <h2>{customer.name || 'Nome Cliente'}</h2>
+                <h2>{customer.name || 'Nome Cliente'}{customer.numero_azienda_snapshot ? ` (${customer.numero_azienda_snapshot})` : ''}</h2>
                 <p>{customer.email || 'Nessun indirizzo email'}</p>
               </div>
               <div className={styles.invoiceMeta}>
@@ -1296,7 +1277,7 @@ export function ModificaPreventivoPage() {
               <div className={styles.invoiceCol}>
                 <h4>Destinatario Fattura</h4>
                 <p>
-                  <strong>{customer.name || '-'}</strong>
+                  <strong>{customer.name || '-'}{customer.numero_azienda_snapshot ? ` (${customer.numero_azienda_snapshot})` : ''}</strong>
                   {customer.address && (
                     <>
                       <br />

@@ -279,7 +279,6 @@ func (h *Handler) handleQuotePaymentMethods(w http.ResponseWriter, r *http.Reque
 	rows, err := h.deps.Mistra.QueryContext(r.Context(), `
 		SELECT RTRIM(cod_pagamento) AS cod_pagamento, desc_pagamento
 		FROM loader.erp_metodi_pagamento
-		WHERE selezionabile IS TRUE
 		ORDER BY desc_pagamento, RTRIM(cod_pagamento)`)
 	if err != nil {
 		h.dbFailure(w, r, "quote_payment_methods", err)

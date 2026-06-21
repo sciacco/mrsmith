@@ -569,7 +569,7 @@ func (h *Handler) resolvePaymentForSave(w http.ResponseWriter, r *http.Request, 
 	err := h.deps.Mistra.QueryRowContext(r.Context(), `
 		SELECT RTRIM(cod_pagamento) AS cod_pagamento, desc_pagamento
 		FROM loader.erp_metodi_pagamento
-		WHERE RTRIM(cod_pagamento) = $1 AND selezionabile IS TRUE`, trimmed).Scan(&dbCode, &label)
+		WHERE RTRIM(cod_pagamento) = $1`, trimmed).Scan(&dbCode, &label)
 	if errors.Is(err, sql.ErrNoRows) {
 		httputil.Error(w, http.StatusBadRequest, "payment_method_not_found")
 		return paymentSnapshotResolved{}, false

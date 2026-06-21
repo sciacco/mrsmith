@@ -89,15 +89,15 @@ func TestQuoteCustomersSearchMatchesRequiredFields(t *testing.T) {
 		{name: "name", query: "Acme"},
 		{name: "numero azienda", query: "ERP-77"},
 		{name: "partita iva", query: "VAT-77"},
-		{name: "codice fiscale", query: "CF-77"},
+		{name: "domain", query: "acme.example"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			state := &raenadTestState{
 				companies: []raenadTestCompany{
-					{ID: 77, Name: ptr("Acme SpA"), VAT: ptr("VAT-77"), TaxCode: ptr("CF-77"), NumeroAzienda: ptr("ERP-77")},
-					{ID: 88, Name: ptr("Other SpA"), VAT: ptr("VAT-88"), TaxCode: ptr("CF-88"), NumeroAzienda: ptr("ERP-88")},
+					{ID: 77, Name: ptr("Acme SpA"), VAT: ptr("VAT-77"), NumeroAzienda: ptr("ERP-77"), Domain: ptr("acme.example")},
+					{ID: 88, Name: ptr("Other SpA"), VAT: ptr("VAT-88"), NumeroAzienda: ptr("ERP-88"), Domain: ptr("other.example")},
 				},
 			}
 			mux := http.NewServeMux()
@@ -112,7 +112,7 @@ func TestQuoteCustomersSearchMatchesRequiredFields(t *testing.T) {
 			if len(got) != 1 || got[0].HubSpotCompanyID != "77" {
 				t.Fatalf("expected required-field match to return company 77, got %#v", got)
 			}
-			assertRaenadQueryContains(t, state, "loader.hubs_company", "c.name ILIKE", "c.numero_azienda ILIKE", "c.partita_iva ILIKE", "c.codice_fiscale ILIKE")
+			assertRaenadQueryContains(t, state, "loader.hubs_company", "c.name ILIKE", "c.numero_azienda ILIKE", "c.partita_iva ILIKE", "c.domain ILIKE", "c.email ILIKE")
 		})
 	}
 }
@@ -132,7 +132,7 @@ func TestParseReferenceLimitDefaultsAndCaps(t *testing.T) {
 	}
 }
 
-func TestQuotePaymentMethodsFiltersSelectableAndTrimsCode(t *testing.T) {
+func TestQuotePaymentMethodsReturnsAllAndTrimsCode(t *testing.T) {
 	state := &raenadTestState{
 		paymentMethods: []raenadTestPaymentMethod{
 			{Code: "999   ", Description: "Hidden", Selectable: false},
@@ -150,16 +150,13 @@ func TestQuotePaymentMethodsFiltersSelectableAndTrimsCode(t *testing.T) {
 
 	var got []paymentMethodSelection
 	decodeRaenadResponse(t, rec, &got)
-	if len(got) != 2 {
-		t.Fatalf("expected two selectable methods, got %#v", got)
+	if len(got) != 3 {
+		t.Fatalf("expected all three methods, got %#v", got)
 	}
 	if got[0].CodPagamento != "010" || got[0].DescPagamento != "Bonifico" {
 		t.Fatalf("expected methods ordered by description and code trimmed, got %#v", got)
 	}
-	if strings.Contains(rec.Body.String(), "999") {
-		t.Fatalf("non-selectable payment method leaked: %s", rec.Body.String())
-	}
-	assertRaenadQueryContains(t, state, "loader.erp_metodi_pagamento", "selezionabile IS TRUE", "ORDER BY desc_pagamento")
+	assertRaenadQueryContains(t, state, "loader.erp_metodi_pagamento", "ORDER BY desc_pagamento")
 }
 
 func TestQuoteStagesUsesConfiguredPipelineAndOrdering(t *testing.T) {

@@ -55,7 +55,7 @@ func TestQuoteCreatePersistsPaymentLabelFromDBAndReturnsDBTotals(t *testing.T) {
 	if !hasRaenadEvent(mistraState, 101, quoteEventHubSpotCreateEnqueued) {
 		t.Fatalf("expected create enqueue event, got %#v", mistraState.events[101])
 	}
-	assertRaenadQueryContains(t, mistraState, "loader.erp_metodi_pagamento", "selezionabile IS TRUE")
+	assertRaenadQueryContains(t, mistraState, "loader.erp_metodi_pagamento")
 }
 
 func TestQuoteCreateEnqueueFailureKeepsCommittedQuoteRecoverable(t *testing.T) {
@@ -462,8 +462,8 @@ func TestQuoteUpdatePaymentValidationUsesDBLabel(t *testing.T) {
 	RegisterRoutes(mux, Deps{Mistra: openRaenadTestDBWithState(t, state)})
 
 	rec := serveRaenadJSON(mux, http.MethodPut, "/aenad/v1/quotes/101", validSavePayload(map[string]any{
-		"payment_method_code":  "999",
-		"payment_method_label": "Hidden label",
+		"payment_method_code":  "404",
+		"payment_method_label": "Missing label",
 	}))
 	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "payment_method_not_found") {
 		t.Fatalf("expected payment_method_not_found, got %d body=%q", rec.Code, rec.Body.String())
