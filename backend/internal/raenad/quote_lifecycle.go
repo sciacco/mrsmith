@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -128,14 +129,15 @@ func (h *Handler) handleQuoteCreate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	lines, ok := h.normalizeLineInputs(w, req.Lines)
-	if !ok {
+	lines, lineNormErrs := h.normalizeLineInputs(req.Lines)
+	createErrs := h.validateCreatePayload(req)
+	lineErrs, dbErr := h.validateWritableLines(r.Context(), h.deps.Mistra, lines, false)
+	if dbErr != nil {
+		h.dbFailure(w, r, "quote_line_vat_validate", dbErr)
 		return
 	}
-	if !h.validateCreatePayload(w, req) {
-		return
-	}
-	if !h.validateWritableLines(r.Context(), w, r, h.deps.Mistra, lines, false) {
+	if allErrs := append(append(lineNormErrs, createErrs...), lineErrs...); len(allErrs) > 0 {
+		allErrs.write(w)
 		return
 	}
 
@@ -232,14 +234,15 @@ func (h *Handler) handleQuoteUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	lines, ok := h.normalizeLineInputs(w, req.Lines)
-	if !ok {
+	lines, lineNormErrs := h.normalizeLineInputs(req.Lines)
+	lineErrs, dbErr := h.validateWritableLines(r.Context(), h.deps.Mistra, lines, false)
+	if dbErr != nil {
+		h.dbFailure(w, r, "quote_line_vat_validate", dbErr)
 		return
 	}
-	if !h.validateWritableLines(r.Context(), w, r, h.deps.Mistra, lines, false) {
-		return
-	}
-	if !h.validateUpdatePayload(w, req) {
+	updateErrs := h.validateUpdatePayload(req)
+	if allErrs := append(append(lineNormErrs, updateErrs...), lineErrs...); len(allErrs) > 0 {
+		allErrs.write(w)
 		return
 	}
 
@@ -435,7 +438,8 @@ func (h *Handler) handleQuoteReady(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !validateReadyQuote(w, quote, lines) {
+	if errs := validateReadyQuote(quote, lines); len(errs) > 0 {
+		errs.write(w)
 		return
 	}
 
@@ -510,38 +514,65 @@ func hasClientOwnedTotals(raw []byte) bool {
 	return false
 }
 
-func (h *Handler) validateCreatePayload(w http.ResponseWriter, req saveQuoteRequest) bool {
-	if strings.TrimSpace(deref(req.HubSpotCompanyID)) == "" ||
-		strings.TrimSpace(deref(req.Customer.Name)) == "" ||
-		strings.TrimSpace(deref(req.DocumentDate)) == "" ||
-		strings.TrimSpace(deref(req.Description)) == "" {
-		httputil.Error(w, http.StatusBadRequest, "validation_failed")
-		return false
-	}
-	if !validDate(req.DocumentDate) {
-		httputil.Error(w, http.StatusBadRequest, "invalid_payload")
-		return false
-	}
-	return true
+type validationDetail struct {
+	Field string `json:"field"`
+	Code  string `json:"code"`
 }
 
-func (h *Handler) validateUpdatePayload(w http.ResponseWriter, req saveQuoteRequest) bool {
+type validationErrors []validationDetail
+
+func (v validationErrors) write(w http.ResponseWriter) {
+	httputil.JSON(w, http.StatusBadRequest, map[string]any{
+		"error":   "validation_failed",
+		"details": v,
+	})
+}
+
+func (h *Handler) validateCreatePayload(req saveQuoteRequest) validationErrors {
+	var errs validationErrors
+	if strings.TrimSpace(deref(req.HubSpotCompanyID)) == "" {
+		errs = append(errs, validationDetail{Field: "hubspot_company_id", Code: "required"})
+	}
+	if strings.TrimSpace(deref(req.Customer.Name)) == "" {
+		errs = append(errs, validationDetail{Field: "customer.name", Code: "required"})
+	}
+	if strings.TrimSpace(deref(req.DocumentDate)) == "" {
+		errs = append(errs, validationDetail{Field: "document_date", Code: "required"})
+	} else if !validDate(req.DocumentDate) {
+		errs = append(errs, validationDetail{Field: "document_date", Code: "invalid_date"})
+	}
+	if strings.TrimSpace(deref(req.Description)) == "" {
+		errs = append(errs, validationDetail{Field: "description", Code: "required"})
+	}
+	return errs
+}
+
+func (h *Handler) validateUpdatePayload(req saveQuoteRequest) validationErrors {
+	var errs validationErrors
 	if req.DocumentDate != nil && !validDate(req.DocumentDate) {
-		httputil.Error(w, http.StatusBadRequest, "invalid_payload")
-		return false
+		errs = append(errs, validationDetail{Field: "document_date", Code: "invalid_date"})
 	}
-	return true
+	return errs
 }
 
-func validateReadyQuote(w http.ResponseWriter, quote quoteResponse, lines []quoteLine) bool {
-	if strings.TrimSpace(deref(quote.HubSpotCompanyID)) == "" ||
-		strings.TrimSpace(deref(quote.Customer.Name)) == "" ||
-		strings.TrimSpace(deref(quote.DocumentDate)) == "" ||
-		strings.TrimSpace(deref(quote.Description)) == "" ||
-		strings.TrimSpace(deref(quote.Payment.MethodCode)) == "" {
-		httputil.Error(w, http.StatusBadRequest, "validation_failed")
-		return false
+func validateReadyQuote(quote quoteResponse, lines []quoteLine) validationErrors {
+	var errs validationErrors
+	if strings.TrimSpace(deref(quote.HubSpotCompanyID)) == "" {
+		errs = append(errs, validationDetail{Field: "hubspot_company_id", Code: "required"})
 	}
+	if strings.TrimSpace(deref(quote.Customer.Name)) == "" {
+		errs = append(errs, validationDetail{Field: "customer.name", Code: "required"})
+	}
+	if strings.TrimSpace(deref(quote.DocumentDate)) == "" {
+		errs = append(errs, validationDetail{Field: "document_date", Code: "required"})
+	}
+	if strings.TrimSpace(deref(quote.Description)) == "" {
+		errs = append(errs, validationDetail{Field: "description", Code: "required"})
+	}
+	if strings.TrimSpace(deref(quote.Payment.MethodCode)) == "" {
+		errs = append(errs, validationDetail{Field: "payment_method_code", Code: "required"})
+	}
+	hasEconomic := false
 	for _, line := range lines {
 		if line.LineType != lineTypeItem {
 			continue
@@ -549,11 +580,14 @@ func validateReadyQuote(w http.ResponseWriter, quote quoteResponse, lines []quot
 		if strings.TrimSpace(deref(line.Qta)) != "" &&
 			strings.TrimSpace(deref(line.UnitPrice)) != "" &&
 			(strings.TrimSpace(deref(line.CodIVA)) != "" || strings.TrimSpace(deref(line.IVAPercentSnapshot)) != "") {
-			return true
+			hasEconomic = true
+			break
 		}
 	}
-	httputil.Error(w, http.StatusBadRequest, "validation_failed")
-	return false
+	if !hasEconomic {
+		errs = append(errs, validationDetail{Field: "lines", Code: "no_economic_line"})
+	}
+	return errs
 }
 
 func (h *Handler) resolvePaymentForSave(w http.ResponseWriter, r *http.Request, code *string, required bool) (paymentSnapshotResolved, bool) {
@@ -602,7 +636,8 @@ func (h *Handler) initialStageSnapshot(ctx context.Context) (stageSnapshotResolv
 	return stage, true
 }
 
-func (h *Handler) normalizeLineInputs(w http.ResponseWriter, inputs []quoteLineInput) ([]quoteLineInput, bool) {
+func (h *Handler) normalizeLineInputs(inputs []quoteLineInput) ([]quoteLineInput, validationErrors) {
+	var errs validationErrors
 	out := make([]quoteLineInput, 0, len(inputs))
 	for i, line := range inputs {
 		line.LineType = strings.TrimSpace(line.LineType)
@@ -610,8 +645,8 @@ func (h *Handler) normalizeLineInputs(w http.ResponseWriter, inputs []quoteLineI
 			line.LineType = lineTypeItem
 		}
 		if line.LineType != lineTypeItem && line.LineType != lineTypeDescription && line.LineType != lineTypeSpacer {
-			httputil.Error(w, http.StatusBadRequest, "invalid_payload")
-			return nil, false
+			errs = append(errs, validationDetail{Field: fmt.Sprintf("lines[%d].line_type", i), Code: "invalid_line_type"})
+			continue
 		}
 		line.Position = i + 1
 		line.ItemCode = trimmedOrNil(line.ItemCode)
@@ -622,27 +657,24 @@ func (h *Handler) normalizeLineInputs(w http.ResponseWriter, inputs []quoteLineI
 		line.CodIVA = trimmedOrNil(line.CodIVA)
 		var err error
 		if line.Qta, err = normalizeDecimal18_4(line.Qta); err != nil {
-			httputil.Error(w, http.StatusBadRequest, "invalid_payload")
-			return nil, false
+			errs = append(errs, validationDetail{Field: fmt.Sprintf("lines[%d].qta", i), Code: "invalid_decimal"})
 		}
 		if line.UnitPrice, err = normalizeDecimal18_4(line.UnitPrice); err != nil {
-			httputil.Error(w, http.StatusBadRequest, "invalid_payload")
-			return nil, false
+			errs = append(errs, validationDetail{Field: fmt.Sprintf("lines[%d].unit_price", i), Code: "invalid_decimal"})
 		}
 		if line.IVAPercentSnapshot, err = normalizeDecimal18_4(line.IVAPercentSnapshot); err != nil {
-			httputil.Error(w, http.StatusBadRequest, "invalid_payload")
-			return nil, false
+			errs = append(errs, validationDetail{Field: fmt.Sprintf("lines[%d].iva_percent_snapshot", i), Code: "invalid_decimal"})
 		}
 		if line.PurchaseUnitPrice, err = normalizeDecimal18_4(line.PurchaseUnitPrice); err != nil {
-			httputil.Error(w, http.StatusBadRequest, "invalid_payload")
-			return nil, false
+			errs = append(errs, validationDetail{Field: fmt.Sprintf("lines[%d].purchase_unit_price", i), Code: "invalid_decimal"})
 		}
 		out = append(out, line)
 	}
-	return out, true
+	return out, errs
 }
 
-func (h *Handler) validateWritableLines(ctx context.Context, w http.ResponseWriter, r *http.Request, q queryer, lines []quoteLineInput, ready bool) bool {
+func (h *Handler) validateWritableLines(ctx context.Context, q queryer, lines []quoteLineInput, ready bool) (validationErrors, error) {
+	var errs validationErrors
 	for _, line := range lines {
 		economic := line.LineType == lineTypeItem && line.Qta != nil && line.UnitPrice != nil
 		if !economic {
@@ -651,24 +683,20 @@ func (h *Handler) validateWritableLines(ctx context.Context, w http.ResponseWrit
 		if line.IVAPercentSnapshot != nil {
 			continue
 		}
+		field := fmt.Sprintf("lines[%d].cod_iva", line.Position-1)
 		if strings.TrimSpace(deref(line.CodIVA)) == "" {
-			httputil.Error(w, http.StatusBadRequest, "validation_failed")
-			return false
+			errs = append(errs, validationDetail{Field: field, Code: "required"})
+			continue
 		}
 		var resolved sql.NullString
 		if err := q.QueryRowContext(ctx, `SELECT raenad.resolve_iva_percent($1)::text`, *line.CodIVA).Scan(&resolved); err != nil {
-			h.dbFailure(w, r, "quote_line_vat_validate", err)
-			return false
+			return errs, err
 		}
 		if !resolved.Valid || strings.TrimSpace(resolved.String) == "" {
-			httputil.Error(w, http.StatusBadRequest, "validation_failed")
-			return false
+			errs = append(errs, validationDetail{Field: field, Code: "invalid_vat_code"})
 		}
 	}
-	if ready {
-		return true
-	}
-	return true
+	return errs, nil
 }
 
 func (h *Handler) replaceQuoteLines(ctx context.Context, tx *sql.Tx, quoteID int64, lines []quoteLineInput) error {
@@ -921,11 +949,17 @@ func parsePositiveInt(raw string, fallback, min, max int) int {
 }
 
 func validDate(value *string) bool {
-	if strings.TrimSpace(deref(value)) == "" {
+	trimmed := strings.TrimSpace(deref(value))
+	if trimmed == "" {
 		return true
 	}
-	_, err := time.Parse(dateLayout, strings.TrimSpace(*value))
-	return err == nil
+	if _, err := time.Parse(dateLayout, trimmed); err == nil {
+		return true
+	}
+	if _, err := time.Parse(time.RFC3339, trimmed); err == nil {
+		return true
+	}
+	return false
 }
 
 func trimmedOrNil(value *string) *string {

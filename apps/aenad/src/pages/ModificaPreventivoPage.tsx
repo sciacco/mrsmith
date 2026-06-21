@@ -21,6 +21,7 @@ import {
 } from '../api/queries';
 import { formatMoney, calculateDiscountMultiplier } from '../utils/format';
 import { downloadBlob } from '../utils/downloads';
+import { apiErrorMessage } from '../lib/errors';
 import { useApiClient } from '../api/client';
 import type {
   QuoteLineInput,
@@ -534,6 +535,10 @@ export function ModificaPreventivoPage() {
       toast('Il nome del cliente è obbligatorio!', 'error');
       return;
     }
+    if (!description.trim()) {
+      toast('L\'oggetto / descrizione breve è obbligatorio!', 'error');
+      return;
+    }
 
     const payload: SaveQuotePayload = {
       hubspot_company_id: hubspotCompanyId,
@@ -578,7 +583,7 @@ export function ModificaPreventivoPage() {
         },
         onError: (err) => {
           toast(
-            `Errore durante la creazione: ${err instanceof Error ? err.message : 'Errore del server'}`,
+            `Errore durante la creazione: ${apiErrorMessage(err, 'Salvataggio non riuscito.')}`,
             'error'
           );
         },
@@ -596,7 +601,7 @@ export function ModificaPreventivoPage() {
           },
           onError: (err) => {
             toast(
-              `Errore durante il salvataggio: ${err instanceof Error ? err.message : 'Errore del server'}`,
+              `Errore durante il salvataggio: ${apiErrorMessage(err, 'Salvataggio non riuscito.')}`,
               'error'
             );
           },
@@ -1003,7 +1008,7 @@ export function ModificaPreventivoPage() {
                 </div>
               </div>
               <div className={styles.formField}>
-                <span className={styles.formFieldLabel}>Oggetto / Descrizione Breve</span>
+                <span className={styles.formFieldLabel}>Oggetto / Descrizione Breve <span className={styles.requiredDot}>*</span></span>
                 <input
                   type="text"
                   className={styles.formFieldInput}

@@ -120,8 +120,8 @@ func TestQuoteCreateRejectsInvalidDecimalBeforeWrite(t *testing.T) {
 			"cod_iva":    "22",
 		}},
 	}))
-	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "invalid_payload") {
-		t.Fatalf("expected invalid_payload, got %d body=%q", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "validation_failed") || !strings.Contains(rec.Body.String(), "invalid_decimal") {
+		t.Fatalf("expected validation_failed with invalid_decimal detail, got %d body=%q", rec.Code, rec.Body.String())
 	}
 	if len(mistraState.quotes) != 0 || mistraState.begins != 0 {
 		t.Fatalf("invalid decimal should fail before DB write, quotes=%#v begins=%d", mistraState.quotes, mistraState.begins)
