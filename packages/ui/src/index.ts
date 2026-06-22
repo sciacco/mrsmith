@@ -41,3 +41,6 @@ export { useTableFilter } from './hooks/useTableFilter';
 export { provinces, provinceSelectOptions, type ProvinceOption } from './data/provinces';
 export { PhoneInput } from './components/PhoneInput/PhoneInput';
 export type { PhoneInputProps } from './components/PhoneInput/PhoneInput';
+export { MoneyInput } from './components/MoneyInput';
+export type { MoneyInputProps } from './components/MoneyInput';
+export { parseToWire, formatForDisplay } from './components/MoneyInput';

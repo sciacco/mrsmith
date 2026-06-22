@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Modal, SingleSelect, useToast } from '@mrsmith/ui';
+import { Modal, SingleSelect, useToast, MoneyInput } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { useCreateUserBudget, useCreateCcBudget, useUsers, useCostCenters } from './queries';
-import { isValidMoneyInput } from '../../utils/format';
 import styles from './BudgetDetailPage.module.css';
 
 interface AllocationCreateModalProps {
@@ -20,7 +19,6 @@ export function AllocationCreateModal({
   const [userId, setUserId] = useState<number | null>(null);
   const [costCenter, setCostCenter] = useState('');
   const [limit, setLimit] = useState('');
-  const [limitError, setLimitError] = useState('');
   const { toast } = useToast();
 
   const { data: users } = useUsers();
@@ -42,16 +40,10 @@ export function AllocationCreateModal({
     setUserId(null);
     setCostCenter('');
     setLimit('');
-    setLimitError('');
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!limit.trim() || !isValidMoneyInput(limit.trim())) {
-      setLimitError('Formato non valido (es. 1500.00)');
-      return;
-    }
-    setLimitError('');
 
     const handlers = {
       onSuccess: (res: { message: string }) => {
@@ -113,20 +105,14 @@ export function AllocationCreateModal({
           </div>
         )}
         <div className={styles.formGroup}>
-          <label className={styles.label}>Limite</label>
-          <input
-            className={`${styles.input} ${limitError ? styles.inputError : ''}`}
-            type="text"
+          <MoneyInput
+            label="Limite"
             value={limit}
-            onChange={(e) => { setLimit(e.target.value); setLimitError(''); }}
-            placeholder="es. 50000.00"
+            onChange={setLimit}
+            locale="it-IT"
+            currency="EUR"
             required
           />
-          {limitError ? (
-            <p className={styles.errorText}>{limitError}</p>
-          ) : (
-            <p className={styles.helpText}>Inserire il valore in formato decimale (es. 1500.00)</p>
-          )}
         </div>
         <div className={styles.actions}>
           <button type="button" className={styles.btnSecondary} onClick={onClose}>

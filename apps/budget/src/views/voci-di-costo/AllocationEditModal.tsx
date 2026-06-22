@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Modal, useToast } from '@mrsmith/ui';
+import { Modal, useToast, MoneyInput } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { useEditUserBudget, useEditCcBudget } from './queries';
-import { isValidMoneyInput } from '../../utils/format';
 import styles from './BudgetDetailPage.module.css';
 
 interface AllocationEditModalProps {
@@ -20,7 +19,6 @@ export function AllocationEditModal({
 }: AllocationEditModalProps) {
   const [limit, setLimit] = useState(currentLimit);
   const [enabled, setEnabled] = useState(currentEnabled);
-  const [limitError, setLimitError] = useState('');
   const { toast } = useToast();
 
   const editUser = useEditUserBudget(budgetId);
@@ -30,17 +28,11 @@ export function AllocationEditModal({
     if (open) {
       setLimit(currentLimit);
       setEnabled(currentEnabled);
-      setLimitError('');
     }
   }, [open, currentLimit, currentEnabled]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (limit.trim() && !isValidMoneyInput(limit.trim())) {
-      setLimitError('Formato non valido (es. 1500.00)');
-      return;
-    }
-    setLimitError('');
 
     const handlers = {
       onSuccess: (res: { message: string }) => {
@@ -77,19 +69,13 @@ export function AllocationEditModal({
     <Modal open={open} onClose={onClose} title="Modifica allocazione">
       <form onSubmit={handleSubmit}>
         <div className={styles.formGroup}>
-          <label className={styles.label}>Limite</label>
-          <input
-            className={`${styles.input} ${limitError ? styles.inputError : ''}`}
-            type="text"
+          <MoneyInput
+            label="Limite"
             value={limit}
-            onChange={(e) => { setLimit(e.target.value); setLimitError(''); }}
-            placeholder="es. 50000.00"
+            onChange={setLimit}
+            locale="it-IT"
+            currency="EUR"
           />
-          {limitError ? (
-            <p className={styles.errorText}>{limitError}</p>
-          ) : (
-            <p className={styles.helpText}>Inserire il valore in formato decimale (es. 1500.00)</p>
-          )}
         </div>
         <div className={styles.formGroup}>
           <div className={styles.toggle}>

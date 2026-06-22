@@ -1,0 +1,108 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  width: 100%;
+  position: relative;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+}
+
+.requiredMarker {
+  color: var(--color-danger);
+  margin-left: 2px;
+}
+
+.requiredMarker::after {
+  content: '*';
+}
+
+.inputContainer {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-bg);
+  min-height: 44px;
+  position: relative;
+  transition: all var(--duration-normal, 250ms) var(--ease-out);
+}
+
+.inputContainer:hover:not(.disabled):not(.focused) {
+  border-color: var(--color-text-muted);
+}
+
+.focused {
+  border-color: var(--color-accent);
+  background: var(--color-bg-elevated);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.disabled {
+  cursor: not-allowed;
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.symbol {
+  display: flex;
+  align-items: center;
+  padding: 0 10px 0 14px;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background-color: var(--color-border);
+  flex-shrink: 0;
+}
+
+.input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  font-family: var(--font-mono, inherit);
+  color: var(--color-text);
+  width: 100%;
+  min-width: 0;
+}
+
+.input::placeholder {
+  color: var(--color-text-faint);
+  font-family: inherit;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+  color: var(--color-text-muted);
+}
+
+/* Error states */
+.fieldError .inputContainer {
+  border-color: var(--color-danger);
+}
+
+.fieldError .inputContainer.focused {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+}
+
+.errorText {
+  font-size: 0.75rem;
+  color: var(--color-danger);
+  margin-top: 2px;
+}
