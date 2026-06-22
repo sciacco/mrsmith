@@ -504,7 +504,7 @@ func handleEditCostCenter(w http.ResponseWriter, r *http.Request) {
 
 func handleGetAllBudgets(w http.ResponseWriter, r *http.Request) {
 	if arakClient != nil {
-		proxyToArak(w, r, "/arak/budget/v1/budget")
+		proxyToArakRoundingMoney(w, r, "/arak/budget/v1/budget")
 		return
 	}
 	if r.URL.Query().Get("page_number") == "" {
@@ -523,7 +523,7 @@ func handleGetAllBudgets(w http.ResponseWriter, r *http.Request) {
 func handleGetBudgetDetails(w http.ResponseWriter, r *http.Request) {
 	budgetID := r.PathValue("budget_id")
 	if arakClient != nil {
-		proxyToArak(w, r, "/arak/budget/v1/budget/"+budgetID)
+		proxyToArakRoundingMoney(w, r, "/arak/budget/v1/budget/"+budgetID)
 		return
 	}
 	id, ok := parseBudgetID(budgetID)
@@ -604,7 +604,7 @@ func handleDeleteBudget(w http.ResponseWriter, r *http.Request) {
 
 func handleGetBudgetOverPercent(w http.ResponseWriter, r *http.Request) {
 	if arakClient != nil {
-		proxyToArak(w, r, "/arak/budget/v1/report/budget-used-over-percentage")
+		proxyToArakRoundingMoney(w, r, "/arak/budget/v1/report/budget-used-over-percentage")
 		return
 	}
 	if r.URL.Query().Get("page_number") == "" {
