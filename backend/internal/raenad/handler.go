@@ -57,6 +57,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handle("GET /aenad/v1/quotes/customers", h.handleQuoteCustomers)
 	handle("POST /aenad/v1/quotes/prospects", h.handleQuoteProspects)
 	handle("GET /aenad/v1/quotes/payment-methods", h.handleQuotePaymentMethods)
+	handle("GET /aenad/v1/customer-payment/{alyanteCustomerId}", h.handleCustomerPayment)
 	handle("GET /aenad/v1/quotes/stages", h.handleQuoteStages)
 	handle("GET /aenad/v1/quotes/defaults", h.handleQuoteDefaults)
 	handle("GET /aenad/v1/quotes/articles", h.handleQuoteArticles)

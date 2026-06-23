@@ -1,5 +1,5 @@
 import { Button, Icon, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useQuoteDetails,
@@ -10,6 +10,7 @@ import {
   useCreateProspect,
   useQuoteArticles,
   useQuotePaymentMethods,
+  useCustomerPayment,
   useQuoteDefaults,
   usePdfExports,
   useCreatePdfExport,
@@ -49,6 +50,7 @@ export function ModificaPreventivoPage() {
   const stagesQuery = useQuoteStages();
   const paymentMethodsQuery = useQuotePaymentMethods();
   const defaultsQuery = useQuoteDefaults();
+  const paymentManuallySetRef = useRef(false);
   const pdfExportsQuery = usePdfExports(quoteId, quoteId > 0);
 
   // Mutations
@@ -78,6 +80,10 @@ export function ModificaPreventivoPage() {
     address: '', zip: '', city: '', province: '', country: 'IT',
     language: 'it', numero_azienda_snapshot: null
   });
+
+  // Auto-resolve payment method from Alyante ERP when customer is selected
+  const alyanteIdAnagrafica = customer.numero_azienda_snapshot;
+  const customerPaymentQuery = useCustomerPayment(alyanteIdAnagrafica);
 
   const [contact, setContact] = useState<ContactSnapshotInput>({
     first_name: '', last_name: '', full_name: '', email: '', role: ''
@@ -182,6 +188,32 @@ export function ModificaPreventivoPage() {
       setDocumentDate(new Date().toISOString().slice(0, 10));
     }
   }, [isNew, defaultsQuery.data]);
+
+  // Reset manual payment flag when the customer changes
+  useEffect(() => {
+    paymentManuallySetRef.current = false;
+  }, [alyanteIdAnagrafica]);
+
+  // Auto-resolve payment method from Alyante ERP for the selected customer
+  useEffect(() => {
+    if (paymentManuallySetRef.current) return;
+    if (!alyanteIdAnagrafica) return;
+    if (customerPaymentQuery.isPending || customerPaymentQuery.isError) return;
+
+    const resolved = customerPaymentQuery.data?.payment_code;
+    if (!resolved || resolved === '') return;
+
+    const pm = paymentMethodsQuery.data?.find(
+      (p) => p.cod_pagamento === resolved,
+    );
+    if (!pm) return;
+
+    setPayment({
+      method_code: pm.cod_pagamento,
+      method_label: pm.desc_pagamento,
+      bank_details: '',
+    });
+  }, [alyanteIdAnagrafica, customerPaymentQuery.data, customerPaymentQuery.isPending, customerPaymentQuery.isError, paymentMethodsQuery.data]);
 
   // Detect commercial/structural modifications for Demotion Warning
   const isCommercialModified = useMemo(() => {
@@ -461,6 +493,7 @@ export function ModificaPreventivoPage() {
 
   // Payment Method Selection
   const handleSelectPayment = (codPagamento: string | null) => {
+    paymentManuallySetRef.current = true;
     if (!codPagamento) {
       setPayment({ method_code: '', method_label: '', bank_details: '' });
       return;

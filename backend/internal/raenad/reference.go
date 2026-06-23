@@ -75,6 +75,10 @@ type quoteDefaultsConfig struct {
 	CodIVA string `json:"cod_iva"`
 }
 
+const alyanteCustomerPaymentQuery = `SELECT TOP 1 CONVERT(varchar(20), ISNULL(CAST(CODICE_PAGAMENTO as INT), 311)) as payment_code
+          FROM Tsmi_Anagrafiche_clienti
+          WHERE NUMERO_AZIENDA = @p1`
+
 const alyanteArticleSearchQuery = `
 WITH listino AS (
 	SELECT
@@ -184,6 +188,7 @@ func (h *Handler) handleQuoteCustomers(w http.ResponseWriter, r *http.Request) {
 			c.numero_azienda
 		FROM loader.hubs_company c
 		WHERE ($1::boolean OR NULLIF(BTRIM(COALESCE(c.numero_azienda, '')), '') IS NOT NULL)
+		  AND c.name IS NOT NULL AND BTRIM(c.name) <> ''
 		  AND (
 			$2 = ''
 			OR c.name ILIKE '%' || $2 || '%'
@@ -269,6 +274,55 @@ func (h *Handler) handleQuoteCustomers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) handleCustomerPayment(w http.ResponseWriter, r *http.Request) {
+	alyanteCustomerID := r.PathValue("alyanteCustomerId")
+	if alyanteCustomerID == "" {
+		httputil.Error(w, http.StatusBadRequest, "missing_customer_id")
+		return
+	}
+
+	type payment struct {
+		PaymentCode string `json:"payment_code"`
+	}
+	defaultPayment := payment{PaymentCode: "311"}
+
+	// Alyante not configured — return documented fallback
+	if h.deps.Alyante == nil {
+		httputil.JSON(w, http.StatusOK, defaultPayment)
+		return
+	}
+
+	var p payment
+	err := h.deps.Alyante.QueryRowContext(r.Context(),
+		alyanteCustomerPaymentQuery, alyanteCustomerID).Scan(&p.PaymentCode)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		httputil.JSON(w, http.StatusOK, defaultPayment)
+		return
+	}
+	if err != nil {
+		h.dbFailure(w, r, "customer_payment", err)
+		return
+	}
+
+	// Validate that the resolved code exists in the selectable payment methods list;
+	// otherwise the frontend SingleSelect would silently fall back to its placeholder.
+	if !h.requireMistra(w) {
+		return
+	}
+	var exists bool
+	err = h.deps.Mistra.QueryRowContext(r.Context(),
+		`SELECT EXISTS(SELECT 1 FROM loader.erp_metodi_pagamento
+		               WHERE RTRIM(cod_pagamento) = $1)`,
+		p.PaymentCode).Scan(&exists)
+	if err != nil || !exists {
+		httputil.JSON(w, http.StatusOK, defaultPayment)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, p)
 }
 
 func (h *Handler) handleQuotePaymentMethods(w http.ResponseWriter, r *http.Request) {

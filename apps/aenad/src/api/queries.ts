@@ -282,6 +282,15 @@ export function useQuotePaymentMethods() {
   });
 }
 
+export function useCustomerPayment(alyanteCustomerId: string | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...aenadQuoteKeys.all, 'customer-payment', alyanteCustomerId] as const,
+    queryFn: () => api.get<{ payment_code: string }>(`/aenad/v1/customer-payment/${alyanteCustomerId}`),
+    enabled: alyanteCustomerId !== null && alyanteCustomerId !== '',
+  });
+}
+
 export function useQuoteDefaults() {
   const api = useApiClient();
   return useQuery({
