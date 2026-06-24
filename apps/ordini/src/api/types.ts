@@ -62,6 +62,8 @@ export interface OrderDetail extends OrderSummary {
   data_decorrenza: string | null;
   cdlan_tacito_rin_in_pdf: string | null;
   origin_cod_termini_pag: string | null;
+  payment_method_label: string | null;
+  origin_payment_method_label: string | null;
   is_arxivar: number | null;
   origin?: OrderOrigin;
 }

@@ -69,8 +69,10 @@ type OrderDetail struct {
 	ProfileSDI              *string      `json:"profile_sdi"`
 	DataDecorrenza          NullDate     `json:"data_decorrenza"`
 	CdlanTacitoRinInPDF     *string      `json:"cdlan_tacito_rin_in_pdf"`
-	OriginCodTerminiPag     *string      `json:"origin_cod_termini_pag"`
-	IsArxivar               *int64       `json:"is_arxivar"`
+	OriginCodTerminiPag       *string      `json:"origin_cod_termini_pag"`
+	PaymentMethodLabel        *string      `json:"payment_method_label,omitempty"`
+	OriginPaymentMethodLabel  *string      `json:"origin_payment_method_label,omitempty"`
+	IsArxivar                 *int64       `json:"is_arxivar"`
 	Origin                  *OrderOrigin `json:"origin,omitempty"`
 }
 

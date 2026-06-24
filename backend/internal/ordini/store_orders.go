@@ -1,6 +1,7 @@
 package ordini
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log/slog"
@@ -188,7 +189,35 @@ LIMIT 1`, id)
 	); err != nil {
 		return nil, err
 	}
+
+	// Resolve payment method labels from Mistra PG (loader.erp_metodi_pagamento).
+	// Non-filtered: decode any code, even if no longer selectable.
+	if h.deps.Mistra != nil {
+		if order.CdlanCodTerminiPag != nil && *order.CdlanCodTerminiPag != "" {
+			label, err := h.paymentMethodLabel(r.Context(), *order.CdlanCodTerminiPag)
+			if err == nil && label != "" {
+				order.PaymentMethodLabel = &label
+			}
+		}
+		if order.OriginCodTerminiPag != nil && *order.OriginCodTerminiPag != "" {
+			label, err := h.paymentMethodLabel(r.Context(), *order.OriginCodTerminiPag)
+			if err == nil && label != "" {
+				order.OriginPaymentMethodLabel = &label
+			}
+		}
+	}
+
 	return &order, nil
+}
+
+func (h *Handler) paymentMethodLabel(ctx context.Context, code string) (string, error) {
+	var label string
+	err := h.deps.Mistra.QueryRowContext(ctx,
+		`SELECT desc_pagamento FROM loader.erp_metodi_pagamento WHERE cod_pagamento = $1`, code).Scan(&label)
+	if err != nil {
+		return "", err
+	}
+	return label, nil
 }
 
 func (h *Handler) handleListOrders(w http.ResponseWriter, r *http.Request) {

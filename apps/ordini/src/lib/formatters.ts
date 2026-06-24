@@ -128,6 +128,19 @@ export function formatServiceTypes(serviceType: string | null | undefined, isCol
   return formatEmpty(serviceType);
 }
 
+export function formatPaymentMethod(code: string | null | undefined, label: string | null | undefined): string {
+  const codeStr = formatEmpty(code);
+  if (!label || label === '—') return codeStr;
+  return `${label} (${codeStr})`;
+}
+
+export function formatCurrency(value: string | null | undefined): string {
+  if (!value || value === '—') return '—';
+  const normalized = value.toUpperCase();
+  if (normalized === 'EURO' || normalized === 'EUR') return 'Euro (EUR)';
+  return normalized;
+}
+
 export function orderCode(ndoc: string | null | undefined, anno: number | null | undefined): string {
   if (!ndoc && !anno) return '—';
   if (!ndoc) return String(anno);

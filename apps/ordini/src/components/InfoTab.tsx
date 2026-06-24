@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Icon } from '@mrsmith/ui';
 import type { CustomerRef, OrderDetail, SendToERPResponse, UpdateHeaderPayload } from '../api/types';
-import { dateInputValue, formatDate, formatDurRin, formatEmpty, formatFatturazione, formatFatturazioneAtt, formatSiNo, formatTipoDoc, formatTipoProposta } from '../lib/formatters';
+import { dateInputValue, formatCurrency, formatDate, formatDurRin, formatEmpty, formatFatturazione, formatFatturazioneAtt, formatPaymentMethod, formatSiNo, formatTipoDoc, formatTipoProposta } from '../lib/formatters';
 import { CustomerSelect } from './CustomerSelect';
 import { SendToErpResultPanel } from './SendToErpResultPanel';
 import styles from '../pages/OrderDetailPage.module.css';
@@ -97,7 +97,7 @@ export function InfoTab({
           <div className={styles.infoGroup}>
             <h3 className={styles.infoGroupTitle}>Condizioni & Fatturazione</h3>
             <div className={styles.factGrid8}>
-              <Field label="Condizioni pagamento" value={order.cdlan_cod_termini_pag} mono span={2} />
+              <Field label="Condizioni pagamento" value={formatPaymentMethod(order.cdlan_cod_termini_pag, order.payment_method_label)} mono span={2} />
               <Field label="Fatturazione canoni" value={formatFatturazione(order.cdlan_int_fatturazione)} span={2} />
               <Field label="Fatturazione attivazione" value={formatFatturazioneAtt(order.cdlan_int_fatturazione_att)} span={2} />
               <Field label="Durata servizio (Mesi)" value={order.cdlan_durata_servizio} span={2} />
@@ -105,6 +105,7 @@ export function InfoTab({
               <Field label="Durata rinnovo" value={formatDurRin(order.cdlan_dur_rin)} span={2} />
               <Field label="Giorni rilascio" value={order.cdlan_tempi_ril} span={1} />
               <Field label="Data decorrenza" value={formatDate(order.data_decorrenza)} span={2} />
+              <Field label="Valuta" value={formatCurrency(order.cdlan_valuta)} span={1} />
               <Field label="Note legali" value={order.cdlan_note} span={8} collapsible />
             </div>
           </div>
