@@ -205,7 +205,8 @@ func (h *Handler) forwardArakAfterSuccess(w http.ResponseWriter, r *http.Request
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	if resp.StatusCode == http.StatusUnauthorized {
+		h.requestLogger(r, "proxy_to_arak", "upstream_path", path, "upstream_status", resp.StatusCode).Warn("upstream rejected with auth failure")
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "Autorizzazione verso il servizio RDA non riuscita",
 			"code":  codeUpstreamAuthFailed,
@@ -253,7 +254,8 @@ func (h *Handler) forwardArakPOList(w http.ResponseWriter, r *http.Request, path
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	if resp.StatusCode == http.StatusUnauthorized {
+		h.requestLogger(r, "proxy_to_arak", "upstream_path", path, "upstream_status", resp.StatusCode).Warn("upstream rejected with auth failure")
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "Autorizzazione verso il servizio RDA non riuscita",
 			"code":  codeUpstreamAuthFailed,
@@ -301,6 +303,13 @@ func (h *Handler) writeUpstreamRejected(w http.ResponseWriter, r *http.Request, 
 
 	parsedBody := parseUpstreamRejectionBody(body)
 	message := upstreamRejectionMessage(parsedBody)
+
+	h.requestLogger(r, "proxy_to_arak",
+		"upstream_path", upstreamPathWithQuery(path, rawQuery),
+		"upstream_status", resp.StatusCode,
+		"upstream_message", message,
+	).Warn("upstream rejected request")
+
 	contentType := resp.Header.Get("Content-Type")
 
 	httputil.JSON(w, resp.StatusCode, map[string]any{
@@ -402,7 +411,7 @@ func (h *Handler) handleArticles(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var statusErr *upstreamStatusError
 		if errors.As(err, &statusErr) {
-			if statusErr.status == http.StatusUnauthorized || statusErr.status == http.StatusForbidden {
+			if statusErr.status == http.StatusUnauthorized {
 				httputil.JSON(w, http.StatusBadGateway, map[string]string{
 					"error": "Autorizzazione verso il servizio RDA non riuscita",
 					"code":  codeUpstreamAuthFailed,
@@ -520,7 +529,7 @@ func (h *Handler) handleGetPO(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	if resp.StatusCode == http.StatusUnauthorized {
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "Autorizzazione verso il servizio RDA non riuscita",
 			"code":  codeUpstreamAuthFailed,
@@ -882,7 +891,7 @@ func (h *Handler) handleFetchPOError(w http.ResponseWriter, r *http.Request, err
 			httputil.Error(w, http.StatusNotFound, "Richiesta non disponibile")
 			return
 		}
-		if upstream.status == http.StatusUnauthorized || upstream.status == http.StatusForbidden {
+		if upstream.status == http.StatusUnauthorized {
 			httputil.JSON(w, http.StatusBadGateway, map[string]string{
 				"error": "Autorizzazione verso il servizio RDA non riuscita",
 				"code":  codeUpstreamAuthFailed,

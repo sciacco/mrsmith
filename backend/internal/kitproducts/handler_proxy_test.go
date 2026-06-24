@@ -98,34 +98,57 @@ func TestHandleProxyMistraKitReturnsBadGatewayOnTransportFailure(t *testing.T) {
 }
 
 func TestHandleProxyMistraKitReturnsBadGatewayOnUpstreamAuthFailure(t *testing.T) {
-	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden} {
-		t.Run(http.StatusText(status), func(t *testing.T) {
-			upstream := httptest.NewRecorder()
-			upstream.Header().Set("Content-Type", "application/json")
-			upstream.WriteHeader(status)
-			upstream.WriteString(`{"error":"auth failed"}`)
+	t.Run("Unauthorized", func(t *testing.T) {
+		upstream := httptest.NewRecorder()
+		upstream.Header().Set("Content-Type", "application/json")
+		upstream.WriteHeader(http.StatusUnauthorized)
+		upstream.WriteString(`{"error":"auth failed"}`)
 
-			h := &Handler{
-				arak: &stubArakClient{
-					resp: upstream.Result(),
-				},
-			}
-			req := httptest.NewRequest(http.MethodGet, "/kit-products/v1/mistra/kit", nil)
-			rec := httptest.NewRecorder()
+		h := &Handler{
+			arak: &stubArakClient{
+				resp: upstream.Result(),
+			},
+		}
+		req := httptest.NewRequest(http.MethodGet, "/kit-products/v1/mistra/kit", nil)
+		rec := httptest.NewRecorder()
 
-			h.handleProxyMistraKit(rec, req)
+		h.handleProxyMistraKit(rec, req)
 
-			if rec.Code != http.StatusBadGateway {
-				t.Fatalf("expected 502, got %d", rec.Code)
-			}
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("expected 502, got %d", rec.Code)
+		}
 
-			var body map[string]string
-			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-				t.Fatalf("failed to decode response: %v", err)
-			}
-			if body["code"] != upstreamAuthFailedCode {
-				t.Fatalf("unexpected response body: %#v", body)
-			}
-		})
-	}
+		var body map[string]string
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if body["code"] != upstreamAuthFailedCode {
+			t.Fatalf("unexpected response body: %#v", body)
+		}
+	})
+
+	t.Run("Forbidden", func(t *testing.T) {
+		upstream := httptest.NewRecorder()
+		upstream.Header().Set("Content-Type", "application/json")
+		upstream.WriteHeader(http.StatusForbidden)
+		upstream.WriteString(`{"error":"forbidden"}`)
+
+		h := &Handler{
+			arak: &stubArakClient{
+				resp: upstream.Result(),
+			},
+		}
+		req := httptest.NewRequest(http.MethodGet, "/kit-products/v1/mistra/kit", nil)
+		rec := httptest.NewRecorder()
+
+		h.handleProxyMistraKit(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("expected 403, got %d", rec.Code)
+		}
+
+		if body := rec.Body.String(); body != `{"error":"forbidden"}` {
+			t.Fatalf("unexpected response body: %q", body)
+		}
+	})
 }

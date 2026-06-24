@@ -113,7 +113,7 @@ func proxyToArak(w http.ResponseWriter, r *http.Request, arakPath string) {
 }
 
 func isUpstreamAuthFailure(status int) bool {
-	return status == http.StatusUnauthorized || status == http.StatusForbidden
+	return status == http.StatusUnauthorized
 }
 
 func translateUpstreamAuthFailure(w http.ResponseWriter, status int) bool {

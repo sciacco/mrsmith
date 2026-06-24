@@ -82,7 +82,7 @@ func (h *Handler) handleClonePO(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if createResponse.status == http.StatusUnauthorized || createResponse.status == http.StatusForbidden {
+	if createResponse.status == http.StatusUnauthorized {
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "Autorizzazione verso il servizio RDA non riuscita",
 			"code":  codeUpstreamAuthFailed,

@@ -161,7 +161,7 @@ func (h *Handler) createRowUpstream(email string, poID string, body io.Reader) (
 }
 
 func (h *Handler) writeCreateRowResponse(w http.ResponseWriter, r *http.Request, response upstreamBodyResponse) {
-	if response.status == http.StatusUnauthorized || response.status == http.StatusForbidden {
+	if response.status == http.StatusUnauthorized {
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "Autorizzazione verso il servizio RDA non riuscita",
 			"code":  codeUpstreamAuthFailed,
@@ -366,7 +366,7 @@ func (h *Handler) handleReplaceRow(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if createResponse.status == http.StatusUnauthorized || createResponse.status == http.StatusForbidden {
+	if createResponse.status == http.StatusUnauthorized {
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "Autorizzazione verso il servizio RDA non riuscita",
 			"code":  codeUpstreamAuthFailed,
@@ -635,7 +635,7 @@ func (h *Handler) postCommentUpstream(email string, poID string, body io.Reader)
 
 func (h *Handler) writePostCommentResponse(w http.ResponseWriter, r *http.Request, response upstreamBodyResponse, after func(commentID string)) {
 	path := arakRDARoot + "/po/" + url.PathEscape(r.PathValue("id")) + "/comment"
-	if response.status == http.StatusUnauthorized || response.status == http.StatusForbidden {
+	if response.status == http.StatusUnauthorized {
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "Autorizzazione verso il servizio RDA non riuscita",
 			"code":  codeUpstreamAuthFailed,

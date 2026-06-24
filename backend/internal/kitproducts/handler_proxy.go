@@ -50,7 +50,7 @@ func (h *Handler) proxyToArak(w http.ResponseWriter, r *http.Request, upstreamPa
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	if resp.StatusCode == http.StatusUnauthorized {
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "upstream authorization failed",
 			"code":  upstreamAuthFailedCode,

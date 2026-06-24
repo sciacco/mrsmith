@@ -324,7 +324,7 @@ func (h *Handler) forwardArak(w http.ResponseWriter, r *http.Request, path, rawQ
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	if resp.StatusCode == http.StatusUnauthorized {
 		httputil.JSON(w, http.StatusBadGateway, map[string]string{
 			"error": "Autorizzazione verso il servizio fornitori non riuscita",
 			"code":  "UPSTREAM_AUTH_FAILED",
