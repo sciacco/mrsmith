@@ -85,12 +85,28 @@ func TestDraftStrategyUsesAtecoToolWhitelist(t *testing.T) {
 	}}
 	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, ateco, nil, &fakeMALLMProvider{ai: ai})
 
-	strategy, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "", "", "")
+	strategy, audit, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "", "", "")
 	if err != nil {
 		t.Fatalf("draftStrategy returned error: %v", err)
 	}
 	if len(ai.requests) != 2 {
 		t.Fatalf("ai requests = %d, want 2", len(ai.requests))
+	}
+	// The audit request must mirror the final wire payload across the tool loop:
+	// provider model string + the accumulated conversation (system+developer+user,
+	// plus the assistant tool-call turn and tool result).
+	var auditReq struct {
+		Model    string        `json:"model"`
+		Messages []llm.Message `json:"messages"`
+	}
+	if err := json.Unmarshal(audit.Request, &auditReq); err != nil {
+		t.Fatalf("audit.Request is not valid JSON: %v (%s)", err, string(audit.Request))
+	}
+	if auditReq.Model != "test-model" {
+		t.Fatalf("audit.Request model = %q, want provider model string %q", auditReq.Model, "test-model")
+	}
+	if len(auditReq.Messages) < 5 {
+		t.Fatalf("audit.Request messages = %d, want the full accumulated tool-loop conversation", len(auditReq.Messages))
 	}
 	if !hasTool(ai.requests[0].Tools, maAtecoToolName) || !hasTool(ai.requests[0].Tools, maProvinceRegionToolName) || !hasTool(ai.requests[0].Tools, maCompanySurfaceToolName) {
 		t.Fatalf("first request tools = %#v, want ateco, province, and surface tools", ai.requests[0].Tools)
@@ -134,6 +150,51 @@ func TestDraftStrategyRejectsAtecoOutsideToolWhitelist(t *testing.T) {
 	_, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "", "", "")
 	if !errors.Is(err, errMAStrategyInvalid) {
 		t.Fatalf("err = %v, want errMAStrategyInvalid", err)
+	}
+}
+
+// TestScoreWebSearchResultsAuditRequest guards the llm_call_audit contract: the
+// request snapshot (model_id + messages) must be recorded, not left empty. This
+// is the regression that left request = {} in the audit table.
+func TestScoreWebSearchResultsAuditRequest(t *testing.T) {
+	ai := &fakeMAAI{responses: []llm.ChatResponse{
+		{Content: `{"scores":[{"i":0,"score":90},{"i":1,"score":40}]}`},
+	}}
+	provider := &fakeMALLMProvider{ai: ai}
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, nil, nil, provider)
+
+	results := []WebSearchResult{
+		{Title: "Data center Milano", URL: "https://x.it/dc", Hostname: "x.it", Snippets: []string{"datacenter tier IV"}},
+		{Title: "Chi siamo", URL: "https://x.it/about", Hostname: "x.it", Snippets: []string{"storia azienda"}},
+	}
+	scores, err := service.scoreWebSearchResults(context.Background(), "data center", results, "sub-1", "user@x.it")
+	if err != nil {
+		t.Fatalf("scoreWebSearchResults returned error: %v", err)
+	}
+	if scores[0] != 90 || scores[1] != 40 {
+		t.Fatalf("scores = %#v, want {0:90, 1:40}", scores)
+	}
+	if len(provider.audits) != 1 {
+		t.Fatalf("recorded audits = %d, want 1", len(provider.audits))
+	}
+	audit := provider.audits[0]
+	if len(audit.Request) == 0 || string(audit.Request) == "{}" {
+		t.Fatalf("audit.Request = %q, want a populated request snapshot", string(audit.Request))
+	}
+	// request must mirror the wire payload: the provider model string (not our FK)
+	// and the messages actually sent.
+	var req struct {
+		Model    string        `json:"model"`
+		Messages []llm.Message `json:"messages"`
+	}
+	if err := json.Unmarshal(audit.Request, &req); err != nil {
+		t.Fatalf("audit.Request is not valid JSON: %v (%s)", err, string(audit.Request))
+	}
+	if req.Model != "test-model" {
+		t.Fatalf("audit.Request model = %q, want provider model string %q", req.Model, "test-model")
+	}
+	if len(req.Messages) != 2 {
+		t.Fatalf("audit.Request messages = %d, want 2 (system+user)", len(req.Messages))
 	}
 }
 
@@ -796,7 +857,8 @@ func (f *fakeMAAI) Chat(_ context.Context, req llm.ChatRequest) (llm.ChatRespons
 // fakeMALLMProvider implements maLLMProvider for tests: canned model/prompt and
 // a fakeMAAI as the per-call chat client.
 type fakeMALLMProvider struct {
-	ai *fakeMAAI
+	ai     *fakeMAAI
+	audits []llm.CallAudit
 }
 
 func (f *fakeMALLMProvider) ResolveModel(_ context.Context, scope, _ string) (llm.Model, error) {
@@ -814,7 +876,10 @@ func (f *fakeMALLMProvider) ClientForModel(context.Context, llm.Model) (maAIClie
 	return f.ai, nil
 }
 
-func (f *fakeMALLMProvider) RecordAudit(context.Context, llm.CallAudit) error { return nil }
+func (f *fakeMALLMProvider) RecordAudit(_ context.Context, a llm.CallAudit) error {
+	f.audits = append(f.audits, a)
+	return nil
+}
 
 func (f *fakeMALLMProvider) ListModels(context.Context) ([]llm.Model, error) { return nil, nil }
 

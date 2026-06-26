@@ -63,6 +63,22 @@ func (m Model) DecodedParams() Params {
 	return p
 }
 
+// RawParams returns Model.Params as a dynamic map, so callers can forward arbitrary
+// provider sampling parameters (temperature, max_tokens, reasoning_effort, top_p, …)
+// straight from the DB config into ChatRequest.Params — no typed field per key.
+// Empty/invalid yields a non-nil empty map (safe to write call-site defaults into).
+func (m Model) RawParams() map[string]any {
+	out := map[string]any{}
+	if len(m.Params) == 0 {
+		return out
+	}
+	_ = json.Unmarshal(m.Params, &out)
+	if out == nil {
+		out = map[string]any{}
+	}
+	return out
+}
+
 const modelColumns = `id::text, app, scope, provider_id::text, name, model, params, supports_tools, supports_json_mode, is_default`
 const promptColumns = `id::text, app, scope, name, prompt, is_default`
 

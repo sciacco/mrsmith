@@ -200,29 +200,30 @@ func (s *maService) scoreWebSearchResults(ctx context.Context, terms string, res
 		return nil, err
 	}
 
-	params := model.DecodedParams()
-	temperature := 0.0
-	if params.Temperature != nil {
-		temperature = *params.Temperature
-	}
-	maxTokens := webSearchScoreMaxToken
-	if params.MaxTokens != nil {
-		maxTokens = *params.MaxTokens
+	// Sampling params are dynamic, sourced from the model's DB config; the scope's
+	// default max_tokens applies only when the config omits it.
+	reqParams := model.RawParams()
+	if _, ok := reqParams["max_tokens"]; !ok {
+		reqParams["max_tokens"] = webSearchScoreMaxToken
 	}
 
-	resp, chatErr := client.Chat(ctx, llm.ChatRequest{
+	chatReq := llm.ChatRequest{
 		Model:          model.Model,
-		Temperature:    temperature,
-		MaxTokens:      maxTokens,
+		Params:         reqParams,
 		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
 		Messages: []llm.Message{
 			{Role: "system", Content: prompt.Prompt},
 			{Role: "user", Content: string(input)},
 		},
-	})
+	}
+	resp, chatErr := client.Chat(ctx, chatReq)
 
-	// Best-effort audit (mirrors buildMADeepBriefLLM).
+	// Best-effort audit. request is the exact wire body (BuildRequestBody = what Chat
+	// sends), so dynamic params (temperature, max_tokens, reasoning_effort, …) are
+	// recorded faithfully. Internal FKs live in the model_id/prompt_id columns.
 	usageRaw, _ := json.Marshal(resp.Usage)
+	requestBody, _ := llm.BuildRequestBody(chatReq)
+	requestRaw, _ := json.Marshal(requestBody)
 	audit := llm.CallAudit{
 		App:          maApp,
 		Scope:        maModelScopeWebSearchScorer,
@@ -230,6 +231,7 @@ func (s *maService) scoreWebSearchResults(ctx context.Context, terms string, res
 		ModelID:      model.ID,
 		PromptID:     prompt.ID,
 		Model:        model.Model,
+		Request:      requestRaw,
 		Usage:        usageRaw,
 		ActorSubject: subject,
 		ActorEmail:   email,
@@ -246,14 +248,20 @@ func (s *maService) scoreWebSearchResults(ctx context.Context, terms string, res
 		return nil, chatErr
 	}
 
+	// The model may wrap the JSON in prose, markdown fences, or a reasoning block;
+	// extract the object before parsing, and surface the raw content on failure.
+	content := extractJSONObject(resp.Content)
+	if content == "" {
+		return nil, fmt.Errorf("scorer returned non-JSON content: %s", truncateRunes(strings.TrimSpace(resp.Content), 200))
+	}
 	var parsed struct {
 		Scores []struct {
 			I     int `json:"i"`
 			Score int `json:"score"`
 		} `json:"scores"`
 	}
-	if err := json.Unmarshal([]byte(resp.Content), &parsed); err != nil {
-		return nil, err
+	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+		return nil, fmt.Errorf("scorer JSON parse: %w (content: %s)", err, truncateRunes(strings.TrimSpace(resp.Content), 200))
 	}
 	out := make(map[int]int, len(parsed.Scores))
 	for _, sc := range parsed.Scores {
@@ -276,6 +284,31 @@ func scoreOf(r WebSearchResult) int {
 		return -1
 	}
 	return *r.Score
+}
+
+// extractJSONObject pulls the JSON object out of an LLM response that may wrap it in
+// markdown fences, a <think> reasoning block, or surrounding prose. Returns "" when
+// no object is present.
+func extractJSONObject(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.Index(s, "</think>"); i >= 0 {
+		s = s[i+len("</think>"):]
+	}
+	if i := strings.Index(s, "```"); i >= 0 {
+		rest := s[i+3:]
+		rest = strings.TrimPrefix(rest, "json")
+		rest = strings.TrimPrefix(rest, "JSON")
+		if j := strings.Index(rest, "```"); j >= 0 {
+			rest = rest[:j]
+		}
+		s = rest
+	}
+	start := strings.Index(s, "{")
+	end := strings.LastIndex(s, "}")
+	if start < 0 || end < 0 || end < start {
+		return ""
+	}
+	return s[start : end+1]
 }
 
 func truncateRunes(s string, max int) string {

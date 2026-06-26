@@ -75,5 +75,5 @@ func (s *Service) ClientForModel(ctx context.Context, m Model) (*Client, Provide
 	for k, v := range p.DefaultHeaders {
 		opts = append(opts, option.WithHeader(k, v))
 	}
-	return &Client{sdk: openai.NewClient(opts...)}, p, nil
+	return &Client{sdk: openai.NewClient(opts...), label: p.Name}, p, nil
 }

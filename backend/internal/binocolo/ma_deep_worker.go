@@ -225,28 +225,28 @@ func buildMADeepBriefLLM(ctx context.Context, llmp maLLMProvider, model llm.Mode
 	if err != nil {
 		return nil, err
 	}
-	params := model.DecodedParams()
-	temperature := 0.0
-	if params.Temperature != nil {
-		temperature = *params.Temperature
+	// Sampling params are dynamic, from the model's DB config; the scope default
+	// max_tokens applies only when the config omits it.
+	reqParams := model.RawParams()
+	if _, ok := reqParams["max_tokens"]; !ok {
+		reqParams["max_tokens"] = 2200
 	}
-	maxTokens := 2200
-	if params.MaxTokens != nil {
-		maxTokens = *params.MaxTokens
-	}
-	resp, chatErr := client.Chat(ctx, llm.ChatRequest{
+	chatReq := llm.ChatRequest{
 		Model:          model.Model,
-		Temperature:    temperature,
-		MaxTokens:      maxTokens,
+		Params:         reqParams,
 		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
 		Messages: []llm.Message{
 			{Role: "system", Content: prompt.Prompt},
 			{Role: "user", Content: string(input)},
 		},
-	})
+	}
+	resp, chatErr := client.Chat(ctx, chatReq)
 	// Best-effort audit: this runs per-row in a batch, so a failed audit must not
-	// abort brief generation.
+	// abort brief generation. request is the exact wire body (BuildRequestBody),
+	// so dynamic params are recorded faithfully; FKs live in their own columns.
 	usageRaw, _ := json.Marshal(resp.Usage)
+	requestBody, _ := llm.BuildRequestBody(chatReq)
+	requestRaw, _ := json.Marshal(requestBody)
 	audit := llm.CallAudit{
 		App:        maApp,
 		Scope:      maModelScopeDeepBrief,
@@ -254,6 +254,7 @@ func buildMADeepBriefLLM(ctx context.Context, llmp maLLMProvider, model llm.Mode
 		ModelID:    model.ID,
 		PromptID:   prompt.ID,
 		Model:      model.Model,
+		Request:    requestRaw,
 		Usage:      usageRaw,
 	}
 	if chatErr != nil {

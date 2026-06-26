@@ -14,7 +14,16 @@ import (
 )
 
 type Client struct {
-	sdk openai.Client
+	sdk   openai.Client
+	label string // provider name for error messages; falls back to "llm"
+}
+
+// name returns the provider label used in error messages.
+func (c *Client) name() string {
+	if c != nil && strings.TrimSpace(c.label) != "" {
+		return c.label
+	}
+	return "llm"
 }
 
 type Message struct {
@@ -51,10 +60,18 @@ type ToolCallFunction struct {
 }
 
 type ChatRequest struct {
-	Model          string          `json:"model"`
-	Messages       []Message       `json:"messages"`
-	Temperature    float64         `json:"temperature,omitempty"`
-	MaxTokens      int             `json:"max_tokens,omitempty"`
+	Model    string    `json:"model"`
+	Messages []Message `json:"messages"`
+	// Temperature / MaxTokens are explicit overrides for callers without a model
+	// params bag (e.g. a bare model string). Model-backed callers should instead pass
+	// the dynamic Params bag below, which carries arbitrary provider sampling params.
+	Temperature float64 `json:"temperature,omitempty"`
+	MaxTokens   int     `json:"max_tokens,omitempty"`
+	// Params are dynamic provider sampling parameters sourced verbatim from
+	// llm_model.params (temperature, max_tokens, reasoning_effort, top_p, …). They are
+	// merged into the request body by BuildRequestBody, so a new knob needs no Go
+	// change — only the model's DB config. Not a wire field itself (it is flattened).
+	Params         map[string]any  `json:"-"`
 	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
 	Tools          []Tool          `json:"tools,omitempty"`
 	ToolChoice     any             `json:"tool_choice,omitempty"`
@@ -75,12 +92,17 @@ type ChatResponse struct {
 }
 
 type APIError struct {
+	Provider   string
 	StatusCode int
 	Body       string
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("openrouter: HTTP %d: %s", e.StatusCode, e.Body)
+	provider := strings.TrimSpace(e.Provider)
+	if provider == "" {
+		provider = "llm"
+	}
+	return fmt.Sprintf("%s: HTTP %d: %s", provider, e.StatusCode, e.Body)
 }
 
 func NewWithBaseURL(apiKey, baseURL string, httpCli *http.Client) *Client {
@@ -104,9 +126,9 @@ func NewWithBaseURL(apiKey, baseURL string, httpCli *http.Client) *Client {
 }
 
 func (c *Client) Chat(ctx context.Context, reqBody ChatRequest) (ChatResponse, error) {
-	params, err := buildChatCompletionParams(reqBody)
+	params, err := BuildRequestBody(reqBody)
 	if err != nil {
-		return ChatResponse{}, fmt.Errorf("openrouter: build request: %w", err)
+		return ChatResponse{}, fmt.Errorf("%s: build request: %w", c.name(), err)
 	}
 
 	var decoded struct {
@@ -123,12 +145,12 @@ func (c *Client) Chat(ctx context.Context, reqBody ChatRequest) (ChatResponse, e
 	if err := c.sdk.Post(ctx, "chat/completions", params, &decoded); err != nil {
 		var apiErr *openai.Error
 		if errors.As(err, &apiErr) {
-			return ChatResponse{}, &APIError{StatusCode: apiErr.StatusCode, Body: errorBody(apiErr)}
+			return ChatResponse{}, &APIError{Provider: c.name(), StatusCode: apiErr.StatusCode, Body: errorBody(apiErr)}
 		}
-		return ChatResponse{}, fmt.Errorf("openrouter: request failed: %w", err)
+		return ChatResponse{}, fmt.Errorf("%s: request failed: %w", c.name(), err)
 	}
 	if len(decoded.Choices) == 0 {
-		return ChatResponse{}, fmt.Errorf("openrouter: missing choices")
+		return ChatResponse{}, fmt.Errorf("%s: missing choices", c.name())
 	}
 
 	content, err := flattenContent(decoded.Choices[0].Message.Content)
@@ -145,7 +167,19 @@ func (c *Client) Chat(ctx context.Context, reqBody ChatRequest) (ChatResponse, e
 	}, nil
 }
 
-func buildChatCompletionParams(reqBody ChatRequest) (map[string]any, error) {
+// bodyStructuralKeys are set explicitly from typed ChatRequest fields and must
+// never be overridden by the dynamic Params bag.
+var bodyStructuralKeys = map[string]struct{}{
+	"model": {}, "messages": {}, "response_format": {}, "tools": {}, "tool_choice": {},
+}
+
+// BuildRequestBody assembles the chat/completions request body. Structural fields
+// come from typed ChatRequest fields; the dynamic Params bag (from llm_model.params)
+// is merged on top so DB-configured sampling params (temperature, max_tokens,
+// reasoning_effort, …) are forwarded verbatim without a Go change per key. The
+// returned map is exactly what goes on the wire, so callers also use it to record a
+// faithful audit request.
+func BuildRequestBody(reqBody ChatRequest) (map[string]any, error) {
 	params := map[string]any{
 		"model":    reqBody.Model,
 		"messages": make([]map[string]any, 0, len(reqBody.Messages)),
@@ -173,6 +207,13 @@ func buildChatCompletionParams(reqBody ChatRequest) (map[string]any, error) {
 	}
 	if reqBody.ToolChoice != nil {
 		params["tool_choice"] = reqBody.ToolChoice
+	}
+	// Dynamic params win for sampling keys; structural keys are protected.
+	for k, v := range reqBody.Params {
+		if _, structural := bodyStructuralKeys[k]; structural {
+			continue
+		}
+		params[k] = v
 	}
 	return params, nil
 }
@@ -232,10 +273,10 @@ func flattenContent(value any) (string, error) {
 			}
 		}
 		if len(parts) == 0 {
-			return "", fmt.Errorf("openrouter: empty content array")
+			return "", fmt.Errorf("llm: empty content array")
 		}
 		return strings.Join(parts, "\n"), nil
 	default:
-		return "", fmt.Errorf("openrouter: unsupported content type %T", value)
+		return "", fmt.Errorf("llm: unsupported content type %T", value)
 	}
 }

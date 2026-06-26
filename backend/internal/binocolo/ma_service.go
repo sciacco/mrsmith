@@ -1166,14 +1166,11 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 	if err != nil {
 		return MAStrategySpec{}, llm.CallAudit{}, llmConfigError(err)
 	}
-	params := modelConfig.DecodedParams()
-	temperature := 0.0
-	if params.Temperature != nil {
-		temperature = *params.Temperature
-	}
-	maxTokens := 1800
-	if params.MaxTokens != nil {
-		maxTokens = *params.MaxTokens
+	// Sampling params are dynamic, from the model's DB config; the scope default
+	// max_tokens applies only when the config omits it.
+	reqParams := modelConfig.RawParams()
+	if _, ok := reqParams["max_tokens"]; !ok {
+		reqParams["max_tokens"] = 1800
 	}
 	if err := s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_strategy_draft_config",
@@ -1200,11 +1197,11 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 	tools := []llm.Tool{maAtecoSearchTool(), maProvinceRegionTool(), maCompanySurfaceProbeTool()}
 	var response llm.ChatResponse
 	var responseRaw json.RawMessage
+	var req llm.ChatRequest
 	for round := 0; round <= maMaxToolRounds; round++ {
-		req := llm.ChatRequest{
+		req = llm.ChatRequest{
 			Model:          modelConfig.Model,
-			Temperature:    temperature,
-			MaxTokens:      maxTokens,
+			Params:         reqParams,
 			ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
 			Messages:       messages,
 			Tools:          tools,
@@ -1335,12 +1332,12 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 		return MAStrategySpec{}, llm.CallAudit{}, err
 	}
 	usageRaw, _ := json.Marshal(response.Usage)
-	promptRaw, _ := json.Marshal(map[string]any{
-		"model_id":  modelConfig.ID,
-		"prompt_id": promptConfig.ID,
-		"messages":  messages,
-		"tools":     tools,
-	})
+	// request is the exact wire body of the final call (BuildRequestBody = what Chat
+	// sends). messages grow across tool rounds and the loop breaks on the no-tool-call
+	// response, so the last req carries the whole exchange (provider model + full
+	// conversation + tools + dynamic params). FKs live in their own columns.
+	requestBody, _ := llm.BuildRequestBody(req)
+	requestRaw, _ := json.Marshal(requestBody)
 	return strategy, llm.CallAudit{
 		App:          maApp,
 		Scope:        maModelScopeStrategy,
@@ -1348,7 +1345,7 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 		ModelID:      modelConfig.ID,
 		PromptID:     promptConfig.ID,
 		Model:        modelConfig.Model,
-		Request:      promptRaw,
+		Request:      requestRaw,
 		Response:     responseRaw,
 		Usage:        usageRaw,
 		ActorSubject: subject,
