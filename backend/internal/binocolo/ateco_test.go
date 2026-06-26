@@ -867,6 +867,14 @@ func (f *fakeMAWorkspaceStore) MarkMASessionExecuting(context.Context, string) e
 	return errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) HasRunningMAExecution(context.Context, string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) AbandonMASessionExecution(context.Context, string, string) error {
+	return errors.New("not implemented")
+}
+
 func (f *fakeMAWorkspaceStore) CreateMAExecutionRun(context.Context, maExecutionRunCreate) (MAExecutionRun, error) {
 	return MAExecutionRun{}, errors.New("not implemented")
 }

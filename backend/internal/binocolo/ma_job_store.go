@@ -218,6 +218,58 @@ RETURNING attempts
 	return attempts, nil
 }
 
+// HasRunningMAExecution reports whether the session already has an execution run
+// in flight. The execute worker checks this before creating a run: if a prior
+// attempt created one but never finished (a worker crashed mid-fetch), it must NOT
+// create a second run and re-charge the paid company fetch. Charge-idempotency
+// here does not depend on lease timing — a reclaimer always sees the orphan run.
+func (s *SQLStore) HasRunningMAExecution(ctx context.Context, sessionID string) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	var exists bool
+	if err := s.db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM binocolo.ma_execution_run
+  WHERE session_id = $1::uuid AND status = 'running'
+)`, sessionID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check running ma execution: %w", err)
+	}
+	return exists, nil
+}
+
+// AbandonMASessionExecution fails any in-flight execution run for the session and
+// moves the session out of 'running' into 'failed'. Used when the execute worker
+// finds a run already in flight (a crashed prior attempt) and refuses to re-charge.
+// If the original worker is in fact still alive and finishes, its CompleteMAExecutionRun
+// overwrites this — so the worst case is a transient 'failed' that self-heals, never
+// a double charge.
+func (s *SQLStore) AbandonMASessionExecution(ctx context.Context, sessionID, errorCode string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin abandon ma execution: %w", err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `
+UPDATE binocolo.ma_execution_run
+SET status = 'failed', error_code = $2, completed_at = now()
+WHERE session_id = $1::uuid AND status = 'running'
+`, sessionID, nullString(errorCode)); err != nil {
+		return fmt.Errorf("abandon ma execution run: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+UPDATE binocolo.ma_session
+SET status = 'failed', updated_at = now()
+WHERE id = $1::uuid AND status = 'running'
+`, sessionID); err != nil {
+		return fmt.Errorf("abandon ma session: %w", err)
+	}
+	return tx.Commit()
+}
+
 // MarkMASessionExecuting flips the session into the in-flight 'running' state at
 // execute enqueue, so the UI shows progress and polls immediately (the worker
 // creates the execution run a tick later). Idempotent; skips a no-op write when

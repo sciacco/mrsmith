@@ -722,6 +722,23 @@ func (s *maService) executeJobWork(ctx context.Context, job maJob) error {
 		return err
 	}
 
+	// Charge guard: if a prior attempt already created a run (a worker crashed
+	// mid-fetch and this is a reclaim), do NOT create a second run and re-charge the
+	// paid company fetch. Abandon the orphan; the analyst re-executes deliberately.
+	// Fresh runs and pre-run-failure retries pass this — no run exists yet.
+	inflight, err := s.store.HasRunningMAExecution(ctx, job.SessionID)
+	if err != nil {
+		return err
+	}
+	if inflight {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_execution_abandoned",
+			Status:    maTraceEventFailed,
+			Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "reason": "execution already in flight (worker likely crashed mid-run)"}),
+		})
+		return s.store.AbandonMASessionExecution(ctx, job.SessionID, "execute_interrupted")
+	}
+
 	run, err := s.store.CreateMAExecutionRun(ctx, maExecutionRunCreate{
 		SessionID:         job.SessionID,
 		StrategyVersionID: version.ID,
@@ -731,9 +748,9 @@ func (s *maService) executeJobWork(ctx context.Context, job maJob) error {
 	if err != nil {
 		return err
 	}
-	if err := s.linkTrace(ctx, maTraceLink{SessionID: job.SessionID, StrategyVersionID: version.ID, ExecutionRunID: run.ID}); err != nil {
-		return err
-	}
+	// Best-effort from here: once the run exists, never return an error that would
+	// make the worker retry (and re-charge). Failures below are recorded on the run.
+	_ = s.linkTrace(ctx, maTraceLink{SessionID: job.SessionID, StrategyVersionID: version.ID, ExecutionRunID: run.ID})
 
 	strategy := version.Strategy
 	strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategy, nil, false)

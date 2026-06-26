@@ -25,6 +25,8 @@ type maWorkspaceStore interface {
 	EnqueueMAJob(ctx context.Context, input maJobEnqueue) (bool, error)
 	SetMASessionEstimateStatus(ctx context.Context, sessionID, strategyVersionID, status string) error
 	MarkMASessionExecuting(ctx context.Context, sessionID string) error
+	HasRunningMAExecution(ctx context.Context, sessionID string) (bool, error)
+	AbandonMASessionExecution(ctx context.Context, sessionID, errorCode string) error
 	CreateMAExecutionRun(ctx context.Context, input maExecutionRunCreate) (MAExecutionRun, error)
 	CompleteMAExecutionRun(ctx context.Context, runID, status string, resultCount int, errorCode string) error
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
