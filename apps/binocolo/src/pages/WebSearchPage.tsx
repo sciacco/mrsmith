@@ -256,6 +256,9 @@ export function WebSearchPage() {
               {data.results.length} risultati{data.ranked ? ' · ordinati per rilevanza' : ''} ·{' '}
               <span className={styles.mono}>{data.query}</span>
             </p>
+            {data.rankError ? (
+              <p className={styles.rankWarning}>Ordinamento per rilevanza non disponibile: {data.rankError}</p>
+            ) : null}
             {data.results.map((r, i) => (
               <article key={`${r.url}-${i}`} className={styles.result}>
                 <div className={styles.resultHead}>

@@ -52,6 +52,7 @@ export interface WebSearchResponse {
   query: string;
   count: number;
   ranked: boolean;
+  rankError?: string;
   results: WebSearchResult[];
 }
 

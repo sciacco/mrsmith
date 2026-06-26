@@ -202,6 +202,12 @@
   margin-bottom: var(--space-1);
 }
 
+.rankWarning {
+  font-size: 0.8125rem;
+  color: var(--color-danger);
+  margin: 0 0 var(--space-2);
+}
+
 .result {
   display: flex;
   flex-direction: column;

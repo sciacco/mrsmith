@@ -3,6 +3,7 @@ package binocolo
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
@@ -36,10 +37,11 @@ type WebSearchResult struct {
 }
 
 type WebSearchResponse struct {
-	Query   string            `json:"query"`
-	Count   int               `json:"count"`
-	Ranked  bool              `json:"ranked"` // true when results carry LLM relevance scores
-	Results []WebSearchResult `json:"results"`
+	Query     string            `json:"query"`
+	Count     int               `json:"count"`
+	Ranked    bool              `json:"ranked"`              // true when results carry LLM relevance scores
+	RankError string            `json:"rankError,omitempty"` // set when ranking was requested but failed
+	Results   []WebSearchResult `json:"results"`
 }
 
 const (
@@ -126,10 +128,12 @@ func (h *Handler) handleWebSearch(w http.ResponseWriter, r *http.Request) {
 	// Optional LLM relevance ranking. Best-effort: a scoring failure (e.g. scope not
 	// configured) must never break the search — we just return the Brave order.
 	ranked := false
+	rankErr := ""
 	if body.Rank && len(results) > 0 {
 		subject, email := companySearchRefreshActor(r.Context())
 		scores, scoreErr := h.ma.scoreWebSearchResults(r.Context(), strings.Join(keywords, " "), results, subject, email)
 		if scoreErr != nil {
+			rankErr = scoreErr.Error()
 			logging.FromContext(r.Context()).Warn(
 				"brave web search scoring failed",
 				"component", "binocolo",
@@ -151,10 +155,11 @@ func (h *Handler) handleWebSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.JSON(w, http.StatusOK, WebSearchResponse{
-		Query:   query,
-		Count:   count,
-		Ranked:  ranked,
-		Results: results,
+		Query:     query,
+		Count:     count,
+		Ranked:    ranked,
+		RankError: rankErr,
+		Results:   results,
 	})
 }
 
@@ -256,6 +261,11 @@ func (s *maService) scoreWebSearchResults(ctx context.Context, terms string, res
 			continue
 		}
 		out[sc.I] = max(0, min(100, sc.Score))
+	}
+	if len(out) == 0 {
+		// JSON parsed but no usable indices — treat as a failure so the caller can
+		// surface it instead of silently returning an unscored "ranked" list.
+		return nil, fmt.Errorf("scorer returned no valid scores (content: %s)", truncateRunes(resp.Content, 200))
 	}
 	return out, nil
 }
