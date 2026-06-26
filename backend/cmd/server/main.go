@@ -35,6 +35,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/panoramica"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/brave"
 	"github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/database"
 	"github.com/sciacco/mrsmith/internal/platform/email"
@@ -272,6 +273,11 @@ func main() {
 			CompanyBaseURL: cfg.OpenAPIITCompanyBaseURL,
 		})
 		logger.Info("shared openapi.it client configured", "component", "openapiit")
+	}
+
+	braveCli := brave.New(brave.Config{APIKey: cfg.BraveAPIKey, BaseURL: cfg.BraveBaseURL})
+	if braveCli != nil {
+		logger.Info("shared brave client configured", "component", "brave")
 	}
 
 	mailer, err := email.NewSMTPClient(email.Config{
@@ -549,7 +555,7 @@ func main() {
 		appCatalog = filtered
 	}
 	portal.RegisterRoutes(api, appCatalog)
-	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, LLM: llmSvc, AnisettaDB: anisettaDB})
+	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, Brave: braveCli, LLM: llmSvc, AnisettaDB: anisettaDB})
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	rda.RegisterRoutes(api, rda.Deps{

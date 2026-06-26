@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
+	"github.com/sciacco/mrsmith/internal/platform/brave"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
@@ -21,12 +22,14 @@ import (
 
 type Deps struct {
 	OpenAPIIT  *openapiit.Client
+	Brave      *brave.Client
 	LLM        *llm.Service
 	AnisettaDB *sql.DB
 }
 
 type Handler struct {
 	openapiit          *openapiit.Client
+	brave              *brave.Client
 	companySearchCache companySearchCacheStore
 	provinceCache      provinceCacheStore
 	ateco              atecoStore
@@ -52,6 +55,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	llmProvider := newMALLMProvider(deps.LLM)
 	h := &Handler{
 		openapiit:          deps.OpenAPIIT,
+		brave:              deps.Brave,
 		companySearchCache: cache,
 		provinceCache:      provinceCache,
 		ateco:              ateco,
@@ -109,6 +113,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/deep/regenerate-briefs", h.handleRegenerateMADeepBriefs)
 	handle("GET /binocolo/v1/companies/{vat}/dossier", h.handleGetCompanyDossier)
 	handle("POST /binocolo/v1/companies/{vat}/dossier", h.handleCreateCompanyDossier)
+	handle("POST /binocolo/v1/web-search", h.handleWebSearch)
 	return runWorkers
 }
 
@@ -118,6 +123,24 @@ func (h *Handler) requireOpenAPIIT(w http.ResponseWriter) bool {
 		return false
 	}
 	return true
+}
+
+func (h *Handler) requireBrave(w http.ResponseWriter) bool {
+	if h.brave == nil {
+		httputil.Error(w, http.StatusServiceUnavailable, "brave_not_configured")
+		return false
+	}
+	return true
+}
+
+func (h *Handler) braveFailure(w http.ResponseWriter, r *http.Request, operation string, err error) {
+	logging.FromContext(r.Context()).Warn(
+		"brave request failed",
+		"component", "binocolo",
+		"operation", operation,
+		"error", err,
+	)
+	httputil.Error(w, http.StatusBadGateway, "brave_upstream_error")
 }
 
 func (h *Handler) openAPIITFailure(w http.ResponseWriter, r *http.Request, operation string, err error) {

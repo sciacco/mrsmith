@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/afctools"
+	"github.com/sciacco/mrsmith/internal/platform/brave"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 	"github.com/sciacco/mrsmith/internal/simulatorivendita"
 )
@@ -100,6 +101,10 @@ type Config struct {
 	OpenAPIITAPIToken       string
 	OpenAPIITCAPBaseURL     string
 	OpenAPIITCompanyBaseURL string
+
+	// Brave Search API (optional — binocolo web search)
+	BraveAPIKey  string
+	BraveBaseURL string
 
 	// SMTP email delivery (optional, disabled by default)
 	SMTPEnabled       bool
@@ -225,6 +230,8 @@ func Load() Config {
 		OpenAPIITAPIToken:           envOr("OPENAPI_IT_API_TOKEN", ""),
 		OpenAPIITCAPBaseURL:         envOr("OPENAPI_IT_CAP_BASE_URL", openapiit.DefaultCAPBaseURL),
 		OpenAPIITCompanyBaseURL:     envOr("OPENAPI_IT_COMPANY_BASE_URL", openapiit.DefaultCompanyBaseURL),
+		BraveAPIKey:                 envOr("BRAVE_API_KEY", ""),
+		BraveBaseURL:                envOr("BRAVE_BASE_URL", brave.DefaultBaseURL),
 		SMTPEnabled:                 boolEnvOr("SMTP_ENABLED", false),
 		SMTPHost:                    envOr("SMTP_HOST", ""),
 		SMTPPort:                    envOr("SMTP_PORT", "587"),

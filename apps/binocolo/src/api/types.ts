@@ -32,6 +32,26 @@ export interface CompanySearchRow {
   };
 }
 
+export interface WebSearchRequest {
+  domain: string;
+  keywords: string[];
+  count?: number;
+}
+
+export interface WebSearchResult {
+  title: string;
+  url: string;
+  hostname: string;
+  age?: string;
+  snippets: string[];
+}
+
+export interface WebSearchResponse {
+  query: string;
+  count: number;
+  results: WebSearchResult[];
+}
+
 export interface MASessionListResponse {
   items: MASessionSummary[];
 }
