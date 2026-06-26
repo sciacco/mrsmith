@@ -451,18 +451,17 @@ func (h *Handler) handleExecuteMASession(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	var traceOK bool
-	r, traceOK = h.startMATrace(w, r, "ma_session_execute", id, body, subject, email)
-	if !traceOK {
-		return
-	}
-	detail, err := h.ma.executeSession(r.Context(), id, body, subject, email)
+	// Execute runs asynchronously (maJobWorker): the request validates (estimate
+	// freshness, surface ceiling, budget gate) and enqueues, so it returns at once
+	// and cannot time out during the paid company fetch. The UI polls
+	// GET .../sessions/{id} until status leaves 'running'. The operation trace is
+	// owned by the worker, not this request.
+	detail, err := h.ma.enqueueExecute(r.Context(), id, body, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_execute", err, "session_id", id)
 		return
 	}
-	h.completeMATraceSuccess(r, http.StatusOK)
-	httputil.JSON(w, http.StatusOK, detail)
+	httputil.JSON(w, http.StatusAccepted, detail)
 }
 
 func (h *Handler) handleExportMASession(w http.ResponseWriter, r *http.Request) {

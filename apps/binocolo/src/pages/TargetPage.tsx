@@ -270,10 +270,12 @@ export function TargetPage() {
       : false;
   const strategyModels = useMemo(() => filterStrategyModels(llmOptions.models), [llmOptions.models]);
   const strategyPrompts = llmOptions.prompts.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
-  // Estimate runs server-side as an async job; the session sits in 'estimating'
-  // until the worker finishes. We poll the session detail until it leaves that state.
+  // Estimate and execute run server-side as async jobs; the session sits in
+  // 'estimating' / 'running' until the worker finishes. We poll the session detail
+  // until it leaves those states.
   const estimating = detail?.session.status === 'estimating';
-  const canEstimate = hasStrategy && canOperateOnSession && busy !== 'create' && busy !== 'estimate' && !estimating;
+  const executing = detail?.session.status === 'running';
+  const canEstimate = hasStrategy && canOperateOnSession && busy !== 'create' && busy !== 'estimate' && !estimating && !executing;
   const costPerCompanyEur = detail?.costPerCompanyEur ?? 0.1;
   const budgetEur = detail?.budgetEur ?? 0;
   const projectedFetched = selectedEstimateGroup
@@ -295,7 +297,8 @@ export function TargetPage() {
     !selectedEstimateGroup?.blocked &&
     canOperateOnSession &&
     (!overBudget || acknowledgeCost) &&
-    busy !== 'execute';
+    busy !== 'execute' &&
+    !executing;
 
   useEffect(() => {
     setAcknowledgeCost(false);
@@ -318,9 +321,10 @@ export function TargetPage() {
     return () => clearInterval(handle);
   }, [detail?.session.id, deepPending, api]);
 
+  const sessionWorking = estimating || executing;
   useEffect(() => {
     const sessionId = detail?.session.id;
-    if (!sessionId || !estimating) return;
+    if (!sessionId || !sessionWorking) return;
     const handle = setInterval(() => {
       api
         .get<MASessionDetail>(`/binocolo/v1/ma/sessions/${sessionId}`)
@@ -328,7 +332,7 @@ export function TargetPage() {
         .catch(() => {});
     }, 2500);
     return () => clearInterval(handle);
-  }, [detail?.session.id, estimating, api]);
+  }, [detail?.session.id, sessionWorking, api]);
 
   function switchSessionVisibility(visibility: MASessionVisibility) {
     setSessionVisibility(visibility);
@@ -774,7 +778,7 @@ export function TargetPage() {
                       {showOutside ? `Nascondi ${hiddenCount} fuori perimetro` : `Mostra ${hiddenCount} fuori perimetro`}
                     </button>
                   ) : null}
-                  {busy === 'execute' ? (
+                  {busy === 'execute' || executing ? (
                     <div className={styles.skeletonBlock}>
                       <Skeleton rows={8} />
                     </div>
@@ -927,12 +931,12 @@ export function TargetPage() {
                       <div className={styles.strategyActions}>
                         <Button
                           onClick={executeSession}
-                          loading={busy === 'execute'}
+                          loading={busy === 'execute' || executing}
                           disabled={!canExecute || !selectedEstimateType}
                           leftIcon={<Icon name="check" />}
                           style={{ width: '100%' }}
                         >
-                          Conferma e cerca target
+                          {executing ? 'Ricerca in corso…' : 'Conferma e cerca target'}
                         </Button>
                       </div>
                     </>

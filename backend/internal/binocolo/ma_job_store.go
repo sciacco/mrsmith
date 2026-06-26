@@ -218,6 +218,44 @@ RETURNING attempts
 	return attempts, nil
 }
 
+// MarkMASessionExecuting flips the session into the in-flight 'running' state at
+// execute enqueue, so the UI shows progress and polls immediately (the worker
+// creates the execution run a tick later). Idempotent; skips a no-op write when
+// already running.
+func (s *SQLStore) MarkMASessionExecuting(ctx context.Context, sessionID string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	_, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_session
+SET status = 'running', updated_at = now()
+WHERE id = $1::uuid AND status <> 'running'
+`, sessionID)
+	if err != nil {
+		return fmt.Errorf("mark ma session executing: %w", err)
+	}
+	return nil
+}
+
+// MarkMASessionExecuteFailed moves a session out of 'running' into 'failed' when
+// the execute job gives up before an execution run was even created (a run, once
+// created, is completed-failed instead, which sets the session itself). Gated on
+// status='running' so it never stomps a session the user has moved on from.
+func (s *SQLStore) MarkMASessionExecuteFailed(ctx context.Context, sessionID string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	_, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_session
+SET status = 'failed', updated_at = now()
+WHERE id = $1::uuid AND status = 'running'
+`, sessionID)
+	if err != nil {
+		return fmt.Errorf("mark ma session execute failed: %w", err)
+	}
+	return nil
+}
+
 // MarkMASessionEstimateFailed moves a session out of the in-flight 'estimating'
 // state into 'failed' when the estimate job gives up. Gated on status='estimating'
 // (not on version) so it never stomps a session the user has already moved on from.

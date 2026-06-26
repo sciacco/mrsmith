@@ -20,9 +20,11 @@ type maWorkspaceStore interface {
 	GetMASessionState(ctx context.Context, id string) (MASession, error)
 	UpdateMASessionLifecycle(ctx context.Context, sessionID, action, subject, email string) (bool, error)
 	AddMAStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error)
+	GetMAStrategyVersion(ctx context.Context, sessionID, versionID string) (MAStrategyVersion, error)
 	ReplaceMAEstimates(ctx context.Context, sessionID, strategyVersionID, selectedStrategy string, estimates []MAEstimate) error
 	EnqueueMAJob(ctx context.Context, input maJobEnqueue) (bool, error)
 	SetMASessionEstimateStatus(ctx context.Context, sessionID, strategyVersionID, status string) error
+	MarkMASessionExecuting(ctx context.Context, sessionID string) error
 	CreateMAExecutionRun(ctx context.Context, input maExecutionRunCreate) (MAExecutionRun, error)
 	CompleteMAExecutionRun(ctx context.Context, runID, status string, resultCount int, errorCode string) error
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
@@ -998,6 +1000,39 @@ WHERE session.id = $1::uuid
 	parsed, err := rawToStrategy(raw)
 	if err != nil {
 		return MAStrategyVersion{}, fmt.Errorf("decode active ma strategy: %w", err)
+	}
+	strategy.Strategy = parsed
+	return strategy, nil
+}
+
+// GetMAStrategyVersion loads a specific strategy version by id (scoped to its
+// session). The execute job pins the version the user confirmed, so the worker
+// executes exactly that — not whatever is active when it later runs.
+func (s *SQLStore) GetMAStrategyVersion(ctx context.Context, sessionID, versionID string) (MAStrategyVersion, error) {
+	if s == nil || s.db == nil {
+		return MAStrategyVersion{}, errors.New("binocolo ma store not configured")
+	}
+	var strategy MAStrategyVersion
+	var raw []byte
+	err := s.db.QueryRowContext(ctx, `
+SELECT strategy.id::text, strategy.session_id::text, strategy.version, strategy.strategy,
+       COALESCE(strategy.created_by_email, ''), strategy.created_at
+FROM binocolo.ma_strategy_version strategy
+WHERE strategy.id = $1::uuid AND strategy.session_id = $2::uuid
+`, versionID, sessionID).Scan(
+		&strategy.ID,
+		&strategy.SessionID,
+		&strategy.Version,
+		&raw,
+		&strategy.CreatedByEmail,
+		&strategy.CreatedAt,
+	)
+	if err != nil {
+		return MAStrategyVersion{}, fmt.Errorf("get ma strategy version: %w", err)
+	}
+	parsed, err := rawToStrategy(raw)
+	if err != nil {
+		return MAStrategyVersion{}, fmt.Errorf("decode ma strategy version: %w", err)
 	}
 	strategy.Strategy = parsed
 	return strategy, nil

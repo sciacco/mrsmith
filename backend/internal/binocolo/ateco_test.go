@@ -851,11 +851,19 @@ func (f *fakeMAWorkspaceStore) ReplaceMAEstimates(context.Context, string, strin
 	return errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) GetMAStrategyVersion(context.Context, string, string) (MAStrategyVersion, error) {
+	return MAStrategyVersion{}, errors.New("not implemented")
+}
+
 func (f *fakeMAWorkspaceStore) EnqueueMAJob(context.Context, maJobEnqueue) (bool, error) {
 	return false, errors.New("not implemented")
 }
 
 func (f *fakeMAWorkspaceStore) SetMASessionEstimateStatus(context.Context, string, string, string) error {
+	return errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) MarkMASessionExecuting(context.Context, string) error {
 	return errors.New("not implemented")
 }
 

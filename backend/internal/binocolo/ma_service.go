@@ -553,19 +553,28 @@ func (s *maService) estimateJobWork(ctx context.Context, job maJob) error {
 	return errMAEstimateSuperseded
 }
 
-func (s *maService) executeSession(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string) (MASessionDetail, error) {
+// maExecuteJobPayload is the execute job's self-contained args: the analyst's
+// confirmed choices, validated synchronously at enqueue. The strategy version is
+// pinned via the job row (StrategyVersionID), so the worker executes exactly what
+// was confirmed.
+type maExecuteJobPayload struct {
+	StrategyType   string `json:"strategy_type"`
+	Limit          int    `json:"limit"`
+	EstimatedCount int    `json:"estimated_count"`
+}
+
+// enqueueExecute is the synchronous half of the execute flow. It runs the fast
+// validation (estimate freshness, surface ceiling, budget gate) against the
+// already-persisted estimates so the analyst gets an immediate 4xx, then queues a
+// background job. The heavy network work — subtree expansion and the paid company
+// fetch — runs in the worker (runExecuteJob), so the request cannot time out and a
+// client disconnect cannot cancel the run.
+func (s *maService) enqueueExecute(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
 	if s.openapiit == nil {
 		return MASessionDetail{}, errMAOpenAPIITUnavailable
-	}
-	if err := s.traceEvent(ctx, maTraceEventWrite{
-		EventType: "ma_execute_started",
-		Status:    maTraceEventStarted,
-		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "strategy_supplied": req.Strategy != nil, "requested_strategy_type": req.StrategyType, "limit": req.Limit}),
-	}); err != nil {
-		return MASessionDetail{}, err
 	}
 	detail, err := s.store.GetMASession(ctx, sessionID)
 	if err != nil {
@@ -588,13 +597,6 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 		if err != nil {
 			return MASessionDetail{}, err
 		}
-		if err := s.traceEvent(ctx, maTraceEventWrite{
-			EventType: "ma_strategy_version_created",
-			Status:    maTraceEventSucceeded,
-			Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "strategy_version_id": strategyVersion.ID, "version": strategyVersion.Version}),
-		}); err != nil {
-			return MASessionDetail{}, err
-		}
 		detail, err = s.store.GetMASession(ctx, sessionID)
 		if err != nil {
 			return MASessionDetail{}, err
@@ -603,21 +605,9 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	if strategyVersion == nil {
 		return MASessionDetail{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
 	}
-	if err := s.linkTrace(ctx, maTraceLink{SessionID: sessionID, StrategyVersionID: strategyVersion.ID}); err != nil {
-		return MASessionDetail{}, err
-	}
-	strategyVersion.Strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategyVersion.Strategy, nil, false)
-	if err != nil {
-		return MASessionDetail{}, err
-	}
-	strategyVersion.Strategy, err = s.expandStrategyAteco(ctx, strategyVersion.Strategy, subject, email)
-	if err != nil {
-		return MASessionDetail{}, err
-	}
-	strategyVersion.Strategy, err = s.expandStrategyExpansion(ctx, strategyVersion.Strategy, subject, email)
-	if err != nil {
-		return MASessionDetail{}, err
-	}
+
+	// Validation uses the persisted estimates and the strategy's base fields only —
+	// no subtree expansion needed here, so it stays fast and synchronous.
 	strategyType := normalizeMAStrategyType(req.StrategyType)
 	if strategyType == "" {
 		strategyType = detail.Session.SelectedStrategy
@@ -626,7 +616,7 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 		strategyType = strategyVersion.Strategy.SelectedStrategy
 	}
 	if strategyType == "" {
-		strategyType = chooseSelectedStrategyFromEstimates(detail.Estimates, len(strategyVersion.Strategy.AtecoQueryCandidates) > 0)
+		strategyType = chooseSelectedStrategyFromEstimates(detail.Estimates, estimateTotal(detail.Estimates, maStrategyTypeATECO) > 0)
 	}
 	estimatedCount := estimateTotal(detail.Estimates, strategyType)
 	if len(detail.Estimates) == 0 || estimatedCount == 0 {
@@ -646,45 +636,134 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	budget := maStrategyBudget(strategyVersion.Strategy, pricing.BudgetDefault)
 	projectedCost := maProjectedSpend(estimatedCount, limit, pricing.CostAdvanced)
 	if projectedCost > budget && !req.AcknowledgeCost {
-		_ = s.traceEvent(ctx, maTraceEventWrite{
-			EventType: "ma_execution_over_budget",
-			Status:    maTraceEventInfo,
-			Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "projected_cost": projectedCost, "budget": budget, "estimated_count": estimatedCount, "limit": limit}),
-		})
 		return MASessionDetail{}, errMAEstimateOverBudget
 	}
 
-	run, err := s.store.CreateMAExecutionRun(ctx, maExecutionRunCreate{
+	payload, err := json.Marshal(maExecuteJobPayload{StrategyType: strategyType, Limit: limit, EstimatedCount: estimatedCount})
+	if err != nil {
+		return MASessionDetail{}, fmt.Errorf("marshal ma execute payload: %w", err)
+	}
+	// One in-flight execute per session (ma_job_inflight_idx); a duplicate submit
+	// while a run is queued/running is a no-op (no second run created). The worker
+	// creates the execution run when it picks the job up, so there is never a
+	// dangling run without a job.
+	created, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
+		JobType:           maJobTypeExecute,
 		SessionID:         sessionID,
 		StrategyVersionID: strategyVersion.ID,
-		StrategyType:      strategyType,
-		EstimatedCount:    estimatedCount,
+		Subject:           subject,
+		Email:             email,
+		Payload:           payload,
 	})
 	if err != nil {
 		return MASessionDetail{}, err
 	}
-	if err := s.linkTrace(ctx, maTraceLink{SessionID: sessionID, StrategyVersionID: strategyVersion.ID, ExecutionRunID: run.ID}); err != nil {
-		return MASessionDetail{}, err
+	if created {
+		if err := s.store.MarkMASessionExecuting(ctx, sessionID); err != nil {
+			return MASessionDetail{}, err
+		}
 	}
+	return s.getSession(ctx, sessionID)
+}
+
+// runExecuteJob executes a queued execute job off the request path. It owns the
+// operation trace for the run and returns the trace id for correlation.
+func (s *maService) runExecuteJob(ctx context.Context, job maJob) (string, error) {
+	trace, err := s.startTrace(ctx, maTraceStart{
+		Operation:        "ma_session_execute",
+		SessionID:        job.SessionID,
+		CreatedBySubject: job.CreatedBySubject,
+		CreatedByEmail:   job.CreatedByEmail,
+		Request:          job.Payload,
+	})
+	if err != nil {
+		return "", err
+	}
+	ctx = withMATrace(ctx, trace)
+	if workErr := s.executeJobWork(ctx, job); workErr != nil {
+		_ = s.completeTrace(ctx, maTraceComplete{Status: maTraceStatusFailed, ErrorMessage: workErr.Error()})
+		return trace.id, workErr
+	}
+	_ = s.completeTrace(ctx, maTraceComplete{Status: maTraceStatusSucceeded, HTTPStatus: http.StatusOK})
+	return trace.id, nil
+}
+
+// executeJobWork creates the execution run, expands the pinned strategy, runs the
+// paid company fetch, scores and persists targets. It returns an error ONLY for
+// pre-run infra failures (which the worker retries); once a run exists, an
+// execution failure is recorded as a failed run (which moves the session to
+// 'failed') and returns nil — a paid execution is never silently re-run.
+func (s *maService) executeJobWork(ctx context.Context, job maJob) error {
+	var payload maExecuteJobPayload
+	if len(job.Payload) > 0 {
+		if err := json.Unmarshal(job.Payload, &payload); err != nil {
+			return fmt.Errorf("decode ma execute payload: %w", err)
+		}
+	}
+	detail, err := s.store.GetMASession(ctx, job.SessionID)
+	if err != nil {
+		return err
+	}
+	if err := ensureMASessionOperational(detail.Session); err != nil {
+		return err
+	}
+	version, err := s.store.GetMAStrategyVersion(ctx, job.SessionID, job.StrategyVersionID)
+	if err != nil {
+		return err
+	}
+	strategyType := normalizeMAStrategyType(payload.StrategyType)
+	limit := normalizeMASearchLimit(payload.Limit)
+
 	if err := s.traceEvent(ctx, maTraceEventWrite{
-		EventType: "ma_execution_run_created",
-		Status:    maTraceEventSucceeded,
-		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "strategy_version_id": strategyVersion.ID, "run_id": run.ID, "strategy_type": strategyType, "estimated_count": estimatedCount, "limit": limit}),
+		EventType: "ma_execute_started",
+		Status:    maTraceEventStarted,
+		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "strategy_version_id": version.ID, "strategy_type": strategyType, "limit": limit}),
 	}); err != nil {
-		return MASessionDetail{}, err
+		return err
 	}
 
-	targets, execErr := s.runExecution(ctx, strategyVersion.Strategy, strategyType, limit, subject, email)
+	run, err := s.store.CreateMAExecutionRun(ctx, maExecutionRunCreate{
+		SessionID:         job.SessionID,
+		StrategyVersionID: version.ID,
+		StrategyType:      strategyType,
+		EstimatedCount:    payload.EstimatedCount,
+	})
+	if err != nil {
+		return err
+	}
+	if err := s.linkTrace(ctx, maTraceLink{SessionID: job.SessionID, StrategyVersionID: version.ID, ExecutionRunID: run.ID}); err != nil {
+		return err
+	}
+
+	strategy := version.Strategy
+	strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategy, nil, false)
+	if err != nil {
+		_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, "canonicalize_error")
+		return nil
+	}
+	strategy, err = s.expandStrategyAteco(ctx, strategy, job.CreatedBySubject, job.CreatedByEmail)
+	if err != nil {
+		_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, maErrorCode(err))
+		return nil
+	}
+	strategy, err = s.expandStrategyExpansion(ctx, strategy, job.CreatedBySubject, job.CreatedByEmail)
+	if err != nil {
+		_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, maErrorCode(err))
+		return nil
+	}
+
+	targets, execErr := s.runExecution(ctx, strategy, strategyType, limit, job.CreatedBySubject, job.CreatedByEmail)
 	if execErr != nil {
 		_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, maErrorCode(execErr))
-		return MASessionDetail{}, execErr
+		return nil
 	}
 	for index := range targets {
-		targets[index].SessionID = sessionID
+		targets[index].SessionID = job.SessionID
 		targets[index].RunID = run.ID
 	}
+	pricing := s.loadPricing(ctx)
 	scoringParams := maScoringParams{ThesisFitHoldingFactor: 1 - pricing.ThesisFitHoldingHaircutPct/100}
-	targets = scoreMATargetsV2(targets, strategyVersion.Strategy, scoringParams, s.now())
+	targets = scoreMATargetsV2(targets, strategy, scoringParams, s.now())
 	missingFinancials := 0
 	for _, target := range targets {
 		for _, flag := range target.Flags {
@@ -697,23 +776,21 @@ func (s *maService) executeSession(ctx context.Context, sessionID string, req MA
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_scoring_completed",
 		Status:    maTraceEventSucceeded,
-		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "run_id": run.ID, "result_count": len(targets), "missing_financials": missingFinancials, "thesis": normalizeMAThesis(strategyVersion.Strategy.Thesis)}),
+		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "run_id": run.ID, "result_count": len(targets), "missing_financials": missingFinancials, "thesis": normalizeMAThesis(strategy.Thesis)}),
 	})
-	if err := s.store.ReplaceMATargets(ctx, sessionID, run.ID, targets); err != nil {
+	if err := s.store.ReplaceMATargets(ctx, job.SessionID, run.ID, targets); err != nil {
 		_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, "store_error")
-		return MASessionDetail{}, err
+		return nil
 	}
 	if err := s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusCompleted, len(targets), ""); err != nil {
-		return MASessionDetail{}, err
+		return err
 	}
-	if err := s.traceEvent(ctx, maTraceEventWrite{
+	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_execution_completed",
 		Status:    maTraceEventSucceeded,
-		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "run_id": run.ID, "result_count": len(targets)}),
-	}); err != nil {
-		return MASessionDetail{}, err
-	}
-	return s.getSession(ctx, sessionID)
+		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "run_id": run.ID, "result_count": len(targets)}),
+	})
+	return nil
 }
 
 func (s *maService) exportSession(ctx context.Context, sessionID string, format string, email string) ([]byte, string, string, error) {

@@ -20,6 +20,7 @@ type maJobWorkerStore interface {
 	FailMAJob(ctx context.Context, jobID, errorCode string) error
 	BumpMAJobAttempt(ctx context.Context, jobID string) (int, error)
 	MarkMASessionEstimateFailed(ctx context.Context, sessionID string) error
+	MarkMASessionExecuteFailed(ctx context.Context, sessionID string) error
 }
 
 // maJobWorker drives the async session-job queue (estimate today; execute next)
@@ -96,6 +97,8 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 	switch job.JobType {
 	case maJobTypeEstimate:
 		traceID, err = w.svc.runEstimateJob(ctx, job)
+	case maJobTypeExecute:
+		traceID, err = w.svc.runExecuteJob(ctx, job)
 	default:
 		logging.FromContext(ctx).Error("binocolo job worker unknown job type", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType)
 		_ = w.store.FailMAJob(ctx, job.ID, "unknown_job_type")
@@ -131,8 +134,13 @@ func (w *maJobWorker) retryOrFail(ctx context.Context, job maJob, code string) {
 	if err := w.store.FailMAJob(ctx, job.ID, code); err != nil {
 		logging.FromContext(ctx).Warn("binocolo job worker fail failed", "component", "binocolo", "job_id", job.ID, "error", err)
 	}
-	if job.JobType == maJobTypeEstimate {
+	switch job.JobType {
+	case maJobTypeEstimate:
 		if err := w.store.MarkMASessionEstimateFailed(ctx, job.SessionID); err != nil {
+			logging.FromContext(ctx).Warn("binocolo job worker session-fail failed", "component", "binocolo", "session_id", job.SessionID, "error", err)
+		}
+	case maJobTypeExecute:
+		if err := w.store.MarkMASessionExecuteFailed(ctx, job.SessionID); err != nil {
 			logging.FromContext(ctx).Warn("binocolo job worker session-fail failed", "component", "binocolo", "session_id", job.SessionID, "error", err)
 		}
 	}
