@@ -62,15 +62,11 @@ type ToolCallFunction struct {
 type ChatRequest struct {
 	Model    string    `json:"model"`
 	Messages []Message `json:"messages"`
-	// Temperature / MaxTokens are explicit overrides for callers without a model
-	// params bag (e.g. a bare model string). Model-backed callers should instead pass
-	// the dynamic Params bag below, which carries arbitrary provider sampling params.
-	Temperature float64 `json:"temperature,omitempty"`
-	MaxTokens   int     `json:"max_tokens,omitempty"`
-	// Params are dynamic provider sampling parameters sourced verbatim from
-	// llm_model.params (temperature, max_tokens, reasoning_effort, top_p, …). They are
+	// Params carries ALL provider sampling parameters (temperature, max_tokens,
+	// reasoning_effort, top_p, …) as a dynamic bag — sourced verbatim from
+	// llm_model.params, or built inline by callers without a registry model. It is
 	// merged into the request body by BuildRequestBody, so a new knob needs no Go
-	// change — only the model's DB config. Not a wire field itself (it is flattened).
+	// change. Not a wire field itself: it is flattened into the top-level body.
 	Params         map[string]any  `json:"-"`
 	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
 	Tools          []Tool          `json:"tools,omitempty"`
@@ -193,12 +189,6 @@ func BuildRequestBody(reqBody ChatRequest) (map[string]any, error) {
 		messages = append(messages, mapped)
 	}
 	params["messages"] = messages
-	if reqBody.Temperature != 0 {
-		params["temperature"] = reqBody.Temperature
-	}
-	if reqBody.MaxTokens > 0 {
-		params["max_tokens"] = reqBody.MaxTokens
-	}
 	if reqBody.ResponseFormat != nil {
 		params["response_format"] = *reqBody.ResponseFormat
 	}

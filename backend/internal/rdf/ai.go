@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/llm"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 const (
@@ -88,9 +88,8 @@ func (h *Handler) runAICompletion(ctx context.Context, richiestaID int, model, s
 	}
 
 	request := llm.ChatRequest{
-		Model:       model,
-		Temperature: 0,
-		MaxTokens:   4096,
+		Model:  model,
+		Params: map[string]any{"temperature": 0, "max_tokens": 4096},
 		Messages: []llm.Message{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: string(payload)},

@@ -204,19 +204,18 @@ func (h *Handler) generateAssistanceDraft(r *http.Request, detail MaintenanceDet
 	if err != nil {
 		return assistanceDraftResponse{}, wrapAssistanceFailure(fmt.Errorf("marshal assistance payload: %w", err), modelScope, model.Model)
 	}
-	params := model.DecodedParams()
-	temperature := 0.2
-	if params.Temperature != nil {
-		temperature = *params.Temperature
+	// Sampling params are dynamic, from the model's DB config; scope defaults apply
+	// only when the config omits them.
+	reqParams := model.RawParams()
+	if _, ok := reqParams["temperature"]; !ok {
+		reqParams["temperature"] = 0.2
 	}
-	maxTokens := 4096
-	if params.MaxTokens != nil {
-		maxTokens = *params.MaxTokens
+	if _, ok := reqParams["max_tokens"]; !ok {
+		reqParams["max_tokens"] = 4096
 	}
 	request := llm.ChatRequest{
-		Model:       model.Model,
-		Temperature: temperature,
-		MaxTokens:   maxTokens,
+		Model:  model.Model,
+		Params: reqParams,
 		ResponseFormat: &llm.ResponseFormat{
 			Type: "json_object",
 		},

@@ -45,25 +45,7 @@ type Prompt struct {
 	IsDefault bool
 }
 
-// Params are the per-call request parameters stored on llm_model.params.
-// Pointers distinguish "set" from "absent" so callers can fall back to their
-// own defaults when a field is not configured.
-type Params struct {
-	Temperature *float64 `json:"temperature,omitempty"`
-	MaxTokens   *int     `json:"max_tokens,omitempty"`
-}
-
-// DecodedParams parses Model.Params; an empty/invalid value yields zero Params.
-func (m Model) DecodedParams() Params {
-	var p Params
-	if len(m.Params) == 0 {
-		return p
-	}
-	_ = json.Unmarshal(m.Params, &p)
-	return p
-}
-
-// RawParams returns Model.Params as a dynamic map, so callers can forward arbitrary
+// RawParams returns Model.Params as a dynamic map, so callers forward arbitrary
 // provider sampling parameters (temperature, max_tokens, reasoning_effort, top_p, …)
 // straight from the DB config into ChatRequest.Params — no typed field per key.
 // Empty/invalid yields a non-nil empty map (safe to write call-site defaults into).
