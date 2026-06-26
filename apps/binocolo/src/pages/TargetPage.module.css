@@ -696,6 +696,7 @@
   color: var(--color-info-strong);
 }
 
+.status_estimating,
 .status_estimated,
 .status_running {
   background: var(--color-warning-subtle);

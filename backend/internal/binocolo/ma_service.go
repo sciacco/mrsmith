@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,6 +32,11 @@ var (
 	errMAVisibilityInvalid     = errors.New("ma session visibility invalid")
 	errMASessionArchived       = errors.New("ma session archived")
 	errMASessionDeleted        = errors.New("ma session deleted")
+	// errMAEstimateSuperseded is returned by ReplaceMAEstimates when the active
+	// strategy version changed mid-estimate (the user re-submitted). The estimate
+	// worker loops on it to re-run against the now-active version, so the latest
+	// strategy is always the one that ends up estimated.
+	errMAEstimateSuperseded = errors.New("ma estimate superseded by newer strategy version")
 )
 
 const (
@@ -394,19 +400,17 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	return decorateMACost(detail, s.loadPricing(ctx)), nil
 }
 
-func (s *maService) estimateSession(ctx context.Context, sessionID string, req MAEstimateSessionRequest, subject, email string) (MASessionDetail, error) {
+// enqueueEstimate is the synchronous half of the estimate flow: validate the
+// request, materialize the strategy version, and queue a background job. The
+// expensive surface probing runs in the estimate worker (runEstimateJob), so the
+// HTTP request returns immediately — it cannot time out while the backend works,
+// and a client disconnect can no longer cancel the work mid-flight.
+func (s *maService) enqueueEstimate(ctx context.Context, sessionID string, req MAEstimateSessionRequest, subject, email string) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
 	if s.openapiit == nil {
 		return MASessionDetail{}, errMAOpenAPIITUnavailable
-	}
-	if err := s.traceEvent(ctx, maTraceEventWrite{
-		EventType: "ma_estimate_started",
-		Status:    maTraceEventStarted,
-		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "strategy_supplied": req.Strategy != nil}),
-	}); err != nil {
-		return MASessionDetail{}, err
 	}
 	detail, err := s.store.GetMASession(ctx, sessionID)
 	if err != nil {
@@ -429,53 +433,124 @@ func (s *maService) estimateSession(ctx context.Context, sessionID string, req M
 		if err != nil {
 			return MASessionDetail{}, err
 		}
-		if err := s.traceEvent(ctx, maTraceEventWrite{
-			EventType: "ma_strategy_version_created",
-			Status:    maTraceEventSucceeded,
-			Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "strategy_version_id": strategyVersion.ID, "version": strategyVersion.Version}),
-		}); err != nil {
-			return MASessionDetail{}, err
-		}
 	}
 	if strategyVersion == nil {
 		return MASessionDetail{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
 	}
-	if err := s.linkTrace(ctx, maTraceLink{SessionID: sessionID, StrategyVersionID: strategyVersion.ID}); err != nil {
-		return MASessionDetail{}, err
-	}
-	strategyVersion.Strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategyVersion.Strategy, nil, false)
-	if err != nil {
-		return MASessionDetail{}, err
-	}
-	strategyVersion.Strategy, err = s.expandStrategyAteco(ctx, strategyVersion.Strategy, subject, email)
-	if err != nil {
-		return MASessionDetail{}, err
-	}
-	strategyVersion.Strategy, err = s.expandStrategyExpansion(ctx, strategyVersion.Strategy, subject, email)
-	if err != nil {
-		return MASessionDetail{}, err
-	}
-
-	estimates, selected, err := s.runEstimates(ctx, sessionID, strategyVersion.ID, strategyVersion.Strategy, subject, email)
-	if err != nil {
-		return MASessionDetail{}, err
-	}
-	if err := s.store.ReplaceMAEstimates(ctx, sessionID, strategyVersion.ID, selected, estimates); err != nil {
-		return MASessionDetail{}, err
-	}
-	if err := s.traceEvent(ctx, maTraceEventWrite{
-		EventType: "ma_estimates_saved",
-		Status:    maTraceEventSucceeded,
-		Metadata: maTraceJSON(map[string]any{
-			"session_id":          sessionID,
-			"strategy_version_id": strategyVersion.ID,
-			"selected_strategy":   selected,
-			"estimate_count":      len(estimates),
-		}),
+	// One in-flight estimate per session (ma_job_inflight_idx). A re-submit while a
+	// job is queued/running is a no-op here: that job estimates whatever the active
+	// version is at run time and loops if it changes, so the latest strategy is
+	// always covered without launching duplicate work.
+	if _, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
+		JobType:           maJobTypeEstimate,
+		SessionID:         sessionID,
+		StrategyVersionID: strategyVersion.ID,
+		Subject:           subject,
+		Email:             email,
 	}); err != nil {
 		return MASessionDetail{}, err
 	}
+	// Reflect the in-flight state so the UI polls. Gated on active match: if a newer
+	// version was activated between load and here, that newer enqueue owns the state.
+	if err := s.store.SetMASessionEstimateStatus(ctx, sessionID, strategyVersion.ID, maSessionStatusEstimating); err != nil {
+		return MASessionDetail{}, err
+	}
 	return s.getSession(ctx, sessionID)
+}
+
+// runEstimateJob executes a queued estimate job off the request path. It owns the
+// operation trace for the run (the request handler no longer can, having already
+// returned) and returns the trace id for correlation. estimateJobWork retries
+// internally against the active strategy version, so this surfaces only a real
+// (non-supersession) error to the worker for job-row bookkeeping.
+func (s *maService) runEstimateJob(ctx context.Context, job maJob) (string, error) {
+	trace, err := s.startTrace(ctx, maTraceStart{
+		Operation:        "ma_session_estimate",
+		SessionID:        job.SessionID,
+		CreatedBySubject: job.CreatedBySubject,
+		CreatedByEmail:   job.CreatedByEmail,
+		Request:          job.Payload,
+	})
+	if err != nil {
+		return "", err
+	}
+	ctx = withMATrace(ctx, trace)
+	if workErr := s.estimateJobWork(ctx, job); workErr != nil {
+		_ = s.completeTrace(ctx, maTraceComplete{Status: maTraceStatusFailed, ErrorMessage: workErr.Error()})
+		return trace.id, workErr
+	}
+	_ = s.completeTrace(ctx, maTraceComplete{Status: maTraceStatusSucceeded, HTTPStatus: http.StatusOK})
+	return trace.id, nil
+}
+
+// estimateJobWork probes the search surface for the session's active strategy and
+// persists the estimates. It always targets the *current* active version: if the
+// user activated a newer version mid-run, ReplaceMAEstimates reports it superseded
+// and the loop re-runs for the now-active version. A small cap guards against a
+// pathological flip-flop.
+func (s *maService) estimateJobWork(ctx context.Context, job maJob) error {
+	const maxSupersedeLoops = 3
+	for attempt := 0; attempt < maxSupersedeLoops; attempt++ {
+		detail, err := s.store.GetMASession(ctx, job.SessionID)
+		if err != nil {
+			return err
+		}
+		if err := ensureMASessionOperational(detail.Session); err != nil {
+			return err
+		}
+		version := detail.Strategy
+		if version == nil {
+			return fmt.Errorf("%w: strategy", errMAStrategyInvalid)
+		}
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_estimate_started",
+			Status:    maTraceEventStarted,
+			Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "strategy_version_id": version.ID, "attempt": attempt}),
+		}); err != nil {
+			return err
+		}
+		if err := s.linkTrace(ctx, maTraceLink{SessionID: job.SessionID, StrategyVersionID: version.ID}); err != nil {
+			return err
+		}
+		strategy := version.Strategy
+		strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategy, nil, false)
+		if err != nil {
+			return err
+		}
+		strategy, err = s.expandStrategyAteco(ctx, strategy, job.CreatedBySubject, job.CreatedByEmail)
+		if err != nil {
+			return err
+		}
+		strategy, err = s.expandStrategyExpansion(ctx, strategy, job.CreatedBySubject, job.CreatedByEmail)
+		if err != nil {
+			return err
+		}
+		estimates, selected, err := s.runEstimates(ctx, job.SessionID, version.ID, strategy, job.CreatedBySubject, job.CreatedByEmail)
+		if err != nil {
+			return err
+		}
+		err = s.store.ReplaceMAEstimates(ctx, job.SessionID, version.ID, selected, estimates)
+		if errors.Is(err, errMAEstimateSuperseded) {
+			continue // active version changed during the run; re-estimate the new one
+		}
+		if err != nil {
+			return err
+		}
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_estimates_saved",
+			Status:    maTraceEventSucceeded,
+			Metadata: maTraceJSON(map[string]any{
+				"session_id":          job.SessionID,
+				"strategy_version_id": version.ID,
+				"selected_strategy":   selected,
+				"estimate_count":      len(estimates),
+			}),
+		}); err != nil {
+			return err
+		}
+		return nil
+	}
+	return errMAEstimateSuperseded
 }
 
 func (s *maService) executeSession(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string) (MASessionDetail, error) {
@@ -1867,49 +1942,84 @@ func (s *maService) expandStrategyExpansion(ctx context.Context, strategy MAStra
 
 func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec, subject, email string) ([]MAEstimate, string, error) {
 	queries := buildMAEstimateQueries(strategy)
-	estimates := make([]MAEstimate, 0, len(queries))
+	estimates := make([]MAEstimate, len(queries))
 	pricing := s.loadPricing(ctx)
-	for _, query := range queries {
-		query.params = baseMASurfaceParams(strategy, query.province, query.legalForm, query.params.DryRun)
-		if query.atecoSearchCode != "" {
-			query.params.AtecoCode = query.atecoSearchCode
+
+	// Probe the (province × ateco × legal form) surface concurrently with a bounded
+	// pool: each combo is an independent dry-run, so the previously-sequential fan-out
+	// (the source of the request timeout) collapses to roughly the slowest probe.
+	// Results are written by index, so the slice needs no synchronization.
+	probeCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	sem := make(chan struct{}, maEstimateProbeConcurrency)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error
+	failOnce := func(err error) {
+		mu.Lock()
+		if firstErr == nil {
+			firstErr = err
+			cancel() // stop probes still waiting on the semaphore
 		}
-		if err := s.traceEvent(ctx, maTraceEventWrite{
-			EventType: "ma_estimate_query",
-			Status:    maTraceEventStarted,
-			Request:   maTraceJSON(query.params.Values()),
-			Metadata: maTraceJSON(map[string]any{
-				"session_id":          sessionID,
-				"strategy_version_id": strategyVersionID,
-				"strategy_type":       query.strategyType,
-				"province":            query.province,
-				"ateco_code":          query.atecoCode,
-				"legal_form":          query.legalForm,
-			}),
-		}); err != nil {
-			return nil, "", err
-		}
-		surface, err := s.probeMASearchSurface(ctx, query.params, subject, email)
-		if err != nil {
-			return nil, "", err
-		}
-		estimates = append(estimates, MAEstimate{
-			ID:                uuid.NewString(),
-			SessionID:         sessionID,
-			StrategyVersionID: strategyVersionID,
-			StrategyType:      query.strategyType,
-			AtecoCode:         query.atecoCode,
-			AtecoDescription:  query.atecoDescription,
-			Province:          query.province,
-			EstimatedCount:    surface.EstimatedCount,
-			EstimatedCost:     float64(surface.EstimatedCount) * pricing.CostAdvanced,
-			Selected:          false,
-			SurfaceStatus:     surface.Status,
-			ExecutionLimit:    strategy.SearchLimit,
-			ProbeCount:        surface.ProbeCount,
-			Params:            surface.Params,
-			VendorResponse:    surface.VendorResponse,
-		})
+		mu.Unlock()
+	}
+	for index := range queries {
+		wg.Add(1)
+		go func(index int, query maSearchQuery) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-probeCtx.Done():
+				return
+			}
+			defer func() { <-sem }()
+			query.params = baseMASurfaceParams(strategy, query.province, query.legalForm, query.params.DryRun)
+			if query.atecoSearchCode != "" {
+				query.params.AtecoCode = query.atecoSearchCode
+			}
+			if err := s.traceEvent(probeCtx, maTraceEventWrite{
+				EventType: "ma_estimate_query",
+				Status:    maTraceEventStarted,
+				Request:   maTraceJSON(query.params.Values()),
+				Metadata: maTraceJSON(map[string]any{
+					"session_id":          sessionID,
+					"strategy_version_id": strategyVersionID,
+					"strategy_type":       query.strategyType,
+					"province":            query.province,
+					"ateco_code":          query.atecoCode,
+					"legal_form":          query.legalForm,
+				}),
+			}); err != nil {
+				failOnce(err)
+				return
+			}
+			surface, err := s.probeMASearchSurface(probeCtx, query.params, subject, email)
+			if err != nil {
+				failOnce(err)
+				return
+			}
+			estimates[index] = MAEstimate{
+				ID:                uuid.NewString(),
+				SessionID:         sessionID,
+				StrategyVersionID: strategyVersionID,
+				StrategyType:      query.strategyType,
+				AtecoCode:         query.atecoCode,
+				AtecoDescription:  query.atecoDescription,
+				Province:          query.province,
+				EstimatedCount:    surface.EstimatedCount,
+				EstimatedCost:     float64(surface.EstimatedCount) * pricing.CostAdvanced,
+				Selected:          false,
+				SurfaceStatus:     surface.Status,
+				ExecutionLimit:    strategy.SearchLimit,
+				ProbeCount:        surface.ProbeCount,
+				Params:            surface.Params,
+				VendorResponse:    surface.VendorResponse,
+			}
+		}(index, queries[index])
+	}
+	wg.Wait()
+	if firstErr != nil {
+		return nil, "", firstErr
 	}
 	estimates = aggregateExpandedEstimates(estimates, strategy, pricing.CostAdvanced)
 	selected := chooseSelectedStrategyFromEstimates(estimates, len(strategy.AtecoQueryCandidates) > 0)

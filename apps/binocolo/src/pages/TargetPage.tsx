@@ -270,7 +270,10 @@ export function TargetPage() {
       : false;
   const strategyModels = useMemo(() => filterStrategyModels(llmOptions.models), [llmOptions.models]);
   const strategyPrompts = llmOptions.prompts.filter((item) => item.scope === 'ma_strategy' || item.scope === 'default');
-  const canEstimate = hasStrategy && canOperateOnSession && busy !== 'create' && busy !== 'estimate';
+  // Estimate runs server-side as an async job; the session sits in 'estimating'
+  // until the worker finishes. We poll the session detail until it leaves that state.
+  const estimating = detail?.session.status === 'estimating';
+  const canEstimate = hasStrategy && canOperateOnSession && busy !== 'create' && busy !== 'estimate' && !estimating;
   const costPerCompanyEur = detail?.costPerCompanyEur ?? 0.1;
   const budgetEur = detail?.budgetEur ?? 0;
   const projectedFetched = selectedEstimateGroup
@@ -314,6 +317,18 @@ export function TargetPage() {
     }, 5000);
     return () => clearInterval(handle);
   }, [detail?.session.id, deepPending, api]);
+
+  useEffect(() => {
+    const sessionId = detail?.session.id;
+    if (!sessionId || !estimating) return;
+    const handle = setInterval(() => {
+      api
+        .get<MASessionDetail>(`/binocolo/v1/ma/sessions/${sessionId}`)
+        .then(setDetail)
+        .catch(() => {});
+    }, 2500);
+    return () => clearInterval(handle);
+  }, [detail?.session.id, estimating, api]);
 
   function switchSessionVisibility(visibility: MASessionVisibility) {
     setSessionVisibility(visibility);
@@ -817,11 +832,11 @@ export function TargetPage() {
                     <Button
                       variant="secondary"
                       onClick={estimateSession}
-                      loading={busy === 'estimate'}
+                      loading={busy === 'estimate' || estimating}
                       disabled={!canEstimate}
                       leftIcon={<Icon name="search" />}
                     >
-                      Stima ricerca
+                      {estimating ? 'Stima in corso…' : 'Stima ricerca'}
                     </Button>
                   </div>
                 </section>
@@ -833,7 +848,15 @@ export function TargetPage() {
                       <p>Confronta le superfici di ricerca e conferma per estrarre i target.</p>
                     </div>
                   </div>
-                  {hasEstimate ? (
+                  {estimating ? (
+                    <div className={styles.estimateEmptyContainer}>
+                      <EmptyState
+                        icon="search"
+                        title="Stima in corso…"
+                        text="Calcolo della dimensione del target e dei costi. La pagina si aggiorna da sola al termine."
+                      />
+                    </div>
+                  ) : hasEstimate ? (
                     <>
                       {detail.strategy?.strategy ? <AppliedPerimeter strategy={detail.strategy.strategy} /> : null}
                       <div className={styles.estimateGrid}>
@@ -2602,6 +2625,8 @@ function sessionStatusLabel(status: MASessionStatus): string {
   switch (status) {
     case 'draft':
       return 'Bozza strategia';
+    case 'estimating':
+      return 'Stima in corso';
     case 'estimated':
       return 'Stima pronta';
     case 'running':

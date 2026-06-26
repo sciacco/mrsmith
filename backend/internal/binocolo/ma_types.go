@@ -9,11 +9,12 @@ const (
 	maStrategyTypeATECO    = "ateco"
 	maStrategyTypeExpanded = "expanded"
 
-	maSessionStatusDraft     = "draft"
-	maSessionStatusEstimated = "estimated"
-	maSessionStatusRunning   = "running"
-	maSessionStatusCompleted = "completed"
-	maSessionStatusFailed    = "failed"
+	maSessionStatusDraft      = "draft"
+	maSessionStatusEstimating = "estimating"
+	maSessionStatusEstimated  = "estimated"
+	maSessionStatusRunning    = "running"
+	maSessionStatusCompleted  = "completed"
+	maSessionStatusFailed     = "failed"
 
 	maSessionVisibilityActive   = "active"
 	maSessionVisibilityArchived = "archived"
@@ -58,6 +59,32 @@ const (
 	// its lease. Longer than the slowest single process() (the IT-full POST plus the
 	// LLM brief), short enough that a crashed worker's rows are reclaimed promptly.
 	maDeepLeaseSeconds = 60
+
+	// ma_job async queue (estimate/execute run off the request path). Same state
+	// machine as the deep worker; see deploy/migrations/049.
+	maJobTypeEstimate = "estimate"
+	maJobTypeExecute  = "execute"
+
+	maJobStatusQueued  = "queued"
+	maJobStatusRunning = "running"
+	maJobStatusReady   = "ready"
+	maJobStatusFailed  = "failed"
+
+	// maJobMaxAttempts bounds retries of a failing job before it is marked failed
+	// (and the session moved to 'failed'). Estimate work is cheap+cached, so a
+	// retry re-runs the whole job; the cap guards against a permanently broken
+	// upstream rather than a poll budget.
+	maJobMaxAttempts = 5
+
+	// maJobLeaseSeconds is how long a worker owns a job row. The whole estimate runs
+	// inside one process() call, so this must exceed the slowest single estimate
+	// (parallelized probe fan-out); a crashed worker's row is reclaimed after it.
+	maJobLeaseSeconds = 300
+
+	// maEstimateProbeConcurrency caps concurrent dry-run probes against OpenAPI.it
+	// during an estimate fan-out: polite to the upstream while collapsing the
+	// previously-sequential wall-clock from ~90s to seconds.
+	maEstimateProbeConcurrency = 6
 
 	maEvidenceMatch   = "match"
 	maEvidencePartial = "match_parziale"

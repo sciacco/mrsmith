@@ -171,7 +171,7 @@ export interface MACompanyDossier {
   updatedAt?: string;
 }
 
-export type MASessionStatus = 'draft' | 'estimated' | 'running' | 'completed' | 'failed';
+export type MASessionStatus = 'draft' | 'estimating' | 'estimated' | 'running' | 'completed' | 'failed';
 export type MASessionVisibility = 'active' | 'archived' | 'deleted';
 export type MAStrategyType = 'ateco' | 'expanded';
 export type MAMatchState = 'match' | 'match_parziale' | 'fuori_criterio';

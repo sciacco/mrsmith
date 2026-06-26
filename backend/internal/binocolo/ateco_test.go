@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -305,9 +306,14 @@ func TestLooksLikeMATraceSecretValue(t *testing.T) {
 }
 
 func TestMAEstimatesSendDotlessAtecoToOpenAPIIT(t *testing.T) {
+	var mu sync.Mutex
 	upstreamAteco := []string{}
 	client := newCompanySearchTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		// runEstimates now probes the surface concurrently, so this recorder is hit
+		// from multiple goroutines.
+		mu.Lock()
 		upstreamAteco = append(upstreamAteco, r.URL.Query().Get("atecoCode"))
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"data":    []map[string]any{},
@@ -842,6 +848,14 @@ func (f *fakeMAWorkspaceStore) AddMAStrategyVersion(context.Context, string, MAS
 }
 
 func (f *fakeMAWorkspaceStore) ReplaceMAEstimates(context.Context, string, string, string, []MAEstimate) error {
+	return errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) EnqueueMAJob(context.Context, maJobEnqueue) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) SetMASessionEstimateStatus(context.Context, string, string, string) error {
 	return errors.New("not implemented")
 }
 

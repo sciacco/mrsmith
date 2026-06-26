@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/sciacco/mrsmith/internal/acl"
@@ -56,11 +57,31 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 		ateco:              ateco,
 		ma:                 newMAService(maStore, cache, provinceCache, ateco, deps.OpenAPIIT, llmProvider),
 	}
-	// Veryshort deep-dive worker: drains queued IT-full jobs and resumes pending
-	// ones on restart. Returned so main.go runs it under appCtx + workerWG.
-	var runDeepWorker func(context.Context)
-	if sqlStore != nil && deps.OpenAPIIT != nil {
-		runDeepWorker = newMADeepWorker(sqlStore, deps.OpenAPIIT, llmProvider, h.ma.loadPricing).run
+	// Background workers, returned so main.go runs them under appCtx + workerWG for
+	// graceful shutdown. Both are DB-backed and resume pending rows on restart:
+	//   - maJobWorker drains the async session-job queue (estimate today) so the
+	//     estimate runs off the request path and can't be killed by a client timeout.
+	//   - maDeepWorker drains queued IT-full deep-dive jobs.
+	var runners []func(context.Context)
+	if sqlStore != nil {
+		runners = append(runners, newMAJobWorker(h.ma, sqlStore).run)
+		if deps.OpenAPIIT != nil {
+			runners = append(runners, newMADeepWorker(sqlStore, deps.OpenAPIIT, llmProvider, h.ma.loadPricing).run)
+		}
+	}
+	var runWorkers func(context.Context)
+	if len(runners) > 0 {
+		runWorkers = func(ctx context.Context) {
+			var wg sync.WaitGroup
+			for _, run := range runners {
+				wg.Add(1)
+				go func(run func(context.Context)) {
+					defer wg.Done()
+					run(ctx)
+				}(run)
+			}
+			wg.Wait()
+		}
 	}
 	protect := acl.RequireRole(applaunch.BinocoloAccessRoles()...)
 	handle := func(pattern string, handler http.HandlerFunc) {
@@ -88,7 +109,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/deep/regenerate-briefs", h.handleRegenerateMADeepBriefs)
 	handle("GET /binocolo/v1/companies/{vat}/dossier", h.handleGetCompanyDossier)
 	handle("POST /binocolo/v1/companies/{vat}/dossier", h.handleCreateCompanyDossier)
-	return runDeepWorker
+	return runWorkers
 }
 
 func (h *Handler) requireOpenAPIIT(w http.ResponseWriter) bool {
@@ -406,18 +427,17 @@ func (h *Handler) handleEstimateMASession(w http.ResponseWriter, r *http.Request
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	var traceOK bool
-	r, traceOK = h.startMATrace(w, r, "ma_session_estimate", id, body, subject, email)
-	if !traceOK {
-		return
-	}
-	detail, err := h.ma.estimateSession(r.Context(), id, body, subject, email)
+	// Estimate runs asynchronously (maJobWorker): the request only validates and
+	// enqueues, so it returns immediately and cannot time out while the surface
+	// probing happens — nor can a client disconnect cancel the work. The UI polls
+	// GET .../sessions/{id} until status leaves 'estimating'. The operation trace is
+	// owned by the worker, not this request.
+	detail, err := h.ma.enqueueEstimate(r.Context(), id, body, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_estimate", err, "session_id", id)
 		return
 	}
-	h.completeMATraceSuccess(r, http.StatusOK)
-	httputil.JSON(w, http.StatusOK, detail)
+	httputil.JSON(w, http.StatusAccepted, detail)
 }
 
 func (h *Handler) handleExecuteMASession(w http.ResponseWriter, r *http.Request) {

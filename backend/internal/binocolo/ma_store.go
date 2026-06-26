@@ -21,6 +21,8 @@ type maWorkspaceStore interface {
 	UpdateMASessionLifecycle(ctx context.Context, sessionID, action, subject, email string) (bool, error)
 	AddMAStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error)
 	ReplaceMAEstimates(ctx context.Context, sessionID, strategyVersionID, selectedStrategy string, estimates []MAEstimate) error
+	EnqueueMAJob(ctx context.Context, input maJobEnqueue) (bool, error)
+	SetMASessionEstimateStatus(ctx context.Context, sessionID, strategyVersionID, status string) error
 	CreateMAExecutionRun(ctx context.Context, input maExecutionRunCreate) (MAExecutionRun, error)
 	CompleteMAExecutionRun(ctx context.Context, runID, status string, resultCount int, errorCode string) error
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
@@ -378,6 +380,24 @@ func (s *SQLStore) ReplaceMAEstimates(ctx context.Context, sessionID, strategyVe
 		return fmt.Errorf("begin ma estimate replace: %w", err)
 	}
 	defer tx.Rollback()
+
+	// Lock the session row and verify the estimate still targets the active strategy
+	// version. If a newer version was activated mid-estimate, abort the whole write
+	// (do not clobber the current estimates) and report it superseded so the worker
+	// re-runs for the now-active version. FOR UPDATE serializes against the
+	// AddMAStrategyVersion that would flip active_strategy_id.
+	var activeStrategyID sql.NullString
+	if err := tx.QueryRowContext(ctx, `
+SELECT active_strategy_id::text
+FROM binocolo.ma_session
+WHERE id = $1::uuid
+FOR UPDATE
+`, sessionID).Scan(&activeStrategyID); err != nil {
+		return fmt.Errorf("lock ma session for estimate: %w", err)
+	}
+	if !activeStrategyID.Valid || activeStrategyID.String != strategyVersionID {
+		return errMAEstimateSuperseded
+	}
 
 	if _, err := tx.ExecContext(ctx, `
 DELETE FROM binocolo.ma_dry_run_estimate
