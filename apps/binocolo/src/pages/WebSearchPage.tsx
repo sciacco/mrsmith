@@ -100,11 +100,12 @@ export function WebSearchPage() {
   const [keywords, setKeywords] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
   const [count, setCount] = useState(DEFAULT_COUNT);
+  const [rank, setRank] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [searchedKeywords, setSearchedKeywords] = useState<string[]>([]);
 
   const search = useMutation({
-    mutationFn: (body: { domain: string; keywords: string[]; count: number }) =>
+    mutationFn: (body: { domain: string; keywords: string[]; count: number; rank: boolean }) =>
       api.post<WebSearchResponse>('/binocolo/v1/web-search', body),
   });
 
@@ -150,7 +151,7 @@ export function WebSearchPage() {
     setKeywords(effective);
     setSearchedKeywords(effective);
     setDraft('');
-    search.mutate({ domain: trimmedDomain, keywords: effective, count });
+    search.mutate({ domain: trimmedDomain, keywords: effective, count, rank });
   }
 
   const canSubmit = domain.trim() !== '' && (keywords.length > 0 || draft.trim() !== '');
@@ -230,6 +231,11 @@ export function WebSearchPage() {
         <Button type="submit" loading={search.isPending} disabled={!canSubmit} leftIcon={<Icon name="search" />}>
           Cerca
         </Button>
+
+        <label className={styles.optionRow}>
+          <input type="checkbox" checked={rank} onChange={(e) => setRank(e.target.checked)} />
+          <span>Ordina per rilevanza (AI)</span>
+        </label>
       </form>
       {localError ? <p className={styles.localError}>{localError}</p> : null}
 
@@ -247,13 +253,21 @@ export function WebSearchPage() {
         data.results.length > 0 ? (
           <div className={styles.results}>
             <p className={styles.resultsMeta}>
-              {data.results.length} risultati · <span className={styles.mono}>{data.query}</span>
+              {data.results.length} risultati{data.ranked ? ' · ordinati per rilevanza' : ''} ·{' '}
+              <span className={styles.mono}>{data.query}</span>
             </p>
             {data.results.map((r, i) => (
               <article key={`${r.url}-${i}`} className={styles.result}>
-                <a className={styles.resultTitle} href={r.url} target="_blank" rel="noreferrer">
-                  {r.title || r.url}
-                </a>
+                <div className={styles.resultHead}>
+                  <a className={styles.resultTitle} href={r.url} target="_blank" rel="noreferrer">
+                    {r.title || r.url}
+                  </a>
+                  {typeof r.score === 'number' ? (
+                    <span className={styles.scoreBadge} title="Rilevanza stimata (0–100)">
+                      {r.score}
+                    </span>
+                  ) : null}
+                </div>
                 <div className={styles.resultSource}>
                   <span className={styles.mono}>{r.hostname}</span>
                   {r.age ? <span>· {r.age}</span> : null}

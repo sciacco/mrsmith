@@ -134,6 +134,16 @@
   outline: none;
 }
 
+.optionRow {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
 .localError {
   color: var(--color-danger);
   font-size: 0.8125rem;
@@ -202,11 +212,31 @@
   background: var(--color-bg-elevated);
 }
 
+.resultHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .resultTitle {
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-accent);
   text-decoration: none;
+}
+
+.scoreBadge {
+  flex: none;
+  min-width: 2.5ch;
+  text-align: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-muted, var(--color-surface));
+  color: var(--color-accent);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .resultTitle:hover {

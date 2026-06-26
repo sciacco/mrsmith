@@ -1,21 +1,28 @@
 package binocolo
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/sciacco/mrsmith/internal/platform/brave"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/llm"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 // WebSearchRequest is the body for POST /binocolo/v1/web-search: an ad-hoc,
 // site-restricted keyword search backed by Brave LLM-context. The flow is
-// stateless — nothing is persisted.
+// stateless — nothing is persisted. When Rank is set, the results are reordered
+// by an LLM relevance score against the searched keywords.
 type WebSearchRequest struct {
 	Domain   string   `json:"domain"`
 	Keywords []string `json:"keywords"`
 	Count    int      `json:"count"`
+	Rank     bool     `json:"rank"`
 }
 
 // WebSearchResult is one source page with the snippets Brave extracted for the query.
@@ -25,19 +32,23 @@ type WebSearchResult struct {
 	Hostname string   `json:"hostname"`
 	Age      string   `json:"age,omitempty"`
 	Snippets []string `json:"snippets"`
+	Score    *int     `json:"score,omitempty"` // 0-100 LLM relevance; nil when not ranked
 }
 
 type WebSearchResponse struct {
 	Query   string            `json:"query"`
 	Count   int               `json:"count"`
+	Ranked  bool              `json:"ranked"` // true when results carry LLM relevance scores
 	Results []WebSearchResult `json:"results"`
 }
 
 const (
-	webSearchDefaultCount = 25
-	webSearchMaxCount     = 50
-	webSearchMaxQueryLen  = 400 // Brave: q is 1-400 chars
-	webSearchMaxWords     = 50  // Brave: q is max 50 words
+	webSearchDefaultCount  = 25
+	webSearchMaxCount      = 50
+	webSearchMaxQueryLen   = 400 // Brave: q is 1-400 chars
+	webSearchMaxWords      = 50  // Brave: q is max 50 words
+	webSearchScoreTextCap  = 400 // chars of snippet text sent to the scorer per result
+	webSearchScoreMaxToken = 512
 )
 
 // handleWebSearch restricts the search to a single domain via the "site:" operator
@@ -112,11 +123,157 @@ func (h *Handler) handleWebSearch(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Optional LLM relevance ranking. Best-effort: a scoring failure (e.g. scope not
+	// configured) must never break the search — we just return the Brave order.
+	ranked := false
+	if body.Rank && len(results) > 0 {
+		subject, email := companySearchRefreshActor(r.Context())
+		scores, scoreErr := h.ma.scoreWebSearchResults(r.Context(), strings.Join(keywords, " "), results, subject, email)
+		if scoreErr != nil {
+			logging.FromContext(r.Context()).Warn(
+				"brave web search scoring failed",
+				"component", "binocolo",
+				"operation", "web_search_score",
+				"error", scoreErr,
+			)
+		} else {
+			for i := range results {
+				if sc, ok := scores[i]; ok {
+					v := sc
+					results[i].Score = &v
+				}
+			}
+			sort.SliceStable(results, func(a, b int) bool {
+				return scoreOf(results[a]) > scoreOf(results[b])
+			})
+			ranked = true
+		}
+	}
+
 	httputil.JSON(w, http.StatusOK, WebSearchResponse{
 		Query:   query,
 		Count:   count,
+		Ranked:  ranked,
 		Results: results,
 	})
+}
+
+// scoreWebSearchResults asks the configured LLM to rate each result's relevance to
+// the searched terms in a SINGLE batched call. Token-frugal by design: only
+// {index, title, truncated text} go up, only {index, score} come back — no
+// rationale. Returns index→score (0-100). Any failure is returned to the caller,
+// which keeps the unranked order.
+func (s *maService) scoreWebSearchResults(ctx context.Context, terms string, results []WebSearchResult, subject, email string) (map[int]int, error) {
+	model, err := s.llmp.ResolveModel(ctx, maModelScopeWebSearchScorer, "")
+	if err != nil {
+		return nil, err
+	}
+	prompt, err := s.llmp.ResolvePrompt(ctx, maModelScopeWebSearchScorer, "")
+	if err != nil {
+		return nil, err
+	}
+	client, err := s.llmp.ClientForModel(ctx, model)
+	if err != nil {
+		return nil, err
+	}
+
+	type scoreItem struct {
+		I     int    `json:"i"`
+		Title string `json:"title"`
+		Text  string `json:"text"`
+	}
+	items := make([]scoreItem, 0, len(results))
+	for i, r := range results {
+		items = append(items, scoreItem{
+			I:     i,
+			Title: r.Title,
+			Text:  truncateRunes(strings.Join(r.Snippets, " "), webSearchScoreTextCap),
+		})
+	}
+	input, err := json.Marshal(map[string]any{"terms": terms, "results": items})
+	if err != nil {
+		return nil, err
+	}
+
+	params := model.DecodedParams()
+	temperature := 0.0
+	if params.Temperature != nil {
+		temperature = *params.Temperature
+	}
+	maxTokens := webSearchScoreMaxToken
+	if params.MaxTokens != nil {
+		maxTokens = *params.MaxTokens
+	}
+
+	resp, chatErr := client.Chat(ctx, llm.ChatRequest{
+		Model:          model.Model,
+		Temperature:    temperature,
+		MaxTokens:      maxTokens,
+		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+		Messages: []llm.Message{
+			{Role: "system", Content: prompt.Prompt},
+			{Role: "user", Content: string(input)},
+		},
+	})
+
+	// Best-effort audit (mirrors buildMADeepBriefLLM).
+	usageRaw, _ := json.Marshal(resp.Usage)
+	audit := llm.CallAudit{
+		App:          maApp,
+		Scope:        maModelScopeWebSearchScorer,
+		ProviderID:   model.ProviderID,
+		ModelID:      model.ID,
+		PromptID:     prompt.ID,
+		Model:        model.Model,
+		Usage:        usageRaw,
+		ActorSubject: subject,
+		ActorEmail:   email,
+	}
+	if chatErr != nil {
+		audit.Status = "failed"
+		audit.ErrorMessage = chatErr.Error()
+	} else if respRaw, mErr := json.Marshal(map[string]any{"content": resp.Content}); mErr == nil {
+		audit.Response = respRaw
+	}
+	_ = s.llmp.RecordAudit(ctx, audit)
+
+	if chatErr != nil {
+		return nil, chatErr
+	}
+
+	var parsed struct {
+		Scores []struct {
+			I     int `json:"i"`
+			Score int `json:"score"`
+		} `json:"scores"`
+	}
+	if err := json.Unmarshal([]byte(resp.Content), &parsed); err != nil {
+		return nil, err
+	}
+	out := make(map[int]int, len(parsed.Scores))
+	for _, sc := range parsed.Scores {
+		if sc.I < 0 || sc.I >= len(results) {
+			continue
+		}
+		out[sc.I] = max(0, min(100, sc.Score))
+	}
+	return out, nil
+}
+
+// scoreOf returns a result's score, or -1 when unscored so it sinks to the bottom.
+func scoreOf(r WebSearchResult) int {
+	if r.Score == nil {
+		return -1
+	}
+	return *r.Score
+}
+
+func truncateRunes(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max])
 }
 
 // normalizeDomain reduces a pasted value (e.g. "https://www.azienda.it/chi-siamo")

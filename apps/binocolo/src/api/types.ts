@@ -36,6 +36,7 @@ export interface WebSearchRequest {
   domain: string;
   keywords: string[];
   count?: number;
+  rank?: boolean;
 }
 
 export interface WebSearchResult {
@@ -44,11 +45,13 @@ export interface WebSearchResult {
   hostname: string;
   age?: string;
   snippets: string[];
+  score?: number;
 }
 
 export interface WebSearchResponse {
   query: string;
   count: number;
+  ranked: boolean;
   results: WebSearchResult[];
 }
 
