@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
-	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -57,8 +57,62 @@ type maSurfaceProbeAudit struct {
 	Response json.RawMessage `json:"response"`
 }
 
+// maAIClient is the chat seam — the per-call OpenAI-compatible client. Kept as
+// an interface so the agentic loop stays testable.
 type maAIClient interface {
-	Chat(context.Context, openrouter.ChatRequest) (openrouter.ChatResponse, error)
+	Chat(context.Context, llm.ChatRequest) (llm.ChatResponse, error)
+}
+
+// maApp is this module's app namespace in the centralized llm registry.
+const maApp = "binocolo"
+
+// maLLMProvider is binocolo's view of the shared llm.Service: model/prompt
+// resolution (scoped to app="binocolo"), per-call client construction, audit,
+// and option lists. *llm.Service is adapted to it by maLLMAdapter.
+type maLLMProvider interface {
+	ResolveModel(ctx context.Context, scope, modelID string) (llm.Model, error)
+	ResolvePrompt(ctx context.Context, scope, promptID string) (llm.Prompt, error)
+	ClientForModel(ctx context.Context, m llm.Model) (maAIClient, error)
+	RecordAudit(ctx context.Context, audit llm.CallAudit) error
+	ListModels(ctx context.Context) ([]llm.Model, error)
+	ListPrompts(ctx context.Context) ([]llm.Prompt, error)
+}
+
+type maLLMAdapter struct{ svc *llm.Service }
+
+func newMALLMProvider(svc *llm.Service) maLLMProvider {
+	if svc == nil {
+		return nil
+	}
+	return maLLMAdapter{svc: svc}
+}
+
+func (a maLLMAdapter) ResolveModel(ctx context.Context, scope, modelID string) (llm.Model, error) {
+	return a.svc.ResolveModel(ctx, maApp, scope, modelID)
+}
+
+func (a maLLMAdapter) ResolvePrompt(ctx context.Context, scope, promptID string) (llm.Prompt, error) {
+	return a.svc.ResolvePrompt(ctx, maApp, scope, promptID)
+}
+
+func (a maLLMAdapter) ClientForModel(ctx context.Context, m llm.Model) (maAIClient, error) {
+	client, _, err := a.svc.ClientForModel(ctx, m)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+func (a maLLMAdapter) RecordAudit(ctx context.Context, audit llm.CallAudit) error {
+	return a.svc.RecordAudit(ctx, audit)
+}
+
+func (a maLLMAdapter) ListModels(ctx context.Context) ([]llm.Model, error) {
+	return a.svc.ListModels(ctx, maApp)
+}
+
+func (a maLLMAdapter) ListPrompts(ctx context.Context) ([]llm.Prompt, error) {
+	return a.svc.ListPrompts(ctx, maApp)
 }
 
 type maService struct {
@@ -67,18 +121,18 @@ type maService struct {
 	provinceCache provinceCacheStore
 	ateco         atecoStore
 	openapiit     *openapiit.Client
-	ai            maAIClient
+	llmp          maLLMProvider
 	now           func() time.Time
 }
 
-func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, provinceCache provinceCacheStore, ateco atecoStore, openapiitClient *openapiit.Client, ai maAIClient) *maService {
+func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, provinceCache provinceCacheStore, ateco atecoStore, openapiitClient *openapiit.Client, llmp maLLMProvider) *maService {
 	return &maService{
 		store:         store,
 		searchCache:   searchCache,
 		provinceCache: provinceCache,
 		ateco:         ateco,
 		openapiit:     openapiitClient,
-		ai:            ai,
+		llmp:          llmp,
 		now:           func() time.Time { return time.Now().UTC() },
 	}
 }
@@ -241,10 +295,28 @@ func decorateMACost(detail MASessionDetail, pricing maPricing) MASessionDetail {
 }
 
 func (s *maService) listLLMOptions(ctx context.Context) (MALLMOptionsResponse, error) {
-	if s.store == nil {
-		return MALLMOptionsResponse{}, errMAStoreUnavailable
+	if s.llmp == nil {
+		return MALLMOptionsResponse{}, errMAOpenRouterUnavailable
 	}
-	return s.store.ListMALLMOptions(ctx)
+	models, err := s.llmp.ListModels(ctx)
+	if err != nil {
+		return MALLMOptionsResponse{}, err
+	}
+	prompts, err := s.llmp.ListPrompts(ctx)
+	if err != nil {
+		return MALLMOptionsResponse{}, err
+	}
+	out := MALLMOptionsResponse{
+		Models:  make([]MALLMModelOption, 0, len(models)),
+		Prompts: make([]MALLMPromptOption, 0, len(prompts)),
+	}
+	for _, m := range models {
+		out.Models = append(out.Models, MALLMModelOption{ID: m.ID, Scope: m.Scope, Name: m.Name, Model: m.Model, IsDefault: m.IsDefault})
+	}
+	for _, p := range prompts {
+		out.Prompts = append(out.Prompts, MALLMPromptOption{ID: p.ID, Scope: p.Scope, Name: p.Name, IsDefault: p.IsDefault})
+	}
+	return out, nil
 }
 
 func (s *maService) createSession(ctx context.Context, req MACreateSessionRequest, subject, email string) (MASessionDetail, error) {
@@ -294,11 +366,16 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	}); err != nil {
 		return MASessionDetail{}, err
 	}
-	audit.SessionID = detail.Session.ID
+	auditCtx := map[string]string{"session_id": detail.Session.ID}
+	strategyVersionID := ""
 	if detail.Strategy != nil {
-		audit.StrategyVersionID = detail.Strategy.ID
+		strategyVersionID = detail.Strategy.ID
+		auditCtx["strategy_version_id"] = strategyVersionID
 	}
-	if err := s.store.RecordMAModelAudit(ctx, audit); err != nil {
+	if raw, marshalErr := json.Marshal(auditCtx); marshalErr == nil {
+		audit.Context = raw
+	}
+	if err := s.llmp.RecordAudit(ctx, audit); err != nil {
 		return MASessionDetail{}, err
 	}
 	if err := s.traceEvent(ctx, maTraceEventWrite{
@@ -308,8 +385,8 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 			"scope":               audit.Scope,
 			"model_id":            audit.ModelID,
 			"prompt_id":           audit.PromptID,
-			"session_id":          audit.SessionID,
-			"strategy_version_id": audit.StrategyVersionID,
+			"session_id":          detail.Session.ID,
+			"strategy_version_id": strategyVersionID,
 		}),
 	}); err != nil {
 		return MASessionDetail{}, err
@@ -707,14 +784,14 @@ func (s *maService) regenerateMADeepBriefs(ctx context.Context) (int, error) {
 	if s.store == nil {
 		return 0, errMAStoreUnavailable
 	}
-	if s.ai == nil {
+	if s.llmp == nil {
 		return 0, errMAOpenRouterUnavailable
 	}
-	model, err := s.store.ResolveMAModel(ctx, maModelScopeDeepBrief, "")
+	model, err := s.llmp.ResolveModel(ctx, maModelScopeDeepBrief, "")
 	if err != nil {
 		return 0, err
 	}
-	prompt, err := s.store.ResolveMAPrompt(ctx, maModelScopeDeepBrief, "")
+	prompt, err := s.llmp.ResolvePrompt(ctx, maModelScopeDeepBrief, "")
 	if err != nil {
 		return 0, err
 	}
@@ -728,7 +805,7 @@ func (s *maService) regenerateMADeepBriefs(ctx context.Context) (int, error) {
 		if scorecard == nil {
 			continue
 		}
-		brief, err := buildMADeepBriefLLM(ctx, s.ai, model, prompt, row.Payload, scorecard, row.Valuation)
+		brief, err := buildMADeepBriefLLM(ctx, s.llmp, model, prompt, row.Payload, scorecard, row.Valuation)
 		if err != nil {
 			logging.FromContext(ctx).Warn("binocolo brief regenerate failed", "component", "binocolo", "operation", "ma_deep_regenerate_briefs", "company_key", row.CompanyKey, "error", err)
 			continue
@@ -895,26 +972,39 @@ func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, em
 	return s.getSession(ctx, sessionID)
 }
 
-func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID string, promptID string, subject, email string) (MAStrategySpec, maModelAuditWrite, error) {
-	if s.ai == nil {
-		return MAStrategySpec{}, maModelAuditWrite{}, errMAOpenRouterUnavailable
+func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID string, promptID string, subject, email string) (MAStrategySpec, llm.CallAudit, error) {
+	if s.llmp == nil {
+		return MAStrategySpec{}, llm.CallAudit{}, errMAOpenRouterUnavailable
 	}
 	if s.store == nil {
-		return MAStrategySpec{}, maModelAuditWrite{}, errMAStoreUnavailable
+		return MAStrategySpec{}, llm.CallAudit{}, errMAStoreUnavailable
 	}
 	if err := validateOptionalUUID(modelID); err != nil {
-		return MAStrategySpec{}, maModelAuditWrite{}, err
+		return MAStrategySpec{}, llm.CallAudit{}, err
 	}
 	if err := validateOptionalUUID(promptID); err != nil {
-		return MAStrategySpec{}, maModelAuditWrite{}, err
+		return MAStrategySpec{}, llm.CallAudit{}, err
 	}
-	modelConfig, err := s.store.ResolveMAModel(ctx, maModelScopeStrategy, modelID)
+	modelConfig, err := s.llmp.ResolveModel(ctx, maModelScopeStrategy, modelID)
 	if err != nil {
-		return MAStrategySpec{}, maModelAuditWrite{}, llmConfigError(err)
+		return MAStrategySpec{}, llm.CallAudit{}, llmConfigError(err)
 	}
-	promptConfig, err := s.store.ResolveMAPrompt(ctx, maModelScopeStrategy, promptID)
+	promptConfig, err := s.llmp.ResolvePrompt(ctx, maModelScopeStrategy, promptID)
 	if err != nil {
-		return MAStrategySpec{}, maModelAuditWrite{}, llmConfigError(err)
+		return MAStrategySpec{}, llm.CallAudit{}, llmConfigError(err)
+	}
+	client, err := s.llmp.ClientForModel(ctx, modelConfig)
+	if err != nil {
+		return MAStrategySpec{}, llm.CallAudit{}, llmConfigError(err)
+	}
+	params := modelConfig.DecodedParams()
+	temperature := 0.0
+	if params.Temperature != nil {
+		temperature = *params.Temperature
+	}
+	maxTokens := 1800
+	if params.MaxTokens != nil {
+		maxTokens = *params.MaxTokens
 	}
 	if err := s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_strategy_draft_config",
@@ -929,30 +1019,30 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			"prompt":       promptConfig.Prompt,
 		}),
 	}); err != nil {
-		return MAStrategySpec{}, maModelAuditWrite{}, err
+		return MAStrategySpec{}, llm.CallAudit{}, err
 	}
-	messages := []openrouter.Message{
+	messages := []llm.Message{
 		{Role: "system", Content: promptConfig.Prompt},
 		{Role: "developer", Content: maStrategyToolInstructions()},
 		{Role: "user", Content: prompt},
 	}
 	allowedAteco := map[string]AtecoCode{}
 	allowedProvinces := map[string]openapiit.Province{}
-	tools := []openrouter.Tool{maAtecoSearchTool(), maProvinceRegionTool(), maCompanySurfaceProbeTool()}
-	var response openrouter.ChatResponse
+	tools := []llm.Tool{maAtecoSearchTool(), maProvinceRegionTool(), maCompanySurfaceProbeTool()}
+	var response llm.ChatResponse
 	var responseRaw json.RawMessage
 	for round := 0; round <= maMaxToolRounds; round++ {
-		req := openrouter.ChatRequest{
+		req := llm.ChatRequest{
 			Model:          modelConfig.Model,
-			Temperature:    0,
-			MaxTokens:      1800,
-			ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
+			Temperature:    temperature,
+			MaxTokens:      maxTokens,
+			ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
 			Messages:       messages,
 			Tools:          tools,
 			ToolChoice:     "auto",
 		}
 		start := time.Now()
-		response, err = s.ai.Chat(ctx, req)
+		response, err = client.Chat(ctx, req)
 		duration := maTraceDuration(start)
 		if err != nil {
 			_ = s.traceEvent(ctx, maTraceEventWrite{
@@ -964,7 +1054,7 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 				Request:        maTraceJSON(req),
 				Error:          err.Error(),
 			})
-			return MAStrategySpec{}, maModelAuditWrite{}, err
+			return MAStrategySpec{}, llm.CallAudit{}, err
 		}
 		if err := s.traceEvent(ctx, maTraceEventWrite{
 			EventType:      "openrouter_chat",
@@ -976,7 +1066,7 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			Response:       maTraceJSON(response),
 			Metadata:       maTraceJSON(map[string]any{"tool_call_count": len(response.ToolCalls), "response_id": response.ID, "response_model": response.Model}),
 		}); err != nil {
-			return MAStrategySpec{}, maModelAuditWrite{}, err
+			return MAStrategySpec{}, llm.CallAudit{}, err
 		}
 		if len(response.ToolCalls) == 0 {
 			responseRaw = json.RawMessage([]byte(strings.TrimSpace(response.Content)))
@@ -991,9 +1081,9 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 				Metadata:  maTraceJSON(map[string]any{"max_tool_rounds": maMaxToolRounds, "tool_call_count": len(response.ToolCalls)}),
 				Error:     err.Error(),
 			})
-			return MAStrategySpec{}, maModelAuditWrite{}, err
+			return MAStrategySpec{}, llm.CallAudit{}, err
 		}
-		messages = append(messages, openrouter.Message{
+		messages = append(messages, llm.Message{
 			Role:      "assistant",
 			Content:   response.Content,
 			ToolCalls: response.ToolCalls,
@@ -1014,9 +1104,9 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 					"allowed_province_count": len(allowedProvinces),
 				}),
 			}); err != nil {
-				return MAStrategySpec{}, maModelAuditWrite{}, err
+				return MAStrategySpec{}, llm.CallAudit{}, err
 			}
-			messages = append(messages, openrouter.Message{
+			messages = append(messages, llm.Message{
 				Role:       "tool",
 				ToolCallID: call.ID,
 				Content:    content,
@@ -1031,14 +1121,14 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			Response:  maTraceJSON(responseRaw),
 			Error:     err.Error(),
 		})
-		return MAStrategySpec{}, maModelAuditWrite{}, err
+		return MAStrategySpec{}, llm.CallAudit{}, err
 	}
 	if err := s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_strategy_decode",
 		Status:    maTraceEventSucceeded,
 		Response:  maTraceJSON(strategy),
 	}); err != nil {
-		return MAStrategySpec{}, maModelAuditWrite{}, err
+		return MAStrategySpec{}, llm.CallAudit{}, err
 	}
 	strategy, err = s.canonicalizeMAStrategyProvinces(strategy, allowedProvinces, true)
 	if err != nil {
@@ -1048,14 +1138,14 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			Metadata:  maTraceJSON(map[string]any{"allowed_province_count": len(allowedProvinces)}),
 			Error:     err.Error(),
 		})
-		return MAStrategySpec{}, maModelAuditWrite{}, err
+		return MAStrategySpec{}, llm.CallAudit{}, err
 	}
 	if err := s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_strategy_province_canonicalization",
 		Status:    maTraceEventSucceeded,
 		Metadata:  maTraceJSON(map[string]any{"allowed_province_count": len(allowedProvinces), "provinces": strategy.Provinces}),
 	}); err != nil {
-		return MAStrategySpec{}, maModelAuditWrite{}, err
+		return MAStrategySpec{}, llm.CallAudit{}, err
 	}
 	strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategy, allowedAteco, true)
 	if err != nil {
@@ -1065,7 +1155,7 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 			Metadata:  maTraceJSON(map[string]any{"allowed_ateco_count": len(allowedAteco)}),
 			Error:     err.Error(),
 		})
-		return MAStrategySpec{}, maModelAuditWrite{}, err
+		return MAStrategySpec{}, llm.CallAudit{}, err
 	}
 	if err := s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_strategy_ateco_canonicalization",
@@ -1073,7 +1163,7 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 		Response:  maTraceJSON(strategy.AtecoCandidates),
 		Metadata:  maTraceJSON(map[string]any{"allowed_ateco_count": len(allowedAteco), "candidate_count": len(strategy.AtecoCandidates)}),
 	}); err != nil {
-		return MAStrategySpec{}, maModelAuditWrite{}, err
+		return MAStrategySpec{}, llm.CallAudit{}, err
 	}
 	usageRaw, _ := json.Marshal(response.Usage)
 	promptRaw, _ := json.Marshal(map[string]any{
@@ -1082,14 +1172,18 @@ func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID st
 		"messages":  messages,
 		"tools":     tools,
 	})
-	return strategy, maModelAuditWrite{
-		Scope:    maModelScopeStrategy,
-		ModelID:  modelConfig.ID,
-		PromptID: promptConfig.ID,
-		Model:    modelConfig.Model,
-		Prompt:   promptRaw,
-		Response: responseRaw,
-		Usage:    usageRaw,
+	return strategy, llm.CallAudit{
+		App:          maApp,
+		Scope:        maModelScopeStrategy,
+		ProviderID:   modelConfig.ProviderID,
+		ModelID:      modelConfig.ID,
+		PromptID:     promptConfig.ID,
+		Model:        modelConfig.Model,
+		Request:      promptRaw,
+		Response:     responseRaw,
+		Usage:        usageRaw,
+		ActorSubject: subject,
+		ActorEmail:   email,
 	}, nil
 }
 
@@ -1133,10 +1227,10 @@ func maStrategyToolInstructions() string {
 	}, "\n")
 }
 
-func maAtecoSearchTool() openrouter.Tool {
-	return openrouter.Tool{
+func maAtecoSearchTool() llm.Tool {
+	return llm.Tool{
 		Type: "function",
-		Function: openrouter.ToolFunction{
+		Function: llm.ToolFunction{
 			Name:        maAtecoToolName,
 			Description: "Cerca codici ATECO 2025 reali nella tabella Binocolo. Restituisce solo codici validi per la selezione ATECO.",
 			Parameters: map[string]any{
@@ -1160,10 +1254,10 @@ func maAtecoSearchTool() openrouter.Tool {
 	}
 }
 
-func maProvinceRegionTool() openrouter.Tool {
-	return openrouter.Tool{
+func maProvinceRegionTool() llm.Tool {
+	return llm.Tool{
 		Type: "function",
-		Function: openrouter.ToolFunction{
+		Function: llm.ToolFunction{
 			Name:        maProvinceRegionToolName,
 			Description: "Restituisce province italiane reali e rispettive regioni dai dati OpenAPI.it cacheati in Binocolo.",
 			Parameters: map[string]any{
@@ -1184,10 +1278,10 @@ func maProvinceRegionTool() openrouter.Tool {
 	}
 }
 
-func maCompanySurfaceProbeTool() openrouter.Tool {
-	return openrouter.Tool{
+func maCompanySurfaceProbeTool() llm.Tool {
+	return llm.Tool{
 		Type: "function",
-		Function: openrouter.ToolFunction{
+		Function: llm.ToolFunction{
 			Name:        maCompanySurfaceToolName,
 			Description: "Esegue un dry-run Company IT-search senza limit operativo e misura se la superficie e' esatta o troppo ampia.",
 			Parameters: map[string]any{
@@ -1263,7 +1357,7 @@ type maCompanySurfaceToolArgs struct {
 	MaxEmployees   *int   `json:"maxEmployees,omitempty"`
 }
 
-func (s *maService) executeMAStrategyTool(ctx context.Context, call openrouter.ToolCall, allowedAteco map[string]AtecoCode, allowedProvinces map[string]openapiit.Province, subject, email string) string {
+func (s *maService) executeMAStrategyTool(ctx context.Context, call llm.ToolCall, allowedAteco map[string]AtecoCode, allowedProvinces map[string]openapiit.Province, subject, email string) string {
 	switch call.Function.Name {
 	case maAtecoToolName:
 		return s.executeMAAtecoTool(ctx, call, allowedAteco)
@@ -1276,7 +1370,7 @@ func (s *maService) executeMAStrategyTool(ctx context.Context, call openrouter.T
 	}
 }
 
-func (s *maService) executeMAAtecoTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]AtecoCode) string {
+func (s *maService) executeMAAtecoTool(ctx context.Context, call llm.ToolCall, allowed map[string]AtecoCode) string {
 	if s.ateco == nil {
 		return maToolErrorJSON("ateco_not_configured")
 	}
@@ -1298,7 +1392,7 @@ func (s *maService) executeMAAtecoTool(ctx context.Context, call openrouter.Tool
 	return string(raw)
 }
 
-func (s *maService) executeMAProvinceRegionTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]openapiit.Province) string {
+func (s *maService) executeMAProvinceRegionTool(ctx context.Context, call llm.ToolCall, allowed map[string]openapiit.Province) string {
 	var args maProvinceRegionToolArgs
 	if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
 		return maToolErrorJSON("invalid_arguments")
@@ -1361,7 +1455,7 @@ func (s *maService) executeMAProvinceRegionTool(ctx context.Context, call openro
 	return string(raw)
 }
 
-func (s *maService) executeMACompanySurfaceTool(ctx context.Context, call openrouter.ToolCall, allowed map[string]AtecoCode, allowedProvinces map[string]openapiit.Province, subject, email string) string {
+func (s *maService) executeMACompanySurfaceTool(ctx context.Context, call llm.ToolCall, allowed map[string]AtecoCode, allowedProvinces map[string]openapiit.Province, subject, email string) string {
 	var args maCompanySurfaceToolArgs
 	if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
 		return maToolErrorJSON("invalid_arguments")

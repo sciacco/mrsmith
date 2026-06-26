@@ -20,7 +20,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/keycloak"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
-	"github.com/sciacco/mrsmith/internal/platform/openrouter"
+	"github.com/sciacco/mrsmith/internal/platform/llm"
 )
 
 const (
@@ -49,7 +49,7 @@ var (
 type Handler struct {
 	anisettaDB   *sql.DB
 	mistraDB     *sql.DB
-	ai           *openrouter.Client
+	ai           *llm.Client
 	logger       *slog.Logger
 	notifier     notifications.Notifier
 	roleResolver RoleUserResolver
@@ -63,7 +63,7 @@ type RoleUserResolver interface {
 type Deps struct {
 	AnisettaDB   *sql.DB
 	MistraDB     *sql.DB
-	AI           *openrouter.Client
+	AI           *llm.Client
 	Logger       *slog.Logger
 	Notifier     notifications.Notifier
 	RoleResolver RoleUserResolver

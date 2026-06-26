@@ -1,6 +1,6 @@
 import { Icon } from '@mrsmith/ui';
 import { Link } from 'react-router-dom';
-import { useConfigSummary, useLLMModels, useServiceDependencies, type ConfigSummary } from '../api/queries';
+import { useConfigSummary, useServiceDependencies, type ConfigSummary } from '../api/queries';
 import { errorMessage } from '../lib/format';
 import {
   RESOURCE_GROUPS,
@@ -58,7 +58,6 @@ function ResourceGroupSection({
   const items = RESOURCE_KEYS.map((key) => RESOURCE_META[key]).filter(
     (meta) => meta.group === group.id && !meta.hiddenFromIndex,
   );
-  const isAutomationGroup = group.id === 'automation';
   const isImpactGroup = group.id === 'impact';
   const hasDomainsCard = items.some((meta) => meta.key === 'technical-domains');
   return (
@@ -75,7 +74,6 @@ function ResourceGroupSection({
           />
         ))}
         {isImpactGroup ? <DependencyGraphCard /> : null}
-        {isAutomationGroup ? <LLMModelsCard /> : null}
       </div>
       {hasDomainsCard ? (
         <div className={styles.groupFooter}>
@@ -173,38 +171,6 @@ function ResourceCard({
           </span>
         ) : (
           <span className={styles.counters}>—</span>
-        )}
-        <Icon name="chevron-right" size={18} className={styles.chevron} />
-      </div>
-    </Link>
-  );
-}
-
-function LLMModelsCard() {
-  const models = useLLMModels();
-  const count = models.data?.length ?? 0;
-  const isEmpty = !models.isLoading && !models.error && count === 0;
-  return (
-    <Link to="/manutenzioni/configurazione/modelli-llm" className={styles.card}>
-      <div className={styles.cardHeader}>
-        <h3 className={styles.cardTitle}>Modelli AI</h3>
-        {isEmpty ? (
-          <span className={styles.emptyBadge}>
-            <Icon name="triangle-alert" size={12} />
-            Da configurare
-          </span>
-        ) : null}
-      </div>
-      <p className={styles.cardDescription}>Modelli usati dalle automazioni assistite.</p>
-      <div className={styles.cardFooter}>
-        {models.isLoading ? (
-          <span className={styles.counterSkeleton} aria-hidden="true" />
-        ) : models.error ? (
-          <span className={styles.counters}>—</span>
-        ) : (
-          <span className={styles.counters}>
-            {count} {count === 1 ? 'modello' : 'modelli'}
-          </span>
         )}
         <Icon name="chevron-right" size={18} className={styles.chevron} />
       </div>

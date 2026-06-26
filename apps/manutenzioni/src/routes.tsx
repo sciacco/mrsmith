@@ -9,7 +9,6 @@ import { MaintenanceDetailPage } from './pages/MaintenanceDetailPage';
 import { MaintenanceListPage } from './pages/MaintenanceListPage';
 import { ConfigurationDependenciesPage } from './pages/ConfigurationDependenciesPage';
 import { ConfigurationIndexPage } from './pages/ConfigurationIndexPage';
-import { ConfigurationLLMModelsPage } from './pages/ConfigurationLLMModelsPage';
 import { ConfigurationResourcePage } from './pages/ConfigurationResourcePage';
 
 function RequireConfiguration({ children }: { children: ReactElement }) {
@@ -37,14 +36,6 @@ export const routes: RouteObject[] = [
     element: (
       <RequireConfiguration>
         <ConfigurationIndexPage />
-      </RequireConfiguration>
-    ),
-  },
-  {
-    path: 'manutenzioni/configurazione/modelli-llm',
-    element: (
-      <RequireConfiguration>
-        <ConfigurationLLMModelsPage />
       </RequireConfiguration>
     ),
   },

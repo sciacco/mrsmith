@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/logging"
-	"github.com/sciacco/mrsmith/internal/platform/openrouter"
+	"github.com/sciacco/mrsmith/internal/platform/llm"
 )
 
 const (
@@ -77,27 +77,27 @@ func (h *Handler) analyzeJSON(ctx context.Context, richiestaID int, full Richies
 	return parsed, nil
 }
 
-func (h *Handler) runAICompletion(ctx context.Context, richiestaID int, model, systemPrompt string, jsonMode bool, full RichiestaFull) (string, openrouter.Usage, error) {
+func (h *Handler) runAICompletion(ctx context.Context, richiestaID int, model, systemPrompt string, jsonMode bool, full RichiestaFull) (string, llm.Usage, error) {
 	if !rdfAIRequestsEnabled || h.ai == nil {
-		return "", openrouter.Usage{}, errAIUnavailable
+		return "", llm.Usage{}, errAIUnavailable
 	}
 
 	payload, err := json.MarshalIndent(buildAnalysisRecords(full), "", "  ")
 	if err != nil {
-		return "", openrouter.Usage{}, fmt.Errorf("marshal analysis payload: %w", err)
+		return "", llm.Usage{}, fmt.Errorf("marshal analysis payload: %w", err)
 	}
 
-	request := openrouter.ChatRequest{
+	request := llm.ChatRequest{
 		Model:       model,
 		Temperature: 0,
 		MaxTokens:   4096,
-		Messages: []openrouter.Message{
+		Messages: []llm.Message{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: string(payload)},
 		},
 	}
 	if jsonMode {
-		request.ResponseFormat = &openrouter.ResponseFormat{Type: "json_object"}
+		request.ResponseFormat = &llm.ResponseFormat{Type: "json_object"}
 	}
 
 	start := time.Now()
@@ -113,7 +113,7 @@ func (h *Handler) runAICompletion(ctx context.Context, richiestaID int, model, s
 			"latency_ms", latencyMs,
 			"error", err,
 		)
-		return "", openrouter.Usage{}, err
+		return "", llm.Usage{}, err
 	}
 
 	logging.FromContext(ctx).Info(

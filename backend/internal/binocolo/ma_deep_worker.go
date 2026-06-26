@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
-	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 )
 
 // maDeepWorkerStore is the persistence the deep-dive worker needs. *SQLStore
@@ -22,8 +22,6 @@ type maDeepWorkerStore interface {
 	ClaimMADeepQueued(ctx context.Context, companyKey string) (bool, error)
 	SetMADeepVendorRequest(ctx context.Context, companyKey, vendorRequestID string) error
 	ResolveSectorMultiple(ctx context.Context, ateco string) (*sectorMultiple, error)
-	ResolveMAModel(ctx context.Context, scope, modelID string) (maLLMModel, error)
-	ResolveMAPrompt(ctx context.Context, scope, promptID string) (maLLMPrompt, error)
 	SaveMADeepReady(ctx context.Context, companyKey string, result maDeepResult) error
 	MarkMADeepFailed(ctx context.Context, companyKey, errorCode string) error
 	BumpMADeepAttempt(ctx context.Context, companyKey string) (int, error)
@@ -37,25 +35,21 @@ type maDeepWorker struct {
 	id        string
 	store     maDeepWorkerStore
 	openapiit *openapiit.Client
-	ai        maAIClient
+	llmp      maLLMProvider
 	pricing   func(ctx context.Context) maPricing
 	interval  time.Duration
 	batch     int
 }
 
-func newMADeepWorker(store maDeepWorkerStore, client *openapiit.Client, ai *openrouter.Client, pricing func(context.Context) maPricing) *maDeepWorker {
+func newMADeepWorker(store maDeepWorkerStore, client *openapiit.Client, llmp maLLMProvider, pricing func(context.Context) maPricing) *maDeepWorker {
 	worker := &maDeepWorker{
 		id:        uuid.NewString(),
 		store:     store,
 		openapiit: client,
+		llmp:      llmp,
 		pricing:   pricing,
 		interval:  5 * time.Second,
 		batch:     16,
-	}
-	// Guard against a typed-nil interface: leave ai unset (nil) when no client,
-	// so w.ai != nil correctly skips brief generation.
-	if ai != nil {
-		worker.ai = ai
 	}
 	return worker
 }
@@ -166,7 +160,7 @@ func (w *maDeepWorker) process(ctx context.Context, job maDeepJob) {
 			}
 		}
 		result := maDeepResult{Payload: resp.Data, Scorecard: scorecard, Valuation: valuation, CostEUR: pricing.CostFull}
-		if w.ai != nil && scorecard != nil {
+		if w.llmp != nil && scorecard != nil {
 			brief, modelID, promptID, err := w.generateBrief(ctx, resp.Data, scorecard, valuation)
 			if err != nil {
 				// Brief is best-effort: a failure must not lose the paid scorecard.
@@ -199,15 +193,15 @@ func scorecardHasMetric(scorecard *MADeepScorecard) bool {
 // scorecard + valuation. The model receives only the computed numbers and must not
 // invent any (thesis-neutral, since the deep analysis is cached globally per company).
 func (w *maDeepWorker) generateBrief(ctx context.Context, rawPayload json.RawMessage, scorecard *MADeepScorecard, valuation *MADeepValuation) (*MADeepBrief, string, string, error) {
-	model, err := w.store.ResolveMAModel(ctx, maModelScopeDeepBrief, "")
+	model, err := w.llmp.ResolveModel(ctx, maModelScopeDeepBrief, "")
 	if err != nil {
 		return nil, "", "", err
 	}
-	prompt, err := w.store.ResolveMAPrompt(ctx, maModelScopeDeepBrief, "")
+	prompt, err := w.llmp.ResolvePrompt(ctx, maModelScopeDeepBrief, "")
 	if err != nil {
 		return nil, "", "", err
 	}
-	brief, err := buildMADeepBriefLLM(ctx, w.ai, model, prompt, rawPayload, scorecard, valuation)
+	brief, err := buildMADeepBriefLLM(ctx, w.llmp, model, prompt, rawPayload, scorecard, valuation)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -218,7 +212,11 @@ func (w *maDeepWorker) generateBrief(ctx context.Context, rawPayload json.RawMes
 // deep-dive worker (fresh analyses) and service-level brief regeneration (rolling out a
 // new prompt to already-cached companies). Numbers come from scorecard/valuation; the
 // curated raw payload supplies qualitative facts. No IT-full call.
-func buildMADeepBriefLLM(ctx context.Context, ai maAIClient, model maLLMModel, prompt maLLMPrompt, rawPayload json.RawMessage, scorecard *MADeepScorecard, valuation *MADeepValuation) (*MADeepBrief, error) {
+func buildMADeepBriefLLM(ctx context.Context, llmp maLLMProvider, model llm.Model, prompt llm.Prompt, rawPayload json.RawMessage, scorecard *MADeepScorecard, valuation *MADeepValuation) (*MADeepBrief, error) {
+	client, err := llmp.ClientForModel(ctx, model)
+	if err != nil {
+		return nil, err
+	}
 	briefInput := map[string]any{"scorecard": scorecard, "valuation": valuation}
 	if company := curateITFullForBrief(rawPayload); company != nil {
 		briefInput["company"] = company
@@ -227,18 +225,46 @@ func buildMADeepBriefLLM(ctx context.Context, ai maAIClient, model maLLMModel, p
 	if err != nil {
 		return nil, err
 	}
-	resp, err := ai.Chat(ctx, openrouter.ChatRequest{
+	params := model.DecodedParams()
+	temperature := 0.0
+	if params.Temperature != nil {
+		temperature = *params.Temperature
+	}
+	maxTokens := 2200
+	if params.MaxTokens != nil {
+		maxTokens = *params.MaxTokens
+	}
+	resp, chatErr := client.Chat(ctx, llm.ChatRequest{
 		Model:          model.Model,
-		Temperature:    0,
-		MaxTokens:      2200,
-		ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
-		Messages: []openrouter.Message{
+		Temperature:    temperature,
+		MaxTokens:      maxTokens,
+		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+		Messages: []llm.Message{
 			{Role: "system", Content: prompt.Prompt},
 			{Role: "user", Content: string(input)},
 		},
 	})
-	if err != nil {
-		return nil, err
+	// Best-effort audit: this runs per-row in a batch, so a failed audit must not
+	// abort brief generation.
+	usageRaw, _ := json.Marshal(resp.Usage)
+	audit := llm.CallAudit{
+		App:        maApp,
+		Scope:      maModelScopeDeepBrief,
+		ProviderID: model.ProviderID,
+		ModelID:    model.ID,
+		PromptID:   prompt.ID,
+		Model:      model.Model,
+		Usage:      usageRaw,
+	}
+	if chatErr != nil {
+		audit.Status = "failed"
+		audit.ErrorMessage = chatErr.Error()
+	} else if respRaw, mErr := json.Marshal(map[string]any{"content": resp.Content}); mErr == nil {
+		audit.Response = respRaw
+	}
+	_ = llmp.RecordAudit(ctx, audit)
+	if chatErr != nil {
+		return nil, chatErr
 	}
 	return parseMADeepBrief(resp.Content)
 }

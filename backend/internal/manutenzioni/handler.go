@@ -19,20 +19,20 @@ import (
 	"github.com/sciacco/mrsmith/internal/authz"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
-	"github.com/sciacco/mrsmith/internal/platform/openrouter"
+	"github.com/sciacco/mrsmith/internal/platform/llm"
 )
 
 type Deps struct {
 	Maintenance *sql.DB
 	Mistra      *sql.DB
-	AI          *openrouter.Client
+	LLM         *llm.Service
 	Logger      *slog.Logger
 }
 
 type Handler struct {
 	maintenance *sql.DB
 	mistra      *sql.DB
-	ai          *openrouter.Client
+	llmSvc      *llm.Service
 	logger      *slog.Logger
 }
 
@@ -46,7 +46,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	h := &Handler{
 		maintenance: deps.Maintenance,
 		mistra:      deps.Mistra,
-		ai:          deps.AI,
+		llmSvc:      deps.LLM,
 		logger:      deps.Logger,
 	}
 
@@ -117,10 +117,6 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	operator("PUT /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/locales/{locale}", h.handleUpsertNoticeLocale)
 	operator("POST /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/status", h.handleNoticeStatus)
 	operator("PUT /manutenzioni/v1/maintenances/{id}/notices/{noticeId}/quality-flags", h.handleReplaceNoticeQualityFlags)
-
-	config("GET /manutenzioni/v1/llm-models", h.handleListLLMModels)
-	config("POST /manutenzioni/v1/llm-models", h.handleCreateLLMModel)
-	config("PATCH /manutenzioni/v1/llm-models/{scope}", h.handleUpdateLLMModel)
 
 	config("POST /manutenzioni/v1/service-dependencies", h.handleCreateServiceDependency)
 	config("PATCH /manutenzioni/v1/service-dependencies/{id}", h.handleUpdateServiceDependency)

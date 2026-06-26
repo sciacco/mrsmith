@@ -416,11 +416,6 @@ export interface MaintenanceAssistanceDraft {
   usage: AssistanceUsage;
 }
 
-export interface LLMModel {
-  scope: string;
-  model: string;
-}
-
 export interface NoticeBody {
   maintenance_window_id?: number | null;
   notice_type: string;

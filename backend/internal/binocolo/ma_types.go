@@ -385,12 +385,12 @@ type MATarget struct {
 }
 
 type MATargetEvidence struct {
-	Criterion  string  `json:"criterion"`
-	Status     string  `json:"status"`
-	Family     string  `json:"family,omitempty"`
-	Label      string  `json:"label"`
-	Value      string  `json:"value,omitempty"`
-	Points     float64 `json:"points"`
+	Criterion string  `json:"criterion"`
+	Status    string  `json:"status"`
+	Family    string  `json:"family,omitempty"`
+	Label     string  `json:"label"`
+	Value     string  `json:"value,omitempty"`
+	Points    float64 `json:"points"`
 	// Weight is the criterion's effective share of the re-normalized 100-point
 	// budget for active rows (so Points <= Weight), and the nominal weight for
 	// missing rows (Points is 0, shown as the foregone budget). See ma_scoring.go.
@@ -523,34 +523,6 @@ type MACompanyDossier struct {
 
 type maStrategyDraftEnvelope struct {
 	Strategy MAStrategySpec `json:"strategy"`
-}
-
-type maModelAuditWrite struct {
-	SessionID         string
-	StrategyVersionID string
-	Scope             string
-	ModelID           string
-	PromptID          string
-	Model             string
-	Prompt            json.RawMessage
-	Response          json.RawMessage
-	Usage             json.RawMessage
-}
-
-type maLLMModel struct {
-	ID        string
-	Scope     string
-	Name      string
-	Model     string
-	IsDefault bool
-}
-
-type maLLMPrompt struct {
-	ID        string
-	Scope     string
-	Name      string
-	Prompt    string
-	IsDefault bool
 }
 
 type maSessionCreate struct {

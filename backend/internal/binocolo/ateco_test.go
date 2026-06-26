@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
-	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 )
 
 func TestAtecoSearchTokensExpandITWithoutBroadServizi(t *testing.T) {
@@ -65,13 +65,13 @@ func TestDraftStrategyUsesAtecoToolWhitelist(t *testing.T) {
 		CodiceSearch: "621000",
 		Titolo:       "Attività di programmazione informatica",
 	}})
-	ai := &fakeMAAI{responses: []openrouter.ChatResponse{
+	ai := &fakeMAAI{responses: []llm.ChatResponse{
 		{
-			ToolCalls: []openrouter.ToolCall{
+			ToolCalls: []llm.ToolCall{
 				{
 					ID:   "call_ateco",
 					Type: "function",
-					Function: openrouter.ToolCallFunction{
+					Function: llm.ToolCallFunction{
 						Name:      maAtecoToolName,
 						Arguments: `{"query":"servizi IT","limit":500}`,
 					},
@@ -82,7 +82,7 @@ func TestDraftStrategyUsesAtecoToolWhitelist(t *testing.T) {
 			Content: `{"strategy":{"sectorDescription":"servizi IT","provinces":[],"activityStatus":"ATTIVA","searchLimit":100,"atecoCandidates":[{"code":"62.10.00","description":"LLM","rationale":"trovato via tool"}],"keywords":[],"rationale":"ok","missingCriteria":[]}}`,
 		},
 	}}
-	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, ateco, nil, ai)
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, ateco, nil, &fakeMALLMProvider{ai: ai})
 
 	strategy, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "", "", "")
 	if err != nil {
@@ -111,13 +111,13 @@ func TestDraftStrategyRejectsAtecoOutsideToolWhitelist(t *testing.T) {
 		CodiceSearch: "621000",
 		Titolo:       "Attività di programmazione informatica",
 	}})
-	ai := &fakeMAAI{responses: []openrouter.ChatResponse{
+	ai := &fakeMAAI{responses: []llm.ChatResponse{
 		{
-			ToolCalls: []openrouter.ToolCall{
+			ToolCalls: []llm.ToolCall{
 				{
 					ID:   "call_ateco",
 					Type: "function",
-					Function: openrouter.ToolCallFunction{
+					Function: llm.ToolCallFunction{
 						Name:      maAtecoToolName,
 						Arguments: `{"query":"servizi IT"}`,
 					},
@@ -128,7 +128,7 @@ func TestDraftStrategyRejectsAtecoOutsideToolWhitelist(t *testing.T) {
 			Content: `{"strategy":{"sectorDescription":"servizi IT","provinces":[],"activityStatus":"ATTIVA","searchLimit":100,"atecoCandidates":[{"code":"63.10.10","description":"inventato","rationale":"non restituito"}],"keywords":[],"rationale":"ok","missingCriteria":[]}}`,
 		},
 	}}
-	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, ateco, nil, ai)
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, ateco, nil, &fakeMALLMProvider{ai: ai})
 
 	_, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT", "", "", "", "")
 	if !errors.Is(err, errMAStrategyInvalid) {
@@ -168,15 +168,15 @@ func TestDraftStrategyTracesToolLoopFailure(t *testing.T) {
 		CodiceSearch: "621000",
 		Titolo:       "Attività di programmazione informatica",
 	}})
-	responses := make([]openrouter.ChatResponse, 0, maMaxToolRounds+1)
+	responses := make([]llm.ChatResponse, 0, maMaxToolRounds+1)
 	for i := 0; i <= maMaxToolRounds; i++ {
-		responses = append(responses, openrouter.ChatResponse{
+		responses = append(responses, llm.ChatResponse{
 			ID:    "resp-loop",
 			Model: "test-model",
-			ToolCalls: []openrouter.ToolCall{{
+			ToolCalls: []llm.ToolCall{{
 				ID:   "call_ateco",
 				Type: "function",
-				Function: openrouter.ToolCallFunction{
+				Function: llm.ToolCallFunction{
 					Name:      maAtecoToolName,
 					Arguments: `{"query":"servizi IT"}`,
 				},
@@ -184,7 +184,7 @@ func TestDraftStrategyTracesToolLoopFailure(t *testing.T) {
 		})
 	}
 	store := &fakeMAWorkspaceStore{}
-	service := newMAService(store, nil, nil, ateco, nil, &fakeMAAI{responses: responses})
+	service := newMAService(store, nil, nil, ateco, nil, &fakeMALLMProvider{ai: &fakeMAAI{responses: responses}})
 	trace, err := service.startTrace(context.Background(), maTraceStart{Operation: "ma_session_create", Request: maTraceJSON(map[string]string{"prompt": "trova aziende servizi IT"})})
 	if err != nil {
 		t.Fatalf("start trace: %v", err)
@@ -483,10 +483,10 @@ func TestMASurfaceProbeMarksAboveVendorLimitTooBroadWithExactCount(t *testing.T)
 
 func TestMACompanySurfaceToolRejectsAtecoOutsideWhitelist(t *testing.T) {
 	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, nil, nil, nil)
-	call := openrouter.ToolCall{
+	call := llm.ToolCall{
 		ID:   "surface",
 		Type: "function",
-		Function: openrouter.ToolCallFunction{
+		Function: llm.ToolCallFunction{
 			Name:      maCompanySurfaceToolName,
 			Arguments: `{"province":"MI","atecoCode":"62.10.00"}`,
 		},
@@ -550,10 +550,10 @@ func TestProvinceRegionToolReturnsRegionsAndWhitelistsProvinces(t *testing.T) {
 	})
 	service := newMAService(&fakeMAWorkspaceStore{}, nil, cache, nil, nil, nil)
 	allowed := map[string]openapiit.Province{}
-	call := openrouter.ToolCall{
+	call := llm.ToolCall{
 		ID:   "province",
 		Type: "function",
-		Function: openrouter.ToolCallFunction{
+		Function: llm.ToolCallFunction{
 			Name:      maProvinceRegionToolName,
 			Arguments: `{"region":"lombardia"}`,
 		},
@@ -594,13 +594,13 @@ func TestDraftStrategyUsesProvinceToolWhitelist(t *testing.T) {
 		{Sigla: "MI", Provincia: "Milano", Regione: "Lombardia"},
 		{Sigla: "BG", Provincia: "Bergamo", Regione: "Lombardia"},
 	})
-	ai := &fakeMAAI{responses: []openrouter.ChatResponse{
+	ai := &fakeMAAI{responses: []llm.ChatResponse{
 		{
-			ToolCalls: []openrouter.ToolCall{
+			ToolCalls: []llm.ToolCall{
 				{
 					ID:   "call_province",
 					Type: "function",
-					Function: openrouter.ToolCallFunction{
+					Function: llm.ToolCallFunction{
 						Name:      maProvinceRegionToolName,
 						Arguments: `{"query":"Milano"}`,
 					},
@@ -611,7 +611,7 @@ func TestDraftStrategyUsesProvinceToolWhitelist(t *testing.T) {
 			Content: `{"strategy":{"sectorDescription":"servizi IT","provinces":["MI"],"activityStatus":"ATTIVA","searchLimit":100,"atecoCandidates":[],"keywords":[],"rationale":"ok","missingCriteria":[]}}`,
 		},
 	}}
-	service := newMAService(&fakeMAWorkspaceStore{}, nil, cache, nil, nil, ai)
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, cache, nil, nil, &fakeMALLMProvider{ai: ai})
 
 	strategy, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT a Milano", "", "", "", "")
 	if err != nil {
@@ -626,13 +626,13 @@ func TestDraftStrategyRejectsProvinceOutsideToolWhitelist(t *testing.T) {
 	cache := newFakeProvinceCache(t, []openapiit.Province{
 		{Sigla: "MI", Provincia: "Milano", Regione: "Lombardia"},
 	})
-	ai := &fakeMAAI{responses: []openrouter.ChatResponse{
+	ai := &fakeMAAI{responses: []llm.ChatResponse{
 		{
-			ToolCalls: []openrouter.ToolCall{
+			ToolCalls: []llm.ToolCall{
 				{
 					ID:   "call_province",
 					Type: "function",
-					Function: openrouter.ToolCallFunction{
+					Function: llm.ToolCallFunction{
 						Name:      maProvinceRegionToolName,
 						Arguments: `{"query":"Milano"}`,
 					},
@@ -643,7 +643,7 @@ func TestDraftStrategyRejectsProvinceOutsideToolWhitelist(t *testing.T) {
 			Content: `{"strategy":{"sectorDescription":"servizi IT","provinces":["RM"],"activityStatus":"ATTIVA","searchLimit":100,"atecoCandidates":[],"keywords":[],"rationale":"ok","missingCriteria":[]}}`,
 		},
 	}}
-	service := newMAService(&fakeMAWorkspaceStore{}, nil, cache, nil, nil, ai)
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, cache, nil, nil, &fakeMALLMProvider{ai: ai})
 
 	_, _, err := service.draftStrategy(context.Background(), "trova aziende servizi IT a Milano", "", "", "", "")
 	if !errors.Is(err, errMAStrategyInvalid) {
@@ -653,10 +653,10 @@ func TestDraftStrategyRejectsProvinceOutsideToolWhitelist(t *testing.T) {
 
 func TestMACompanySurfaceToolRejectsProvinceOutsideWhitelist(t *testing.T) {
 	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, nil, nil, nil)
-	call := openrouter.ToolCall{
+	call := llm.ToolCall{
 		ID:   "surface",
 		Type: "function",
-		Function: openrouter.ToolCallFunction{
+		Function: llm.ToolCallFunction{
 			Name:      maCompanySurfaceToolName,
 			Arguments: `{"province":"MI"}`,
 		},
@@ -689,7 +689,7 @@ func validSurfaceStrategy() MAStrategySpec {
 	return strategy
 }
 
-func hasTool(tools []openrouter.Tool, name string) bool {
+func hasTool(tools []llm.Tool, name string) bool {
 	for _, tool := range tools {
 		if tool.Function.Name == name {
 			return true
@@ -773,19 +773,46 @@ func (s *fakeAtecoStore) SearchAteco(_ context.Context, query string, limit int)
 }
 
 type fakeMAAI struct {
-	responses []openrouter.ChatResponse
-	requests  []openrouter.ChatRequest
+	responses []llm.ChatResponse
+	requests  []llm.ChatRequest
 }
 
-func (f *fakeMAAI) Chat(_ context.Context, req openrouter.ChatRequest) (openrouter.ChatResponse, error) {
+func (f *fakeMAAI) Chat(_ context.Context, req llm.ChatRequest) (llm.ChatResponse, error) {
 	f.requests = append(f.requests, req)
 	if len(f.responses) == 0 {
-		return openrouter.ChatResponse{}, errors.New("missing fake ai response")
+		return llm.ChatResponse{}, errors.New("missing fake ai response")
 	}
 	response := f.responses[0]
 	f.responses = f.responses[1:]
 	return response, nil
 }
+
+// fakeMALLMProvider implements maLLMProvider for tests: canned model/prompt and
+// a fakeMAAI as the per-call chat client.
+type fakeMALLMProvider struct {
+	ai *fakeMAAI
+}
+
+func (f *fakeMALLMProvider) ResolveModel(_ context.Context, scope, _ string) (llm.Model, error) {
+	return llm.Model{ID: "model-id", App: maApp, Scope: scope, ProviderID: "provider-id", Name: "Model", Model: "test-model", IsDefault: true}, nil
+}
+
+func (f *fakeMALLMProvider) ResolvePrompt(_ context.Context, scope, _ string) (llm.Prompt, error) {
+	return llm.Prompt{ID: "prompt-id", App: maApp, Scope: scope, Name: "Prompt", Prompt: "Rispondi solo con JSON.", IsDefault: true}, nil
+}
+
+func (f *fakeMALLMProvider) ClientForModel(context.Context, llm.Model) (maAIClient, error) {
+	if f.ai == nil {
+		return nil, errors.New("missing fake ai")
+	}
+	return f.ai, nil
+}
+
+func (f *fakeMALLMProvider) RecordAudit(context.Context, llm.CallAudit) error { return nil }
+
+func (f *fakeMALLMProvider) ListModels(context.Context) ([]llm.Model, error) { return nil, nil }
+
+func (f *fakeMALLMProvider) ListPrompts(context.Context) ([]llm.Prompt, error) { return nil, nil }
 
 type fakeMAWorkspaceStore struct {
 	traces []maTraceStart
@@ -874,10 +901,6 @@ func (f *fakeMAWorkspaceStore) UpdateMADeepBrief(context.Context, string, *MADee
 	return nil
 }
 
-func (f *fakeMAWorkspaceStore) RecordMAModelAudit(context.Context, maModelAuditWrite) error {
-	return nil
-}
-
 func (f *fakeMAWorkspaceStore) StartMATrace(_ context.Context, input maTraceStart) (string, error) {
 	if input.ID == "" {
 		input.ID = "trace-id"
@@ -899,18 +922,6 @@ func (f *fakeMAWorkspaceStore) CompleteMATrace(_ context.Context, input maTraceC
 func (f *fakeMAWorkspaceStore) RecordMATraceEvent(_ context.Context, input maTraceEventWrite) error {
 	f.events = append(f.events, input)
 	return nil
-}
-
-func (f *fakeMAWorkspaceStore) ListMALLMOptions(context.Context) (MALLMOptionsResponse, error) {
-	return MALLMOptionsResponse{}, errors.New("not implemented")
-}
-
-func (f *fakeMAWorkspaceStore) ResolveMAModel(context.Context, string, string) (maLLMModel, error) {
-	return maLLMModel{ID: "model-id", Scope: maModelScopeStrategy, Name: "Model", Model: "test-model", IsDefault: true}, nil
-}
-
-func (f *fakeMAWorkspaceStore) ResolveMAPrompt(context.Context, string, string) (maLLMPrompt, error) {
-	return maLLMPrompt{ID: "prompt-id", Scope: maModelScopeStrategy, Name: "Prompt", Prompt: "Rispondi solo con JSON.", IsDefault: true}, nil
 }
 
 func (f *fakeMAWorkspaceStore) RecordMAExport(context.Context, string, string, int, string) error {

@@ -42,9 +42,9 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 	"github.com/sciacco/mrsmith/internal/platform/keycloak"
+	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
-	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 	"github.com/sciacco/mrsmith/internal/platform/staticspa"
 	"github.com/sciacco/mrsmith/internal/portal"
 	"github.com/sciacco/mrsmith/internal/quotes"
@@ -255,10 +255,13 @@ func main() {
 		raenadHubSpotStage = hubspotCli
 	}
 
-	var openrouterCli *openrouter.Client
-	if cfg.OpenRouterAPIKey != "" {
-		openrouterCli = openrouter.New(cfg.OpenRouterAPIKey)
-		logger.Info("shared openrouter client configured", "component", "openrouter")
+	// Centralized multi-provider LLM service: provider config, model/prompt
+	// bindings and per-call audit live in the mrsmith schema on Anisetta. API
+	// keys resolve env-first (os.Getenv of each provider's api_key_env) with a
+	// plaintext DB fallback. Clients are built per-call (no cache).
+	llmSvc := llm.New(anisettaDB)
+	if anisettaDB != nil {
+		logger.Info("shared llm service configured", "component", "llm")
 	}
 
 	var openapiitCli *openapiit.Client
@@ -546,7 +549,7 @@ func main() {
 		appCatalog = filtered
 	}
 	portal.RegisterRoutes(api, appCatalog)
-	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, OpenRouter: openrouterCli, AnisettaDB: anisettaDB})
+	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, LLM: llmSvc, AnisettaDB: anisettaDB})
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	rda.RegisterRoutes(api, rda.Deps{
@@ -583,7 +586,7 @@ func main() {
 	manutenzioni.RegisterRoutes(api, manutenzioni.Deps{
 		Maintenance: manutenzioniDB,
 		Mistra:      mistraDB,
-		AI:          openrouterCli,
+		LLM:         llmSvc,
 		Logger:      logger,
 	})
 	training.RegisterRoutes(api, training.Deps{
@@ -616,9 +619,12 @@ func main() {
 		AppURLs: appURLs,
 	})
 	rdf.RegisterRoutes(api, rdf.Deps{
-		AnisettaDB:   anisettaDB,
-		MistraDB:     mistraDB,
-		AI:           openrouterCli,
+		AnisettaDB: anisettaDB,
+		MistraDB:   mistraDB,
+		// RDF AI is disabled (rdfAIRequestsEnabled=false); the multi-provider
+		// cutover left it on the raw client type. Pass nil until RDF is migrated
+		// to the llm.Service when the feature is re-enabled.
+		AI:           nil,
 		Logger:       logger,
 		Notifier:     notificationNotifier,
 		RoleResolver: keycloakRoleResolver,

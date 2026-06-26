@@ -1,4 +1,4 @@
-package openrouter
+package llm
 
 import (
 	"context"
@@ -81,10 +81,6 @@ type APIError struct {
 
 func (e *APIError) Error() string {
 	return fmt.Sprintf("openrouter: HTTP %d: %s", e.StatusCode, e.Body)
-}
-
-func New(apiKey string) *Client {
-	return NewWithBaseURL(apiKey, "", nil)
 }
 
 func NewWithBaseURL(apiKey, baseURL string, httpCli *http.Client) *Client {

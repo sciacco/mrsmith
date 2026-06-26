@@ -11,11 +11,46 @@ import (
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
-	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 )
 
 var errAssistanceDecode = errors.New("decode assistance response")
+
+const (
+	manutenzioniApp      = "manutenzioni"
+	assistanceDraftScope = "assistance_draft"
+)
+
+// recordAssistanceAudit appends the assistance LLM call (success or failure) to
+// the centralized audit, best-effort.
+func (h *Handler) recordAssistanceAudit(ctx context.Context, detail MaintenanceDetail, model llm.Model, prompt llm.Prompt, request llm.ChatRequest, resp llm.ChatResponse, latencyMs int, callErr error) {
+	if h.llmSvc == nil {
+		return
+	}
+	requestRaw, _ := json.Marshal(request)
+	usageRaw, _ := json.Marshal(resp.Usage)
+	ctxRaw, _ := json.Marshal(map[string]any{"maintenance_id": detail.MaintenanceID})
+	audit := llm.CallAudit{
+		App:        manutenzioniApp,
+		Scope:      assistanceDraftScope,
+		ProviderID: model.ProviderID,
+		ModelID:    model.ID,
+		PromptID:   prompt.ID,
+		Model:      model.Model,
+		Request:    requestRaw,
+		Usage:      usageRaw,
+		Context:    ctxRaw,
+		DurationMS: &latencyMs,
+	}
+	if callErr != nil {
+		audit.Status = "failed"
+		audit.ErrorMessage = callErr.Error()
+	} else if respRaw, mErr := json.Marshal(map[string]any{"content": resp.Content}); mErr == nil {
+		audit.Response = respRaw
+	}
+	_ = h.llmSvc.RecordAudit(ctx, audit)
+}
 
 type assistanceFailure struct {
 	err            error
@@ -87,7 +122,7 @@ func (h *Handler) handleDraftAssistance(w http.ResponseWriter, r *http.Request) 
 	if !h.requireMaintenanceDB(w) {
 		return
 	}
-	if h.ai == nil {
+	if h.llmSvc == nil {
 		appError(w, http.StatusServiceUnavailable, "assistance_not_configured")
 		return
 	}
@@ -152,33 +187,51 @@ func (h *Handler) loadAssistanceReferences(r *http.Request, maintenanceID int64)
 }
 
 func (h *Handler) generateAssistanceDraft(r *http.Request, detail MaintenanceDetail, refs assistanceReferenceBundle, body assistanceDraftRequest) (assistanceDraftResponse, error) {
-	modelScope := llmModelScopeAssistanceDraft
-	requestedModel, err := h.resolveLLMModel(r.Context(), modelScope)
+	modelScope := assistanceDraftScope
+	model, err := h.llmSvc.ResolveModel(r.Context(), manutenzioniApp, modelScope, "")
 	if err != nil {
 		return assistanceDraftResponse{}, wrapAssistanceFailure(fmt.Errorf("resolve assistance model: %w", err), modelScope, "")
 	}
+	prompt, err := h.llmSvc.ResolvePrompt(r.Context(), manutenzioniApp, modelScope, "")
+	if err != nil {
+		return assistanceDraftResponse{}, wrapAssistanceFailure(fmt.Errorf("resolve assistance prompt: %w", err), modelScope, model.Model)
+	}
+	client, _, err := h.llmSvc.ClientForModel(r.Context(), model)
+	if err != nil {
+		return assistanceDraftResponse{}, wrapAssistanceFailure(fmt.Errorf("build assistance client: %w", err), modelScope, model.Model)
+	}
 	payload, err := json.MarshalIndent(buildAssistancePromptPayload(detail, refs, body), "", "  ")
 	if err != nil {
-		return assistanceDraftResponse{}, wrapAssistanceFailure(fmt.Errorf("marshal assistance payload: %w", err), modelScope, requestedModel)
+		return assistanceDraftResponse{}, wrapAssistanceFailure(fmt.Errorf("marshal assistance payload: %w", err), modelScope, model.Model)
 	}
-	request := openrouter.ChatRequest{
-		Model:       requestedModel,
-		Temperature: 0.2,
-		MaxTokens:   4096,
-		ResponseFormat: &openrouter.ResponseFormat{
+	params := model.DecodedParams()
+	temperature := 0.2
+	if params.Temperature != nil {
+		temperature = *params.Temperature
+	}
+	maxTokens := 4096
+	if params.MaxTokens != nil {
+		maxTokens = *params.MaxTokens
+	}
+	request := llm.ChatRequest{
+		Model:       model.Model,
+		Temperature: temperature,
+		MaxTokens:   maxTokens,
+		ResponseFormat: &llm.ResponseFormat{
 			Type: "json_object",
 		},
-		Messages: []openrouter.Message{
-			{Role: "system", Content: maintenanceAssistanceSystemPrompt},
+		Messages: []llm.Message{
+			{Role: "system", Content: prompt.Prompt},
 			{Role: "user", Content: string(payload)},
 		},
 	}
 
 	start := time.Now()
-	aiResponse, err := h.ai.Chat(r.Context(), request)
+	aiResponse, chatErr := client.Chat(r.Context(), request)
 	latencyMs := time.Since(start).Milliseconds()
-	if err != nil {
-		return assistanceDraftResponse{}, wrapAssistanceFailure(err, modelScope, requestedModel)
+	h.recordAssistanceAudit(r.Context(), detail, model, prompt, request, aiResponse, int(latencyMs), chatErr)
+	if chatErr != nil {
+		return assistanceDraftResponse{}, wrapAssistanceFailure(chatErr, modelScope, model.Model)
 	}
 	logging.FromContext(r.Context()).Info(
 		"maintenance assistance completion succeeded",
@@ -186,7 +239,7 @@ func (h *Handler) generateAssistanceDraft(r *http.Request, detail MaintenanceDet
 		"request_id", logging.RequestID(r.Context()),
 		"maintenance_id", detail.MaintenanceID,
 		"model_scope", modelScope,
-		"requested_model", requestedModel,
+		"requested_model", model.Model,
 		"model", aiResponse.Model,
 		"latency_ms", latencyMs,
 		"prompt_tokens", aiResponse.Usage.PromptTokens,
@@ -196,7 +249,7 @@ func (h *Handler) generateAssistanceDraft(r *http.Request, detail MaintenanceDet
 
 	parsed, err := decodeAssistanceAIOutput(aiResponse.Content)
 	if err != nil {
-		return assistanceDraftResponse{}, wrapAssistanceFailure(err, modelScope, requestedModel)
+		return assistanceDraftResponse{}, wrapAssistanceFailure(err, modelScope, model.Model)
 	}
 	parsed.Texts.TitleIT = cleanTextOrFallback(parsed.Texts.TitleIT, detail.TitleIT)
 	parsed.Texts.TitleEN = cleanText(parsed.Texts.TitleEN)
@@ -386,35 +439,3 @@ func cleanConfidence(value *float64) *float64 {
 	}
 	return &cleaned
 }
-
-var maintenanceAssistanceSystemPrompt = strings.TrimSpace(`
-Sei un assistente per manutenzioni tecniche interne. Devi proporre testi e classificazioni a partire dal contesto disponibile e dalle opzioni di riferimento.
-
-Se la manutenzione non ha ancora id ne titolo e user_note contiene un brief libero, usa user_note come fonte primaria per inferire titolo, descrizione e classificazioni.
-Se la manutenzione esiste gia con dati propri, integra e affina senza inventare informazioni non supportate.
-
-Restituisci solo un oggetto JSON valido con questa forma:
-{
-  "texts": {
-    "title_it": "titolo operativo in italiano",
-    "title_en": "English title",
-    "description_it": "descrizione operativa in italiano",
-    "description_en": "English description",
-    "reason_en": "English reason, only if reason_it exists",
-    "residual_service_en": "English residual service, only if residual_service_it exists"
-  },
-  "service_taxonomy": [{"reference_id": 1, "confidence": 0.85, "rationale": "motivo sintetico"}],
-  "reason_classes": [{"reference_id": 1, "confidence": 0.85, "rationale": "motivo sintetico"}],
-  "impact_effects": [{"reference_id": 1, "confidence": 0.85, "rationale": "motivo sintetico"}],
-  "quality_flags": [{"reference_id": 1, "confidence": 0.85, "rationale": "motivo sintetico"}],
-  "summary": "sintesi sintetica delle proposte"
-}
-
-Regole:
-- Usa solo reference_id presenti in reference_options.
-- Per service_taxonomy scegli solo servizi coerenti con il technical_domain della manutenzione.
-- Non inventare clienti, target, ordini, circuiti o asset puntuali.
-- Non applicare automaticamente nulla: produci solo proposte.
-- Mantieni un tono operativo, sintetico e adatto a comunicazioni interne.
-- Se un dato non e supportato dal contesto, lascia il campo vuoto o ometti la proposta.
-`)

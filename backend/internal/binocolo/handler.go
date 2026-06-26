@@ -13,14 +13,14 @@ import (
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
-	"github.com/sciacco/mrsmith/internal/platform/openrouter"
 )
 
 type Deps struct {
 	OpenAPIIT  *openapiit.Client
-	OpenRouter *openrouter.Client
+	LLM        *llm.Service
 	AnisettaDB *sql.DB
 }
 
@@ -48,18 +48,19 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 		maStore = sqlStore
 		ateco = sqlStore
 	}
+	llmProvider := newMALLMProvider(deps.LLM)
 	h := &Handler{
 		openapiit:          deps.OpenAPIIT,
 		companySearchCache: cache,
 		provinceCache:      provinceCache,
 		ateco:              ateco,
-		ma:                 newMAService(maStore, cache, provinceCache, ateco, deps.OpenAPIIT, deps.OpenRouter),
+		ma:                 newMAService(maStore, cache, provinceCache, ateco, deps.OpenAPIIT, llmProvider),
 	}
 	// Veryshort deep-dive worker: drains queued IT-full jobs and resumes pending
 	// ones on restart. Returned so main.go runs it under appCtx + workerWG.
 	var runDeepWorker func(context.Context)
 	if sqlStore != nil && deps.OpenAPIIT != nil {
-		runDeepWorker = newMADeepWorker(sqlStore, deps.OpenAPIIT, deps.OpenRouter, h.ma.loadPricing).run
+		runDeepWorker = newMADeepWorker(sqlStore, deps.OpenAPIIT, llmProvider, h.ma.loadPricing).run
 	}
 	protect := acl.RequireRole(applaunch.BinocoloAccessRoles()...)
 	handle := func(pattern string, handler http.HandlerFunc) {
@@ -567,7 +568,7 @@ func maHTTPError(err error) (int, string, string) {
 		}
 		return http.StatusBadGateway, "openapiit_upstream_error", "warn"
 	}
-	var openRouterErr *openrouter.APIError
+	var openRouterErr *llm.APIError
 	if errors.As(err, &openRouterErr) {
 		return http.StatusBadGateway, "openrouter_upstream_error", "warn"
 	}

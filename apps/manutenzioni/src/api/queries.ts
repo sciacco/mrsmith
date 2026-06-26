@@ -4,7 +4,6 @@ import type {
   ClassificationInput,
   CustomerSearchItem,
   ImpactedCustomerBody,
-  LLMModel,
   MaintenanceCockpit,
   MaintenanceAssistanceDraft,
   MaintenanceAssistanceDraftBody,
@@ -36,7 +35,6 @@ const queryKeys = {
   configSummary: () => ['manutenzioni', 'config-summary'] as const,
   configUsage: (resource: string, id: number) =>
     ['manutenzioni', 'config-usage', resource, id] as const,
-  llmModels: () => ['manutenzioni', 'llm-models'] as const,
   serviceDependencies: (active: string, q: string) =>
     ['manutenzioni', 'service-dependencies', active, q] as const,
 };
@@ -454,36 +452,6 @@ export function useConfigMutations(resource: string) {
   };
 }
 
-export function useLLMModels() {
-  const api = useManutenzioniApiClient();
-  return useQuery({
-    queryKey: queryKeys.llmModels(),
-    queryFn: () => api.get<LLMModel[]>('/manutenzioni/v1/llm-models'),
-  });
-}
-
-export function useLLMModelMutations() {
-  const api = useManutenzioniApiClient();
-  const queryClient = useQueryClient();
-  const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.llmModels() });
-  };
-  return {
-    create: useMutation({
-      mutationFn: (body: LLMModel) =>
-        api.post<LLMModel>('/manutenzioni/v1/llm-models', body),
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ scope, model }: LLMModel) =>
-        api.patch<LLMModel>(
-          `/manutenzioni/v1/llm-models/${encodeURIComponent(scope)}`,
-          { scope, model },
-        ),
-      onSuccess: invalidate,
-    }),
-  };
-}
 
 export function useServiceDependencies(active = 'active', q = '') {
   const api = useManutenzioniApiClient();
