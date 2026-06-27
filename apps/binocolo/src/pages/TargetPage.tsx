@@ -121,6 +121,7 @@ export function TargetPage() {
   const [modalActiveTab, setModalActiveTab] = useState<'overview' | 'deep' | 'financials' | 'shareholders' | 'registry'>('overview');
   const [lifecycleBusyId, setLifecycleBusyId] = useState<string | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<MASessionSummary | null>(null);
+  const [purgeCandidate, setPurgeCandidate] = useState<MASessionSummary | null>(null);
   const [lastSessionId, setLastSessionId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
@@ -538,6 +539,24 @@ export function TargetPage() {
     }
   }
 
+  async function purgeSession() {
+    if (!purgeCandidate) return;
+    const candidate = purgeCandidate;
+    setLifecycleBusyId(candidate.id);
+    setError(null);
+    try {
+      await api.post<void>(`/binocolo/v1/ma/sessions/${candidate.id}/purge`);
+      toast('Ricerca eliminata definitivamente.', 'success');
+      setPurgeCandidate(null);
+      await loadSessionsFor('deleted');
+    } catch (err) {
+      setError(errorLabel(err));
+      toast(errorLabel(err), 'error');
+    } finally {
+      setLifecycleBusyId(null);
+    }
+  }
+
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -642,6 +661,7 @@ export function TargetPage() {
                       onArchive={archiveSession}
                       onRestore={restoreSession}
                       onDelete={setDeleteCandidate}
+                      onPurge={setPurgeCandidate}
                     />
                   </div>
                 ))}
@@ -1028,6 +1048,34 @@ export function TargetPage() {
               leftIcon={<Icon name="trash" size={16} />}
             >
               Sposta nel cestino
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={purgeCandidate !== null}
+        onClose={() => setPurgeCandidate(null)}
+        title="Elimina definitivamente"
+        size="sm"
+        dismissible={lifecycleBusyId === null}
+      >
+        <div className={styles.confirmBody}>
+          <p>
+            La ricerca &ldquo;{purgeCandidate?.title ?? ''}&rdquo; sarà rimossa dal cestino e non sarà più
+            recuperabile.
+          </p>
+          <div className={styles.confirmActions}>
+            <Button variant="secondary" onClick={() => setPurgeCandidate(null)} disabled={lifecycleBusyId !== null}>
+              Annulla
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => void purgeSession()}
+              loading={lifecycleBusyId === purgeCandidate?.id}
+              leftIcon={<Icon name="x-circle" size={16} />}
+            >
+              Elimina definitivamente
             </Button>
           </div>
         </div>
@@ -2448,6 +2496,7 @@ function SessionActions({
   onArchive,
   onRestore,
   onDelete,
+  onPurge,
 }: {
   item: MASessionSummary;
   visibility: MASessionVisibility;
@@ -2455,6 +2504,7 @@ function SessionActions({
   onArchive: (item: MASessionSummary) => void;
   onRestore: (item: MASessionSummary) => void;
   onDelete: (item: MASessionSummary) => void;
+  onPurge: (item: MASessionSummary) => void;
 }) {
   if (visibility === 'deleted') {
     return (
@@ -2469,6 +2519,17 @@ function SessionActions({
           aria-busy={busy || undefined}
         >
           <Icon name="refresh-cw" size={15} />
+        </button>
+        <button
+          type="button"
+          className={`${styles.sessionIconAction} ${styles.sessionIconDanger}`}
+          onClick={() => onPurge(item)}
+          disabled={busy}
+          aria-label="Elimina definitivamente"
+          title="Elimina definitivamente"
+          aria-busy={busy || undefined}
+        >
+          <Icon name="x-circle" size={15} />
         </button>
       </div>
     );

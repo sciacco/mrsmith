@@ -104,6 +104,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/archive", h.handleArchiveMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/restore", h.handleRestoreMASession)
 	handle("DELETE /binocolo/v1/ma/sessions/{id}", h.handleDeleteMASession)
+	handle("POST /binocolo/v1/ma/sessions/{id}/purge", h.handlePurgeMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/rating", h.handleRateMATarget)
 	handle("POST /binocolo/v1/ma/sessions/{id}/deep-dive", h.handleDeepDiveMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/estimate", h.handleEstimateMASession)
@@ -277,6 +278,19 @@ func (h *Handler) handleDeleteMASession(w http.ResponseWriter, r *http.Request) 
 	subject, email := companySearchRefreshActor(r.Context())
 	if err := h.ma.softDeleteSession(r.Context(), id, subject, email); err != nil {
 		h.maFailure(w, r, "ma_session_delete", err, "session_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handlePurgeMASession(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.purgeSession(r.Context(), id, subject, email); err != nil {
+		h.maFailure(w, r, "ma_session_purge", err, "session_id", id)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

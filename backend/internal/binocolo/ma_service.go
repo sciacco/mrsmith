@@ -181,6 +181,12 @@ func (s *maService) softDeleteSession(ctx context.Context, id, subject, email st
 	return s.updateSessionLifecycle(ctx, id, maSessionLifecycleDelete, subject, email)
 }
 
+// purgeSession permanently hides a trashed session from every UI view. No data is
+// deleted; the session must already be in the trash (deleted_at set).
+func (s *maService) purgeSession(ctx context.Context, id, subject, email string) error {
+	return s.updateSessionLifecycle(ctx, id, maSessionLifecyclePurge, subject, email)
+}
+
 func (s *maService) updateSessionLifecycle(ctx context.Context, id, action, subject, email string) error {
 	if s.store == nil {
 		return errMAStoreUnavailable

@@ -139,7 +139,7 @@ func maSessionListClauses(visibility string) (string, string) {
 	case maSessionVisibilityArchived:
 		return "session.archived_at IS NOT NULL AND session.deleted_at IS NULL", "session.archived_at DESC, session.updated_at DESC"
 	case maSessionVisibilityDeleted:
-		return "session.deleted_at IS NOT NULL", "session.deleted_at DESC, session.updated_at DESC"
+		return "session.deleted_at IS NOT NULL AND session.purged_at IS NULL", "session.deleted_at DESC, session.updated_at DESC"
 	default:
 		return "session.archived_at IS NULL AND session.deleted_at IS NULL", "session.updated_at DESC, session.created_at DESC"
 	}
@@ -352,6 +352,17 @@ SET deleted_at = COALESCE(deleted_at, now()),
     archived_by_email = NULL,
     updated_at = now()
 WHERE id = $1::uuid
+RETURNING id::text
+`
+	case maSessionLifecyclePurge:
+		query = `
+UPDATE binocolo.ma_session
+SET purged_at = COALESCE(purged_at, now()),
+    purged_by_subject = CASE WHEN purged_at IS NULL THEN $2 ELSE purged_by_subject END,
+    purged_by_email = CASE WHEN purged_at IS NULL THEN $3 ELSE purged_by_email END,
+    updated_at = now()
+WHERE id = $1::uuid
+  AND deleted_at IS NOT NULL
 RETURNING id::text
 `
 	default:

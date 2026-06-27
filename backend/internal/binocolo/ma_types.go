@@ -23,6 +23,7 @@ const (
 	maSessionLifecycleArchive = "archive"
 	maSessionLifecycleRestore = "restore"
 	maSessionLifecycleDelete  = "delete"
+	maSessionLifecyclePurge   = "purge"
 
 	maRunStatusRunning   = "running"
 	maRunStatusCompleted = "completed"
