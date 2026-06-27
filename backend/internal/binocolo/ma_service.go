@@ -41,6 +41,7 @@ var (
 
 const (
 	maAtecoToolName          = "search_ateco_2025"
+	maAtecoChildrenToolName  = "list_ateco_children"
 	maProvinceRegionToolName = "list_italian_provinces_regions"
 	maCompanySurfaceToolName = "probe_company_search_surface"
 	maMaxToolRounds          = 4
@@ -1379,17 +1380,21 @@ type maAtecoRerankSector struct {
 	SourceText string `json:"sourceText,omitempty"`
 }
 
-type maAtecoRerankCandidate struct {
-	Code        string `json:"code"`
-	SearchCode  string `json:"searchCode,omitempty"`
-	Description string `json:"description"`
+type maAtecoHierarchyCode struct {
+	Code         string `json:"code"`
+	SearchCode   string `json:"searchCode,omitempty"`
+	Title        string `json:"title"`
+	Hierarchy    int    `json:"hierarchy,omitempty"`
+	ChildCount   int    `json:"childCount,omitempty"`
+	SubtreeCount int    `json:"subtreeCount,omitempty"`
 }
 
-type maAtecoRerankInput struct {
-	Prompt         string                   `json:"prompt"`
-	IncludeSectors []maAtecoRerankSector    `json:"includeSectors"`
-	ExcludeSectors []maAtecoRerankSector    `json:"excludeSectors"`
-	Candidates     []maAtecoRerankCandidate `json:"candidates"`
+type maAtecoHierarchyInput struct {
+	Prompt         string                 `json:"prompt"`
+	Intent         MAIntent               `json:"intent"`
+	IncludeSectors []maAtecoRerankSector  `json:"includeSectors"`
+	ExcludeSectors []maAtecoRerankSector  `json:"excludeSectors"`
+	Divisions      []maAtecoHierarchyCode `json:"divisions"`
 }
 
 type maAtecoRerankOutput struct {
@@ -1633,7 +1638,7 @@ func maIntentRationale(intent MAIntent, provinces []string, candidates []MAAteco
 	if len(intent.AtecoExplicit) > 0 {
 		parts = append(parts, "ATECO validati da codici espliciti.")
 	} else if len(intent.Sectors.Include)+len(intent.Sectors.Exclude) > 0 {
-		parts = append(parts, "ATECO selezionati con rerank vincolato sui candidati recuperati.")
+		parts = append(parts, "ATECO selezionati con resolver gerarchico vincolato al catalogo.")
 	}
 	if len(provinces) > 0 {
 		parts = append(parts, fmt.Sprintf("Territorio risolto su %d province.", len(provinces)))
@@ -1848,7 +1853,90 @@ func (lookup maProvinceLookup) resolveProvince(value string) (openapiit.Province
 			matches = append(matches, items...)
 		}
 	}
+	if match, ok := singleMAProvinceMatch(matches); ok {
+		return match, true
+	}
+	return lookup.resolveProvinceFuzzy(value)
+}
+
+func (lookup maProvinceLookup) resolveProvinceFuzzy(value string) (openapiit.Province, bool) {
+	key := normalizeMACompactKey(value)
+	keyLen := len([]rune(key))
+	if keyLen < 5 {
+		return openapiit.Province{}, false
+	}
+	limit := maProvinceFuzzyDistanceLimit(keyLen)
+	bestDistance := limit + 1
+	matches := []openapiit.Province{}
+	for nameKey, items := range lookup.byCompact {
+		distance := maBoundedEditDistance(key, nameKey, limit)
+		if distance > limit {
+			continue
+		}
+		if distance < bestDistance {
+			bestDistance = distance
+			matches = matches[:0]
+		}
+		if distance == bestDistance {
+			matches = append(matches, items...)
+		}
+	}
+	if bestDistance > limit {
+		return openapiit.Province{}, false
+	}
 	return singleMAProvinceMatch(matches)
+}
+
+func maProvinceFuzzyDistanceLimit(keyLen int) int {
+	if keyLen >= 10 {
+		return 2
+	}
+	return 1
+}
+
+func maBoundedEditDistance(a, b string, limit int) int {
+	left := []rune(a)
+	right := []rune(b)
+	if len(left) == 0 {
+		return len(right)
+	}
+	if len(right) == 0 {
+		return len(left)
+	}
+	if diff := len(left) - len(right); diff > limit || -diff > limit {
+		return limit + 1
+	}
+	previous := make([]int, len(right)+1)
+	current := make([]int, len(right)+1)
+	for j := range previous {
+		previous[j] = j
+	}
+	for i, lr := range left {
+		current[0] = i + 1
+		rowMin := current[0]
+		for j, rr := range right {
+			cost := 0
+			if lr != rr {
+				cost = 1
+			}
+			current[j+1] = min(
+				previous[j+1]+1,
+				current[j]+1,
+				previous[j]+cost,
+			)
+			if current[j+1] < rowMin {
+				rowMin = current[j+1]
+			}
+		}
+		if rowMin > limit {
+			return limit + 1
+		}
+		previous, current = current, previous
+	}
+	if previous[len(right)] > limit {
+		return limit + 1
+	}
+	return previous[len(right)]
 }
 
 func singleMAProvinceMatch(items []openapiit.Province) (openapiit.Province, bool) {
@@ -1936,27 +2024,41 @@ func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string,
 	if s.ateco == nil {
 		return nil, nil, nil, errAtecoStoreUnavailable
 	}
-	candidates, missing, err := s.collectMAIntentAtecoCandidates(ctx, appendMAIntentTextConstraints(intent.Sectors.Include, intent.Sectors.Exclude), allowed)
+	divisions, err := s.ateco.AtecoDivisions(ctx)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	for _, division := range divisions {
+		rememberAllowedAteco(allowed, division)
+	}
+	missing := []string{}
+	if len(divisions) == 0 {
+		missing = append(missing, "Catalogo ATECO senza divisioni disponibili")
 	}
 	if len(intent.Sectors.Include) == 0 && len(intent.Sectors.Exclude) > 0 {
 		missing = append(missing, "Esclusione settoriale senza settore incluso: serve un perimetro positivo")
 	}
+	divisionCodes := make([]string, 0, len(divisions))
+	for _, division := range divisions {
+		if code := normalizeAtecoCode(division.Codice); code != "" {
+			divisionCodes = append(divisionCodes, code)
+		}
+	}
 	if err := s.traceEvent(ctx, maTraceEventWrite{
-		EventType: "ma_ateco_retrieval",
+		EventType: "ma_ateco_hierarchy_initial",
 		Status:    maTraceEventSucceeded,
 		Metadata: maTraceJSON(map[string]any{
 			"sector_include":      len(intent.Sectors.Include),
 			"sector_exclude":      len(intent.Sectors.Exclude),
-			"candidate_count":     len(candidates),
+			"division_count":      len(divisions),
+			"division_codes":      divisionCodes,
 			"allowed_ateco_count": len(allowed),
 		}),
 	}); err != nil {
 		return nil, nil, nil, err
 	}
 
-	output, audit, err := s.rerankMAIntentAteco(ctx, promptText, intent.Sectors.Include, intent.Sectors.Exclude, candidates, subject, email)
+	output, audit, err := s.rerankMAIntentAteco(ctx, promptText, intent, divisions, allowed, subject, email)
 	if err != nil {
 		audits := []llm.CallAudit{}
 		if audit.Scope != "" || len(audit.Request) > 0 {
@@ -1964,8 +2066,22 @@ func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string,
 		}
 		return nil, nil, audits, err
 	}
-	resolved, constrainedMissing := constrainMAAtecoRerank(output, candidates, intent.Sectors.Include, intent.Sectors.Exclude)
+	resolved, constrainedMissing := constrainMAAtecoRerank(output, allowed, intent.Sectors.Include, intent.Sectors.Exclude)
 	missing = appendMAMissingCriteria(missing, constrainedMissing...)
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_ateco_hierarchy_result",
+		Status:    maTraceEventSucceeded,
+		Response:  maTraceJSON(map[string]any{"selected": resolved, "missing": missing}),
+		Metadata: maTraceJSON(map[string]any{
+			"selected_count":        len(resolved),
+			"missing_count":         len(missing),
+			"allowed_ateco_count":   len(allowed),
+			"model_missing_count":   len(output.MissingCriteria),
+			"excluded_prefix_count": len(output.ExcludedPrefixes),
+		}),
+	}); err != nil {
+		return nil, nil, nil, err
+	}
 	return resolved, missing, []llm.CallAudit{audit}, nil
 }
 
@@ -2011,58 +2127,15 @@ func (s *maService) resolveMAIntentExplicitAteco(ctx context.Context, constraint
 	return candidates, missing, nil, nil
 }
 
-func appendMAIntentTextConstraints(a, b []MAIntentTextConstraint) []MAIntentTextConstraint {
-	out := make([]MAIntentTextConstraint, 0, len(a)+len(b))
-	out = append(out, a...)
-	out = append(out, b...)
-	return out
-}
-
-func (s *maService) collectMAIntentAtecoCandidates(ctx context.Context, sectors []MAIntentTextConstraint, allowed map[string]AtecoCode) ([]AtecoCode, []string, error) {
-	out := []AtecoCode{}
-	missing := []string{}
-	seen := map[string]struct{}{}
-	for _, sector := range sectors {
-		query := cleanText(sector.Text, 240)
-		if query == "" {
-			continue
-		}
-		items, err := s.ateco.SearchAteco(ctx, query, atecoSearchDefaultLimit)
-		if err != nil {
-			return nil, nil, err
-		}
-		if len(items) == 0 {
-			missing = append(missing, "Settore non risolto in ATECO: "+maIntentSourceLabel(sector.Text, sector.SourceText))
-			continue
-		}
-		for _, item := range items {
-			searchCode := item.CodiceSearch
-			if searchCode == "" {
-				searchCode = atecoSearchCode(item.Codice)
-			}
-			if searchCode == "" {
-				continue
-			}
-			rememberAllowedAteco(allowed, item)
-			if _, exists := seen[searchCode]; exists {
-				continue
-			}
-			seen[searchCode] = struct{}{}
-			out = append(out, item)
-		}
-	}
-	return out, missing, nil
-}
-
-func (s *maService) rerankMAIntentAteco(ctx context.Context, promptText string, includeSectors, excludeSectors []MAIntentTextConstraint, candidates []AtecoCode, subject, email string) (maAtecoRerankOutput, llm.CallAudit, error) {
+func (s *maService) rerankMAIntentAteco(ctx context.Context, promptText string, intent MAIntent, divisions []AtecoCode, allowed map[string]AtecoCode, subject, email string) (maAtecoRerankOutput, llm.CallAudit, error) {
 	if s.llmp == nil {
 		return maAtecoRerankOutput{}, llm.CallAudit{}, errMAOpenRouterUnavailable
 	}
-	modelConfig, err := s.llmp.ResolveModel(ctx, maModelScopeStrategyAteco, "")
+	modelConfig, err := s.llmp.ResolveModel(ctx, maModelScopeStrategyAtecoHierarchy, "")
 	if err != nil {
 		return maAtecoRerankOutput{}, llm.CallAudit{}, llmConfigError(err)
 	}
-	promptConfig, err := s.llmp.ResolvePrompt(ctx, maModelScopeStrategyAteco, "")
+	promptConfig, err := s.llmp.ResolvePrompt(ctx, maModelScopeStrategyAtecoHierarchy, "")
 	if err != nil {
 		return maAtecoRerankOutput{}, llm.CallAudit{}, llmConfigError(err)
 	}
@@ -2072,57 +2145,214 @@ func (s *maService) rerankMAIntentAteco(ctx context.Context, promptText string, 
 	}
 	reqParams := modelConfig.RawParams()
 	if _, ok := reqParams["max_tokens"]; !ok {
-		reqParams["max_tokens"] = 1600
+		reqParams["max_tokens"] = 2400
 	}
+	systemPrompt := maAtecoHierarchySystemPrompt(promptConfig.Prompt)
 	if err := s.traceEvent(ctx, maTraceEventWrite{
-		EventType: "ma_ateco_rerank_config",
+		EventType: "ma_ateco_hierarchy_config",
 		Status:    maTraceEventSucceeded,
 		Metadata: maTraceJSON(map[string]any{
-			"model_id":        modelConfig.ID,
-			"model_scope":     modelConfig.Scope,
-			"model":           modelConfig.Model,
-			"prompt_id":       promptConfig.ID,
-			"prompt_scope":    promptConfig.Scope,
-			"prompt_name":     promptConfig.Name,
-			"candidate_count": len(candidates),
+			"model_id":       modelConfig.ID,
+			"model_scope":    modelConfig.Scope,
+			"model":          modelConfig.Model,
+			"prompt_id":      promptConfig.ID,
+			"prompt_scope":   promptConfig.Scope,
+			"prompt_name":    promptConfig.Name,
+			"prompt":         systemPrompt,
+			"division_count": len(divisions),
 		}),
 	}); err != nil {
 		return maAtecoRerankOutput{}, llm.CallAudit{}, err
 	}
-	payload := maAtecoRerankInput{
+	payload := maAtecoHierarchyInput{
 		Prompt:         promptText,
-		IncludeSectors: maAtecoRerankSectors(includeSectors),
-		ExcludeSectors: maAtecoRerankSectors(excludeSectors),
-		Candidates:     maAtecoRerankCandidates(candidates),
+		Intent:         intent,
+		IncludeSectors: maAtecoRerankSectors(intent.Sectors.Include),
+		ExcludeSectors: maAtecoRerankSectors(intent.Sectors.Exclude),
+		Divisions:      maAtecoHierarchyCodes(divisions),
 	}
 	inputRaw, err := json.Marshal(payload)
 	if err != nil {
 		return maAtecoRerankOutput{}, llm.CallAudit{}, err
 	}
-	req := llm.ChatRequest{
-		Model:          modelConfig.Model,
-		Params:         reqParams,
-		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
-		Messages: []llm.Message{
-			{Role: "system", Content: promptConfig.Prompt},
-			{Role: "user", Content: string(inputRaw)},
-		},
-		Tools: nil,
+
+	messages := []llm.Message{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: string(inputRaw)},
 	}
+	tools := []llm.Tool{maAtecoChildrenTool()}
+	var response llm.ChatResponse
+	var responseRaw json.RawMessage
+	var req llm.ChatRequest
+	var duration *int
+	resolverStart := time.Now()
+	chatRoundCount := 0
+	totalToolCallCount := 0
+	llmDurationMS := 0
+	for round := 0; round <= maMaxToolRounds; round++ {
+		req = llm.ChatRequest{
+			Model:          modelConfig.Model,
+			Params:         reqParams,
+			ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+			Messages:       messages,
+			Tools:          tools,
+			ToolChoice:     "auto",
+		}
+		start := time.Now()
+		response, err = client.Chat(ctx, req)
+		duration = maTraceDuration(start)
+		if duration != nil {
+			llmDurationMS += *duration
+		}
+		chatRoundCount++
+		if err != nil {
+			requestBody, _ := llm.BuildRequestBody(req)
+			requestRaw, _ := json.Marshal(requestBody)
+			responseFull := maTraceJSON(response)
+			totalDuration := maTraceDuration(resolverStart)
+			audit := llm.CallAudit{
+				App:          maApp,
+				Scope:        maModelScopeStrategyAtecoHierarchy,
+				ProviderID:   modelConfig.ProviderID,
+				ModelID:      modelConfig.ID,
+				PromptID:     promptConfig.ID,
+				Model:        modelConfig.Model,
+				Request:      requestRaw,
+				Response:     responseFull,
+				ActorSubject: subject,
+				ActorEmail:   email,
+				DurationMS:   totalDuration,
+				Status:       "failed",
+				ErrorMessage: err.Error(),
+			}
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType:      "ma_ateco_hierarchy_chat",
+				Round:          maTraceRound(round),
+				ExternalSystem: "openrouter",
+				Status:         maTraceEventFailed,
+				DurationMS:     duration,
+				Request:        requestRaw,
+				Response:       responseFull,
+				Error:          err.Error(),
+			})
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType:  "ma_ateco_hierarchy_summary",
+				Status:     maTraceEventFailed,
+				DurationMS: totalDuration,
+				Metadata: maTraceJSON(map[string]any{
+					"chat_round_count": chatRoundCount,
+					"tool_call_count":  totalToolCallCount,
+					"llm_duration_ms":  llmDurationMS,
+				}),
+				Error: err.Error(),
+			})
+			return maAtecoRerankOutput{}, audit, err
+		}
+		totalToolCallCount += len(response.ToolCalls)
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType:      "ma_ateco_hierarchy_chat",
+			Round:          maTraceRound(round),
+			ExternalSystem: "openrouter",
+			Status:         maTraceEventSucceeded,
+			DurationMS:     duration,
+			Request:        maTraceJSON(req),
+			Response:       maTraceJSON(response),
+			Metadata:       maTraceJSON(map[string]any{"tool_call_count": len(response.ToolCalls), "response_id": response.ID, "response_model": response.Model}),
+		}); err != nil {
+			return maAtecoRerankOutput{}, llm.CallAudit{}, err
+		}
+		if len(response.ToolCalls) == 0 {
+			responseRaw = json.RawMessage([]byte(strings.TrimSpace(response.Content)))
+			break
+		}
+		if round == maMaxToolRounds {
+			err := fmt.Errorf("%w: ateco hierarchy tool loop", errMAStrategyInvalid)
+			requestBody, _ := llm.BuildRequestBody(req)
+			requestRaw, _ := json.Marshal(requestBody)
+			responseFull := maTraceJSON(response)
+			usageRaw, _ := json.Marshal(response.Usage)
+			totalDuration := maTraceDuration(resolverStart)
+			audit := llm.CallAudit{
+				App:          maApp,
+				Scope:        maModelScopeStrategyAtecoHierarchy,
+				ProviderID:   modelConfig.ProviderID,
+				ModelID:      modelConfig.ID,
+				PromptID:     promptConfig.ID,
+				Model:        modelConfig.Model,
+				Request:      requestRaw,
+				Response:     responseFull,
+				Usage:        usageRaw,
+				ActorSubject: subject,
+				ActorEmail:   email,
+				DurationMS:   totalDuration,
+				Status:       "failed",
+				ErrorMessage: err.Error(),
+			}
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType: "ma_ateco_hierarchy_loop_limit",
+				Round:     maTraceRound(round),
+				Status:    maTraceEventFailed,
+				Metadata:  maTraceJSON(map[string]any{"max_tool_rounds": maMaxToolRounds, "tool_call_count": len(response.ToolCalls)}),
+				Error:     err.Error(),
+			})
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType:  "ma_ateco_hierarchy_summary",
+				Status:     maTraceEventFailed,
+				DurationMS: totalDuration,
+				Metadata: maTraceJSON(map[string]any{
+					"chat_round_count": chatRoundCount,
+					"tool_call_count":  totalToolCallCount,
+					"llm_duration_ms":  llmDurationMS,
+				}),
+				Error: err.Error(),
+			})
+			return maAtecoRerankOutput{}, audit, err
+		}
+		messages = append(messages, llm.Message{
+			Role:      "assistant",
+			Content:   response.Content,
+			ToolCalls: response.ToolCalls,
+		})
+		for _, call := range response.ToolCalls {
+			start := time.Now()
+			content := s.executeMAAtecoChildrenTool(ctx, call, allowed)
+			parentCode := maAtecoChildrenToolParent(call)
+			childCount := maAtecoChildrenToolResultCount(content)
+			if err := s.traceEvent(ctx, maTraceEventWrite{
+				EventType:  "ma_ateco_hierarchy_tool",
+				Round:      maTraceRound(round),
+				ToolName:   call.Function.Name,
+				Status:     maToolResultStatus(content),
+				DurationMS: maTraceDuration(start),
+				Request:    maTraceJSON(call),
+				Response:   maTraceRawJSON([]byte(content)),
+				Metadata: maTraceJSON(map[string]any{
+					"parent_code":         parentCode,
+					"child_count":         childCount,
+					"allowed_ateco_count": len(allowed),
+				}),
+			}); err != nil {
+				return maAtecoRerankOutput{}, llm.CallAudit{}, err
+			}
+			messages = append(messages, llm.Message{
+				Role:       "tool",
+				ToolCallID: call.ID,
+				Content:    content,
+			})
+		}
+	}
+
 	requestBody, err := llm.BuildRequestBody(req)
 	if err != nil {
 		return maAtecoRerankOutput{}, llm.CallAudit{}, err
 	}
 	requestRaw, _ := json.Marshal(requestBody)
-
-	start := time.Now()
-	response, err := client.Chat(ctx, req)
-	duration := maTraceDuration(start)
 	usageRaw, _ := json.Marshal(response.Usage)
 	responseFull := maTraceJSON(response)
+	totalDuration := maTraceDuration(resolverStart)
 	audit := llm.CallAudit{
 		App:          maApp,
-		Scope:        maModelScopeStrategyAteco,
+		Scope:        maModelScopeStrategyAtecoHierarchy,
 		ProviderID:   modelConfig.ProviderID,
 		ModelID:      modelConfig.ID,
 		PromptID:     promptConfig.ID,
@@ -2132,50 +2362,38 @@ func (s *maService) rerankMAIntentAteco(ctx context.Context, promptText string, 
 		Usage:        usageRaw,
 		ActorSubject: subject,
 		ActorEmail:   email,
-		DurationMS:   duration,
+		DurationMS:   totalDuration,
 		Status:       "succeeded",
 	}
-	if err != nil {
-		audit.Status = "failed"
-		audit.ErrorMessage = err.Error()
-		_ = s.traceEvent(ctx, maTraceEventWrite{
-			EventType:      "ma_ateco_rerank",
-			ExternalSystem: "openrouter",
-			Status:         maTraceEventFailed,
-			DurationMS:     duration,
-			Request:        requestRaw,
-			Response:       responseFull,
-			Error:          err.Error(),
-		})
-		return maAtecoRerankOutput{}, audit, err
-	}
-	if err := s.traceEvent(ctx, maTraceEventWrite{
-		EventType:      "ma_ateco_rerank",
-		ExternalSystem: "openrouter",
-		Status:         maTraceEventSucceeded,
-		DurationMS:     duration,
-		Request:        requestRaw,
-		Response:       responseFull,
-		Metadata:       maTraceJSON(map[string]any{"response_id": response.ID, "response_model": response.Model}),
-	}); err != nil {
-		return maAtecoRerankOutput{}, audit, err
-	}
 
-	responseRaw := json.RawMessage([]byte(strings.TrimSpace(response.Content)))
 	var output maAtecoRerankOutput
 	if err := json.Unmarshal(responseRaw, &output); err != nil {
 		_ = s.traceEvent(ctx, maTraceEventWrite{
-			EventType: "ma_ateco_rerank_decode",
+			EventType: "ma_ateco_hierarchy_decode",
 			Status:    maTraceEventFailed,
 			Response:  responseRaw,
 			Error:     err.Error(),
 		})
-		return maAtecoRerankOutput{}, audit, fmt.Errorf("decode ma ateco rerank: %w", err)
+		return maAtecoRerankOutput{}, audit, fmt.Errorf("decode ma ateco hierarchy: %w", err)
 	}
 	if err := s.traceEvent(ctx, maTraceEventWrite{
-		EventType: "ma_ateco_rerank_decode",
+		EventType: "ma_ateco_hierarchy_decode",
 		Status:    maTraceEventSucceeded,
 		Response:  maTraceJSON(output),
+		Metadata:  maTraceJSON(map[string]any{"allowed_ateco_count": len(allowed)}),
+	}); err != nil {
+		return maAtecoRerankOutput{}, audit, err
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType:  "ma_ateco_hierarchy_summary",
+		Status:     maTraceEventSucceeded,
+		DurationMS: totalDuration,
+		Metadata: maTraceJSON(map[string]any{
+			"chat_round_count":    chatRoundCount,
+			"tool_call_count":     totalToolCallCount,
+			"llm_duration_ms":     llmDurationMS,
+			"allowed_ateco_count": len(allowed),
+		}),
 	}); err != nil {
 		return maAtecoRerankOutput{}, audit, err
 	}
@@ -2194,25 +2412,65 @@ func maAtecoRerankSectors(items []MAIntentTextConstraint) []maAtecoRerankSector 
 	return out
 }
 
-func maAtecoRerankCandidates(items []AtecoCode) []maAtecoRerankCandidate {
-	out := make([]maAtecoRerankCandidate, 0, len(items))
+func maAtecoHierarchySystemPrompt(base string) string {
+	extra := strings.Join([]string{
+		"Runtime tool contract override:",
+		"- list_ateco_children(code) returns every descendant of the requested ATECO code, not only immediate children.",
+		"- The requested code itself is already visible and is not repeated in the tool response.",
+		"- Any descendant returned by list_ateco_children may be selected directly; do not call list_ateco_children on returned descendants merely to reach leaves.",
+	}, "\n")
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return extra
+	}
+	return base + "\n\n" + extra
+}
+
+func maAtecoHierarchyCodes(items []AtecoCode) []maAtecoHierarchyCode {
+	out := make([]maAtecoHierarchyCode, 0, len(items))
 	for _, item := range items {
 		code := normalizeAtecoCode(item.Codice)
 		if code == "" {
 			continue
 		}
-		out = append(out, maAtecoRerankCandidate{
-			Code:        code,
-			SearchCode:  item.CodiceSearch,
-			Description: cleanText(item.Titolo, 180),
-		})
+		node := maAtecoHierarchyCode{
+			Code:       code,
+			SearchCode: item.CodiceSearch,
+			Title:      cleanText(item.Titolo, 180),
+		}
+		if item.Gerarchia != nil {
+			node.Hierarchy = *item.Gerarchia
+		}
+		out = append(out, node)
 	}
 	return out
 }
 
-func constrainMAAtecoRerank(output maAtecoRerankOutput, candidates []AtecoCode, includeSectors, excludeSectors []MAIntentTextConstraint) ([]MAAtecoCandidate, []string) {
+func maAtecoHierarchyToolCodes(items []AtecoHierarchyCode) []maAtecoHierarchyCode {
+	out := make([]maAtecoHierarchyCode, 0, len(items))
+	for _, item := range items {
+		code := normalizeAtecoCode(item.Codice)
+		if code == "" {
+			continue
+		}
+		node := maAtecoHierarchyCode{
+			Code:         code,
+			SearchCode:   item.CodiceSearch,
+			Title:        cleanText(item.Titolo, 180),
+			ChildCount:   item.ChildCount,
+			SubtreeCount: item.SubtreeCount,
+		}
+		if item.Gerarchia != nil {
+			node.Hierarchy = *item.Gerarchia
+		}
+		out = append(out, node)
+	}
+	return out
+}
+
+func constrainMAAtecoRerank(output maAtecoRerankOutput, allowed map[string]AtecoCode, includeSectors, excludeSectors []MAIntentTextConstraint) ([]MAAtecoCandidate, []string) {
 	bySearch := map[string]AtecoCode{}
-	for _, item := range candidates {
+	for _, item := range allowed {
 		searchCode := item.CodiceSearch
 		if searchCode == "" {
 			searchCode = atecoSearchCode(item.Codice)
@@ -2225,11 +2483,12 @@ func constrainMAAtecoRerank(output maAtecoRerankOutput, candidates []AtecoCode, 
 	out := []MAAtecoCandidate{}
 	missing := []string{}
 	seen := map[string]struct{}{}
+	selectedCount := 0
 	for _, selected := range output.Selected {
 		searchCode := atecoSearchCode(selected.Code)
 		item, ok := bySearch[searchCode]
 		if !ok {
-			missing = append(missing, "ATECO selezionato fuori dai candidati: "+cleanText(selected.Code, 40))
+			missing = append(missing, "ATECO selezionato fuori dai codici esplorati: "+cleanText(selected.Code, 40))
 			continue
 		}
 		if _, exists := seen[searchCode]; exists {
@@ -2242,6 +2501,7 @@ func constrainMAAtecoRerank(output maAtecoRerankOutput, candidates []AtecoCode, 
 			Rationale:   cleanText(selected.Reason, 240),
 			Fit:         maAtecoRerankFit(selected.Fit),
 		})
+		selectedCount++
 	}
 	if len(excludeSectors) > 0 {
 		exclusionSource := maAtecoExclusionSource(excludeSectors)
@@ -2255,8 +2515,9 @@ func constrainMAAtecoRerank(output maAtecoRerankOutput, candidates []AtecoCode, 
 			if searchCode == "" || len(searchCode) < 2 {
 				continue
 			}
-			if !maAtecoPrefixDerivedFromCandidates(searchCode, bySearch) {
-				missing = append(missing, "Prefisso ATECO escluso fuori dai candidati: "+cleanText(prefix, 40))
+			item, ok := bySearch[searchCode]
+			if !ok {
+				missing = append(missing, "Prefisso ATECO escluso fuori dai codici esplorati: "+cleanText(prefix, 40))
 				continue
 			}
 			key := "excluded:" + searchCode
@@ -2265,14 +2526,18 @@ func constrainMAAtecoRerank(output maAtecoRerankOutput, candidates []AtecoCode, 
 			}
 			seen[key] = struct{}{}
 			out = append(out, MAAtecoCandidate{
-				Code:        code,
+				Code:        item.Codice,
 				Description: maAtecoExcludedDescription(code, bySearch),
 				Rationale:   maAtecoExcludedRationale(excluded.Reason, exclusionSource),
 				Fit:         maFitExcluded,
 			})
 		}
 	}
+	acceptedSectorMissing := 0
 	for _, item := range output.MissingCriteria {
+		if !maAtecoMissingGroundedInSectors(item, includeSectors, excludeSectors) {
+			continue
+		}
 		text := cleanText(item.Text, 100)
 		if text == "" {
 			continue
@@ -2281,9 +2546,10 @@ func constrainMAAtecoRerank(output maAtecoRerankOutput, candidates []AtecoCode, 
 			text += ": " + reason
 		}
 		missing = append(missing, text)
+		acceptedSectorMissing++
 	}
-	if len(out) == 0 && len(includeSectors) > 0 && len(output.MissingCriteria) == 0 {
-		missing = append(missing, "Settore testuale non mappato con sicurezza agli ATECO candidati")
+	if selectedCount == 0 && len(includeSectors) > 0 && acceptedSectorMissing == 0 {
+		missing = append(missing, "Settore testuale non mappato con sicurezza al catalogo ATECO esplorato")
 	}
 	return out, missing
 }
@@ -2297,13 +2563,87 @@ func maAtecoRerankFit(value string) string {
 	}
 }
 
-func maAtecoPrefixDerivedFromCandidates(prefix string, candidates map[string]AtecoCode) bool {
-	for searchCode := range candidates {
-		if searchCode == prefix || strings.HasPrefix(searchCode, prefix) {
+func maAtecoMissingGroundedInSectors(item maAtecoRerankMissingCriterion, includeSectors, excludeSectors []MAIntentTextConstraint) bool {
+	sectorTokens := maSectorConstraintTokens(includeSectors, excludeSectors)
+	if len(sectorTokens) == 0 {
+		return false
+	}
+	for _, token := range maTextTokens(item.Text) {
+		if _, ok := sectorTokens[token]; ok {
 			return true
 		}
 	}
 	return false
+}
+
+func maSectorConstraintTokens(includeSectors, excludeSectors []MAIntentTextConstraint) map[string]struct{} {
+	out := map[string]struct{}{}
+	add := func(item MAIntentTextConstraint) {
+		for _, token := range maTextTokens(positiveSectorText(item.Text)) {
+			out[token] = struct{}{}
+		}
+	}
+	for _, item := range includeSectors {
+		add(item)
+	}
+	for _, item := range excludeSectors {
+		add(item)
+	}
+	return out
+}
+
+func maTextTokens(value string) []string {
+	fields := strings.Fields(normalizeMAFoldKey(value))
+	out := make([]string, 0, len(fields))
+	seen := map[string]struct{}{}
+	for _, token := range fields {
+		token = strings.TrimSpace(strings.ToLower(token))
+		if token == "" || maAtecoMissingGroundingStopwords[token] || maNumericToken(token) {
+			continue
+		}
+		if _, exists := seen[token]; exists {
+			continue
+		}
+		seen[token] = struct{}{}
+		out = append(out, token)
+	}
+	return out
+}
+
+func maNumericToken(token string) bool {
+	if token == "" {
+		return false
+	}
+	for _, r := range token {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+var maAtecoMissingGroundingStopwords = map[string]bool{
+	"attivita": true,
+	"azienda":  true,
+	"aziende":  true,
+	"con":      true,
+	"dei":      true,
+	"del":      true,
+	"della":    true,
+	"delle":    true,
+	"di":       true,
+	"e":        true,
+	"gli":      true,
+	"il":       true,
+	"in":       true,
+	"la":       true,
+	"le":       true,
+	"lo":       true,
+	"per":      true,
+	"servizi":  true,
+	"servizio": true,
+	"settore":  true,
+	"settori":  true,
 }
 
 func maAtecoExcludedDescription(code string, candidates map[string]AtecoCode) string {
@@ -2805,6 +3145,27 @@ func maAtecoSearchTool() llm.Tool {
 	}
 }
 
+func maAtecoChildrenTool() llm.Tool {
+	return llm.Tool{
+		Type: "function",
+		Function: llm.ToolFunction{
+			Name:        maAtecoChildrenToolName,
+			Description: "Restituisce tutti i discendenti ATECO di un codice gia' visto nel resolver gerarchico, escluso il codice richiesto. Non fa ricerca testuale.",
+			Parameters: map[string]any{
+				"type":                 "object",
+				"additionalProperties": false,
+				"required":             []string{"code"},
+				"properties": map[string]any{
+					"code": map[string]any{
+						"type":        "string",
+						"description": "Codice ATECO gia' presente nelle divisioni iniziali o restituito prima da list_ateco_children.",
+					},
+				},
+			},
+		},
+	}
+}
+
 func maProvinceRegionTool() llm.Tool {
 	return llm.Tool{
 		Type: "function",
@@ -2882,6 +3243,10 @@ type maAtecoToolArgs struct {
 	Limit int    `json:"limit,omitempty"`
 }
 
+type maAtecoChildrenToolArgs struct {
+	Code string `json:"code"`
+}
+
 type maProvinceRegionToolArgs struct {
 	Region string `json:"region,omitempty"`
 	Query  string `json:"query,omitempty"`
@@ -2937,6 +3302,42 @@ func (s *maService) executeMAAtecoTool(ctx context.Context, call llm.ToolCall, a
 		rememberAllowedAteco(allowed, item)
 	}
 	raw, err := json.Marshal(map[string]any{"items": items})
+	if err != nil {
+		return maToolErrorJSON("encode_failed")
+	}
+	return string(raw)
+}
+
+func (s *maService) executeMAAtecoChildrenTool(ctx context.Context, call llm.ToolCall, allowed map[string]AtecoCode) string {
+	if call.Function.Name != maAtecoChildrenToolName {
+		return maToolErrorJSON("unsupported_tool")
+	}
+	if s.ateco == nil {
+		return maToolErrorJSON("ateco_not_configured")
+	}
+	var args maAtecoChildrenToolArgs
+	if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
+		return maToolErrorJSON("invalid_arguments")
+	}
+	searchCode := atecoSearchCode(args.Code)
+	if searchCode == "" {
+		return maToolErrorJSON("invalid_code")
+	}
+	parent, ok := allowed[searchCode]
+	if !ok {
+		return maToolErrorJSON("code_not_allowed")
+	}
+	children, err := s.ateco.AtecoChildren(ctx, parent.Codice)
+	if errors.Is(err, errAtecoCodeNotFound) {
+		return maToolErrorJSON("code_not_found")
+	}
+	if err != nil {
+		return maToolErrorJSON("children_failed")
+	}
+	for _, child := range children {
+		rememberAllowedAteco(allowed, child.AtecoCode)
+	}
+	raw, err := json.Marshal(map[string]any{"items": maAtecoHierarchyToolCodes(children)})
 	if err != nil {
 		return maToolErrorJSON("encode_failed")
 	}
@@ -3092,6 +3493,24 @@ func textContainsFold(value, query string) bool {
 func maToolErrorJSON(code string) string {
 	raw, _ := json.Marshal(map[string]string{"error": code})
 	return string(raw)
+}
+
+func maAtecoChildrenToolParent(call llm.ToolCall) string {
+	var args maAtecoChildrenToolArgs
+	if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
+		return ""
+	}
+	return normalizeAtecoCode(args.Code)
+}
+
+func maAtecoChildrenToolResultCount(content string) int {
+	var result struct {
+		Items []json.RawMessage `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(content), &result); err != nil {
+		return 0
+	}
+	return len(result.Items)
 }
 
 func rememberAllowedAteco(allowed map[string]AtecoCode, item AtecoCode) {

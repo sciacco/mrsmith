@@ -164,12 +164,12 @@ Alyante ERP ID
 - Used by: `apps/binocolo` `/target`.
 - Open questions: whether the threshold should become an admin-configurable value after real usage data.
 
-### Binocolo ATECO 2025 Codes Are Tool-Gated
+### Binocolo ATECO 2025 Codes Are Resolver-Gated
 
 - Context: Binocolo M&A ATECO candidate selection and OpenAPI.it Company `IT-search` calls.
-- Discovery: OpenAPI.it `IT-search` expects the ATECO query parameter without dots, while the ATECO 2025 source list uses canonical dotted codes. LLM-generated codes are not authoritative enough for deterministic searches.
-- Practical rule: store ATECO 2025 in `binocolo.codici_ateco_2025`, keep canonical `codice` for UI/audit, derive `codice_search` by removing dots for vendor calls, and require M&A strategy drafting to select ATECO candidates only from the backend `search_ateco_2025` tool results. Reject codes that are not present in the table or were not returned by the tool in the same strategy conversation.
-- Evidence: `apps/binocolo/docs/codici_ateco_2025.json`, migration `deploy/migrations/027_anisetta_binocolo_ateco_2025.sql`, and Binocolo ATECO resolver/tool wiring in `backend/internal/binocolo`.
+- Discovery: OpenAPI.it `IT-search` expects the ATECO query parameter without dots, while the ATECO 2025 source list uses canonical dotted codes. LLM-generated codes are not authoritative enough for deterministic searches. The legacy monolith gates ATECO selection through `search_ateco_2025`; the V2.1 intent pipeline instead gates selection through an initial level-2 taxonomy payload plus the deterministic `list_ateco_children` hierarchy tool.
+- Practical rule: store ATECO 2025 in `binocolo.codici_ateco_2025`, keep canonical `codice` for UI/audit, derive `codice_search` by removing dots for vendor calls, and reject codes that are not present in the table or were not shown to the model in the same resolver call. In the monolith path, "shown" means returned by `search_ateco_2025`; in the V2.1 path, it means either a level-2 division loaded from the DB or a descendant returned by `list_ateco_children`.
+- Evidence: `apps/binocolo/docs/codici_ateco_2025.json`, migrations `deploy/migrations/027_anisetta_binocolo_ateco_2025.sql` and `deploy/migrations/052_anisetta_mrsmith_binocolo_ma_strategy_ateco_hierarchy.sql`, and Binocolo ATECO resolver/tool wiring in `backend/internal/binocolo`.
 - Used by: `apps/binocolo` `/target` and `/test` company search.
 - Open questions: none.
 

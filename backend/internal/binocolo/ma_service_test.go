@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -568,6 +569,319 @@ func TestMACompanySurfaceToolRejectsAtecoOutsideWhitelist(t *testing.T) {
 	}
 }
 
+func TestMAAtecoChildrenToolReturnsDescendantsAndWhitelists(t *testing.T) {
+	ateco := newFakeAtecoStore(testHierarchyAtecoCodes())
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, ateco, nil, nil)
+	allowed := map[string]AtecoCode{}
+	rememberAllowedAteco(allowed, mustResolveFakeAteco(t, ateco, "62"))
+	call := llm.ToolCall{
+		ID:   "children",
+		Type: "function",
+		Function: llm.ToolCallFunction{
+			Name:      maAtecoChildrenToolName,
+			Arguments: `{"code":"62"}`,
+		},
+	}
+
+	content := service.executeMAAtecoChildrenTool(context.Background(), call, allowed)
+
+	var got struct {
+		Items []maAtecoHierarchyCode `json:"items"`
+		Error string                 `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(content), &got); err != nil {
+		t.Fatalf("unmarshal tool response: %v", err)
+	}
+	if got.Error != "" {
+		t.Fatalf("tool returned error %q", got.Error)
+	}
+	if len(got.Items) != 6 {
+		t.Fatalf("children = %#v, want all 6 descendants below 62", got.Items)
+	}
+	wantCodes := []string{"62.1", "62.10", "62.10.0", "62.10.00", "62.2", "62.9"}
+	for index, want := range wantCodes {
+		if got.Items[index].Code != want {
+			t.Fatalf("children[%d] = %q, want %q; all children = %#v", index, got.Items[index].Code, want, got.Items)
+		}
+	}
+	if got.Items[0].ChildCount != 1 || got.Items[0].SubtreeCount != 4 {
+		t.Fatalf("62.1 counts = child:%d subtree:%d, want child 1 subtree 4", got.Items[0].ChildCount, got.Items[0].SubtreeCount)
+	}
+	if _, ok := allowed["621"]; !ok {
+		t.Fatalf("62.1 was not whitelisted: %#v", allowed)
+	}
+	if _, ok := allowed["622"]; !ok {
+		t.Fatalf("62.2 was not whitelisted: %#v", allowed)
+	}
+	if _, ok := allowed["621000"]; !ok {
+		t.Fatalf("62.10.00 should be whitelisted by the parent subtree call: %#v", allowed)
+	}
+
+	call.Function.Arguments = `{"code":"62.1"}`
+	content = service.executeMAAtecoChildrenTool(context.Background(), call, allowed)
+	got = struct {
+		Items []maAtecoHierarchyCode `json:"items"`
+		Error string                 `json:"error"`
+	}{}
+	if err := json.Unmarshal([]byte(content), &got); err != nil {
+		t.Fatalf("unmarshal second tool response: %v", err)
+	}
+	if got.Error != "" {
+		t.Fatalf("second tool returned error %q", got.Error)
+	}
+	if len(got.Items) != 3 || got.Items[0].Code != "62.10" || got.Items[1].Code != "62.10.0" || got.Items[2].Code != "62.10.00" {
+		t.Fatalf("62.1 children = %#v, want all descendants 62.10, 62.10.0, 62.10.00", got.Items)
+	}
+}
+
+func TestMAAtecoChildrenToolRejectsUnseenParent(t *testing.T) {
+	ateco := newFakeAtecoStore(testHierarchyAtecoCodes())
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, nil, ateco, nil, nil)
+	allowed := map[string]AtecoCode{}
+	rememberAllowedAteco(allowed, mustResolveFakeAteco(t, ateco, "62"))
+	call := llm.ToolCall{
+		ID:   "children",
+		Type: "function",
+		Function: llm.ToolCallFunction{
+			Name:      maAtecoChildrenToolName,
+			Arguments: `{"code":"63"}`,
+		},
+	}
+
+	content := service.executeMAAtecoChildrenTool(context.Background(), call, allowed)
+
+	var got map[string]string
+	if err := json.Unmarshal([]byte(content), &got); err != nil {
+		t.Fatalf("unmarshal tool response: %v", err)
+	}
+	if got["error"] != "code_not_allowed" {
+		t.Fatalf("tool response = %#v, want code_not_allowed", got)
+	}
+}
+
+func TestResolveMAIntentAtecoUsesHierarchyScopeAndToolWhitelist(t *testing.T) {
+	ateco := newFakeAtecoStore(testHierarchyAtecoCodes())
+	ai := &fakeMAAI{responses: []llm.ChatResponse{
+		{
+			ToolCalls: []llm.ToolCall{
+				{
+					ID:   "children-62",
+					Type: "function",
+					Function: llm.ToolCallFunction{
+						Name:      maAtecoChildrenToolName,
+						Arguments: `{"code":"62"}`,
+					},
+				},
+			},
+		},
+		{
+			Content: `{"selected":[{"code":"62.10.00","fit":"strong","reason":"foglia programmazione informatica esplorata in un solo subtree call"}],"excludedPrefixes":[],"missingCriteria":[]}`,
+		},
+	}}
+	store := &fakeMAWorkspaceStore{}
+	service := newMAService(store, nil, nil, ateco, nil, &fakeMALLMProvider{ai: ai})
+	trace, err := service.startTrace(context.Background(), maTraceStart{Operation: "ma_session_create"})
+	if err != nil {
+		t.Fatalf("start trace: %v", err)
+	}
+	ctx := withMATrace(context.Background(), trace)
+	allowed := map[string]AtecoCode{}
+	intent := MAIntent{
+		Sectors: MAIntentSectors{
+			Include: []MAIntentTextConstraint{{Text: "it", SourceText: "settore it"}},
+		},
+	}
+
+	candidates, missing, audits, err := service.resolveMAIntentAteco(ctx, "target settore it", intent, allowed, "", "")
+
+	if err != nil {
+		t.Fatalf("resolveMAIntentAteco returned error: %v", err)
+	}
+	if len(missing) != 0 {
+		t.Fatalf("missing = %#v, want none", missing)
+	}
+	if len(candidates) != 1 || candidates[0].Code != "62.10.00" || candidates[0].SearchCode != "" {
+		t.Fatalf("candidates = %#v, want selected 62.10.00 before canonicalization", candidates)
+	}
+	if len(audits) != 1 || audits[0].Scope != maModelScopeStrategyAtecoHierarchy {
+		t.Fatalf("audits = %#v, want one hierarchy-scope audit", audits)
+	}
+	if len(ai.requests) != 2 {
+		t.Fatalf("ai requests = %d, want 2", len(ai.requests))
+	}
+	if !hasTool(ai.requests[0].Tools, maAtecoChildrenToolName) {
+		t.Fatalf("first request tools = %#v, want list_ateco_children", ai.requests[0].Tools)
+	}
+	if hasTool(ai.requests[0].Tools, maAtecoToolName) {
+		t.Fatalf("first request tools = %#v, must not expose search_ateco_2025", ai.requests[0].Tools)
+	}
+	if !strings.Contains(ai.requests[0].Messages[0].Content, "returns every descendant") {
+		t.Fatalf("system prompt does not include subtree tool override: %q", ai.requests[0].Messages[0].Content)
+	}
+	var payload maAtecoHierarchyInput
+	if err := json.Unmarshal([]byte(ai.requests[0].Messages[1].Content), &payload); err != nil {
+		t.Fatalf("unmarshal hierarchy payload: %v", err)
+	}
+	if len(payload.Divisions) != 2 || payload.Divisions[0].Code != "62" || payload.Divisions[1].Code != "63" {
+		t.Fatalf("payload divisions = %#v, want level-2 divisions 62 and 63", payload.Divisions)
+	}
+	if ateco.lastQuery != "" {
+		t.Fatalf("SearchAteco query = %q, want no lexical retrieval in V2.1", ateco.lastQuery)
+	}
+	if _, ok := allowed["62"]; !ok {
+		t.Fatalf("division 62 was not whitelisted: %#v", allowed)
+	}
+	if _, ok := allowed["621"]; !ok {
+		t.Fatalf("tool child 62.1 was not whitelisted: %#v", allowed)
+	}
+	if _, ok := allowed["621000"]; !ok {
+		t.Fatalf("leaf 62.10.00 should be whitelisted by the parent subtree call: %#v", allowed)
+	}
+	summary := traceEvent(store.events, "ma_ateco_hierarchy_summary")
+	if summary == nil {
+		t.Fatalf("missing ma_ateco_hierarchy_summary trace event")
+	}
+	var metadata struct {
+		ChatRoundCount    int `json:"chat_round_count"`
+		ToolCallCount     int `json:"tool_call_count"`
+		AllowedAtecoCount int `json:"allowed_ateco_count"`
+	}
+	if err := json.Unmarshal(summary.Metadata, &metadata); err != nil {
+		t.Fatalf("unmarshal summary metadata: %v", err)
+	}
+	if metadata.ChatRoundCount != 2 || metadata.ToolCallCount != 1 {
+		t.Fatalf("summary metadata = %#v, want 2 chat rounds and 1 tool call", metadata)
+	}
+	if metadata.AllowedAtecoCount != 8 {
+		t.Fatalf("allowed count = %d, want 8", metadata.AllowedAtecoCount)
+	}
+}
+
+func TestConstrainMAAtecoRerankRejectsUnseenCodes(t *testing.T) {
+	allowed := map[string]AtecoCode{}
+	rememberAllowedAteco(allowed, AtecoCode{Codice: "62.1", CodiceSearch: "621", Titolo: "Attività di programmazione informatica"})
+	rememberAllowedAteco(allowed, AtecoCode{Codice: "95", CodiceSearch: "95", Titolo: "Riparazione e manutenzione di computer"})
+	output := maAtecoRerankOutput{
+		Selected: []maAtecoRerankSelected{
+			{Code: "62.1", Fit: "strong", Reason: "visto"},
+			{Code: "63.10", Fit: "strong", Reason: "non visto"},
+		},
+		ExcludedPrefixes: []maAtecoRerankExcludedPrefix{
+			{Prefix: "95", Reason: "esclusione esplicita"},
+			{Prefix: "94", Reason: "non visto"},
+		},
+	}
+
+	candidates, missing := constrainMAAtecoRerank(
+		output,
+		allowed,
+		[]MAIntentTextConstraint{{Text: "it", SourceText: "settore it"}},
+		[]MAIntentTextConstraint{{Text: "riparazione computer", SourceText: "esclusa riparazione computer"}},
+	)
+
+	if len(candidates) != 2 {
+		t.Fatalf("candidates = %#v, want selected 62.1 plus excluded 95", candidates)
+	}
+	if candidates[0].Code != "62.1" || candidates[0].Fit != maFitCore {
+		t.Fatalf("selected candidate = %#v, want canonical 62.1 core", candidates[0])
+	}
+	if candidates[1].Code != "95" || candidates[1].Fit != maFitExcluded {
+		t.Fatalf("excluded candidate = %#v, want canonical 95 excluded", candidates[1])
+	}
+	joined := strings.Join(missing, "\n")
+	if !strings.Contains(joined, "ATECO selezionato fuori dai codici esplorati: 63.10") {
+		t.Fatalf("missing = %#v, want unseen selected code", missing)
+	}
+	if !strings.Contains(joined, "Prefisso ATECO escluso fuori dai codici esplorati: 94") {
+		t.Fatalf("missing = %#v, want unseen excluded code", missing)
+	}
+	if strings.Contains(joined, "Settore testuale non mappato") {
+		t.Fatalf("missing = %#v, should not add fallback when a positive selection exists", missing)
+	}
+}
+
+func TestConstrainMAAtecoRerankFiltersModelMissingBySectorTextOnly(t *testing.T) {
+	output := maAtecoRerankOutput{
+		MissingCriteria: []maAtecoRerankMissingCriterion{
+			{Text: "target in provincia di alessandria", Reason: "criterio geografico non mappabile a codici ATECO per settore IT"},
+			{Text: "massimo 50 addetti", Reason: "criterio dimensionale non mappabile a codici ATECO per IT"},
+			{Text: "attività non mappabile", Reason: "contiene solo token generico"},
+			{Text: "it non mappato", Reason: "settore ambiguo"},
+		},
+	}
+
+	_, missing := constrainMAAtecoRerank(
+		output,
+		nil,
+		[]MAIntentTextConstraint{{
+			Text:       "it",
+			SourceText: "target in provincia di alessandria, settore it, massimo 50 addetti",
+		}},
+		nil,
+	)
+
+	if len(missing) != 1 || missing[0] != "it non mappato: settore ambiguo" {
+		t.Fatalf("missing = %#v, want only sector-grounded missing", missing)
+	}
+}
+
+func TestConstrainMAAtecoRerankEmitsFallbackWhenOnlyNonSectorMissingRemain(t *testing.T) {
+	output := maAtecoRerankOutput{
+		MissingCriteria: []maAtecoRerankMissingCriterion{
+			{Text: "target in provincia di alessandria", Reason: "criterio geografico non mappabile a codici ATECO per settore IT"},
+			{Text: "massimo 50 addetti", Reason: "criterio dimensionale non mappabile a codici ATECO per IT"},
+		},
+	}
+
+	_, missing := constrainMAAtecoRerank(
+		output,
+		nil,
+		[]MAIntentTextConstraint{{Text: "it", SourceText: "settore it"}},
+		nil,
+	)
+
+	if len(missing) != 1 || missing[0] != "Settore testuale non mappato con sicurezza al catalogo ATECO esplorato" {
+		t.Fatalf("missing = %#v, want fallback only", missing)
+	}
+}
+
+func TestMAAtecoMissingGroundingUsesWholeNonNumericTokens(t *testing.T) {
+	sectors := []MAIntentTextConstraint{{Text: "it", SourceText: "settore it"}}
+	if !maAtecoMissingGroundedInSectors(maAtecoRerankMissingCriterion{Text: "IT non mappato"}, sectors, nil) {
+		t.Fatalf("IT token should ground a sector missing")
+	}
+	for _, text := range []string{"diritto societario", "attivita non mappabile"} {
+		if maAtecoMissingGroundedInSectors(maAtecoRerankMissingCriterion{Text: text}, sectors, nil) {
+			t.Fatalf("%q should not be grounded by sector token it", text)
+		}
+	}
+	numericSector := []MAIntentTextConstraint{{Text: "50", SourceText: "50"}}
+	if maAtecoMissingGroundedInSectors(maAtecoRerankMissingCriterion{Text: "50 addetti"}, numericSector, nil) {
+		t.Fatalf("numeric tokens should not ground an ATECO missing")
+	}
+}
+
+func TestMAStrategyAtecoHierarchyMigrationCoversPipelineTextValueType(t *testing.T) {
+	raw, err := os.ReadFile("../../../deploy/migrations/052_anisetta_mrsmith_binocolo_ma_strategy_ateco_hierarchy.sql")
+	if err != nil {
+		t.Fatalf("read migration: %v", err)
+	}
+	sql := string(raw)
+	for _, snippet := range []string{
+		"CHECK (value_type IN ('money', 'percent', 'number', 'text'))",
+		"WHEN value IN ('v2', 'monolith') THEN value",
+		"value_type = 'text'",
+		"'ma_strategy_ateco_hierarchy'",
+		"M&A strategy ATECO hierarchical resolver v1",
+		"M&A strategy intent extractor v1 thesis guard",
+		"is_default = false",
+	} {
+		if !strings.Contains(sql, snippet) {
+			t.Fatalf("migration missing %q", snippet)
+		}
+	}
+}
+
 func TestCompanySearchNormalizesAtecoBeforeCacheAndUpstream(t *testing.T) {
 	ateco := newFakeAtecoStore([]AtecoCode{{
 		Codice:       "62.10.00",
@@ -653,6 +967,62 @@ func TestProvinceRegionToolReturnsRegionsAndWhitelistsProvinces(t *testing.T) {
 	}
 	if _, ok := allowed["RM"]; ok {
 		t.Fatalf("RM should not be whitelisted by Lombardia filter: %#v", allowed)
+	}
+}
+
+func TestResolveMAIntentTerritoryExcludesTypoProvinceAndIncludesOutOfRegionProvince(t *testing.T) {
+	cache := newFakeProvinceCache(t, []openapiit.Province{
+		{Sigla: "AV", Provincia: "Avellino", Regione: "Campania"},
+		{Sigla: "BN", Provincia: "Benevento", Regione: "Campania"},
+		{Sigla: "CE", Provincia: "Caserta", Regione: "Campania"},
+		{Sigla: "NA", Provincia: "Napoli", Regione: "Campania"},
+		{Sigla: "SA", Provincia: "Salerno", Regione: "Campania"},
+		{Sigla: "CS", Provincia: "Cosenza", Regione: "Calabria"},
+		{Sigla: "CZ", Provincia: "Catanzaro", Regione: "Calabria"},
+		{Sigla: "KR", Provincia: "Crotone", Regione: "Calabria"},
+		{Sigla: "RC", Provincia: "Reggio Calabria", Regione: "Calabria"},
+		{Sigla: "VV", Provincia: "Vibo Valentia", Regione: "Calabria"},
+		{Sigla: "MT", Provincia: "Matera", Regione: "Basilicata"},
+	})
+	service := newMAService(&fakeMAWorkspaceStore{}, nil, cache, nil, nil, nil)
+	allowed := map[string]openapiit.Province{}
+	territory := MAIntentTerritory{
+		IncludeRegions: []MAIntentTerritoryConstraint{
+			{Value: "calabria", SourceText: "calabria"},
+			{Value: "campania", SourceText: "campania"},
+		},
+		IncludeProvinces: []MAIntentTerritoryConstraint{
+			{Value: "matera", SourceText: "provincia di matera"},
+		},
+		ExcludeProvinces: []MAIntentTerritoryConstraint{
+			{Value: "vibo valenzia", SourceText: "vibo valenzia"},
+			{Value: "avellino", SourceText: "avellino"},
+		},
+	}
+
+	provinces, label, missing, err := service.resolveMAIntentTerritory(context.Background(), territory, allowed)
+
+	if err != nil {
+		t.Fatalf("resolveMAIntentTerritory returned error: %v", err)
+	}
+	want := []string{"BN", "CE", "CS", "CZ", "KR", "MT", "NA", "RC", "SA"}
+	if !slices.Equal(provinces, want) {
+		t.Fatalf("provinces = %#v, want %#v", provinces, want)
+	}
+	if len(missing) != 0 {
+		t.Fatalf("missing = %#v, want none", missing)
+	}
+	if strings.Contains(strings.Join(provinces, ","), "AV") || strings.Contains(strings.Join(provinces, ","), "VV") {
+		t.Fatalf("excluded provinces leaked into result: %#v", provinces)
+	}
+	if _, ok := allowed["MT"]; !ok {
+		t.Fatalf("MT was not whitelisted: %#v", allowed)
+	}
+	if _, ok := allowed["VV"]; ok {
+		t.Fatalf("VV should not be whitelisted after exclusion: %#v", allowed)
+	}
+	if !strings.Contains(label, "Calabria") || !strings.Contains(label, "Campania") || !strings.Contains(label, "MT") || !strings.Contains(label, "VV") || !strings.Contains(label, "AV") {
+		t.Fatalf("territory label = %q, want included labels and exclusions", label)
 	}
 }
 
@@ -784,6 +1154,35 @@ func traceEvent(events []maTraceEventWrite, eventType string) *maTraceEventWrite
 	return nil
 }
 
+func testHierarchyAtecoCodes() []AtecoCode {
+	return []AtecoCode{
+		{Codice: "62", CodiceSearch: "62", Titolo: "Attività di programmazione, consulenza informatica e attività connesse", Gerarchia: testAtecoLevel(2)},
+		{Codice: "62.1", CodiceSearch: "621", Titolo: "Attività di programmazione informatica", Gerarchia: testAtecoLevel(3)},
+		{Codice: "62.10", CodiceSearch: "6210", Titolo: "Attività di programmazione informatica", Gerarchia: testAtecoLevel(4)},
+		{Codice: "62.10.0", CodiceSearch: "62100", Titolo: "Attività di programmazione informatica", Gerarchia: testAtecoLevel(5)},
+		{Codice: "62.10.00", CodiceSearch: "621000", Titolo: "Attività di programmazione informatica", Gerarchia: testAtecoLevel(6)},
+		{Codice: "62.2", CodiceSearch: "622", Titolo: "Attività di consulenza informatica e di gestione di strutture informatiche", Gerarchia: testAtecoLevel(3)},
+		{Codice: "62.9", CodiceSearch: "629", Titolo: "Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica", Gerarchia: testAtecoLevel(3)},
+		{Codice: "63", CodiceSearch: "63", Titolo: "Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione", Gerarchia: testAtecoLevel(2)},
+		{Codice: "63.1", CodiceSearch: "631", Titolo: "Infrastrutture informatiche, elaborazione dati, hosting e attività connesse", Gerarchia: testAtecoLevel(3)},
+		{Codice: "63.10", CodiceSearch: "6310", Titolo: "Infrastrutture informatiche, elaborazione dati, hosting e attività connesse", Gerarchia: testAtecoLevel(4)},
+	}
+}
+
+func testAtecoLevel(value int) *int {
+	out := value
+	return &out
+}
+
+func mustResolveFakeAteco(t *testing.T, store *fakeAtecoStore, code string) AtecoCode {
+	t.Helper()
+	item, err := store.ResolveAtecoCode(context.Background(), code)
+	if err != nil {
+		t.Fatalf("resolve fake ateco %q: %v", code, err)
+	}
+	return item
+}
+
 func newFakeAtecoStore(items []AtecoCode) *fakeAtecoStore {
 	store := &fakeAtecoStore{items: map[string]AtecoCode{}}
 	for _, item := range items {
@@ -800,6 +1199,57 @@ func (s *fakeAtecoStore) ResolveAtecoCode(_ context.Context, code string) (Ateco
 	return item, nil
 }
 
+func (s *fakeAtecoStore) AtecoDivisions(context.Context) ([]AtecoCode, error) {
+	out := make([]AtecoCode, 0, len(s.items))
+	seen := map[string]struct{}{}
+	for _, item := range s.items {
+		if item.Gerarchia == nil || *item.Gerarchia != 2 {
+			continue
+		}
+		if _, exists := seen[item.CodiceSearch]; exists {
+			continue
+		}
+		seen[item.CodiceSearch] = struct{}{}
+		out = append(out, item)
+	}
+	slices.SortFunc(out, func(a, b AtecoCode) int {
+		return strings.Compare(a.Codice, b.Codice)
+	})
+	return out, nil
+}
+
+func (s *fakeAtecoStore) AtecoChildren(_ context.Context, code string) ([]AtecoHierarchyCode, error) {
+	parent, ok := s.items[atecoSearchCode(code)]
+	if !ok || parent.Gerarchia == nil {
+		return nil, errAtecoCodeNotFound
+	}
+	parentSearchCode := atecoSearchCode(parent.Codice)
+	out := make([]AtecoHierarchyCode, 0)
+	seen := map[string]struct{}{}
+	for _, item := range s.items {
+		if item.Gerarchia == nil {
+			continue
+		}
+		searchCode := atecoSearchCode(item.Codice)
+		if searchCode == parentSearchCode || !strings.HasPrefix(searchCode, parentSearchCode) {
+			continue
+		}
+		if _, exists := seen[item.CodiceSearch]; exists {
+			continue
+		}
+		seen[item.CodiceSearch] = struct{}{}
+		out = append(out, AtecoHierarchyCode{
+			AtecoCode:    item,
+			ChildCount:   fakeAtecoChildCount(s.items, item),
+			SubtreeCount: fakeAtecoSubtreeCount(s.items, item),
+		})
+	}
+	slices.SortFunc(out, func(a, b AtecoHierarchyCode) int {
+		return strings.Compare(a.Codice, b.Codice)
+	})
+	return out, nil
+}
+
 func (s *fakeAtecoStore) SubtreeAtecoCodes(_ context.Context, code string) ([]AtecoCode, error) {
 	code = normalizeAtecoCode(code)
 	if code == "" {
@@ -807,9 +1257,10 @@ func (s *fakeAtecoStore) SubtreeAtecoCodes(_ context.Context, code string) ([]At
 	}
 	out := make([]AtecoCode, 0, len(s.items))
 	seen := map[string]struct{}{}
+	rootSearchCode := atecoSearchCode(code)
 	for _, item := range s.items {
-		dotted := normalizeAtecoCode(item.Codice)
-		if dotted != code && !strings.HasPrefix(dotted, code+".") {
+		searchCode := atecoSearchCode(item.Codice)
+		if searchCode != rootSearchCode && !strings.HasPrefix(searchCode, rootSearchCode) {
 			continue
 		}
 		if _, exists := seen[item.CodiceSearch]; exists {
@@ -819,6 +1270,39 @@ func (s *fakeAtecoStore) SubtreeAtecoCodes(_ context.Context, code string) ([]At
 		out = append(out, item)
 	}
 	return out, nil
+}
+
+func fakeAtecoChildCount(items map[string]AtecoCode, parent AtecoCode) int {
+	if parent.Gerarchia == nil {
+		return 0
+	}
+	parentSearchCode := atecoSearchCode(parent.Codice)
+	childLevel := *parent.Gerarchia + 1
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		if item.Gerarchia == nil || *item.Gerarchia != childLevel {
+			continue
+		}
+		searchCode := atecoSearchCode(item.Codice)
+		if searchCode == parentSearchCode || !strings.HasPrefix(searchCode, parentSearchCode) {
+			continue
+		}
+		seen[item.CodiceSearch] = struct{}{}
+	}
+	return len(seen)
+}
+
+func fakeAtecoSubtreeCount(items map[string]AtecoCode, parent AtecoCode) int {
+	parentSearchCode := atecoSearchCode(parent.Codice)
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		searchCode := atecoSearchCode(item.Codice)
+		if searchCode != parentSearchCode && !strings.HasPrefix(searchCode, parentSearchCode) {
+			continue
+		}
+		seen[item.CodiceSearch] = struct{}{}
+	}
+	return len(seen)
 }
 
 func (s *fakeAtecoStore) SearchAteco(_ context.Context, query string, limit int) ([]AtecoCode, error) {

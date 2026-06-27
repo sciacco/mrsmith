@@ -23,6 +23,8 @@ var (
 
 type atecoStore interface {
 	ResolveAtecoCode(ctx context.Context, code string) (AtecoCode, error)
+	AtecoDivisions(ctx context.Context) ([]AtecoCode, error)
+	AtecoChildren(ctx context.Context, code string) ([]AtecoHierarchyCode, error)
 	SearchAteco(ctx context.Context, query string, limit int) ([]AtecoCode, error)
 	SubtreeAtecoCodes(ctx context.Context, code string) ([]AtecoCode, error)
 }
@@ -34,6 +36,12 @@ type AtecoCode struct {
 	Titolo               string `json:"titolo"`
 	Gerarchia            *int   `json:"gerarchia,omitempty"`
 	NumeroCorrispondenze int    `json:"-"`
+}
+
+type AtecoHierarchyCode struct {
+	AtecoCode
+	ChildCount   int `json:"childCount"`
+	SubtreeCount int `json:"subtreeCount"`
 }
 
 func (s *SQLStore) ResolveAtecoCode(ctx context.Context, code string) (AtecoCode, error) {
@@ -63,6 +71,124 @@ LIMIT 1
 	return item, nil
 }
 
+func (s *SQLStore) AtecoDivisions(ctx context.Context) ([]AtecoCode, error) {
+	if s == nil || s.db == nil {
+		return nil, errAtecoStoreUnavailable
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT ordine, codice, codice_search, titolo, gerarchia, numero_corrispondenze
+FROM binocolo.codici_ateco_2025
+WHERE codice_search ~ '^[0-9]+$'
+  AND gerarchia = 2
+ORDER BY ordine
+`)
+	if err != nil {
+		return nil, fmt.Errorf("ateco divisions: %w", err)
+	}
+	defer rows.Close()
+	out := []AtecoCode{}
+	for rows.Next() {
+		item, err := scanAtecoScanner(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ateco divisions: %w", err)
+	}
+	return out, nil
+}
+
+func (s *SQLStore) AtecoChildren(ctx context.Context, code string) ([]AtecoHierarchyCode, error) {
+	if s == nil || s.db == nil {
+		return nil, errAtecoStoreUnavailable
+	}
+	code = normalizeAtecoCode(code)
+	if code == "" {
+		return nil, errAtecoCodeNotFound
+	}
+	searchCode := atecoSearchCode(code)
+	rows, err := s.db.QueryContext(ctx, `
+WITH parent AS (
+  SELECT codice, codice_search, gerarchia
+  FROM binocolo.codici_ateco_2025
+  WHERE codice_search ~ '^[0-9]+$'
+    AND (upper(codice) = upper($1) OR upper(codice_search) = upper($2))
+  ORDER BY CASE WHEN upper(codice) = upper($1) THEN 0 ELSE 1 END, ordine
+  LIMIT 1
+),
+	descendants AS (
+	  SELECT child.ordine, child.codice, child.codice_search, child.titolo, child.gerarchia, child.numero_corrispondenze
+	  FROM parent
+	  JOIN binocolo.codici_ateco_2025 child
+	    -- Dotted codes are not prefix-stable across levels (62.1 -> 62.10), so
+	    -- hierarchy traversal must use the dotless generated code.
+	    ON child.codice_search LIKE parent.codice_search || '%'
+	   AND child.codice_search <> parent.codice_search
+	  WHERE child.codice_search ~ '^[0-9]+$'
+	)
+	SELECT
+  child.ordine,
+  child.codice,
+  child.codice_search,
+  child.titolo,
+  child.gerarchia,
+  child.numero_corrispondenze,
+  (
+    SELECT count(*)
+    FROM binocolo.codici_ateco_2025 grandchild
+    WHERE grandchild.codice_search ~ '^[0-9]+$'
+      AND grandchild.codice_search LIKE child.codice_search || '%'
+      AND grandchild.codice_search <> child.codice_search
+      AND grandchild.gerarchia = child.gerarchia + 1
+  ) AS child_count,
+  (
+    SELECT count(*)
+    FROM binocolo.codici_ateco_2025 descendant
+    WHERE descendant.codice_search ~ '^[0-9]+$'
+      AND (
+        descendant.codice_search = child.codice_search
+        OR descendant.codice_search LIKE child.codice_search || '%'
+      )
+  ) AS subtree_count
+	FROM descendants child
+	ORDER BY child.ordine
+	`, code, searchCode)
+	if err != nil {
+		return nil, fmt.Errorf("ateco children: %w", err)
+	}
+	defer rows.Close()
+	out := []AtecoHierarchyCode{}
+	for rows.Next() {
+		item, err := scanAtecoHierarchyScanner(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ateco children: %w", err)
+	}
+	if len(out) == 0 {
+		var exists bool
+		if err := s.db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM binocolo.codici_ateco_2025
+  WHERE codice_search ~ '^[0-9]+$'
+    AND (upper(codice) = upper($1) OR upper(codice_search) = upper($2))
+)
+`, code, searchCode).Scan(&exists); err != nil {
+			return nil, fmt.Errorf("check ateco parent: %w", err)
+		}
+		if !exists {
+			return nil, errAtecoCodeNotFound
+		}
+	}
+	return out, nil
+}
+
 // SubtreeAtecoCodes returns the node itself plus every descendant in the ATECO
 // hierarchy. Because OpenAPI.it matches the ATECO code exactly (no prefix, no
 // descent) and companies are tagged at heterogeneous levels per branch, callers
@@ -75,13 +201,26 @@ func (s *SQLStore) SubtreeAtecoCodes(ctx context.Context, code string) ([]AtecoC
 	if code == "" {
 		return nil, errAtecoCodeNotFound
 	}
+	searchCode := atecoSearchCode(code)
 	rows, err := s.db.QueryContext(ctx, `
-SELECT ordine, codice, codice_search, titolo, gerarchia, numero_corrispondenze
-FROM binocolo.codici_ateco_2025
-WHERE codice_search ~ '^[0-9]+$'
-  AND (upper(codice) = upper($1) OR upper(codice) LIKE upper($1) || '.%')
-ORDER BY ordine
-`, code)
+WITH parent AS (
+  SELECT codice_search
+  FROM binocolo.codici_ateco_2025
+  WHERE codice_search ~ '^[0-9]+$'
+    AND (upper(codice) = upper($1) OR upper(codice_search) = upper($2))
+  ORDER BY CASE WHEN upper(codice) = upper($1) THEN 0 ELSE 1 END, ordine
+  LIMIT 1
+)
+SELECT ateco.ordine, ateco.codice, ateco.codice_search, ateco.titolo, ateco.gerarchia, ateco.numero_corrispondenze
+FROM binocolo.codici_ateco_2025 ateco
+CROSS JOIN parent
+WHERE ateco.codice_search ~ '^[0-9]+$'
+  AND (
+    ateco.codice_search = parent.codice_search
+    OR ateco.codice_search LIKE parent.codice_search || '%'
+  )
+ORDER BY ateco.ordine
+`, code, searchCode)
 	if err != nil {
 		return nil, fmt.Errorf("subtree ateco codes: %w", err)
 	}
@@ -203,6 +342,31 @@ func scanAtecoScanner(scanner atecoScanner) (AtecoCode, error) {
 		&item.NumeroCorrispondenze,
 	); err != nil {
 		return AtecoCode{}, err
+	}
+	item.Codice = strings.TrimSpace(item.Codice)
+	item.CodiceSearch = strings.TrimSpace(item.CodiceSearch)
+	item.Titolo = strings.TrimSpace(item.Titolo)
+	if gerarchia.Valid {
+		value := int(gerarchia.Int64)
+		item.Gerarchia = &value
+	}
+	return item, nil
+}
+
+func scanAtecoHierarchyScanner(scanner atecoScanner) (AtecoHierarchyCode, error) {
+	var item AtecoHierarchyCode
+	var gerarchia sql.NullInt64
+	if err := scanner.Scan(
+		&item.Ordine,
+		&item.Codice,
+		&item.CodiceSearch,
+		&item.Titolo,
+		&gerarchia,
+		&item.NumeroCorrispondenze,
+		&item.ChildCount,
+		&item.SubtreeCount,
+	); err != nil {
+		return AtecoHierarchyCode{}, err
 	}
 	item.Codice = strings.TrimSpace(item.Codice)
 	item.CodiceSearch = strings.TrimSpace(item.CodiceSearch)
