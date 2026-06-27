@@ -25,6 +25,8 @@ import type {
   MAThesis,
   MAWebValidation,
   MAWebValidationEnrichRequest,
+  PipelineFinalAction,
+  PipelineWebValidationState,
 } from '../api/types';
 import styles from './TargetPage.module.css';
 
@@ -120,7 +122,7 @@ export function TargetPage() {
   const [activeTab, setActiveTab] = useState<'results' | 'config'>('results');
   const [isFullDetailOpen, setIsFullDetailOpen] = useState(false);
   const [isDeepDiveOpen, setIsDeepDiveOpen] = useState(false);
-  const [modalActiveTab, setModalActiveTab] = useState<'overview' | 'deep' | 'financials' | 'shareholders' | 'registry'>('overview');
+  const [modalActiveTab, setModalActiveTab] = useState<'overview' | 'deep' | 'financials' | 'shareholders' | 'registry' | 'web'>('overview');
   const [lifecycleBusyId, setLifecycleBusyId] = useState<string | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<MASessionSummary | null>(null);
   const [purgeCandidate, setPurgeCandidate] = useState<MASessionSummary | null>(null);
@@ -1195,6 +1197,14 @@ export function TargetPage() {
                   <Icon name="file-text" size={16} />
                   <span>Anagrafica Legale</span>
                 </button>
+                <button
+                  type="button"
+                  className={`${styles.tabLink} ${modalActiveTab === 'web' ? styles.tabLinkActive : ''}`}
+                  onClick={() => setModalActiveTab('web')}
+                >
+                  <Icon name="network" size={16} />
+                  <span>Web</span>
+                </button>
               </div>
 
               {/* Tab 1: Overview */}
@@ -1588,6 +1598,11 @@ export function TargetPage() {
                   </dl>
                 );
               })()}
+
+              {/* Tab 5: Web */}
+              {modalActiveTab === 'web' && (
+                <WebTabContent target={selectedTarget} />
+              )}
             </div>
 
             {/* Sidebar Column (Option 2 Integration) */}
@@ -2139,7 +2154,6 @@ function TargetTable({
                     )}
                     <ConfidenceCaveat confidence={target.confidence} missing={target.missingCriteria} />
                     <FlagChips flags={target.flags} />
-                    <WebValidationChip validation={target.webValidation} />
                     <DeepStatusChip deep={target.deep} />
                   </div>
                 </td>
@@ -2244,36 +2258,32 @@ const evidenceFamilies: { key: string; label: string }[] = [
   { key: 'economico', label: 'Profilo economico' },
 ];
 
-function WebValidationChip({ validation }: { validation?: MAWebValidation }) {
-  if (!validation) return null;
-  return (
-    <span className={`${styles.webChip} ${styles[`webChip_${validation.finalAction}`] ?? ''}`}>
-      Web {webFinalActionLabel(validation.finalAction)}
-      {validation.freshness !== 'fresh' ? ` · ${validation.freshness}` : ''}
-    </span>
-  );
-}
-
 function WebValidationBlock({ validation }: { validation?: MAWebValidation }) {
   if (!validation) return null;
+
+  if (validation.webValidationState === 'domain_unresolved') {
+    return (
+      <div className={styles.webValidationBox}>
+        <div className={styles.webValidationHead}>
+          <span>Analisi WEB</span>
+          <strong>Dominio non risolto</strong>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.webValidationBox}>
       <div className={styles.webValidationHead}>
-        <span>Validazione web</span>
-        <strong>{webFinalActionLabel(validation.finalAction)}</strong>
+        <span>Analisi WEB</span>
+        <span className={`${styles.webChip} ${styles[`webChip_${validation.finalAction}`] ?? ''}`}>
+          {webFinalActionLabel(validation.finalAction)}
+        </span>
       </div>
       <dl>
         <div>
           <dt>Dominio</dt>
           <dd>{validation.selectedDomain || 'Non risolto'}</dd>
-        </div>
-        <div>
-          <dt>Score</dt>
-          <dd>{validation.webScore}/100 · {webValidationStateLabel(validation.webValidationState)}</dd>
-        </div>
-        <div>
-          <dt>Freshness</dt>
-          <dd>{validation.freshness} · fino al {dateLabel(validation.staleAfter)}</dd>
         </div>
       </dl>
       <p>{validation.finalDecision.reason}</p>
@@ -2298,22 +2308,67 @@ function webFinalActionLabel(action: string): string {
   }
 }
 
-function webValidationStateLabel(state: string): string {
+function candidateVerdictLabel(verdict: string): string {
+  switch (verdict) {
+    case 'strong_match':
+      return 'Strong match';
+    case 'match':
+      return 'Match';
+    case 'weak_match':
+      return 'Weak match';
+    case 'no_match':
+      return 'No match';
+    case 'unclear':
+      return 'Unclear';
+    default:
+      return verdict || 'N/D';
+  }
+}
+
+function candidateActionLabel(action: string): string {
+  switch (action) {
+    case 'confirm':
+      return 'Conferma';
+    case 'review':
+      return 'Review';
+    case 'downgrade':
+      return 'Downgrade';
+    case 'reject':
+      return 'Reject';
+    default:
+      return action || 'N/D';
+  }
+}
+
+function finalActionLabel(action: PipelineFinalAction): string {
+  switch (action) {
+    case 'confirm':
+      return 'Conferma';
+    case 'deprioritize':
+      return 'Deprioritizza';
+    case 'reject':
+      return 'Reject';
+    case 'needs_domain_review':
+      return 'Review dominio';
+    case 'needs_business_validation':
+      return 'Validazione business';
+  }
+}
+
+function webValidationStateLabel(state: PipelineWebValidationState): string {
   switch (state) {
     case 'confirmed':
-      return 'confermato';
+      return 'Confermato';
     case 'deprioritized':
-      return 'declassato';
+      return 'Declassato';
     case 'domain_unresolved':
-      return 'dominio non risolto';
+      return 'Dominio non risolto';
     case 'analysis_unavailable':
-      return 'analyst non disponibile';
+      return 'Analyst non disponibile';
     case 'rejected':
-      return 'respinto';
+      return 'Respinto';
     case 'unclear':
-      return 'incerto';
-    default:
-      return state || 'N/D';
+      return 'Incerto';
   }
 }
 
@@ -3025,4 +3080,182 @@ function safeFilename(value: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 48);
   return normalized || 'ricerca';
+}
+
+function WebTabContent({ target }: { target: MATarget }) {
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const validation = target.webValidation;
+
+  if (!validation) {
+    return (
+      <div className={`${styles.statePanel} ${styles.companyState}`} style={{ margin: 'var(--space-4) var(--space-6)' }} role="alert">
+        <div className={styles.stateIcon}>
+          <Icon name="network" size={22} />
+        </div>
+        <p className={styles.stateTitle}>Analisi WEB non disponibile</p>
+        <p className={styles.stateText}>Avvia l'arricchimento web dalla barra delle azioni per questo target.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.webTabContainer}>
+      <article className={`${styles.resultCard} ${styles.finalDecisionCard}`}>
+        <div className={styles.resultCardHead}>
+          <div>
+            <h3>Final reconciliation</h3>
+            <p>{validation.finalDecision.reason}</p>
+          </div>
+          <div className={styles.cardActions}>
+            <span className={`${styles.scoreBadge} ${styles[`finalAction_${validation.finalDecision.finalAction}`] ?? ''}`}>
+              {finalActionLabel(validation.finalDecision.finalAction)}
+            </span>
+            <span className={`${styles.scoreBadge} ${styles[`confidence_${validation.finalDecision.confidence}`] ?? ''}`}>
+              {webValidationStateLabel(validation.webValidationState)}
+            </span>
+          </div>
+        </div>
+        <div className={styles.analysisGrid}>
+          <div>
+            <span>Score iniziale</span>
+            <p>
+              {validation.finalDecision.deterministicScore} ·{' '}
+              {validation.finalDecision.initialMatchState}
+            </p>
+          </div>
+          <div>
+            <span>Validazione web</span>
+            <p>
+              {validation.finalDecision.webScore} ·{' '}
+              {webValidationStateLabel(validation.webValidationState)}
+            </p>
+          </div>
+          <div>
+            <span>Analyst</span>
+            <p>
+              {validation.finalDecision.analystVerdict
+                ? `${candidateVerdictLabel(validation.finalDecision.analystVerdict)} · ${candidateActionLabel(
+                    validation.finalDecision.analystAction ?? '',
+                  )}`
+                : 'N/D'}
+            </p>
+          </div>
+          <div>
+            <span>Dominio</span>
+            <p>
+              {validation.selectedDomain
+                ? `${validation.selectedDomain}${validation.domainConfidence ? ` · ${validation.domainConfidence}` : ''}`
+                : 'N/D'}
+            </p>
+          </div>
+        </div>
+
+        <div className={styles.collapsibleSection}>
+          <button
+            type="button"
+            className={styles.collapseToggle}
+            onClick={() => setIsDetailsOpen(!isDetailsOpen)}
+          >
+            <span>Altri dati</span>
+            <Icon name={isDetailsOpen ? 'chevron-up' : 'chevron-down'} size={16} />
+          </button>
+          
+          {isDetailsOpen && (
+            <>
+              <div className={styles.analysisGrid} style={{ marginTop: 'var(--space-2)' }}>
+                <div>
+                  <span>Persistenza</span>
+                  <p>
+                    {`salvata · ${new Date(validation.updatedAt).toLocaleString('it-IT')}`}
+                  </p>
+                </div>
+                <div>
+                  <span>Freshness</span>
+                  <p>
+                    {validation.freshness} · stale dopo{' '}
+                    {new Date(validation.staleAfter).toLocaleDateString('it-IT')}
+                  </p>
+                </div>
+              </div>
+              {validation.finalDecision.reasons.length > 0 ? (
+                <div className={styles.finalReasons} style={{ marginTop: 'var(--space-3)' }}>
+                  {validation.finalDecision.reasons.slice(0, 6).map((reason) => (
+                    <span key={reason}>{reason}</span>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      </article>
+
+      {validation.candidateMatchAnalysis ? (
+        <article className={`${styles.resultCard} ${styles.analysisCard}`}>
+          <div className={styles.resultCardHead}>
+            <div>
+              <h3>Candidate match analyst</h3>
+              <p>{validation.candidateMatchAnalysis.rationale}</p>
+            </div>
+            <div className={styles.cardActions}>
+              <span className={`${styles.scoreBadge} ${styles[`confidence_${validation.candidateMatchAnalysis.confidence}`] ?? ''}`}>
+                {candidateVerdictLabel(validation.candidateMatchAnalysis.verdict)}
+              </span>
+              <span className={styles.bucketBadge}>
+                {candidateActionLabel(validation.candidateMatchAnalysis.recommendedAction)}
+              </span>
+            </div>
+          </div>
+          <div className={styles.analysisGrid}>
+            <div>
+              <span>Sector fit</span>
+              <p>{validation.candidateMatchAnalysis.sectorFit || 'N/D'}</p>
+            </div>
+            <div>
+              <span>Business fit</span>
+              <p>{validation.candidateMatchAnalysis.businessFit || 'N/D'}</p>
+            </div>
+          </div>
+          <div className={styles.analysisColumns}>
+            <div>
+              <span>Prove a favore</span>
+              {validation.candidateMatchAnalysis.evidenceFor.length > 0 ? (
+                <ul>
+                  {validation.candidateMatchAnalysis.evidenceFor.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              ) : <p>N/D</p>}
+            </div>
+            <div>
+              <span>Contro / lacune</span>
+              {[...validation.candidateMatchAnalysis.evidenceAgainst, ...validation.candidateMatchAnalysis.missingEvidence].length > 0 ? (
+                <ul>
+                  {[...validation.candidateMatchAnalysis.evidenceAgainst, ...validation.candidateMatchAnalysis.missingEvidence].map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              ) : <p>N/D</p>}
+            </div>
+          </div>
+          {validation.candidateMatchAnalysis.negativeSignals.length > 0 ? (
+            <div className={styles.analysisList}>
+              <span>Segnali negativi</span>
+              <p>{validation.candidateMatchAnalysis.negativeSignals.join(' · ')}</p>
+            </div>
+          ) : null}
+          {validation.candidateMatchAnalysis.conceptAliases.length > 0 ? (
+            <div className={styles.aliasList}>
+              <span>Alias concettuali</span>
+              {validation.candidateMatchAnalysis.conceptAliases.map((alias) => (
+                <p key={`${alias.term}-${alias.matchedConcept}`}>
+                  <strong>{alias.term}</strong> -&gt; {alias.matchedConcept}
+                  {alias.evidence ? ` · ${alias.evidence}` : ''}
+                </p>
+              ))}
+            </div>
+          ) : null}
+        </article>
+      ) : validation.candidateMatchError ? (
+        <div className={styles.responseBar} style={{ margin: 'var(--space-4) var(--space-6) 0' }}>
+          <span>Candidate match analyst non disponibile: {validation.candidateMatchError}</span>
+        </div>
+      ) : null}
+    </div>
+  );
 }
