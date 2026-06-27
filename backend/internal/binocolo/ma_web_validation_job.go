@@ -14,7 +14,7 @@ import (
 const (
 	maWebValidationDefaultLimit        = 25
 	maWebValidationMaxLimit            = 100
-	maWebValidationDefaultDomainCount  = 10
+	maWebValidationDefaultDomainCount  = 20
 	maWebValidationDefaultKeywordCount = 5
 	maWebValidationMaxKeywordCount     = 20
 )
@@ -58,6 +58,7 @@ func (s *maService) enqueueWebValidation(ctx context.Context, sessionID string, 
 		JobType:           maJobTypeWebValidation,
 		SessionID:         sessionID,
 		StrategyVersionID: detail.Strategy.ID,
+		Status:            maJobStatusPending,
 		Subject:           subject,
 		Email:             email,
 		Payload:           rawPayload,

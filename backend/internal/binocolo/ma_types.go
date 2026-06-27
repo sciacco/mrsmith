@@ -69,8 +69,13 @@ const (
 
 	maJobStatusQueued  = "queued"
 	maJobStatusRunning = "running"
-	maJobStatusReady   = "ready"
-	maJobStatusFailed  = "failed"
+	// Rollout-safe active states for job types introduced after the original
+	// ma_job worker. Older binaries only poll queued/running, so they ignore
+	// pending/processing rows during progressive deploys.
+	maJobStatusPending    = "pending"
+	maJobStatusProcessing = "processing"
+	maJobStatusReady      = "ready"
+	maJobStatusFailed     = "failed"
 
 	// maJobMaxAttempts bounds retries of a failing job before it is marked failed
 	// (and the session moved to 'failed'). Estimate work is cheap+cached, so a

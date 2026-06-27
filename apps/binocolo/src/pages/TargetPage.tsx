@@ -519,7 +519,7 @@ export function TargetPage() {
       limit: 25,
       includeIdentifiers: false,
       analyzeWithLLM: true,
-      domainCount: 10,
+      domainCount: 20,
       keywordCount: 5,
       rank: true,
     };

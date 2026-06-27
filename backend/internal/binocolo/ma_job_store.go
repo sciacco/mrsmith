@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -30,6 +31,7 @@ type maJobEnqueue struct {
 	JobType           string
 	SessionID         string
 	StrategyVersionID string
+	Status            string
 	Subject           string
 	Email             string
 	Payload           json.RawMessage
@@ -48,12 +50,20 @@ func (s *SQLStore) EnqueueMAJob(ctx context.Context, input maJobEnqueue) (bool, 
 	if len(input.Payload) > 0 {
 		payload = input.Payload
 	}
-	result, err := s.db.ExecContext(ctx, `
+	status := input.Status
+	if status == "" {
+		status = maJobStatusQueued
+	}
+	conflictPredicate := "status IN ('queued', 'running')"
+	if status == maJobStatusPending {
+		conflictPredicate = "status IN ('queued', 'running', 'pending', 'processing')"
+	}
+	result, err := s.db.ExecContext(ctx, fmt.Sprintf(`
 INSERT INTO binocolo.ma_job (id, job_type, session_id, strategy_version_id, status, payload, created_by_subject, created_by_email)
-VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'queued', $5::jsonb, $6, $7)
-ON CONFLICT (session_id, job_type) WHERE status IN ('queued', 'running')
+VALUES ($1::uuid, $2, $3::uuid, $4::uuid, $5, $6::jsonb, $7, $8)
+ON CONFLICT (session_id, job_type) WHERE %s
 DO NOTHING
-`, uuid.NewString(), input.JobType, input.SessionID, input.StrategyVersionID, []byte(payload), nullString(input.Subject), nullString(input.Email))
+`, conflictPredicate), uuid.NewString(), input.JobType, input.SessionID, input.StrategyVersionID, status, []byte(payload), nullString(input.Subject), nullString(input.Email))
 	if err != nil {
 		return false, fmt.Errorf("enqueue ma job: %w", err)
 	}
@@ -64,24 +74,43 @@ DO NOTHING
 	return affected == 1, nil
 }
 
-// ListMAJobs returns pending jobs that are free or already owned by this worker,
-// so workers do not even fetch rows another worker is actively processing.
-func (s *SQLStore) ListMAJobs(ctx context.Context, limit int, workerID string) ([]maJob, error) {
+// ListMAJobs returns pending jobs of the types this binary can process. The
+// job-type filter is part of the rollout contract: during progressive deploys,
+// older workers must ignore job types introduced by newer versions instead of
+// failing them as unknown.
+func (s *SQLStore) ListMAJobs(ctx context.Context, limit int, workerID string, jobTypes []string) ([]maJob, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
 	if limit <= 0 {
 		limit = 16
 	}
-	rows, err := s.db.QueryContext(ctx, `
+	if len(jobTypes) == 0 {
+		return []maJob{}, nil
+	}
+	args := []any{limit, workerID}
+	placeholders := make([]string, 0, len(jobTypes))
+	for _, jobType := range jobTypes {
+		if jobType == "" {
+			continue
+		}
+		args = append(args, jobType)
+		placeholders = append(placeholders, fmt.Sprintf("$%d", len(args)))
+	}
+	if len(placeholders) == 0 {
+		return []maJob{}, nil
+	}
+	query := fmt.Sprintf(`
 SELECT id::text, job_type, session_id::text, strategy_version_id::text, status, attempts,
        payload, COALESCE(trace_id::text, ''), COALESCE(created_by_subject, ''), COALESCE(created_by_email, '')
 FROM binocolo.ma_job
-WHERE status IN ('queued', 'running')
+WHERE status IN ('queued', 'running', 'pending', 'processing')
   AND (lease_until IS NULL OR lease_until < now() OR locked_by = $2)
+  AND job_type IN (%s)
 ORDER BY updated_at
 LIMIT $1
-`, limit, workerID)
+`, strings.Join(placeholders, ", "))
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list ma jobs: %w", err)
 	}
@@ -116,7 +145,7 @@ func (s *SQLStore) AcquireMAJobLease(ctx context.Context, jobID, workerID string
 	result, err := s.db.ExecContext(ctx, `
 UPDATE binocolo.ma_job
 SET lease_until = now() + ($3::int * interval '1 second'), locked_by = $2
-WHERE id = $1::uuid AND status IN ('queued', 'running')
+WHERE id = $1::uuid AND status IN ('queued', 'running', 'pending', 'processing')
   AND (lease_until IS NULL OR lease_until < now() OR locked_by = $2)
 `, jobID, workerID, leaseSeconds)
 	if err != nil {
@@ -137,8 +166,10 @@ func (s *SQLStore) ClaimMAJobQueued(ctx context.Context, jobID string) (bool, er
 	}
 	result, err := s.db.ExecContext(ctx, `
 UPDATE binocolo.ma_job
-SET status = 'running', error_code = NULL, updated_at = now()
-WHERE id = $1::uuid AND status = 'queued'
+SET status = CASE WHEN status = 'pending' THEN 'processing' ELSE 'running' END,
+    error_code = NULL,
+    updated_at = now()
+WHERE id = $1::uuid AND status IN ('queued', 'pending')
 `, jobID)
 	if err != nil {
 		return false, fmt.Errorf("claim ma job queued: %w", err)

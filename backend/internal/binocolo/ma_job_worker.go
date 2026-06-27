@@ -12,7 +12,7 @@ import (
 // maJobWorkerStore is the persistence the async job worker needs. *SQLStore
 // satisfies it; kept narrow so the worker stays testable and decoupled.
 type maJobWorkerStore interface {
-	ListMAJobs(ctx context.Context, limit int, workerID string) ([]maJob, error)
+	ListMAJobs(ctx context.Context, limit int, workerID string, jobTypes []string) ([]maJob, error)
 	AcquireMAJobLease(ctx context.Context, jobID, workerID string, leaseSeconds int) (bool, error)
 	ClaimMAJobQueued(ctx context.Context, jobID string) (bool, error)
 	SetMAJobTrace(ctx context.Context, jobID, traceID string) error
@@ -34,6 +34,7 @@ type maJobWorker struct {
 	store    maJobWorkerStore
 	interval time.Duration
 	batch    int
+	jobTypes []string
 }
 
 func newMAJobWorker(svc *maService, store maJobWorkerStore) *maJobWorker {
@@ -43,6 +44,11 @@ func newMAJobWorker(svc *maService, store maJobWorkerStore) *maJobWorker {
 		store:    store,
 		interval: 2 * time.Second,
 		batch:    16,
+		jobTypes: []string{
+			maJobTypeEstimate,
+			maJobTypeExecute,
+			maJobTypeWebValidation,
+		},
 	}
 }
 
@@ -61,7 +67,7 @@ func (w *maJobWorker) run(ctx context.Context) {
 }
 
 func (w *maJobWorker) tick(ctx context.Context) {
-	jobs, err := w.store.ListMAJobs(ctx, w.batch, w.id)
+	jobs, err := w.store.ListMAJobs(ctx, w.batch, w.id, w.jobTypes)
 	if err != nil {
 		logging.FromContext(ctx).Warn("binocolo job worker list failed", "component", "binocolo", "operation", "ma_job_worker", "error", err)
 		return
@@ -82,7 +88,7 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 	if !owned {
 		return // another worker owns this row right now
 	}
-	if job.Status == maJobStatusQueued {
+	if job.Status == maJobStatusQueued || job.Status == maJobStatusPending {
 		claimed, err := w.store.ClaimMAJobQueued(ctx, job.ID)
 		if err != nil {
 			logging.FromContext(ctx).Warn("binocolo job worker claim failed", "component", "binocolo", "job_id", job.ID, "error", err)
@@ -102,8 +108,7 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 	case maJobTypeWebValidation:
 		traceID, err = w.svc.runWebValidationJob(ctx, job)
 	default:
-		logging.FromContext(ctx).Error("binocolo job worker unknown job type", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType)
-		_ = w.store.FailMAJob(ctx, job.ID, "unknown_job_type")
+		logging.FromContext(ctx).Warn("binocolo job worker skipped unknown job type", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType)
 		return
 	}
 	if traceID != "" {
