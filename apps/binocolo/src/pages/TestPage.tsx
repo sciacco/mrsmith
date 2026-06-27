@@ -1,9 +1,20 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { ApiError } from '@mrsmith/api-client';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button, Icon, Skeleton, ToggleSwitch } from '@mrsmith/ui';
 import { useApiClient } from '../api/client';
-import type { CompanySearchRow, DomainResolutionResponse, OpenAPIITEnvelope, WebSearchResponse } from '../api/types';
+import type {
+  CompanySearchRow,
+  DomainResolutionCandidate,
+  DomainResolutionResponse,
+  MASessionDetail,
+  MASessionListResponse,
+  MASessionVisibility,
+  MAStrategySpec,
+  MATarget,
+  OpenAPIITEnvelope,
+  WebSearchResponse,
+} from '../api/types';
 import styles from './TestPage.module.css';
 
 const numberFormat = new Intl.NumberFormat('it-IT');
@@ -46,14 +57,60 @@ type DomainResolutionForm = typeof defaultDomainResolutionForm;
 type DomainResolutionField = keyof DomainResolutionForm;
 type KeywordEvidenceForm = typeof defaultKeywordEvidenceForm;
 type KeywordEvidenceField = keyof Omit<KeywordEvidenceForm, 'rank'>;
-type TestTab = 'company' | 'domain' | 'keyword' | 'maintenance';
+type TestTab = 'company' | 'pipeline' | 'domain' | 'keyword' | 'maintenance';
+type EvidenceBucket = 'core' | 'adjacent' | 'negative';
 
 const testTabs = [
   { id: 'company', label: 'Company search', icon: 'database' },
+  { id: 'pipeline', label: 'Evidence pipeline', icon: 'route' },
   { id: 'domain', label: 'Domain resolver', icon: 'network' },
   { id: 'keyword', label: 'Keyword evidence', icon: 'search' },
   { id: 'maintenance', label: 'Manutenzione', icon: 'settings' },
 ] as const;
+
+const sessionVisibilityOptions: Array<{ value: MASessionVisibility; label: string }> = [
+  { value: 'active', label: 'Attive' },
+  { value: 'archived', label: 'Archiviate' },
+  { value: 'deleted', label: 'Cestino' },
+];
+
+interface PipelineKeywordSet {
+  intentLabel: string;
+  coreTerms: string[];
+  adjacentTerms: string[];
+  negativeTerms: string[];
+  sources: string[];
+}
+
+interface PipelineTermSpec {
+  bucket: EvidenceBucket;
+  term: string;
+}
+
+interface PipelineEvidenceRun extends PipelineTermSpec {
+  response?: WebSearchResponse;
+  error?: string;
+  resultCount: number;
+  bestScore?: number;
+  matched: boolean;
+}
+
+interface PipelineSummary {
+  score: number;
+  confidence: 'alta' | 'media' | 'bassa';
+  coreMatches: number;
+  adjacentMatches: number;
+  negativeMatches: number;
+}
+
+interface PipelineRunResult {
+  target: MATarget;
+  keywordSet: PipelineKeywordSet;
+  domainResponse: DomainResolutionResponse;
+  selectedDomain?: DomainResolutionCandidate;
+  evidenceRuns: PipelineEvidenceRun[];
+  summary: PipelineSummary;
+}
 
 const dataEnrichmentOptions = [
   { value: '', label: 'Non impostato' },
@@ -260,6 +317,198 @@ function positiveInteger(value: string, fallback: number, min: number, max: numb
   return Math.max(min, Math.min(max, Math.trunc(parsed)));
 }
 
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function cleanTerm(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function addTerm(list: string[], value: string, limit = 12) {
+  const term = cleanTerm(value);
+  if (!term || list.length >= limit) return;
+  const key = term.toLowerCase();
+  if (list.some((item) => item.toLowerCase() === key)) return;
+  list.push(term);
+}
+
+function addTerms(list: string[], values: string[], limit = 12) {
+  for (const value of values) addTerm(list, value, limit);
+}
+
+function normalizeAteco(value: string | undefined): string {
+  return (value ?? '').replace(/\D/g, '');
+}
+
+function strategyAtecoCodes(strategy?: MAStrategySpec, target?: MATarget): string[] {
+  const codes = new Set<string>();
+  if (target?.atecoCode) codes.add(normalizeAteco(target.atecoCode));
+  for (const candidate of strategy?.atecoCandidates ?? []) {
+    const code = normalizeAteco(candidate.code);
+    if (code && candidate.fit !== 'excluded') codes.add(code);
+  }
+  return Array.from(codes).filter(Boolean);
+}
+
+function hasAtecoPrefix(codes: string[], prefixes: string[]): boolean {
+  return codes.some((code) => prefixes.some((prefix) => code.startsWith(prefix)));
+}
+
+function derivedKeywordSet(strategy?: MAStrategySpec, target?: MATarget, extraKeywords = ''): PipelineKeywordSet {
+  const coreTerms: string[] = [];
+  const adjacentTerms: string[] = [];
+  const negativeTerms: string[] = [];
+  const sources: string[] = [];
+  const atecoCodes = strategyAtecoCodes(strategy, target);
+  const sector = cleanTerm(strategy?.sectorDescription ?? '');
+
+  if (sector) sources.push(`settore: ${sector}`);
+  if (atecoCodes.length > 0) sources.push(`ATECO: ${atecoCodes.join(', ')}`);
+  if (target?.atecoDescription) sources.push(`target ATECO: ${target.atecoDescription}`);
+
+  addTerms(coreTerms, splitKeywords(extraKeywords), 10);
+  addTerms(coreTerms, strategy?.keywords ?? [], 10);
+
+  if (hasAtecoPrefix(atecoCodes, ['631010', '6310', '631'])) {
+    addTerms(coreTerms, [
+      'infrastrutture informatiche',
+      'hosting',
+      'cloud infrastructure',
+      'cloud native',
+      'data center',
+    ]);
+    addTerms(adjacentTerms, ['cloud', 'server', 'storage', 'backup', 'virtualizzazione']);
+  }
+
+  if (hasAtecoPrefix(atecoCodes, ['622020', '6220', '622'])) {
+    addTerms(coreTerms, [
+      'gestione strutture informatiche',
+      'gestione infrastrutture IT',
+      'IT operations',
+      'system management',
+      'assistenza sistemistica',
+    ]);
+    addTerms(adjacentTerms, ['networking', 'monitoraggio', 'help desk', 'SLA']);
+  }
+
+  if (hasAtecoPrefix(atecoCodes, ['629009', '6290', '629'])) {
+    addTerms(coreTerms, [
+      'servizi IT',
+      'servizi informatici',
+      'tecnologie informatiche',
+      'information technology services',
+    ]);
+    addTerms(adjacentTerms, ['cybersecurity', 'Microsoft 365', 'consulenza informatica']);
+  }
+
+  const text = `${sector} ${target?.atecoDescription ?? ''}`.toLowerCase();
+  if (text.includes('cloud')) addTerm(coreTerms, 'cloud');
+  if (text.includes('hosting')) addTerm(coreTerms, 'hosting');
+  if (text.includes('infrastrutt')) addTerm(coreTerms, 'infrastrutture informatiche');
+  if (text.includes('gestione')) addTerm(coreTerms, 'gestione infrastrutture IT');
+
+  if (coreTerms.length === 0) {
+    addTerms(coreTerms, ['servizi IT', 'tecnologie informatiche', 'consulenza informatica']);
+    sources.push('fallback: lente IT ampia');
+  }
+
+  addTerms(adjacentTerms, ['cloud', 'backup', 'cybersecurity', 'networking', 'virtualizzazione'], 8);
+  addTerms(negativeTerms, [
+    'web agency',
+    'marketing digitale',
+    'rivendita hardware',
+    'sviluppo software puro',
+    'formazione informatica',
+  ], 6);
+
+  return {
+    intentLabel: sector || 'Lente derivata da strategia M&A',
+    coreTerms: coreTerms.slice(0, 10),
+    adjacentTerms: adjacentTerms.slice(0, 8),
+    negativeTerms: negativeTerms.slice(0, 6),
+    sources,
+  };
+}
+
+function pipelineTermSpecs(keywordSet: PipelineKeywordSet): PipelineTermSpec[] {
+  return [
+    ...keywordSet.coreTerms.slice(0, 6).map((term) => ({ bucket: 'core' as const, term })),
+    ...keywordSet.adjacentTerms.slice(0, 4).map((term) => ({ bucket: 'adjacent' as const, term })),
+    ...keywordSet.negativeTerms.slice(0, 3).map((term) => ({ bucket: 'negative' as const, term })),
+  ];
+}
+
+function chooseDomainCandidate(candidates: DomainResolutionCandidate[]): DomainResolutionCandidate | undefined {
+  const credibleReasons = [
+    'host compatibile con ragione sociale',
+    'dominio citato come sameAs',
+    'dominio citato come sito ufficiale',
+    'email aziendale su dominio',
+  ];
+  return candidates.find((candidate) => {
+    if (candidate.confidence === 'bassa' || candidate.score < 45) return false;
+    return candidate.reasons.some((reason) => credibleReasons.includes(reason));
+  });
+}
+
+function bestWebSearchScore(response: WebSearchResponse): number | undefined {
+  const scores = response.results
+    .map((result) => result.score)
+    .filter((score): score is number => typeof score === 'number');
+  return scores.length > 0 ? Math.max(...scores) : undefined;
+}
+
+function evidenceResponseMatched(response: WebSearchResponse): boolean {
+  const bestScore = bestWebSearchScore(response);
+  if (typeof bestScore === 'number') return bestScore >= 45;
+  return !response.ranked && response.results.length > 0;
+}
+
+function computePipelineSummary(
+  selectedDomain: DomainResolutionCandidate | undefined,
+  runs: PipelineEvidenceRun[],
+): PipelineSummary {
+  const matched = (bucket: EvidenceBucket) =>
+    runs.filter((run) => run.bucket === bucket && run.matched).length;
+  const coreMatches = matched('core');
+  const adjacentMatches = matched('adjacent');
+  const negativeMatches = matched('negative');
+  const domainMultiplier =
+    selectedDomain?.confidence === 'alta' ? 1 : selectedDomain?.confidence === 'media' ? 0.85 : 0.45;
+  const rawScore = (coreMatches * 26 + adjacentMatches * 8 - negativeMatches * 22) * domainMultiplier;
+  const score = selectedDomain ? clampScore(rawScore) : 0;
+  const confidence: PipelineSummary['confidence'] =
+    selectedDomain && coreMatches >= 2
+      ? 'alta'
+      : selectedDomain && (coreMatches >= 1 || adjacentMatches >= 2)
+        ? 'media'
+        : 'bassa';
+
+  return { score, confidence, coreMatches, adjacentMatches, negativeMatches };
+}
+
+function pipelineBucketLabel(bucket: EvidenceBucket): string {
+  switch (bucket) {
+    case 'core':
+      return 'Core';
+    case 'adjacent':
+      return 'Adiacente';
+    case 'negative':
+      return 'Negativo';
+  }
+}
+
+function targetOptionLabel(target: MATarget): string {
+  const bits = [
+    target.companyName,
+    target.province,
+    target.atecoCode,
+    `score ${target.score}`,
+  ].filter(Boolean);
+  return bits.join(' · ');
+}
+
 function companyFilterSummary(filters: CompanySearchFilters): string {
   const parts: string[] = [];
   const province = normalizeProvinceInput(filters.province);
@@ -284,6 +533,27 @@ export function TestPage() {
   const [companyForceRefresh, setCompanyForceRefresh] = useState(false);
   const [domainForm, setDomainForm] = useState<DomainResolutionForm>(defaultDomainResolutionForm);
   const [keywordForm, setKeywordForm] = useState<KeywordEvidenceForm>(defaultKeywordEvidenceForm);
+  const [pipelineVisibility, setPipelineVisibility] = useState<MASessionVisibility>('active');
+  const [pipelineSessionId, setPipelineSessionId] = useState('');
+  const [pipelineTargetId, setPipelineTargetId] = useState('');
+  const [pipelineExtraKeywords, setPipelineExtraKeywords] = useState('');
+  const [pipelineDomainCount, setPipelineDomainCount] = useState('10');
+  const [pipelineKeywordCount, setPipelineKeywordCount] = useState('5');
+  const [pipelineIncludeIdentifiers, setPipelineIncludeIdentifiers] = useState(false);
+  const [pipelineRank, setPipelineRank] = useState(true);
+
+  const pipelineSessions = useQuery({
+    queryKey: ['binocolo-test-ma-sessions', pipelineVisibility],
+    queryFn: () =>
+      api.get<MASessionListResponse>(`/binocolo/v1/ma/sessions?visibility=${pipelineVisibility}`),
+    enabled: activeTab === 'pipeline',
+  });
+
+  const pipelineDetail = useQuery({
+    queryKey: ['binocolo-test-ma-session', pipelineSessionId],
+    queryFn: () => api.get<MASessionDetail>(`/binocolo/v1/ma/sessions/${pipelineSessionId}`),
+    enabled: activeTab === 'pipeline' && Boolean(pipelineSessionId),
+  });
 
   const companySearch = useMutation({
     mutationFn: (forceRefresh: boolean = companyForceRefresh) => {
@@ -336,6 +606,58 @@ export function TestPage() {
         rank: keywordForm.rank,
       }),
   });
+  const evidencePipeline = useMutation({
+    mutationFn: async (): Promise<PipelineRunResult> => {
+      const detail = pipelineDetail.data;
+      if (!detail) throw new Error('Seleziona una sessione M&A.');
+      const target = detail.targets.find((item) => item.id === pipelineTargetId) ?? detail.targets[0];
+      if (!target) throw new Error('La sessione selezionata non contiene target.');
+
+      const keywordSet = derivedKeywordSet(detail.strategy?.strategy, target, pipelineExtraKeywords);
+      const domainResponse = await api.post<DomainResolutionResponse>('/binocolo/v1/test/domain-resolution', {
+        companyName: target.companyName,
+        vatCode: pipelineIncludeIdentifiers ? target.vatCode : undefined,
+        taxCode: pipelineIncludeIdentifiers ? target.taxCode : undefined,
+        town: target.town || undefined,
+        province: target.province || undefined,
+        keywords: [...keywordSet.coreTerms.slice(0, 3), ...keywordSet.adjacentTerms.slice(0, 2)],
+        count: positiveInteger(pipelineDomainCount, 10, 1, 20),
+      });
+      const selectedDomain = chooseDomainCandidate(domainResponse.candidates);
+      const specs = selectedDomain ? pipelineTermSpecs(keywordSet) : [];
+      const evidenceRuns = await Promise.all(
+        specs.map(async (spec): Promise<PipelineEvidenceRun> => {
+          try {
+            const response = await api.post<WebSearchResponse>('/binocolo/v1/web-search', {
+              domain: selectedDomain?.domain ?? '',
+              keywords: [spec.term],
+              count: positiveInteger(pipelineKeywordCount, 5, 1, 20),
+              rank: pipelineRank,
+            });
+            const bestScore = bestWebSearchScore(response);
+            return {
+              ...spec,
+              response,
+              resultCount: response.results.length,
+              bestScore,
+              matched: evidenceResponseMatched(response),
+            };
+          } catch (err) {
+            return { ...spec, error: errorLabel(err), resultCount: 0, matched: false };
+          }
+        }),
+      );
+
+      return {
+        target,
+        keywordSet,
+        domainResponse,
+        selectedDomain,
+        evidenceRuns,
+        summary: computePipelineSummary(selectedDomain, evidenceRuns),
+      };
+    },
+  });
 
   const companyData = companySearch.data?.data;
   const companyRows: CompanySearchRow[] = Array.isArray(companyData)
@@ -344,6 +666,40 @@ export function TestPage() {
   const dryRunCount = findMetric(companySearch.data, countHints);
   const dryRunPrice = findMetric(companySearch.data, priceHints);
   const companyScopeLabel = companyFilterSummary(companyFilters);
+  const selectableSessions = pipelineSessions.data?.items ?? [];
+  const selectedPipelineDetail = pipelineDetail.data;
+  const pipelineTargets = useMemo(() => {
+    return [...(selectedPipelineDetail?.targets ?? [])].sort((a, b) => {
+      if ((b.rating ?? 0) !== (a.rating ?? 0)) return (b.rating ?? 0) - (a.rating ?? 0);
+      if (b.score !== a.score) return b.score - a.score;
+      return a.companyName.localeCompare(b.companyName);
+    });
+  }, [selectedPipelineDetail?.targets]);
+  const selectedPipelineTarget =
+    pipelineTargets.find((target) => target.id === pipelineTargetId) ?? pipelineTargets[0];
+  const pipelineKeywordSet = useMemo(
+    () => derivedKeywordSet(selectedPipelineDetail?.strategy?.strategy, selectedPipelineTarget, pipelineExtraKeywords),
+    [pipelineExtraKeywords, selectedPipelineDetail?.strategy?.strategy, selectedPipelineTarget],
+  );
+
+  useEffect(() => {
+    if (activeTab !== 'pipeline' || pipelineSessionId || selectableSessions.length === 0) return;
+    const withTargets = selectableSessions.find((session) => session.resultCount > 0) ?? selectableSessions.at(0);
+    if (!withTargets) return;
+    setPipelineSessionId(withTargets.id);
+  }, [activeTab, pipelineSessionId, selectableSessions]);
+
+  useEffect(() => {
+    if (activeTab !== 'pipeline') return;
+    if (pipelineTargets.length === 0) {
+      if (pipelineTargetId) setPipelineTargetId('');
+      return;
+    }
+    const firstTarget = pipelineTargets.at(0);
+    if (firstTarget && !pipelineTargets.some((target) => target.id === pipelineTargetId)) {
+      setPipelineTargetId(firstTarget.id);
+    }
+  }, [activeTab, pipelineTargetId, pipelineTargets]);
 
   function handleCompanyDryRunChange(value: boolean) {
     setCompanyDryRun(value);
@@ -402,6 +758,29 @@ export function TestPage() {
   function handleKeywordSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     keywordEvidence.mutate();
+  }
+
+  function handlePipelineVisibilityChange(event: ChangeEvent<HTMLSelectElement>) {
+    setPipelineVisibility(event.target.value as MASessionVisibility);
+    setPipelineSessionId('');
+    setPipelineTargetId('');
+    evidencePipeline.reset();
+  }
+
+  function handlePipelineSessionChange(event: ChangeEvent<HTMLSelectElement>) {
+    setPipelineSessionId(event.target.value);
+    setPipelineTargetId('');
+    evidencePipeline.reset();
+  }
+
+  function handlePipelineTargetChange(event: ChangeEvent<HTMLSelectElement>) {
+    setPipelineTargetId(event.target.value);
+    evidencePipeline.reset();
+  }
+
+  function handlePipelineSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    evidencePipeline.mutate();
   }
 
   return (
@@ -627,6 +1006,334 @@ export function TestPage() {
               <pre>{rawPreview(companySearch.data)}</pre>
             </div>
           </>
+        )}
+      </section>
+      ) : null}
+
+      {activeTab === 'pipeline' ? (
+      <section className={`${styles.panel} ${styles.companyPanel}`} aria-labelledby="pipeline-title">
+        <div className={styles.panelHeader}>
+          <div>
+            <div className={styles.endpointLine}>
+              <span className={styles.method}>LAB</span>
+              <span className={styles.path}>session target pick · domain resolution · site keyword evidence</span>
+            </div>
+            <h2 id="pipeline-title" className={styles.sectionTitle}>Evidence pipeline</h2>
+          </div>
+          <form className={styles.companyForm} onSubmit={handlePipelineSubmit}>
+            <div className={styles.filterGrid}>
+              <label className={styles.filterField}>
+                <span>Sessioni</span>
+                <select
+                  value={pipelineVisibility}
+                  onChange={handlePipelineVisibilityChange}
+                  disabled={pipelineSessions.isFetching}
+                >
+                  {sessionVisibilityOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Sessione</span>
+                <select
+                  value={pipelineSessionId}
+                  onChange={handlePipelineSessionChange}
+                  disabled={pipelineSessions.isFetching || selectableSessions.length === 0}
+                >
+                  <option value="">Seleziona sessione</option>
+                  {selectableSessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {session.title || session.prompt.slice(0, 72)} · {session.resultCount} target · {session.status}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Target</span>
+                <select
+                  value={pipelineTargetId}
+                  onChange={handlePipelineTargetChange}
+                  disabled={pipelineDetail.isFetching || pipelineTargets.length === 0}
+                >
+                  <option value="">Seleziona target</option>
+                  {pipelineTargets.map((target) => (
+                    <option key={target.id} value={target.id}>{targetOptionLabel(target)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Keyword core extra</span>
+                <input
+                  type="text"
+                  value={pipelineExtraKeywords}
+                  onChange={(event) => {
+                    setPipelineExtraKeywords(event.target.value);
+                    evidencePipeline.reset();
+                  }}
+                  placeholder="cloud, hosting, infrastrutture informatiche"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+              <label className={styles.filterField}>
+                <span>Resolver count</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  step={1}
+                  value={pipelineDomainCount}
+                  onChange={(event) => {
+                    setPipelineDomainCount(event.target.value);
+                    evidencePipeline.reset();
+                  }}
+                />
+              </label>
+              <label className={styles.filterField}>
+                <span>Evidence count</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  step={1}
+                  value={pipelineKeywordCount}
+                  onChange={(event) => {
+                    setPipelineKeywordCount(event.target.value);
+                    evidencePipeline.reset();
+                  }}
+                />
+              </label>
+            </div>
+            <div className={styles.formActions}>
+              <label className={styles.dryRunField}>
+                <span>Usa P.IVA/CF</span>
+                <ToggleSwitch
+                  id="binocolo-pipeline-identifiers"
+                  checked={pipelineIncludeIdentifiers}
+                  onChange={(value) => {
+                    setPipelineIncludeIdentifiers(value);
+                    evidencePipeline.reset();
+                  }}
+                />
+              </label>
+              <label className={styles.dryRunField}>
+                <span>Rank AI</span>
+                <ToggleSwitch
+                  id="binocolo-pipeline-rank"
+                  checked={pipelineRank}
+                  onChange={(value) => {
+                    setPipelineRank(value);
+                    evidencePipeline.reset();
+                  }}
+                />
+              </label>
+              <Button
+                type="submit"
+                loading={evidencePipeline.isPending}
+                disabled={!selectedPipelineTarget || pipelineDetail.isFetching}
+                leftIcon={<Icon name="route" />}
+              >
+                Esegui pipeline
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        {pipelineSessions.isFetching && !pipelineSessions.data ? (
+          <div className={styles.skeletonWrap}>
+            <Skeleton rows={5} />
+          </div>
+        ) : pipelineSessions.isError ? (
+          <div className={`${styles.statePanel} ${styles.companyState}`} role="alert">
+            <div className={styles.stateIcon}>
+              <Icon name="triangle-alert" size={22} />
+            </div>
+            <p className={styles.stateTitle}>Sessioni non disponibili</p>
+            <p className={styles.stateText}>{errorLabel(pipelineSessions.error)}</p>
+          </div>
+        ) : selectableSessions.length === 0 ? (
+          <div className={`${styles.statePanel} ${styles.companyState}`}>
+            <div className={styles.stateIcon}>
+              <Icon name="database" size={22} />
+            </div>
+            <p className={styles.stateTitle}>Nessuna sessione</p>
+            <p className={styles.stateText}>Non ci sono sessioni M&A nella visibilita selezionata.</p>
+          </div>
+        ) : pipelineDetail.isFetching && !pipelineDetail.data ? (
+          <div className={styles.skeletonWrap}>
+            <Skeleton rows={5} />
+          </div>
+        ) : pipelineDetail.isError ? (
+          <div className={`${styles.statePanel} ${styles.companyState}`} role="alert">
+            <div className={styles.stateIcon}>
+              <Icon name="triangle-alert" size={22} />
+            </div>
+            <p className={styles.stateTitle}>Sessione non disponibile</p>
+            <p className={styles.stateText}>{errorLabel(pipelineDetail.error)}</p>
+          </div>
+        ) : !selectedPipelineTarget ? (
+          <div className={`${styles.statePanel} ${styles.companyState}`}>
+            <div className={styles.stateIcon}>
+              <Icon name="search" size={22} />
+            </div>
+            <p className={styles.stateTitle}>Nessun target</p>
+            <p className={styles.stateText}>La sessione selezionata non contiene target su cui eseguire la pipeline.</p>
+          </div>
+        ) : (
+          <div className={styles.companyResult}>
+            <div className={styles.pipelinePrep}>
+              <article className={styles.resultCard}>
+                <div className={styles.resultCardHead}>
+                  <div>
+                    <h3>{selectedPipelineTarget.companyName}</h3>
+                    <p>
+                      {[
+                        selectedPipelineTarget.town,
+                        selectedPipelineTarget.province,
+                        selectedPipelineTarget.atecoCode,
+                        selectedPipelineTarget.atecoDescription,
+                      ].filter(Boolean).join(' · ') || 'Target selezionato'}
+                    </p>
+                  </div>
+                  <span className={styles.scoreBadge}>
+                    {selectedPipelineTarget.score} · {selectedPipelineTarget.matchState}
+                  </span>
+                </div>
+                <div className={styles.pipelineFacts}>
+                  <span>P.IVA {displayValue(selectedPipelineTarget.vatCode)}</span>
+                  <span>CF {displayValue(selectedPipelineTarget.taxCode)}</span>
+                  <span>{selectedPipelineTarget.confidence ? `confidenza ${selectedPipelineTarget.confidence}` : 'confidenza N/D'}</span>
+                </div>
+              </article>
+
+              <div className={styles.keywordGroups}>
+                <div className={styles.keywordGroup}>
+                  <span>Core</span>
+                  <div className={styles.termChips}>
+                    {pipelineKeywordSet.coreTerms.map((term) => <span key={term} className={styles.termChip}>{term}</span>)}
+                  </div>
+                </div>
+                <div className={styles.keywordGroup}>
+                  <span>Adiacenti</span>
+                  <div className={styles.termChips}>
+                    {pipelineKeywordSet.adjacentTerms.map((term) => <span key={term} className={styles.termChip}>{term}</span>)}
+                  </div>
+                </div>
+                <div className={styles.keywordGroup}>
+                  <span>Negativi</span>
+                  <div className={styles.termChips}>
+                    {pipelineKeywordSet.negativeTerms.map((term) => <span key={term} className={`${styles.termChip} ${styles.termChipNegative}`}>{term}</span>)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {evidencePipeline.isIdle ? (
+              <div className={`${styles.statePanel} ${styles.companyState}`}>
+                <div className={styles.stateIcon}>
+                  <Icon name="route" size={22} />
+                </div>
+                <p className={styles.stateTitle}>Pipeline pronta</p>
+                <p className={styles.stateText}>Esegue domain resolution e ricerche Brave site-restricted sul target selezionato.</p>
+              </div>
+            ) : evidencePipeline.isPending ? (
+              <div className={styles.skeletonWrap}>
+                <Skeleton rows={6} />
+              </div>
+            ) : evidencePipeline.isError ? (
+              <div className={`${styles.statePanel} ${styles.companyState}`} role="alert">
+                <div className={styles.stateIcon}>
+                  <Icon name="triangle-alert" size={22} />
+                </div>
+                <p className={styles.stateTitle}>Pipeline non disponibile</p>
+                <p className={styles.stateText}>{errorLabel(evidencePipeline.error)}</p>
+              </div>
+            ) : (
+              <>
+                <div className={styles.responseBar}>
+                  <span>
+                    Web evidence score {evidencePipeline.data.summary.score} · {evidencePipeline.data.summary.confidence}
+                  </span>
+                  <span className={styles.path}>
+                    {evidencePipeline.data.selectedDomain?.domain ?? 'nessun dominio candidato'}
+                  </span>
+                </div>
+                <div className={styles.dryRunGrid}>
+                  <div className={styles.metricBox}>
+                    <span>Core match</span>
+                    <strong>{evidencePipeline.data.summary.coreMatches}</strong>
+                  </div>
+                  <div className={styles.metricBox}>
+                    <span>Adiacenti</span>
+                    <strong>{evidencePipeline.data.summary.adjacentMatches}</strong>
+                  </div>
+                  <div className={styles.metricBox}>
+                    <span>Negativi</span>
+                    <strong>{evidencePipeline.data.summary.negativeMatches}</strong>
+                  </div>
+                  <div className={styles.metricBox}>
+                    <span>Dominio</span>
+                    <strong>{evidencePipeline.data.selectedDomain?.confidence ?? 'N/D'}</strong>
+                  </div>
+                </div>
+
+                {evidencePipeline.data.selectedDomain ? (
+                  <div className={styles.cardList}>
+                    <article className={styles.resultCard}>
+                      <div className={styles.resultCardHead}>
+                        <div>
+                          <h3>{evidencePipeline.data.selectedDomain.domain}</h3>
+                          <p>{evidencePipeline.data.selectedDomain.reasons.join(', ')}</p>
+                        </div>
+                        <span className={`${styles.scoreBadge} ${styles[`confidence_${evidencePipeline.data.selectedDomain.confidence}`] ?? ''}`}>
+                          {evidencePipeline.data.selectedDomain.score} · {evidencePipeline.data.selectedDomain.confidence}
+                        </span>
+                      </div>
+                    </article>
+                    {evidencePipeline.data.evidenceRuns.map((run) => (
+                      <article
+                        key={`${run.bucket}-${run.term}`}
+                        className={`${styles.resultCard} ${run.matched ? styles.pipelineRunMatched : ''}`}
+                      >
+                        <div className={styles.resultCardHead}>
+                          <div>
+                            <h3>{run.term}</h3>
+                            <p>
+                              {pipelineBucketLabel(run.bucket)} · {run.matched ? 'match' : 'rumore'} · {run.resultCount} risultati
+                              {run.error ? ` · ${run.error}` : ''}
+                            </p>
+                          </div>
+                          <span className={`${styles.bucketBadge} ${styles[`bucket_${run.bucket}`]}`}>
+                            {run.bestScore ?? run.resultCount}
+                          </span>
+                        </div>
+                        {run.response?.results.slice(0, 2).map((result) => (
+                          <a key={result.url} href={result.url} target="_blank" rel="noreferrer" className={styles.evidenceItem}>
+                            <span>{result.title || result.url}</span>
+                            <small>{result.snippets[0] || result.hostname}</small>
+                          </a>
+                        ))}
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={`${styles.statePanel} ${styles.companyState}`}>
+                    <div className={styles.stateIcon}>
+                      <Icon name="network" size={22} />
+                    </div>
+                    <p className={styles.stateTitle}>Dominio non risolto</p>
+                    <p className={styles.stateText}>La pipeline non esegue keyword evidence senza un candidato dominio.</p>
+                  </div>
+                )}
+
+                <div className={`${styles.rawBlock} ${styles.rawBlockSeparated}`}>
+                  <span>Risposta</span>
+                  <pre>{rawPreview(evidencePipeline.data)}</pre>
+                </div>
+              </>
+            )}
+          </div>
         )}
       </section>
       ) : null}

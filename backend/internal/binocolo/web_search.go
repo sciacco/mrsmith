@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -79,6 +80,11 @@ const (
 	webSearchScoreMaxToken       = 512
 	domainResolutionDefaultCount = 10
 	domainResolutionMaxCount     = 20
+)
+
+var (
+	domainResolutionURLPattern   = regexp.MustCompile(`https?://[^[:space:]"'<>\\)]+`)
+	domainResolutionEmailPattern = regexp.MustCompile(`[A-Za-z0-9._%+\-]+@([A-Za-z0-9.\-]+\.[A-Za-z]{2,})`)
 )
 
 // handleTestDomainResolution is a lab-only helper used by the Binocolo Test page.
@@ -524,32 +530,33 @@ type domainResolutionAccum struct {
 	results []WebSearchResult
 }
 
+type domainResolutionHint struct {
+	domain  string
+	bonus   int
+	reason  string
+	reasons []string
+}
+
 func rankDomainResolutionCandidates(body DomainResolutionRequest, companyName string, results []WebSearchResult) []DomainResolutionCandidate {
 	accums := map[string]*domainResolutionAccum{}
 	for _, result := range results {
+		sourceDomain, _ := normalizeDomain(result.Hostname)
+		for _, hint := range extractDomainResolutionHints(companyName, sourceDomain, result) {
+			score, reasons := scoreDomainResolutionResult(body, companyName, hint.domain, result)
+			score += hint.bonus
+			if hint.reason != "" {
+				reasons = append(reasons, hint.reason)
+			}
+			reasons = append(reasons, hint.reasons...)
+			addDomainResolutionAccum(accums, hint.domain, min(100, score), reasons, result)
+		}
+
 		domain, ok := normalizeDomain(result.Hostname)
 		if !ok || isDomainResolutionExcludedDomain(domain) {
 			continue
 		}
 		score, reasons := scoreDomainResolutionResult(body, companyName, domain, result)
-		if score <= 0 {
-			continue
-		}
-		accum := accums[domain]
-		if accum == nil {
-			accum = &domainResolutionAccum{
-				domain:  domain,
-				reasons: map[string]struct{}{},
-			}
-			accums[domain] = accum
-		}
-		if score > accum.score {
-			accum.score = score
-		}
-		for _, reason := range reasons {
-			accum.reasons[reason] = struct{}{}
-		}
-		accum.results = append(accum.results, result)
+		addDomainResolutionAccum(accums, domain, score, reasons, result)
 	}
 
 	candidates := make([]DomainResolutionCandidate, 0, len(accums))
@@ -578,6 +585,133 @@ func rankDomainResolutionCandidates(body DomainResolutionRequest, companyName st
 		candidates = candidates[:8]
 	}
 	return candidates
+}
+
+func addDomainResolutionAccum(
+	accums map[string]*domainResolutionAccum,
+	domain string,
+	score int,
+	reasons []string,
+	result WebSearchResult,
+) {
+	if score <= 0 {
+		return
+	}
+	accum := accums[domain]
+	if accum == nil {
+		accum = &domainResolutionAccum{
+			domain:  domain,
+			reasons: map[string]struct{}{},
+		}
+		accums[domain] = accum
+	}
+	if score > accum.score {
+		accum.score = score
+	}
+	for _, reason := range reasons {
+		if reason = strings.TrimSpace(reason); reason != "" {
+			accum.reasons[reason] = struct{}{}
+		}
+	}
+	for _, existing := range accum.results {
+		if existing.URL == result.URL {
+			return
+		}
+	}
+	accum.results = append(accum.results, result)
+}
+
+func extractDomainResolutionHints(
+	companyName string,
+	sourceDomain string,
+	result WebSearchResult,
+) []domainResolutionHint {
+	text := result.Title + " " + result.URL + " " + strings.Join(result.Snippets, " ")
+	tokens := companyResolutionTokens(companyName)
+	hintsByDomain := map[string]*domainResolutionHint{}
+
+	addHint := func(domain string, bonus int, reason string) {
+		domain, ok := normalizeDomain(domain)
+		if !ok || domain == "" {
+			return
+		}
+		if sourceDomain != "" && hostMatchesDomain(domain, sourceDomain) {
+			return
+		}
+		if isDomainResolutionExcludedDomain(domain) || isGenericEmailDomain(domain) {
+			return
+		}
+		hint := hintsByDomain[domain]
+		if hint == nil {
+			hint = &domainResolutionHint{domain: domain}
+			hintsByDomain[domain] = hint
+		}
+		if bonus > hint.bonus {
+			hint.bonus = bonus
+			hint.reason = reason
+		}
+		if reason != "" {
+			hint.reasons = append(hint.reasons, reason)
+		}
+	}
+
+	for _, match := range domainResolutionURLPattern.FindAllStringIndex(text, -1) {
+		raw := text[match[0]:match[1]]
+		domain, ok := normalizeDomain(raw)
+		if !ok {
+			continue
+		}
+		context := strings.ToLower(text[max(0, match[0]-96):min(len(text), match[1]+96)])
+		if isDomainResolutionExampleContext(context) {
+			continue
+		}
+
+		brandCompatible := domainLooksCompanyOwned(domain, tokens)
+		switch {
+		case strings.Contains(context, "sameas"):
+			addHint(domain, 30, "dominio citato come sameAs")
+		case strings.Contains(context, "sito web ufficiale") ||
+			strings.Contains(context, "pagina web ufficiale") ||
+			strings.Contains(context, "sito ufficiale"):
+			addHint(domain, 28, "dominio citato come sito ufficiale")
+		case brandCompatible:
+			addHint(domain, 18, "dominio citato da fonte terza")
+		}
+	}
+
+	for _, match := range domainResolutionEmailPattern.FindAllStringSubmatchIndex(text, -1) {
+		if len(match) < 4 || match[2] < 0 || match[3] < 0 {
+			continue
+		}
+		domain := text[match[2]:match[3]]
+		normalized, ok := normalizeDomain(domain)
+		if !ok || !domainLooksCompanyOwned(normalized, tokens) {
+			continue
+		}
+		addHint(normalized, 24, "email aziendale su dominio")
+	}
+
+	hints := make([]domainResolutionHint, 0, len(hintsByDomain))
+	for _, hint := range hintsByDomain {
+		hint.reasons = cleanStringList(hint.reasons, 6, 80)
+		hints = append(hints, *hint)
+	}
+	sort.SliceStable(hints, func(i, j int) bool {
+		if hints[i].bonus == hints[j].bonus {
+			return hints[i].domain < hints[j].domain
+		}
+		return hints[i].bonus > hints[j].bonus
+	})
+	return hints
+}
+
+func isDomainResolutionExampleContext(context string) bool {
+	for _, marker := range []string{"non ha fornito", "es.", "esempio", "example"} {
+		if strings.Contains(context, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func scoreDomainResolutionResult(body DomainResolutionRequest, companyName, domain string, result WebSearchResult) (int, []string) {
@@ -646,20 +780,22 @@ func scoreDomainResolutionResult(body DomainResolutionRequest, companyName, doma
 }
 
 func domainResolutionConfidence(score int, reasons []string) string {
-	hasStrongIdentifier := false
 	hasHostMatch := false
+	hasCitedDomain := false
 	for _, reason := range reasons {
-		if reason == "partita IVA trovata" || reason == "codice fiscale trovato" {
-			hasStrongIdentifier = true
-		}
 		if reason == "host compatibile con ragione sociale" {
 			hasHostMatch = true
 		}
+		if reason == "dominio citato come sameAs" ||
+			reason == "dominio citato come sito ufficiale" ||
+			reason == "email aziendale su dominio" {
+			hasCitedDomain = true
+		}
 	}
 	switch {
-	case score >= 75 && (hasStrongIdentifier || hasHostMatch):
+	case score >= 75 && (hasHostMatch || hasCitedDomain):
 		return "alta"
-	case score >= 45:
+	case score >= 45 && (hasHostMatch || hasCitedDomain):
 		return "media"
 	default:
 		return "bassa"
@@ -697,10 +833,17 @@ func domainLooksCompanyOwned(domain string, tokens []string) bool {
 	}
 	strongMatches := 0
 	for _, token := range tokens {
-		if len(token) < 4 {
+		compactToken := compactAlnum(token)
+		if len(compactToken) < 3 {
 			continue
 		}
-		if strings.Contains(brand, compactAlnum(token)) {
+		if len(compactToken) == 3 {
+			if brand == compactToken || (strings.HasPrefix(brand, compactToken) && len(brand) <= 16) {
+				strongMatches++
+			}
+			continue
+		}
+		if strings.Contains(brand, compactToken) {
 			strongMatches++
 		}
 	}
@@ -766,6 +909,30 @@ func isDomainResolutionExcludedDomain(domain string) bool {
 
 func isHostedSiteDomain(domain string) bool {
 	for _, item := range []string{"wixsite.com", "wordpress.com", "blogspot.com", "weebly.com", "jimdosite.com", "business.site"} {
+		if hostMatchesDomain(domain, item) {
+			return true
+		}
+	}
+	return false
+}
+
+func isGenericEmailDomain(domain string) bool {
+	for _, item := range []string{
+		"pec.it",
+		"pec-mail.eu",
+		"gmail.com",
+		"googlemail.com",
+		"outlook.com",
+		"hotmail.com",
+		"live.com",
+		"icloud.com",
+		"yahoo.com",
+		"libero.it",
+		"virgilio.it",
+		"alice.it",
+		"tim.it",
+		"tiscali.it",
+	} {
 		if hostMatchesDomain(domain, item) {
 			return true
 		}
