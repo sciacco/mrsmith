@@ -369,7 +369,16 @@ RETURNING id::text
 		return false, fmt.Errorf("invalid ma session lifecycle action: %s", action)
 	}
 	var id string
-	if err := s.db.QueryRowContext(ctx, query, sessionID, nullString(subject), nullString(email)).Scan(&id); err != nil {
+	args := []any{sessionID}
+	actionsWithSubject := map[string]bool{
+		maSessionLifecycleArchive: true,
+		maSessionLifecycleDelete:  true,
+		maSessionLifecyclePurge:   true,
+	}
+	if actionsWithSubject[action] {
+		args = append(args, nullString(subject), nullString(email))
+	}
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(&id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
