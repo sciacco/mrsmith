@@ -153,6 +153,15 @@ export interface MAWebValidation {
   companyKey: string;
   targetId?: string;
   runId?: string;
+  pipelineVersion: string;
+  inputHash?: string;
+  keywordSetHash?: string;
+  llmModelId?: string;
+  llmPromptId?: string;
+  llmModel?: string;
+  freshness: 'fresh' | 'stale' | 'expired' | string;
+  staleAfter: string;
+  expiresAt: string;
   selectedDomain?: string;
   domainConfidence?: string;
   domainScore?: number;
@@ -175,6 +184,16 @@ export interface MAWebValidation {
   updatedAt: string;
 }
 
+export interface MAWebValidationEnrichRequest {
+  limit?: number;
+  force?: boolean;
+  includeIdentifiers?: boolean;
+  analyzeWithLLM?: boolean;
+  domainCount?: number;
+  keywordCount?: number;
+  rank?: boolean;
+}
+
 export interface CandidateMatchAnalysisResponse {
   verdict: 'strong_match' | 'match' | 'weak_match' | 'no_match' | 'unclear' | string;
   confidence: MAConfidence | string;
@@ -188,6 +207,9 @@ export interface CandidateMatchAnalysisResponse {
   recommendedAction: 'confirm' | 'review' | 'downgrade' | 'reject' | string;
   rationale: string;
   finalDecision?: CandidateMatchFinalDecision;
+  modelId?: string;
+  promptId?: string;
+  model?: string;
 }
 
 export interface CandidateMatchConceptAlias {

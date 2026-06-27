@@ -23,6 +23,8 @@ import type {
   MATargetEvidence,
   MATargetFlag,
   MAThesis,
+  MAWebValidation,
+  MAWebValidationEnrichRequest,
 } from '../api/types';
 import styles from './TargetPage.module.css';
 
@@ -85,7 +87,7 @@ const emptyStrategy: MAStrategySpec = {
   missingCriteria: [],
 };
 
-type BusyState = 'sessions' | 'create' | 'estimate' | 'execute' | 'export' | 'deepdive' | null;
+type BusyState = 'sessions' | 'create' | 'estimate' | 'execute' | 'export' | 'deepdive' | 'webenrich' | null;
 
 interface EstimateGroup {
   type: MAStrategyType;
@@ -123,6 +125,7 @@ export function TargetPage() {
   const [deleteCandidate, setDeleteCandidate] = useState<MASessionSummary | null>(null);
   const [purgeCandidate, setPurgeCandidate] = useState<MASessionSummary | null>(null);
   const [lastSessionId, setLastSessionId] = useState<string | null>(null);
+  const [webEnrichPolling, setWebEnrichPolling] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('mrsmith_binocolo_sidebar_collapsed');
@@ -162,6 +165,7 @@ export function TargetPage() {
     setAcknowledgeCost(false);
     setIsFullDetailOpen(false);
     setLastSessionId(null);
+    setWebEnrichPolling(false);
   }, []);
 
   const startNewSearch = useCallback(() => {
@@ -286,6 +290,8 @@ export function TargetPage() {
   const overBudget = budgetEur > 0 && projectedSpendEur > budgetEur;
   const costFullEur = detail?.costFullEur ?? 0;
   const ratedCount = (detail?.targets ?? []).filter((target) => (target.rating ?? 0) >= 1).length;
+  const webValidatedCount = visibleTargets.filter((target) => target.webValidation?.freshness === 'fresh').length;
+  const webEligibleCount = visibleTargets.length;
   const deepChargeable = (detail?.targets ?? []).filter(
     (target) => (target.rating ?? 0) >= 1 && (!target.deep || target.deep.status === 'failed'),
   ).length;
@@ -300,6 +306,7 @@ export function TargetPage() {
     (!overBudget || acknowledgeCost) &&
     busy !== 'execute' &&
     !executing;
+  const canWebEnrich = hasTargets && canOperateOnSession && busy !== 'webenrich' && !executing;
 
   useEffect(() => {
     setAcknowledgeCost(false);
@@ -321,6 +328,28 @@ export function TargetPage() {
     }, 5000);
     return () => clearInterval(handle);
   }, [detail?.session.id, deepPending, api]);
+
+  useEffect(() => {
+    const sessionId = detail?.session.id;
+    if (!sessionId || !webEnrichPolling) return;
+    const startedAt = Date.now();
+    const handle = setInterval(() => {
+      api
+        .get<MASessionDetail>(`/binocolo/v1/ma/sessions/${sessionId}`)
+        .then((data) => {
+          setDetail(data);
+          const eligible = data.targets.filter((target) => target.matchState !== 'fuori_criterio');
+          const fresh = eligible.filter((target) => target.webValidation?.freshness === 'fresh');
+          if (fresh.length >= Math.min(eligible.length, 25) || Date.now() - startedAt > 120_000) {
+            setWebEnrichPolling(false);
+          }
+        })
+        .catch(() => {
+          setWebEnrichPolling(false);
+        });
+    }, 5000);
+    return () => clearInterval(handle);
+  }, [detail?.session.id, webEnrichPolling, api]);
 
   const sessionWorking = estimating || executing;
   useEffect(() => {
@@ -474,6 +503,31 @@ export function TargetPage() {
       setDetail(data);
       setIsDeepDiveOpen(false);
       toast('Analisi approfondita avviata.', 'success');
+    } catch (err) {
+      setError(errorLabel(err));
+      toast(errorLabel(err), 'error');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runWebEnrichment() {
+    if (!detail?.session.id) return;
+    setBusy('webenrich');
+    setError(null);
+    const body: MAWebValidationEnrichRequest = {
+      limit: 25,
+      includeIdentifiers: false,
+      analyzeWithLLM: true,
+      domainCount: 10,
+      keywordCount: 5,
+      rank: true,
+    };
+    try {
+      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/web-validation/enrich`, body);
+      setDetail(data);
+      setWebEnrichPolling(true);
+      toast('Arricchimento web avviato.', 'success');
     } catch (err) {
       setError(errorLabel(err));
       toast(errorLabel(err), 'error');
@@ -768,6 +822,16 @@ export function TargetPage() {
                       <p>{hasTargets ? `${visibleTargets.length} target in perimetro ordinati per aderenza` : 'I target appariranno dopo la conferma.'}</p>
                     </div>
                     <div className={styles.exportActions}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void runWebEnrichment()}
+                        loading={busy === 'webenrich' || webEnrichPolling}
+                        disabled={!canWebEnrich}
+                        leftIcon={<Icon name="network" size={14} />}
+                      >
+                        Web{webEligibleCount > 0 ? ` ${webValidatedCount}/${webEligibleCount}` : ''}
+                      </Button>
                       <Button
                         size="sm"
                         onClick={() => setIsDeepDiveOpen(true)}
@@ -2075,6 +2139,7 @@ function TargetTable({
                     )}
                     <ConfidenceCaveat confidence={target.confidence} missing={target.missingCriteria} />
                     <FlagChips flags={target.flags} />
+                    <WebValidationChip validation={target.webValidation} />
                     <DeepStatusChip deep={target.deep} />
                   </div>
                 </td>
@@ -2127,6 +2192,7 @@ function TargetDetail({ target }: { target: MATarget }) {
         <ConfidenceCaveat confidence={target.confidence} missing={target.missingCriteria} />
       </div>
       <FlagChips flags={target.flags} />
+      <WebValidationBlock validation={target.webValidation} />
       <p className={styles.detailRationale}>{target.rationale || 'Motivazione non disponibile.'}</p>
       <dl className={styles.detailFacts}>
         <div>
@@ -2177,6 +2243,79 @@ const evidenceFamilies: { key: string; label: string }[] = [
   { key: 'opportunita', label: 'Opportunità deal' },
   { key: 'economico', label: 'Profilo economico' },
 ];
+
+function WebValidationChip({ validation }: { validation?: MAWebValidation }) {
+  if (!validation) return null;
+  return (
+    <span className={`${styles.webChip} ${styles[`webChip_${validation.finalAction}`] ?? ''}`}>
+      Web {webFinalActionLabel(validation.finalAction)}
+      {validation.freshness !== 'fresh' ? ` · ${validation.freshness}` : ''}
+    </span>
+  );
+}
+
+function WebValidationBlock({ validation }: { validation?: MAWebValidation }) {
+  if (!validation) return null;
+  return (
+    <div className={styles.webValidationBox}>
+      <div className={styles.webValidationHead}>
+        <span>Validazione web</span>
+        <strong>{webFinalActionLabel(validation.finalAction)}</strong>
+      </div>
+      <dl>
+        <div>
+          <dt>Dominio</dt>
+          <dd>{validation.selectedDomain || 'Non risolto'}</dd>
+        </div>
+        <div>
+          <dt>Score</dt>
+          <dd>{validation.webScore}/100 · {webValidationStateLabel(validation.webValidationState)}</dd>
+        </div>
+        <div>
+          <dt>Freshness</dt>
+          <dd>{validation.freshness} · fino al {dateLabel(validation.staleAfter)}</dd>
+        </div>
+      </dl>
+      <p>{validation.finalDecision.reason}</p>
+    </div>
+  );
+}
+
+function webFinalActionLabel(action: string): string {
+  switch (action) {
+    case 'confirm':
+      return 'conferma';
+    case 'deprioritize':
+      return 'declassa';
+    case 'reject':
+      return 'reject';
+    case 'needs_domain_review':
+      return 'review dominio';
+    case 'needs_business_validation':
+      return 'validazione business';
+    default:
+      return action || 'N/D';
+  }
+}
+
+function webValidationStateLabel(state: string): string {
+  switch (state) {
+    case 'confirmed':
+      return 'confermato';
+    case 'deprioritized':
+      return 'declassato';
+    case 'domain_unresolved':
+      return 'dominio non risolto';
+    case 'analysis_unavailable':
+      return 'analyst non disponibile';
+    case 'rejected':
+      return 'respinto';
+    case 'unclear':
+      return 'incerto';
+    default:
+      return state || 'N/D';
+  }
+}
 
 function DeepStatusChip({ deep }: { deep?: MADeepAnalysis }) {
   if (!deep) return null;

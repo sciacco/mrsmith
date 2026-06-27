@@ -60,6 +60,14 @@ type maWebValidationUpsert struct {
 	CompanyKey             string
 	TargetID               string
 	RunID                  string
+	PipelineVersion        string
+	InputHash              string
+	KeywordSetHash         string
+	LLMModelID             string
+	LLMPromptID            string
+	LLMModel               string
+	StaleAfter             time.Time
+	ExpiresAt              time.Time
 	SelectedDomain         string
 	DomainConfidence       string
 	DomainScore            *int
@@ -1422,6 +1430,14 @@ SELECT
   COALESCE(analyst_verdict, ''),
   COALESCE(analyst_action, ''),
   COALESCE(analyst_confidence, ''),
+  pipeline_version,
+  input_hash,
+  keyword_set_hash,
+  COALESCE(llm_model_id, ''),
+  COALESCE(llm_prompt_id, ''),
+  COALESCE(llm_model, ''),
+  stale_after,
+  expires_at,
   summary,
   keyword_set,
   selected_domain_payload,
@@ -1473,6 +1489,14 @@ INSERT INTO binocolo.ma_target_web_validation (
   analyst_verdict,
   analyst_action,
   analyst_confidence,
+  pipeline_version,
+  input_hash,
+  keyword_set_hash,
+  llm_model_id,
+  llm_prompt_id,
+  llm_model,
+  stale_after,
+  expires_at,
   summary,
   keyword_set,
   selected_domain_payload,
@@ -1487,8 +1511,8 @@ INSERT INTO binocolo.ma_target_web_validation (
   updated_by_email
 ) VALUES (
   $1::uuid, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5, $6, $7, $8, $9, $10,
-  $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17::jsonb, $18::jsonb, $19::jsonb,
-  $20::jsonb, $21, $22::jsonb, $23, $24, $23, $24
+  $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23::jsonb, $24::jsonb,
+  $25::jsonb, $26::jsonb, $27::jsonb, $28::jsonb, $29, $30::jsonb, $31, $32, $31, $32
 )
 ON CONFLICT (session_id, company_key) DO UPDATE
 SET target_id = EXCLUDED.target_id,
@@ -1503,6 +1527,14 @@ SET target_id = EXCLUDED.target_id,
     analyst_verdict = EXCLUDED.analyst_verdict,
     analyst_action = EXCLUDED.analyst_action,
     analyst_confidence = EXCLUDED.analyst_confidence,
+    pipeline_version = EXCLUDED.pipeline_version,
+    input_hash = EXCLUDED.input_hash,
+    keyword_set_hash = EXCLUDED.keyword_set_hash,
+    llm_model_id = EXCLUDED.llm_model_id,
+    llm_prompt_id = EXCLUDED.llm_prompt_id,
+    llm_model = EXCLUDED.llm_model,
+    stale_after = EXCLUDED.stale_after,
+    expires_at = EXCLUDED.expires_at,
     summary = EXCLUDED.summary,
     keyword_set = EXCLUDED.keyword_set,
     selected_domain_payload = EXCLUDED.selected_domain_payload,
@@ -1529,6 +1561,14 @@ RETURNING
   COALESCE(analyst_verdict, ''),
   COALESCE(analyst_action, ''),
   COALESCE(analyst_confidence, ''),
+  pipeline_version,
+  input_hash,
+  keyword_set_hash,
+  COALESCE(llm_model_id, ''),
+  COALESCE(llm_prompt_id, ''),
+  COALESCE(llm_model, ''),
+  stale_after,
+  expires_at,
   summary,
   keyword_set,
   selected_domain_payload,
@@ -1553,6 +1593,14 @@ RETURNING
 		nullString(input.AnalystVerdict),
 		nullString(input.AnalystAction),
 		nullString(input.AnalystConfidence),
+		input.PipelineVersion,
+		input.InputHash,
+		input.KeywordSetHash,
+		nullString(input.LLMModelID),
+		nullString(input.LLMPromptID),
+		nullString(input.LLMModel),
+		input.StaleAfter,
+		input.ExpiresAt,
 		[]byte(input.Summary),
 		[]byte(input.KeywordSet),
 		[]byte(input.SelectedDomainPayload),
@@ -1590,6 +1638,14 @@ func scanMAWebValidation(row maWebValidationScanner) (MAWebValidation, error) {
 		&item.AnalystVerdict,
 		&item.AnalystAction,
 		&item.AnalystConfidence,
+		&item.PipelineVersion,
+		&item.InputHash,
+		&item.KeywordSetHash,
+		&item.LLMModelID,
+		&item.LLMPromptID,
+		&item.LLMModel,
+		&item.StaleAfter,
+		&item.ExpiresAt,
 		&summaryRaw,
 		&keywordSetRaw,
 		&selectedDomainRaw,
@@ -1607,6 +1663,7 @@ func scanMAWebValidation(row maWebValidationScanner) (MAWebValidation, error) {
 		value := int(domainScore.Int64)
 		item.DomainScore = &value
 	}
+	item.Freshness = maWebValidationFreshness(time.Now(), item.StaleAfter, item.ExpiresAt)
 	_ = json.Unmarshal(summaryRaw, &item.Summary)
 	_ = json.Unmarshal(keywordSetRaw, &item.KeywordSet)
 	if len(selectedDomainRaw) > 0 && string(selectedDomainRaw) != "null" && string(selectedDomainRaw) != "{}" {

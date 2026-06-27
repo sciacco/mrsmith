@@ -61,6 +61,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 		ateco:              ateco,
 		ma:                 newMAService(maStore, cache, provinceCache, ateco, deps.OpenAPIIT, llmProvider),
 	}
+	h.ma.brave = deps.Brave
 	// Background workers, returned so main.go runs them under appCtx + workerWG for
 	// graceful shutdown. Both are DB-backed and resume pending rows on restart:
 	//   - maJobWorker drains the async session-job queue (estimate today) so the
@@ -107,6 +108,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/purge", h.handlePurgeMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/rating", h.handleRateMATarget)
 	handle("PUT /binocolo/v1/ma/sessions/{id}/web-validation", h.handleUpsertMAWebValidation)
+	handle("POST /binocolo/v1/ma/sessions/{id}/web-validation/enrich", h.handleEnrichMAWebValidation)
 	handle("POST /binocolo/v1/ma/sessions/{id}/deep-dive", h.handleDeepDiveMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/estimate", h.handleEstimateMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/execute", h.handleExecuteMASession)
@@ -340,6 +342,27 @@ func (h *Handler) handleUpsertMAWebValidation(w http.ResponseWriter, r *http.Req
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, validation)
+}
+
+func (h *Handler) handleEnrichMAWebValidation(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	var body MAWebValidationEnrichRequest
+	if r.Body != nil && r.ContentLength != 0 {
+		if err := decodeMABody(r, &body); err != nil {
+			httputil.Error(w, http.StatusBadRequest, "invalid_json")
+			return
+		}
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	detail, err := h.ma.enqueueWebValidation(r.Context(), id, body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_session_web_validation", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusAccepted, detail)
 }
 
 func (h *Handler) handleDeepDiveMASession(w http.ResponseWriter, r *http.Request) {
@@ -614,6 +637,9 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMAOpenRouterUnavailable) {
 		return http.StatusServiceUnavailable, "openrouter_not_configured", "warn"
+	}
+	if errors.Is(err, errMABraveUnavailable) {
+		return http.StatusServiceUnavailable, "brave_not_configured", "warn"
 	}
 	if errors.Is(err, errMALLMConfigUnavailable) {
 		return http.StatusServiceUnavailable, "binocolo_llm_config_not_configured", "warn"

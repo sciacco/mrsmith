@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"math"
 	"net/http"
 	"sort"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sciacco/mrsmith/internal/platform/brave"
 	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
@@ -26,6 +28,7 @@ var (
 	errMAStoreUnavailable      = errors.New("ma store unavailable")
 	errMAOpenAPIITUnavailable  = errors.New("openapiit unavailable")
 	errMAOpenRouterUnavailable = errors.New("openrouter unavailable")
+	errMABraveUnavailable      = errors.New("brave unavailable")
 	errMALLMConfigUnavailable  = errors.New("ma llm config unavailable")
 	errMAEstimateTooLarge      = errors.New("estimate too large")
 	errMAEstimateOverBudget    = errors.New("estimate over budget")
@@ -128,8 +131,11 @@ type maService struct {
 	provinceCache provinceCacheStore
 	ateco         atecoStore
 	openapiit     *openapiit.Client
-	llmp          maLLMProvider
-	now           func() time.Time
+	brave         interface {
+		LLMContext(context.Context, brave.LLMContextParams) (brave.LLMContextResult, error)
+	}
+	llmp maLLMProvider
+	now  func() time.Time
 }
 
 func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, provinceCache provinceCacheStore, ateco atecoStore, openapiitClient *openapiit.Client, llmp maLLMProvider) *maService {
@@ -1030,6 +1036,23 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 	if !validMAWebValidationState(body.FinalDecision.WebValidationState) {
 		return MAWebValidation{}, fmt.Errorf("%w: web validation state", errMAStrategyInvalid)
 	}
+	pipelineVersion := strings.TrimSpace(body.PipelineVersion)
+	if pipelineVersion == "" {
+		pipelineVersion = maWebValidationPipelineVersion
+	}
+	keywordSetHash := strings.TrimSpace(body.KeywordSetHash)
+	if keywordSetHash == "" {
+		keywordSetHash = maWebValidationHash(maWebValidationKeywordSetFingerprint(body.KeywordSet))
+	}
+	inputHash := strings.TrimSpace(body.InputHash)
+	if inputHash == "" {
+		inputHash = maWebValidationHash(map[string]any{
+			"pipelineVersion": pipelineVersion,
+			"target":          maWebValidationTargetFingerprint(body.Target),
+			"keywordSet":      maWebValidationKeywordSetFingerprint(body.KeywordSet),
+		})
+	}
+	staleAfter, expiresAt := maWebValidationFreshnessBounds(time.Now().UTC(), body.FinalDecision.FinalAction, body.CandidateMatchError)
 
 	summaryRaw, err := json.Marshal(body.Summary)
 	if err != nil {
@@ -1077,6 +1100,9 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 	analystVerdict := body.FinalDecision.AnalystVerdict
 	analystAction := body.FinalDecision.AnalystAction
 	analystConfidence := ""
+	llmModelID := ""
+	llmPromptID := ""
+	llmModel := ""
 	if body.CandidateMatchAnalysis != nil {
 		if analystVerdict == "" {
 			analystVerdict = body.CandidateMatchAnalysis.Verdict
@@ -1085,12 +1111,23 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 			analystAction = body.CandidateMatchAnalysis.RecommendedAction
 		}
 		analystConfidence = body.CandidateMatchAnalysis.Confidence
+		llmModelID = body.CandidateMatchAnalysis.ModelID
+		llmPromptID = body.CandidateMatchAnalysis.PromptID
+		llmModel = body.CandidateMatchAnalysis.Model
 	}
 	validation, err := s.store.UpsertMAWebValidation(ctx, maWebValidationUpsert{
 		SessionID:              sessionID,
 		CompanyKey:             companyKey,
 		TargetID:               body.Target.ID,
 		RunID:                  body.Target.RunID,
+		PipelineVersion:        pipelineVersion,
+		InputHash:              inputHash,
+		KeywordSetHash:         keywordSetHash,
+		LLMModelID:             llmModelID,
+		LLMPromptID:            llmPromptID,
+		LLMModel:               llmModel,
+		StaleAfter:             staleAfter,
+		ExpiresAt:              expiresAt,
 		SelectedDomain:         selectedDomain,
 		DomainConfidence:       domainConfidence,
 		DomainScore:            domainScore,
@@ -1122,6 +1159,9 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 			"session_id":    sessionID,
 			"company_key":   companyKey,
 			"final_action":  body.FinalDecision.FinalAction,
+			"fresh_until":   staleAfter,
+			"expires_at":    expiresAt,
+			"input_hash":    inputHash,
 			"web_score":     body.FinalDecision.WebScore,
 			"selected_site": selectedDomain,
 		}),
@@ -1144,6 +1184,79 @@ func validMAWebValidationState(state string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func maWebValidationFreshnessBounds(now time.Time, finalAction, analysisError string) (time.Time, time.Time) {
+	staleAfter := now.Add(90 * 24 * time.Hour)
+	if finalAction == "needs_domain_review" || finalAction == "needs_business_validation" || strings.TrimSpace(analysisError) != "" {
+		staleAfter = now.Add(30 * 24 * time.Hour)
+	}
+	expiresAt := now.Add(180 * 24 * time.Hour)
+	if staleAfter.After(expiresAt) {
+		staleAfter = expiresAt
+	}
+	return staleAfter, expiresAt
+}
+
+func maWebValidationFreshness(now, staleAfter, expiresAt time.Time) string {
+	if !expiresAt.IsZero() && now.After(expiresAt) {
+		return maWebValidationExpired
+	}
+	if !staleAfter.IsZero() && now.After(staleAfter) {
+		return maWebValidationStale
+	}
+	return maWebValidationFresh
+}
+
+func maWebValidationHash(value any) string {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	hash := fnv.New32a()
+	_, _ = hash.Write(raw)
+	return fmt.Sprintf("fnv1a:%08x", hash.Sum32())
+}
+
+func maWebValidationTargetFingerprint(target MATarget) map[string]any {
+	var staffCost *int
+	if value := candidateMatchLatestStaffCost(target); value != nil {
+		copyValue := *value
+		staffCost = &copyValue
+	}
+	return map[string]any{
+		"activityStatus":   target.ActivityStatus,
+		"adjustments":      target.Adjustments,
+		"atecoCode":        target.AtecoCode,
+		"atecoDescription": target.AtecoDescription,
+		"companyKey":       target.CompanyKey,
+		"companyName":      target.CompanyName,
+		"confidence":       target.Confidence,
+		"employees":        target.Employees,
+		"evidence":         target.Evidence,
+		"flags":            target.Flags,
+		"latestStaffCost":  staffCost,
+		"matchState":       target.MatchState,
+		"missingCriteria":  target.MissingCriteria,
+		"province":         target.Province,
+		"rating":           target.Rating,
+		"score":            target.Score,
+		"taxCode":          target.TaxCode,
+		"town":             target.Town,
+		"turnover":         target.Turnover,
+		"turnoverYear":     target.TurnoverYear,
+		"vatCode":          target.VATCode,
+	}
+}
+
+func maWebValidationKeywordSetFingerprint(keywordSet CandidateMatchKeywordSet) map[string]any {
+	return map[string]any{
+		"adjacentTerms": keywordSet.AdjacentTerms,
+		"coreTerms":     keywordSet.CoreTerms,
+		"intentLabel":   keywordSet.IntentLabel,
+		"negativeTerms": keywordSet.NegativeTerms,
+		"sources":       keywordSet.Sources,
 	}
 }
 

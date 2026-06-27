@@ -23,6 +23,7 @@ import type {
 import styles from './TestPage.module.css';
 
 const numberFormat = new Intl.NumberFormat('it-IT');
+const candidateWebValidationPipelineVersion = 'candidate-web-validation-v1';
 const defaultCompanyFilters = {
   province: 'AG',
   dataEnrichment: 'start',
@@ -121,6 +122,9 @@ interface PipelineSummary {
 type PipelineFinalDecision = CandidateMatchFinalDecision;
 
 interface PipelineRunResult {
+  pipelineVersion: string;
+  inputHash: string;
+  keywordSetHash: string;
   target: MATarget;
   keywordSet: PipelineKeywordSet;
   domainResponse: DomainResolutionResponse;
@@ -135,7 +139,10 @@ interface PipelineRunResult {
   finalDecision: PipelineFinalDecision;
 }
 
-type PipelineReconciliationInput = Omit<PipelineRunResult, 'finalDecision'>;
+type PipelineReconciliationInput = Omit<
+  PipelineRunResult,
+  'finalDecision' | 'persistedWebValidation' | 'persistError' | 'loadedFromCache' | 'pipelineVersion' | 'inputHash' | 'keywordSetHash'
+>;
 
 const dataEnrichmentOptions = [
   { value: '', label: 'Non impostato' },
@@ -686,6 +693,95 @@ function targetBusinessRiskSignals(target: MATarget): string[] {
   return signals;
 }
 
+function stableStringify(value: unknown): string {
+  if (value === undefined) return 'null';
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+    .join(',')}}`;
+}
+
+function hashStableValue(value: unknown): string {
+  const raw = stableStringify(value);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < raw.length; index += 1) {
+    hash ^= raw.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `fnv1a:${hash.toString(16).padStart(8, '0')}`;
+}
+
+function pipelineTargetFingerprint(target: MATarget): Record<string, unknown> {
+  return {
+    activityStatus: target.activityStatus ?? '',
+    adjustments: target.adjustments ?? null,
+    atecoCode: target.atecoCode ?? '',
+    atecoDescription: target.atecoDescription ?? '',
+    companyKey: target.companyKey ?? '',
+    companyName: target.companyName,
+    confidence: target.confidence ?? '',
+    employees: target.employees ?? null,
+    evidence: target.evidence,
+    flags: target.flags ?? null,
+    latestStaffCost: latestStaffCost(target) ?? null,
+    matchState: target.matchState,
+    missingCriteria: target.missingCriteria,
+    province: target.province ?? '',
+    rating: target.rating ?? null,
+    score: target.score,
+    taxCode: target.taxCode ?? '',
+    town: target.town ?? '',
+    turnover: target.turnover ?? null,
+    turnoverYear: target.turnoverYear ?? null,
+    vatCode: target.vatCode ?? '',
+  };
+}
+
+interface PipelineFingerprintOptions {
+  analyzeWithLLM: boolean;
+  domainCount: number;
+  includeIdentifiers: boolean;
+  keywordCount: number;
+  rank: boolean;
+}
+
+function pipelineKeywordSetHash(keywordSet: PipelineKeywordSet): string {
+  return hashStableValue(keywordSet);
+}
+
+function pipelineInputHash(target: MATarget, keywordSet: PipelineKeywordSet, options: PipelineFingerprintOptions): string {
+  return hashStableValue({
+    keywordSet,
+    options,
+    pipelineVersion: candidateWebValidationPipelineVersion,
+    target: pipelineTargetFingerprint(target),
+  });
+}
+
+function validationRuntimeFreshness(validation: MAWebValidation): string {
+  const expiresAt = Date.parse(validation.expiresAt);
+  if (Number.isFinite(expiresAt) && Date.now() > expiresAt) return 'expired';
+  const staleAfter = Date.parse(validation.staleAfter);
+  if (Number.isFinite(staleAfter) && Date.now() > staleAfter) return 'stale';
+  return validation.freshness || 'fresh';
+}
+
+function reusableWebValidation(validation: MAWebValidation, inputHash: string, keywordSetHash: string): boolean {
+  return (
+    validation.pipelineVersion === candidateWebValidationPipelineVersion &&
+    validation.inputHash === inputHash &&
+    validation.keywordSetHash === keywordSetHash &&
+    validationRuntimeFreshness(validation) === 'fresh'
+  );
+}
+
+function validationFreshnessLabel(validation?: MAWebValidation): string {
+  return validation ? validationRuntimeFreshness(validation) : 'N/D';
+}
+
 function reconcilePipelineDecision(input: PipelineReconciliationInput): PipelineFinalDecision {
   const { target, selectedDomain, summary, candidateMatchAnalysis, candidateMatchError } = input;
   const reasons: string[] = [];
@@ -874,6 +970,9 @@ function pipelineKeywordSetsEqual(a: PipelineKeywordSet, b: PipelineKeywordSet):
 
 function pipelineRunFromWebValidation(target: MATarget, validation: MAWebValidation): PipelineRunResult {
   return {
+    pipelineVersion: validation.pipelineVersion,
+    inputHash: validation.inputHash ?? '',
+    keywordSetHash: validation.keywordSetHash ?? '',
     target,
     keywordSet: validation.keywordSet as PipelineKeywordSet,
     domainResponse: validation.domainResponse,
@@ -1005,10 +1104,20 @@ export function TestPage() {
       if (!target) throw new Error('La sessione selezionata non contiene target.');
 
       const keywordSet = derivedKeywordSet(detail.strategy?.strategy, target, pipelineExtraKeywords);
+      const fingerprintOptions: PipelineFingerprintOptions = {
+        analyzeWithLLM: pipelineAnalyzeWithLLM,
+        domainCount: positiveInteger(pipelineDomainCount, 10, 1, 20),
+        includeIdentifiers: pipelineIncludeIdentifiers,
+        keywordCount: positiveInteger(pipelineKeywordCount, 5, 1, 20),
+        rank: pipelineRank,
+      };
+      const keywordSetHash = pipelineKeywordSetHash(keywordSet);
+      const inputHash = pipelineInputHash(target, keywordSet, fingerprintOptions);
       if (
         target.webValidation &&
         !pipelineForceRecompute &&
-        pipelineKeywordSetsEqual(keywordSet, target.webValidation.keywordSet as PipelineKeywordSet)
+        pipelineKeywordSetsEqual(keywordSet, target.webValidation.keywordSet as PipelineKeywordSet) &&
+        reusableWebValidation(target.webValidation, inputHash, keywordSetHash)
       ) {
         return pipelineRunFromWebValidation(target, target.webValidation);
       }
@@ -1020,7 +1129,7 @@ export function TestPage() {
         town: target.town || undefined,
         province: target.province || undefined,
         keywords: [...keywordSet.coreTerms.slice(0, 3), ...keywordSet.adjacentTerms.slice(0, 2)],
-        count: positiveInteger(pipelineDomainCount, 10, 1, 20),
+        count: fingerprintOptions.domainCount,
       });
       const selectedDomain = chooseDomainCandidate(domainResponse.candidates);
       const specs = selectedDomain ? pipelineTermSpecs(keywordSet) : [];
@@ -1030,8 +1139,8 @@ export function TestPage() {
             const response = await api.post<WebSearchResponse>('/binocolo/v1/web-search', {
               domain: selectedDomain?.domain ?? '',
               keywords: [spec.term],
-              count: positiveInteger(pipelineKeywordCount, 5, 1, 20),
-              rank: pipelineRank,
+              count: fingerprintOptions.keywordCount,
+              rank: fingerprintOptions.rank,
             });
             const bestScore = bestWebSearchScore(response);
             return {
@@ -1069,6 +1178,9 @@ export function TestPage() {
 
       const finalResult: PipelineRunResult = {
         ...result,
+        pipelineVersion: candidateWebValidationPipelineVersion,
+        inputHash,
+        keywordSetHash,
         finalDecision: result.candidateMatchAnalysis?.finalDecision ?? reconcilePipelineDecision(result),
       };
       try {
@@ -1707,9 +1819,9 @@ export function TestPage() {
                   </span>
                   <span>
                     {evidencePipeline.data.loadedFromCache
-                      ? 'Validazione riusata'
+                      ? `Validazione riusata · ${validationFreshnessLabel(evidencePipeline.data.persistedWebValidation)}`
                       : evidencePipeline.data.persistedWebValidation
-                        ? 'Validazione salvata'
+                        ? `Validazione salvata · ${validationRuntimeFreshness(evidencePipeline.data.persistedWebValidation)}`
                         : evidencePipeline.data.persistError
                           ? 'Persistenza non riuscita'
                         : 'Persistenza N/D'}
@@ -1815,6 +1927,15 @@ export function TestPage() {
                             : evidencePipeline.data.persistError ?? 'N/D'}
                       </p>
                     </div>
+                    {evidencePipeline.data.persistedWebValidation ? (
+                      <div>
+                        <span>Freshness</span>
+                        <p>
+                          {validationRuntimeFreshness(evidencePipeline.data.persistedWebValidation)} · stale dopo{' '}
+                          {new Date(evidencePipeline.data.persistedWebValidation.staleAfter).toLocaleDateString('it-IT')}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                   {evidencePipeline.data.finalDecision.reasons.length > 0 ? (
                     <div className={styles.finalReasons}>

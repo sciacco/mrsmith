@@ -99,6 +99,8 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 		traceID, err = w.svc.runEstimateJob(ctx, job)
 	case maJobTypeExecute:
 		traceID, err = w.svc.runExecuteJob(ctx, job)
+	case maJobTypeWebValidation:
+		traceID, err = w.svc.runWebValidationJob(ctx, job)
 	default:
 		logging.FromContext(ctx).Error("binocolo job worker unknown job type", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType)
 		_ = w.store.FailMAJob(ctx, job.ID, "unknown_job_type")
@@ -108,7 +110,7 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 		_ = w.store.SetMAJobTrace(ctx, job.ID, traceID)
 	}
 	if err != nil {
-		w.retryOrFail(ctx, job, classifyMAJobError(err))
+		w.retryOrFail(ctx, job, classifyMAJobError(err, job.JobType))
 		return
 	}
 	if err := w.store.CompleteMAJob(ctx, job.ID); err != nil {
@@ -148,17 +150,22 @@ func (w *maJobWorker) retryOrFail(ctx context.Context, job maJob, code string) {
 
 // classifyMAJobError maps an internal error to a short, stable error_code stored
 // on the job row (and surfaced for diagnosis), without leaking message detail.
-func classifyMAJobError(err error) string {
+func classifyMAJobError(err error, jobType string) string {
 	switch {
 	case errors.Is(err, errMAEstimateSuperseded):
 		return "superseded"
 	case errors.Is(err, errMAStrategyInvalid):
 		return "strategy_invalid"
+	case errors.Is(err, errMABraveUnavailable):
+		return "brave_unavailable"
 	case errors.Is(err, errMAOpenAPIITUnavailable):
 		return "openapiit_unavailable"
 	case errors.Is(err, errMAStoreUnavailable):
 		return "store_unavailable"
 	default:
+		if jobType == maJobTypeWebValidation {
+			return "web_validation_failed"
+		}
 		return "estimate_failed"
 	}
 }

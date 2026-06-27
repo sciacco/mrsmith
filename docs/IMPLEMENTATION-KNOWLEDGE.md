@@ -164,6 +164,15 @@ Alyante ERP ID
 - Used by: `apps/binocolo` `/target`.
 - Open questions: whether the threshold should become an admin-configurable value after real usage data.
 
+### Binocolo M&A Long Session Work Uses `ma_job`
+
+- Context: async Binocolo M&A work that operates on a whole session after strategy creation or target acquisition.
+- Discovery: `binocolo.ma_job` is the concurrency boundary for long session jobs. The table has a partial unique index on `(session_id, job_type)` for `queued/running` rows and a per-row lease (`locked_by`, `lease_until`) so multiple backend replicas do not execute the same job concurrently.
+- Practical rule: add new long-running session sidecars as new `job_type` values on `ma_job`, not as request-context goroutines or ad hoc tables, unless they need a materially different locking model. Sidecar jobs that do not own the session lifecycle, such as web validation, must not flip the session to `running`/`failed`; they should persist their own artifacts and let the session detail surface them.
+- Evidence: migrations `049_binocolo_ma_job.sql` and `056_binocolo_ma_web_validation_job.sql`, worker `backend/internal/binocolo/ma_job_worker.go`, and web-validation job `backend/internal/binocolo/ma_web_validation_job.go`.
+- Used by: Binocolo M&A estimate, execute, and target web validation.
+- Open questions: none.
+
 ### Binocolo ATECO 2025 Codes Are Resolver-Gated
 
 - Context: Binocolo M&A ATECO candidate selection and OpenAPI.it Company `IT-search` calls.

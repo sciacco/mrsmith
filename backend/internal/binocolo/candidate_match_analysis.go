@@ -74,6 +74,9 @@ type CandidateMatchAnalysisResponse struct {
 	RecommendedAction string                       `json:"recommendedAction"`
 	Rationale         string                       `json:"rationale"`
 	FinalDecision     *CandidateMatchFinalDecision `json:"finalDecision,omitempty"`
+	ModelID           string                       `json:"modelId,omitempty"`
+	PromptID          string                       `json:"promptId,omitempty"`
+	Model             string                       `json:"model,omitempty"`
 }
 
 type CandidateMatchFinalDecision struct {
@@ -192,6 +195,9 @@ func (s *maService) analyzeCandidateMatch(ctx context.Context, input CandidateMa
 	if err != nil {
 		return CandidateMatchAnalysisResponse{}, err
 	}
+	analysis.ModelID = model.ID
+	analysis.PromptID = prompt.ID
+	analysis.Model = model.Model
 	analysis.FinalDecision = reconcileCandidateMatchDecision(input, &analysis, "")
 	return analysis, nil
 }

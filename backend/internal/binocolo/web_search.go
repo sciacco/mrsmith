@@ -289,6 +289,9 @@ func (h *Handler) handleWebSearch(w http.ResponseWriter, r *http.Request) {
 // rationale. Returns index→score (0-100). Any failure is returned to the caller,
 // which keeps the unranked order.
 func (s *maService) scoreWebSearchResults(ctx context.Context, terms string, results []WebSearchResult, subject, email string) (map[int]int, error) {
+	if s.llmp == nil {
+		return nil, errMAOpenRouterUnavailable
+	}
 	model, err := s.llmp.ResolveModel(ctx, maModelScopeWebSearchScorer, "")
 	if err != nil {
 		return nil, err

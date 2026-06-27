@@ -61,10 +61,11 @@ const (
 	// LLM brief), short enough that a crashed worker's rows are reclaimed promptly.
 	maDeepLeaseSeconds = 60
 
-	// ma_job async queue (estimate/execute run off the request path). Same state
+	// ma_job async queue (estimate/execute/web validation run off the request path). Same state
 	// machine as the deep worker; see deploy/migrations/049.
-	maJobTypeEstimate = "estimate"
-	maJobTypeExecute  = "execute"
+	maJobTypeEstimate      = "estimate"
+	maJobTypeExecute       = "execute"
+	maJobTypeWebValidation = "web_validation"
 
 	maJobStatusQueued  = "queued"
 	maJobStatusRunning = "running"
@@ -100,6 +101,11 @@ const (
 	maModelScopeDeepBrief              = "ma_deep_brief"
 	maModelScopeWebSearchScorer        = "web_search_scorer"
 	maModelScopeCandidateMatchAnalyst  = "candidate_match_analyst"
+
+	maWebValidationPipelineVersion = "candidate-web-validation-v1"
+	maWebValidationFresh           = "fresh"
+	maWebValidationStale           = "stale"
+	maWebValidationExpired         = "expired"
 
 	maEstimateSurfaceExact    = "exact"
 	maEstimateSurfaceTooBroad = "too_broad"
@@ -173,6 +179,9 @@ type MATargetRatingRequest struct {
 }
 
 type MAWebValidationUpsertRequest struct {
+	PipelineVersion        string                          `json:"pipelineVersion,omitempty"`
+	InputHash              string                          `json:"inputHash,omitempty"`
+	KeywordSetHash         string                          `json:"keywordSetHash,omitempty"`
 	Target                 MATarget                        `json:"target"`
 	KeywordSet             CandidateMatchKeywordSet        `json:"keywordSet"`
 	DomainResponse         DomainResolutionResponse        `json:"domainResponse"`
@@ -182,6 +191,16 @@ type MAWebValidationUpsertRequest struct {
 	CandidateMatchAnalysis *CandidateMatchAnalysisResponse `json:"candidateMatchAnalysis,omitempty"`
 	CandidateMatchError    string                          `json:"candidateMatchError,omitempty"`
 	FinalDecision          CandidateMatchFinalDecision     `json:"finalDecision"`
+}
+
+type MAWebValidationEnrichRequest struct {
+	Limit              int   `json:"limit,omitempty"`
+	Force              bool  `json:"force,omitempty"`
+	IncludeIdentifiers bool  `json:"includeIdentifiers,omitempty"`
+	AnalyzeWithLLM     *bool `json:"analyzeWithLLM,omitempty"`
+	DomainCount        int   `json:"domainCount,omitempty"`
+	KeywordCount       int   `json:"keywordCount,omitempty"`
+	Rank               *bool `json:"rank,omitempty"`
 }
 
 type MAParameter struct {
@@ -539,6 +558,15 @@ type MAWebValidation struct {
 	CompanyKey             string                          `json:"companyKey"`
 	TargetID               string                          `json:"targetId,omitempty"`
 	RunID                  string                          `json:"runId,omitempty"`
+	PipelineVersion        string                          `json:"pipelineVersion"`
+	InputHash              string                          `json:"inputHash,omitempty"`
+	KeywordSetHash         string                          `json:"keywordSetHash,omitempty"`
+	LLMModelID             string                          `json:"llmModelId,omitempty"`
+	LLMPromptID            string                          `json:"llmPromptId,omitempty"`
+	LLMModel               string                          `json:"llmModel,omitempty"`
+	Freshness              string                          `json:"freshness"`
+	StaleAfter             time.Time                       `json:"staleAfter"`
+	ExpiresAt              time.Time                       `json:"expiresAt"`
 	SelectedDomain         string                          `json:"selectedDomain,omitempty"`
 	DomainConfidence       string                          `json:"domainConfidence,omitempty"`
 	DomainScore            *int                            `json:"domainScore,omitempty"`

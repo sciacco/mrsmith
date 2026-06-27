@@ -1125,6 +1125,53 @@
   background: var(--color-warning-subtle);
 }
 
+.webValidationBox {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.webValidationHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.webValidationHead span,
+.webValidationBox dt {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.webValidationHead strong {
+  color: var(--color-text);
+  font-size: 0.8125rem;
+}
+
+.webValidationBox dl {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.webValidationBox dl > div {
+  display: grid;
+  gap: 2px;
+}
+
+.webValidationBox dd,
+.webValidationBox p {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
 .evidenceList {
   display: grid;
   gap: var(--space-3);
@@ -1355,6 +1402,42 @@
 }
 .deep_failed {
   background: rgba(229, 72, 77, 0.14);
+  color: var(--color-danger, #e5484d);
+}
+
+.webChip {
+  display: inline-flex;
+  align-items: center;
+  margin-top: var(--space-1);
+  padding: 1px var(--space-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.webChip_confirm {
+  border-color: rgba(21, 128, 61, 0.22);
+  background: rgba(21, 128, 61, 0.12);
+  color: var(--color-success-strong, #15803d);
+}
+
+.webChip_deprioritize,
+.webChip_needs_business_validation {
+  border-color: var(--color-warning);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
+.webChip_reject,
+.webChip_needs_domain_review {
+  border-color: rgba(229, 72, 77, 0.22);
+  background: rgba(229, 72, 77, 0.12);
   color: var(--color-danger, #e5484d);
 }
 
@@ -2203,6 +2286,7 @@
 }
 
 .metaRow .flagRow,
+.metaRow .webChip,
 .metaRow .deepChip {
   margin-top: 0 !important;
 }
@@ -2311,4 +2395,3 @@
   --thesis-border-hover: var(--color-info);
   --thesis-shadow: 0 0 0 1px var(--color-info);
 }
-
