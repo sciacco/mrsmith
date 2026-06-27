@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/sciacco/mrsmith/internal/platform/brave"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
@@ -44,14 +45,111 @@ type WebSearchResponse struct {
 	Results   []WebSearchResult `json:"results"`
 }
 
+type DomainResolutionRequest struct {
+	CompanyName string   `json:"companyName"`
+	VATCode     string   `json:"vatCode,omitempty"`
+	TaxCode     string   `json:"taxCode,omitempty"`
+	Town        string   `json:"town,omitempty"`
+	Province    string   `json:"province,omitempty"`
+	Keywords    []string `json:"keywords,omitempty"`
+	Count       int      `json:"count"`
+}
+
+type DomainResolutionCandidate struct {
+	Domain     string            `json:"domain"`
+	Score      int               `json:"score"`
+	Confidence string            `json:"confidence"`
+	Reasons    []string          `json:"reasons"`
+	Results    []WebSearchResult `json:"results"`
+}
+
+type DomainResolutionResponse struct {
+	Query      string                      `json:"query"`
+	Count      int                         `json:"count"`
+	Candidates []DomainResolutionCandidate `json:"candidates"`
+	Results    []WebSearchResult           `json:"results"`
+}
+
 const (
-	webSearchDefaultCount  = 25
-	webSearchMaxCount      = 50
-	webSearchMaxQueryLen   = 400 // Brave: q is 1-400 chars
-	webSearchMaxWords      = 50  // Brave: q is max 50 words
-	webSearchScoreTextCap  = 400 // chars of snippet text sent to the scorer per result
-	webSearchScoreMaxToken = 512
+	webSearchDefaultCount        = 25
+	webSearchMaxCount            = 50
+	webSearchMaxQueryLen         = 400 // Brave: q is 1-400 chars
+	webSearchMaxWords            = 50  // Brave: q is max 50 words
+	webSearchScoreTextCap        = 400 // chars of snippet text sent to the scorer per result
+	webSearchScoreMaxToken       = 512
+	domainResolutionDefaultCount = 10
+	domainResolutionMaxCount     = 20
 )
+
+// handleTestDomainResolution is a lab-only helper used by the Binocolo Test page.
+// It tries to infer a target's official domain from Brave results, returning the
+// raw candidate evidence and deterministic reasons. It deliberately does not
+// persist anything and should not be treated as an authoritative source.
+func (h *Handler) handleTestDomainResolution(w http.ResponseWriter, r *http.Request) {
+	if !h.requireBrave(w) {
+		return
+	}
+
+	var body DomainResolutionRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	companyName := strings.Join(strings.Fields(strings.TrimSpace(body.CompanyName)), " ")
+	if companyName == "" {
+		httputil.Error(w, http.StatusBadRequest, "missing_company_name")
+		return
+	}
+
+	count := body.Count
+	if count <= 0 {
+		count = domainResolutionDefaultCount
+	}
+	if count > domainResolutionMaxCount {
+		count = domainResolutionMaxCount
+	}
+
+	query := buildDomainResolutionQuery(body, companyName)
+	if len(query) > webSearchMaxQueryLen || len(strings.Fields(query)) > webSearchMaxWords {
+		httputil.Error(w, http.StatusBadRequest, "query_too_long")
+		return
+	}
+
+	res, err := h.brave.LLMContext(r.Context(), brave.LLMContextParams{
+		Query:      query,
+		Count:      count,
+		Country:    "it",
+		SearchLang: "it",
+	})
+	if err != nil {
+		h.braveFailure(w, r, "domain_resolution", err)
+		return
+	}
+
+	results := make([]WebSearchResult, 0, len(res.Generic))
+	for _, g := range res.Generic {
+		host := resultHostname(g.URL, res.Sources)
+		if strings.TrimSpace(host) == "" {
+			continue
+		}
+		results = append(results, WebSearchResult{
+			Title:    g.Title,
+			URL:      g.URL,
+			Hostname: host,
+			Age:      firstAge(res.Sources[g.URL].Age),
+			Snippets: g.Snippets,
+		})
+	}
+
+	candidates := rankDomainResolutionCandidates(body, companyName, results)
+	httputil.JSON(w, http.StatusOK, DomainResolutionResponse{
+		Query:      query,
+		Count:      count,
+		Candidates: candidates,
+		Results:    results,
+	})
+}
 
 // handleWebSearch restricts the search to a single domain via the "site:" operator
 // in the query and, as a safety net, drops any result whose hostname is not on that
@@ -379,4 +477,298 @@ func firstAge(age []string) string {
 		}
 	}
 	return ""
+}
+
+func buildDomainResolutionQuery(body DomainResolutionRequest, companyName string) string {
+	parts := []string{quoteBraveTerm(companyName), "sito ufficiale"}
+	if value := sanitizeDomainResolutionIdentifier(body.VATCode); value != "" {
+		parts = append(parts, quoteBraveTerm(value))
+	}
+	if value := sanitizeDomainResolutionIdentifier(body.TaxCode); value != "" && value != sanitizeDomainResolutionIdentifier(body.VATCode) {
+		parts = append(parts, quoteBraveTerm(value))
+	}
+	if town := strings.TrimSpace(body.Town); town != "" {
+		parts = append(parts, quoteBraveTerm(town))
+	}
+	if province := strings.TrimSpace(body.Province); province != "" {
+		parts = append(parts, strings.ToUpper(province))
+	}
+	for _, keyword := range body.Keywords {
+		keyword = strings.TrimSpace(keyword)
+		if keyword == "" {
+			continue
+		}
+		parts = append(parts, quoteBraveTerm(keyword))
+		if len(parts) >= 10 {
+			break
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+func quoteBraveTerm(value string) string {
+	value = strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	if value == "" {
+		return ""
+	}
+	if strings.ContainsAny(value, " \t") {
+		return `"` + strings.ReplaceAll(value, `"`, "") + `"`
+	}
+	return strings.ReplaceAll(value, `"`, "")
+}
+
+type domainResolutionAccum struct {
+	domain  string
+	score   int
+	reasons map[string]struct{}
+	results []WebSearchResult
+}
+
+func rankDomainResolutionCandidates(body DomainResolutionRequest, companyName string, results []WebSearchResult) []DomainResolutionCandidate {
+	accums := map[string]*domainResolutionAccum{}
+	for _, result := range results {
+		domain, ok := normalizeDomain(result.Hostname)
+		if !ok || isDomainResolutionExcludedDomain(domain) {
+			continue
+		}
+		score, reasons := scoreDomainResolutionResult(body, companyName, domain, result)
+		if score <= 0 {
+			continue
+		}
+		accum := accums[domain]
+		if accum == nil {
+			accum = &domainResolutionAccum{
+				domain:  domain,
+				reasons: map[string]struct{}{},
+			}
+			accums[domain] = accum
+		}
+		if score > accum.score {
+			accum.score = score
+		}
+		for _, reason := range reasons {
+			accum.reasons[reason] = struct{}{}
+		}
+		accum.results = append(accum.results, result)
+	}
+
+	candidates := make([]DomainResolutionCandidate, 0, len(accums))
+	for _, accum := range accums {
+		score := min(100, accum.score+min(15, (len(accum.results)-1)*3))
+		reasons := make([]string, 0, len(accum.reasons))
+		for reason := range accum.reasons {
+			reasons = append(reasons, reason)
+		}
+		sort.Strings(reasons)
+		candidates = append(candidates, DomainResolutionCandidate{
+			Domain:     accum.domain,
+			Score:      score,
+			Confidence: domainResolutionConfidence(score, reasons),
+			Reasons:    reasons,
+			Results:    accum.results,
+		})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].Score == candidates[j].Score {
+			return candidates[i].Domain < candidates[j].Domain
+		}
+		return candidates[i].Score > candidates[j].Score
+	})
+	if len(candidates) > 8 {
+		candidates = candidates[:8]
+	}
+	return candidates
+}
+
+func scoreDomainResolutionResult(body DomainResolutionRequest, companyName, domain string, result WebSearchResult) (int, []string) {
+	text := strings.ToLower(result.Title + " " + result.URL + " " + strings.Join(result.Snippets, " "))
+	compactText := compactAlnum(text)
+	tokens := companyResolutionTokens(companyName)
+	score := 0
+	reasons := []string{}
+
+	matchedNameTokens := 0
+	for _, token := range tokens {
+		if strings.Contains(text, token) || strings.Contains(compactAlnum(domain), token) {
+			matchedNameTokens++
+		}
+	}
+	if matchedNameTokens > 0 {
+		score += min(35, matchedNameTokens*8)
+		reasons = append(reasons, "nome azienda presente")
+	}
+	if domainLooksCompanyOwned(domain, tokens) {
+		score += 30
+		reasons = append(reasons, "host compatibile con ragione sociale")
+	}
+	if value := sanitizeDomainResolutionIdentifier(body.VATCode); value != "" && strings.Contains(compactText, strings.ToLower(value)) {
+		score += 35
+		reasons = append(reasons, "partita IVA trovata")
+	}
+	if value := sanitizeDomainResolutionIdentifier(body.TaxCode); value != "" && strings.Contains(compactText, strings.ToLower(value)) {
+		score += 35
+		reasons = append(reasons, "codice fiscale trovato")
+	}
+	if town := strings.ToLower(strings.TrimSpace(body.Town)); town != "" && strings.Contains(text, town) {
+		score += 8
+		reasons = append(reasons, "localita coerente")
+	}
+	keywordMatches := 0
+	for _, keyword := range body.Keywords {
+		for _, token := range companyResolutionTokens(keyword) {
+			if strings.Contains(text, token) {
+				keywordMatches++
+			}
+		}
+	}
+	if keywordMatches > 0 {
+		score += min(12, keywordMatches*4)
+		reasons = append(reasons, "keyword settore presenti")
+	}
+	for _, marker := range []string{"sito ufficiale", "homepage", "chi siamo", "contatti", "azienda"} {
+		if strings.Contains(text, marker) {
+			score += 5
+			reasons = append(reasons, "indicatori sito aziendale")
+			break
+		}
+	}
+	if isHostedSiteDomain(domain) {
+		score -= 12
+		reasons = append(reasons, "dominio hosted da verificare")
+	}
+	if score < 0 {
+		score = 0
+	}
+	if len(reasons) == 0 {
+		reasons = append(reasons, "evidenza debole")
+	}
+	return min(100, score), cleanStringList(reasons, 8, 80)
+}
+
+func domainResolutionConfidence(score int, reasons []string) string {
+	hasStrongIdentifier := false
+	hasHostMatch := false
+	for _, reason := range reasons {
+		if reason == "partita IVA trovata" || reason == "codice fiscale trovato" {
+			hasStrongIdentifier = true
+		}
+		if reason == "host compatibile con ragione sociale" {
+			hasHostMatch = true
+		}
+	}
+	switch {
+	case score >= 75 && (hasStrongIdentifier || hasHostMatch):
+		return "alta"
+	case score >= 45:
+		return "media"
+	default:
+		return "bassa"
+	}
+}
+
+func companyResolutionTokens(value string) []string {
+	seen := map[string]struct{}{}
+	out := []string{}
+	for _, token := range strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		token = strings.TrimSpace(token)
+		if len([]rune(token)) < 3 || domainResolutionStopword(token) {
+			continue
+		}
+		if _, exists := seen[token]; exists {
+			continue
+		}
+		seen[token] = struct{}{}
+		out = append(out, token)
+	}
+	return out
+}
+
+func domainLooksCompanyOwned(domain string, tokens []string) bool {
+	host := strings.TrimSuffix(strings.TrimPrefix(strings.ToLower(domain), "www."), ".")
+	labels := strings.Split(host, ".")
+	if len(labels) == 0 {
+		return false
+	}
+	brand := compactAlnum(labels[0])
+	if brand == "" {
+		return false
+	}
+	strongMatches := 0
+	for _, token := range tokens {
+		if len(token) < 4 {
+			continue
+		}
+		if strings.Contains(brand, compactAlnum(token)) {
+			strongMatches++
+		}
+	}
+	return strongMatches >= 1 && (len(tokens) == 1 || strongMatches >= 2 || len(brand) <= 18)
+}
+
+func sanitizeDomainResolutionIdentifier(value string) string {
+	return strings.ToUpper(compactAlnum(value))
+}
+
+func compactAlnum(value string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(value) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func domainResolutionStopword(token string) bool {
+	switch token {
+	case "srl", "spa", "srls", "soc", "societa", "cooperativa", "coop", "consorzio", "azienda", "italia", "italiana", "group", "holding":
+		return true
+	default:
+		return false
+	}
+}
+
+func isDomainResolutionExcludedDomain(domain string) bool {
+	excluded := []string{
+		"facebook.com",
+		"instagram.com",
+		"linkedin.com",
+		"twitter.com",
+		"x.com",
+		"youtube.com",
+		"google.com",
+		"paginegialle.it",
+		"registroimprese.it",
+		"ufficiocamerali.it",
+		"ufficio-camerale.it",
+		"reportaziende.it",
+		"informazione-aziende.it",
+		"aziende.it",
+		"misterimprese.it",
+		"cylex-italia.it",
+		"europages.it",
+		"kompass.com",
+		"kompassitalia.com",
+		"indeed.com",
+		"glassdoor.it",
+		"crif.it",
+		"cerved.com",
+	}
+	for _, item := range excluded {
+		if hostMatchesDomain(domain, item) {
+			return true
+		}
+	}
+	return false
+}
+
+func isHostedSiteDomain(domain string) bool {
+	for _, item := range []string{"wixsite.com", "wordpress.com", "blogspot.com", "weebly.com", "jimdosite.com", "business.site"} {
+		if hostMatchesDomain(domain, item) {
+			return true
+		}
+	}
+	return false
 }

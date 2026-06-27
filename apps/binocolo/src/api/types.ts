@@ -56,6 +56,31 @@ export interface WebSearchResponse {
   results: WebSearchResult[];
 }
 
+export interface DomainResolutionRequest {
+  companyName: string;
+  vatCode?: string;
+  taxCode?: string;
+  town?: string;
+  province?: string;
+  keywords?: string[];
+  count?: number;
+}
+
+export interface DomainResolutionCandidate {
+  domain: string;
+  score: number;
+  confidence: 'alta' | 'media' | 'bassa' | string;
+  reasons: string[];
+  results: WebSearchResult[];
+}
+
+export interface DomainResolutionResponse {
+  query: string;
+  count: number;
+  candidates: DomainResolutionCandidate[];
+  results: WebSearchResult[];
+}
+
 export interface MASessionListResponse {
   items: MASessionSummary[];
 }

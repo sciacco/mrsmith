@@ -3,7 +3,7 @@ import { ApiError } from '@mrsmith/api-client';
 import { useMutation } from '@tanstack/react-query';
 import { Button, Icon, Skeleton, ToggleSwitch } from '@mrsmith/ui';
 import { useApiClient } from '../api/client';
-import type { CompanySearchRow, OpenAPIITEnvelope } from '../api/types';
+import type { CompanySearchRow, DomainResolutionResponse, OpenAPIITEnvelope, WebSearchResponse } from '../api/types';
 import styles from './TestPage.module.css';
 
 const numberFormat = new Intl.NumberFormat('it-IT');
@@ -23,8 +23,37 @@ const defaultCompanyFilters = {
   limit: '10',
 };
 
+const defaultDomainResolutionForm = {
+  companyName: '',
+  vatCode: '',
+  taxCode: '',
+  town: '',
+  province: '',
+  keywords: '',
+  count: '10',
+};
+
+const defaultKeywordEvidenceForm = {
+  domain: '',
+  keywords: '',
+  count: '10',
+  rank: true,
+};
+
 type CompanySearchFilters = typeof defaultCompanyFilters;
 type CompanySearchFilterField = keyof CompanySearchFilters;
+type DomainResolutionForm = typeof defaultDomainResolutionForm;
+type DomainResolutionField = keyof DomainResolutionForm;
+type KeywordEvidenceForm = typeof defaultKeywordEvidenceForm;
+type KeywordEvidenceField = keyof Omit<KeywordEvidenceForm, 'rank'>;
+type TestTab = 'company' | 'domain' | 'keyword' | 'maintenance';
+
+const testTabs = [
+  { id: 'company', label: 'Company search', icon: 'database' },
+  { id: 'domain', label: 'Domain resolver', icon: 'network' },
+  { id: 'keyword', label: 'Keyword evidence', icon: 'search' },
+  { id: 'maintenance', label: 'Manutenzione', icon: 'settings' },
+] as const;
 
 const dataEnrichmentOptions = [
   { value: '', label: 'Non impostato' },
@@ -87,6 +116,10 @@ const validationErrorLabels: Record<string, string> = {
   invalid_skip: 'Skip non valido. Inserisci un numero maggiore o uguale a 0.',
   invalid_limit: 'Limit non valido. Inserisci un numero tra 1 e 1000.',
   invalid_ateco_code: 'Codice ATECO non trovato. Inserisci un codice ATECO 2025 valido.',
+  invalid_domain: 'Dominio non valido.',
+  missing_keywords: 'Inserisci almeno una keyword.',
+  missing_company_name: 'Inserisci la ragione sociale.',
+  query_too_long: 'Query troppo lunga per Brave Search.',
 };
 
 function apiErrorCode(error: ApiError): string | undefined {
@@ -109,8 +142,11 @@ function errorLabel(error: unknown): string {
     if (error.status === 503 && code === 'openapiit_not_configured') {
       return 'OpenAPI.it non e configurato in questo ambiente.';
     }
-    if (error.status === 503) return 'OpenAPI.it non e configurato in questo ambiente.';
-    if (error.status === 502) return 'OpenAPI.it non ha risposto correttamente.';
+    if (error.status === 503 && code === 'brave_not_configured') {
+      return 'Brave Search non e configurato in questo ambiente.';
+    }
+    if (error.status === 503) return 'Il servizio richiesto non e configurato in questo ambiente.';
+    if (error.status === 502) return 'Il servizio esterno non ha risposto correttamente.';
     if (error.status === 401) return 'Sessione non valida.';
     if (error.status === 403) return 'Non hai accesso a Binocolo.';
     return `Richiesta non riuscita (${error.status}).`;
@@ -211,6 +247,19 @@ function appendSearchParam(
   if (normalized) params.set(key, normalized);
 }
 
+function splitKeywords(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function positiveInteger(value: string, fallback: number, min: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(parsed)));
+}
+
 function companyFilterSummary(filters: CompanySearchFilters): string {
   const parts: string[] = [];
   const province = normalizeProvinceInput(filters.province);
@@ -229,9 +278,12 @@ function companyFilterSummary(filters: CompanySearchFilters): string {
 
 export function TestPage() {
   const api = useApiClient();
+  const [activeTab, setActiveTab] = useState<TestTab>('company');
   const [companyFilters, setCompanyFilters] = useState<CompanySearchFilters>(defaultCompanyFilters);
   const [companyDryRun, setCompanyDryRun] = useState(true);
   const [companyForceRefresh, setCompanyForceRefresh] = useState(false);
+  const [domainForm, setDomainForm] = useState<DomainResolutionForm>(defaultDomainResolutionForm);
+  const [keywordForm, setKeywordForm] = useState<KeywordEvidenceForm>(defaultKeywordEvidenceForm);
 
   const companySearch = useMutation({
     mutationFn: (forceRefresh: boolean = companyForceRefresh) => {
@@ -262,6 +314,27 @@ export function TestPage() {
   });
   const regenerateBriefs = useMutation({
     mutationFn: () => api.post<{ regenerated: number }>('/binocolo/v1/ma/deep/regenerate-briefs', {}),
+  });
+  const domainResolution = useMutation({
+    mutationFn: () =>
+      api.post<DomainResolutionResponse>('/binocolo/v1/test/domain-resolution', {
+        companyName: domainForm.companyName.trim(),
+        vatCode: domainForm.vatCode.trim() || undefined,
+        taxCode: domainForm.taxCode.trim() || undefined,
+        town: domainForm.town.trim() || undefined,
+        province: domainForm.province.trim().toUpperCase() || undefined,
+        keywords: splitKeywords(domainForm.keywords),
+        count: positiveInteger(domainForm.count, 10, 1, 20),
+      }),
+  });
+  const keywordEvidence = useMutation({
+    mutationFn: () =>
+      api.post<WebSearchResponse>('/binocolo/v1/web-search', {
+        domain: keywordForm.domain.trim(),
+        keywords: splitKeywords(keywordForm.keywords),
+        count: positiveInteger(keywordForm.count, 10, 1, 50),
+        rank: keywordForm.rank,
+      }),
   });
 
   const companyData = companySearch.data?.data;
@@ -297,15 +370,66 @@ export function TestPage() {
     companySearch.mutate(companyForceRefresh);
   }
 
+  function handleDomainFieldChange(field: DomainResolutionField) {
+    return (event: ChangeEvent<HTMLInputElement>) => {
+      setDomainForm((current) => ({ ...current, [field]: event.target.value }));
+      domainResolution.reset();
+    };
+  }
+
+  function handleDomainSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    domainResolution.mutate();
+  }
+
+  function useCandidateDomain(domain: string) {
+    setKeywordForm((current) => ({ ...current, domain }));
+    setActiveTab('keyword');
+  }
+
+  function handleKeywordFieldChange(field: KeywordEvidenceField) {
+    return (event: ChangeEvent<HTMLInputElement>) => {
+      setKeywordForm((current) => ({ ...current, [field]: event.target.value }));
+      keywordEvidence.reset();
+    };
+  }
+
+  function handleKeywordRankChange(value: boolean) {
+    setKeywordForm((current) => ({ ...current, rank: value }));
+    keywordEvidence.reset();
+  }
+
+  function handleKeywordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    keywordEvidence.mutate();
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Test</h1>
-          <p className={styles.pageSubtitle}>Verifica l'API di ricerca aziende.</p>
+          <p className={styles.pageSubtitle}>Laboratorio per API e funzioni sperimentali Binocolo.</p>
         </div>
       </div>
 
+      <div className={styles.tabBar} role="tablist" aria-label="Funzioni test">
+        {testTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={`${styles.tabButton} ${activeTab === tab.id ? styles.tabButtonActive : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <Icon name={tab.icon} size={15} />
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'company' ? (
       <section className={`${styles.panel} ${styles.companyPanel}`} aria-labelledby="companies-title">
         <div className={styles.panelHeader}>
           <div>
@@ -505,7 +629,304 @@ export function TestPage() {
           </>
         )}
       </section>
+      ) : null}
 
+      {activeTab === 'domain' ? (
+      <section className={`${styles.panel} ${styles.companyPanel}`} aria-labelledby="domain-title">
+        <div className={styles.panelHeader}>
+          <div>
+            <div className={styles.endpointLine}>
+              <span className={styles.method}>POST</span>
+              <span className={styles.path}>/binocolo/v1/test/domain-resolution</span>
+            </div>
+            <h2 id="domain-title" className={styles.sectionTitle}>Domain resolver</h2>
+          </div>
+          <form className={styles.companyForm} onSubmit={handleDomainSubmit}>
+            <div className={styles.filterGrid}>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Ragione sociale</span>
+                <input
+                  type="text"
+                  value={domainForm.companyName}
+                  onChange={handleDomainFieldChange('companyName')}
+                  autoComplete="off"
+                  spellCheck={false}
+                  required
+                />
+              </label>
+              <label className={styles.filterField}>
+                <span>Partita IVA</span>
+                <input
+                  type="text"
+                  value={domainForm.vatCode}
+                  onChange={handleDomainFieldChange('vatCode')}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className={styles.codeInput}
+                />
+              </label>
+              <label className={styles.filterField}>
+                <span>Codice fiscale</span>
+                <input
+                  type="text"
+                  value={domainForm.taxCode}
+                  onChange={handleDomainFieldChange('taxCode')}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className={styles.codeInput}
+                />
+              </label>
+              <label className={styles.filterField}>
+                <span>Comune</span>
+                <input type="text" value={domainForm.town} onChange={handleDomainFieldChange('town')} autoComplete="off" />
+              </label>
+              <label className={styles.filterField}>
+                <span>Provincia</span>
+                <input
+                  type="text"
+                  value={domainForm.province}
+                  onChange={handleDomainFieldChange('province')}
+                  maxLength={2}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  className={styles.codeInput}
+                />
+              </label>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Keyword contesto</span>
+                <input
+                  type="text"
+                  value={domainForm.keywords}
+                  onChange={handleDomainFieldChange('keywords')}
+                  placeholder="cloud, hosting, sistemistica"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+              <label className={styles.filterField}>
+                <span>Risultati Brave</span>
+                <input
+                  type="number"
+                  value={domainForm.count}
+                  onChange={handleDomainFieldChange('count')}
+                  min={1}
+                  max={20}
+                  step={1}
+                />
+              </label>
+            </div>
+            <div className={styles.formActions}>
+              <Button type="submit" loading={domainResolution.isPending} leftIcon={<Icon name="network" />}>
+                Risolvi dominio
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        {domainResolution.isIdle ? (
+          <div className={`${styles.statePanel} ${styles.companyState}`}>
+            <div className={styles.stateIcon}>
+              <Icon name="network" size={22} />
+            </div>
+            <p className={styles.stateTitle}>Resolver pronto</p>
+            <p className={styles.stateText}>Inserisci ragione sociale e identificativi per cercare domini candidati con Brave.</p>
+          </div>
+        ) : domainResolution.isPending ? (
+          <div className={styles.skeletonWrap}>
+            <Skeleton rows={5} />
+          </div>
+        ) : domainResolution.isError ? (
+          <div className={`${styles.statePanel} ${styles.companyState}`} role="alert">
+            <div className={styles.stateIcon}>
+              <Icon name="triangle-alert" size={22} />
+            </div>
+            <p className={styles.stateTitle}>Resolver non disponibile</p>
+            <p className={styles.stateText}>{errorLabel(domainResolution.error)}</p>
+          </div>
+        ) : (
+          <div className={styles.companyResult}>
+            <div className={styles.responseBar}>
+              <span>{domainResolution.data.candidates.length} domini candidati</span>
+              <span className={styles.path}>{domainResolution.data.query}</span>
+            </div>
+            {domainResolution.data.candidates.length > 0 ? (
+              <div className={styles.cardList}>
+                {domainResolution.data.candidates.map((candidate) => (
+                  <article key={candidate.domain} className={styles.resultCard}>
+                    <div className={styles.resultCardHead}>
+                      <div>
+                        <h3>{candidate.domain}</h3>
+                        <p>{candidate.reasons.join(', ') || 'Nessuna ragione forte'}</p>
+                      </div>
+                      <div className={styles.cardActions}>
+                        <span className={`${styles.scoreBadge} ${styles[`confidence_${candidate.confidence}`] ?? ''}`}>
+                          {candidate.score} · {candidate.confidence}
+                        </span>
+                        <Button variant="secondary" size="sm" onClick={() => useCandidateDomain(candidate.domain)}>
+                          Usa
+                        </Button>
+                      </div>
+                    </div>
+                    <div className={styles.evidenceList}>
+                      {candidate.results.slice(0, 3).map((result) => (
+                        <a key={result.url} href={result.url} target="_blank" rel="noreferrer" className={styles.evidenceItem}>
+                          <span>{result.title || result.url}</span>
+                          <small>{result.hostname}</small>
+                        </a>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className={`${styles.statePanel} ${styles.companyState}`}>
+                <div className={styles.stateIcon}>
+                  <Icon name="search" size={22} />
+                </div>
+                <p className={styles.stateTitle}>Nessun dominio candidato</p>
+                <p className={styles.stateText}>Prova con partita IVA, comune o keyword piu specifiche.</p>
+              </div>
+            )}
+            <div className={`${styles.rawBlock} ${styles.rawBlockSeparated}`}>
+              <span>Risposta</span>
+              <pre>{rawPreview(domainResolution.data)}</pre>
+            </div>
+          </div>
+        )}
+      </section>
+      ) : null}
+
+      {activeTab === 'keyword' ? (
+      <section className={`${styles.panel} ${styles.companyPanel}`} aria-labelledby="keyword-title">
+        <div className={styles.panelHeader}>
+          <div>
+            <div className={styles.endpointLine}>
+              <span className={styles.method}>POST</span>
+              <span className={styles.path}>/binocolo/v1/web-search</span>
+            </div>
+            <h2 id="keyword-title" className={styles.sectionTitle}>Keyword evidence</h2>
+          </div>
+          <form className={styles.companyForm} onSubmit={handleKeywordSubmit}>
+            <div className={styles.filterGrid}>
+              <label className={styles.filterField}>
+                <span>Dominio</span>
+                <input
+                  type="text"
+                  value={keywordForm.domain}
+                  onChange={handleKeywordFieldChange('domain')}
+                  placeholder="azienda.it"
+                  autoComplete="off"
+                  spellCheck={false}
+                  required
+                />
+              </label>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Keyword</span>
+                <input
+                  type="text"
+                  value={keywordForm.keywords}
+                  onChange={handleKeywordFieldChange('keywords')}
+                  placeholder="managed services, cloud, cybersecurity"
+                  autoComplete="off"
+                  spellCheck={false}
+                  required
+                />
+              </label>
+              <label className={styles.filterField}>
+                <span>Risultati</span>
+                <input
+                  type="number"
+                  value={keywordForm.count}
+                  onChange={handleKeywordFieldChange('count')}
+                  min={1}
+                  max={50}
+                  step={1}
+                />
+              </label>
+            </div>
+            <div className={styles.formActions}>
+              <label className={styles.dryRunField}>
+                <span>Rank AI</span>
+                <ToggleSwitch
+                  id="binocolo-keyword-rank"
+                  checked={keywordForm.rank}
+                  onChange={handleKeywordRankChange}
+                />
+              </label>
+              <Button type="submit" loading={keywordEvidence.isPending} leftIcon={<Icon name="search" />}>
+                Cerca evidenze
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        {keywordEvidence.isIdle ? (
+          <div className={`${styles.statePanel} ${styles.companyState}`}>
+            <div className={styles.stateIcon}>
+              <Icon name="search" size={22} />
+            </div>
+            <p className={styles.stateTitle}>Keyword evidence pronta</p>
+            <p className={styles.stateText}>Usa un dominio candidato e keyword settoriali per verificare snippet citabili.</p>
+          </div>
+        ) : keywordEvidence.isPending ? (
+          <div className={styles.skeletonWrap}>
+            <Skeleton rows={5} />
+          </div>
+        ) : keywordEvidence.isError ? (
+          <div className={`${styles.statePanel} ${styles.companyState}`} role="alert">
+            <div className={styles.stateIcon}>
+              <Icon name="triangle-alert" size={22} />
+            </div>
+            <p className={styles.stateTitle}>Ricerca non disponibile</p>
+            <p className={styles.stateText}>{errorLabel(keywordEvidence.error)}</p>
+          </div>
+        ) : (
+          <div className={styles.companyResult}>
+            <div className={styles.responseBar}>
+              <span>{keywordEvidence.data.results.length} risultati{keywordEvidence.data.ranked ? ' · ordinati per rilevanza' : ''}</span>
+              <span className={styles.path}>{keywordEvidence.data.query}</span>
+            </div>
+            {keywordEvidence.data.rankError ? (
+              <div className={styles.responseBar}>
+                <span>{keywordEvidence.data.rankError}</span>
+              </div>
+            ) : null}
+            {keywordEvidence.data.results.length > 0 ? (
+              <div className={styles.cardList}>
+                {keywordEvidence.data.results.map((result) => (
+                  <article key={result.url} className={styles.resultCard}>
+                    <div className={styles.resultCardHead}>
+                      <div>
+                        <h3>
+                          <a href={result.url} target="_blank" rel="noreferrer">{result.title || result.url}</a>
+                        </h3>
+                        <p>{result.hostname}{result.age ? ` · ${result.age}` : ''}</p>
+                      </div>
+                      {typeof result.score === 'number' ? <span className={styles.scoreBadge}>{result.score}</span> : null}
+                    </div>
+                    {result.snippets.length > 0 ? <p className={styles.snippetText}>{result.snippets.join(' ... ')}</p> : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className={`${styles.statePanel} ${styles.companyState}`}>
+                <div className={styles.stateIcon}>
+                  <Icon name="search" size={22} />
+                </div>
+                <p className={styles.stateTitle}>Nessuna evidenza</p>
+                <p className={styles.stateText}>Prova keyword diverse o un dominio candidato alternativo.</p>
+              </div>
+            )}
+            <div className={`${styles.rawBlock} ${styles.rawBlockSeparated}`}>
+              <span>Risposta</span>
+              <pre>{rawPreview(keywordEvidence.data)}</pre>
+            </div>
+          </div>
+        )}
+      </section>
+      ) : null}
+
+      {activeTab === 'maintenance' ? (
       <section className={styles.panel} aria-labelledby="maint-title">
         <div className={styles.panelHeader}>
           <div>
@@ -553,6 +974,7 @@ export function TestPage() {
           </div>
         ) : null}
       </section>
+      ) : null}
     </div>
   );
 }

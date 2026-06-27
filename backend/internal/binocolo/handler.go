@@ -114,6 +114,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/deep/regenerate-briefs", h.handleRegenerateMADeepBriefs)
 	handle("GET /binocolo/v1/companies/{vat}/dossier", h.handleGetCompanyDossier)
 	handle("POST /binocolo/v1/companies/{vat}/dossier", h.handleCreateCompanyDossier)
+	handle("POST /binocolo/v1/test/domain-resolution", h.handleTestDomainResolution)
 	handle("POST /binocolo/v1/web-search", h.handleWebSearch)
 	return runWorkers
 }
