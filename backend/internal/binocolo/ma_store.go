@@ -38,6 +38,7 @@ type maWorkspaceStore interface {
 	RecordMAExport(ctx context.Context, sessionID, format string, rowCount int, createdByEmail string) error
 	ListMAParameters(ctx context.Context) ([]MAParameter, error)
 	UpdateMAParameter(ctx context.Context, key, value, email string) error
+	ListMACompanyLegalForms(ctx context.Context) ([]maCompanyLegalForm, error)
 	ListMADeepAnalysis(ctx context.Context, companyKeys []string) (map[string]MADeepAnalysis, error)
 	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
 	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
@@ -45,6 +46,12 @@ type maWorkspaceStore interface {
 	GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRecord, error)
 	ListMADeepReadyForBrief(ctx context.Context) ([]maDeepBriefRow, error)
 	UpdateMADeepBrief(ctx context.Context, companyKey string, brief *MADeepBrief, modelID, promptID string) error
+}
+
+type maCompanyLegalForm struct {
+	Code          string
+	DescriptionIT string
+	DescriptionEN string
 }
 
 func (s *SQLStore) ListMASessions(ctx context.Context, visibility string) ([]MASessionSummary, error) {
@@ -136,6 +143,40 @@ func maSessionListClauses(visibility string) (string, string) {
 	default:
 		return "session.archived_at IS NULL AND session.deleted_at IS NULL", "session.updated_at DESC, session.created_at DESC"
 	}
+}
+
+func (s *SQLStore) ListMACompanyLegalForms(ctx context.Context) ([]maCompanyLegalForm, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT code, description_it, description_en
+FROM binocolo.company_legal_forms
+ORDER BY sort_order
+`)
+	if err != nil {
+		return nil, fmt.Errorf("list ma company legal forms: %w", err)
+	}
+	defer rows.Close()
+
+	out := []maCompanyLegalForm{}
+	for rows.Next() {
+		var item maCompanyLegalForm
+		if err := rows.Scan(&item.Code, &item.DescriptionIT, &item.DescriptionEN); err != nil {
+			return nil, fmt.Errorf("scan ma company legal form: %w", err)
+		}
+		item.Code = strings.ToUpper(strings.TrimSpace(item.Code))
+		item.DescriptionIT = cleanText(item.DescriptionIT, 180)
+		item.DescriptionEN = cleanText(item.DescriptionEN, 180)
+		if item.Code == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma company legal forms: %w", err)
+	}
+	return out, nil
 }
 
 func (s *SQLStore) CreateMASession(ctx context.Context, input maSessionCreate) (MASessionDetail, error) {

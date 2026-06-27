@@ -243,6 +243,8 @@ export interface MAStrategySpec {
   turnoverMax?: number;
   employeeMin?: number;
   employeeMax?: number;
+  revenuePerEmployeeMin?: number;
+  maxShareholders?: number;
   searchLimit: number;
   atecoCandidates: MAAtecoCandidate[];
   keywords: string[];

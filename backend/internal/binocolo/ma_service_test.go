@@ -968,6 +968,10 @@ func (f *fakeMAWorkspaceStore) UpdateMAParameter(context.Context, string, string
 	return nil
 }
 
+func (f *fakeMAWorkspaceStore) ListMACompanyLegalForms(context.Context) ([]maCompanyLegalForm, error) {
+	return nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) ListMADeepAnalysis(context.Context, []string) (map[string]MADeepAnalysis, error) {
 	return map[string]MADeepAnalysis{}, nil
 }

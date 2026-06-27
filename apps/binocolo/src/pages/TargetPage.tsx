@@ -239,7 +239,7 @@ export function TargetPage() {
     }
   }, [detail, lastSessionId, sortedTargets]);
 
-  // Sector gate (and viability knockout) land off-perimeter targets in
+  // Sector gate, viability knockout and hard post-filters land off-perimeter targets in
   // fuori_criterio; they are hidden by default, revealable via a toggle so the
   // filtering is never silent. Selection and the shortlist track the visible set.
   const visibleTargets = useMemo(
@@ -1539,6 +1539,8 @@ const PROVINCE_OPTIONS = provinces.map((item) => ({ value: item.code, label: `${
 const OPTIONAL_PERIMETER: { key: string; label: string }[] = [
   { key: 'turnover', label: 'Fatturato' },
   { key: 'employees', label: 'Dipendenti' },
+  { key: 'revenuePerEmployeeMin', label: 'Ricavo per dipendente' },
+  { key: 'maxShareholders', label: 'Numero soci' },
   { key: 'legalForms', label: 'Forme giuridiche' },
 ];
 
@@ -1553,7 +1555,12 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
   const weakCount = atecoCandidates.filter((item) => item.fit === 'weak').length;
   const excludedCount = atecoCandidates.filter((item) => item.fit === 'excluded').length;
 
-  function updateNumber(field: keyof Pick<MAStrategySpec, 'turnoverMin' | 'turnoverMax' | 'employeeMin' | 'employeeMax' | 'successionMinOwnerAge'>) {
+  function updateNumber(
+    field: keyof Pick<
+      MAStrategySpec,
+      'turnoverMin' | 'turnoverMax' | 'employeeMin' | 'employeeMax' | 'revenuePerEmployeeMin' | 'maxShareholders' | 'successionMinOwnerAge'
+    >,
+  ) {
     return (event: ChangeEvent<HTMLInputElement>) => {
       onChange({ [field]: optionalNumber(event.target.value) } as Partial<MAStrategySpec>);
     };
@@ -1565,6 +1572,10 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
         return strategy.turnoverMin != null || strategy.turnoverMax != null;
       case 'employees':
         return strategy.employeeMin != null || strategy.employeeMax != null;
+      case 'revenuePerEmployeeMin':
+        return strategy.revenuePerEmployeeMin != null;
+      case 'maxShareholders':
+        return strategy.maxShareholders != null;
       case 'legalForms':
         return (strategy.legalForms ?? []).length > 0;
       default:
@@ -1582,7 +1593,7 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
     <div className={styles.editorSections}>
       <section className={styles.editorSection}>
         <div className={styles.editorSectionTitle}>
-          <span>Perimetro <small>superficie di ricerca — guida count e costo</small></span>
+          <span>Perimetro <small>ricerca e post-filtri</small></span>
           {atecoCandidates.length > 0 && (
             <span className={styles.sectionHeaderBadge}>
               {atecoCandidates.length} codici ATECO · {coreCount} core · {weakCount} adiacenti · {excludedCount} esclusi
@@ -1616,6 +1627,30 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
             <label>
               <span>Dipendenti</span>
               <RangeInput minValue={strategy.employeeMin} maxValue={strategy.employeeMax} onMin={updateNumber('employeeMin')} onMax={updateNumber('employeeMax')} />
+            </label>
+          ) : null}
+          {isShown('revenuePerEmployeeMin') ? (
+            <label>
+              <span>Ricavo minimo / dipendente (€)</span>
+              <input
+                type="number"
+                min={0}
+                value={strategy.revenuePerEmployeeMin ?? ''}
+                onChange={updateNumber('revenuePerEmployeeMin')}
+                placeholder="min"
+              />
+            </label>
+          ) : null}
+          {isShown('maxShareholders') ? (
+            <label>
+              <span>Numero massimo soci</span>
+              <input
+                type="number"
+                min={0}
+                value={strategy.maxShareholders ?? ''}
+                onChange={updateNumber('maxShareholders')}
+                placeholder="max"
+              />
             </label>
           ) : null}
           {isShown('legalForms') ? (
@@ -1791,6 +1826,20 @@ function buildPerimeterChips(strategy: MAStrategySpec): PerimeterChip[] {
       hint: 'Filtro applicato alla ricerca: le aziende senza dato addetti vengono escluse.',
     });
   }
+  if (strategy.revenuePerEmployeeMin != null) {
+    chips.push({
+      key: 'revenuePerEmployeeMin',
+      label: `Ricavo/dip ≥ ${moneyCompact.format(strategy.revenuePerEmployeeMin)}`,
+      hint: 'Post-filtro sui risultati: richiede fatturato e dipendenti valutabili.',
+    });
+  }
+  if (strategy.maxShareholders != null) {
+    chips.push({
+      key: 'maxShareholders',
+      label: `Soci ≤ ${numberFormat.format(strategy.maxShareholders)}`,
+      hint: 'Post-filtro sui risultati: richiede elenco soci valutabile.',
+    });
+  }
   const forms = strategy.legalForms ?? [];
   if (forms.length > 0) {
     chips.push({ key: 'forms', label: `${forms.length > 1 ? 'Forme' : 'Forma'} ${forms.join(', ')}` });
@@ -1806,10 +1855,9 @@ function buildPerimeterChips(strategy: MAStrategySpec): PerimeterChip[] {
   return chips;
 }
 
-// AppliedPerimeter surfaces the hard filters that produced a count / result set
-// — the perimeter is applied server-side at OpenAPI.it, so this is the only place
-// the operator sees what was (silently) excluded. Feed it the persisted strategy
-// version that generated the numbers, not the editable draft.
+// AppliedPerimeter surfaces the hard search filters and result post-filters that
+// produced the current target set. Feed it the persisted strategy version that
+// generated the numbers, not the editable draft.
 function AppliedPerimeter({ strategy }: { strategy: MAStrategySpec }) {
   const chips = buildPerimeterChips(strategy);
   if (chips.length === 0) return null;
@@ -2584,6 +2632,8 @@ function strategyKey(strategy: MAStrategySpec): string {
     turnoverMax: strategy.turnoverMax ?? null,
     employeeMin: strategy.employeeMin ?? null,
     employeeMax: strategy.employeeMax ?? null,
+    revenuePerEmployeeMin: strategy.revenuePerEmployeeMin ?? null,
+    maxShareholders: strategy.maxShareholders ?? null,
     searchLimit: normalizeSearchLimit(strategy.searchLimit),
     atecoCandidates: strategy.atecoCandidates,
     keywords: strategy.keywords,

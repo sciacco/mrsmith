@@ -71,6 +71,12 @@ func validateMAStrategy(input MAStrategySpec) (MAStrategySpec, error) {
 	if err := validateOptionalRange(strategy.EmployeeMin, strategy.EmployeeMax, "employees"); err != nil {
 		return MAStrategySpec{}, err
 	}
+	if err := validateOptionalInt(strategy.RevenuePerEmployeeMin, "revenue per employee min"); err != nil {
+		return MAStrategySpec{}, err
+	}
+	if err := validateOptionalInt(strategy.MaxShareholders, "max shareholders"); err != nil {
+		return MAStrategySpec{}, err
+	}
 	strategy.SearchLimit = normalizeMASearchLimit(strategy.SearchLimit)
 
 	candidates := make([]MAAtecoCandidate, 0, len(strategy.AtecoCandidates))
@@ -108,6 +114,218 @@ func validateMAStrategy(input MAStrategySpec) (MAStrategySpec, error) {
 	strategy.SignalWeights = normalizeMASignalWeights(strategy.SignalWeights)
 
 	return strategy, nil
+}
+
+func validateIntentSpans(intent MAIntent, promptText string) MAIntent {
+	promptNorm := normalizeMAIntentSpanText(promptText)
+
+	intent.Sectors.Include = filterMAIntentTextConstraints(intent.Sectors.Include, promptNorm)
+	intent.Sectors.Exclude = filterMAIntentTextConstraints(intent.Sectors.Exclude, promptNorm)
+	intent.AtecoExplicit = filterMAIntentAtecoConstraints(intent.AtecoExplicit, promptNorm)
+	intent.Territory.IncludeRegions = filterMAIntentTerritoryConstraints(intent.Territory.IncludeRegions, promptNorm)
+	intent.Territory.IncludeProvinces = filterMAIntentTerritoryConstraints(intent.Territory.IncludeProvinces, promptNorm)
+	intent.Territory.ExcludeProvinces = filterMAIntentTerritoryConstraints(intent.Territory.ExcludeProvinces, promptNorm)
+	intent.Turnover = validateMAIntentNumericConstraint(intent.Turnover, promptNorm)
+	intent.Employees = validateMAIntentNumericConstraint(intent.Employees, promptNorm)
+	intent.LegalForms = filterMAIntentTextConstraints(intent.LegalForms, promptNorm)
+	intent.OwnerAge = validateMAIntentNumericConstraint(intent.OwnerAge, promptNorm)
+	intent.Status = validateMAIntentStatusConstraint(intent.Status, promptNorm)
+	intent.RevenuePerEmployeeMin = validateMAIntentValueConstraint(intent.RevenuePerEmployeeMin, promptNorm)
+	intent.MaxShareholders = validateMAIntentValueConstraint(intent.MaxShareholders, promptNorm)
+	intent.Constraints = filterMAIntentAdditionalConstraints(intent.Constraints, promptNorm)
+
+	return intent
+}
+
+func filterMAIntentTextConstraints(items []MAIntentTextConstraint, promptNorm string) []MAIntentTextConstraint {
+	out := make([]MAIntentTextConstraint, 0, len(items))
+	for _, item := range items {
+		text := cleanText(item.Text, 180)
+		if text == "" || !maIntentSourceTextValid(item.SourceText, promptNorm) {
+			continue
+		}
+		item.Text = text
+		item.SourceText = cleanText(item.SourceText, 400)
+		item.Disposition = cleanText(item.Disposition, 80)
+		out = append(out, item)
+	}
+	return out
+}
+
+func filterMAIntentAtecoConstraints(items []MAIntentAtecoConstraint, promptNorm string) []MAIntentAtecoConstraint {
+	out := make([]MAIntentAtecoConstraint, 0, len(items))
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		code := normalizeAtecoCode(item.Code)
+		if code == "" || !maIntentSourceTextValid(item.SourceText, promptNorm) {
+			continue
+		}
+		key := atecoSearchCode(code)
+		if key == "" {
+			continue
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		item.Code = code
+		item.Description = cleanText(item.Description, 180)
+		item.Fit = normalizeMAFit(item.Fit)
+		item.SourceText = cleanText(item.SourceText, 400)
+		item.Disposition = cleanText(item.Disposition, 80)
+		out = append(out, item)
+	}
+	return out
+}
+
+func filterMAIntentTerritoryConstraints(items []MAIntentTerritoryConstraint, promptNorm string) []MAIntentTerritoryConstraint {
+	out := make([]MAIntentTerritoryConstraint, 0, len(items))
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		value := cleanText(item.Value, 120)
+		if value == "" || !maIntentSourceTextValid(item.SourceText, promptNorm) {
+			continue
+		}
+		key := strings.ToLower(value)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		item.Value = value
+		item.SourceText = cleanText(item.SourceText, 400)
+		item.Disposition = cleanText(item.Disposition, 80)
+		out = append(out, item)
+	}
+	return out
+}
+
+func validateMAIntentNumericConstraint(item *MAIntentNumericConstraint, promptNorm string) *MAIntentNumericConstraint {
+	if item == nil || !maIntentNumericHasValue(item) || !maIntentSourceTextValid(item.SourceText, promptNorm) {
+		return nil
+	}
+	item.Mode = cleanText(item.Mode, 40)
+	item.Unit = cleanText(item.Unit, 40)
+	item.SourceText = cleanText(item.SourceText, 400)
+	item.Disposition = cleanText(item.Disposition, 80)
+	return item
+}
+
+func maIntentNumericHasValue(item *MAIntentNumericConstraint) bool {
+	return item != nil && (item.Min != nil || item.Max != nil || item.Around != nil)
+}
+
+func validateMAIntentStatusConstraint(item *MAIntentStatusConstraint, promptNorm string) *MAIntentStatusConstraint {
+	if item == nil || cleanText(item.Value, 80) == "" || !maIntentSourceTextValid(item.SourceText, promptNorm) {
+		return nil
+	}
+	item.Value = cleanText(item.Value, 80)
+	item.SourceText = cleanText(item.SourceText, 400)
+	item.Disposition = cleanText(item.Disposition, 80)
+	return item
+}
+
+func validateMAIntentValueConstraint(item *MAIntentValueConstraint, promptNorm string) *MAIntentValueConstraint {
+	if item == nil || item.Value == nil || !maIntentSourceTextValid(item.SourceText, promptNorm) {
+		return nil
+	}
+	item.SourceText = cleanText(item.SourceText, 400)
+	item.Disposition = cleanText(item.Disposition, 80)
+	return item
+}
+
+func filterMAIntentAdditionalConstraints(items []MAIntentAdditionalConstraint, promptNorm string) []MAIntentAdditionalConstraint {
+	out := make([]MAIntentAdditionalConstraint, 0, len(items))
+	for _, item := range items {
+		if !maIntentSourceTextValid(item.SourceText, promptNorm) {
+			continue
+		}
+		item.Kind = cleanText(item.Kind, 80)
+		item.Text = cleanText(item.Text, 240)
+		if item.Kind == "" && item.Text == "" {
+			continue
+		}
+		item.SourceText = cleanText(item.SourceText, 400)
+		item.Disposition = cleanText(item.Disposition, 80)
+		if item.Disposition == "" {
+			item.Disposition = "unsupported"
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func maIntentSourceTextValid(sourceText, promptNorm string) bool {
+	sourceNorm := normalizeMAIntentSpanText(sourceText)
+	return sourceNorm != "" && promptNorm != "" && strings.Contains(promptNorm, sourceNorm)
+}
+
+func normalizeMAIntentSpanText(value string) string {
+	var b strings.Builder
+	for _, r := range value {
+		if unicode.IsSpace(r) {
+			continue
+		}
+		b.WriteRune(unicode.ToLower(r))
+	}
+	return b.String()
+}
+
+func normalizeMAFoldKey(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	var b strings.Builder
+	lastSpace := false
+	for _, r := range value {
+		folded := maFoldRune(r)
+		if folded == "" {
+			if !lastSpace && b.Len() > 0 {
+				b.WriteByte(' ')
+				lastSpace = true
+			}
+			continue
+		}
+		for _, fr := range folded {
+			if unicode.IsLetter(fr) || unicode.IsDigit(fr) {
+				b.WriteRune(fr)
+				lastSpace = false
+				continue
+			}
+			if !lastSpace && b.Len() > 0 {
+				b.WriteByte(' ')
+				lastSpace = true
+			}
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+func normalizeMACompactKey(value string) string {
+	return strings.ReplaceAll(normalizeMAFoldKey(value), " ", "")
+}
+
+func maFoldRune(r rune) string {
+	switch r {
+	case 'à', 'á', 'â', 'ã', 'ä', 'å':
+		return "a"
+	case 'è', 'é', 'ê', 'ë':
+		return "e"
+	case 'ì', 'í', 'î', 'ï':
+		return "i"
+	case 'ò', 'ó', 'ô', 'õ', 'ö':
+		return "o"
+	case 'ù', 'ú', 'û', 'ü':
+		return "u"
+	case 'ç':
+		return "c"
+	case 'ñ':
+		return "n"
+	case 'ß':
+		return "ss"
+	default:
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return string(r)
+		}
+		return ""
+	}
 }
 
 func normalizeMASearchLimit(value int) int {
@@ -234,6 +452,13 @@ func validateOptionalRange(min, max *int, label string) error {
 	}
 	if min != nil && max != nil && *min > *max {
 		return fmt.Errorf("%w: %s range", errMAStrategyInvalid, label)
+	}
+	return nil
+}
+
+func validateOptionalInt(value *int, label string) error {
+	if value != nil && *value < 0 {
+		return fmt.Errorf("%w: %s", errMAStrategyInvalid, label)
 	}
 	return nil
 }

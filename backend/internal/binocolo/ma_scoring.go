@@ -150,6 +150,9 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScor
 				Weight:    math.Round(weight*10) / 10,
 			})
 		}
+		postFilterEvidence, postFilterMissing, postFilterOut := maPostFilterEvidence(contexts[i])
+		evidence = append(evidence, postFilterEvidence...)
+		missing = append(missing, postFilterMissing...)
 
 		coverage := 0.0
 		if intendedWeight > 0 {
@@ -169,7 +172,7 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScor
 		// Sector gate and viability knockout both land the target in fuori_criterio
 		// (hidden by default in the UI). The gate is sector-only; it does not touch
 		// the score, so a revealed off-sector row still shows what it would score.
-		if knockout || sectorOut {
+		if knockout || sectorOut || postFilterOut {
 			targets[i].MatchState = maMatchStateOutside
 		} else {
 			targets[i].MatchState = maMatchStateFromConfidence(confidence)
@@ -225,6 +228,103 @@ func maMatchStateFromConfidence(confidence string) string {
 		return maMatchStateMatch
 	}
 	return maMatchStatePartial
+}
+
+const (
+	maPostFilterRevenuePerEmployeeMin = "revenue_per_employee_min"
+	maPostFilterMaxShareholders       = "max_shareholders"
+)
+
+func maPostFilterEvidence(c maSignalContext) ([]MATargetEvidence, []string, bool) {
+	evidence := make([]MATargetEvidence, 0, 2)
+	missing := make([]string, 0, 2)
+	outside := false
+
+	if c.strategy.RevenuePerEmployeeMin != nil {
+		item, missingText, itemOutside := maRevenuePerEmployeeMinEvidence(c, *c.strategy.RevenuePerEmployeeMin)
+		evidence = append(evidence, item)
+		if missingText != "" {
+			missing = append(missing, missingText)
+		}
+		outside = outside || itemOutside
+	}
+	if c.strategy.MaxShareholders != nil {
+		item, missingText, itemOutside := maMaxShareholdersEvidence(c, *c.strategy.MaxShareholders)
+		evidence = append(evidence, item)
+		if missingText != "" {
+			missing = append(missing, missingText)
+		}
+		outside = outside || itemOutside
+	}
+
+	return evidence, missing, outside
+}
+
+func maRevenuePerEmployeeMinEvidence(c maSignalContext, min int) (MATargetEvidence, string, bool) {
+	evidence := MATargetEvidence{
+		Criterion: maPostFilterRevenuePerEmployeeMin,
+		Family:    maFamilyEconomic,
+		Label:     "Ricavo per dipendente minimo",
+	}
+	turnover, hasTurnover := maPositiveInt(c.fin.Turnover, c.target.Turnover)
+	employees, hasEmployees := maPositiveInt(c.fin.Employees, c.target.Employees)
+	if !hasTurnover || !hasEmployees {
+		reason := maRevenuePerEmployeeMissingReason(hasTurnover, hasEmployees)
+		evidence.Status = maEvidenceMissing
+		evidence.Value = reason
+		return evidence, "Ricavo/dipendente non valutabile: " + reason, false
+	}
+
+	ratio := float64(turnover) / float64(employees)
+	evidence.Value = fmt.Sprintf("%.0f €/dip (min %d)", ratio, min)
+	if ratio < float64(min) {
+		evidence.Status = maEvidenceOutside
+		return evidence, "", true
+	}
+	evidence.Status = maEvidenceMatch
+	return evidence, "", false
+}
+
+func maRevenuePerEmployeeMissingReason(hasTurnover, hasEmployees bool) string {
+	switch {
+	case !hasTurnover && !hasEmployees:
+		return "fatturato/dipendenti non disponibili"
+	case !hasTurnover:
+		return "fatturato non disponibile"
+	default:
+		return "dipendenti non disponibili"
+	}
+}
+
+func maMaxShareholdersEvidence(c maSignalContext, max int) (MATargetEvidence, string, bool) {
+	evidence := MATargetEvidence{
+		Criterion: maPostFilterMaxShareholders,
+		Family:    maFamilyDeal,
+		Label:     "Numero massimo soci",
+	}
+	count := len(c.holders)
+	if count <= 0 {
+		evidence.Status = maEvidenceMissing
+		evidence.Value = "soci non disponibili"
+		return evidence, "Numero soci non valutabile", false
+	}
+
+	evidence.Value = fmt.Sprintf("%d soci (max %d)", count, max)
+	if count > max {
+		evidence.Status = maEvidenceOutside
+		return evidence, "", true
+	}
+	evidence.Status = maEvidenceMatch
+	return evidence, "", false
+}
+
+func maPositiveInt(values ...*int) (int, bool) {
+	for _, value := range values {
+		if value != nil && *value > 0 {
+			return *value, true
+		}
+	}
+	return 0, false
 }
 
 const (

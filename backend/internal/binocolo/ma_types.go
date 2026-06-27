@@ -92,6 +92,8 @@ const (
 	maEvidenceOutside = "fuori_criterio"
 
 	maModelScopeStrategy             = "ma_strategy"
+	maModelScopeStrategyIntent       = "ma_strategy_intent"
+	maModelScopeStrategyAteco        = "ma_strategy_ateco"
 	maModelScopeSectorClassification = "ma_sector_classification"
 	maModelScopeDeepBrief            = "ma_deep_brief"
 	maModelScopeWebSearchScorer      = "web_search_scorer"
@@ -275,6 +277,8 @@ type MAStrategySpec struct {
 	TurnoverMax            *int                 `json:"turnoverMax,omitempty"`
 	EmployeeMin            *int                 `json:"employeeMin,omitempty"`
 	EmployeeMax            *int                 `json:"employeeMax,omitempty"`
+	RevenuePerEmployeeMin  *int                 `json:"revenuePerEmployeeMin,omitempty"`
+	MaxShareholders        *int                 `json:"maxShareholders,omitempty"`
 	SearchLimit            int                  `json:"searchLimit"`
 	AtecoCandidates        []MAAtecoCandidate   `json:"atecoCandidates"`
 	Keywords               []string             `json:"keywords"`
@@ -315,6 +319,86 @@ type MAStrategySpec struct {
 	// iterates these codes instead of dropping the ATECO filter entirely (which
 	// retrieved the whole provincial economy). Empty for sector-less strategies.
 	ExpandedAtecoCandidates []MAAtecoCandidate `json:"-"`
+}
+
+// MAIntent is the structured, trace-only intermediate contract for the M&A
+// strategy v2 pipeline. Every field that can become a search, exclusion, or
+// scoring constraint carries sourceText so validateIntentSpans can enforce that
+// the constraint is grounded in the original analyst request.
+type MAIntent struct {
+	Title                 string                         `json:"title,omitempty"`
+	Territory             MAIntentTerritory              `json:"territory,omitempty"`
+	AtecoExplicit         []MAIntentAtecoConstraint      `json:"atecoExplicit,omitempty"`
+	Sectors               MAIntentSectors                `json:"sectors,omitempty"`
+	Turnover              *MAIntentNumericConstraint     `json:"turnover,omitempty"`
+	Employees             *MAIntentNumericConstraint     `json:"employees,omitempty"`
+	LegalForms            []MAIntentTextConstraint       `json:"legalForms,omitempty"`
+	OwnerAge              *MAIntentNumericConstraint     `json:"ownerAge,omitempty"`
+	Status                *MAIntentStatusConstraint      `json:"status,omitempty"`
+	RevenuePerEmployeeMin *MAIntentValueConstraint       `json:"revenuePerEmployeeMin,omitempty"`
+	MaxShareholders       *MAIntentValueConstraint       `json:"maxShareholders,omitempty"`
+	Constraints           []MAIntentAdditionalConstraint `json:"constraints,omitempty"`
+	Thesis                string                         `json:"thesis,omitempty"`
+}
+
+type MAIntentTerritory struct {
+	IncludeRegions   []MAIntentTerritoryConstraint `json:"includeRegions,omitempty"`
+	IncludeProvinces []MAIntentTerritoryConstraint `json:"includeProvinces,omitempty"`
+	ExcludeProvinces []MAIntentTerritoryConstraint `json:"excludeProvinces,omitempty"`
+}
+
+type MAIntentTerritoryConstraint struct {
+	Value       string `json:"value"`
+	SourceText  string `json:"sourceText"`
+	Disposition string `json:"disposition,omitempty"`
+}
+
+type MAIntentAtecoConstraint struct {
+	Code        string `json:"code"`
+	Description string `json:"description,omitempty"`
+	Fit         string `json:"fit,omitempty"`
+	SourceText  string `json:"sourceText"`
+	Disposition string `json:"disposition,omitempty"`
+}
+
+type MAIntentSectors struct {
+	Include []MAIntentTextConstraint `json:"include,omitempty"`
+	Exclude []MAIntentTextConstraint `json:"exclude,omitempty"`
+}
+
+type MAIntentTextConstraint struct {
+	Text        string `json:"text"`
+	SourceText  string `json:"sourceText"`
+	Disposition string `json:"disposition,omitempty"`
+}
+
+type MAIntentNumericConstraint struct {
+	Mode        string `json:"mode,omitempty"`
+	Min         *int   `json:"min,omitempty"`
+	Max         *int   `json:"max,omitempty"`
+	Around      *int   `json:"around,omitempty"`
+	Unit        string `json:"unit,omitempty"`
+	SourceText  string `json:"sourceText"`
+	Disposition string `json:"disposition,omitempty"`
+}
+
+type MAIntentStatusConstraint struct {
+	Value       string `json:"value"`
+	SourceText  string `json:"sourceText"`
+	Disposition string `json:"disposition,omitempty"`
+}
+
+type MAIntentValueConstraint struct {
+	Value       *int   `json:"value,omitempty"`
+	SourceText  string `json:"sourceText"`
+	Disposition string `json:"disposition,omitempty"`
+}
+
+type MAIntentAdditionalConstraint struct {
+	Kind        string `json:"kind,omitempty"`
+	Disposition string `json:"disposition"`
+	Text        string `json:"text"`
+	SourceText  string `json:"sourceText,omitempty"`
 }
 
 type MAAtecoCandidate struct {

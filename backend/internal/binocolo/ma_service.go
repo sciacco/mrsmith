@@ -333,9 +333,41 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	if prompt == "" {
 		return MASessionDetail{}, fmt.Errorf("%w: prompt", errMAStrategyInvalid)
 	}
-	strategy, audit, err := s.draftStrategy(ctx, prompt, req.ModelID, req.PromptID, subject, email)
-	if err != nil {
+	pipeline := s.loadMAStrategyPipeline(ctx)
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_strategy_pipeline_selected",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"pipeline":      pipeline,
+			"parameter_key": maStrategyPipelineParameter,
+		}),
+	}); err != nil {
 		return MASessionDetail{}, err
+	}
+
+	var strategy MAStrategySpec
+	var audits []llm.CallAudit
+	if pipeline == maStrategyPipelineMonolith {
+		strategyAudit := llm.CallAudit{}
+		var err error
+		strategy, strategyAudit, err = s.draftStrategy(ctx, prompt, req.ModelID, req.PromptID, subject, email)
+		if err != nil {
+			return MASessionDetail{}, err
+		}
+		audits = append(audits, strategyAudit)
+	} else {
+		intent, intentAudit, err := s.extractIntent(ctx, prompt, subject, email)
+		if err != nil {
+			return MASessionDetail{}, err
+		}
+		audits = append(audits, intentAudit)
+
+		resolveAudits := []llm.CallAudit{}
+		strategy, resolveAudits, err = s.resolveIntent(ctx, prompt, intent, subject, email)
+		audits = append(audits, resolveAudits...)
+		if err != nil {
+			return MASessionDetail{}, err
+		}
 	}
 	title := strategy.Title
 	if title == "" {
@@ -372,32 +404,81 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	}); err != nil {
 		return MASessionDetail{}, err
 	}
-	auditCtx := map[string]string{"session_id": detail.Session.ID}
 	strategyVersionID := ""
 	if detail.Strategy != nil {
 		strategyVersionID = detail.Strategy.ID
-		auditCtx["strategy_version_id"] = strategyVersionID
 	}
-	if raw, marshalErr := json.Marshal(auditCtx); marshalErr == nil {
-		audit.Context = raw
-	}
-	if err := s.llmp.RecordAudit(ctx, audit); err != nil {
-		return MASessionDetail{}, err
-	}
-	if err := s.traceEvent(ctx, maTraceEventWrite{
-		EventType: "ma_model_audit_recorded",
-		Status:    maTraceEventSucceeded,
-		Metadata: maTraceJSON(map[string]any{
-			"scope":               audit.Scope,
-			"model_id":            audit.ModelID,
-			"prompt_id":           audit.PromptID,
-			"session_id":          detail.Session.ID,
-			"strategy_version_id": strategyVersionID,
-		}),
-	}); err != nil {
+	if err := s.recordMAStrategyAudits(ctx, audits, detail.Session.ID, strategyVersionID); err != nil {
 		return MASessionDetail{}, err
 	}
 	return decorateMACost(detail, s.loadPricing(ctx)), nil
+}
+
+const (
+	maStrategyPipelineParameter = "ma_strategy_pipeline"
+	maStrategyPipelineV2        = "v2"
+	maStrategyPipelineMonolith  = "monolith"
+)
+
+func (s *maService) loadMAStrategyPipeline(ctx context.Context) string {
+	if s.store == nil {
+		return maStrategyPipelineV2
+	}
+	params, err := s.store.ListMAParameters(ctx)
+	if err != nil {
+		return maStrategyPipelineV2
+	}
+	for _, param := range params {
+		if param.Key != maStrategyPipelineParameter {
+			continue
+		}
+		switch param.Value {
+		case maStrategyPipelineMonolith:
+			return maStrategyPipelineMonolith
+		case maStrategyPipelineV2:
+			return maStrategyPipelineV2
+		default:
+			return maStrategyPipelineV2
+		}
+	}
+	return maStrategyPipelineV2
+}
+
+func (s *maService) recordMAStrategyAudits(ctx context.Context, audits []llm.CallAudit, sessionID, strategyVersionID string) error {
+	if len(audits) == 0 {
+		return nil
+	}
+	if s.llmp == nil {
+		return errMAOpenRouterUnavailable
+	}
+	auditCtx := map[string]string{
+		"session_id":          sessionID,
+		"strategy_version_id": strategyVersionID,
+	}
+	raw, err := json.Marshal(auditCtx)
+	if err != nil {
+		return err
+	}
+	for _, audit := range audits {
+		audit.Context = raw
+		if err := s.llmp.RecordAudit(ctx, audit); err != nil {
+			return err
+		}
+		if err := s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_model_audit_recorded",
+			Status:    maTraceEventSucceeded,
+			Metadata: maTraceJSON(map[string]any{
+				"scope":               audit.Scope,
+				"model_id":            audit.ModelID,
+				"prompt_id":           audit.PromptID,
+				"session_id":          sessionID,
+				"strategy_version_id": strategyVersionID,
+			}),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // enqueueEstimate is the synchronous half of the estimate flow: validate the
@@ -1139,6 +1220,1290 @@ func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, em
 		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "candidates": len(candidates), "enqueued": enqueued, "projected_cost": projected}),
 	})
 	return s.getSession(ctx, sessionID)
+}
+
+func (s *maService) extractIntent(ctx context.Context, prompt, subject, email string) (MAIntent, llm.CallAudit, error) {
+	if s.llmp == nil {
+		return MAIntent{}, llm.CallAudit{}, errMAOpenRouterUnavailable
+	}
+	modelConfig, err := s.llmp.ResolveModel(ctx, maModelScopeStrategyIntent, "")
+	if err != nil {
+		return MAIntent{}, llm.CallAudit{}, llmConfigError(err)
+	}
+	promptConfig, err := s.llmp.ResolvePrompt(ctx, maModelScopeStrategyIntent, "")
+	if err != nil {
+		return MAIntent{}, llm.CallAudit{}, llmConfigError(err)
+	}
+	client, err := s.llmp.ClientForModel(ctx, modelConfig)
+	if err != nil {
+		return MAIntent{}, llm.CallAudit{}, llmConfigError(err)
+	}
+	reqParams := modelConfig.RawParams()
+	if _, ok := reqParams["max_tokens"]; !ok {
+		reqParams["max_tokens"] = 2400
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_intent_extract_config",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"model_id":     modelConfig.ID,
+			"model_scope":  modelConfig.Scope,
+			"model":        modelConfig.Model,
+			"prompt_id":    promptConfig.ID,
+			"prompt_scope": promptConfig.Scope,
+			"prompt_name":  promptConfig.Name,
+			"prompt":       promptConfig.Prompt,
+		}),
+	}); err != nil {
+		return MAIntent{}, llm.CallAudit{}, err
+	}
+	req := llm.ChatRequest{
+		Model:          modelConfig.Model,
+		Params:         reqParams,
+		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+		Messages: []llm.Message{
+			{Role: "system", Content: promptConfig.Prompt},
+			{Role: "user", Content: prompt},
+		},
+		Tools: nil,
+	}
+	requestBody, err := llm.BuildRequestBody(req)
+	if err != nil {
+		return MAIntent{}, llm.CallAudit{}, err
+	}
+	requestRaw, _ := json.Marshal(requestBody)
+
+	start := time.Now()
+	response, err := client.Chat(ctx, req)
+	duration := maTraceDuration(start)
+	usageRaw, _ := json.Marshal(response.Usage)
+	audit := llm.CallAudit{
+		App:          maApp,
+		Scope:        maModelScopeStrategyIntent,
+		ProviderID:   modelConfig.ProviderID,
+		ModelID:      modelConfig.ID,
+		PromptID:     promptConfig.ID,
+		Model:        modelConfig.Model,
+		Request:      requestRaw,
+		Usage:        usageRaw,
+		ActorSubject: subject,
+		ActorEmail:   email,
+		DurationMS:   duration,
+	}
+	if err != nil {
+		audit.Status = "failed"
+		audit.ErrorMessage = err.Error()
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType:      "ma_intent_extract_chat",
+			ExternalSystem: "openrouter",
+			Status:         maTraceEventFailed,
+			DurationMS:     duration,
+			Request:        requestRaw,
+			Error:          err.Error(),
+		})
+		return MAIntent{}, audit, err
+	}
+	responseRaw := json.RawMessage([]byte(strings.TrimSpace(response.Content)))
+	audit.Response = responseRaw
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType:      "ma_intent_extract_chat",
+		ExternalSystem: "openrouter",
+		Status:         maTraceEventSucceeded,
+		DurationMS:     duration,
+		Request:        requestRaw,
+		Response:       maTraceJSON(response),
+		Metadata:       maTraceJSON(map[string]any{"response_id": response.ID, "response_model": response.Model}),
+	}); err != nil {
+		return MAIntent{}, audit, err
+	}
+
+	intent, err := decodeMAIntentResponse(responseRaw, prompt)
+	if err != nil {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_intent_extract_decode",
+			Status:    maTraceEventFailed,
+			Response:  maTraceJSON(responseRaw),
+			Error:     err.Error(),
+		})
+		return MAIntent{}, audit, err
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_intent_extract_decode",
+		Status:    maTraceEventSucceeded,
+		Response:  maTraceJSON(intent),
+	}); err != nil {
+		return MAIntent{}, audit, err
+	}
+	return intent, audit, nil
+}
+
+func decodeMAIntentResponse(responseRaw json.RawMessage, promptText string) (MAIntent, error) {
+	if len(strings.TrimSpace(string(responseRaw))) == 0 {
+		return MAIntent{}, fmt.Errorf("%w: empty intent response", errMAStrategyInvalid)
+	}
+	var envelope struct {
+		Intent *MAIntent `json:"intent"`
+	}
+	if err := json.Unmarshal(responseRaw, &envelope); err == nil && envelope.Intent != nil {
+		return validateIntentSpans(*envelope.Intent, promptText), nil
+	}
+	var intent MAIntent
+	if err := json.Unmarshal(responseRaw, &intent); err != nil {
+		return MAIntent{}, fmt.Errorf("decode ma intent: %w", err)
+	}
+	return validateIntentSpans(intent, promptText), nil
+}
+
+type maAtecoRerankSector struct {
+	Text       string `json:"text"`
+	SourceText string `json:"sourceText,omitempty"`
+}
+
+type maAtecoRerankCandidate struct {
+	Code        string `json:"code"`
+	SearchCode  string `json:"searchCode,omitempty"`
+	Description string `json:"description"`
+}
+
+type maAtecoRerankInput struct {
+	Prompt         string                   `json:"prompt"`
+	IncludeSectors []maAtecoRerankSector    `json:"includeSectors"`
+	ExcludeSectors []maAtecoRerankSector    `json:"excludeSectors"`
+	Candidates     []maAtecoRerankCandidate `json:"candidates"`
+}
+
+type maAtecoRerankOutput struct {
+	Selected         []maAtecoRerankSelected         `json:"selected"`
+	ExcludedPrefixes []maAtecoRerankExcludedPrefix   `json:"excludedPrefixes"`
+	MissingCriteria  []maAtecoRerankMissingCriterion `json:"missingCriteria"`
+}
+
+type maAtecoRerankSelected struct {
+	Code   string `json:"code"`
+	Fit    string `json:"fit"`
+	Reason string `json:"reason"`
+}
+
+type maAtecoRerankExcludedPrefix struct {
+	Prefix string `json:"prefix"`
+	Code   string `json:"code,omitempty"`
+	Reason string `json:"reason"`
+}
+
+type maAtecoRerankMissingCriterion struct {
+	Text   string `json:"text"`
+	Reason string `json:"reason"`
+}
+
+func (s *maService) resolveIntent(ctx context.Context, promptText string, intent MAIntent, subject, email string) (strategy MAStrategySpec, audits []llm.CallAudit, err error) {
+	start := time.Now()
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_intent_resolve",
+		Status:    maTraceEventStarted,
+		Metadata: maTraceJSON(map[string]any{
+			"has_territory":  hasMAIntentTerritory(intent.Territory),
+			"ateco_explicit": len(intent.AtecoExplicit),
+			"sector_include": len(intent.Sectors.Include),
+			"sector_exclude": len(intent.Sectors.Exclude),
+			"legal_forms":    len(intent.LegalForms),
+		}),
+	}); err != nil {
+		return MAStrategySpec{}, nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType:  "ma_intent_resolve",
+				Status:     maTraceEventFailed,
+				DurationMS: maTraceDuration(start),
+				Error:      err.Error(),
+			})
+		}
+	}()
+
+	intent = validateIntentSpans(intent, promptText)
+	missing := []string{}
+
+	allowedProvinces := map[string]openapiit.Province{}
+	provinces, territoryLabel, territoryMissing, err := s.resolveMAIntentTerritory(ctx, intent.Territory, allowedProvinces)
+	if err != nil {
+		return MAStrategySpec{}, nil, err
+	}
+	missing = appendMAMissingCriteria(missing, territoryMissing...)
+
+	allowedAteco := map[string]AtecoCode{}
+	atecoCandidates, atecoMissing, atecoAudits, err := s.resolveMAIntentAteco(ctx, promptText, intent, allowedAteco, subject, email)
+	audits = append(audits, atecoAudits...)
+	if err != nil {
+		return MAStrategySpec{}, audits, err
+	}
+	missing = appendMAMissingCriteria(missing, atecoMissing...)
+
+	legalForms, legalFormMissing, err := s.resolveMAIntentLegalForms(ctx, intent.LegalForms)
+	if err != nil {
+		return MAStrategySpec{}, nil, err
+	}
+	missing = appendMAMissingCriteria(missing, legalFormMissing...)
+	missing = appendMAMissingCriteria(missing, maIntentUnsupportedCriteria(intent)...)
+
+	activityStatus, statusMissing := maIntentActivityStatus(intent.Status)
+	missing = appendMAMissingCriteria(missing, statusMissing...)
+
+	strategy = MAStrategySpec{
+		Title:                  maIntentTitle(promptText, intent),
+		SectorDescription:      maIntentSectorDescription(intent, atecoCandidates),
+		TerritoryLabel:         territoryLabel,
+		Provinces:              provinces,
+		ActivityStatus:         activityStatus,
+		SearchLimit:            maDefaultSearchLimit,
+		AtecoCandidates:        atecoCandidates,
+		Keywords:               maIntentKeywords(intent, atecoCandidates),
+		Rationale:              maIntentRationale(intent, provinces, atecoCandidates, legalForms),
+		MissingCriteria:        missing,
+		Thesis:                 normalizeMAThesis(intent.Thesis),
+		LegalForms:             legalForms,
+		RevenuePerEmployeeMin:  maIntentValueConstraintValue(intent.RevenuePerEmployeeMin),
+		MaxShareholders:        maIntentValueConstraintValue(intent.MaxShareholders),
+		SuccessionMinOwnerAge:  maIntentSuccessionMinOwnerAge(intent.OwnerAge),
+		SignalWeights:          nil,
+		ScoringCriteria:        nil,
+		SelectedStrategy:       "",
+		ExpandedClassification: "",
+	}
+	applyMAIntentNumericRange(intent.Turnover, &strategy.TurnoverAround, &strategy.TurnoverMin, &strategy.TurnoverMax)
+	applyMAIntentNumericRange(intent.Employees, nil, &strategy.EmployeeMin, &strategy.EmployeeMax)
+
+	strategy, err = validateMAStrategy(strategy)
+	if err != nil {
+		return MAStrategySpec{}, audits, err
+	}
+	strategy, err = s.canonicalizeMAStrategyProvinces(strategy, allowedProvinces, true)
+	if err != nil {
+		return MAStrategySpec{}, audits, err
+	}
+	strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategy, allowedAteco, true)
+	if err != nil {
+		return MAStrategySpec{}, audits, err
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType:  "ma_intent_resolve",
+		Status:     maTraceEventSucceeded,
+		DurationMS: maTraceDuration(start),
+		Response:   maTraceJSON(strategy),
+		Metadata: maTraceJSON(map[string]any{
+			"province_count":         len(strategy.Provinces),
+			"allowed_province_count": len(allowedProvinces),
+			"ateco_candidate_count":  len(strategy.AtecoCandidates),
+			"allowed_ateco_count":    len(allowedAteco),
+			"legal_form_count":       len(strategy.LegalForms),
+			"missing_count":          len(strategy.MissingCriteria),
+			"ateco_audit_count":      len(audits),
+		}),
+	}); err != nil {
+		return MAStrategySpec{}, audits, err
+	}
+	return strategy, audits, nil
+}
+
+func maIntentTitle(promptText string, intent MAIntent) string {
+	if title := cleanText(intent.Title, 120); title != "" {
+		return title
+	}
+	return titleFromPrompt(promptText)
+}
+
+func maIntentActivityStatus(status *MAIntentStatusConstraint) (string, []string) {
+	if status == nil {
+		return "ATTIVA", nil
+	}
+	normalized, ok := normalizeCompanyActivityStatus(status.Value)
+	if !ok || normalized == "" {
+		return "ATTIVA", []string{"Stato attivita non mappabile: " + maIntentSourceLabel(status.Value, status.SourceText)}
+	}
+	return normalized, nil
+}
+
+func applyMAIntentNumericRange(item *MAIntentNumericConstraint, aroundField, minField, maxField **int) {
+	if item == nil {
+		return
+	}
+	if aroundField != nil && item.Around != nil && *item.Around >= 0 {
+		value := *item.Around
+		*aroundField = &value
+	}
+	if minField != nil && item.Min != nil && *item.Min >= 0 {
+		value := *item.Min
+		*minField = &value
+	}
+	if maxField != nil && item.Max != nil && *item.Max >= 0 {
+		value := *item.Max
+		*maxField = &value
+	}
+}
+
+func maIntentSuccessionMinOwnerAge(item *MAIntentNumericConstraint) *int {
+	if item == nil {
+		return nil
+	}
+	for _, value := range []*int{item.Min, item.Around} {
+		if value != nil && *value >= 0 {
+			out := *value
+			return &out
+		}
+	}
+	return nil
+}
+
+func maIntentValueConstraintValue(item *MAIntentValueConstraint) *int {
+	if item == nil || item.Value == nil {
+		return nil
+	}
+	value := *item.Value
+	return &value
+}
+
+func maIntentSectorDescription(intent MAIntent, candidates []MAAtecoCandidate) string {
+	parts := []string{}
+	for _, sector := range intent.Sectors.Include {
+		if text := cleanText(positiveSectorText(sector.Text), 140); text != "" {
+			parts = append(parts, text)
+		}
+	}
+	if len(parts) == 0 {
+		for _, candidate := range candidates {
+			if normalizeMAFit(candidate.Fit) == maFitExcluded {
+				continue
+			}
+			if desc := cleanText(candidate.Description, 140); desc != "" {
+				parts = append(parts, desc)
+			}
+			if len(parts) >= 4 {
+				break
+			}
+		}
+	}
+	if len(parts) == 0 {
+		return "Settore non specificato"
+	}
+	return cleanText(strings.Join(cleanStringList(parts, 6, 140), "; "), 300)
+}
+
+func maIntentKeywords(intent MAIntent, candidates []MAAtecoCandidate) []string {
+	values := []string{}
+	for _, sector := range intent.Sectors.Include {
+		text := positiveSectorText(sector.Text)
+		if cleaned := cleanText(text, 80); cleaned != "" {
+			values = append(values, cleaned)
+		}
+		values = append(values, atecoSearchTokens(text)...)
+	}
+	if len(values) == 0 {
+		for _, candidate := range candidates {
+			if normalizeMAFit(candidate.Fit) == maFitExcluded {
+				continue
+			}
+			values = append(values, atecoSearchTokens(candidate.Description)...)
+		}
+	}
+	return cleanStringList(values, 12, 80)
+}
+
+func maIntentRationale(intent MAIntent, provinces []string, candidates []MAAtecoCandidate, legalForms []string) string {
+	parts := []string{"Strategia assemblata da intent strutturato con resolver deterministici."}
+	if len(intent.AtecoExplicit) > 0 {
+		parts = append(parts, "ATECO validati da codici espliciti.")
+	} else if len(intent.Sectors.Include)+len(intent.Sectors.Exclude) > 0 {
+		parts = append(parts, "ATECO selezionati con rerank vincolato sui candidati recuperati.")
+	}
+	if len(provinces) > 0 {
+		parts = append(parts, fmt.Sprintf("Territorio risolto su %d province.", len(provinces)))
+	}
+	if len(candidates) > 0 {
+		parts = append(parts, fmt.Sprintf("Perimetro ATECO con %d candidati.", len(candidates)))
+	}
+	if len(legalForms) > 0 {
+		parts = append(parts, fmt.Sprintf("Forme giuridiche mappate: %s.", strings.Join(legalForms, ", ")))
+	}
+	return cleanText(strings.Join(parts, " "), 600)
+}
+
+func maIntentUnsupportedCriteria(intent MAIntent) []string {
+	out := []string{}
+	if intent.OwnerAge != nil && intent.OwnerAge.Max != nil && intent.OwnerAge.Min == nil && intent.OwnerAge.Around == nil {
+		out = append(out, "Eta proprietario massima non applicabile al filtro successione: "+maIntentSourceLabel(strconv.Itoa(*intent.OwnerAge.Max), intent.OwnerAge.SourceText))
+	}
+	for _, item := range intent.Constraints {
+		label := maIntentSourceLabel(item.Text, item.SourceText)
+		if label == "" {
+			label = item.Kind
+		}
+		disposition := cleanText(item.Disposition, 80)
+		if disposition == "" {
+			disposition = "unsupported"
+		}
+		out = append(out, fmt.Sprintf("Vincolo %s non applicato: %s", disposition, label))
+	}
+	return out
+}
+
+func maIntentSourceLabel(value, sourceText string) string {
+	if source := cleanText(sourceText, 120); source != "" {
+		return source
+	}
+	return cleanText(value, 120)
+}
+
+func appendMAMissingCriteria(existing []string, values ...string) []string {
+	out := append([]string{}, existing...)
+	seen := map[string]struct{}{}
+	for _, value := range out {
+		seen[strings.ToLower(strings.TrimSpace(value))] = struct{}{}
+	}
+	for _, raw := range values {
+		value := cleanText(raw, 120)
+		if value == "" {
+			continue
+		}
+		key := strings.ToLower(value)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
+type maProvinceLookup struct {
+	byCode      map[string]openapiit.Province
+	byName      map[string][]openapiit.Province
+	byCompact   map[string][]openapiit.Province
+	regionByKey map[string]*maRegionProvinceGroup
+}
+
+type maRegionProvinceGroup struct {
+	Name  string
+	Codes []string
+}
+
+func hasMAIntentTerritory(territory MAIntentTerritory) bool {
+	return len(territory.IncludeRegions)+len(territory.IncludeProvinces)+len(territory.ExcludeProvinces) > 0
+}
+
+func (s *maService) resolveMAIntentTerritory(ctx context.Context, territory MAIntentTerritory, allowed map[string]openapiit.Province) ([]string, string, []string, error) {
+	if !hasMAIntentTerritory(territory) {
+		return nil, "Italia", nil, nil
+	}
+	envelope, _, err := listProvincesWithCache(ctx, s.provinceCache, s.openapiit, s.now)
+	if err != nil {
+		return nil, "", nil, err
+	}
+	lookup := newMAProvinceLookup(envelope.Data)
+	included := map[string]struct{}{}
+	regionLabels := []string{}
+	provinceLabels := []string{}
+	excludedLabels := []string{}
+	missing := []string{}
+
+	for _, item := range territory.IncludeRegions {
+		group, ok := lookup.resolveRegion(item.Value)
+		if !ok {
+			missing = append(missing, "Regione non risolvibile: "+maIntentSourceLabel(item.Value, item.SourceText))
+			continue
+		}
+		for _, code := range group.Codes {
+			included[code] = struct{}{}
+		}
+		regionLabels = append(regionLabels, group.Name)
+	}
+	for _, item := range territory.IncludeProvinces {
+		province, ok := lookup.resolveProvince(item.Value)
+		if !ok {
+			missing = append(missing, "Provincia non risolvibile: "+maIntentSourceLabel(item.Value, item.SourceText))
+			continue
+		}
+		included[province.Sigla] = struct{}{}
+		provinceLabels = append(provinceLabels, province.Sigla)
+	}
+	for _, item := range territory.ExcludeProvinces {
+		province, ok := lookup.resolveProvince(item.Value)
+		if !ok {
+			missing = append(missing, "Provincia esclusa non risolvibile: "+maIntentSourceLabel(item.Value, item.SourceText))
+			continue
+		}
+		if _, exists := included[province.Sigla]; !exists {
+			missing = append(missing, "Provincia esclusa fuori dal perimetro incluso: "+maIntentSourceLabel(item.Value, item.SourceText))
+			continue
+		}
+		delete(included, province.Sigla)
+		excludedLabels = append(excludedLabels, province.Sigla)
+	}
+
+	provinces := make([]string, 0, len(included))
+	for code := range included {
+		if province, ok := lookup.byCode[code]; ok {
+			rememberAllowedProvince(allowed, province)
+		}
+		provinces = append(provinces, code)
+	}
+	sort.Strings(provinces)
+	return provinces, maIntentTerritoryLabel(regionLabels, provinceLabels, excludedLabels, provinces), missing, nil
+}
+
+func newMAProvinceLookup(items []openapiit.Province) maProvinceLookup {
+	lookup := maProvinceLookup{
+		byCode:      map[string]openapiit.Province{},
+		byName:      map[string][]openapiit.Province{},
+		byCompact:   map[string][]openapiit.Province{},
+		regionByKey: map[string]*maRegionProvinceGroup{},
+	}
+	regionsByPrimary := map[string]*maRegionProvinceGroup{}
+	for _, item := range items {
+		code, ok := normalizeProvince(item.Sigla)
+		if !ok || code == "" {
+			continue
+		}
+		item.Sigla = code
+		item.Provincia = cleanText(item.Provincia, 120)
+		item.Regione = cleanText(item.Regione, 120)
+		if item.Provincia == "" || item.Regione == "" {
+			continue
+		}
+		lookup.byCode[code] = item
+		if key := normalizeMAFoldKey(item.Provincia); key != "" {
+			lookup.byName[key] = append(lookup.byName[key], item)
+		}
+		if key := normalizeMACompactKey(item.Provincia); key != "" {
+			lookup.byCompact[key] = append(lookup.byCompact[key], item)
+		}
+
+		primary := normalizeMAFoldKey(item.Regione)
+		group := regionsByPrimary[primary]
+		if group == nil {
+			group = &maRegionProvinceGroup{Name: item.Regione}
+			regionsByPrimary[primary] = group
+			for _, key := range maRegionLookupKeys(item.Regione) {
+				lookup.regionByKey[key] = group
+			}
+		}
+		group.Codes = append(group.Codes, code)
+	}
+	for _, group := range regionsByPrimary {
+		sort.Strings(group.Codes)
+	}
+	return lookup
+}
+
+func (lookup maProvinceLookup) resolveRegion(value string) (*maRegionProvinceGroup, bool) {
+	for _, key := range maRegionLookupKeys(value) {
+		if group := lookup.regionByKey[key]; group != nil {
+			return group, true
+		}
+	}
+	return nil, false
+}
+
+func (lookup maProvinceLookup) resolveProvince(value string) (openapiit.Province, bool) {
+	if code, ok := normalizeProvince(value); ok && code != "" {
+		item, exists := lookup.byCode[code]
+		return item, exists
+	}
+	if key := normalizeMAFoldKey(value); key != "" {
+		if match, ok := singleMAProvinceMatch(lookup.byName[key]); ok {
+			return match, true
+		}
+	}
+	if key := normalizeMACompactKey(value); key != "" {
+		if match, ok := singleMAProvinceMatch(lookup.byCompact[key]); ok {
+			return match, true
+		}
+	}
+	key := normalizeMAFoldKey(value)
+	if len([]rune(key)) < 4 {
+		return openapiit.Province{}, false
+	}
+	matches := []openapiit.Province{}
+	for nameKey, items := range lookup.byName {
+		if strings.Contains(nameKey, key) || strings.Contains(key, nameKey) {
+			matches = append(matches, items...)
+		}
+	}
+	return singleMAProvinceMatch(matches)
+}
+
+func singleMAProvinceMatch(items []openapiit.Province) (openapiit.Province, bool) {
+	seen := map[string]openapiit.Province{}
+	for _, item := range items {
+		if item.Sigla == "" {
+			continue
+		}
+		seen[item.Sigla] = item
+	}
+	if len(seen) != 1 {
+		return openapiit.Province{}, false
+	}
+	for _, item := range seen {
+		return item, true
+	}
+	return openapiit.Province{}, false
+}
+
+func maRegionLookupKeys(value string) []string {
+	seen := map[string]struct{}{}
+	keys := []string{}
+	add := func(key string) {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			return
+		}
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		keys = append(keys, key)
+	}
+	folded := normalizeMAFoldKey(value)
+	compact := normalizeMACompactKey(value)
+	add(folded)
+	add(compact)
+	switch {
+	case strings.Contains(compact, "valledaosta") || strings.Contains(compact, "valleedaoste"):
+		add("valle d aosta")
+		add("valledaosta")
+	case strings.Contains(compact, "trentinoaltoadige") || strings.Contains(compact, "sudtirol") || strings.Contains(compact, "suedtirol"):
+		add("trentino alto adige")
+		add("trentinoaltoadige")
+		add("trentino alto adige sudtirol")
+		add("trentinoaltoadigesudtirol")
+	case strings.Contains(compact, "friuliveneziagiulia"):
+		add("friuli venezia giulia")
+		add("friuliveneziagiulia")
+	case strings.Contains(compact, "emiliaromagna"):
+		add("emilia romagna")
+		add("emiliaromagna")
+	}
+	return keys
+}
+
+func maIntentTerritoryLabel(regions, provinces, excluded, resolved []string) string {
+	parts := []string{}
+	if len(regions) > 0 {
+		parts = append(parts, cleanStringList(regions, 20, 80)...)
+	}
+	if len(provinces) > 0 {
+		parts = append(parts, cleanStringList(provinces, 20, 8)...)
+	}
+	if len(parts) == 0 && len(resolved) > 0 {
+		parts = append(parts, resolved...)
+	}
+	if len(parts) == 0 {
+		return "Italia"
+	}
+	label := strings.Join(cleanStringList(parts, 30, 80), ", ")
+	if len(excluded) > 0 {
+		label += " (escluse " + strings.Join(cleanStringList(excluded, 20, 8), ", ") + ")"
+	}
+	return cleanText(label, 160)
+}
+
+func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string, intent MAIntent, allowed map[string]AtecoCode, subject, email string) ([]MAAtecoCandidate, []string, []llm.CallAudit, error) {
+	if len(intent.AtecoExplicit) > 0 {
+		return s.resolveMAIntentExplicitAteco(ctx, intent.AtecoExplicit, intent.Sectors.Exclude, allowed)
+	}
+	if len(intent.Sectors.Include)+len(intent.Sectors.Exclude) == 0 {
+		return nil, nil, nil, nil
+	}
+	if s.ateco == nil {
+		return nil, nil, nil, errAtecoStoreUnavailable
+	}
+	candidates, missing, err := s.collectMAIntentAtecoCandidates(ctx, appendMAIntentTextConstraints(intent.Sectors.Include, intent.Sectors.Exclude), allowed)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if len(intent.Sectors.Include) == 0 && len(intent.Sectors.Exclude) > 0 {
+		missing = append(missing, "Esclusione settoriale senza settore incluso: serve un perimetro positivo")
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_ateco_retrieval",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"sector_include":      len(intent.Sectors.Include),
+			"sector_exclude":      len(intent.Sectors.Exclude),
+			"candidate_count":     len(candidates),
+			"allowed_ateco_count": len(allowed),
+		}),
+	}); err != nil {
+		return nil, nil, nil, err
+	}
+
+	output, audit, err := s.rerankMAIntentAteco(ctx, promptText, intent.Sectors.Include, intent.Sectors.Exclude, candidates, subject, email)
+	if err != nil {
+		audits := []llm.CallAudit{}
+		if audit.Scope != "" || len(audit.Request) > 0 {
+			audits = append(audits, audit)
+		}
+		return nil, nil, audits, err
+	}
+	resolved, constrainedMissing := constrainMAAtecoRerank(output, candidates, intent.Sectors.Include, intent.Sectors.Exclude)
+	missing = appendMAMissingCriteria(missing, constrainedMissing...)
+	return resolved, missing, []llm.CallAudit{audit}, nil
+}
+
+func (s *maService) resolveMAIntentExplicitAteco(ctx context.Context, constraints []MAIntentAtecoConstraint, excludedSectors []MAIntentTextConstraint, allowed map[string]AtecoCode) ([]MAAtecoCandidate, []string, []llm.CallAudit, error) {
+	if s.ateco == nil {
+		return nil, nil, nil, errAtecoStoreUnavailable
+	}
+	candidates := []MAAtecoCandidate{}
+	missing := []string{}
+	seen := map[string]struct{}{}
+	for _, constraint := range constraints {
+		resolved, err := s.ateco.ResolveAtecoCode(ctx, constraint.Code)
+		if errors.Is(err, errAtecoCodeNotFound) {
+			missing = append(missing, "ATECO esplicito non trovato: "+maIntentSourceLabel(constraint.Code, constraint.SourceText))
+			continue
+		}
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		searchCode := resolved.CodiceSearch
+		if searchCode == "" {
+			searchCode = atecoSearchCode(resolved.Codice)
+		}
+		if searchCode == "" {
+			missing = append(missing, "ATECO esplicito non utilizzabile: "+maIntentSourceLabel(constraint.Code, constraint.SourceText))
+			continue
+		}
+		rememberAllowedAteco(allowed, resolved)
+		if _, exists := seen[searchCode]; exists {
+			continue
+		}
+		seen[searchCode] = struct{}{}
+		candidates = append(candidates, MAAtecoCandidate{
+			Code:        resolved.Codice,
+			Description: resolved.Titolo,
+			Rationale:   cleanText("Codice ATECO esplicito: "+maIntentSourceLabel(constraint.Code, constraint.SourceText), 240),
+			Fit:         normalizeMAFit(constraint.Fit),
+		})
+	}
+	for _, excluded := range excludedSectors {
+		missing = append(missing, "Esclusione settoriale testuale non applicata con ATECO espliciti: "+maIntentSourceLabel(excluded.Text, excluded.SourceText))
+	}
+	return candidates, missing, nil, nil
+}
+
+func appendMAIntentTextConstraints(a, b []MAIntentTextConstraint) []MAIntentTextConstraint {
+	out := make([]MAIntentTextConstraint, 0, len(a)+len(b))
+	out = append(out, a...)
+	out = append(out, b...)
+	return out
+}
+
+func (s *maService) collectMAIntentAtecoCandidates(ctx context.Context, sectors []MAIntentTextConstraint, allowed map[string]AtecoCode) ([]AtecoCode, []string, error) {
+	out := []AtecoCode{}
+	missing := []string{}
+	seen := map[string]struct{}{}
+	for _, sector := range sectors {
+		query := cleanText(sector.Text, 240)
+		if query == "" {
+			continue
+		}
+		items, err := s.ateco.SearchAteco(ctx, query, atecoSearchDefaultLimit)
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(items) == 0 {
+			missing = append(missing, "Settore non risolto in ATECO: "+maIntentSourceLabel(sector.Text, sector.SourceText))
+			continue
+		}
+		for _, item := range items {
+			searchCode := item.CodiceSearch
+			if searchCode == "" {
+				searchCode = atecoSearchCode(item.Codice)
+			}
+			if searchCode == "" {
+				continue
+			}
+			rememberAllowedAteco(allowed, item)
+			if _, exists := seen[searchCode]; exists {
+				continue
+			}
+			seen[searchCode] = struct{}{}
+			out = append(out, item)
+		}
+	}
+	return out, missing, nil
+}
+
+func (s *maService) rerankMAIntentAteco(ctx context.Context, promptText string, includeSectors, excludeSectors []MAIntentTextConstraint, candidates []AtecoCode, subject, email string) (maAtecoRerankOutput, llm.CallAudit, error) {
+	if s.llmp == nil {
+		return maAtecoRerankOutput{}, llm.CallAudit{}, errMAOpenRouterUnavailable
+	}
+	modelConfig, err := s.llmp.ResolveModel(ctx, maModelScopeStrategyAteco, "")
+	if err != nil {
+		return maAtecoRerankOutput{}, llm.CallAudit{}, llmConfigError(err)
+	}
+	promptConfig, err := s.llmp.ResolvePrompt(ctx, maModelScopeStrategyAteco, "")
+	if err != nil {
+		return maAtecoRerankOutput{}, llm.CallAudit{}, llmConfigError(err)
+	}
+	client, err := s.llmp.ClientForModel(ctx, modelConfig)
+	if err != nil {
+		return maAtecoRerankOutput{}, llm.CallAudit{}, llmConfigError(err)
+	}
+	reqParams := modelConfig.RawParams()
+	if _, ok := reqParams["max_tokens"]; !ok {
+		reqParams["max_tokens"] = 1600
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_ateco_rerank_config",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"model_id":        modelConfig.ID,
+			"model_scope":     modelConfig.Scope,
+			"model":           modelConfig.Model,
+			"prompt_id":       promptConfig.ID,
+			"prompt_scope":    promptConfig.Scope,
+			"prompt_name":     promptConfig.Name,
+			"candidate_count": len(candidates),
+		}),
+	}); err != nil {
+		return maAtecoRerankOutput{}, llm.CallAudit{}, err
+	}
+	payload := maAtecoRerankInput{
+		Prompt:         promptText,
+		IncludeSectors: maAtecoRerankSectors(includeSectors),
+		ExcludeSectors: maAtecoRerankSectors(excludeSectors),
+		Candidates:     maAtecoRerankCandidates(candidates),
+	}
+	inputRaw, err := json.Marshal(payload)
+	if err != nil {
+		return maAtecoRerankOutput{}, llm.CallAudit{}, err
+	}
+	req := llm.ChatRequest{
+		Model:          modelConfig.Model,
+		Params:         reqParams,
+		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+		Messages: []llm.Message{
+			{Role: "system", Content: promptConfig.Prompt},
+			{Role: "user", Content: string(inputRaw)},
+		},
+		Tools: nil,
+	}
+	requestBody, err := llm.BuildRequestBody(req)
+	if err != nil {
+		return maAtecoRerankOutput{}, llm.CallAudit{}, err
+	}
+	requestRaw, _ := json.Marshal(requestBody)
+
+	start := time.Now()
+	response, err := client.Chat(ctx, req)
+	duration := maTraceDuration(start)
+	usageRaw, _ := json.Marshal(response.Usage)
+	responseFull := maTraceJSON(response)
+	audit := llm.CallAudit{
+		App:          maApp,
+		Scope:        maModelScopeStrategyAteco,
+		ProviderID:   modelConfig.ProviderID,
+		ModelID:      modelConfig.ID,
+		PromptID:     promptConfig.ID,
+		Model:        modelConfig.Model,
+		Request:      requestRaw,
+		Response:     responseFull,
+		Usage:        usageRaw,
+		ActorSubject: subject,
+		ActorEmail:   email,
+		DurationMS:   duration,
+		Status:       "succeeded",
+	}
+	if err != nil {
+		audit.Status = "failed"
+		audit.ErrorMessage = err.Error()
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType:      "ma_ateco_rerank",
+			ExternalSystem: "openrouter",
+			Status:         maTraceEventFailed,
+			DurationMS:     duration,
+			Request:        requestRaw,
+			Response:       responseFull,
+			Error:          err.Error(),
+		})
+		return maAtecoRerankOutput{}, audit, err
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType:      "ma_ateco_rerank",
+		ExternalSystem: "openrouter",
+		Status:         maTraceEventSucceeded,
+		DurationMS:     duration,
+		Request:        requestRaw,
+		Response:       responseFull,
+		Metadata:       maTraceJSON(map[string]any{"response_id": response.ID, "response_model": response.Model}),
+	}); err != nil {
+		return maAtecoRerankOutput{}, audit, err
+	}
+
+	responseRaw := json.RawMessage([]byte(strings.TrimSpace(response.Content)))
+	var output maAtecoRerankOutput
+	if err := json.Unmarshal(responseRaw, &output); err != nil {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_ateco_rerank_decode",
+			Status:    maTraceEventFailed,
+			Response:  responseRaw,
+			Error:     err.Error(),
+		})
+		return maAtecoRerankOutput{}, audit, fmt.Errorf("decode ma ateco rerank: %w", err)
+	}
+	if err := s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_ateco_rerank_decode",
+		Status:    maTraceEventSucceeded,
+		Response:  maTraceJSON(output),
+	}); err != nil {
+		return maAtecoRerankOutput{}, audit, err
+	}
+	return output, audit, nil
+}
+
+func maAtecoRerankSectors(items []MAIntentTextConstraint) []maAtecoRerankSector {
+	out := make([]maAtecoRerankSector, 0, len(items))
+	for _, item := range items {
+		text := cleanText(item.Text, 180)
+		if text == "" {
+			continue
+		}
+		out = append(out, maAtecoRerankSector{Text: text, SourceText: cleanText(item.SourceText, 240)})
+	}
+	return out
+}
+
+func maAtecoRerankCandidates(items []AtecoCode) []maAtecoRerankCandidate {
+	out := make([]maAtecoRerankCandidate, 0, len(items))
+	for _, item := range items {
+		code := normalizeAtecoCode(item.Codice)
+		if code == "" {
+			continue
+		}
+		out = append(out, maAtecoRerankCandidate{
+			Code:        code,
+			SearchCode:  item.CodiceSearch,
+			Description: cleanText(item.Titolo, 180),
+		})
+	}
+	return out
+}
+
+func constrainMAAtecoRerank(output maAtecoRerankOutput, candidates []AtecoCode, includeSectors, excludeSectors []MAIntentTextConstraint) ([]MAAtecoCandidate, []string) {
+	bySearch := map[string]AtecoCode{}
+	for _, item := range candidates {
+		searchCode := item.CodiceSearch
+		if searchCode == "" {
+			searchCode = atecoSearchCode(item.Codice)
+		}
+		if searchCode == "" {
+			continue
+		}
+		bySearch[searchCode] = item
+	}
+	out := []MAAtecoCandidate{}
+	missing := []string{}
+	seen := map[string]struct{}{}
+	for _, selected := range output.Selected {
+		searchCode := atecoSearchCode(selected.Code)
+		item, ok := bySearch[searchCode]
+		if !ok {
+			missing = append(missing, "ATECO selezionato fuori dai candidati: "+cleanText(selected.Code, 40))
+			continue
+		}
+		if _, exists := seen[searchCode]; exists {
+			continue
+		}
+		seen[searchCode] = struct{}{}
+		out = append(out, MAAtecoCandidate{
+			Code:        item.Codice,
+			Description: item.Titolo,
+			Rationale:   cleanText(selected.Reason, 240),
+			Fit:         maAtecoRerankFit(selected.Fit),
+		})
+	}
+	if len(excludeSectors) > 0 {
+		exclusionSource := maAtecoExclusionSource(excludeSectors)
+		for _, excluded := range output.ExcludedPrefixes {
+			prefix := excluded.Prefix
+			if prefix == "" {
+				prefix = excluded.Code
+			}
+			code := normalizeAtecoCode(prefix)
+			searchCode := atecoSearchCode(code)
+			if searchCode == "" || len(searchCode) < 2 {
+				continue
+			}
+			if !maAtecoPrefixDerivedFromCandidates(searchCode, bySearch) {
+				missing = append(missing, "Prefisso ATECO escluso fuori dai candidati: "+cleanText(prefix, 40))
+				continue
+			}
+			key := "excluded:" + searchCode
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, MAAtecoCandidate{
+				Code:        code,
+				Description: maAtecoExcludedDescription(code, bySearch),
+				Rationale:   maAtecoExcludedRationale(excluded.Reason, exclusionSource),
+				Fit:         maFitExcluded,
+			})
+		}
+	}
+	for _, item := range output.MissingCriteria {
+		text := cleanText(item.Text, 100)
+		if text == "" {
+			continue
+		}
+		if reason := cleanText(item.Reason, 80); reason != "" {
+			text += ": " + reason
+		}
+		missing = append(missing, text)
+	}
+	if len(out) == 0 && len(includeSectors) > 0 && len(output.MissingCriteria) == 0 {
+		missing = append(missing, "Settore testuale non mappato con sicurezza agli ATECO candidati")
+	}
+	return out, missing
+}
+
+func maAtecoRerankFit(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case maFitWeak:
+		return maFitWeak
+	default:
+		return maFitCore
+	}
+}
+
+func maAtecoPrefixDerivedFromCandidates(prefix string, candidates map[string]AtecoCode) bool {
+	for searchCode := range candidates {
+		if searchCode == prefix || strings.HasPrefix(searchCode, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func maAtecoExcludedDescription(code string, candidates map[string]AtecoCode) string {
+	searchCode := atecoSearchCode(code)
+	if item, ok := candidates[searchCode]; ok && item.Titolo != "" {
+		return item.Titolo
+	}
+	return cleanText("Esclusione ATECO "+code, 180)
+}
+
+func maAtecoExcludedRationale(reason, source string) string {
+	parts := []string{}
+	if reason := cleanText(reason, 140); reason != "" {
+		parts = append(parts, reason)
+	}
+	if source := cleanText(source, 120); source != "" {
+		parts = append(parts, "fonte: "+source)
+	}
+	if len(parts) == 0 {
+		return "Esclusione settoriale esplicita"
+	}
+	return cleanText(strings.Join(parts, "; "), 240)
+}
+
+func maAtecoExclusionSource(items []MAIntentTextConstraint) string {
+	parts := []string{}
+	for _, item := range items {
+		if source := maIntentSourceLabel(item.Text, item.SourceText); source != "" {
+			parts = append(parts, source)
+		}
+	}
+	return strings.Join(cleanStringList(parts, 4, 80), "; ")
+}
+
+type maLegalFormResolver struct {
+	byCode    map[string]maCompanyLegalForm
+	byKey     map[string][]string
+	byCompact map[string][]string
+	rank      map[string]int
+}
+
+func (s *maService) resolveMAIntentLegalForms(ctx context.Context, constraints []MAIntentTextConstraint) ([]string, []string, error) {
+	if len(constraints) == 0 {
+		return nil, nil, nil
+	}
+	if s.store == nil {
+		return nil, nil, errMAStoreUnavailable
+	}
+	rows, err := s.store.ListMACompanyLegalForms(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	resolver := newMALegalFormResolver(rows)
+	codes := []string{}
+	missing := []string{}
+	seen := map[string]struct{}{}
+	for _, constraint := range constraints {
+		resolved := resolver.resolve(constraint.Text)
+		if len(resolved) == 0 {
+			missing = append(missing, "Forma giuridica non mappabile: "+maIntentSourceLabel(constraint.Text, constraint.SourceText))
+			continue
+		}
+		for _, code := range resolved {
+			if _, exists := seen[code]; exists {
+				continue
+			}
+			seen[code] = struct{}{}
+			codes = append(codes, code)
+		}
+	}
+	sort.SliceStable(codes, func(i, j int) bool {
+		left := resolver.rank[codes[i]]
+		right := resolver.rank[codes[j]]
+		if left == right {
+			return codes[i] < codes[j]
+		}
+		return left < right
+	})
+	return normalizeMALegalForms(codes), missing, nil
+}
+
+func newMALegalFormResolver(rows []maCompanyLegalForm) maLegalFormResolver {
+	resolver := maLegalFormResolver{
+		byCode:    map[string]maCompanyLegalForm{},
+		byKey:     map[string][]string{},
+		byCompact: map[string][]string{},
+		rank:      map[string]int{},
+	}
+	for index, row := range rows {
+		code := strings.ToUpper(strings.TrimSpace(row.Code))
+		if !maLegalFormCodePattern(code) {
+			continue
+		}
+		row.Code = code
+		resolver.byCode[code] = row
+		resolver.rank[code] = index + 1
+		for _, value := range []string{code, row.DescriptionIT, row.DescriptionEN} {
+			if key := normalizeMAFoldKey(value); key != "" {
+				resolver.byKey[key] = append(resolver.byKey[key], code)
+			}
+			if key := normalizeMACompactKey(value); key != "" {
+				resolver.byCompact[key] = append(resolver.byCompact[key], code)
+			}
+		}
+	}
+	return resolver
+}
+
+func (r maLegalFormResolver) resolve(value string) []string {
+	text := cleanText(value, 160)
+	if text == "" {
+		return nil
+	}
+	if code := strings.ToUpper(strings.TrimSpace(text)); maLegalFormCodePattern(code) {
+		if _, ok := r.byCode[code]; ok {
+			return []string{code}
+		}
+	}
+	key := normalizeMAFoldKey(text)
+	compact := normalizeMACompactKey(text)
+	if codes := r.filterExisting(maLegalFormSynonymCodes(key, compact)); len(codes) > 0 {
+		return codes
+	}
+	if codes := r.onlyExisting(r.byKey[key]); len(codes) > 0 {
+		return codes
+	}
+	if codes := r.onlyExisting(r.byCompact[compact]); len(codes) > 0 {
+		return codes
+	}
+	if strings.Contains(key, "cooperativ") {
+		return r.codesWithDescriptionToken("cooperativ", 8)
+	}
+	return nil
+}
+
+func maLegalFormSynonymCodes(key, compact string) []string {
+	switch {
+	case strings.Contains(compact, "srlsemplificata") || compact == "srls" || strings.Contains(key, "responsabilita limitata semplificata"):
+		return []string{"RS"}
+	case strings.Contains(compact, "srlunipersonale") || strings.Contains(key, "srl unico socio") || strings.Contains(key, "responsabilita limitata unico socio") || strings.Contains(key, "responsabilita limitata unipersonale"):
+		return []string{"SU"}
+	case strings.Contains(key, "capitale ridotto") && strings.Contains(key, "responsabilita limitata"):
+		return []string{"RR"}
+	case compact == "srl" || strings.Contains(key, "societa a responsabilita limitata"):
+		return []string{"SR"}
+	case strings.Contains(compact, "spasociounico") || strings.Contains(key, "spa socio unico") || strings.Contains(key, "per azioni socio unico"):
+		return []string{"AU"}
+	case compact == "spa" || strings.Contains(key, "societa per azioni"):
+		return []string{"SP"}
+	case compact == "sapa" || strings.Contains(key, "accomandita per azioni"):
+		return []string{"AA"}
+	case compact == "sas" || strings.Contains(key, "accomandita semplice"):
+		return []string{"AS"}
+	case compact == "snc" || strings.Contains(key, "nome collettivo"):
+		return []string{"SN"}
+	case strings.Contains(key, "ditta individuale") || strings.Contains(key, "impresa individuale") || strings.Contains(key, "azienda individuale"):
+		return []string{"DI"}
+	case strings.Contains(key, "persona fisica"):
+		return []string{"PF"}
+	case strings.Contains(key, "impresa familiare"):
+		return []string{"IF"}
+	case strings.Contains(key, "cooperativa sociale"):
+		return []string{"OO"}
+	case compact == "coop" || strings.Contains(key, "cooperativa") || strings.Contains(key, "cooperative"):
+		return []string{"SC"}
+	default:
+		return nil
+	}
+}
+
+func (r maLegalFormResolver) filterExisting(codes []string) []string {
+	if len(codes) == 0 {
+		return nil
+	}
+	out := []string{}
+	for _, code := range codes {
+		if _, ok := r.byCode[code]; ok {
+			out = append(out, code)
+		}
+	}
+	return out
+}
+
+func (r maLegalFormResolver) onlyExisting(codes []string) []string {
+	out := []string{}
+	seen := map[string]struct{}{}
+	for _, code := range codes {
+		if _, ok := r.byCode[code]; !ok {
+			continue
+		}
+		if _, exists := seen[code]; exists {
+			continue
+		}
+		seen[code] = struct{}{}
+		out = append(out, code)
+	}
+	return out
+}
+
+func (r maLegalFormResolver) codesWithDescriptionToken(token string, max int) []string {
+	out := []string{}
+	for code, row := range r.byCode {
+		key := normalizeMAFoldKey(row.DescriptionIT + " " + row.DescriptionEN)
+		if !strings.Contains(key, token) {
+			continue
+		}
+		out = append(out, code)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		left := r.rank[out[i]]
+		right := r.rank[out[j]]
+		if left == right {
+			return out[i] < out[j]
+		}
+		return left < right
+	})
+	if max > 0 && len(out) > max {
+		out = out[:max]
+	}
+	return out
 }
 
 func (s *maService) draftStrategy(ctx context.Context, prompt string, modelID string, promptID string, subject, email string) (MAStrategySpec, llm.CallAudit, error) {
