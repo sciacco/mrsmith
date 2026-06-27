@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button, Icon, Skeleton, ToggleSwitch } from '@mrsmith/ui';
 import { useApiClient } from '../api/client';
 import type {
+  CandidateMatchAnalysisResponse,
   CompanySearchRow,
   DomainResolutionCandidate,
   DomainResolutionResponse,
@@ -110,6 +111,8 @@ interface PipelineRunResult {
   selectedDomain?: DomainResolutionCandidate;
   evidenceRuns: PipelineEvidenceRun[];
   summary: PipelineSummary;
+  candidateMatchAnalysis?: CandidateMatchAnalysisResponse;
+  candidateMatchError?: string;
 }
 
 const dataEnrichmentOptions = [
@@ -176,6 +179,7 @@ const validationErrorLabels: Record<string, string> = {
   invalid_domain: 'Dominio non valido.',
   missing_keywords: 'Inserisci almeno una keyword.',
   missing_company_name: 'Inserisci la ragione sociale.',
+  missing_selected_domain: 'Seleziona o risolvi prima un dominio candidato.',
   query_too_long: 'Query troppo lunga per Brave Search.',
 };
 
@@ -201,6 +205,12 @@ function errorLabel(error: unknown): string {
     }
     if (error.status === 503 && code === 'brave_not_configured') {
       return 'Brave Search non e configurato in questo ambiente.';
+    }
+    if (error.status === 503 && code === 'openrouter_not_configured') {
+      return 'LLM non configurato in questo ambiente.';
+    }
+    if (error.status === 503 && code === 'binocolo_llm_config_not_configured') {
+      return 'Scope LLM Binocolo non configurato in Anisetta.';
     }
     if (error.status === 503) return 'Il servizio richiesto non e configurato in questo ambiente.';
     if (error.status === 502) return 'Il servizio esterno non ha risposto correttamente.';
@@ -499,6 +509,38 @@ function pipelineBucketLabel(bucket: EvidenceBucket): string {
   }
 }
 
+function candidateVerdictLabel(verdict: string): string {
+  switch (verdict) {
+    case 'strong_match':
+      return 'Strong match';
+    case 'match':
+      return 'Match';
+    case 'weak_match':
+      return 'Weak match';
+    case 'no_match':
+      return 'No match';
+    case 'unclear':
+      return 'Unclear';
+    default:
+      return verdict || 'N/D';
+  }
+}
+
+function candidateActionLabel(action: string): string {
+  switch (action) {
+    case 'confirm':
+      return 'Conferma';
+    case 'review':
+      return 'Review';
+    case 'downgrade':
+      return 'Downgrade';
+    case 'reject':
+      return 'Reject';
+    default:
+      return action || 'N/D';
+  }
+}
+
 function targetOptionLabel(target: MATarget): string {
   const bits = [
     target.companyName,
@@ -541,6 +583,7 @@ export function TestPage() {
   const [pipelineKeywordCount, setPipelineKeywordCount] = useState('5');
   const [pipelineIncludeIdentifiers, setPipelineIncludeIdentifiers] = useState(false);
   const [pipelineRank, setPipelineRank] = useState(true);
+  const [pipelineAnalyzeWithLLM, setPipelineAnalyzeWithLLM] = useState(true);
 
   const pipelineSessions = useQuery({
     queryKey: ['binocolo-test-ma-sessions', pipelineVisibility],
@@ -648,7 +691,7 @@ export function TestPage() {
         }),
       );
 
-      return {
+      const result: PipelineRunResult = {
         target,
         keywordSet,
         domainResponse,
@@ -656,6 +699,19 @@ export function TestPage() {
         evidenceRuns,
         summary: computePipelineSummary(selectedDomain, evidenceRuns),
       };
+
+      if (selectedDomain && pipelineAnalyzeWithLLM) {
+        try {
+          result.candidateMatchAnalysis = await api.post<CandidateMatchAnalysisResponse>(
+            '/binocolo/v1/test/candidate-match-analysis',
+            result,
+          );
+        } catch (err) {
+          result.candidateMatchError = errorLabel(err);
+        }
+      }
+
+      return result;
     },
   });
 
@@ -1128,6 +1184,17 @@ export function TestPage() {
                   }}
                 />
               </label>
+              <label className={styles.dryRunField}>
+                <span>Analisi LLM</span>
+                <ToggleSwitch
+                  id="binocolo-pipeline-analysis"
+                  checked={pipelineAnalyzeWithLLM}
+                  onChange={(value) => {
+                    setPipelineAnalyzeWithLLM(value);
+                    evidencePipeline.reset();
+                  }}
+                />
+              </label>
               <Button
                 type="submit"
                 loading={evidencePipeline.isPending}
@@ -1277,6 +1344,74 @@ export function TestPage() {
                     <strong>{evidencePipeline.data.selectedDomain?.confidence ?? 'N/D'}</strong>
                   </div>
                 </div>
+
+                {evidencePipeline.data.candidateMatchAnalysis ? (
+                  <article className={`${styles.resultCard} ${styles.analysisCard}`}>
+                    <div className={styles.resultCardHead}>
+                      <div>
+                        <h3>Candidate match analyst</h3>
+                        <p>{evidencePipeline.data.candidateMatchAnalysis.rationale}</p>
+                      </div>
+                      <div className={styles.cardActions}>
+                        <span className={`${styles.scoreBadge} ${styles[`confidence_${evidencePipeline.data.candidateMatchAnalysis.confidence}`] ?? ''}`}>
+                          {candidateVerdictLabel(evidencePipeline.data.candidateMatchAnalysis.verdict)}
+                        </span>
+                        <span className={styles.bucketBadge}>
+                          {candidateActionLabel(evidencePipeline.data.candidateMatchAnalysis.recommendedAction)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={styles.analysisGrid}>
+                      <div>
+                        <span>Sector fit</span>
+                        <p>{evidencePipeline.data.candidateMatchAnalysis.sectorFit || 'N/D'}</p>
+                      </div>
+                      <div>
+                        <span>Business fit</span>
+                        <p>{evidencePipeline.data.candidateMatchAnalysis.businessFit || 'N/D'}</p>
+                      </div>
+                    </div>
+                    <div className={styles.analysisColumns}>
+                      <div>
+                        <span>Prove a favore</span>
+                        {evidencePipeline.data.candidateMatchAnalysis.evidenceFor.length > 0 ? (
+                          <ul>
+                            {evidencePipeline.data.candidateMatchAnalysis.evidenceFor.map((item) => <li key={item}>{item}</li>)}
+                          </ul>
+                        ) : <p>N/D</p>}
+                      </div>
+                      <div>
+                        <span>Contro / lacune</span>
+                        {[...evidencePipeline.data.candidateMatchAnalysis.evidenceAgainst, ...evidencePipeline.data.candidateMatchAnalysis.missingEvidence].length > 0 ? (
+                          <ul>
+                            {[...evidencePipeline.data.candidateMatchAnalysis.evidenceAgainst, ...evidencePipeline.data.candidateMatchAnalysis.missingEvidence].map((item) => <li key={item}>{item}</li>)}
+                          </ul>
+                        ) : <p>N/D</p>}
+                      </div>
+                    </div>
+                    {evidencePipeline.data.candidateMatchAnalysis.negativeSignals.length > 0 ? (
+                      <div className={styles.analysisList}>
+                        <span>Segnali negativi</span>
+                        <p>{evidencePipeline.data.candidateMatchAnalysis.negativeSignals.join(' · ')}</p>
+                      </div>
+                    ) : null}
+                    {evidencePipeline.data.candidateMatchAnalysis.conceptAliases.length > 0 ? (
+                      <div className={styles.aliasList}>
+                        <span>Alias concettuali</span>
+                        {evidencePipeline.data.candidateMatchAnalysis.conceptAliases.map((alias) => (
+                          <p key={`${alias.term}-${alias.matchedConcept}`}>
+                            <strong>{alias.term}</strong> -&gt; {alias.matchedConcept}
+                            {alias.evidence ? ` · ${alias.evidence}` : ''}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                ) : evidencePipeline.data.candidateMatchError ? (
+                  <div className={styles.responseBar}>
+                    <span>Candidate match analyst non disponibile: {evidencePipeline.data.candidateMatchError}</span>
+                  </div>
+                ) : null}
 
                 {evidencePipeline.data.selectedDomain ? (
                   <div className={styles.cardList}>

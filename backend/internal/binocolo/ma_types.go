@@ -99,6 +99,7 @@ const (
 	maModelScopeSectorClassification   = "ma_sector_classification"
 	maModelScopeDeepBrief              = "ma_deep_brief"
 	maModelScopeWebSearchScorer        = "web_search_scorer"
+	maModelScopeCandidateMatchAnalyst  = "candidate_match_analyst"
 
 	maEstimateSurfaceExact    = "exact"
 	maEstimateSurfaceTooBroad = "too_broad"

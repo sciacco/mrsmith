@@ -81,6 +81,55 @@ export interface DomainResolutionResponse {
   results: WebSearchResult[];
 }
 
+export interface CandidateMatchAnalysisRequest {
+  target: MATarget;
+  keywordSet: {
+    intentLabel: string;
+    coreTerms: string[];
+    adjacentTerms: string[];
+    negativeTerms: string[];
+    sources: string[];
+  };
+  domainResponse: DomainResolutionResponse;
+  selectedDomain?: DomainResolutionCandidate;
+  evidenceRuns: Array<{
+    bucket: string;
+    term: string;
+    response?: WebSearchResponse;
+    error?: string;
+    resultCount: number;
+    bestScore?: number;
+    matched: boolean;
+  }>;
+  summary: {
+    score: number;
+    confidence: string;
+    coreMatches: number;
+    adjacentMatches: number;
+    negativeMatches: number;
+  };
+}
+
+export interface CandidateMatchAnalysisResponse {
+  verdict: 'strong_match' | 'match' | 'weak_match' | 'no_match' | 'unclear' | string;
+  confidence: MAConfidence | string;
+  sectorFit: string;
+  businessFit: string;
+  evidenceFor: string[];
+  evidenceAgainst: string[];
+  negativeSignals: string[];
+  missingEvidence: string[];
+  conceptAliases: CandidateMatchConceptAlias[];
+  recommendedAction: 'confirm' | 'review' | 'downgrade' | 'reject' | string;
+  rationale: string;
+}
+
+export interface CandidateMatchConceptAlias {
+  term: string;
+  matchedConcept: string;
+  evidence: string;
+}
+
 export interface MASessionListResponse {
   items: MASessionSummary[];
 }
