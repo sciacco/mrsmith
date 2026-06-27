@@ -266,23 +266,97 @@ func maRevenuePerEmployeeMinEvidence(c maSignalContext, min int) (MATargetEviden
 		Family:    maFamilyEconomic,
 		Label:     "Ricavo per dipendente minimo",
 	}
-	turnover, hasTurnover := maPositiveInt(c.fin.Turnover, c.target.Turnover)
-	employees, hasEmployees := maPositiveInt(c.fin.Employees, c.target.Employees)
-	if !hasTurnover || !hasEmployees {
-		reason := maRevenuePerEmployeeMissingReason(hasTurnover, hasEmployees)
+	pair, reason, ok := resolveMARevenueEmployeePair(c)
+	if !ok {
 		evidence.Status = maEvidenceMissing
 		evidence.Value = reason
 		return evidence, "Ricavo/dipendente non valutabile: " + reason, false
 	}
 
-	ratio := float64(turnover) / float64(employees)
-	evidence.Value = fmt.Sprintf("%.0f €/dip (min %d)", ratio, min)
+	ratio := float64(pair.turnover) / float64(pair.employees)
+	evidence.Value = maRevenuePerEmployeeValue(ratio, min, pair)
 	if ratio < float64(min) {
 		evidence.Status = maEvidenceOutside
 		return evidence, "", true
 	}
 	evidence.Status = maEvidenceMatch
 	return evidence, "", false
+}
+
+type maRevenueEmployeePair struct {
+	turnover  int
+	employees int
+	year      int
+	source    string
+}
+
+const (
+	maRevenueEmployeeSourceBalanceSheet = "bilancio"
+	maRevenueEmployeeSourceHeadline     = "headline"
+)
+
+func resolveMARevenueEmployeePair(c maSignalContext) (maRevenueEmployeePair, string, bool) {
+	if len(c.fin.Series) > 0 {
+		return maRevenueEmployeePairFromSeries(c.fin)
+	}
+	if pair, reason, ok := maRevenueEmployeePairFromValues(c.fin.Turnover, c.fin.Employees, c.fin.LastYear, maRevenueEmployeeSourceBalanceSheet); ok {
+		return pair, "", true
+	} else if c.fin.Turnover != nil || c.fin.Employees != nil {
+		return maRevenueEmployeePair{}, reason, false
+	}
+	return maRevenueEmployeePairFromValues(c.target.Turnover, c.target.Employees, intValue(c.target.TurnoverYear), maRevenueEmployeeSourceHeadline)
+}
+
+func maRevenueEmployeePairFromSeries(fin maFinancials) (maRevenueEmployeePair, string, bool) {
+	hasTurnover := false
+	hasEmployees := false
+	for i := len(fin.Series) - 1; i >= 0; i-- {
+		sheet := fin.Series[i]
+		if sheet.Turnover != nil && *sheet.Turnover >= 0 {
+			hasTurnover = true
+		}
+		if sheet.Employees != nil && *sheet.Employees > 0 {
+			hasEmployees = true
+		}
+		if sheet.Turnover == nil || *sheet.Turnover < 0 || sheet.Employees == nil || *sheet.Employees <= 0 {
+			continue
+		}
+		pair := maRevenueEmployeePair{
+			turnover:  *sheet.Turnover,
+			employees: *sheet.Employees,
+			year:      sheet.Year,
+			source:    maRevenueEmployeeSourceBalanceSheet,
+		}
+		if fin.LastYear > 0 && sheet.Year > 0 && sheet.Year < fin.LastYear-1 {
+			return maRevenueEmployeePair{}, "bilancio coerente troppo datato", false
+		}
+		return pair, "", true
+	}
+	return maRevenueEmployeePair{}, maRevenuePerEmployeeMissingReason(hasTurnover, hasEmployees), false
+}
+
+func maRevenueEmployeePairFromValues(turnover, employees *int, year int, source string) (maRevenueEmployeePair, string, bool) {
+	hasTurnover := turnover != nil && *turnover >= 0
+	hasEmployees := employees != nil && *employees > 0
+	if !hasTurnover || !hasEmployees {
+		return maRevenueEmployeePair{}, maRevenuePerEmployeeMissingReason(hasTurnover, hasEmployees), false
+	}
+	return maRevenueEmployeePair{
+		turnover:  *turnover,
+		employees: *employees,
+		year:      year,
+		source:    source,
+	}, "", true
+}
+
+func maRevenuePerEmployeeValue(ratio float64, min int, pair maRevenueEmployeePair) string {
+	if pair.year > 0 {
+		return fmt.Sprintf("%.0f €/dip anno %d (min %d)", ratio, pair.year, min)
+	}
+	if pair.source == maRevenueEmployeeSourceHeadline {
+		return fmt.Sprintf("%.0f €/dip dato sintetico (min %d)", ratio, min)
+	}
+	return fmt.Sprintf("%.0f €/dip (min %d)", ratio, min)
 }
 
 func maRevenuePerEmployeeMissingReason(hasTurnover, hasEmployees bool) string {
@@ -302,8 +376,8 @@ func maMaxShareholdersEvidence(c maSignalContext, max int) (MATargetEvidence, st
 		Family:    maFamilyDeal,
 		Label:     "Numero massimo soci",
 	}
-	count := len(c.holders)
-	if count <= 0 {
+	count, ok := extractDirectShareholderCount(c.object)
+	if !ok {
 		evidence.Status = maEvidenceMissing
 		evidence.Value = "soci non disponibili"
 		return evidence, "Numero soci non valutabile", false
@@ -325,6 +399,13 @@ func maPositiveInt(values ...*int) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+func intValue(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 const (

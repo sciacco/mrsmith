@@ -219,6 +219,39 @@ func extractShareholders(object map[string]any) []maShareholder {
 	return nil
 }
 
+func extractDirectShareholderCount(object map[string]any) (int, bool) {
+	if object == nil {
+		return 0, false
+	}
+	if raw, ok := object["shareHolders"]; ok {
+		list, ok := raw.([]any)
+		if !ok {
+			return 0, false
+		}
+		count := countVendorObjects(list)
+		return count, count > 0
+	}
+	if raw, ok := object["shareholders"]; ok {
+		list, ok := raw.([]any)
+		if !ok {
+			return 0, false
+		}
+		count := countVendorObjects(list)
+		return count, count > 0
+	}
+	return 0, false
+}
+
+func countVendorObjects(list []any) int {
+	count := 0
+	for _, item := range list {
+		if _, ok := item.(map[string]any); ok {
+			count++
+		}
+	}
+	return count
+}
+
 func extractFlatShareholders(list []any, inheritedPercent float64) []maShareholder {
 	out := make([]maShareholder, 0, len(list))
 	for _, item := range list {

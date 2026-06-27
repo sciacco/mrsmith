@@ -1562,7 +1562,9 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
     >,
   ) {
     return (event: ChangeEvent<HTMLInputElement>) => {
-      onChange({ [field]: optionalNumber(event.target.value) } as Partial<MAStrategySpec>);
+      const parsed = optionalNumber(event.target.value);
+      const value = field === 'maxShareholders' && parsed != null && parsed < 1 ? undefined : parsed;
+      onChange({ [field]: value } as Partial<MAStrategySpec>);
     };
   }
 
@@ -1646,7 +1648,8 @@ function StrategyEditor({ strategy, onChange }: { strategy: MAStrategySpec; onCh
               <span>Numero massimo soci</span>
               <input
                 type="number"
-                min={0}
+                min={1}
+                step={1}
                 value={strategy.maxShareholders ?? ''}
                 onChange={updateNumber('maxShareholders')}
                 placeholder="max"

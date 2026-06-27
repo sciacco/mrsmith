@@ -232,6 +232,17 @@ type maPricing struct {
 // loadPricing reads the configurable pricing levers; missing/unreadable values
 // fall back to the compiled defaults so the feature degrades gracefully.
 func (s *maService) loadPricing(ctx context.Context) maPricing {
+	if s.store == nil {
+		return maPricingFromParameters(nil)
+	}
+	params, err := s.store.ListMAParameters(ctx)
+	if err != nil {
+		return maPricingFromParameters(nil)
+	}
+	return maPricingFromParameters(params)
+}
+
+func maPricingFromParameters(params []MAParameter) maPricing {
 	pricing := maPricing{
 		CostAdvanced:               maCostPerCompanyEUR,
 		CostFull:                   maCostPerFullEUR,
@@ -240,13 +251,6 @@ func (s *maService) loadPricing(ctx context.Context) maPricing {
 		SMEHaircutPct:              maSMEHaircutPctDefault,
 		EBITDAFallbackPct:          maEBITDAFallbackPctDefault,
 		ThesisFitHoldingHaircutPct: maThesisFitHoldingHaircutPctDefault,
-	}
-	if s.store == nil {
-		return pricing
-	}
-	params, err := s.store.ListMAParameters(ctx)
-	if err != nil {
-		return pricing
 	}
 	values := make(map[string]string, len(params))
 	for _, param := range params {
@@ -333,7 +337,12 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	if prompt == "" {
 		return MASessionDetail{}, fmt.Errorf("%w: prompt", errMAStrategyInvalid)
 	}
-	pipeline := s.loadMAStrategyPipeline(ctx)
+	params := []MAParameter(nil)
+	if listed, err := s.store.ListMAParameters(ctx); err == nil {
+		params = listed
+	}
+	pipeline := maStrategyPipelineFromParameters(params)
+	pricing := maPricingFromParameters(params)
 	if err := s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_strategy_pipeline_selected",
 		Status:    maTraceEventSucceeded,
@@ -411,7 +420,7 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	if err := s.recordMAStrategyAudits(ctx, audits, detail.Session.ID, strategyVersionID); err != nil {
 		return MASessionDetail{}, err
 	}
-	return decorateMACost(detail, s.loadPricing(ctx)), nil
+	return decorateMACost(detail, pricing), nil
 }
 
 const (
@@ -422,12 +431,16 @@ const (
 
 func (s *maService) loadMAStrategyPipeline(ctx context.Context) string {
 	if s.store == nil {
-		return maStrategyPipelineV2
+		return maStrategyPipelineFromParameters(nil)
 	}
 	params, err := s.store.ListMAParameters(ctx)
 	if err != nil {
-		return maStrategyPipelineV2
+		return maStrategyPipelineFromParameters(nil)
 	}
+	return maStrategyPipelineFromParameters(params)
+}
+
+func maStrategyPipelineFromParameters(params []MAParameter) string {
 	for _, param := range params {
 		if param.Key != maStrategyPipelineParameter {
 			continue
@@ -986,8 +999,9 @@ func (s *maService) listParameters(ctx context.Context) ([]MAParameter, error) {
 }
 
 // updateParameter validates and persists one configurable business parameter.
-// Only seeded keys are editable (the UPDATE matches an existing row); the value
-// must be a non-negative number. Each change is audited via a trace event.
+// Only seeded keys are editable (the UPDATE matches an existing row). Numeric
+// parameters must be non-negative; ma_strategy_pipeline is an enum kill-switch.
+// Each change is audited via a trace event.
 func (s *maService) updateParameter(ctx context.Context, key, value, subject, email string) error {
 	if s.store == nil {
 		return errMAStoreUnavailable
@@ -997,9 +1011,15 @@ func (s *maService) updateParameter(ctx context.Context, key, value, subject, em
 		return fmt.Errorf("%w: parameter key", errMAStrategyInvalid)
 	}
 	value = strings.TrimSpace(value)
-	parsed, err := strconv.ParseFloat(value, 64)
-	if err != nil || parsed < 0 || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
-		return fmt.Errorf("%w: parameter value", errMAStrategyInvalid)
+	if key == maStrategyPipelineParameter {
+		if value != maStrategyPipelineV2 && value != maStrategyPipelineMonolith {
+			return fmt.Errorf("%w: parameter value ma_strategy_pipeline must be v2 or monolith", errMAStrategyInvalid)
+		}
+	} else {
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil || parsed < 0 || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+			return fmt.Errorf("%w: parameter value", errMAStrategyInvalid)
+		}
 	}
 	if err := s.store.UpdateMAParameter(ctx, key, value, email); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -1441,7 +1461,7 @@ func (s *maService) resolveIntent(ctx context.Context, promptText string, intent
 
 	legalForms, legalFormMissing, err := s.resolveMAIntentLegalForms(ctx, intent.LegalForms)
 	if err != nil {
-		return MAStrategySpec{}, nil, err
+		return MAStrategySpec{}, audits, err
 	}
 	missing = appendMAMissingCriteria(missing, legalFormMissing...)
 	missing = appendMAMissingCriteria(missing, maIntentUnsupportedCriteria(intent)...)

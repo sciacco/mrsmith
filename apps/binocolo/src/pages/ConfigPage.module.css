@@ -109,17 +109,27 @@
   background: var(--color-bg);
 }
 
-.inputWrap input {
-  width: 120px;
+.inputWrap input,
+.inputWrap select {
   border: 0;
   background: transparent;
   color: var(--color-text);
   font: inherit;
   padding: var(--space-2) 0;
+}
+
+.inputWrap input {
+  width: 120px;
   text-align: right;
 }
 
-.inputWrap input:focus {
+.inputWrap select {
+  min-width: 140px;
+  cursor: pointer;
+}
+
+.inputWrap input:focus,
+.inputWrap select:focus {
   outline: none;
 }
 

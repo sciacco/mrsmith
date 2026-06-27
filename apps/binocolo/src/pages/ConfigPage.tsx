@@ -4,6 +4,9 @@ import { useApiClient } from '../api/client';
 import type { MAParameter, MAParametersResponse } from '../api/types';
 import styles from './ConfigPage.module.css';
 
+const MA_STRATEGY_PIPELINE_PARAMETER = 'ma_strategy_pipeline';
+const MA_STRATEGY_PIPELINE_VALUES = ['v2', 'monolith'];
+
 export function ConfigPage() {
   const api = useApiClient();
   const { toast } = useToast();
@@ -40,7 +43,7 @@ export function ConfigPage() {
       toast('Parametro aggiornato.', 'success');
       await load();
     } catch {
-      toast('Salvataggio non riuscito: verifica il valore (numero ≥ 0).', 'error');
+      toast(parameterErrorMessage(param), 'error');
     } finally {
       setSavingKey(null);
     }
@@ -76,6 +79,8 @@ export function ConfigPage() {
             {params.map((param) => {
               const draft = drafts[param.key] ?? '';
               const dirty = draft.trim() !== param.value.trim();
+              const isPipeline = isStrategyPipelineParameter(param);
+              const isValid = isParameterDraftValid(param, draft);
               return (
                 <li key={param.key} className={styles.row}>
                   <div className={styles.rowInfo}>
@@ -85,21 +90,34 @@ export function ConfigPage() {
                   </div>
                   <div className={styles.rowEdit}>
                     <div className={styles.inputWrap}>
-                      {param.valueType === 'money' ? <span className={styles.affix}>€</span> : null}
-                      <input
-                        type="number"
-                        min={0}
-                        step={param.valueType === 'money' ? 0.01 : 1}
-                        value={draft}
-                        onChange={(event) => setDrafts((current) => ({ ...current, [param.key]: event.target.value }))}
-                      />
-                      {param.valueType === 'percent' ? <span className={styles.affix}>%</span> : null}
+                      {isPipeline ? (
+                        <select
+                          value={draft}
+                          aria-label={param.label}
+                          onChange={(event) => setDrafts((current) => ({ ...current, [param.key]: event.target.value }))}
+                        >
+                          <option value="v2">v2</option>
+                          <option value="monolith">monolith</option>
+                        </select>
+                      ) : (
+                        <>
+                          {param.valueType === 'money' ? <span className={styles.affix}>€</span> : null}
+                          <input
+                            type="number"
+                            min={0}
+                            step={param.valueType === 'money' ? 0.01 : 1}
+                            value={draft}
+                            onChange={(event) => setDrafts((current) => ({ ...current, [param.key]: event.target.value }))}
+                          />
+                          {param.valueType === 'percent' ? <span className={styles.affix}>%</span> : null}
+                        </>
+                      )}
                     </div>
                     <Button
                       size="sm"
                       onClick={() => save(param)}
                       loading={savingKey === param.key}
-                      disabled={!dirty || draft.trim() === '' || !(Number.isFinite(Number(draft)) && Number(draft) >= 0)}
+                      disabled={!dirty || !isValid}
                     >
                       Salva
                     </Button>
@@ -112,4 +130,23 @@ export function ConfigPage() {
       )}
     </main>
   );
+}
+
+function isStrategyPipelineParameter(param: MAParameter): boolean {
+  return param.key === MA_STRATEGY_PIPELINE_PARAMETER;
+}
+
+function isParameterDraftValid(param: MAParameter, draft: string): boolean {
+  const value = draft.trim();
+  if (isStrategyPipelineParameter(param)) {
+    return MA_STRATEGY_PIPELINE_VALUES.includes(value);
+  }
+  return value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
+}
+
+function parameterErrorMessage(param: MAParameter): string {
+  if (isStrategyPipelineParameter(param)) {
+    return 'Salvataggio non riuscito: scegli v2 o monolith.';
+  }
+  return 'Salvataggio non riuscito: verifica il valore (numero ≥ 0).';
 }

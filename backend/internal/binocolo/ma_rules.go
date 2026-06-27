@@ -74,7 +74,7 @@ func validateMAStrategy(input MAStrategySpec) (MAStrategySpec, error) {
 	if err := validateOptionalInt(strategy.RevenuePerEmployeeMin, "revenue per employee min"); err != nil {
 		return MAStrategySpec{}, err
 	}
-	if err := validateOptionalInt(strategy.MaxShareholders, "max shareholders"); err != nil {
+	if err := validateOptionalMinInt(strategy.MaxShareholders, 1, "max shareholders"); err != nil {
 		return MAStrategySpec{}, err
 	}
 	strategy.SearchLimit = normalizeMASearchLimit(strategy.SearchLimit)
@@ -458,6 +458,13 @@ func validateOptionalRange(min, max *int, label string) error {
 
 func validateOptionalInt(value *int, label string) error {
 	if value != nil && *value < 0 {
+		return fmt.Errorf("%w: %s", errMAStrategyInvalid, label)
+	}
+	return nil
+}
+
+func validateOptionalMinInt(value *int, min int, label string) error {
+	if value != nil && *value < min {
 		return fmt.Errorf("%w: %s", errMAStrategyInvalid, label)
 	}
 	return nil
