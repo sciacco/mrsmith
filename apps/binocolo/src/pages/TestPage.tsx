@@ -5,6 +5,7 @@ import { Button, Icon, Skeleton, ToggleSwitch } from '@mrsmith/ui';
 import { useApiClient } from '../api/client';
 import type {
   CandidateMatchAnalysisResponse,
+  CandidateMatchFinalDecision,
   CompanySearchRow,
   DomainResolutionCandidate,
   DomainResolutionResponse,
@@ -14,6 +15,8 @@ import type {
   MAStrategySpec,
   MATarget,
   OpenAPIITEnvelope,
+  PipelineFinalAction,
+  PipelineWebValidationState,
   WebSearchResponse,
 } from '../api/types';
 import styles from './TestPage.module.css';
@@ -99,10 +102,22 @@ interface PipelineEvidenceRun extends PipelineTermSpec {
 interface PipelineSummary {
   score: number;
   confidence: 'alta' | 'media' | 'bassa';
+  sectorEvidenceScore: number;
+  coverageScore: number;
+  domainScore: number;
+  negativePenalty: number;
   coreMatches: number;
   adjacentMatches: number;
   negativeMatches: number;
+  searchedCoreTerms: number;
+  searchedAdjacentTerms: number;
+  searchedNegativeTerms: number;
+  totalCoreTerms: number;
+  totalAdjacentTerms: number;
+  totalNegativeTerms: number;
 }
+
+type PipelineFinalDecision = CandidateMatchFinalDecision;
 
 interface PipelineRunResult {
   target: MATarget;
@@ -113,7 +128,10 @@ interface PipelineRunResult {
   summary: PipelineSummary;
   candidateMatchAnalysis?: CandidateMatchAnalysisResponse;
   candidateMatchError?: string;
+  finalDecision: PipelineFinalDecision;
 }
+
+type PipelineReconciliationInput = Omit<PipelineRunResult, 'finalDecision'>;
 
 const dataEnrichmentOptions = [
   { value: '', label: 'Non impostato' },
@@ -331,6 +349,11 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function ratioScore(value: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.max(0, Math.min(100, (value / total) * 100));
+}
+
 function cleanTerm(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
@@ -475,27 +498,90 @@ function evidenceResponseMatched(response: WebSearchResponse): boolean {
   return !response.ranked && response.results.length > 0;
 }
 
+function bucketEvidenceScore(runs: PipelineEvidenceRun[], bucket: EvidenceBucket): number {
+  const bucketRuns = runs.filter((run) => run.bucket === bucket);
+  if (bucketRuns.length === 0) return 0;
+  const matchedRuns = bucketRuns.filter((run) => run.matched);
+  const matchedRate = matchedRuns.length / bucketRuns.length;
+  const quality =
+    matchedRuns.length > 0
+      ? matchedRuns.reduce((sum, run) => sum + (run.bestScore ?? 60), 0) / matchedRuns.length
+      : 0;
+
+  return clampScore(matchedRate * 70 + quality * 0.3);
+}
+
+function domainEvidenceScore(selectedDomain: DomainResolutionCandidate | undefined): number {
+  if (!selectedDomain) return 0;
+  const confidenceScore =
+    selectedDomain.confidence === 'alta'
+      ? 100
+      : selectedDomain.confidence === 'media'
+        ? 70
+        : 30;
+  return clampScore(selectedDomain.score * 0.75 + confidenceScore * 0.25);
+}
+
 function computePipelineSummary(
   selectedDomain: DomainResolutionCandidate | undefined,
+  keywordSet: PipelineKeywordSet,
   runs: PipelineEvidenceRun[],
 ): PipelineSummary {
   const matched = (bucket: EvidenceBucket) =>
     runs.filter((run) => run.bucket === bucket && run.matched).length;
+  const searched = (bucket: EvidenceBucket) =>
+    runs.filter((run) => run.bucket === bucket).length;
   const coreMatches = matched('core');
   const adjacentMatches = matched('adjacent');
   const negativeMatches = matched('negative');
-  const domainMultiplier =
-    selectedDomain?.confidence === 'alta' ? 1 : selectedDomain?.confidence === 'media' ? 0.85 : 0.45;
-  const rawScore = (coreMatches * 26 + adjacentMatches * 8 - negativeMatches * 22) * domainMultiplier;
+  const searchedCoreTerms = searched('core');
+  const searchedAdjacentTerms = searched('adjacent');
+  const searchedNegativeTerms = searched('negative');
+  const totalCoreTerms = keywordSet.coreTerms.length;
+  const totalAdjacentTerms = keywordSet.adjacentTerms.length;
+  const totalNegativeTerms = keywordSet.negativeTerms.length;
+  const coreEvidenceScore = bucketEvidenceScore(runs, 'core');
+  const adjacentEvidenceScore = bucketEvidenceScore(runs, 'adjacent');
+  const sectorEvidenceScore = clampScore(coreEvidenceScore * 0.72 + adjacentEvidenceScore * 0.28);
+  const coverageScore = clampScore(
+    ratioScore(coreMatches, Math.max(totalCoreTerms, searchedCoreTerms)) * 0.7 +
+      ratioScore(adjacentMatches, Math.max(totalAdjacentTerms, searchedAdjacentTerms)) * 0.3,
+  );
+  const domainScore = domainEvidenceScore(selectedDomain);
+  const negativeRate = ratioScore(negativeMatches, Math.max(1, searchedNegativeTerms));
+  const negativePenalty = clampScore(negativeMatches * 18 + negativeRate * 0.35);
+  const noNegativeScore = 100 - negativePenalty;
+  const rawScore =
+    sectorEvidenceScore * 0.45 +
+    coverageScore * 0.2 +
+    domainScore * 0.25 +
+    noNegativeScore * 0.1 -
+    negativePenalty * 0.35;
   const score = selectedDomain ? clampScore(rawScore) : 0;
   const confidence: PipelineSummary['confidence'] =
-    selectedDomain && coreMatches >= 2
+    selectedDomain && score >= 70 && coreMatches >= 2 && negativePenalty < 25
       ? 'alta'
-      : selectedDomain && (coreMatches >= 1 || adjacentMatches >= 2)
+      : selectedDomain && score >= 45 && (coreMatches >= 1 || adjacentMatches >= 2)
         ? 'media'
         : 'bassa';
 
-  return { score, confidence, coreMatches, adjacentMatches, negativeMatches };
+  return {
+    score,
+    confidence,
+    sectorEvidenceScore,
+    coverageScore,
+    domainScore,
+    negativePenalty,
+    coreMatches,
+    adjacentMatches,
+    negativeMatches,
+    searchedCoreTerms,
+    searchedAdjacentTerms,
+    searchedNegativeTerms,
+    totalCoreTerms,
+    totalAdjacentTerms,
+    totalNegativeTerms,
+  };
 }
 
 function pipelineBucketLabel(bucket: EvidenceBucket): string {
@@ -539,6 +625,232 @@ function candidateActionLabel(action: string): string {
     default:
       return action || 'N/D';
   }
+}
+
+function finalActionLabel(action: PipelineFinalAction): string {
+  switch (action) {
+    case 'confirm':
+      return 'Conferma';
+    case 'deprioritize':
+      return 'Deprioritizza';
+    case 'reject':
+      return 'Reject';
+    case 'needs_domain_review':
+      return 'Review dominio';
+    case 'needs_business_validation':
+      return 'Validazione business';
+  }
+}
+
+function webValidationStateLabel(state: PipelineWebValidationState): string {
+  switch (state) {
+    case 'confirmed':
+      return 'Confermato';
+    case 'deprioritized':
+      return 'Declassato';
+    case 'domain_unresolved':
+      return 'Dominio non risolto';
+    case 'analysis_unavailable':
+      return 'Analyst non disponibile';
+    case 'rejected':
+      return 'Respinto';
+    case 'unclear':
+      return 'Incerto';
+  }
+}
+
+function latestStaffCost(target: MATarget): number | undefined {
+  if (!isRecord(target.vendorPayload)) return undefined;
+  const balanceSheets = target.vendorPayload.balanceSheets;
+  if (!isRecord(balanceSheets)) return undefined;
+  const last = balanceSheets.last;
+  if (!isRecord(last)) return undefined;
+  return typeof last.totalStaffCost === 'number' ? last.totalStaffCost : undefined;
+}
+
+function targetBusinessRiskSignals(target: MATarget): string[] {
+  const signals: string[] = [];
+  if (target.employees === 0) signals.push('dipendenti dichiarati pari a 0');
+  const staffCost = latestStaffCost(target);
+  if (typeof staffCost === 'number' && staffCost <= 1000) signals.push('costo personale nullo o quasi nullo');
+  if (target.missingCriteria.some((criterion) => criterion.toLowerCase().includes('produtt'))) {
+    signals.push('produttivita non valutabile');
+  }
+  if (target.flags?.some((flag) => flag.code === 'bilancio_datato')) {
+    signals.push('ultimo bilancio datato');
+  }
+  return signals;
+}
+
+function reconcilePipelineDecision(input: PipelineReconciliationInput): PipelineFinalDecision {
+  const { target, selectedDomain, summary, candidateMatchAnalysis, candidateMatchError } = input;
+  const reasons: string[] = [];
+  const deterministicHigh = target.matchState === 'match' && target.score >= 75;
+  const businessRisks = targetBusinessRiskSignals(target);
+  if (businessRisks.length > 0) reasons.push(...businessRisks.map((risk) => `Rischio business: ${risk}.`));
+
+  if (!selectedDomain) {
+    reasons.unshift('Nessun dominio ufficiale credibile risolto.');
+    return {
+      initialMatchState: target.matchState,
+      deterministicScore: target.score,
+      webScore: summary.score,
+      webValidationState: 'domain_unresolved',
+      finalAction: 'needs_domain_review',
+      confidence: deterministicHigh ? 'media' : 'bassa',
+      reason: 'Score iniziale non validabile senza dominio ufficiale.',
+      reasons,
+    };
+  }
+
+  const weakWebEvidence = summary.score < 45 || summary.coreMatches === 0;
+  const moderateWebEvidence = summary.score < 70 || selectedDomain.confidence !== 'alta';
+  const negativeEvidence = summary.negativeMatches > 0 || summary.negativePenalty >= 25;
+
+  if (!candidateMatchAnalysis) {
+    if (candidateMatchError) reasons.unshift(`Analyst non disponibile: ${candidateMatchError}`);
+    if (weakWebEvidence || negativeEvidence) {
+      reasons.unshift('Web evidence insufficiente o rumorosa senza validazione LLM.');
+    }
+    return {
+      initialMatchState: target.matchState,
+      deterministicScore: target.score,
+      webScore: summary.score,
+      webValidationState: 'analysis_unavailable',
+      finalAction: deterministicHigh && !weakWebEvidence ? 'needs_business_validation' : 'deprioritize',
+      confidence: deterministicHigh && !weakWebEvidence ? 'media' : 'bassa',
+      reason: deterministicHigh
+        ? 'Il candidato resta interessante sulla carta, ma manca il giudizio LLM finale.'
+        : 'Validazione incompleta e segnale web non sufficiente per confermare.',
+      reasons,
+    };
+  }
+
+  const analystReject =
+    candidateMatchAnalysis.recommendedAction === 'reject' || candidateMatchAnalysis.verdict === 'no_match';
+  const analystDowngrade =
+    candidateMatchAnalysis.recommendedAction === 'downgrade' || candidateMatchAnalysis.verdict === 'weak_match';
+  const analystReview =
+    candidateMatchAnalysis.recommendedAction === 'review' ||
+    candidateMatchAnalysis.verdict === 'unclear' ||
+    candidateMatchAnalysis.confidence === 'bassa';
+  const analystConfirm =
+    candidateMatchAnalysis.recommendedAction === 'confirm' &&
+    (candidateMatchAnalysis.verdict === 'strong_match' || candidateMatchAnalysis.verdict === 'match');
+
+  if (candidateMatchAnalysis.evidenceAgainst.length > 0) {
+    reasons.push(...candidateMatchAnalysis.evidenceAgainst.map((item) => `Contro: ${item}`));
+  }
+  if (candidateMatchAnalysis.missingEvidence.length > 0) {
+    reasons.push(...candidateMatchAnalysis.missingEvidence.map((item) => `Lacuna: ${item}`));
+  }
+  if (candidateMatchAnalysis.negativeSignals.length > 0) {
+    reasons.push(...candidateMatchAnalysis.negativeSignals.map((item) => `Segnale negativo: ${item}`));
+  }
+  if (negativeEvidence) reasons.unshift('La web evidence contiene segnali negativi o penalty rilevante.');
+  if (weakWebEvidence) reasons.unshift('La web evidence non copre i termini core.');
+
+  if (analystConfirm && summary.score >= 70 && !negativeEvidence && businessRisks.length < 2) {
+    if (moderateWebEvidence) {
+      reasons.unshift('Analyst positivo, ma dominio/copertura non sono abbastanza forti per conferma automatica.');
+      return {
+        initialMatchState: target.matchState,
+        deterministicScore: target.score,
+        webScore: summary.score,
+        webValidationState: 'unclear',
+        finalAction: 'needs_business_validation',
+        confidence: 'media',
+        reason: 'Match promettente, da validare prima di promuoverlo.',
+        reasons,
+        analystVerdict: candidateMatchAnalysis.verdict,
+        analystAction: candidateMatchAnalysis.recommendedAction,
+      };
+    }
+    reasons.unshift('Score iniziale, web evidence e analyst sono coerenti.');
+    return {
+      initialMatchState: target.matchState,
+      deterministicScore: target.score,
+      webScore: summary.score,
+      webValidationState: 'confirmed',
+      finalAction: 'confirm',
+      confidence: candidateMatchAnalysis.confidence === 'alta' ? 'alta' : 'media',
+      reason: 'Candidato confermato dalla validazione web/LLM.',
+      reasons,
+      analystVerdict: candidateMatchAnalysis.verdict,
+      analystAction: candidateMatchAnalysis.recommendedAction,
+    };
+  }
+
+  if (analystReject) {
+    const hardReject = !deterministicHigh || summary.score < 30 || negativeEvidence;
+    reasons.unshift('Analyst orientato al reject.');
+    return {
+      initialMatchState: target.matchState,
+      deterministicScore: target.score,
+      webScore: summary.score,
+      webValidationState: hardReject ? 'rejected' : 'deprioritized',
+      finalAction: hardReject ? 'reject' : 'deprioritize',
+      confidence: hardReject ? 'alta' : 'media',
+      reason: hardReject
+        ? 'Il candidato non supera la validazione web/LLM.'
+        : 'Score camerale alto, ma validazione web/LLM contraria: non lavorarlo in priorita.',
+      reasons,
+      analystVerdict: candidateMatchAnalysis.verdict,
+      analystAction: candidateMatchAnalysis.recommendedAction,
+    };
+  }
+
+  if (analystDowngrade || weakWebEvidence || businessRisks.length >= 2) {
+    reasons.unshift(
+      deterministicHigh
+        ? 'Score camerale alto, ma web evidence/LLM non confermano abbastanza.'
+        : 'Web evidence/LLM non supportano il match iniziale.',
+    );
+    return {
+      initialMatchState: target.matchState,
+      deterministicScore: target.score,
+      webScore: summary.score,
+      webValidationState: 'deprioritized',
+      finalAction: deterministicHigh ? 'needs_business_validation' : 'deprioritize',
+      confidence: deterministicHigh ? 'media' : 'bassa',
+      reason: deterministicHigh
+        ? 'Buona candidata sulla carta, non confermata dalla validazione web/LLM.'
+        : 'Candidato declassato dalla validazione web/LLM.',
+      reasons,
+      analystVerdict: candidateMatchAnalysis.verdict,
+      analystAction: candidateMatchAnalysis.recommendedAction,
+    };
+  }
+
+  if (analystReview || moderateWebEvidence) {
+    reasons.unshift('Validazione non conclusiva.');
+    return {
+      initialMatchState: target.matchState,
+      deterministicScore: target.score,
+      webScore: summary.score,
+      webValidationState: 'unclear',
+      finalAction: deterministicHigh ? 'needs_business_validation' : 'deprioritize',
+      confidence: 'media',
+      reason: 'Serve revisione business prima di decidere.',
+      reasons,
+      analystVerdict: candidateMatchAnalysis.verdict,
+      analystAction: candidateMatchAnalysis.recommendedAction,
+    };
+  }
+
+  reasons.unshift('Nessun blocco forte, ma manca allineamento pieno per conferma.');
+  return {
+    initialMatchState: target.matchState,
+    deterministicScore: target.score,
+    webScore: summary.score,
+    webValidationState: 'unclear',
+    finalAction: 'needs_business_validation',
+    confidence: 'media',
+    reason: 'Decisione prudente: validazione manuale richiesta.',
+    reasons,
+    analystVerdict: candidateMatchAnalysis.verdict,
+    analystAction: candidateMatchAnalysis.recommendedAction,
+  };
 }
 
 function targetOptionLabel(target: MATarget): string {
@@ -691,13 +1003,13 @@ export function TestPage() {
         }),
       );
 
-      const result: PipelineRunResult = {
+      const result: PipelineReconciliationInput = {
         target,
         keywordSet,
         domainResponse,
         selectedDomain,
         evidenceRuns,
-        summary: computePipelineSummary(selectedDomain, evidenceRuns),
+        summary: computePipelineSummary(selectedDomain, keywordSet, evidenceRuns),
       };
 
       if (selectedDomain && pipelineAnalyzeWithLLM) {
@@ -711,7 +1023,10 @@ export function TestPage() {
         }
       }
 
-      return result;
+      return {
+        ...result,
+        finalDecision: result.candidateMatchAnalysis?.finalDecision ?? reconcilePipelineDecision(result),
+      };
     },
   });
 
@@ -1322,6 +1637,9 @@ export function TestPage() {
                   <span>
                     Web evidence score {evidencePipeline.data.summary.score} · {evidencePipeline.data.summary.confidence}
                   </span>
+                  <span>
+                    Final action {finalActionLabel(evidencePipeline.data.finalDecision.finalAction)}
+                  </span>
                   <span className={styles.path}>
                     {evidencePipeline.data.selectedDomain?.domain ?? 'nessun dominio candidato'}
                   </span>
@@ -1329,21 +1647,99 @@ export function TestPage() {
                 <div className={styles.dryRunGrid}>
                   <div className={styles.metricBox}>
                     <span>Core match</span>
-                    <strong>{evidencePipeline.data.summary.coreMatches}</strong>
+                    <strong>
+                      {evidencePipeline.data.summary.coreMatches}/{evidencePipeline.data.summary.searchedCoreTerms}
+                    </strong>
+                    <p>{evidencePipeline.data.summary.totalCoreTerms} termini totali</p>
                   </div>
                   <div className={styles.metricBox}>
                     <span>Adiacenti</span>
-                    <strong>{evidencePipeline.data.summary.adjacentMatches}</strong>
+                    <strong>
+                      {evidencePipeline.data.summary.adjacentMatches}/{evidencePipeline.data.summary.searchedAdjacentTerms}
+                    </strong>
+                    <p>{evidencePipeline.data.summary.totalAdjacentTerms} termini totali</p>
                   </div>
                   <div className={styles.metricBox}>
                     <span>Negativi</span>
-                    <strong>{evidencePipeline.data.summary.negativeMatches}</strong>
+                    <strong>
+                      {evidencePipeline.data.summary.negativeMatches}/{evidencePipeline.data.summary.searchedNegativeTerms}
+                    </strong>
+                    <p>penalty -{evidencePipeline.data.summary.negativePenalty}</p>
+                  </div>
+                  <div className={styles.metricBox}>
+                    <span>Settore</span>
+                    <strong>{evidencePipeline.data.summary.sectorEvidenceScore}</strong>
+                    <p>forza web evidence</p>
+                  </div>
+                  <div className={styles.metricBox}>
+                    <span>Copertura</span>
+                    <strong>{evidencePipeline.data.summary.coverageScore}</strong>
+                    <p>match su keyword set</p>
                   </div>
                   <div className={styles.metricBox}>
                     <span>Dominio</span>
-                    <strong>{evidencePipeline.data.selectedDomain?.confidence ?? 'N/D'}</strong>
+                    <strong>{evidencePipeline.data.summary.domainScore}</strong>
+                    <p>{evidencePipeline.data.selectedDomain?.confidence ?? 'N/D'}</p>
                   </div>
                 </div>
+
+                <article className={`${styles.resultCard} ${styles.finalDecisionCard}`}>
+                  <div className={styles.resultCardHead}>
+                    <div>
+                      <h3>Final reconciliation</h3>
+                      <p>{evidencePipeline.data.finalDecision.reason}</p>
+                    </div>
+                    <div className={styles.cardActions}>
+                      <span className={`${styles.scoreBadge} ${styles[`finalAction_${evidencePipeline.data.finalDecision.finalAction}`] ?? ''}`}>
+                        {finalActionLabel(evidencePipeline.data.finalDecision.finalAction)}
+                      </span>
+                      <span className={`${styles.scoreBadge} ${styles[`confidence_${evidencePipeline.data.finalDecision.confidence}`] ?? ''}`}>
+                        {webValidationStateLabel(evidencePipeline.data.finalDecision.webValidationState)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.analysisGrid}>
+                    <div>
+                      <span>Score iniziale</span>
+                      <p>
+                        {evidencePipeline.data.finalDecision.deterministicScore} ·{' '}
+                        {evidencePipeline.data.finalDecision.initialMatchState}
+                      </p>
+                    </div>
+                    <div>
+                      <span>Validazione web</span>
+                      <p>
+                        {evidencePipeline.data.finalDecision.webScore} ·{' '}
+                        {webValidationStateLabel(evidencePipeline.data.finalDecision.webValidationState)}
+                      </p>
+                    </div>
+                    <div>
+                      <span>Analyst</span>
+                      <p>
+                        {evidencePipeline.data.finalDecision.analystVerdict
+                          ? `${candidateVerdictLabel(evidencePipeline.data.finalDecision.analystVerdict)} · ${candidateActionLabel(
+                              evidencePipeline.data.finalDecision.analystAction ?? '',
+                            )}`
+                          : 'N/D'}
+                      </p>
+                    </div>
+                    <div>
+                      <span>Dominio</span>
+                      <p>
+                        {evidencePipeline.data.selectedDomain
+                          ? `${evidencePipeline.data.selectedDomain.domain} · ${evidencePipeline.data.selectedDomain.confidence}`
+                          : 'N/D'}
+                      </p>
+                    </div>
+                  </div>
+                  {evidencePipeline.data.finalDecision.reasons.length > 0 ? (
+                    <div className={styles.finalReasons}>
+                      {evidencePipeline.data.finalDecision.reasons.slice(0, 6).map((reason) => (
+                        <span key={reason}>{reason}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
 
                 {evidencePipeline.data.candidateMatchAnalysis ? (
                   <article className={`${styles.resultCard} ${styles.analysisCard}`}>

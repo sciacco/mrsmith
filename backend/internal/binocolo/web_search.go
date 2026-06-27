@@ -116,41 +116,57 @@ func (h *Handler) handleTestDomainResolution(w http.ResponseWriter, r *http.Requ
 		count = domainResolutionMaxCount
 	}
 
-	query := buildDomainResolutionQuery(body, companyName)
-	if len(query) > webSearchMaxQueryLen || len(strings.Fields(query)) > webSearchMaxWords {
+	queries := buildDomainResolutionQueries(body, companyName)
+	results := []WebSearchResult{}
+	seenResults := map[string]struct{}{}
+	executedQueries := []string{}
+	var candidates []DomainResolutionCandidate
+	for _, query := range queries {
+		if len(query) > webSearchMaxQueryLen || len(strings.Fields(query)) > webSearchMaxWords {
+			continue
+		}
+		executedQueries = append(executedQueries, query)
+		res, err := h.brave.LLMContext(r.Context(), brave.LLMContextParams{
+			Query:      query,
+			Count:      count,
+			Country:    "it",
+			SearchLang: "it",
+		})
+		if err != nil {
+			h.braveFailure(w, r, "domain_resolution", err)
+			return
+		}
+
+		for _, g := range res.Generic {
+			host := resultHostname(g.URL, res.Sources)
+			if strings.TrimSpace(host) == "" {
+				continue
+			}
+			if _, exists := seenResults[g.URL]; exists {
+				continue
+			}
+			seenResults[g.URL] = struct{}{}
+			results = append(results, WebSearchResult{
+				Title:    g.Title,
+				URL:      g.URL,
+				Hostname: host,
+				Age:      firstAge(res.Sources[g.URL].Age),
+				Snippets: g.Snippets,
+			})
+		}
+
+		candidates = rankDomainResolutionCandidates(body, companyName, results)
+		if hasCredibleDomainResolutionCandidate(candidates) {
+			break
+		}
+	}
+	if len(executedQueries) == 0 {
 		httputil.Error(w, http.StatusBadRequest, "query_too_long")
 		return
 	}
 
-	res, err := h.brave.LLMContext(r.Context(), brave.LLMContextParams{
-		Query:      query,
-		Count:      count,
-		Country:    "it",
-		SearchLang: "it",
-	})
-	if err != nil {
-		h.braveFailure(w, r, "domain_resolution", err)
-		return
-	}
-
-	results := make([]WebSearchResult, 0, len(res.Generic))
-	for _, g := range res.Generic {
-		host := resultHostname(g.URL, res.Sources)
-		if strings.TrimSpace(host) == "" {
-			continue
-		}
-		results = append(results, WebSearchResult{
-			Title:    g.Title,
-			URL:      g.URL,
-			Hostname: host,
-			Age:      firstAge(res.Sources[g.URL].Age),
-			Snippets: g.Snippets,
-		})
-	}
-
-	candidates := rankDomainResolutionCandidates(body, companyName, results)
 	httputil.JSON(w, http.StatusOK, DomainResolutionResponse{
-		Query:      query,
+		Query:      strings.Join(executedQueries, " | "),
 		Count:      count,
 		Candidates: candidates,
 		Results:    results,
@@ -512,6 +528,65 @@ func buildDomainResolutionQuery(body DomainResolutionRequest, companyName string
 	return strings.Join(parts, " ")
 }
 
+func buildDomainResolutionQueries(body DomainResolutionRequest, companyName string) []string {
+	queries := []string{buildDomainResolutionQuery(body, companyName)}
+	brandTerms := companyResolutionTokens(companyName)
+	brandName := strings.Join(brandTerms, " ")
+	if brandName == "" || strings.EqualFold(brandName, companyName) {
+		return cleanStringList(queries, 3, webSearchMaxQueryLen)
+	}
+
+	locality := []string{}
+	if town := strings.TrimSpace(body.Town); town != "" {
+		locality = append(locality, quoteBraveTerm(town))
+	}
+	if province := strings.TrimSpace(body.Province); province != "" {
+		locality = append(locality, strings.ToUpper(province))
+	}
+
+	contactParts := []string{quoteBraveTerm(brandName), "sito ufficiale", "contatti", "chi siamo"}
+	contactParts = append(contactParts, locality...)
+	queries = append(queries, strings.Join(contactParts, " "))
+
+	siteIntentParts := []string{quoteBraveTerm(brandName), "contattaci", "azienda"}
+	siteIntentParts = append(siteIntentParts, locality...)
+	for _, keyword := range domainResolutionFallbackKeywords(body.Keywords) {
+		siteIntentParts = append(siteIntentParts, quoteBraveTerm(keyword))
+	}
+	queries = append(queries, strings.Join(siteIntentParts, " "))
+
+	return cleanStringList(queries, 3, webSearchMaxQueryLen)
+}
+
+func domainResolutionFallbackKeywords(keywords []string) []string {
+	out := []string{}
+	for _, keyword := range keywords {
+		for _, token := range companyResolutionTokens(keyword) {
+			if len(out) >= 3 {
+				return out
+			}
+			if domainResolutionStopword(token) || token == "servizi" || token == "attivita" || token == "altre" {
+				continue
+			}
+			addTermLike(&out, token)
+		}
+	}
+	return out
+}
+
+func addTermLike(list *[]string, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+	for _, item := range *list {
+		if strings.EqualFold(item, value) {
+			return
+		}
+	}
+	*list = append(*list, value)
+}
+
 func quoteBraveTerm(value string) string {
 	value = strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
 	if value == "" {
@@ -585,6 +660,18 @@ func rankDomainResolutionCandidates(body DomainResolutionRequest, companyName st
 		candidates = candidates[:8]
 	}
 	return candidates
+}
+
+func hasCredibleDomainResolutionCandidate(candidates []DomainResolutionCandidate) bool {
+	for _, candidate := range candidates {
+		if candidate.Score < 45 {
+			continue
+		}
+		if candidate.Confidence == "alta" || candidate.Confidence == "media" {
+			return true
+		}
+	}
+	return false
 }
 
 func addDomainResolutionAccum(
@@ -734,6 +821,10 @@ func scoreDomainResolutionResult(body DomainResolutionRequest, companyName, doma
 	if domainLooksCompanyOwned(domain, tokens) {
 		score += 30
 		reasons = append(reasons, "host compatibile con ragione sociale")
+		if sourceDomain, ok := normalizeDomain(result.Hostname); ok && hostMatchesDomain(sourceDomain, domain) {
+			score += 12
+			reasons = append(reasons, "risultato diretto su dominio brand")
+		}
 	}
 	if value := sanitizeDomainResolutionIdentifier(body.VATCode); value != "" && strings.Contains(compactText, strings.ToLower(value)) {
 		score += 35

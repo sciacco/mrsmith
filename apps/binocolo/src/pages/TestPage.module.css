@@ -389,6 +389,27 @@
   color: var(--color-danger);
 }
 
+.finalAction_confirm {
+  background: var(--color-success-bg);
+  color: #047857;
+}
+
+.finalAction_deprioritize,
+.finalAction_needs_business_validation {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
+.finalAction_needs_domain_review {
+  background: var(--color-info-subtle);
+  color: var(--color-info-strong);
+}
+
+.finalAction_reject {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
 .evidenceList {
   display: grid;
   gap: var(--space-2);
@@ -537,6 +558,12 @@
   background: linear-gradient(180deg, var(--color-bg-elevated), var(--color-accent-subtle));
 }
 
+.finalDecisionCard {
+  margin: var(--space-4) var(--space-6) 0;
+  border-color: var(--color-border);
+  background: linear-gradient(180deg, var(--color-bg-elevated), var(--color-surface));
+}
+
 .analysisCard {
   margin: var(--space-4) var(--space-6) 0;
   border-color: var(--color-accent-muted);
@@ -602,6 +629,27 @@
   color: var(--color-text);
 }
 
+.finalReasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.finalReasons span {
+  display: inline-flex;
+  max-width: 100%;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .dryRunGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -634,6 +682,13 @@
   font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.1;
+}
+
+.metricBox p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .rawBlock {
@@ -754,7 +809,8 @@
     padding: var(--space-4);
   }
 
-  .analysisCard {
+  .analysisCard,
+  .finalDecisionCard {
     margin: var(--space-4) var(--space-4) 0;
   }
 

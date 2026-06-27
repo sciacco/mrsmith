@@ -25,7 +25,7 @@ SELECT
   p.id,
   'Fireworks: DeepSeek V4 Flash',
   'accounts/fireworks/models/deepseek-v4-flash',
-  '{"temperature":0,"max_tokens":1800}'::jsonb,
+  '{"temperature":0,"max_tokens":5000}'::jsonb,
   false,
   true,
   true
@@ -51,12 +51,13 @@ Ricevi:
 - keywordSet: intenzione settoriale, termini core/adiacenti/negativi e fonti della lente
 - selectedDomain: dominio già selezionato dal resolver deterministico
 - evidenceRuns: ricerche site-restricted già raccolte sul dominio selezionato
-- summary: sintesi numerica della web evidence
+- summary: sintesi numerica calibrata della web evidence; score è il risultato finale, mentre sectorEvidenceScore, coverageScore, domainScore e negativePenalty spiegano le componenti
 
 Regole non negoziabili:
 - Non navigare, non inferire da conoscenza esterna e non inventare fatti non presenti nel JSON.
 - Non scegliere domini alternativi e non contestare il dominio se non con contraddizioni presenti nel JSON.
 - Non sovrascrivere lo score deterministico: puoi solo raccomandare confirm, review, downgrade o reject.
+- Non trattare uno score alto come copertura perfetta: guarda anche searched*/total*, coverageScore e missingEvidence.
 - Considera sinonimi e equivalenze concettuali quando sono supportati dagli snippet. Esempio: "managed services" può essere coerente con "Infrastruttura Gestita", "Service Operations Center", monitoring, supporto H24, gestione infrastruttura IT.
 - Un risultato negativo è rilevante solo se evidenceRuns lo marca matched=true o se lo snippet contiene davvero il segnale negativo; rumore di ricerca con score basso non è un contro.
 - Distingui tra evidenze forti, lacune informative e veri segnali contrari.

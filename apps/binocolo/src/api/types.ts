@@ -104,10 +104,48 @@ export interface CandidateMatchAnalysisRequest {
   summary: {
     score: number;
     confidence: string;
+    sectorEvidenceScore: number;
+    coverageScore: number;
+    domainScore: number;
+    negativePenalty: number;
     coreMatches: number;
     adjacentMatches: number;
     negativeMatches: number;
+    searchedCoreTerms: number;
+    searchedAdjacentTerms: number;
+    searchedNegativeTerms: number;
+    totalCoreTerms: number;
+    totalAdjacentTerms: number;
+    totalNegativeTerms: number;
   };
+}
+
+export type PipelineWebValidationState =
+  | 'confirmed'
+  | 'deprioritized'
+  | 'domain_unresolved'
+  | 'analysis_unavailable'
+  | 'rejected'
+  | 'unclear';
+
+export type PipelineFinalAction =
+  | 'confirm'
+  | 'deprioritize'
+  | 'reject'
+  | 'needs_domain_review'
+  | 'needs_business_validation';
+
+export interface CandidateMatchFinalDecision {
+  initialMatchState: string;
+  deterministicScore: number;
+  webScore: number;
+  webValidationState: PipelineWebValidationState;
+  finalAction: PipelineFinalAction;
+  confidence: MAConfidence | string;
+  reason: string;
+  reasons: string[];
+  analystVerdict?: string;
+  analystAction?: string;
 }
 
 export interface CandidateMatchAnalysisResponse {
@@ -122,6 +160,7 @@ export interface CandidateMatchAnalysisResponse {
   conceptAliases: CandidateMatchConceptAlias[];
   recommendedAction: 'confirm' | 'review' | 'downgrade' | 'reject' | string;
   rationale: string;
+  finalDecision?: CandidateMatchFinalDecision;
 }
 
 export interface CandidateMatchConceptAlias {
