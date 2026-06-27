@@ -990,6 +990,163 @@ func (s *maService) setTargetRating(ctx context.Context, sessionID, companyKey s
 	return nil
 }
 
+func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID string, body MAWebValidationUpsertRequest, subject, email string) (MAWebValidation, error) {
+	if s.store == nil {
+		return MAWebValidation{}, errMAStoreUnavailable
+	}
+	if strings.TrimSpace(body.Target.SessionID) != "" && body.Target.SessionID != sessionID {
+		return MAWebValidation{}, fmt.Errorf("%w: session mismatch", errMAStrategyInvalid)
+	}
+	session, err := s.store.GetMASessionState(ctx, sessionID)
+	if err != nil {
+		return MAWebValidation{}, err
+	}
+	if err := ensureMASessionOperational(session); err != nil {
+		return MAWebValidation{}, err
+	}
+
+	companyKey := normalizeMACompanyKey(body.Target.CompanyKey)
+	if companyKey == "" {
+		companyKey = normalizeMACompanyKey(maTargetDedupeKey(body.Target))
+	}
+	if companyKey == "" {
+		return MAWebValidation{}, fmt.Errorf("%w: company key", errMAStrategyInvalid)
+	}
+
+	if body.FinalDecision.FinalAction == "" || body.FinalDecision.WebValidationState == "" {
+		input := CandidateMatchAnalysisRequest{
+			Target:         body.Target,
+			KeywordSet:     body.KeywordSet,
+			DomainResponse: body.DomainResponse,
+			SelectedDomain: body.SelectedDomain,
+			EvidenceRuns:   body.EvidenceRuns,
+			Summary:        body.Summary,
+		}
+		body.FinalDecision = *reconcileCandidateMatchDecision(input, body.CandidateMatchAnalysis, body.CandidateMatchError)
+	}
+	if !validMAFinalAction(body.FinalDecision.FinalAction) {
+		return MAWebValidation{}, fmt.Errorf("%w: final action", errMAStrategyInvalid)
+	}
+	if !validMAWebValidationState(body.FinalDecision.WebValidationState) {
+		return MAWebValidation{}, fmt.Errorf("%w: web validation state", errMAStrategyInvalid)
+	}
+
+	summaryRaw, err := json.Marshal(body.Summary)
+	if err != nil {
+		return MAWebValidation{}, fmt.Errorf("marshal web validation summary: %w", err)
+	}
+	keywordSetRaw, err := json.Marshal(body.KeywordSet)
+	if err != nil {
+		return MAWebValidation{}, fmt.Errorf("marshal web validation keyword set: %w", err)
+	}
+	selectedDomainRaw := json.RawMessage(`{}`)
+	selectedDomain := ""
+	domainConfidence := ""
+	var domainScore *int
+	if body.SelectedDomain != nil {
+		raw, err := json.Marshal(body.SelectedDomain)
+		if err != nil {
+			return MAWebValidation{}, fmt.Errorf("marshal web validation selected domain: %w", err)
+		}
+		selectedDomainRaw = raw
+		selectedDomain = body.SelectedDomain.Domain
+		domainConfidence = body.SelectedDomain.Confidence
+		domainScore = &body.SelectedDomain.Score
+	}
+	domainResponseRaw, err := json.Marshal(body.DomainResponse)
+	if err != nil {
+		return MAWebValidation{}, fmt.Errorf("marshal web validation domain response: %w", err)
+	}
+	evidenceRunsRaw, err := json.Marshal(body.EvidenceRuns)
+	if err != nil {
+		return MAWebValidation{}, fmt.Errorf("marshal web validation evidence runs: %w", err)
+	}
+	analysisRaw := json.RawMessage(`{}`)
+	if body.CandidateMatchAnalysis != nil {
+		raw, err := json.Marshal(body.CandidateMatchAnalysis)
+		if err != nil {
+			return MAWebValidation{}, fmt.Errorf("marshal web validation analyst: %w", err)
+		}
+		analysisRaw = raw
+	}
+	finalDecisionRaw, err := json.Marshal(body.FinalDecision)
+	if err != nil {
+		return MAWebValidation{}, fmt.Errorf("marshal web validation final decision: %w", err)
+	}
+
+	analystVerdict := body.FinalDecision.AnalystVerdict
+	analystAction := body.FinalDecision.AnalystAction
+	analystConfidence := ""
+	if body.CandidateMatchAnalysis != nil {
+		if analystVerdict == "" {
+			analystVerdict = body.CandidateMatchAnalysis.Verdict
+		}
+		if analystAction == "" {
+			analystAction = body.CandidateMatchAnalysis.RecommendedAction
+		}
+		analystConfidence = body.CandidateMatchAnalysis.Confidence
+	}
+	validation, err := s.store.UpsertMAWebValidation(ctx, maWebValidationUpsert{
+		SessionID:              sessionID,
+		CompanyKey:             companyKey,
+		TargetID:               body.Target.ID,
+		RunID:                  body.Target.RunID,
+		SelectedDomain:         selectedDomain,
+		DomainConfidence:       domainConfidence,
+		DomainScore:            domainScore,
+		WebScore:               body.FinalDecision.WebScore,
+		WebConfidence:          body.FinalDecision.Confidence,
+		WebValidationState:     body.FinalDecision.WebValidationState,
+		FinalAction:            body.FinalDecision.FinalAction,
+		AnalystVerdict:         analystVerdict,
+		AnalystAction:          analystAction,
+		AnalystConfidence:      analystConfidence,
+		Summary:                summaryRaw,
+		KeywordSet:             keywordSetRaw,
+		SelectedDomainPayload:  selectedDomainRaw,
+		DomainResponse:         domainResponseRaw,
+		EvidenceRuns:           evidenceRunsRaw,
+		CandidateMatchAnalysis: analysisRaw,
+		CandidateMatchError:    body.CandidateMatchError,
+		FinalDecision:          finalDecisionRaw,
+		Subject:                subject,
+		Email:                  email,
+	})
+	if err != nil {
+		return MAWebValidation{}, err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_target_web_validation_upserted",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"session_id":    sessionID,
+			"company_key":   companyKey,
+			"final_action":  body.FinalDecision.FinalAction,
+			"web_score":     body.FinalDecision.WebScore,
+			"selected_site": selectedDomain,
+		}),
+	})
+	return validation, nil
+}
+
+func validMAFinalAction(action string) bool {
+	switch action {
+	case "confirm", "deprioritize", "reject", "needs_domain_review", "needs_business_validation":
+		return true
+	default:
+		return false
+	}
+}
+
+func validMAWebValidationState(state string) bool {
+	switch state {
+	case "confirmed", "deprioritized", "domain_unresolved", "analysis_unavailable", "rejected", "unclear":
+		return true
+	default:
+		return false
+	}
+}
+
 func validMARating(rating int) bool {
 	return rating == 0 || rating == maRatingExcluded || (rating >= 1 && rating <= maRatingMax)
 }

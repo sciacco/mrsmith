@@ -148,6 +148,33 @@ export interface CandidateMatchFinalDecision {
   analystAction?: string;
 }
 
+export interface MAWebValidation {
+  sessionId: string;
+  companyKey: string;
+  targetId?: string;
+  runId?: string;
+  selectedDomain?: string;
+  domainConfidence?: string;
+  domainScore?: number;
+  webScore: number;
+  webConfidence?: string;
+  webValidationState: PipelineWebValidationState;
+  finalAction: PipelineFinalAction;
+  analystVerdict?: string;
+  analystAction?: string;
+  analystConfidence?: string;
+  summary: CandidateMatchAnalysisRequest['summary'];
+  keywordSet: CandidateMatchAnalysisRequest['keywordSet'];
+  selectedDomainPayload?: DomainResolutionCandidate;
+  domainResponse: DomainResolutionResponse;
+  evidenceRuns: CandidateMatchAnalysisRequest['evidenceRuns'];
+  candidateMatchAnalysis?: CandidateMatchAnalysisResponse;
+  candidateMatchError?: string;
+  finalDecision: CandidateMatchFinalDecision;
+  updatedByEmail?: string;
+  updatedAt: string;
+}
+
 export interface CandidateMatchAnalysisResponse {
   verdict: 'strong_match' | 'match' | 'weak_match' | 'no_match' | 'unclear' | string;
   confidence: MAConfidence | string;
@@ -470,6 +497,7 @@ export interface MATarget {
   evidence: MATargetEvidence[];
   adjustments?: MATargetAdjustment[];
   deep?: MADeepAnalysis;
+  webValidation?: MAWebValidation;
   vendorPayload?: any;
 }
 

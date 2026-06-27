@@ -31,6 +31,7 @@ type maWorkspaceStore interface {
 	CompleteMAExecutionRun(ctx context.Context, runID, status string, resultCount int, errorCode string) error
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
 	UpsertMATargetRating(ctx context.Context, sessionID, companyKey string, rating int, subject, email string) error
+	UpsertMAWebValidation(ctx context.Context, input maWebValidationUpsert) (MAWebValidation, error)
 	StartMATrace(ctx context.Context, input maTraceStart) (string, error)
 	LinkMATrace(ctx context.Context, input maTraceLink) error
 	CompleteMATrace(ctx context.Context, input maTraceComplete) error
@@ -52,6 +53,33 @@ type maCompanyLegalForm struct {
 	Code          string
 	DescriptionIT string
 	DescriptionEN string
+}
+
+type maWebValidationUpsert struct {
+	SessionID              string
+	CompanyKey             string
+	TargetID               string
+	RunID                  string
+	SelectedDomain         string
+	DomainConfidence       string
+	DomainScore            *int
+	WebScore               int
+	WebConfidence          string
+	WebValidationState     string
+	FinalAction            string
+	AnalystVerdict         string
+	AnalystAction          string
+	AnalystConfidence      string
+	Summary                json.RawMessage
+	KeywordSet             json.RawMessage
+	SelectedDomainPayload  json.RawMessage
+	DomainResponse         json.RawMessage
+	EvidenceRuns           json.RawMessage
+	CandidateMatchAnalysis json.RawMessage
+	CandidateMatchError    string
+	FinalDecision          json.RawMessage
+	Subject                string
+	Email                  string
 }
 
 func (s *SQLStore) ListMASessions(ctx context.Context, visibility string) ([]MASessionSummary, error) {
@@ -1269,6 +1297,10 @@ ORDER BY score DESC, company_name
 	if err != nil {
 		return nil, err
 	}
+	webValidations, err := s.loadMAWebValidations(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
 	keys := make([]string, 0, len(targets))
 	for index := range targets {
 		keys = append(keys, targets[index].CompanyKey)
@@ -1282,6 +1314,10 @@ ORDER BY score DESC, company_name
 		if rating, ok := ratings[targets[index].CompanyKey]; ok {
 			value := rating
 			targets[index].Rating = &value
+		}
+		if validation, ok := webValidations[targets[index].CompanyKey]; ok {
+			record := validation
+			targets[index].WebValidation = &record
 		}
 		if analysis, ok := deep[targets[index].CompanyKey]; ok {
 			record := analysis
@@ -1367,6 +1403,228 @@ SET rating = EXCLUDED.rating,
 		return fmt.Errorf("upsert ma target rating: %w", err)
 	}
 	return nil
+}
+
+func (s *SQLStore) loadMAWebValidations(ctx context.Context, sessionID string) (map[string]MAWebValidation, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT
+  session_id::text,
+  company_key,
+  COALESCE(target_id::text, ''),
+  COALESCE(run_id::text, ''),
+  COALESCE(selected_domain, ''),
+  COALESCE(domain_confidence, ''),
+  domain_score,
+  web_score,
+  COALESCE(web_confidence, ''),
+  web_validation_state,
+  final_action,
+  COALESCE(analyst_verdict, ''),
+  COALESCE(analyst_action, ''),
+  COALESCE(analyst_confidence, ''),
+  summary,
+  keyword_set,
+  selected_domain_payload,
+  domain_response,
+  evidence_runs,
+  candidate_match_analysis,
+  COALESCE(candidate_match_error, ''),
+  final_decision,
+  COALESCE(updated_by_email, ''),
+  updated_at
+FROM binocolo.ma_target_web_validation
+WHERE session_id = $1::uuid
+`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("load ma web validations: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]MAWebValidation{}
+	for rows.Next() {
+		item, err := scanMAWebValidation(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[item.CompanyKey] = item
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma web validations: %w", err)
+	}
+	return out, nil
+}
+
+func (s *SQLStore) UpsertMAWebValidation(ctx context.Context, input maWebValidationUpsert) (MAWebValidation, error) {
+	if s == nil || s.db == nil {
+		return MAWebValidation{}, errors.New("binocolo ma store not configured")
+	}
+	row := s.db.QueryRowContext(ctx, `
+INSERT INTO binocolo.ma_target_web_validation (
+  session_id,
+  company_key,
+  target_id,
+  run_id,
+  selected_domain,
+  domain_confidence,
+  domain_score,
+  web_score,
+  web_confidence,
+  web_validation_state,
+  final_action,
+  analyst_verdict,
+  analyst_action,
+  analyst_confidence,
+  summary,
+  keyword_set,
+  selected_domain_payload,
+  domain_response,
+  evidence_runs,
+  candidate_match_analysis,
+  candidate_match_error,
+  final_decision,
+  created_by_subject,
+  created_by_email,
+  updated_by_subject,
+  updated_by_email
+) VALUES (
+  $1::uuid, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5, $6, $7, $8, $9, $10,
+  $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17::jsonb, $18::jsonb, $19::jsonb,
+  $20::jsonb, $21, $22::jsonb, $23, $24, $23, $24
+)
+ON CONFLICT (session_id, company_key) DO UPDATE
+SET target_id = EXCLUDED.target_id,
+    run_id = EXCLUDED.run_id,
+    selected_domain = EXCLUDED.selected_domain,
+    domain_confidence = EXCLUDED.domain_confidence,
+    domain_score = EXCLUDED.domain_score,
+    web_score = EXCLUDED.web_score,
+    web_confidence = EXCLUDED.web_confidence,
+    web_validation_state = EXCLUDED.web_validation_state,
+    final_action = EXCLUDED.final_action,
+    analyst_verdict = EXCLUDED.analyst_verdict,
+    analyst_action = EXCLUDED.analyst_action,
+    analyst_confidence = EXCLUDED.analyst_confidence,
+    summary = EXCLUDED.summary,
+    keyword_set = EXCLUDED.keyword_set,
+    selected_domain_payload = EXCLUDED.selected_domain_payload,
+    domain_response = EXCLUDED.domain_response,
+    evidence_runs = EXCLUDED.evidence_runs,
+    candidate_match_analysis = EXCLUDED.candidate_match_analysis,
+    candidate_match_error = EXCLUDED.candidate_match_error,
+    final_decision = EXCLUDED.final_decision,
+    updated_by_subject = EXCLUDED.updated_by_subject,
+    updated_by_email = EXCLUDED.updated_by_email,
+    updated_at = now()
+RETURNING
+  session_id::text,
+  company_key,
+  COALESCE(target_id::text, ''),
+  COALESCE(run_id::text, ''),
+  COALESCE(selected_domain, ''),
+  COALESCE(domain_confidence, ''),
+  domain_score,
+  web_score,
+  COALESCE(web_confidence, ''),
+  web_validation_state,
+  final_action,
+  COALESCE(analyst_verdict, ''),
+  COALESCE(analyst_action, ''),
+  COALESCE(analyst_confidence, ''),
+  summary,
+  keyword_set,
+  selected_domain_payload,
+  domain_response,
+  evidence_runs,
+  candidate_match_analysis,
+  COALESCE(candidate_match_error, ''),
+  final_decision,
+  COALESCE(updated_by_email, ''),
+  updated_at
+`, input.SessionID,
+		input.CompanyKey,
+		input.TargetID,
+		input.RunID,
+		nullString(input.SelectedDomain),
+		nullString(input.DomainConfidence),
+		nullInt(input.DomainScore),
+		input.WebScore,
+		nullString(input.WebConfidence),
+		input.WebValidationState,
+		input.FinalAction,
+		nullString(input.AnalystVerdict),
+		nullString(input.AnalystAction),
+		nullString(input.AnalystConfidence),
+		[]byte(input.Summary),
+		[]byte(input.KeywordSet),
+		[]byte(input.SelectedDomainPayload),
+		[]byte(input.DomainResponse),
+		[]byte(input.EvidenceRuns),
+		[]byte(input.CandidateMatchAnalysis),
+		nullString(input.CandidateMatchError),
+		[]byte(input.FinalDecision),
+		nullString(input.Subject),
+		nullString(input.Email),
+	)
+	return scanMAWebValidation(row)
+}
+
+type maWebValidationScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanMAWebValidation(row maWebValidationScanner) (MAWebValidation, error) {
+	var item MAWebValidation
+	var domainScore sql.NullInt64
+	var summaryRaw, keywordSetRaw, selectedDomainRaw, domainResponseRaw, evidenceRunsRaw, analysisRaw, finalDecisionRaw []byte
+	if err := row.Scan(
+		&item.SessionID,
+		&item.CompanyKey,
+		&item.TargetID,
+		&item.RunID,
+		&item.SelectedDomain,
+		&item.DomainConfidence,
+		&domainScore,
+		&item.WebScore,
+		&item.WebConfidence,
+		&item.WebValidationState,
+		&item.FinalAction,
+		&item.AnalystVerdict,
+		&item.AnalystAction,
+		&item.AnalystConfidence,
+		&summaryRaw,
+		&keywordSetRaw,
+		&selectedDomainRaw,
+		&domainResponseRaw,
+		&evidenceRunsRaw,
+		&analysisRaw,
+		&item.CandidateMatchError,
+		&finalDecisionRaw,
+		&item.UpdatedByEmail,
+		&item.UpdatedAt,
+	); err != nil {
+		return MAWebValidation{}, fmt.Errorf("scan ma web validation: %w", err)
+	}
+	if domainScore.Valid {
+		value := int(domainScore.Int64)
+		item.DomainScore = &value
+	}
+	_ = json.Unmarshal(summaryRaw, &item.Summary)
+	_ = json.Unmarshal(keywordSetRaw, &item.KeywordSet)
+	if len(selectedDomainRaw) > 0 && string(selectedDomainRaw) != "null" && string(selectedDomainRaw) != "{}" {
+		var candidate DomainResolutionCandidate
+		if err := json.Unmarshal(selectedDomainRaw, &candidate); err == nil && candidate.Domain != "" {
+			item.SelectedDomainPayload = &candidate
+		}
+	}
+	_ = json.Unmarshal(domainResponseRaw, &item.DomainResponse)
+	_ = json.Unmarshal(evidenceRunsRaw, &item.EvidenceRuns)
+	if len(analysisRaw) > 0 && string(analysisRaw) != "null" && string(analysisRaw) != "{}" {
+		var analysis CandidateMatchAnalysisResponse
+		if err := json.Unmarshal(analysisRaw, &analysis); err == nil && analysis.Verdict != "" {
+			item.CandidateMatchAnalysis = &analysis
+		}
+	}
+	_ = json.Unmarshal(finalDecisionRaw, &item.FinalDecision)
+	return item, nil
 }
 
 func (s *SQLStore) loadMAEvidence(ctx context.Context, sessionID string) (map[string][]MATargetEvidence, error) {

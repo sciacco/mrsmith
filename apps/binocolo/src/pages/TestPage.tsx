@@ -14,6 +14,7 @@ import type {
   MASessionVisibility,
   MAStrategySpec,
   MATarget,
+  MAWebValidation,
   OpenAPIITEnvelope,
   PipelineFinalAction,
   PipelineWebValidationState,
@@ -128,6 +129,9 @@ interface PipelineRunResult {
   summary: PipelineSummary;
   candidateMatchAnalysis?: CandidateMatchAnalysisResponse;
   candidateMatchError?: string;
+  persistedWebValidation?: MAWebValidation;
+  persistError?: string;
+  loadedFromCache?: boolean;
   finalDecision: PipelineFinalDecision;
 }
 
@@ -853,6 +857,37 @@ function reconcilePipelineDecision(input: PipelineReconciliationInput): Pipeline
   };
 }
 
+function stringListsEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((item, index) => item === b[index]);
+}
+
+function pipelineKeywordSetsEqual(a: PipelineKeywordSet, b: PipelineKeywordSet): boolean {
+  return (
+    a.intentLabel === b.intentLabel &&
+    stringListsEqual(a.coreTerms, b.coreTerms) &&
+    stringListsEqual(a.adjacentTerms, b.adjacentTerms) &&
+    stringListsEqual(a.negativeTerms, b.negativeTerms) &&
+    stringListsEqual(a.sources, b.sources)
+  );
+}
+
+function pipelineRunFromWebValidation(target: MATarget, validation: MAWebValidation): PipelineRunResult {
+  return {
+    target,
+    keywordSet: validation.keywordSet as PipelineKeywordSet,
+    domainResponse: validation.domainResponse,
+    selectedDomain: validation.selectedDomainPayload,
+    evidenceRuns: validation.evidenceRuns as PipelineEvidenceRun[],
+    summary: validation.summary as PipelineSummary,
+    candidateMatchAnalysis: validation.candidateMatchAnalysis,
+    candidateMatchError: validation.candidateMatchError || undefined,
+    persistedWebValidation: validation,
+    loadedFromCache: true,
+    finalDecision: validation.finalDecision,
+  };
+}
+
 function targetOptionLabel(target: MATarget): string {
   const bits = [
     target.companyName,
@@ -896,6 +931,7 @@ export function TestPage() {
   const [pipelineIncludeIdentifiers, setPipelineIncludeIdentifiers] = useState(false);
   const [pipelineRank, setPipelineRank] = useState(true);
   const [pipelineAnalyzeWithLLM, setPipelineAnalyzeWithLLM] = useState(true);
+  const [pipelineForceRecompute, setPipelineForceRecompute] = useState(false);
 
   const pipelineSessions = useQuery({
     queryKey: ['binocolo-test-ma-sessions', pipelineVisibility],
@@ -969,6 +1005,14 @@ export function TestPage() {
       if (!target) throw new Error('La sessione selezionata non contiene target.');
 
       const keywordSet = derivedKeywordSet(detail.strategy?.strategy, target, pipelineExtraKeywords);
+      if (
+        target.webValidation &&
+        !pipelineForceRecompute &&
+        pipelineKeywordSetsEqual(keywordSet, target.webValidation.keywordSet as PipelineKeywordSet)
+      ) {
+        return pipelineRunFromWebValidation(target, target.webValidation);
+      }
+
       const domainResponse = await api.post<DomainResolutionResponse>('/binocolo/v1/test/domain-resolution', {
         companyName: target.companyName,
         vatCode: pipelineIncludeIdentifiers ? target.vatCode : undefined,
@@ -1023,10 +1067,20 @@ export function TestPage() {
         }
       }
 
-      return {
+      const finalResult: PipelineRunResult = {
         ...result,
         finalDecision: result.candidateMatchAnalysis?.finalDecision ?? reconcilePipelineDecision(result),
       };
+      try {
+        finalResult.persistedWebValidation = await api.put<MAWebValidation>(
+          `/binocolo/v1/ma/sessions/${target.sessionId}/web-validation`,
+          finalResult,
+        );
+        await pipelineDetail.refetch();
+      } catch (err) {
+        finalResult.persistError = errorLabel(err);
+      }
+      return finalResult;
     },
   });
 
@@ -1510,6 +1564,17 @@ export function TestPage() {
                   }}
                 />
               </label>
+              <label className={styles.dryRunField}>
+                <span>Forza ricalcolo</span>
+                <ToggleSwitch
+                  id="binocolo-pipeline-force-recompute"
+                  checked={pipelineForceRecompute}
+                  onChange={(value) => {
+                    setPipelineForceRecompute(value);
+                    evidencePipeline.reset();
+                  }}
+                />
+              </label>
               <Button
                 type="submit"
                 loading={evidencePipeline.isPending}
@@ -1640,6 +1705,15 @@ export function TestPage() {
                   <span>
                     Final action {finalActionLabel(evidencePipeline.data.finalDecision.finalAction)}
                   </span>
+                  <span>
+                    {evidencePipeline.data.loadedFromCache
+                      ? 'Validazione riusata'
+                      : evidencePipeline.data.persistedWebValidation
+                        ? 'Validazione salvata'
+                        : evidencePipeline.data.persistError
+                          ? 'Persistenza non riuscita'
+                        : 'Persistenza N/D'}
+                  </span>
                   <span className={styles.path}>
                     {evidencePipeline.data.selectedDomain?.domain ?? 'nessun dominio candidato'}
                   </span>
@@ -1729,6 +1803,16 @@ export function TestPage() {
                         {evidencePipeline.data.selectedDomain
                           ? `${evidencePipeline.data.selectedDomain.domain} · ${evidencePipeline.data.selectedDomain.confidence}`
                           : 'N/D'}
+                      </p>
+                    </div>
+                    <div>
+                      <span>Persistenza</span>
+                      <p>
+                        {evidencePipeline.data.loadedFromCache
+                          ? `riusata · ${new Date(evidencePipeline.data.persistedWebValidation?.updatedAt ?? '').toLocaleString('it-IT')}`
+                          : evidencePipeline.data.persistedWebValidation
+                            ? `salvata · ${new Date(evidencePipeline.data.persistedWebValidation.updatedAt).toLocaleString('it-IT')}`
+                            : evidencePipeline.data.persistError ?? 'N/D'}
                       </p>
                     </div>
                   </div>

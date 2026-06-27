@@ -106,6 +106,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("DELETE /binocolo/v1/ma/sessions/{id}", h.handleDeleteMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/purge", h.handlePurgeMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/rating", h.handleRateMATarget)
+	handle("PUT /binocolo/v1/ma/sessions/{id}/web-validation", h.handleUpsertMAWebValidation)
 	handle("POST /binocolo/v1/ma/sessions/{id}/deep-dive", h.handleDeepDiveMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/estimate", h.handleEstimateMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/execute", h.handleExecuteMASession)
@@ -314,6 +315,31 @@ func (h *Handler) handleRateMATarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleUpsertMAWebValidation(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	var body MAWebValidationUpsertRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_target_web_validation_upsert", id, body, subject, email)
+	if !traceOK {
+		return
+	}
+	validation, err := h.ma.upsertTargetWebValidation(r.Context(), id, body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_target_web_validation_upsert", err, "session_id", id)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, validation)
 }
 
 func (h *Handler) handleDeepDiveMASession(w http.ResponseWriter, r *http.Request) {

@@ -1440,6 +1440,10 @@ func (f *fakeMAWorkspaceStore) UpsertMATargetRating(context.Context, string, str
 	return nil
 }
 
+func (f *fakeMAWorkspaceStore) UpsertMAWebValidation(context.Context, maWebValidationUpsert) (MAWebValidation, error) {
+	return MAWebValidation{}, nil
+}
+
 func (f *fakeMAWorkspaceStore) GetMASessionState(context.Context, string) (MASession, error) {
 	return MASession{}, nil
 }

@@ -172,6 +172,18 @@ type MATargetRatingRequest struct {
 	Rating     int    `json:"rating"`
 }
 
+type MAWebValidationUpsertRequest struct {
+	Target                 MATarget                        `json:"target"`
+	KeywordSet             CandidateMatchKeywordSet        `json:"keywordSet"`
+	DomainResponse         DomainResolutionResponse        `json:"domainResponse"`
+	SelectedDomain         *DomainResolutionCandidate      `json:"selectedDomain,omitempty"`
+	EvidenceRuns           []CandidateMatchEvidenceRun     `json:"evidenceRuns"`
+	Summary                CandidateMatchEvidenceSummary   `json:"summary"`
+	CandidateMatchAnalysis *CandidateMatchAnalysisResponse `json:"candidateMatchAnalysis,omitempty"`
+	CandidateMatchError    string                          `json:"candidateMatchError,omitempty"`
+	FinalDecision          CandidateMatchFinalDecision     `json:"finalDecision"`
+}
+
 type MAParameter struct {
 	Key            string     `json:"key"`
 	Value          string     `json:"value"`
@@ -495,6 +507,7 @@ type MATarget struct {
 	Evidence         []MATargetEvidence   `json:"evidence"`
 	Adjustments      []MATargetAdjustment `json:"adjustments,omitempty"`
 	Deep             *MADeepAnalysis      `json:"deep,omitempty"`
+	WebValidation    *MAWebValidation     `json:"webValidation,omitempty"`
 	VendorPayload    json.RawMessage      `json:"vendorPayload,omitempty"`
 	CreatedAt        time.Time            `json:"createdAt"`
 }
@@ -519,6 +532,33 @@ type MATargetFlag struct {
 	Code     string `json:"code"`
 	Label    string `json:"label"`
 	Severity string `json:"severity"`
+}
+
+type MAWebValidation struct {
+	SessionID              string                          `json:"sessionId"`
+	CompanyKey             string                          `json:"companyKey"`
+	TargetID               string                          `json:"targetId,omitempty"`
+	RunID                  string                          `json:"runId,omitempty"`
+	SelectedDomain         string                          `json:"selectedDomain,omitempty"`
+	DomainConfidence       string                          `json:"domainConfidence,omitempty"`
+	DomainScore            *int                            `json:"domainScore,omitempty"`
+	WebScore               int                             `json:"webScore"`
+	WebConfidence          string                          `json:"webConfidence,omitempty"`
+	WebValidationState     string                          `json:"webValidationState"`
+	FinalAction            string                          `json:"finalAction"`
+	AnalystVerdict         string                          `json:"analystVerdict,omitempty"`
+	AnalystAction          string                          `json:"analystAction,omitempty"`
+	AnalystConfidence      string                          `json:"analystConfidence,omitempty"`
+	Summary                CandidateMatchEvidenceSummary   `json:"summary"`
+	KeywordSet             CandidateMatchKeywordSet        `json:"keywordSet"`
+	SelectedDomainPayload  *DomainResolutionCandidate      `json:"selectedDomainPayload,omitempty"`
+	DomainResponse         DomainResolutionResponse        `json:"domainResponse"`
+	EvidenceRuns           []CandidateMatchEvidenceRun     `json:"evidenceRuns"`
+	CandidateMatchAnalysis *CandidateMatchAnalysisResponse `json:"candidateMatchAnalysis,omitempty"`
+	CandidateMatchError    string                          `json:"candidateMatchError,omitempty"`
+	FinalDecision          CandidateMatchFinalDecision     `json:"finalDecision"`
+	UpdatedByEmail         string                          `json:"updatedByEmail,omitempty"`
+	UpdatedAt              time.Time                       `json:"updatedAt"`
 }
 
 // MATargetAdjustment is a multiplicative score factor applied OUTSIDE the
