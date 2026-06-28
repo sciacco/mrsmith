@@ -1377,6 +1377,14 @@ func (f *fakeMALLMProvider) Embed(context.Context, llm.EmbeddingModel, []string)
 	return nil, llm.Usage{}, errors.New("embeddings not configured")
 }
 
+func (f *fakeMALLMProvider) ResolveRerankModel(context.Context, string, string) (llm.RerankModel, error) {
+	return llm.RerankModel{}, errors.New("rerank not configured")
+}
+
+func (f *fakeMALLMProvider) Rerank(context.Context, llm.RerankModel, string, string, []string) ([]float64, llm.Usage, error) {
+	return nil, llm.Usage{}, errors.New("rerank not configured")
+}
+
 type fakeMAWorkspaceStore struct {
 	traces []maTraceStart
 	links  []maTraceLink

@@ -91,6 +91,10 @@ type maLLMProvider interface {
 	// share one model; Embed returns one vector per input plus token usage.
 	ResolveEmbeddingModel(ctx context.Context, id string) (llm.EmbeddingModel, error)
 	Embed(ctx context.Context, m llm.EmbeddingModel, inputs []string) ([][]float32, llm.Usage, error)
+	// Reranking capability (use case 2 sector classification). ResolveRerankModel
+	// resolves by (app, scope); Rerank returns one yes-probability per document.
+	ResolveRerankModel(ctx context.Context, scope, modelID string) (llm.RerankModel, error)
+	Rerank(ctx context.Context, m llm.RerankModel, instruction, query string, documents []string) ([]float64, llm.Usage, error)
 }
 
 type maLLMAdapter struct{ svc *llm.Service }
@@ -136,6 +140,14 @@ func (a maLLMAdapter) ResolveEmbeddingModel(ctx context.Context, id string) (llm
 
 func (a maLLMAdapter) Embed(ctx context.Context, m llm.EmbeddingModel, inputs []string) ([][]float32, llm.Usage, error) {
 	return a.svc.Embed(ctx, m, inputs)
+}
+
+func (a maLLMAdapter) ResolveRerankModel(ctx context.Context, scope, modelID string) (llm.RerankModel, error) {
+	return a.svc.ResolveRerankModel(ctx, maApp, scope, modelID)
+}
+
+func (a maLLMAdapter) Rerank(ctx context.Context, m llm.RerankModel, instruction, query string, documents []string) ([]float64, llm.Usage, error) {
+	return a.svc.Rerank(ctx, m, instruction, query, documents)
 }
 
 type maService struct {

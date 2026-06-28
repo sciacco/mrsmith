@@ -155,57 +155,11 @@ func (s *maService) retrieveMAIntentAtecoEmbedding(ctx context.Context, intent M
 		return nil, missing, true, nil
 	}
 
-	concepts, err := s.kb.LoadKBConcepts(ctx)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	targets := make([]*kbConcept, 0, len(concepts))
-	for i := range concepts {
-		if concepts[i].Kind == "distractor" || len(concepts[i].Vector) == 0 {
-			continue
-		}
-		targets = append(targets, &concepts[i])
-	}
-	if len(targets) == 0 {
-		return nil, nil, false, nil // KB not loaded yet -> fallback
-	}
-	modelID, dim, driftErr := kbModelConsensus(targets)
-	if driftErr != nil {
-		_ = s.traceEvent(ctx, maTraceEventWrite{
-			EventType: "ma_ateco_retrieval",
-			Status:    maTraceEventFailed,
-			Error:     driftErr.Error(),
-			Metadata:  maTraceJSON(map[string]any{"stage": "kb_drift", "concept_count": len(targets)}),
-		})
-		return nil, nil, false, driftErr
-	}
-
-	embModel, err := s.llmp.ResolveEmbeddingModel(ctx, modelID)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	if embModel.Dimension != dim {
-		return nil, nil, false, fmt.Errorf("kb vector dim %d != embedding model dim %d", dim, embModel.Dimension)
-	}
 	instruction, instructionPromptID := s.loadAtecoEmbedInstruction(ctx)
-	queryInput := queryText
-	if instruction != "" {
-		queryInput = fmt.Sprintf("Instruct: %s\nQuery: %s", instruction, queryText)
-	}
-	vecs, usage, err := s.llmp.Embed(ctx, embModel, []string{queryInput})
-	if err != nil {
+	scored, embModel, usage, ok, err := s.matchKBConcepts(ctx, instruction, queryText, false)
+	if err != nil || !ok {
 		return nil, nil, false, err
 	}
-	if len(vecs) != 1 || len(vecs[0]) != dim {
-		return nil, nil, false, fmt.Errorf("embedding returned %d vectors (dim mismatch)", len(vecs))
-	}
-	query := vecs[0]
-
-	scored := make([]kbScored, 0, len(targets))
-	for _, c := range targets {
-		scored = append(scored, kbScored{concept: c, cosine: kbCosine(query, c.Vector)})
-	}
-	sort.SliceStable(scored, func(i, j int) bool { return scored[i].cosine > scored[j].cosine })
 
 	top := scored[0].cosine
 	if top < cfg.Floor {
@@ -233,6 +187,65 @@ func (s *maService) retrieveMAIntentAtecoEmbedding(ctx context.Context, intent M
 	missing = append(missing, resolveMissing...)
 	s.recordAtecoRetrievalTrace(ctx, queryText, instruction, instructionPromptID, embModel, cfg, top, matched, candidates, usage)
 	return candidates, missing, true, nil
+}
+
+// matchKBConcepts embeds `text` (wrapped with the query-side instruction, Qwen
+// asymmetry) and returns the KB concepts scored by cosine, sorted descending.
+// includeDistractors controls whether distractor concepts are scored: UC1 ATECO
+// retrieval excludes them, UC2 sector classification includes them so an off-target
+// company can land on a distractor. Runs the drift guard (single embedding model +
+// dimension across the KB) and embeds with that exact model. ok=false means the
+// KB/embedder is unavailable and the caller should fall back. Shared by UC1 and UC2.
+func (s *maService) matchKBConcepts(ctx context.Context, instruction, text string, includeDistractors bool) ([]kbScored, llm.EmbeddingModel, llm.Usage, bool, error) {
+	if s.llmp == nil || s.kb == nil {
+		return nil, llm.EmbeddingModel{}, llm.Usage{}, false, nil
+	}
+	concepts, err := s.kb.LoadKBConcepts(ctx)
+	if err != nil {
+		return nil, llm.EmbeddingModel{}, llm.Usage{}, false, err
+	}
+	cands := make([]*kbConcept, 0, len(concepts))
+	for i := range concepts {
+		if len(concepts[i].Vector) == 0 {
+			continue
+		}
+		if !includeDistractors && concepts[i].Kind == "distractor" {
+			continue
+		}
+		cands = append(cands, &concepts[i])
+	}
+	if len(cands) == 0 {
+		return nil, llm.EmbeddingModel{}, llm.Usage{}, false, nil
+	}
+	modelID, dim, err := kbModelConsensus(cands)
+	if err != nil {
+		return nil, llm.EmbeddingModel{}, llm.Usage{}, false, err
+	}
+	embModel, err := s.llmp.ResolveEmbeddingModel(ctx, modelID)
+	if err != nil {
+		return nil, llm.EmbeddingModel{}, llm.Usage{}, false, err
+	}
+	if embModel.Dimension != dim {
+		return nil, llm.EmbeddingModel{}, llm.Usage{}, false, fmt.Errorf("kb vector dim %d != embedding model dim %d", dim, embModel.Dimension)
+	}
+	queryInput := text
+	if strings.TrimSpace(instruction) != "" {
+		queryInput = fmt.Sprintf("Instruct: %s\nQuery: %s", instruction, text)
+	}
+	vecs, usage, err := s.llmp.Embed(ctx, embModel, []string{queryInput})
+	if err != nil {
+		return nil, llm.EmbeddingModel{}, llm.Usage{}, false, err
+	}
+	if len(vecs) != 1 || len(vecs[0]) != dim {
+		return nil, llm.EmbeddingModel{}, llm.Usage{}, false, fmt.Errorf("embedding returned %d vectors (dim mismatch)", len(vecs))
+	}
+	q := vecs[0]
+	scored := make([]kbScored, 0, len(cands))
+	for _, c := range cands {
+		scored = append(scored, kbScored{concept: c, cosine: kbCosine(q, c.Vector)})
+	}
+	sort.SliceStable(scored, func(i, j int) bool { return scored[i].cosine > scored[j].cosine })
+	return scored, embModel, usage, true, nil
 }
 
 // resolveKBFitToCandidates turns the matched concepts into ATECO candidates with
