@@ -1,0 +1,1731 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-06-28T06:01:52.738584+00:00",
+  "source": "codici_ateco_2025.json + business_concepts_seed.json",
+  "description": "Base di conoscenza ATECO ristretta ai settori ICT, arricchita con percorso gerarchico, keyword bilingui IT/EN e back-reference ai concetti del seed. Campo 'embedding_text' pronto per il calcolo degli embedding.",
+  "stats": {
+    "n_nodi": 37,
+    "core": 18,
+    "extended": 19,
+    "concetti_seed_coperti": 29
+  },
+  "nodes": [
+    {
+      "codice": "26.11.00",
+      "titolo": "Fabbricazione di componenti elettronici",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "26",
+          "titolo": "Fabbricazione di computer e prodotti di elettronica e ottica",
+          "gerarchia": 2
+        },
+        {
+          "codice": "26.1",
+          "titolo": "Fabbricazione di componenti elettronici e schede elettroniche",
+          "gerarchia": 3
+        },
+        {
+          "codice": "26.11",
+          "titolo": "Fabbricazione di componenti elettronici",
+          "gerarchia": 4
+        },
+        {
+          "codice": "26.11.0",
+          "titolo": "Fabbricazione di componenti elettronici",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 26 Fabbricazione di computer e prodotti di elettronica e ottica > 26.1 Fabbricazione di componenti elettronici e schede elettroniche > 26.11 Fabbricazione di componenti elettronici > 26.11.0 Fabbricazione di componenti elettronici",
+      "classe_4cifre": "26.11",
+      "keywords": [
+        "componenti elettronici",
+        "semiconduttori",
+        "electronic components"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Fabbricazione di componenti elettronici. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Fabbricazione di computer e prodotti di elettronica e ottica > Fabbricazione di componenti elettronici e schede elettroniche > Fabbricazione di componenti elettronici. Termini correlati: componenti elettronici, semiconduttori, electronic components."
+    },
+    {
+      "codice": "26.12.00",
+      "titolo": "Fabbricazione di schede elettroniche integrate",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "26",
+          "titolo": "Fabbricazione di computer e prodotti di elettronica e ottica",
+          "gerarchia": 2
+        },
+        {
+          "codice": "26.1",
+          "titolo": "Fabbricazione di componenti elettronici e schede elettroniche",
+          "gerarchia": 3
+        },
+        {
+          "codice": "26.12",
+          "titolo": "Fabbricazione di schede elettroniche integrate",
+          "gerarchia": 4
+        },
+        {
+          "codice": "26.12.0",
+          "titolo": "Fabbricazione di schede elettroniche integrate",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 26 Fabbricazione di computer e prodotti di elettronica e ottica > 26.1 Fabbricazione di componenti elettronici e schede elettroniche > 26.12 Fabbricazione di schede elettroniche integrate > 26.12.0 Fabbricazione di schede elettroniche integrate",
+      "classe_4cifre": "26.12",
+      "keywords": [
+        "schede elettroniche",
+        "PCB",
+        "printed circuit board"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Fabbricazione di schede elettroniche integrate. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Fabbricazione di computer e prodotti di elettronica e ottica > Fabbricazione di componenti elettronici e schede elettroniche > Fabbricazione di schede elettroniche integrate. Termini correlati: schede elettroniche, PCB, printed circuit board."
+    },
+    {
+      "codice": "26.20.00",
+      "titolo": "Fabbricazione di computer e unità periferiche",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "26",
+          "titolo": "Fabbricazione di computer e prodotti di elettronica e ottica",
+          "gerarchia": 2
+        },
+        {
+          "codice": "26.2",
+          "titolo": "Fabbricazione di computer e unità periferiche",
+          "gerarchia": 3
+        },
+        {
+          "codice": "26.20",
+          "titolo": "Fabbricazione di computer e unità periferiche",
+          "gerarchia": 4
+        },
+        {
+          "codice": "26.20.0",
+          "titolo": "Fabbricazione di computer e unità periferiche",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 26 Fabbricazione di computer e prodotti di elettronica e ottica > 26.2 Fabbricazione di computer e unità periferiche > 26.20 Fabbricazione di computer e unità periferiche > 26.20.0 Fabbricazione di computer e unità periferiche",
+      "classe_4cifre": "26.20",
+      "keywords": [
+        "computer",
+        "server",
+        "workstation",
+        "periferiche",
+        "hardware",
+        "PC manufacturing"
+      ],
+      "seed_concepts": [
+        "computer_hardware"
+      ],
+      "embedding_text": "Fabbricazione di computer e unità periferiche. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Fabbricazione di computer e prodotti di elettronica e ottica > Fabbricazione di computer e unità periferiche. Termini correlati: computer, server, workstation, periferiche, hardware, PC manufacturing."
+    },
+    {
+      "codice": "26.30.01",
+      "titolo": "Fabbricazione di apparecchiature trasmittenti radiotelevisive",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "26",
+          "titolo": "Fabbricazione di computer e prodotti di elettronica e ottica",
+          "gerarchia": 2
+        },
+        {
+          "codice": "26.3",
+          "titolo": "Fabbricazione di apparecchiature per le comunicazioni",
+          "gerarchia": 3
+        },
+        {
+          "codice": "26.30",
+          "titolo": "Fabbricazione di apparecchiature per le comunicazioni",
+          "gerarchia": 4
+        },
+        {
+          "codice": "26.30.0",
+          "titolo": "Fabbricazione di apparecchiature per le comunicazioni",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 26 Fabbricazione di computer e prodotti di elettronica e ottica > 26.3 Fabbricazione di apparecchiature per le comunicazioni > 26.30 Fabbricazione di apparecchiature per le comunicazioni > 26.30.0 Fabbricazione di apparecchiature per le comunicazioni",
+      "classe_4cifre": "26.30",
+      "keywords": [
+        "trasmettitori",
+        "broadcast equipment",
+        "apparati trasmissione"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Fabbricazione di apparecchiature trasmittenti radiotelevisive. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Fabbricazione di computer e prodotti di elettronica e ottica > Fabbricazione di apparecchiature per le comunicazioni. Termini correlati: trasmettitori, broadcast equipment, apparati trasmissione."
+    },
+    {
+      "codice": "26.30.09",
+      "titolo": "Fabbricazione di altre apparecchiature per le comunicazioni",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "26",
+          "titolo": "Fabbricazione di computer e prodotti di elettronica e ottica",
+          "gerarchia": 2
+        },
+        {
+          "codice": "26.3",
+          "titolo": "Fabbricazione di apparecchiature per le comunicazioni",
+          "gerarchia": 3
+        },
+        {
+          "codice": "26.30",
+          "titolo": "Fabbricazione di apparecchiature per le comunicazioni",
+          "gerarchia": 4
+        },
+        {
+          "codice": "26.30.0",
+          "titolo": "Fabbricazione di apparecchiature per le comunicazioni",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 26 Fabbricazione di computer e prodotti di elettronica e ottica > 26.3 Fabbricazione di apparecchiature per le comunicazioni > 26.30 Fabbricazione di apparecchiature per le comunicazioni > 26.30.0 Fabbricazione di apparecchiature per le comunicazioni",
+      "classe_4cifre": "26.30",
+      "keywords": [
+        "router",
+        "switch",
+        "access point",
+        "apparati di rete",
+        "network equipment",
+        "CPE",
+        "apparati telecom"
+      ],
+      "seed_concepts": [
+        "network_equipment"
+      ],
+      "embedding_text": "Fabbricazione di altre apparecchiature per le comunicazioni. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Fabbricazione di computer e prodotti di elettronica e ottica > Fabbricazione di apparecchiature per le comunicazioni. Termini correlati: router, switch, access point, apparati di rete, network equipment, CPE, apparati telecom."
+    },
+    {
+      "codice": "26.40.01",
+      "titolo": "Fabbricazione di console per videogiochi",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "26",
+          "titolo": "Fabbricazione di computer e prodotti di elettronica e ottica",
+          "gerarchia": 2
+        },
+        {
+          "codice": "26.4",
+          "titolo": "Fabbricazione di prodotti di elettronica di consumo",
+          "gerarchia": 3
+        },
+        {
+          "codice": "26.40",
+          "titolo": "Fabbricazione di prodotti di elettronica di consumo",
+          "gerarchia": 4
+        },
+        {
+          "codice": "26.40.0",
+          "titolo": "Fabbricazione di prodotti di elettronica di consumo",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 26 Fabbricazione di computer e prodotti di elettronica e ottica > 26.4 Fabbricazione di prodotti di elettronica di consumo > 26.40 Fabbricazione di prodotti di elettronica di consumo > 26.40.0 Fabbricazione di prodotti di elettronica di consumo",
+      "classe_4cifre": "26.40",
+      "keywords": [
+        "console videogiochi",
+        "game console hardware"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Fabbricazione di console per videogiochi. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Fabbricazione di computer e prodotti di elettronica e ottica > Fabbricazione di prodotti di elettronica di consumo. Termini correlati: console videogiochi, game console hardware."
+    },
+    {
+      "codice": "26.40.09",
+      "titolo": "Fabbricazione di altri prodotti di elettronica di consumo",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "26",
+          "titolo": "Fabbricazione di computer e prodotti di elettronica e ottica",
+          "gerarchia": 2
+        },
+        {
+          "codice": "26.4",
+          "titolo": "Fabbricazione di prodotti di elettronica di consumo",
+          "gerarchia": 3
+        },
+        {
+          "codice": "26.40",
+          "titolo": "Fabbricazione di prodotti di elettronica di consumo",
+          "gerarchia": 4
+        },
+        {
+          "codice": "26.40.0",
+          "titolo": "Fabbricazione di prodotti di elettronica di consumo",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 26 Fabbricazione di computer e prodotti di elettronica e ottica > 26.4 Fabbricazione di prodotti di elettronica di consumo > 26.40 Fabbricazione di prodotti di elettronica di consumo > 26.40.0 Fabbricazione di prodotti di elettronica di consumo",
+      "classe_4cifre": "26.40",
+      "keywords": [
+        "elettronica di consumo",
+        "consumer electronics"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Fabbricazione di altri prodotti di elettronica di consumo. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Fabbricazione di computer e prodotti di elettronica e ottica > Fabbricazione di prodotti di elettronica di consumo. Termini correlati: elettronica di consumo, consumer electronics."
+    },
+    {
+      "codice": "27.31.00",
+      "titolo": "Fabbricazione di cavi in fibra ottica",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "27",
+          "titolo": "Fabbricazione di apparecchiature elettriche",
+          "gerarchia": 2
+        },
+        {
+          "codice": "27.3",
+          "titolo": "Fabbricazione di cablaggi e attrezzature per cablaggio",
+          "gerarchia": 3
+        },
+        {
+          "codice": "27.31",
+          "titolo": "Fabbricazione di cavi in fibra ottica",
+          "gerarchia": 4
+        },
+        {
+          "codice": "27.31.0",
+          "titolo": "Fabbricazione di cavi in fibra ottica",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 27 Fabbricazione di apparecchiature elettriche > 27.3 Fabbricazione di cablaggi e attrezzature per cablaggio > 27.31 Fabbricazione di cavi in fibra ottica > 27.31.0 Fabbricazione di cavi in fibra ottica",
+      "classe_4cifre": "27.31",
+      "keywords": [
+        "cavi fibra ottica",
+        "fiber optic cable",
+        "cavo ottico",
+        "patch cord",
+        "produzione cavi fibra"
+      ],
+      "seed_concepts": [
+        "fiber_cables"
+      ],
+      "embedding_text": "Fabbricazione di cavi in fibra ottica. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Fabbricazione di apparecchiature elettriche > Fabbricazione di cablaggi e attrezzature per cablaggio > Fabbricazione di cavi in fibra ottica. Termini correlati: cavi fibra ottica, fiber optic cable, cavo ottico, patch cord, produzione cavi fibra."
+    },
+    {
+      "codice": "27.32.00",
+      "titolo": "Fabbricazione di altri fili e cavi elettronici ed elettrici",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "27",
+          "titolo": "Fabbricazione di apparecchiature elettriche",
+          "gerarchia": 2
+        },
+        {
+          "codice": "27.3",
+          "titolo": "Fabbricazione di cablaggi e attrezzature per cablaggio",
+          "gerarchia": 3
+        },
+        {
+          "codice": "27.32",
+          "titolo": "Fabbricazione di altri fili e cavi elettronici ed elettrici",
+          "gerarchia": 4
+        },
+        {
+          "codice": "27.32.0",
+          "titolo": "Fabbricazione di altri fili e cavi elettronici ed elettrici",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 27 Fabbricazione di apparecchiature elettriche > 27.3 Fabbricazione di cablaggi e attrezzature per cablaggio > 27.32 Fabbricazione di altri fili e cavi elettronici ed elettrici > 27.32.0 Fabbricazione di altri fili e cavi elettronici ed elettrici",
+      "classe_4cifre": "27.32",
+      "keywords": [
+        "cavi elettrici",
+        "cavi dati",
+        "cavi rete",
+        "wiring"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Fabbricazione di altri fili e cavi elettronici ed elettrici. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Fabbricazione di apparecchiature elettriche > Fabbricazione di cablaggi e attrezzature per cablaggio > Fabbricazione di altri fili e cavi elettronici ed elettrici. Termini correlati: cavi elettrici, cavi dati, cavi rete, wiring."
+    },
+    {
+      "codice": "33.20.02",
+      "titolo": "Installazione di apparecchiature per le comunicazioni e di apparecchiature radiotelevisive",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "33",
+          "titolo": "Riparazione, manutenzione e installazione di macchine e apparecchiature",
+          "gerarchia": 2
+        },
+        {
+          "codice": "33.2",
+          "titolo": "Installazione di macchine e apparecchiature industriali",
+          "gerarchia": 3
+        },
+        {
+          "codice": "33.20",
+          "titolo": "Installazione di macchine e apparecchiature industriali",
+          "gerarchia": 4
+        },
+        {
+          "codice": "33.20.0",
+          "titolo": "Installazione di macchine e apparecchiature industriali",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 33 Riparazione, manutenzione e installazione di macchine e apparecchiature > 33.2 Installazione di macchine e apparecchiature industriali > 33.20 Installazione di macchine e apparecchiature industriali > 33.20.0 Installazione di macchine e apparecchiature industriali",
+      "classe_4cifre": "33.20",
+      "keywords": [
+        "installazione apparati telecom",
+        "antenne",
+        "ponti radio",
+        "impianti radio",
+        "apparecchiature radiotelevisive"
+      ],
+      "seed_concepts": [
+        "communication_equipment_installation",
+        "voip_uc"
+      ],
+      "embedding_text": "Installazione di apparecchiature per le comunicazioni e di apparecchiature radiotelevisive. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Riparazione, manutenzione e installazione di macchine e apparecchiature > Installazione di macchine e apparecchiature industriali. Termini correlati: installazione apparati telecom, antenne, ponti radio, impianti radio, apparecchiature radiotelevisive."
+    },
+    {
+      "codice": "33.20.06",
+      "titolo": "Installazione di macchinari e attrezzature per ufficio",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "C",
+          "titolo": "ATTIVITÀ MANIFATTURIERE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "33",
+          "titolo": "Riparazione, manutenzione e installazione di macchine e apparecchiature",
+          "gerarchia": 2
+        },
+        {
+          "codice": "33.2",
+          "titolo": "Installazione di macchine e apparecchiature industriali",
+          "gerarchia": 3
+        },
+        {
+          "codice": "33.20",
+          "titolo": "Installazione di macchine e apparecchiature industriali",
+          "gerarchia": 4
+        },
+        {
+          "codice": "33.20.0",
+          "titolo": "Installazione di macchine e apparecchiature industriali",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "C ATTIVITÀ MANIFATTURIERE > 33 Riparazione, manutenzione e installazione di macchine e apparecchiature > 33.2 Installazione di macchine e apparecchiature industriali > 33.20 Installazione di macchine e apparecchiature industriali > 33.20.0 Installazione di macchine e apparecchiature industriali",
+      "classe_4cifre": "33.20",
+      "keywords": [
+        "installazione macchine ufficio",
+        "office equipment install"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Installazione di macchinari e attrezzature per ufficio. Contesto gerarchico: ATTIVITÀ MANIFATTURIERE > Riparazione, manutenzione e installazione di macchine e apparecchiature > Installazione di macchine e apparecchiature industriali. Termini correlati: installazione macchine ufficio, office equipment install."
+    },
+    {
+      "codice": "46.14.03",
+      "titolo": "Attività di intermediari del commercio all'ingrosso di macchine per ufficio, computer e apparecchiature per le comunicazioni",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "G",
+          "titolo": "COMMERCIO ALL'INGROSSO E AL DETTAGLIO",
+          "gerarchia": 1
+        },
+        {
+          "codice": "46",
+          "titolo": "Commercio all'ingrosso",
+          "gerarchia": 2
+        },
+        {
+          "codice": "46.1",
+          "titolo": "Attività di servizi di intermediazione per il commercio all'ingrosso",
+          "gerarchia": 3
+        },
+        {
+          "codice": "46.14",
+          "titolo": "Attività di intermediari del commercio all'ingrosso di macchine e attrezzature industriali, navi e aeromobili",
+          "gerarchia": 4
+        },
+        {
+          "codice": "46.14.0",
+          "titolo": "Attività di intermediari del commercio all'ingrosso di macchine e attrezzature industriali, navi e aeromobili",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "G COMMERCIO ALL'INGROSSO E AL DETTAGLIO > 46 Commercio all'ingrosso > 46.1 Attività di servizi di intermediazione per il commercio all'ingrosso > 46.14 Attività di intermediari del commercio all'ingrosso di macchine e attrezzature industriali, navi e aeromobili > 46.14.0 Attività di intermediari del commercio all'ingrosso di macchine e attrezzature industriali, navi e aeromobili",
+      "classe_4cifre": "46.14",
+      "keywords": [
+        "agente commercio ICT",
+        "intermediazione computer",
+        "rappresentante apparecchiature TLC"
+      ],
+      "seed_concepts": [
+        "ict_wholesale"
+      ],
+      "embedding_text": "Attività di intermediari del commercio all'ingrosso di macchine per ufficio, computer e apparecchiature per le comunicazioni. Contesto gerarchico: COMMERCIO ALL'INGROSSO E AL DETTAGLIO > Commercio all'ingrosso > Attività di servizi di intermediazione per il commercio all'ingrosso > Attività di intermediari del commercio all'ingrosso di macchine e attrezzature industriali, navi e aeromobili. Termini correlati: agente commercio ICT, intermediazione computer, rappresentante apparecchiature TLC."
+    },
+    {
+      "codice": "46.50.10",
+      "titolo": "Commercio all'ingrosso di computer, unità periferiche e software",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "G",
+          "titolo": "COMMERCIO ALL'INGROSSO E AL DETTAGLIO",
+          "gerarchia": 1
+        },
+        {
+          "codice": "46",
+          "titolo": "Commercio all'ingrosso",
+          "gerarchia": 2
+        },
+        {
+          "codice": "46.5",
+          "titolo": "Commercio all'ingrosso di apparecchiature informatiche e di comunicazione",
+          "gerarchia": 3
+        },
+        {
+          "codice": "46.50",
+          "titolo": "Commercio all'ingrosso di apparecchiature informatiche e di comunicazione",
+          "gerarchia": 4
+        },
+        {
+          "codice": "46.50.1",
+          "titolo": "Commercio all'ingrosso di computer, unità periferiche e software",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "G COMMERCIO ALL'INGROSSO E AL DETTAGLIO > 46 Commercio all'ingrosso > 46.5 Commercio all'ingrosso di apparecchiature informatiche e di comunicazione > 46.50 Commercio all'ingrosso di apparecchiature informatiche e di comunicazione > 46.50.1 Commercio all'ingrosso di computer, unità periferiche e software",
+      "classe_4cifre": "46.50",
+      "keywords": [
+        "distributore ICT",
+        "grossista informatica",
+        "wholesale computer",
+        "distribuzione software",
+        "VAR"
+      ],
+      "seed_concepts": [
+        "computer_hardware",
+        "ict_wholesale",
+        "storage"
+      ],
+      "embedding_text": "Commercio all'ingrosso di computer, unità periferiche e software. Contesto gerarchico: COMMERCIO ALL'INGROSSO E AL DETTAGLIO > Commercio all'ingrosso > Commercio all'ingrosso di apparecchiature informatiche e di comunicazione > Commercio all'ingrosso di computer, unità periferiche e software. Termini correlati: distributore ICT, grossista informatica, wholesale computer, distribuzione software, VAR."
+    },
+    {
+      "codice": "46.50.20",
+      "titolo": "Commercio all'ingrosso di apparecchiature per telecomunicazioni",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "G",
+          "titolo": "COMMERCIO ALL'INGROSSO E AL DETTAGLIO",
+          "gerarchia": 1
+        },
+        {
+          "codice": "46",
+          "titolo": "Commercio all'ingrosso",
+          "gerarchia": 2
+        },
+        {
+          "codice": "46.5",
+          "titolo": "Commercio all'ingrosso di apparecchiature informatiche e di comunicazione",
+          "gerarchia": 3
+        },
+        {
+          "codice": "46.50",
+          "titolo": "Commercio all'ingrosso di apparecchiature informatiche e di comunicazione",
+          "gerarchia": 4
+        },
+        {
+          "codice": "46.50.2",
+          "titolo": "Commercio all'ingrosso di apparecchiature per telecomunicazioni",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "G COMMERCIO ALL'INGROSSO E AL DETTAGLIO > 46 Commercio all'ingrosso > 46.5 Commercio all'ingrosso di apparecchiature informatiche e di comunicazione > 46.50 Commercio all'ingrosso di apparecchiature informatiche e di comunicazione > 46.50.2 Commercio all'ingrosso di apparecchiature per telecomunicazioni",
+      "classe_4cifre": "46.50",
+      "keywords": [
+        "distributore apparati telecom",
+        "wholesale telecom equipment",
+        "grossista TLC"
+      ],
+      "seed_concepts": [
+        "ict_wholesale",
+        "network_equipment"
+      ],
+      "embedding_text": "Commercio all'ingrosso di apparecchiature per telecomunicazioni. Contesto gerarchico: COMMERCIO ALL'INGROSSO E AL DETTAGLIO > Commercio all'ingrosso > Commercio all'ingrosso di apparecchiature informatiche e di comunicazione > Commercio all'ingrosso di apparecchiature per telecomunicazioni. Termini correlati: distributore apparati telecom, wholesale telecom equipment, grossista TLC."
+    },
+    {
+      "codice": "46.50.30",
+      "titolo": "Commercio all'ingrosso di altre macchine e attrezzature per ufficio",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "G",
+          "titolo": "COMMERCIO ALL'INGROSSO E AL DETTAGLIO",
+          "gerarchia": 1
+        },
+        {
+          "codice": "46",
+          "titolo": "Commercio all'ingrosso",
+          "gerarchia": 2
+        },
+        {
+          "codice": "46.5",
+          "titolo": "Commercio all'ingrosso di apparecchiature informatiche e di comunicazione",
+          "gerarchia": 3
+        },
+        {
+          "codice": "46.50",
+          "titolo": "Commercio all'ingrosso di apparecchiature informatiche e di comunicazione",
+          "gerarchia": 4
+        },
+        {
+          "codice": "46.50.3",
+          "titolo": "Commercio all'ingrosso di altre macchine e attrezzature per ufficio",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "G COMMERCIO ALL'INGROSSO E AL DETTAGLIO > 46 Commercio all'ingrosso > 46.5 Commercio all'ingrosso di apparecchiature informatiche e di comunicazione > 46.50 Commercio all'ingrosso di apparecchiature informatiche e di comunicazione > 46.50.3 Commercio all'ingrosso di altre macchine e attrezzature per ufficio",
+      "classe_4cifre": "46.50",
+      "keywords": [
+        "ingrosso macchine ufficio",
+        "office machines wholesale"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Commercio all'ingrosso di altre macchine e attrezzature per ufficio. Contesto gerarchico: COMMERCIO ALL'INGROSSO E AL DETTAGLIO > Commercio all'ingrosso > Commercio all'ingrosso di apparecchiature informatiche e di comunicazione > Commercio all'ingrosso di altre macchine e attrezzature per ufficio. Termini correlati: ingrosso macchine ufficio, office machines wholesale."
+    },
+    {
+      "codice": "58.21.00",
+      "titolo": "Edizione di videogiochi",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "J",
+          "titolo": "ATTIVITÀ EDITORIALI, TRASMISSIONI RADIOFONICHE E PRODUZIONE E DISTRIBUZIONE DI CONTENUTI",
+          "gerarchia": 1
+        },
+        {
+          "codice": "58",
+          "titolo": "Attività editoriali",
+          "gerarchia": 2
+        },
+        {
+          "codice": "58.2",
+          "titolo": "Edizione di software",
+          "gerarchia": 3
+        },
+        {
+          "codice": "58.21",
+          "titolo": "Edizione di videogiochi",
+          "gerarchia": 4
+        },
+        {
+          "codice": "58.21.0",
+          "titolo": "Edizione di videogiochi",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "J ATTIVITÀ EDITORIALI, TRASMISSIONI RADIOFONICHE E PRODUZIONE E DISTRIBUZIONE DI CONTENUTI > 58 Attività editoriali > 58.2 Edizione di software > 58.21 Edizione di videogiochi > 58.21.0 Edizione di videogiochi",
+      "classe_4cifre": "58.21",
+      "keywords": [
+        "videogiochi",
+        "game publishing",
+        "videogame",
+        "gaming",
+        "game studio",
+        "pubblicazione giochi",
+        "mobile game"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Edizione di videogiochi. Contesto gerarchico: ATTIVITÀ EDITORIALI, TRASMISSIONI RADIOFONICHE E PRODUZIONE E DISTRIBUZIONE DI CONTENUTI > Attività editoriali > Edizione di software > Edizione di videogiochi. Termini correlati: videogiochi, game publishing, videogame, gaming, game studio, pubblicazione giochi, mobile game."
+    },
+    {
+      "codice": "58.29.00",
+      "titolo": "Edizione di altri software",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "J",
+          "titolo": "ATTIVITÀ EDITORIALI, TRASMISSIONI RADIOFONICHE E PRODUZIONE E DISTRIBUZIONE DI CONTENUTI",
+          "gerarchia": 1
+        },
+        {
+          "codice": "58",
+          "titolo": "Attività editoriali",
+          "gerarchia": 2
+        },
+        {
+          "codice": "58.2",
+          "titolo": "Edizione di software",
+          "gerarchia": 3
+        },
+        {
+          "codice": "58.29",
+          "titolo": "Edizione di altri software",
+          "gerarchia": 4
+        },
+        {
+          "codice": "58.29.0",
+          "titolo": "Edizione di altri software",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "J ATTIVITÀ EDITORIALI, TRASMISSIONI RADIOFONICHE E PRODUZIONE E DISTRIBUZIONE DI CONTENUTI > 58 Attività editoriali > 58.2 Edizione di software > 58.29 Edizione di altri software > 58.29.0 Edizione di altri software",
+      "classe_4cifre": "58.29",
+      "keywords": [
+        "software vendor",
+        "ISV",
+        "SaaS",
+        "licenza software",
+        "software proprietario",
+        "pacchetto software",
+        "edizione software",
+        "prodotto software",
+        "publishing software"
+      ],
+      "seed_concepts": [
+        "ai_ml",
+        "erp_crm",
+        "software_product"
+      ],
+      "embedding_text": "Edizione di altri software. Contesto gerarchico: ATTIVITÀ EDITORIALI, TRASMISSIONI RADIOFONICHE E PRODUZIONE E DISTRIBUZIONE DI CONTENUTI > Attività editoriali > Edizione di software > Edizione di altri software. Termini correlati: software vendor, ISV, SaaS, licenza software, software proprietario, pacchetto software, edizione software, prodotto software, publishing software."
+    },
+    {
+      "codice": "61.10.01",
+      "titolo": "Attività di telecomunicazioni fisse",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "61",
+          "titolo": "Telecomunicazioni",
+          "gerarchia": 2
+        },
+        {
+          "codice": "61.1",
+          "titolo": "Attività di telecomunicazioni fisse, mobili e satellitari",
+          "gerarchia": 3
+        },
+        {
+          "codice": "61.10",
+          "titolo": "Attività di telecomunicazioni fisse, mobili e satellitari",
+          "gerarchia": 4
+        },
+        {
+          "codice": "61.10.0",
+          "titolo": "Attività di telecomunicazioni fisse, mobili e satellitari",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 61 Telecomunicazioni > 61.1 Attività di telecomunicazioni fisse, mobili e satellitari > 61.10 Attività di telecomunicazioni fisse, mobili e satellitari > 61.10.0 Attività di telecomunicazioni fisse, mobili e satellitari",
+      "classe_4cifre": "61.10",
+      "keywords": [
+        "operatore fisso",
+        "rete fissa",
+        "fibra",
+        "FTTH",
+        "FTTC",
+        "FWA",
+        "banda larga fissa",
+        "carrier fisso",
+        "dorsale",
+        "fixed line"
+      ],
+      "seed_concepts": [
+        "internet_service_provider",
+        "telecom_operator"
+      ],
+      "embedding_text": "Attività di telecomunicazioni fisse. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Telecomunicazioni > Attività di telecomunicazioni fisse, mobili e satellitari. Termini correlati: operatore fisso, rete fissa, fibra, FTTH, FTTC, FWA, banda larga fissa, carrier fisso, dorsale, fixed line."
+    },
+    {
+      "codice": "61.10.02",
+      "titolo": "Attività di telecomunicazioni mobili",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "61",
+          "titolo": "Telecomunicazioni",
+          "gerarchia": 2
+        },
+        {
+          "codice": "61.1",
+          "titolo": "Attività di telecomunicazioni fisse, mobili e satellitari",
+          "gerarchia": 3
+        },
+        {
+          "codice": "61.10",
+          "titolo": "Attività di telecomunicazioni fisse, mobili e satellitari",
+          "gerarchia": 4
+        },
+        {
+          "codice": "61.10.0",
+          "titolo": "Attività di telecomunicazioni fisse, mobili e satellitari",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 61 Telecomunicazioni > 61.1 Attività di telecomunicazioni fisse, mobili e satellitari > 61.10 Attività di telecomunicazioni fisse, mobili e satellitari > 61.10.0 Attività di telecomunicazioni fisse, mobili e satellitari",
+      "classe_4cifre": "61.10",
+      "keywords": [
+        "operatore mobile",
+        "rete mobile",
+        "MVNO",
+        "4G",
+        "5G",
+        "SIM",
+        "mobile carrier",
+        "telefonia mobile"
+      ],
+      "seed_concepts": [
+        "telecom_operator"
+      ],
+      "embedding_text": "Attività di telecomunicazioni mobili. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Telecomunicazioni > Attività di telecomunicazioni fisse, mobili e satellitari. Termini correlati: operatore mobile, rete mobile, MVNO, 4G, 5G, SIM, mobile carrier, telefonia mobile."
+    },
+    {
+      "codice": "61.10.03",
+      "titolo": "Attività di telecomunicazioni satellitari",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "61",
+          "titolo": "Telecomunicazioni",
+          "gerarchia": 2
+        },
+        {
+          "codice": "61.1",
+          "titolo": "Attività di telecomunicazioni fisse, mobili e satellitari",
+          "gerarchia": 3
+        },
+        {
+          "codice": "61.10",
+          "titolo": "Attività di telecomunicazioni fisse, mobili e satellitari",
+          "gerarchia": 4
+        },
+        {
+          "codice": "61.10.0",
+          "titolo": "Attività di telecomunicazioni fisse, mobili e satellitari",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 61 Telecomunicazioni > 61.1 Attività di telecomunicazioni fisse, mobili e satellitari > 61.10 Attività di telecomunicazioni fisse, mobili e satellitari > 61.10.0 Attività di telecomunicazioni fisse, mobili e satellitari",
+      "classe_4cifre": "61.10",
+      "keywords": [
+        "satellite",
+        "connettivita satellitare",
+        "VSAT",
+        "satellite broadband",
+        "comunicazioni satellitari"
+      ],
+      "seed_concepts": [
+        "telecom_operator"
+      ],
+      "embedding_text": "Attività di telecomunicazioni satellitari. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Telecomunicazioni > Attività di telecomunicazioni fisse, mobili e satellitari. Termini correlati: satellite, connettivita satellitare, VSAT, satellite broadband, comunicazioni satellitari."
+    },
+    {
+      "codice": "61.20.00",
+      "titolo": "Attività di rivendita di telecomunicazioni e attività di servizi di intermediazione per telecomunicazioni",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "61",
+          "titolo": "Telecomunicazioni",
+          "gerarchia": 2
+        },
+        {
+          "codice": "61.2",
+          "titolo": "Attività di rivendita di telecomunicazioni e attività di servizi di intermediazione per telecomunicazioni",
+          "gerarchia": 3
+        },
+        {
+          "codice": "61.20",
+          "titolo": "Attività di rivendita di telecomunicazioni e attività di servizi di intermediazione per telecomunicazioni",
+          "gerarchia": 4
+        },
+        {
+          "codice": "61.20.0",
+          "titolo": "Attività di rivendita di telecomunicazioni e attività di servizi di intermediazione per telecomunicazioni",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 61 Telecomunicazioni > 61.2 Attività di rivendita di telecomunicazioni e attività di servizi di intermediazione per telecomunicazioni > 61.20 Attività di rivendita di telecomunicazioni e attività di servizi di intermediazione per telecomunicazioni > 61.20.0 Attività di rivendita di telecomunicazioni e attività di servizi di intermediazione per telecomunicazioni",
+      "classe_4cifre": "61.20",
+      "keywords": [
+        "rivenditore telecom",
+        "reseller connettivita",
+        "intermediazione TLC",
+        "wholesale telecom",
+        "MVNO enabler"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Attività di rivendita di telecomunicazioni e attività di servizi di intermediazione per telecomunicazioni. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Telecomunicazioni > Attività di rivendita di telecomunicazioni e attività di servizi di intermediazione per telecomunicazioni. Termini correlati: rivenditore telecom, reseller connettivita, intermediazione TLC, wholesale telecom, MVNO enabler."
+    },
+    {
+      "codice": "61.90.10",
+      "titolo": "Erogazione di servizi di accesso a Internet",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "61",
+          "titolo": "Telecomunicazioni",
+          "gerarchia": 2
+        },
+        {
+          "codice": "61.9",
+          "titolo": "Altre attività di telecomunicazioni",
+          "gerarchia": 3
+        },
+        {
+          "codice": "61.90",
+          "titolo": "Altre attività di telecomunicazioni",
+          "gerarchia": 4
+        },
+        {
+          "codice": "61.90.1",
+          "titolo": "Erogazione di servizi di accesso a Internet",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 61 Telecomunicazioni > 61.9 Altre attività di telecomunicazioni > 61.90 Altre attività di telecomunicazioni > 61.90.1 Erogazione di servizi di accesso a Internet",
+      "classe_4cifre": "61.90",
+      "keywords": [
+        "ISP",
+        "internet access",
+        "accesso internet",
+        "banda larga",
+        "provider internet",
+        "connettivita internet"
+      ],
+      "seed_concepts": [
+        "internet_service_provider",
+        "telecom_operator"
+      ],
+      "embedding_text": "Erogazione di servizi di accesso a Internet. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Telecomunicazioni > Altre attività di telecomunicazioni > Erogazione di servizi di accesso a Internet. Termini correlati: ISP, internet access, accesso internet, banda larga, provider internet, connettivita internet."
+    },
+    {
+      "codice": "61.90.20",
+      "titolo": "Erogazione di servizi di messaggistica e di notifica",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "61",
+          "titolo": "Telecomunicazioni",
+          "gerarchia": 2
+        },
+        {
+          "codice": "61.9",
+          "titolo": "Altre attività di telecomunicazioni",
+          "gerarchia": 3
+        },
+        {
+          "codice": "61.90",
+          "titolo": "Altre attività di telecomunicazioni",
+          "gerarchia": 4
+        },
+        {
+          "codice": "61.90.2",
+          "titolo": "Erogazione di servizi di messaggistica e di notifica",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 61 Telecomunicazioni > 61.9 Altre attività di telecomunicazioni > 61.90 Altre attività di telecomunicazioni > 61.90.2 Erogazione di servizi di messaggistica e di notifica",
+      "classe_4cifre": "61.90",
+      "keywords": [
+        "SMS gateway",
+        "notifiche",
+        "messaggistica",
+        "OTP",
+        "bulk SMS",
+        "email delivery",
+        "push notification"
+      ],
+      "seed_concepts": [
+        "messaging_notifications"
+      ],
+      "embedding_text": "Erogazione di servizi di messaggistica e di notifica. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Telecomunicazioni > Altre attività di telecomunicazioni > Erogazione di servizi di messaggistica e di notifica. Termini correlati: SMS gateway, notifiche, messaggistica, OTP, bulk SMS, email delivery, push notification."
+    },
+    {
+      "codice": "61.90.90",
+      "titolo": "Altre attività di telecomunicazioni n.c.a.",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "61",
+          "titolo": "Telecomunicazioni",
+          "gerarchia": 2
+        },
+        {
+          "codice": "61.9",
+          "titolo": "Altre attività di telecomunicazioni",
+          "gerarchia": 3
+        },
+        {
+          "codice": "61.90",
+          "titolo": "Altre attività di telecomunicazioni",
+          "gerarchia": 4
+        },
+        {
+          "codice": "61.90.9",
+          "titolo": "Altre attività di telecomunicazioni n.c.a.",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 61 Telecomunicazioni > 61.9 Altre attività di telecomunicazioni > 61.90 Altre attività di telecomunicazioni > 61.90.9 Altre attività di telecomunicazioni n.c.a.",
+      "classe_4cifre": "61.90",
+      "keywords": [
+        "VoIP",
+        "PBX",
+        "centralino",
+        "SIP trunk",
+        "unified communications",
+        "fonia",
+        "carrier services"
+      ],
+      "seed_concepts": [
+        "messaging_notifications",
+        "voip_uc"
+      ],
+      "embedding_text": "Altre attività di telecomunicazioni n.c.a.. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Telecomunicazioni > Altre attività di telecomunicazioni > Altre attività di telecomunicazioni n.c.a.. Termini correlati: VoIP, PBX, centralino, SIP trunk, unified communications, fonia, carrier services."
+    },
+    {
+      "codice": "62.10.00",
+      "titolo": "Attività di programmazione informatica",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "62",
+          "titolo": "Attività di programmazione, consulenza informatica e attività connesse",
+          "gerarchia": 2
+        },
+        {
+          "codice": "62.1",
+          "titolo": "Attività di programmazione informatica",
+          "gerarchia": 3
+        },
+        {
+          "codice": "62.10",
+          "titolo": "Attività di programmazione informatica",
+          "gerarchia": 4
+        },
+        {
+          "codice": "62.10.0",
+          "titolo": "Attività di programmazione informatica",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 62 Attività di programmazione, consulenza informatica e attività connesse > 62.1 Attività di programmazione informatica > 62.10 Attività di programmazione informatica > 62.10.0 Attività di programmazione informatica",
+      "classe_4cifre": "62.10",
+      "keywords": [
+        "sviluppo software",
+        "software development",
+        "applicazioni web",
+        "app mobile",
+        "API",
+        "custom software",
+        "DevOps",
+        "sviluppo applicativo",
+        "programmazione"
+      ],
+      "seed_concepts": [
+        "ai_ml",
+        "data_platform",
+        "devops",
+        "erp_crm",
+        "software_development",
+        "software_product"
+      ],
+      "embedding_text": "Attività di programmazione informatica. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Attività di programmazione, consulenza informatica e attività connesse > Attività di programmazione informatica. Termini correlati: sviluppo software, software development, applicazioni web, app mobile, API, custom software, DevOps, sviluppo applicativo, programmazione."
+    },
+    {
+      "codice": "62.20.10",
+      "titolo": "Attività di consulenza informatica",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "62",
+          "titolo": "Attività di programmazione, consulenza informatica e attività connesse",
+          "gerarchia": 2
+        },
+        {
+          "codice": "62.2",
+          "titolo": "Attività di consulenza informatica e di gestione di strutture informatiche",
+          "gerarchia": 3
+        },
+        {
+          "codice": "62.20",
+          "titolo": "Attività di consulenza informatica e di gestione di strutture informatiche",
+          "gerarchia": 4
+        },
+        {
+          "codice": "62.20.1",
+          "titolo": "Attività di consulenza informatica",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 62 Attività di programmazione, consulenza informatica e attività connesse > 62.2 Attività di consulenza informatica e di gestione di strutture informatiche > 62.20 Attività di consulenza informatica e di gestione di strutture informatiche > 62.20.1 Attività di consulenza informatica",
+      "classe_4cifre": "62.20",
+      "keywords": [
+        "consulenza IT",
+        "system integration",
+        "system integrator",
+        "cybersecurity consulting",
+        "progettazione sistemi",
+        "IT advisory",
+        "integrazione sistemi"
+      ],
+      "seed_concepts": [
+        "ai_ml",
+        "backup_dr",
+        "cloud_infrastructure",
+        "cybersecurity_services",
+        "data_platform",
+        "devops",
+        "digital_workplace",
+        "erp_crm",
+        "firewall_network_security",
+        "identity_access",
+        "managed_services",
+        "networking",
+        "soc_mdr",
+        "system_integration",
+        "virtualization",
+        "voip_uc"
+      ],
+      "embedding_text": "Attività di consulenza informatica. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Attività di programmazione, consulenza informatica e attività connesse > Attività di consulenza informatica e di gestione di strutture informatiche > Attività di consulenza informatica. Termini correlati: consulenza IT, system integration, system integrator, cybersecurity consulting, progettazione sistemi, IT advisory, integrazione sistemi."
+    },
+    {
+      "codice": "62.20.20",
+      "titolo": "Attività di gestione di strutture informatiche",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "62",
+          "titolo": "Attività di programmazione, consulenza informatica e attività connesse",
+          "gerarchia": 2
+        },
+        {
+          "codice": "62.2",
+          "titolo": "Attività di consulenza informatica e di gestione di strutture informatiche",
+          "gerarchia": 3
+        },
+        {
+          "codice": "62.20",
+          "titolo": "Attività di consulenza informatica e di gestione di strutture informatiche",
+          "gerarchia": 4
+        },
+        {
+          "codice": "62.20.2",
+          "titolo": "Attività di gestione di strutture informatiche",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 62 Attività di programmazione, consulenza informatica e attività connesse > 62.2 Attività di consulenza informatica e di gestione di strutture informatiche > 62.20 Attività di consulenza informatica e di gestione di strutture informatiche > 62.20.2 Attività di gestione di strutture informatiche",
+      "classe_4cifre": "62.20",
+      "keywords": [
+        "managed services",
+        "MSP",
+        "outsourcing IT",
+        "gestione infrastruttura",
+        "SOC",
+        "MDR",
+        "monitoraggio",
+        "gestione datacenter cliente"
+      ],
+      "seed_concepts": [
+        "backup_dr",
+        "cloud_infrastructure",
+        "digital_workplace",
+        "firewall_network_security",
+        "identity_access",
+        "managed_services",
+        "networking",
+        "soc_mdr",
+        "storage",
+        "virtualization"
+      ],
+      "embedding_text": "Attività di gestione di strutture informatiche. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Attività di programmazione, consulenza informatica e attività connesse > Attività di consulenza informatica e di gestione di strutture informatiche > Attività di gestione di strutture informatiche. Termini correlati: managed services, MSP, outsourcing IT, gestione infrastruttura, SOC, MDR, monitoraggio, gestione datacenter cliente."
+    },
+    {
+      "codice": "62.90.01",
+      "titolo": "Configurazione di personal computer",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "62",
+          "titolo": "Attività di programmazione, consulenza informatica e attività connesse",
+          "gerarchia": 2
+        },
+        {
+          "codice": "62.9",
+          "titolo": "Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica",
+          "gerarchia": 3
+        },
+        {
+          "codice": "62.90",
+          "titolo": "Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica",
+          "gerarchia": 4
+        },
+        {
+          "codice": "62.90.0",
+          "titolo": "Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 62 Attività di programmazione, consulenza informatica e attività connesse > 62.9 Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica > 62.90 Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica > 62.90.0 Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica",
+      "classe_4cifre": "62.90",
+      "keywords": [
+        "configurazione computer",
+        "assemblaggio PC",
+        "setup postazioni"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Configurazione di personal computer. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Attività di programmazione, consulenza informatica e attività connesse > Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica. Termini correlati: configurazione computer, assemblaggio PC, setup postazioni."
+    },
+    {
+      "codice": "62.90.09",
+      "titolo": "Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica n.c.a.",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "62",
+          "titolo": "Attività di programmazione, consulenza informatica e attività connesse",
+          "gerarchia": 2
+        },
+        {
+          "codice": "62.9",
+          "titolo": "Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica",
+          "gerarchia": 3
+        },
+        {
+          "codice": "62.90",
+          "titolo": "Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica",
+          "gerarchia": 4
+        },
+        {
+          "codice": "62.90.0",
+          "titolo": "Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 62 Attività di programmazione, consulenza informatica e attività connesse > 62.9 Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica > 62.90 Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica > 62.90.0 Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica",
+      "classe_4cifre": "62.90",
+      "keywords": [
+        "servizi IT nca",
+        "supporto informatico",
+        "help desk",
+        "assistenza informatica"
+      ],
+      "seed_concepts": [
+        "cybersecurity_services",
+        "managed_services",
+        "soc_mdr",
+        "system_integration"
+      ],
+      "embedding_text": "Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica n.c.a.. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Attività di programmazione, consulenza informatica e attività connesse > Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica. Termini correlati: servizi IT nca, supporto informatico, help desk, assistenza informatica."
+    },
+    {
+      "codice": "63.10.10",
+      "titolo": "Fornitura di infrastrutture informatiche, hosting e attività connesse",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "63",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione",
+          "gerarchia": 2
+        },
+        {
+          "codice": "63.1",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e attività connesse",
+          "gerarchia": 3
+        },
+        {
+          "codice": "63.10",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e attività connesse",
+          "gerarchia": 4
+        },
+        {
+          "codice": "63.10.1",
+          "titolo": "Fornitura di infrastrutture informatiche, hosting e attività connesse",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 63 Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione > 63.1 Infrastrutture informatiche, elaborazione dati, hosting e attività connesse > 63.10 Infrastrutture informatiche, elaborazione dati, hosting e attività connesse > 63.10.1 Fornitura di infrastrutture informatiche, hosting e attività connesse",
+      "classe_4cifre": "63.10",
+      "keywords": [
+        "hosting",
+        "web hosting",
+        "cloud",
+        "IaaS",
+        "datacenter",
+        "colocation",
+        "housing",
+        "VPS",
+        "server dedicati",
+        "infrastruttura cloud",
+        "public cloud",
+        "private cloud"
+      ],
+      "seed_concepts": [
+        "backup_dr",
+        "cloud_infrastructure",
+        "datacenter_colocation",
+        "hosting",
+        "storage",
+        "virtualization"
+      ],
+      "embedding_text": "Fornitura di infrastrutture informatiche, hosting e attività connesse. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione > Infrastrutture informatiche, elaborazione dati, hosting e attività connesse > Fornitura di infrastrutture informatiche, hosting e attività connesse. Termini correlati: hosting, web hosting, cloud, IaaS, datacenter, colocation, housing, VPS, server dedicati, infrastruttura cloud, public cloud, private cloud."
+    },
+    {
+      "codice": "63.10.21",
+      "titolo": "Elaborazione dati contabili",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "63",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione",
+          "gerarchia": 2
+        },
+        {
+          "codice": "63.1",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e attività connesse",
+          "gerarchia": 3
+        },
+        {
+          "codice": "63.10",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e attività connesse",
+          "gerarchia": 4
+        },
+        {
+          "codice": "63.10.2",
+          "titolo": "Elaborazione dati",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 63 Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione > 63.1 Infrastrutture informatiche, elaborazione dati, hosting e attività connesse > 63.10 Infrastrutture informatiche, elaborazione dati, hosting e attività connesse > 63.10.2 Elaborazione dati",
+      "classe_4cifre": "63.10",
+      "keywords": [
+        "elaborazione dati contabili",
+        "data entry contabile",
+        "service contabile"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Elaborazione dati contabili. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione > Infrastrutture informatiche, elaborazione dati, hosting e attività connesse > Elaborazione dati. Termini correlati: elaborazione dati contabili, data entry contabile, service contabile."
+    },
+    {
+      "codice": "63.10.29",
+      "titolo": "Elaborazione altri dati",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "63",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione",
+          "gerarchia": 2
+        },
+        {
+          "codice": "63.1",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e attività connesse",
+          "gerarchia": 3
+        },
+        {
+          "codice": "63.10",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e attività connesse",
+          "gerarchia": 4
+        },
+        {
+          "codice": "63.10.2",
+          "titolo": "Elaborazione dati",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 63 Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione > 63.1 Infrastrutture informatiche, elaborazione dati, hosting e attività connesse > 63.10 Infrastrutture informatiche, elaborazione dati, hosting e attività connesse > 63.10.2 Elaborazione dati",
+      "classe_4cifre": "63.10",
+      "keywords": [
+        "elaborazione dati",
+        "data processing",
+        "data platform",
+        "ETL",
+        "analytics",
+        "business intelligence",
+        "data lake"
+      ],
+      "seed_concepts": [
+        "data_platform"
+      ],
+      "embedding_text": "Elaborazione altri dati. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione > Infrastrutture informatiche, elaborazione dati, hosting e attività connesse > Elaborazione dati. Termini correlati: elaborazione dati, data processing, data platform, ETL, analytics, business intelligence, data lake."
+    },
+    {
+      "codice": "63.91.00",
+      "titolo": "Attività dei portali di ricerca sul web",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "63",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione",
+          "gerarchia": 2
+        },
+        {
+          "codice": "63.9",
+          "titolo": "Attività dei portali di ricerca web e altre attività dei servizi di informazione",
+          "gerarchia": 3
+        },
+        {
+          "codice": "63.91",
+          "titolo": "Attività dei portali di ricerca sul web",
+          "gerarchia": 4
+        },
+        {
+          "codice": "63.91.0",
+          "titolo": "Attività dei portali di ricerca sul web",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 63 Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione > 63.9 Attività dei portali di ricerca web e altre attività dei servizi di informazione > 63.91 Attività dei portali di ricerca sul web > 63.91.0 Attività dei portali di ricerca sul web",
+      "classe_4cifre": "63.91",
+      "keywords": [
+        "portale web",
+        "motore di ricerca",
+        "web portal",
+        "aggregatore",
+        "search portal"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Attività dei portali di ricerca sul web. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione > Attività dei portali di ricerca web e altre attività dei servizi di informazione > Attività dei portali di ricerca sul web. Termini correlati: portale web, motore di ricerca, web portal, aggregatore, search portal."
+    },
+    {
+      "codice": "63.92.00",
+      "titolo": "Altre attività dei servizi di informazione",
+      "gerarchia": 6,
+      "relevance_tier": "core",
+      "path": [
+        {
+          "codice": "K",
+          "titolo": "TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE",
+          "gerarchia": 1
+        },
+        {
+          "codice": "63",
+          "titolo": "Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione",
+          "gerarchia": 2
+        },
+        {
+          "codice": "63.9",
+          "titolo": "Attività dei portali di ricerca web e altre attività dei servizi di informazione",
+          "gerarchia": 3
+        },
+        {
+          "codice": "63.92",
+          "titolo": "Altre attività dei servizi di informazione",
+          "gerarchia": 4
+        },
+        {
+          "codice": "63.92.0",
+          "titolo": "Altre attività dei servizi di informazione",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "K TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > 63 Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione > 63.9 Attività dei portali di ricerca web e altre attività dei servizi di informazione > 63.92 Altre attività dei servizi di informazione > 63.92.0 Altre attività dei servizi di informazione",
+      "classe_4cifre": "63.92",
+      "keywords": [
+        "servizi di informazione",
+        "content service",
+        "information services"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Altre attività dei servizi di informazione. Contesto gerarchico: TELECOMUNICAZIONI, PROGRAMMAZIONE E CONSULENZA INFORMATICA, INFRASTRUTTURE INFORMATICHE E ALTRE ATTIVITÀ DEI SERVIZI D'INFORMAZIONE > Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione > Attività dei portali di ricerca web e altre attività dei servizi di informazione > Altre attività dei servizi di informazione. Termini correlati: servizi di informazione, content service, information services."
+    },
+    {
+      "codice": "95.10.10",
+      "titolo": "Riparazione e manutenzione di computer e periferiche",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "T",
+          "titolo": "ALTRE ATTIVITÀ DI SERVIZI",
+          "gerarchia": 1
+        },
+        {
+          "codice": "95",
+          "titolo": "Riparazione e manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli",
+          "gerarchia": 2
+        },
+        {
+          "codice": "95.1",
+          "titolo": "Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni",
+          "gerarchia": 3
+        },
+        {
+          "codice": "95.10",
+          "titolo": "Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni",
+          "gerarchia": 4
+        },
+        {
+          "codice": "95.10.1",
+          "titolo": "Riparazione e manutenzione di computer e periferiche",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "T ALTRE ATTIVITÀ DI SERVIZI > 95 Riparazione e manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli > 95.1 Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni > 95.10 Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni > 95.10.1 Riparazione e manutenzione di computer e periferiche",
+      "classe_4cifre": "95.10",
+      "keywords": [
+        "riparazione computer",
+        "assistenza hardware",
+        "repair PC"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Riparazione e manutenzione di computer e periferiche. Contesto gerarchico: ALTRE ATTIVITÀ DI SERVIZI > Riparazione e manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli > Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni > Riparazione e manutenzione di computer e periferiche. Termini correlati: riparazione computer, assistenza hardware, repair PC."
+    },
+    {
+      "codice": "95.10.21",
+      "titolo": "Riparazione e manutenzione di telefoni e tablet",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "T",
+          "titolo": "ALTRE ATTIVITÀ DI SERVIZI",
+          "gerarchia": 1
+        },
+        {
+          "codice": "95",
+          "titolo": "Riparazione e manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli",
+          "gerarchia": 2
+        },
+        {
+          "codice": "95.1",
+          "titolo": "Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni",
+          "gerarchia": 3
+        },
+        {
+          "codice": "95.10",
+          "titolo": "Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni",
+          "gerarchia": 4
+        },
+        {
+          "codice": "95.10.2",
+          "titolo": "Riparazione e manutenzione di apparecchiature per le comunicazioni",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "T ALTRE ATTIVITÀ DI SERVIZI > 95 Riparazione e manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli > 95.1 Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni > 95.10 Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni > 95.10.2 Riparazione e manutenzione di apparecchiature per le comunicazioni",
+      "classe_4cifre": "95.10",
+      "keywords": [
+        "riparazione telefoni",
+        "riparazione tablet",
+        "phone repair"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Riparazione e manutenzione di telefoni e tablet. Contesto gerarchico: ALTRE ATTIVITÀ DI SERVIZI > Riparazione e manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli > Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni > Riparazione e manutenzione di apparecchiature per le comunicazioni. Termini correlati: riparazione telefoni, riparazione tablet, phone repair."
+    },
+    {
+      "codice": "95.10.29",
+      "titolo": "Riparazione e manutenzione di altre apparecchiature per le comunicazioni",
+      "gerarchia": 6,
+      "relevance_tier": "extended",
+      "path": [
+        {
+          "codice": "T",
+          "titolo": "ALTRE ATTIVITÀ DI SERVIZI",
+          "gerarchia": 1
+        },
+        {
+          "codice": "95",
+          "titolo": "Riparazione e manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli",
+          "gerarchia": 2
+        },
+        {
+          "codice": "95.1",
+          "titolo": "Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni",
+          "gerarchia": 3
+        },
+        {
+          "codice": "95.10",
+          "titolo": "Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni",
+          "gerarchia": 4
+        },
+        {
+          "codice": "95.10.2",
+          "titolo": "Riparazione e manutenzione di apparecchiature per le comunicazioni",
+          "gerarchia": 5
+        }
+      ],
+      "path_text": "T ALTRE ATTIVITÀ DI SERVIZI > 95 Riparazione e manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli > 95.1 Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni > 95.10 Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni > 95.10.2 Riparazione e manutenzione di apparecchiature per le comunicazioni",
+      "classe_4cifre": "95.10",
+      "keywords": [
+        "riparazione apparati comunicazione",
+        "repair comms equipment"
+      ],
+      "seed_concepts": [],
+      "embedding_text": "Riparazione e manutenzione di altre apparecchiature per le comunicazioni. Contesto gerarchico: ALTRE ATTIVITÀ DI SERVIZI > Riparazione e manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli > Riparazione e manutenzione di computer e di apparecchiature per le comunicazioni > Riparazione e manutenzione di apparecchiature per le comunicazioni. Termini correlati: riparazione apparati comunicazione, repair comms equipment."
+    }
+  ]
+}

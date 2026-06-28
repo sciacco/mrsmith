@@ -1,5 +1,4 @@
 // Package config legge e valida le variabili d'ambiente.
-// È la traduzione di src/ingest/config.py.
 package config
 
 import (
@@ -16,9 +15,7 @@ type Config struct {
 	EmbeddingAPIBase string
 	EmbeddingAPIKey  string
 	EmbeddingModel   string
-	QdrantURL        string
-	QdrantAPIKey     string // "" se assente
-	CollectionPrefix string
+	DatabaseURL      string // DSN Postgres (Anisetta: schemi mrsmith + binocolo)
 	BatchSize        int
 	MaxRetries       int
 	RequestTimeout   time.Duration
@@ -36,9 +33,7 @@ func Load(envFile string) (*Config, error) {
 	apiBase := strings.TrimRight(os.Getenv("EMBEDDING_API_BASE"), "/")
 	apiKey := os.Getenv("EMBEDDING_API_KEY")
 	model := os.Getenv("EMBEDDING_MODEL")
-	qdrantURL := os.Getenv("QDRANT_URL")
-	qdrantAPIKey := os.Getenv("QDRANT_API_KEY")
-	prefix := os.Getenv("QDRANT_COLLECTION_PREFIX")
+	dsn := os.Getenv("DATABASE_URL")
 
 	var errs []string
 	if apiBase == "" {
@@ -50,8 +45,8 @@ func Load(envFile string) (*Config, error) {
 	if model == "" {
 		errs = append(errs, "EMBEDDING_MODEL è obbligatorio")
 	}
-	if qdrantURL == "" {
-		errs = append(errs, "QDRANT_URL è obbligatorio")
+	if dsn == "" {
+		errs = append(errs, "DATABASE_URL è obbligatorio (DSN Postgres Anisetta)")
 	}
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("configurazione incompleta:\n%s", strings.Join(errs, "\n"))
@@ -61,19 +56,9 @@ func Load(envFile string) (*Config, error) {
 		EmbeddingAPIBase: apiBase,
 		EmbeddingAPIKey:  apiKey,
 		EmbeddingModel:   model,
-		QdrantURL:        qdrantURL,
-		QdrantAPIKey:     qdrantAPIKey,
-		CollectionPrefix: prefix,
+		DatabaseURL:      dsn,
 		BatchSize:        32,
 		MaxRetries:       5,
 		RequestTimeout:   60 * time.Second,
 	}, nil
-}
-
-// CollectionName applica il prefisso come config.py::collection_name.
-func (c *Config) CollectionName(base string) string {
-	if c.CollectionPrefix != "" {
-		return c.CollectionPrefix + base
-	}
-	return base
 }

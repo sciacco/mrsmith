@@ -13,16 +13,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Nomi base delle collection (senza prefisso).
-const (
-	CollectionAteco    = "ateco_ict"
-	CollectionConcepts = "business_concepts"
-)
-
 var rootCmd = &cobra.Command{
 	Use:           "atego",
-	Short:         "Batch/build-time ingestion vettoriale su Qdrant",
-	Long:          "atego — caricamento dati vettoriali (build-time) su Qdrant. Port Go del tool Python embed-mrsmith.",
+	Short:         "Build-time ingestion della KB su Postgres (curatela + embeddings)",
+	Long:          "atego — sincronizza la KB binocolo (concetti + nodi ATECO ICT) su Postgres: upsert curatela dalla JSON sorgente + embeddings nelle colonne real[]. Coseno calcolato a runtime in Go (niente Qdrant/pgvector).",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
@@ -38,8 +32,6 @@ func Execute() error {
 	rootCmd.AddCommand(probeCmd)
 	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(smokeCmd)
-	rootCmd.AddCommand(exportCmd)
-	rootCmd.AddCommand(importCmd)
 	return rootCmd.Execute()
 }
 

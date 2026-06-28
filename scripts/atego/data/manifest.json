@@ -1,0 +1,25 @@
+{
+  "collections": [
+    "mrsmith_ateco_ict",
+    "mrsmith_business_concepts"
+  ],
+  "created_at": "2026-06-28T14:34:57Z",
+  "distance": "Cosine",
+  "embedding_dimension": 4096,
+  "embedding_model": "accounts/fireworks/models/qwen3-embedding-8b",
+  "openai_client_version": "net/http (no SDK)",
+  "provider_base_url": "https://api.fireworks.ai/inference/v1",
+  "qdrant_client_version": "v1.18.3",
+  "sources": [
+    {
+      "element_count": 37,
+      "filename": "ateco_ict_kb.json",
+      "sha256": "17a072a2ffc0b9cf749424181efc5043c159212dac7abf4ac23af9f2d96dff77"
+    },
+    {
+      "element_count": 29,
+      "filename": "concept_index_source.json",
+      "sha256": "7b38bda2db01118e483372ae5686e44adb6328c28cb8c026eeadd6e7efbc796f"
+    }
+  ]
+}

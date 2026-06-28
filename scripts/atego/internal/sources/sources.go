@@ -10,14 +10,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/google/uuid"
 )
-
-// ModuleNamespace è l'UUIDv5 namespace fisso per i point id.
-// Deve coincidere con Python: uuid.uuid5(uuid.NAMESPACE_DNS, "embed-mrsmith.local").
-// uuid.NameSpaceDNS in google/uuid == Python uuid.NAMESPACE_DNS.
-var ModuleNamespace = uuid.NewSHA1(uuid.NameSpaceDNS, []byte("embed-mrsmith.local"))
 
 // AtecoNode rappresenta un nodo ATECO.
 type AtecoNode struct {
@@ -48,16 +41,6 @@ type BusinessConcept struct {
 func SourceTextHash(text string) string {
 	sum := sha256.Sum256([]byte(text))
 	return hex.EncodeToString(sum[:])
-}
-
-// PointIDAteco restituisce l'UUID deterministico per un nodo ATECO.
-func PointIDAteco(codice string) string {
-	return uuid.NewSHA1(ModuleNamespace, []byte("ateco:"+codice)).String()
-}
-
-// PointIDConcept restituisce l'UUID deterministico per un concetto.
-func PointIDConcept(id string) string {
-	return uuid.NewSHA1(ModuleNamespace, []byte("concept:"+id)).String()
 }
 
 // LoadAtecoNodes legge il file ATECO e restituisce (nodi, sha256 del file).
