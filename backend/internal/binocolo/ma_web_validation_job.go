@@ -129,7 +129,7 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 		return err
 	}
 
-	targets := selectMAWebValidationTargets(detail.Targets, payload.Limit)
+	targets := selectMAWebValidationTargets(detail.Targets, version.Strategy, payload, s.now(), payload.Limit)
 	processed := 0
 	skipped := 0
 	failed := 0
@@ -145,21 +145,19 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 		}),
 	})
 
-	for _, target := range targets {
+	for _, work := range targets {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		keywordSet := deriveMAWebValidationKeywordSet(version.Strategy, target)
-		keywordSetHash := maWebValidationHash(maWebValidationKeywordSetFingerprint(keywordSet))
-		inputHash := maWebValidationInputHash(target, keywordSet, payload)
-		if !payload.Force && reusableMAWebValidation(target.WebValidation, inputHash, keywordSetHash, s.now()) {
+		target := work.Target
+		if !payload.Force && reusableMAWebValidation(target.WebValidation, work.InputHash, work.KeywordSetHash, s.now()) {
 			skipped++
 			continue
 		}
 
-		body, buildErr := s.buildMAWebValidation(ctx, target, version.Strategy, keywordSet, inputHash, keywordSetHash, payload, job.CreatedBySubject, job.CreatedByEmail)
+		body, buildErr := s.buildMAWebValidation(ctx, target, version.Strategy, work.KeywordSet, work.InputHash, work.KeywordSetHash, payload, job.CreatedBySubject, job.CreatedByEmail)
 		if buildErr != nil {
-			body = failedMAWebValidationRequest(target, keywordSet, inputHash, keywordSetHash, buildErr)
+			body = failedMAWebValidationRequest(target, work.KeywordSet, work.InputHash, work.KeywordSetHash, buildErr)
 			failed++
 		}
 		if _, err := s.upsertTargetWebValidation(ctx, job.SessionID, body, job.CreatedBySubject, job.CreatedByEmail); err != nil {
@@ -451,24 +449,42 @@ func normalizeMAWebValidationPayload(req MAWebValidationEnrichRequest) maWebVali
 	}
 }
 
-func selectMAWebValidationTargets(targets []MATarget, limit int) []MATarget {
-	out := make([]MATarget, 0, len(targets))
+type maWebValidationWorkTarget struct {
+	Target         MATarget
+	KeywordSet     CandidateMatchKeywordSet
+	InputHash      string
+	KeywordSetHash string
+}
+
+func selectMAWebValidationTargets(targets []MATarget, strategy MAStrategySpec, payload maWebValidationJobPayload, now time.Time, limit int) []maWebValidationWorkTarget {
+	out := make([]maWebValidationWorkTarget, 0, len(targets))
 	for _, target := range targets {
 		if target.MatchState == maMatchStateOutside {
 			continue
 		}
-		out = append(out, target)
+		keywordSet := deriveMAWebValidationKeywordSet(strategy, target)
+		keywordSetHash := maWebValidationHash(maWebValidationKeywordSetFingerprint(keywordSet))
+		inputHash := maWebValidationInputHash(target, keywordSet, payload)
+		if !payload.Force && reusableMAWebValidation(target.WebValidation, inputHash, keywordSetHash, now) {
+			continue
+		}
+		out = append(out, maWebValidationWorkTarget{
+			Target:         target,
+			KeywordSet:     keywordSet,
+			InputHash:      inputHash,
+			KeywordSetHash: keywordSetHash,
+		})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
-		ri := targetRatingValue(out[i])
-		rj := targetRatingValue(out[j])
+		ri := targetRatingValue(out[i].Target)
+		rj := targetRatingValue(out[j].Target)
 		if ri != rj {
 			return ri > rj
 		}
-		if out[i].Score != out[j].Score {
-			return out[i].Score > out[j].Score
+		if out[i].Target.Score != out[j].Target.Score {
+			return out[i].Target.Score > out[j].Target.Score
 		}
-		return out[i].CompanyName < out[j].CompanyName
+		return out[i].Target.CompanyName < out[j].Target.CompanyName
 	})
 	if limit > 0 && len(out) > limit {
 		out = out[:limit]
