@@ -18,6 +18,7 @@ import type {
   OpenAPIITEnvelope,
   PipelineFinalAction,
   PipelineWebValidationState,
+  SectorClassificationTestResponse,
   WebSearchResponse,
 } from '../api/types';
 import styles from './TestPage.module.css';
@@ -63,12 +64,13 @@ type DomainResolutionForm = typeof defaultDomainResolutionForm;
 type DomainResolutionField = keyof DomainResolutionForm;
 type KeywordEvidenceForm = typeof defaultKeywordEvidenceForm;
 type KeywordEvidenceField = keyof Omit<KeywordEvidenceForm, 'rank'>;
-type TestTab = 'company' | 'pipeline' | 'domain' | 'keyword' | 'maintenance';
+type TestTab = 'company' | 'pipeline' | 'classification' | 'domain' | 'keyword' | 'maintenance';
 type EvidenceBucket = 'core' | 'adjacent' | 'negative';
 
 const testTabs = [
   { id: 'company', label: 'Company search', icon: 'database' },
   { id: 'pipeline', label: 'Evidence pipeline', icon: 'route' },
+  { id: 'classification', label: 'Classificazione settore', icon: 'sparkles' },
   { id: 'domain', label: 'Domain resolver', icon: 'network' },
   { id: 'keyword', label: 'Keyword evidence', icon: 'search' },
   { id: 'maintenance', label: 'Manutenzione', icon: 'settings' },
@@ -1031,6 +1033,13 @@ export function TestPage() {
   const [pipelineRank, setPipelineRank] = useState(true);
   const [pipelineAnalyzeWithLLM, setPipelineAnalyzeWithLLM] = useState(true);
   const [pipelineForceRecompute, setPipelineForceRecompute] = useState(false);
+  const [sectorForm, setSectorForm] = useState({
+    sectorDescription: '',
+    companyDescription: '',
+    domain: '',
+    snippets: '',
+    analyze: true,
+  });
 
   const pipelineSessions = useQuery({
     queryKey: ['binocolo-test-ma-sessions', pipelineVisibility],
@@ -1085,6 +1094,21 @@ export function TestPage() {
         province: domainForm.province.trim().toUpperCase() || undefined,
         keywords: splitKeywords(domainForm.keywords),
         count: positiveInteger(domainForm.count, 10, 1, 20),
+      }),
+  });
+  const sectorClassification = useMutation({
+    mutationFn: () =>
+      api.post<SectorClassificationTestResponse>('/binocolo/v1/test/sector-classification', {
+        sectorDescription: sectorForm.sectorDescription.trim(),
+        companyDescription: sectorForm.companyDescription.trim() || undefined,
+        domain: sectorForm.domain.trim() || undefined,
+        snippets: sectorForm.snippets.trim()
+          ? sectorForm.snippets
+              .split('\n')
+              .map((line) => line.trim())
+              .filter(Boolean)
+          : undefined,
+        analyze: sectorForm.analyze,
       }),
   });
   const keywordEvidence = useMutation({
@@ -2069,6 +2093,174 @@ export function TestPage() {
                 </div>
               </>
             )}
+          </div>
+        )}
+      </section>
+      ) : null}
+
+      {activeTab === 'classification' ? (
+      <section className={`${styles.panel} ${styles.companyPanel}`} aria-labelledby="classification-title">
+        <div className={styles.panelHeader}>
+          <div>
+            <div className={styles.endpointLine}>
+              <span className={styles.method}>POST</span>
+              <span className={styles.path}>/binocolo/v1/test/sector-classification</span>
+            </div>
+            <h2 id="classification-title" className={styles.sectionTitle}>Classificazione settore (UC2)</h2>
+          </div>
+          <form
+            className={styles.companyForm}
+            onSubmit={(event) => {
+              event.preventDefault();
+              sectorClassification.mutate();
+            }}
+          >
+            <div className={styles.filterGrid}>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Settore strategia (intento)</span>
+                <input
+                  type="text"
+                  value={sectorForm.sectorDescription}
+                  onChange={(event) => setSectorForm((prev) => ({ ...prev, sectorDescription: event.target.value }))}
+                  placeholder="servizi IT gestiti; sicurezza informatica"
+                  autoComplete="off"
+                  required
+                />
+              </label>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Autodescrizione azienda (incolla qui per il test più rapido)</span>
+                <textarea
+                  value={sectorForm.companyDescription}
+                  onChange={(event) => setSectorForm((prev) => ({ ...prev, companyDescription: event.target.value }))}
+                  placeholder="Es: Azienda che offre servizi di gestione infrastrutture IT, cloud e assistenza sistemistica..."
+                  rows={3}
+                  autoComplete="off"
+                />
+              </label>
+              <label className={styles.filterField}>
+                <span>Oppure dominio (via Brave)</span>
+                <input
+                  type="text"
+                  value={sectorForm.domain}
+                  onChange={(event) => setSectorForm((prev) => ({ ...prev, domain: event.target.value }))}
+                  placeholder="azienda.it"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Oppure snippet (uno per riga)</span>
+                <textarea
+                  value={sectorForm.snippets}
+                  onChange={(event) => setSectorForm((prev) => ({ ...prev, snippets: event.target.value }))}
+                  placeholder={'Chi siamo - gestione IT\nServizi cloud e backup'}
+                  rows={3}
+                  autoComplete="off"
+                />
+              </label>
+            </div>
+            <div className={styles.formActions}>
+              <ToggleSwitch
+                id="sector-analyze-toggle"
+                checked={sectorForm.analyze}
+                onChange={(checked) => setSectorForm((prev) => ({ ...prev, analyze: checked }))}
+                label="Escalation LLM se ambiguo"
+              />
+              <Button type="submit" loading={sectorClassification.isPending} leftIcon={<Icon name="sparkles" />}>
+                Classifica
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        {sectorClassification.isIdle ? (
+          <div className={`${styles.statePanel} ${styles.companyState}`}>
+            <div className={styles.stateIcon}>
+              <Icon name="sparkles" size={22} />
+            </div>
+            <p className={styles.stateTitle}>Probe pronto</p>
+            <p className={styles.stateText}>
+              Indica il settore della strategia e l&apos;azienda (descrizione, dominio o snippet). Embedding + reranker
+              sui concetti KB, senza toccare il funnel.
+            </p>
+          </div>
+        ) : sectorClassification.isPending ? (
+          <div className={styles.skeletonWrap}>
+            <Skeleton rows={5} />
+          </div>
+        ) : sectorClassification.isError ? (
+          <div className={`${styles.statePanel} ${styles.companyState}`} role="alert">
+            <div className={styles.stateIcon}>
+              <Icon name="triangle-alert" size={22} />
+            </div>
+            <p className={styles.stateTitle}>Classificazione non disponibile</p>
+            <p className={styles.stateText}>{errorLabel(sectorClassification.error)}</p>
+          </div>
+        ) : (
+          <div className={styles.companyResult}>
+            <div className={styles.responseBar}>
+              <span>
+                Verdetto: <strong>{sectorClassification.data.classification.verdict}</strong> · top{' '}
+                {sectorClassification.data.classification.topProb.toFixed(2)} ·{' '}
+                {sectorClassification.data.classification.rerankApplied ? 'rerank attivo' : 'solo embedding'}
+              </span>
+              <span className={styles.path}>{sectorClassification.data.classification.confidence}</span>
+            </div>
+            <div className={`${styles.rawBlock} ${styles.rawBlockSeparated}`}>
+              <span>Descrizione azienda usata</span>
+              <pre>{sectorClassification.data.classification.companyDescription || '(nessuna)'}</pre>
+            </div>
+            {sectorClassification.data.classification.reason ? (
+              <div className={styles.responseBar}>
+                <span>{sectorClassification.data.classification.reason}</span>
+              </div>
+            ) : null}
+            <div className={styles.cardList}>
+              {sectorClassification.data.classification.concepts.map((concept) => (
+                <article key={concept.conceptId} className={styles.resultCard}>
+                  <div className={styles.resultCardHead}>
+                    <div>
+                      <h3>
+                        {concept.name}
+                        {concept.inStrategy ? ' · in perimetro' : ''}
+                      </h3>
+                      <p>
+                        {concept.conceptId} · coseno {concept.cosine.toFixed(3)}
+                      </p>
+                    </div>
+                    <div className={styles.cardActions}>
+                      <span className={styles.bucketBadge}>{concept.kind}</span>
+                      <span className={styles.scoreBadge}>rerank {concept.rerankProb.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+            {sectorClassification.data.classification.strategyConcepts.length > 0 ? (
+              <div className={styles.responseBar}>
+                <span>Perimetro strategia: {sectorClassification.data.classification.strategyConcepts.join(', ')}</span>
+              </div>
+            ) : null}
+            {sectorClassification.data.analysis ? (
+              <article className={`${styles.resultCard} ${styles.analysisCard}`}>
+                <div className={styles.resultCardHead}>
+                  <div>
+                    <h3>Analyst LLM (tie-breaker)</h3>
+                    <p>{sectorClassification.data.analysis.rationale}</p>
+                  </div>
+                  <div className={styles.cardActions}>
+                    <span className={styles.scoreBadge}>{sectorClassification.data.analysis.verdict}</span>
+                    <span className={styles.bucketBadge}>{sectorClassification.data.analysis.recommendedAction}</span>
+                  </div>
+                </div>
+              </article>
+            ) : null}
+            {sectorClassification.data.evidence.length > 0 ? (
+              <div className={`${styles.rawBlock} ${styles.rawBlockSeparated}`}>
+                <span>Evidenza neutra raccolta</span>
+                <pre>{sectorClassification.data.evidence.join('\n')}</pre>
+              </div>
+            ) : null}
           </div>
         )}
       </section>

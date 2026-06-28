@@ -122,6 +122,27 @@ func (h *Handler) handleTestCandidateMatchAnalysis(w http.ResponseWriter, r *htt
 	httputil.JSON(w, http.StatusOK, analysis)
 }
 
+// handleTestSectorClassification is the UC2 lab probe: classify one company against
+// a sector intent in isolation from the funnel (the analog of UC1's `atego smoke`).
+func (h *Handler) handleTestSectorClassification(w http.ResponseWriter, r *http.Request) {
+	var body SectorClassificationTestRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	if strings.TrimSpace(body.SectorDescription) == "" {
+		httputil.Error(w, http.StatusBadRequest, "missing_sector_description")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	resp, err := h.ma.testSectorClassification(r.Context(), body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "sector_classification", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, resp)
+}
+
 func (s *maService) analyzeCandidateMatch(ctx context.Context, input CandidateMatchAnalysisRequest, subject, email string) (CandidateMatchAnalysisResponse, error) {
 	if s.llmp == nil {
 		return CandidateMatchAnalysisResponse{}, errMAOpenRouterUnavailable

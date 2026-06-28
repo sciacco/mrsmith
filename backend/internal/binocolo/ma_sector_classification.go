@@ -3,6 +3,7 @@ package binocolo
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -145,13 +146,22 @@ type maSectorClassification struct {
 // `ambiguous`/`no_signal` are the hand-off to the LLM tie-breaker (Step 3). An error
 // means the embedder/KB is unavailable and the caller should fall back to legacy.
 func (s *maService) classifyCompanySector(ctx context.Context, evidence maCompanyEvidence, strategy MAStrategySpec, subject, email string) (maSectorClassification, error) {
-	cfg := s.loadSectorClassConfig(ctx)
 	description := s.representCompany(ctx, evidence, subject, email)
+	return s.classifyCompanyDescription(ctx, description, strategy)
+}
+
+// classifyCompanyDescription is the description-in classification core: derive the
+// strategy perimeter concepts, classify the company description against the KB
+// (embedding + reranker), and compute the verdict. Split out from
+// classifyCompanySector so the lab probe can feed a pasted description directly.
+func (s *maService) classifyCompanyDescription(ctx context.Context, description string, strategy MAStrategySpec) (maSectorClassification, error) {
+	cfg := s.loadSectorClassConfig(ctx)
 	if strings.TrimSpace(description) == "" {
 		return maSectorClassification{
-			Verdict:    maSectorNoSignal,
-			Confidence: "bassa",
-			Reason:     "Nessuna autodescrizione web disponibile per la classificazione.",
+			CompanyDescription: description,
+			Verdict:            maSectorNoSignal,
+			Confidence:         "bassa",
+			Reason:             "Nessuna autodescrizione web disponibile per la classificazione.",
 		}, nil
 	}
 
@@ -178,6 +188,68 @@ func (s *maService) classifyCompanySector(ctx context.Context, evidence maCompan
 		Confidence:         confidence,
 		Reason:             reason,
 	}, nil
+}
+
+// SectorClassificationTestRequest is the lab probe input (Test page): classify one
+// company against a sector intent, in isolation from the funnel. Provide the
+// company as raw companyDescription (fastest, skips Brave + distiller), or as
+// snippets, or as a domain (gathers neutral evidence via Brave).
+type SectorClassificationTestRequest struct {
+	SectorDescription  string   `json:"sectorDescription"`
+	CompanyName        string   `json:"companyName,omitempty"`
+	Domain             string   `json:"domain,omitempty"`
+	Snippets           []string `json:"snippets,omitempty"`
+	CompanyDescription string   `json:"companyDescription,omitempty"`
+	Analyze            bool     `json:"analyze,omitempty"`
+}
+
+type SectorClassificationTestResponse struct {
+	Evidence       []string                        `json:"evidence"`
+	Classification maSectorClassification          `json:"classification"`
+	Analysis       *CandidateMatchAnalysisResponse `json:"analysis,omitempty"`
+}
+
+// testSectorClassification runs the UC2 concept pipeline on demand for the Test
+// page. It mirrors the production path (neutral evidence -> distiller -> embed +
+// rerank -> verdict -> optional analyst) but takes its company input directly.
+func (s *maService) testSectorClassification(ctx context.Context, req SectorClassificationTestRequest, subject, email string) (SectorClassificationTestResponse, error) {
+	strategy := MAStrategySpec{SectorDescription: cleanText(req.SectorDescription, 400)}
+	description := cleanText(req.CompanyDescription, maCompanyDescriptionCap)
+	evidenceUsed := []string{}
+	if description == "" {
+		evidence := maCompanyEvidence{Domain: strings.TrimSpace(req.Domain)}
+		switch {
+		case len(req.Snippets) > 0:
+			for _, snippet := range req.Snippets {
+				if cleaned := cleanText(snippet, 360); cleaned != "" {
+					evidence.Snippets = append(evidence.Snippets, cleaned)
+				}
+			}
+		case strings.TrimSpace(req.Domain) != "":
+			if s.brave == nil {
+				return SectorClassificationTestResponse{}, errMABraveUnavailable
+			}
+			gathered, _ := s.gatherNeutralEvidence(ctx, req.Domain, maWebValidationEvidenceCount, subject, email)
+			evidence = gathered
+		default:
+			return SectorClassificationTestResponse{}, fmt.Errorf("%w: serve companyDescription, snippets o domain", errMAStrategyInvalid)
+		}
+		evidenceUsed = evidence.Snippets
+		description = s.representCompany(ctx, evidence, subject, email)
+	}
+
+	class, err := s.classifyCompanyDescription(ctx, description, strategy)
+	if err != nil {
+		return SectorClassificationTestResponse{}, err
+	}
+	resp := SectorClassificationTestResponse{Evidence: evidenceUsed, Classification: class}
+	if req.Analyze && sectorVerdictNeedsLLM(class.Verdict) {
+		analysis, aErr := s.analyzeSectorAmbiguity(ctx, MATarget{CompanyName: cleanText(req.CompanyName, 200)}, strategy, maCompanyEvidence{Snippets: evidenceUsed}, class, subject, email)
+		if aErr == nil {
+			resp.Analysis = &analysis
+		}
+	}
+	return resp, nil
 }
 
 // classifyCompanyConcepts embeds the company description over the KB concepts

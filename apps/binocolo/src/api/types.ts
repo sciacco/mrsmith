@@ -218,6 +218,33 @@ export interface CandidateMatchConceptAlias {
   evidence: string;
 }
 
+// UC2 sector classification lab probe (POST /binocolo/v1/test/sector-classification).
+export interface SectorConceptScore {
+  conceptId: string;
+  name: string;
+  kind: 'target' | 'distractor' | string;
+  cosine: number;
+  rerankProb: number;
+  inStrategy: boolean;
+}
+
+export interface SectorClassification {
+  companyDescription: string;
+  concepts: SectorConceptScore[];
+  strategyConcepts: string[];
+  verdict: 'confirm' | 'reject' | 'weak' | 'ambiguous' | 'no_signal' | string;
+  topProb: number;
+  rerankApplied: boolean;
+  confidence: MAConfidence | string;
+  reason: string;
+}
+
+export interface SectorClassificationTestResponse {
+  evidence: string[];
+  classification: SectorClassification;
+  analysis?: CandidateMatchAnalysisResponse;
+}
+
 export interface MASessionListResponse {
   items: MASessionSummary[];
 }
