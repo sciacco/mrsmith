@@ -163,6 +163,51 @@ func (c *Client) Chat(ctx context.Context, reqBody ChatRequest) (ChatResponse, e
 	}, nil
 }
 
+// Embed produces one embedding vector per input via the provider's
+// OpenAI-compatible /embeddings endpoint. Inputs are sent verbatim (the caller
+// owns any instruction wrapping, e.g. the Qwen "Instruct: …\nQuery: …" form), and
+// vectors are returned in input order. The token usage is returned for cost
+// accounting/tracing.
+func (c *Client) Embed(ctx context.Context, model string, inputs []string) ([][]float32, Usage, error) {
+	if len(inputs) == 0 {
+		return nil, Usage{}, nil
+	}
+	body := map[string]any{
+		"model": model,
+		"input": inputs,
+	}
+	var decoded struct {
+		Data []struct {
+			Index     int       `json:"index"`
+			Embedding []float32 `json:"embedding"`
+		} `json:"data"`
+		Usage Usage `json:"usage"`
+	}
+	if err := c.sdk.Post(ctx, "embeddings", body, &decoded); err != nil {
+		var apiErr *openai.Error
+		if errors.As(err, &apiErr) {
+			return nil, Usage{}, &APIError{Provider: c.name(), StatusCode: apiErr.StatusCode, Body: errorBody(apiErr)}
+		}
+		return nil, Usage{}, fmt.Errorf("%s: embeddings request failed: %w", c.name(), err)
+	}
+	if len(decoded.Data) != len(inputs) {
+		return nil, Usage{}, fmt.Errorf("%s: embeddings returned %d vectors for %d inputs", c.name(), len(decoded.Data), len(inputs))
+	}
+	out := make([][]float32, len(inputs))
+	for _, d := range decoded.Data {
+		if d.Index < 0 || d.Index >= len(out) {
+			return nil, Usage{}, fmt.Errorf("%s: embeddings index %d out of range", c.name(), d.Index)
+		}
+		out[d.Index] = d.Embedding
+	}
+	for i, v := range out {
+		if len(v) == 0 {
+			return nil, Usage{}, fmt.Errorf("%s: embeddings missing vector at index %d", c.name(), i)
+		}
+	}
+	return out, decoded.Usage, nil
+}
+
 // bodyStructuralKeys are set explicitly from typed ChatRequest fields and must
 // never be overridden by the dynamic Params bag.
 var bodyStructuralKeys = map[string]struct{}{

@@ -1369,6 +1369,14 @@ func (f *fakeMALLMProvider) ListModels(context.Context) ([]llm.Model, error) { r
 
 func (f *fakeMALLMProvider) ListPrompts(context.Context) ([]llm.Prompt, error) { return nil, nil }
 
+func (f *fakeMALLMProvider) ResolveEmbeddingModel(context.Context, string) (llm.EmbeddingModel, error) {
+	return llm.EmbeddingModel{}, errors.New("embeddings not configured")
+}
+
+func (f *fakeMALLMProvider) Embed(context.Context, llm.EmbeddingModel, []string) ([][]float32, llm.Usage, error) {
+	return nil, llm.Usage{}, errors.New("embeddings not configured")
+}
+
 type fakeMAWorkspaceStore struct {
 	traces []maTraceStart
 	links  []maTraceLink

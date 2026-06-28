@@ -86,6 +86,11 @@ type maLLMProvider interface {
 	RecordAudit(ctx context.Context, audit llm.CallAudit) error
 	ListModels(ctx context.Context) ([]llm.Model, error)
 	ListPrompts(ctx context.Context) ([]llm.Prompt, error)
+	// Embedding capability (use case 1 ATECO retrieval). ResolveEmbeddingModel is
+	// row-driven (by id carried on the stored KB vectors) so query and documents
+	// share one model; Embed returns one vector per input plus token usage.
+	ResolveEmbeddingModel(ctx context.Context, id string) (llm.EmbeddingModel, error)
+	Embed(ctx context.Context, m llm.EmbeddingModel, inputs []string) ([][]float32, llm.Usage, error)
 }
 
 type maLLMAdapter struct{ svc *llm.Service }
@@ -125,13 +130,25 @@ func (a maLLMAdapter) ListPrompts(ctx context.Context) ([]llm.Prompt, error) {
 	return a.svc.ListPrompts(ctx, maApp)
 }
 
+func (a maLLMAdapter) ResolveEmbeddingModel(ctx context.Context, id string) (llm.EmbeddingModel, error) {
+	return a.svc.ResolveEmbeddingModel(ctx, id)
+}
+
+func (a maLLMAdapter) Embed(ctx context.Context, m llm.EmbeddingModel, inputs []string) ([][]float32, llm.Usage, error) {
+	return a.svc.Embed(ctx, m, inputs)
+}
+
 type maService struct {
 	store         maWorkspaceStore
 	searchCache   companySearchCacheStore
 	provinceCache provinceCacheStore
 	ateco         atecoStore
-	openapiit     *openapiit.Client
-	brave         interface {
+	// kb backs use-case-1 ATECO retrieval (curated concept vectors). Soft
+	// dependency, set post-construction like brave; nil falls back to the LLM
+	// hierarchy resolver.
+	kb        kbStore
+	openapiit *openapiit.Client
+	brave     interface {
 		LLMContext(context.Context, brave.LLMContextParams) (brave.LLMContextResult, error)
 	}
 	llmp maLLMProvider
@@ -1288,11 +1305,16 @@ func (s *maService) updateParameter(ctx context.Context, key, value, subject, em
 		return fmt.Errorf("%w: parameter key", errMAStrategyInvalid)
 	}
 	value = strings.TrimSpace(value)
-	if key == maStrategyPipelineParameter {
+	switch key {
+	case maStrategyPipelineParameter:
 		if value != maStrategyPipelineV2 && value != maStrategyPipelineMonolith {
 			return fmt.Errorf("%w: parameter value ma_strategy_pipeline must be v2 or monolith", errMAStrategyInvalid)
 		}
-	} else {
+	case maAtecoRetrievalMethodParameter:
+		if value != maAtecoRetrievalMethodEmbedding && value != maAtecoRetrievalMethodLLM {
+			return fmt.Errorf("%w: parameter value ateco_retrieval_method must be embedding or llm", errMAStrategyInvalid)
+		}
+	default:
 		parsed, err := strconv.ParseFloat(value, 64)
 		if err != nil || parsed < 0 || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
 			return fmt.Errorf("%w: parameter value", errMAStrategyInvalid)
@@ -2300,6 +2322,30 @@ func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string,
 	if s.ateco == nil {
 		return nil, nil, nil, errAtecoStoreUnavailable
 	}
+
+	// Use case 1: deterministic embedding retrieval over the curated KB replaces the
+	// slow/imprecise LLM hierarchy resolver. It is the default; ok=false (KB/embedder
+	// unavailable) or a retrieval error degrades gracefully to the resolver below.
+	cfg := s.loadAtecoRetrievalConfig(ctx)
+	if cfg.Method == maAtecoRetrievalMethodEmbedding {
+		candidates, missing, ok, embErr := s.retrieveMAIntentAtecoEmbedding(ctx, intent, allowed, cfg)
+		if ok && embErr == nil {
+			return candidates, missing, nil, nil
+		}
+		fallbackReason := "kb_or_embedder_unavailable"
+		fallbackErr := ""
+		if embErr != nil {
+			fallbackReason = "retrieval_error"
+			fallbackErr = embErr.Error()
+		}
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_ateco_retrieval_fallback",
+			Status:    maTraceEventInfo,
+			Error:     fallbackErr,
+			Metadata:  maTraceJSON(map[string]any{"reason": fallbackReason}),
+		})
+	}
+
 	divisions, err := s.ateco.AtecoDivisions(ctx)
 	if err != nil {
 		return nil, nil, nil, err

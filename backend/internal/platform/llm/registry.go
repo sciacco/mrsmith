@@ -54,12 +54,21 @@ FROM mrsmith.llm_provider WHERE id = $1::uuid`, id).Scan(&p.ID, &p.Name, &p.Base
 // OpenAI-compatible client for it. Built per call (no cache, see design #7); the
 // Service's shared *http.Client pools connections per host.
 func (s *Service) ClientForModel(ctx context.Context, m Model) (*Client, Provider, error) {
+	return s.clientForProvider(ctx, m.ProviderID)
+}
+
+// clientForProvider resolves a provider by id and builds an OpenAI-compatible
+// client for it. Shared by ClientForModel (chat) and Embed (embeddings): both
+// dispatch through mrsmith.llm_provider for base URL + key, differing only in the
+// endpoint they POST to. Built per call (no cache); the Service's shared
+// *http.Client pools connections per host.
+func (s *Service) clientForProvider(ctx context.Context, providerID string) (*Client, Provider, error) {
 	if s == nil || s.db == nil {
 		return nil, Provider{}, ErrNotConfigured
 	}
-	p, err := s.loadProvider(ctx, m.ProviderID)
+	p, err := s.loadProvider(ctx, providerID)
 	if err != nil {
-		return nil, Provider{}, fmt.Errorf("llm: load provider %s: %w", m.ProviderID, err)
+		return nil, Provider{}, fmt.Errorf("llm: load provider %s: %w", providerID, err)
 	}
 	key := p.resolveKey()
 	if key == "" {

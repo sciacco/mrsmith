@@ -62,6 +62,9 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 		ma:                 newMAService(maStore, cache, provinceCache, ateco, deps.OpenAPIIT, llmProvider),
 	}
 	h.ma.brave = deps.Brave
+	if sqlStore != nil {
+		h.ma.kb = sqlStore
+	}
 	// Background workers, returned so main.go runs them under appCtx + workerWG for
 	// graceful shutdown. Both are DB-backed and resume pending rows on restart:
 	//   - maJobWorker drains the async session-job queue (estimate today) so the
