@@ -107,7 +107,7 @@ const (
 	maModelScopeWebSearchScorer        = "web_search_scorer"
 	maModelScopeCandidateMatchAnalyst  = "candidate_match_analyst"
 
-	maWebValidationPipelineVersion = "candidate-web-validation-v1"
+	maWebValidationPipelineVersion = "candidate-web-validation-v2-concept"
 	maWebValidationFresh           = "fresh"
 	maWebValidationStale           = "stale"
 	maWebValidationExpired         = "expired"

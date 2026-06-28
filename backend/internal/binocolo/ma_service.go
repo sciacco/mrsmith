@@ -1049,15 +1049,7 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 	}
 
 	if body.FinalDecision.FinalAction == "" || body.FinalDecision.WebValidationState == "" {
-		input := CandidateMatchAnalysisRequest{
-			Target:         body.Target,
-			KeywordSet:     body.KeywordSet,
-			DomainResponse: body.DomainResponse,
-			SelectedDomain: body.SelectedDomain,
-			EvidenceRuns:   body.EvidenceRuns,
-			Summary:        body.Summary,
-		}
-		body.FinalDecision = *reconcileCandidateMatchDecision(input, body.CandidateMatchAnalysis, body.CandidateMatchError)
+		body.FinalDecision = defaultManualMAFinalDecision(body)
 	}
 	if !validMAFinalAction(body.FinalDecision.FinalAction) {
 		return MAWebValidation{}, fmt.Errorf("%w: final action", errMAStrategyInvalid)
@@ -1196,6 +1188,33 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 		}),
 	})
 	return validation, nil
+}
+
+// defaultManualMAFinalDecision fills a FinalDecision for a manual web-validation
+// upsert (analyst-submitted from the UI) that omits one. It is a plain default — no
+// magic thresholds (those were demolished with the concept rework): unresolved
+// domain needs a domain review, otherwise it lands as a business-validation review.
+func defaultManualMAFinalDecision(body MAWebValidationUpsertRequest) CandidateMatchFinalDecision {
+	decision := CandidateMatchFinalDecision{
+		InitialMatchState:  body.Target.MatchState,
+		DeterministicScore: body.Target.Score,
+		WebScore:           body.Summary.Score,
+		Confidence:         "bassa",
+	}
+	if body.SelectedDomain == nil || strings.TrimSpace(body.SelectedDomain.Domain) == "" {
+		decision.WebValidationState = "domain_unresolved"
+		decision.FinalAction = "needs_domain_review"
+		decision.Reason = "Nessun dominio ufficiale credibile risolto."
+	} else {
+		decision.WebValidationState = "unclear"
+		decision.FinalAction = "needs_business_validation"
+		decision.Reason = "Validazione manuale richiesta."
+	}
+	if body.CandidateMatchAnalysis != nil {
+		decision.AnalystVerdict = body.CandidateMatchAnalysis.Verdict
+		decision.AnalystAction = body.CandidateMatchAnalysis.RecommendedAction
+	}
+	return decision
 }
 
 func validMAFinalAction(action string) bool {

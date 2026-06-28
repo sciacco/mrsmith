@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -12,12 +13,20 @@ import (
 )
 
 const (
-	maWebValidationDefaultLimit        = 25
-	maWebValidationMaxLimit            = 100
-	maWebValidationDefaultDomainCount  = 20
-	maWebValidationDefaultKeywordCount = 5
-	maWebValidationMaxKeywordCount     = 20
+	maWebValidationDefaultLimit       = 25
+	maWebValidationMaxLimit           = 100
+	maWebValidationDefaultDomainCount = 20
+	// maWebValidationEvidenceCount is how many results each NEUTRAL self-description
+	// probe pulls from the company's own site (no strategy terms — UC2 gathers what
+	// the company says about itself, then classifies, instead of confirming the
+	// strategy's expectations).
+	maWebValidationEvidenceCount = 5
 )
+
+// maNeutralEvidenceProbes are the deliberately strategy-agnostic site queries used
+// to surface a company's self-description. They never mention the strategy sector,
+// so the evidence cannot be confirmation-biased toward the expected answer.
+var maNeutralEvidenceProbes = []string{"chi siamo", "servizi soluzioni", "cosa facciamo"}
 
 type maWebValidationJobPayload struct {
 	Limit              int  `json:"limit"`
@@ -96,7 +105,7 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 		Limit:          maWebValidationDefaultLimit,
 		AnalyzeWithLLM: true,
 		DomainCount:    maWebValidationDefaultDomainCount,
-		KeywordCount:   maWebValidationDefaultKeywordCount,
+		KeywordCount:   maWebValidationEvidenceCount,
 		Rank:           true,
 	}
 	if len(job.Payload) > 0 {
@@ -142,6 +151,7 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 			"candidate_count":     len(targets),
 			"force":               payload.Force,
 			"limit":               payload.Limit,
+			"method":              "concept",
 		}),
 	})
 
@@ -150,14 +160,14 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 			return err
 		}
 		target := work.Target
-		if !payload.Force && reusableMAWebValidation(target.WebValidation, work.InputHash, work.KeywordSetHash, s.now()) {
+		if !payload.Force && reusableMAWebValidation(target.WebValidation, work.InputHash, work.InputHash, s.now()) {
 			skipped++
 			continue
 		}
 
-		body, buildErr := s.buildMAWebValidation(ctx, target, version.Strategy, work.KeywordSet, work.InputHash, work.KeywordSetHash, payload, job.CreatedBySubject, job.CreatedByEmail)
+		body, buildErr := s.buildMAWebValidation(ctx, target, version.Strategy, work.InputHash, payload, job.CreatedBySubject, job.CreatedByEmail)
 		if buildErr != nil {
-			body = failedMAWebValidationRequest(target, work.KeywordSet, work.InputHash, work.KeywordSetHash, buildErr)
+			body = failedMAWebValidationRequest(target, work.InputHash, buildErr)
 			failed++
 		}
 		if _, err := s.upsertTargetWebValidation(ctx, job.SessionID, body, job.CreatedBySubject, job.CreatedByEmail); err != nil {
@@ -180,84 +190,251 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 	return nil
 }
 
+// buildMAWebValidation runs the UC2 concept pipeline for one target: resolve the
+// official domain (kept), gather NEUTRAL self-description evidence, classify it
+// against the curated KB concepts (embedding + reranker, Step 2), and — only when
+// the deterministic verdict is ambiguous/no_signal — escalate to the LLM analyst.
+// The result maps onto the existing MAWebValidation contract.
 func (s *maService) buildMAWebValidation(
 	ctx context.Context,
 	target MATarget,
 	strategy MAStrategySpec,
-	keywordSet CandidateMatchKeywordSet,
 	inputHash string,
-	keywordSetHash string,
 	payload maWebValidationJobPayload,
 	subject string,
 	email string,
 ) (MAWebValidationUpsertRequest, error) {
-	domainKeywords := append([]string{}, keywordSet.CoreTerms[:min(3, len(keywordSet.CoreTerms))]...)
-	domainKeywords = append(domainKeywords, keywordSet.AdjacentTerms[:min(2, len(keywordSet.AdjacentTerms))]...)
 	domainResponse, err := s.resolveDomainCandidates(ctx, DomainResolutionRequest{
 		CompanyName: target.CompanyName,
 		VATCode:     optionalIdentifier(payload.IncludeIdentifiers, target.VATCode),
 		TaxCode:     optionalIdentifier(payload.IncludeIdentifiers, target.TaxCode),
 		Town:        target.Town,
 		Province:    target.Province,
-		Keywords:    domainKeywords,
 		Count:       payload.DomainCount,
 	})
 	if err != nil {
 		return MAWebValidationUpsertRequest{}, fmt.Errorf("domain resolution: %w", err)
 	}
-
 	selectedDomain := chooseMAWebValidationDomain(domainResponse.Candidates)
-	evidenceRuns := []CandidateMatchEvidenceRun{}
-	if selectedDomain != nil {
-		for _, spec := range maWebValidationTermSpecs(keywordSet) {
-			run := CandidateMatchEvidenceRun{Bucket: spec.Bucket, Term: spec.Term}
-			response, searchErr := s.searchDomainEvidence(ctx, WebSearchRequest{
-				Domain:   selectedDomain.Domain,
-				Keywords: []string{spec.Term},
-				Count:    payload.KeywordCount,
-				Rank:     payload.Rank,
-			}, subject, email)
-			if searchErr != nil {
-				run.Error = cleanText(searchErr.Error(), 180)
-			} else {
-				responseCopy := response
-				run.Response = &responseCopy
-				run.ResultCount = len(response.Results)
-				run.BestScore = bestMAWebSearchScore(response)
-				run.Matched = maEvidenceResponseMatched(response)
-			}
-			evidenceRuns = append(evidenceRuns, run)
+	if selectedDomain == nil {
+		decision := &CandidateMatchFinalDecision{
+			InitialMatchState:  target.MatchState,
+			DeterministicScore: target.Score,
+			WebValidationState: "domain_unresolved",
+			FinalAction:        "needs_domain_review",
+			Confidence:         "bassa",
+			Reason:             "Nessun dominio ufficiale credibile risolto.",
+			Reasons:            []string{"Nessun dominio ufficiale credibile risolto."},
 		}
+		return s.assembleWebValidationRequest(target, inputHash, domainResponse, nil, nil, maSectorClassification{}, nil, "", decision), nil
 	}
 
-	summary := computeMAWebValidationSummary(selectedDomain, keywordSet, evidenceRuns)
-	analysisInput := CandidateMatchAnalysisRequest{
-		Target:         target,
-		KeywordSet:     keywordSet,
-		DomainResponse: domainResponse,
-		SelectedDomain: selectedDomain,
-		EvidenceRuns:   evidenceRuns,
-		Summary:        summary,
+	evidence, evidenceRuns := s.gatherNeutralEvidence(ctx, selectedDomain.Domain, payload.KeywordCount, subject, email)
+
+	classification, classErr := s.classifyCompanySector(ctx, evidence, strategy, subject, email)
+	classError := ""
+	if classErr != nil {
+		// Embedder/KB unavailable: cannot classify. Surface as analysis_unavailable so
+		// the analyst reviews it; never silently confirm/reject.
+		classError = cleanText(classErr.Error(), 180)
+		decision := &CandidateMatchFinalDecision{
+			InitialMatchState:  target.MatchState,
+			DeterministicScore: target.Score,
+			WebValidationState: "analysis_unavailable",
+			FinalAction:        "needs_business_validation",
+			Confidence:         "bassa",
+			Reason:             "Classificazione settore non disponibile (embedder/KB).",
+			Reasons:            []string{"Classificazione settore non disponibile: " + classError},
+		}
+		return s.assembleWebValidationRequest(target, inputHash, domainResponse, selectedDomain, evidenceRuns, maSectorClassification{}, nil, classError, decision), nil
 	}
+
 	var analysis *CandidateMatchAnalysisResponse
 	analysisErr := ""
-	if selectedDomain != nil && payload.AnalyzeWithLLM {
-		result, err := s.analyzeCandidateMatch(ctx, analysisInput, subject, email)
+	if payload.AnalyzeWithLLM && sectorVerdictNeedsLLM(classification.Verdict) {
+		result, err := s.analyzeSectorAmbiguity(ctx, target, strategy, evidence, classification, subject, email)
 		if err != nil {
 			analysisErr = cleanText(err.Error(), 180)
 		} else {
 			analysis = &result
 		}
 	}
-	finalDecision := reconcileCandidateMatchDecision(analysisInput, analysis, analysisErr)
-	if analysis != nil && analysis.FinalDecision != nil {
-		finalDecision = analysis.FinalDecision
+
+	decision := sectorFinalDecision(target, classification, analysis, analysisErr)
+	s.recordSectorClassificationTrace(ctx, target, classification, decision, analysis != nil)
+	return s.assembleWebValidationRequest(target, inputHash, domainResponse, selectedDomain, evidenceRuns, classification, analysis, analysisErr, decision), nil
+}
+
+func sectorVerdictNeedsLLM(verdict maSectorVerdict) bool {
+	return verdict == maSectorAmbiguous || verdict == maSectorNoSignal
+}
+
+// gatherNeutralEvidence collects a company's self-description from its own site
+// using strategy-agnostic probes. Returns the evidence corpus (for classification)
+// and per-probe runs (for the persisted contract / UI).
+func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, count int, subject, email string) (maCompanyEvidence, []CandidateMatchEvidenceRun) {
+	evidence := maCompanyEvidence{Domain: domain}
+	runs := make([]CandidateMatchEvidenceRun, 0, len(maNeutralEvidenceProbes))
+	seen := map[string]struct{}{}
+	add := func(text string) {
+		cleaned := cleanText(text, 360)
+		if cleaned == "" {
+			return
+		}
+		key := strings.ToLower(cleaned)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		evidence.Snippets = append(evidence.Snippets, cleaned)
+	}
+	for _, probe := range maNeutralEvidenceProbes {
+		run := CandidateMatchEvidenceRun{Bucket: "neutral", Term: probe}
+		response, err := s.searchDomainEvidence(ctx, WebSearchRequest{
+			Domain:   domain,
+			Keywords: strings.Fields(probe),
+			Count:    count,
+			Rank:     false,
+		}, subject, email)
+		if err != nil {
+			run.Error = cleanText(err.Error(), 180)
+		} else {
+			responseCopy := response
+			run.Response = &responseCopy
+			run.ResultCount = len(response.Results)
+			run.Matched = run.ResultCount > 0
+			for _, result := range response.Results {
+				add(result.Title)
+				for _, snippet := range result.Snippets {
+					add(snippet)
+				}
+			}
+		}
+		runs = append(runs, run)
+	}
+	return evidence, runs
+}
+
+// sectorFinalDecision maps the concept verdict (+ optional analyst override) onto
+// the MAWebValidation lifecycle, with NO magic thresholds — the verdict already
+// carries the calibrated decision. The analyst only matters when the deterministic
+// verdict was ambiguous/no_signal.
+func sectorFinalDecision(target MATarget, class maSectorClassification, analysis *CandidateMatchAnalysisResponse, analysisErr string) *CandidateMatchFinalDecision {
+	webScore := clampScore(class.TopProb * 100)
+	reasons := []string{}
+	if class.Reason != "" {
+		reasons = append(reasons, class.Reason)
+	}
+	reasons = append(reasons, sectorConceptReasons(class)...)
+
+	state, action, confidence := "unclear", "needs_business_validation", class.Confidence
+	switch class.Verdict {
+	case maSectorConfirm:
+		state, action = "confirmed", "confirm"
+	case maSectorReject:
+		state, action = "rejected", "reject"
+	case maSectorWeak:
+		state, action = "deprioritized", "deprioritize"
+	case maSectorAmbiguous, maSectorNoSignal:
+		if analysis != nil {
+			state, action, confidence = analystToLifecycle(analysis)
+			if analysis.Verdict != "" {
+				reasons = append([]string{"Giudizio LLM: " + analysis.Verdict + " (" + analysis.RecommendedAction + ")."}, reasons...)
+			}
+		} else {
+			state = "analysis_unavailable"
+			action = "needs_business_validation"
+			if confidence == "" {
+				confidence = "bassa"
+			}
+			if strings.TrimSpace(analysisErr) != "" {
+				reasons = append([]string{"Analyst non disponibile: " + analysisErr}, reasons...)
+			} else {
+				reasons = append([]string{"Classificazione non decisiva: validazione business richiesta."}, reasons...)
+			}
+		}
+	}
+	if confidence == "" {
+		confidence = "bassa"
 	}
 
+	decision := &CandidateMatchFinalDecision{
+		InitialMatchState:  target.MatchState,
+		DeterministicScore: target.Score,
+		WebScore:           webScore,
+		WebValidationState: state,
+		FinalAction:        action,
+		Confidence:         confidence,
+		Reason:             firstNonEmpty(class.Reason, "Classificazione settore concept-based."),
+		Reasons:            cleanStringList(reasons, 12, 280),
+	}
+	if analysis != nil {
+		decision.AnalystVerdict = analysis.Verdict
+		decision.AnalystAction = analysis.RecommendedAction
+	}
+	return decision
+}
+
+func analystToLifecycle(analysis *CandidateMatchAnalysisResponse) (state, action, confidence string) {
+	confidence = analysis.Confidence
+	if confidence == "" {
+		confidence = "media"
+	}
+	switch {
+	case analysis.RecommendedAction == "confirm" && (analysis.Verdict == "strong_match" || analysis.Verdict == "match"):
+		return "confirmed", "confirm", confidence
+	case analysis.RecommendedAction == "reject" || analysis.Verdict == "no_match":
+		return "rejected", "reject", confidence
+	case analysis.RecommendedAction == "downgrade" || analysis.Verdict == "weak_match":
+		return "deprioritized", "deprioritize", confidence
+	default:
+		return "unclear", "needs_business_validation", confidence
+	}
+}
+
+func sectorConceptReasons(class maSectorClassification) []string {
+	out := []string{}
+	for i, c := range class.Concepts {
+		if i >= 3 {
+			break
+		}
+		tag := "target"
+		if c.Kind == "distractor" {
+			tag = "distrattore"
+		}
+		scope := ""
+		if c.InStrategy {
+			scope = ", in perimetro"
+		}
+		out = append(out, fmt.Sprintf("Concetto %s (%s%s): prob %.2f", c.Name, tag, scope, c.RerankProb))
+	}
+	return out
+}
+
+// assembleWebValidationRequest maps the classification + evidence onto the existing
+// MAWebValidation contract. The KeywordSet field is repurposed honestly: matched
+// target concepts -> CoreTerms, matched distractors -> NegativeTerms (no hardcoded
+// negative dogma). Full concept provenance lives in the trace event.
+func (s *maService) assembleWebValidationRequest(
+	target MATarget,
+	inputHash string,
+	domainResponse DomainResolutionResponse,
+	selectedDomain *DomainResolutionCandidate,
+	evidenceRuns []CandidateMatchEvidenceRun,
+	class maSectorClassification,
+	analysis *CandidateMatchAnalysisResponse,
+	analysisErr string,
+	decision *CandidateMatchFinalDecision,
+) MAWebValidationUpsertRequest {
+	if evidenceRuns == nil {
+		evidenceRuns = []CandidateMatchEvidenceRun{}
+	}
+	keywordSet := classificationToKeywordSet(class)
+	summary := classificationToSummary(class, decision)
 	return MAWebValidationUpsertRequest{
 		PipelineVersion:        maWebValidationPipelineVersion,
 		InputHash:              inputHash,
-		KeywordSetHash:         keywordSetHash,
+		KeywordSetHash:         inputHash,
 		Target:                 target,
 		KeywordSet:             keywordSet,
 		DomainResponse:         domainResponse,
@@ -266,8 +443,92 @@ func (s *maService) buildMAWebValidation(
 		Summary:                summary,
 		CandidateMatchAnalysis: analysis,
 		CandidateMatchError:    analysisErr,
-		FinalDecision:          *finalDecision,
-	}, nil
+		FinalDecision:          *decision,
+	}
+}
+
+func classificationToKeywordSet(class maSectorClassification) CandidateMatchKeywordSet {
+	core := []string{}
+	negative := []string{}
+	for _, c := range class.Concepts {
+		if c.Kind == "distractor" {
+			negative = append(negative, c.Name)
+		} else {
+			core = append(core, c.Name)
+		}
+	}
+	intent := strings.TrimSpace(class.CompanyDescription)
+	if intent == "" {
+		intent = "Classificazione settore concept-based"
+	}
+	sources := []string{}
+	if len(class.StrategyConcepts) > 0 {
+		sources = append(sources, "perimetro strategia: "+strings.Join(class.StrategyConcepts, ", "))
+	}
+	return CandidateMatchKeywordSet{
+		IntentLabel:   cleanText(intent, 220),
+		CoreTerms:     cleanStringList(core, 12, 120),
+		AdjacentTerms: []string{},
+		NegativeTerms: cleanStringList(negative, 12, 120),
+		Sources:       cleanStringList(sources, 6, 220),
+	}
+}
+
+func classificationToSummary(class maSectorClassification, decision *CandidateMatchFinalDecision) CandidateMatchEvidenceSummary {
+	coreMatches, negativeMatches := 0, 0
+	for _, c := range class.Concepts {
+		if c.Kind == "distractor" {
+			negativeMatches++
+		} else {
+			coreMatches++
+		}
+	}
+	score := 0
+	if decision != nil {
+		score = decision.WebScore
+	}
+	return CandidateMatchEvidenceSummary{
+		Score:           score,
+		Confidence:      class.Confidence,
+		CoreMatches:     coreMatches,
+		NegativeMatches: negativeMatches,
+		TotalCoreTerms:  coreMatches,
+	}
+}
+
+func (s *maService) recordSectorClassificationTrace(ctx context.Context, target MATarget, class maSectorClassification, decision *CandidateMatchFinalDecision, analystUsed bool) {
+	concepts := make([]map[string]any, 0, len(class.Concepts))
+	for i, c := range class.Concepts {
+		if i >= 6 {
+			break
+		}
+		concepts = append(concepts, map[string]any{
+			"concept_id":  c.ID,
+			"name":        c.Name,
+			"kind":        c.Kind,
+			"cosine":      math.Round(c.Cosine*10000) / 10000,
+			"rerank_prob": math.Round(c.RerankProb*10000) / 10000,
+			"in_strategy": c.InStrategy,
+		})
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_sector_classification",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"company_key":       target.CompanyKey,
+			"company_name":      target.CompanyName,
+			"verdict":           string(class.Verdict),
+			"final_action":      decision.FinalAction,
+			"top_prob":          math.Round(class.TopProb*10000) / 10000,
+			"rerank_applied":    class.RerankApplied,
+			"analyst_used":      analystUsed,
+			"strategy_concepts": class.StrategyConcepts,
+		}),
+		Response: maTraceJSON(map[string]any{
+			"description": class.CompanyDescription,
+			"concepts":    concepts,
+		}),
+	})
 }
 
 func (s *maService) resolveDomainCandidates(ctx context.Context, body DomainResolutionRequest) (DomainResolutionResponse, error) {
@@ -433,10 +694,10 @@ func normalizeMAWebValidationPayload(req MAWebValidationEnrichRequest) maWebVali
 	}
 	keywordCount := req.KeywordCount
 	if keywordCount <= 0 {
-		keywordCount = maWebValidationDefaultKeywordCount
+		keywordCount = maWebValidationEvidenceCount
 	}
-	if keywordCount > maWebValidationMaxKeywordCount {
-		keywordCount = maWebValidationMaxKeywordCount
+	if keywordCount > webSearchMaxCount {
+		keywordCount = webSearchMaxCount
 	}
 	return maWebValidationJobPayload{
 		Limit:              limit,
@@ -450,10 +711,8 @@ func normalizeMAWebValidationPayload(req MAWebValidationEnrichRequest) maWebVali
 }
 
 type maWebValidationWorkTarget struct {
-	Target         MATarget
-	KeywordSet     CandidateMatchKeywordSet
-	InputHash      string
-	KeywordSetHash string
+	Target    MATarget
+	InputHash string
 }
 
 func selectMAWebValidationTargets(targets []MATarget, strategy MAStrategySpec, payload maWebValidationJobPayload, now time.Time, limit int) []maWebValidationWorkTarget {
@@ -462,17 +721,13 @@ func selectMAWebValidationTargets(targets []MATarget, strategy MAStrategySpec, p
 		if target.MatchState == maMatchStateOutside {
 			continue
 		}
-		keywordSet := deriveMAWebValidationKeywordSet(strategy, target)
-		keywordSetHash := maWebValidationHash(maWebValidationKeywordSetFingerprint(keywordSet))
-		inputHash := maWebValidationInputHash(target, keywordSet, payload)
-		if !payload.Force && reusableMAWebValidation(target.WebValidation, inputHash, keywordSetHash, now) {
+		inputHash := maWebValidationInputHash(target, strategy, payload)
+		if !payload.Force && reusableMAWebValidation(target.WebValidation, inputHash, inputHash, now) {
 			continue
 		}
 		out = append(out, maWebValidationWorkTarget{
-			Target:         target,
-			KeywordSet:     keywordSet,
-			InputHash:      inputHash,
-			KeywordSetHash: keywordSetHash,
+			Target:    target,
+			InputHash: inputHash,
 		})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -507,48 +762,29 @@ func reusableMAWebValidation(validation *MAWebValidation, inputHash, keywordSetH
 		maWebValidationFreshness(now, validation.StaleAfter, validation.ExpiresAt) == maWebValidationFresh
 }
 
-func failedMAWebValidationRequest(target MATarget, keywordSet CandidateMatchKeywordSet, inputHash, keywordSetHash string, err error) MAWebValidationUpsertRequest {
-	domainResponse := DomainResolutionResponse{}
-	summary := CandidateMatchEvidenceSummary{
-		Score:              0,
-		Confidence:         "bassa",
-		TotalCoreTerms:     len(keywordSet.CoreTerms),
-		TotalAdjacentTerms: len(keywordSet.AdjacentTerms),
-		TotalNegativeTerms: len(keywordSet.NegativeTerms),
-	}
-	input := CandidateMatchAnalysisRequest{Target: target, KeywordSet: keywordSet, DomainResponse: domainResponse, Summary: summary}
+func failedMAWebValidationRequest(target MATarget, inputHash string, err error) MAWebValidationUpsertRequest {
 	errorText := cleanText(err.Error(), 180)
+	decision := &CandidateMatchFinalDecision{
+		InitialMatchState:  target.MatchState,
+		DeterministicScore: target.Score,
+		WebValidationState: "analysis_unavailable",
+		FinalAction:        "needs_business_validation",
+		Confidence:         "bassa",
+		Reason:             "Validazione web fallita.",
+		Reasons:            []string{"Errore pipeline: " + errorText},
+	}
 	return MAWebValidationUpsertRequest{
 		PipelineVersion:     maWebValidationPipelineVersion,
 		InputHash:           inputHash,
-		KeywordSetHash:      keywordSetHash,
+		KeywordSetHash:      inputHash,
 		Target:              target,
-		KeywordSet:          keywordSet,
-		DomainResponse:      domainResponse,
+		KeywordSet:          CandidateMatchKeywordSet{IntentLabel: "Validazione web fallita"},
+		DomainResponse:      DomainResolutionResponse{},
 		EvidenceRuns:        []CandidateMatchEvidenceRun{},
-		Summary:             summary,
+		Summary:             CandidateMatchEvidenceSummary{Confidence: "bassa"},
 		CandidateMatchError: errorText,
-		FinalDecision:       *reconcileCandidateMatchDecision(input, nil, errorText),
+		FinalDecision:       *decision,
 	}
-}
-
-type maWebValidationTermSpec struct {
-	Bucket string
-	Term   string
-}
-
-func maWebValidationTermSpecs(keywordSet CandidateMatchKeywordSet) []maWebValidationTermSpec {
-	out := []maWebValidationTermSpec{}
-	for _, term := range keywordSet.CoreTerms[:min(6, len(keywordSet.CoreTerms))] {
-		out = append(out, maWebValidationTermSpec{Bucket: "core", Term: term})
-	}
-	for _, term := range keywordSet.AdjacentTerms[:min(4, len(keywordSet.AdjacentTerms))] {
-		out = append(out, maWebValidationTermSpec{Bucket: "adjacent", Term: term})
-	}
-	for _, term := range keywordSet.NegativeTerms[:min(3, len(keywordSet.NegativeTerms))] {
-		out = append(out, maWebValidationTermSpec{Bucket: "negative", Term: term})
-	}
-	return out
 }
 
 func chooseMAWebValidationDomain(candidates []DomainResolutionCandidate) *DomainResolutionCandidate {
@@ -572,266 +808,12 @@ func chooseMAWebValidationDomain(candidates []DomainResolutionCandidate) *Domain
 	return nil
 }
 
-func deriveMAWebValidationKeywordSet(strategy MAStrategySpec, target MATarget) CandidateMatchKeywordSet {
-	coreTerms := []string{}
-	adjacentTerms := []string{}
-	negativeTerms := []string{}
-	sources := []string{}
-	atecoCodes := maWebValidationAtecoCodes(strategy, target)
-	sector := cleanText(strategy.SectorDescription, 220)
-	if sector != "" {
-		sources = append(sources, "settore: "+sector)
-	}
-	if len(atecoCodes) > 0 {
-		sources = append(sources, "ATECO: "+strings.Join(atecoCodes, ", "))
-	}
-	if target.AtecoDescription != "" {
-		sources = append(sources, "target ATECO: "+target.AtecoDescription)
-	}
-	addMAWebValidationTerms(&coreTerms, strategy.Keywords, 10)
-	if maHasAtecoPrefix(atecoCodes, []string{"631010", "6310", "631"}) {
-		addMAWebValidationTerms(&coreTerms, []string{"infrastrutture informatiche", "hosting", "cloud infrastructure", "cloud native", "data center"}, 10)
-		addMAWebValidationTerms(&adjacentTerms, []string{"cloud", "server", "storage", "backup", "virtualizzazione"}, 8)
-	}
-	if maHasAtecoPrefix(atecoCodes, []string{"622020", "6220", "622"}) {
-		addMAWebValidationTerms(&coreTerms, []string{"gestione strutture informatiche", "gestione infrastrutture IT", "IT operations", "system management", "assistenza sistemistica"}, 10)
-		addMAWebValidationTerms(&adjacentTerms, []string{"networking", "monitoraggio", "help desk", "SLA"}, 8)
-	}
-	if maHasAtecoPrefix(atecoCodes, []string{"629009", "6290", "629"}) {
-		addMAWebValidationTerms(&coreTerms, []string{"servizi IT", "servizi informatici", "tecnologie informatiche", "information technology services"}, 10)
-		addMAWebValidationTerms(&adjacentTerms, []string{"cybersecurity", "Microsoft 365", "consulenza informatica"}, 8)
-	}
-	text := strings.ToLower(sector + " " + target.AtecoDescription)
-	if strings.Contains(text, "cloud") {
-		addMAWebValidationTerm(&coreTerms, "cloud", 10)
-	}
-	if strings.Contains(text, "hosting") {
-		addMAWebValidationTerm(&coreTerms, "hosting", 10)
-	}
-	if strings.Contains(text, "infrastrutt") {
-		addMAWebValidationTerm(&coreTerms, "infrastrutture informatiche", 10)
-	}
-	if strings.Contains(text, "gestione") {
-		addMAWebValidationTerm(&coreTerms, "gestione infrastrutture IT", 10)
-	}
-	if len(coreTerms) == 0 {
-		addMAWebValidationTerms(&coreTerms, []string{"servizi IT", "tecnologie informatiche", "consulenza informatica"}, 10)
-		sources = append(sources, "fallback: lente IT ampia")
-	}
-	addMAWebValidationTerms(&adjacentTerms, []string{"cloud", "backup", "cybersecurity", "networking", "virtualizzazione"}, 8)
-	addMAWebValidationTerms(&negativeTerms, []string{"web agency", "marketing digitale", "rivendita hardware", "sviluppo software puro", "formazione informatica"}, 6)
-	intentLabel := sector
-	if intentLabel == "" {
-		intentLabel = "Lente derivata da strategia M&A"
-	}
-	return CandidateMatchKeywordSet{
-		IntentLabel:   intentLabel,
-		CoreTerms:     coreTerms,
-		AdjacentTerms: adjacentTerms,
-		NegativeTerms: negativeTerms,
-		Sources:       sources,
-	}
-}
-
-func addMAWebValidationTerms(list *[]string, values []string, limit int) {
-	for _, value := range values {
-		addMAWebValidationTerm(list, value, limit)
-	}
-}
-
-func addMAWebValidationTerm(list *[]string, value string, limit int) {
-	term := cleanText(value, 120)
-	if term == "" || len(*list) >= limit {
-		return
-	}
-	key := strings.ToLower(term)
-	for _, item := range *list {
-		if strings.ToLower(item) == key {
-			return
-		}
-	}
-	*list = append(*list, term)
-}
-
-func maWebValidationAtecoCodes(strategy MAStrategySpec, target MATarget) []string {
-	seen := map[string]struct{}{}
-	out := []string{}
-	add := func(value string) {
-		code := maWebValidationAtecoDigits(value)
-		if code == "" {
-			return
-		}
-		if _, exists := seen[code]; exists {
-			return
-		}
-		seen[code] = struct{}{}
-		out = append(out, code)
-	}
-	add(target.AtecoCode)
-	for _, candidate := range strategy.AtecoCandidates {
-		if normalizeMAFit(candidate.Fit) == maFitExcluded {
-			continue
-		}
-		add(candidate.Code)
-	}
-	return out
-}
-
-func maWebValidationAtecoDigits(value string) string {
-	var b strings.Builder
-	for _, r := range value {
-		if r >= '0' && r <= '9' {
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
-func maHasAtecoPrefix(codes []string, prefixes []string) bool {
-	for _, code := range codes {
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(code, prefix) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func computeMAWebValidationSummary(selectedDomain *DomainResolutionCandidate, keywordSet CandidateMatchKeywordSet, runs []CandidateMatchEvidenceRun) CandidateMatchEvidenceSummary {
-	matched := func(bucket string) int {
-		count := 0
-		for _, run := range runs {
-			if run.Bucket == bucket && run.Matched {
-				count++
-			}
-		}
-		return count
-	}
-	searched := func(bucket string) int {
-		count := 0
-		for _, run := range runs {
-			if run.Bucket == bucket {
-				count++
-			}
-		}
-		return count
-	}
-	coreMatches := matched("core")
-	adjacentMatches := matched("adjacent")
-	negativeMatches := matched("negative")
-	searchedCore := searched("core")
-	searchedAdjacent := searched("adjacent")
-	searchedNegative := searched("negative")
-	coreEvidenceScore := maBucketEvidenceScore(runs, "core")
-	adjacentEvidenceScore := maBucketEvidenceScore(runs, "adjacent")
-	sectorEvidenceScore := clampMAWebScore(float64(coreEvidenceScore)*0.72 + float64(adjacentEvidenceScore)*0.28)
-	coverageScore := clampMAWebScore(ratioMAWebScore(coreMatches, max(len(keywordSet.CoreTerms), searchedCore))*0.7 + ratioMAWebScore(adjacentMatches, max(len(keywordSet.AdjacentTerms), searchedAdjacent))*0.3)
-	domainScore := maDomainEvidenceScore(selectedDomain)
-	negativeRate := ratioMAWebScore(negativeMatches, max(1, searchedNegative))
-	negativePenalty := clampMAWebScore(float64(negativeMatches)*18 + negativeRate*0.35)
-	noNegativeScore := 100 - negativePenalty
-	rawScore := float64(sectorEvidenceScore)*0.45 + float64(coverageScore)*0.2 + float64(domainScore)*0.25 + float64(noNegativeScore)*0.1 - float64(negativePenalty)*0.35
-	score := 0
-	if selectedDomain != nil {
-		score = clampMAWebScore(rawScore)
-	}
-	confidence := "bassa"
-	if selectedDomain != nil && score >= 70 && coreMatches >= 2 && negativePenalty < 25 {
-		confidence = "alta"
-	} else if selectedDomain != nil && score >= 45 && (coreMatches >= 1 || adjacentMatches >= 2) {
-		confidence = "media"
-	}
-	return CandidateMatchEvidenceSummary{
-		Score:                 score,
-		Confidence:            confidence,
-		SectorEvidenceScore:   sectorEvidenceScore,
-		CoverageScore:         coverageScore,
-		DomainScore:           domainScore,
-		NegativePenalty:       negativePenalty,
-		CoreMatches:           coreMatches,
-		AdjacentMatches:       adjacentMatches,
-		NegativeMatches:       negativeMatches,
-		SearchedCoreTerms:     searchedCore,
-		SearchedAdjacentTerms: searchedAdjacent,
-		SearchedNegativeTerms: searchedNegative,
-		TotalCoreTerms:        len(keywordSet.CoreTerms),
-		TotalAdjacentTerms:    len(keywordSet.AdjacentTerms),
-		TotalNegativeTerms:    len(keywordSet.NegativeTerms),
-	}
-}
-
-func maBucketEvidenceScore(runs []CandidateMatchEvidenceRun, bucket string) int {
-	total := 0
-	matched := []CandidateMatchEvidenceRun{}
-	for _, run := range runs {
-		if run.Bucket != bucket {
-			continue
-		}
-		total++
-		if run.Matched {
-			matched = append(matched, run)
-		}
-	}
-	if total == 0 {
-		return 0
-	}
-	matchedRate := float64(len(matched)) / float64(total)
-	quality := 0.0
-	if len(matched) > 0 {
-		sum := 0
-		for _, run := range matched {
-			score := 60
-			if run.BestScore != nil {
-				score = *run.BestScore
-			}
-			sum += score
-		}
-		quality = float64(sum) / float64(len(matched))
-	}
-	return clampMAWebScore(matchedRate*70 + quality*0.3)
-}
-
-func maDomainEvidenceScore(selectedDomain *DomainResolutionCandidate) int {
-	if selectedDomain == nil {
-		return 0
-	}
-	confidenceScore := 30
-	if selectedDomain.Confidence == "alta" {
-		confidenceScore = 100
-	} else if selectedDomain.Confidence == "media" {
-		confidenceScore = 70
-	}
-	return clampMAWebScore(float64(selectedDomain.Score)*0.75 + float64(confidenceScore)*0.25)
-}
-
-func maEvidenceResponseMatched(response WebSearchResponse) bool {
-	if bestScore := bestMAWebSearchScore(response); bestScore != nil {
-		return *bestScore >= 45
-	}
-	return !response.Ranked && len(response.Results) > 0
-}
-
-func bestMAWebSearchScore(response WebSearchResponse) *int {
-	var best *int
-	for _, result := range response.Results {
-		if result.Score == nil {
-			continue
-		}
-		if best == nil || *result.Score > *best {
-			value := *result.Score
-			best = &value
-		}
-	}
-	return best
-}
-
-func maWebValidationInputHash(target MATarget, keywordSet CandidateMatchKeywordSet, payload maWebValidationJobPayload) string {
+func maWebValidationInputHash(target MATarget, strategy MAStrategySpec, payload maWebValidationJobPayload) string {
 	return maWebValidationHash(map[string]any{
-		"keywordSet":      maWebValidationKeywordSetFingerprint(keywordSet),
-		"options":         maWebValidationInputOptions(payload),
 		"pipelineVersion": maWebValidationPipelineVersion,
 		"target":          maWebValidationTargetFingerprint(target),
+		"sector":          cleanText(strategy.SectorDescription, 400),
+		"options":         maWebValidationInputOptions(payload),
 	})
 }
 
@@ -845,7 +827,7 @@ func maWebValidationInputOptions(payload maWebValidationJobPayload) map[string]a
 	}
 }
 
-func clampMAWebScore(value float64) int {
+func clampScore(value float64) int {
 	if value < 0 {
 		return 0
 	}
@@ -855,18 +837,13 @@ func clampMAWebScore(value float64) int {
 	return int(value + 0.5)
 }
 
-func ratioMAWebScore(value int, total int) float64 {
-	if total <= 0 {
-		return 0
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
 	}
-	score := float64(value) / float64(total) * 100
-	if score < 0 {
-		return 0
-	}
-	if score > 100 {
-		return 100
-	}
-	return score
+	return ""
 }
 
 func optionalIdentifier(enabled bool, value string) string {

@@ -413,6 +413,126 @@ func (s *maService) loadInstructionOrDefault(ctx context.Context, scope, fallbac
 	return strings.TrimSpace(prompt.Prompt)
 }
 
+// analyzeSectorAmbiguity is the LLM tie-breaker, invoked ONLY when the
+// deterministic concept verdict is ambiguous/no_signal (decision #4). It is fed the
+// distilled company description, the ranked concept matches (with kind + in-perimeter
+// flags) and the neutral evidence — never strategy-seeded keywords — and returns the
+// existing analyst response contract. Best-effort: the caller degrades to
+// needs_business_validation when this errors.
+func (s *maService) analyzeSectorAmbiguity(ctx context.Context, target MATarget, strategy MAStrategySpec, evidence maCompanyEvidence, class maSectorClassification, subject, email string) (CandidateMatchAnalysisResponse, error) {
+	if s.llmp == nil {
+		return CandidateMatchAnalysisResponse{}, errMAOpenRouterUnavailable
+	}
+	model, err := s.llmp.ResolveModel(ctx, maModelScopeCandidateMatchAnalyst, "")
+	if err != nil {
+		return CandidateMatchAnalysisResponse{}, llmConfigError(err)
+	}
+	prompt, err := s.llmp.ResolvePrompt(ctx, maModelScopeCandidateMatchAnalyst, "")
+	if err != nil {
+		return CandidateMatchAnalysisResponse{}, llmConfigError(err)
+	}
+	client, err := s.llmp.ClientForModel(ctx, model)
+	if err != nil {
+		return CandidateMatchAnalysisResponse{}, llmConfigError(err)
+	}
+
+	concepts := make([]map[string]any, 0, len(class.Concepts))
+	for i, c := range class.Concepts {
+		if i >= 6 {
+			break
+		}
+		concepts = append(concepts, map[string]any{
+			"name":       c.Name,
+			"kind":       c.Kind,
+			"rerankProb": c.RerankProb,
+			"inStrategy": c.InStrategy,
+		})
+	}
+	snippets := evidence.Snippets
+	if len(snippets) > 12 {
+		snippets = snippets[:12]
+	}
+	curated := map[string]any{
+		"company": map[string]any{
+			"name":               target.CompanyName,
+			"atecoDescription":   target.AtecoDescription,
+			"matchState":         target.MatchState,
+			"deterministicScore": target.Score,
+			"selfDescription":    class.CompanyDescription,
+		},
+		"strategy": map[string]any{
+			"sector":            cleanText(strategy.SectorDescription, 400),
+			"perimeterConcepts": class.StrategyConcepts,
+		},
+		"conceptMatches": concepts,
+		"webEvidence":    snippets,
+		"instructions": map[string]any{
+			"doNotBrowse":              true,
+			"decideSectorMembership":   true,
+			"distractorMeansOffTarget": true,
+		},
+	}
+	payload, err := json.Marshal(curated)
+	if err != nil {
+		return CandidateMatchAnalysisResponse{}, err
+	}
+	reqParams := model.RawParams()
+	if _, ok := reqParams["max_tokens"]; !ok {
+		reqParams["max_tokens"] = candidateMatchAnalysisMaxToken
+	}
+	chatReq := llm.ChatRequest{
+		Model:          model.Model,
+		Params:         reqParams,
+		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+		Messages: []llm.Message{
+			{Role: "system", Content: prompt.Prompt},
+			{Role: "user", Content: string(payload)},
+		},
+	}
+	resp, chatErr := client.Chat(ctx, chatReq)
+	usageRaw, _ := json.Marshal(resp.Usage)
+	requestBody, _ := llm.BuildRequestBody(chatReq)
+	requestRaw, _ := json.Marshal(requestBody)
+	contextRaw, _ := json.Marshal(map[string]any{
+		"target_id":   target.ID,
+		"session_id":  target.SessionID,
+		"company_key": target.CompanyKey,
+		"verdict":     string(class.Verdict),
+	})
+	audit := llm.CallAudit{
+		App:          maApp,
+		Scope:        maModelScopeCandidateMatchAnalyst,
+		ProviderID:   model.ProviderID,
+		ModelID:      model.ID,
+		PromptID:     prompt.ID,
+		Model:        model.Model,
+		Request:      requestRaw,
+		Usage:        usageRaw,
+		Context:      contextRaw,
+		ActorSubject: subject,
+		ActorEmail:   email,
+	}
+	if chatErr != nil {
+		audit.Status = "failed"
+		audit.ErrorMessage = chatErr.Error()
+	} else if respRaw, mErr := json.Marshal(map[string]any{"content": resp.Content}); mErr == nil {
+		audit.Response = respRaw
+	}
+	_ = s.llmp.RecordAudit(ctx, audit)
+	if chatErr != nil {
+		return CandidateMatchAnalysisResponse{}, chatErr
+	}
+
+	analysis, err := parseCandidateMatchAnalysis(resp.Content)
+	if err != nil {
+		return CandidateMatchAnalysisResponse{}, err
+	}
+	analysis.ModelID = model.ID
+	analysis.PromptID = prompt.ID
+	analysis.Model = model.Model
+	return analysis, nil
+}
+
 func sortedKeys(set map[string]bool) []string {
 	out := make([]string, 0, len(set))
 	for k := range set {
