@@ -208,6 +208,57 @@ func (c *Client) Embed(ctx context.Context, model string, inputs []string) ([][]
 	return out, decoded.Usage, nil
 }
 
+// Rerank scores each prompt via the provider's /embeddings endpoint in
+// return_logits mode: the reranker emits logits for the given "no"/"yes" token
+// ids and, with normalize=true, softmaxes them so each data[i].embedding is
+// [no_prob, yes_prob]. Returns the yes-probability per prompt, in input order.
+func (c *Client) Rerank(ctx context.Context, model string, prompts []string, noTokenID, yesTokenID int) ([]float64, Usage, error) {
+	if len(prompts) == 0 {
+		return nil, Usage{}, nil
+	}
+	body := map[string]any{
+		"model":         model,
+		"input":         prompts,
+		"return_logits": []int{noTokenID, yesTokenID},
+		"normalize":     true,
+	}
+	var decoded struct {
+		Data []struct {
+			Index     int       `json:"index"`
+			Embedding []float64 `json:"embedding"`
+		} `json:"data"`
+		Usage Usage `json:"usage"`
+	}
+	if err := c.sdk.Post(ctx, "embeddings", body, &decoded); err != nil {
+		var apiErr *openai.Error
+		if errors.As(err, &apiErr) {
+			return nil, Usage{}, &APIError{Provider: c.name(), StatusCode: apiErr.StatusCode, Body: errorBody(apiErr)}
+		}
+		return nil, Usage{}, fmt.Errorf("%s: rerank request failed: %w", c.name(), err)
+	}
+	if len(decoded.Data) != len(prompts) {
+		return nil, Usage{}, fmt.Errorf("%s: rerank returned %d scores for %d prompts", c.name(), len(decoded.Data), len(prompts))
+	}
+	out := make([]float64, len(prompts))
+	seen := make([]bool, len(prompts))
+	for _, d := range decoded.Data {
+		if d.Index < 0 || d.Index >= len(out) {
+			return nil, Usage{}, fmt.Errorf("%s: rerank index %d out of range", c.name(), d.Index)
+		}
+		if len(d.Embedding) < 2 {
+			return nil, Usage{}, fmt.Errorf("%s: rerank logits at index %d have %d values, want 2", c.name(), d.Index, len(d.Embedding))
+		}
+		out[d.Index] = d.Embedding[1] // yes-probability
+		seen[d.Index] = true
+	}
+	for i, ok := range seen {
+		if !ok {
+			return nil, Usage{}, fmt.Errorf("%s: rerank missing score at index %d", c.name(), i)
+		}
+	}
+	return out, decoded.Usage, nil
+}
+
 // bodyStructuralKeys are set explicitly from typed ChatRequest fields and must
 // never be overridden by the dynamic Params bag.
 var bodyStructuralKeys = map[string]struct{}{
