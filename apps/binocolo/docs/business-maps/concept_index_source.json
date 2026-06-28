@@ -1,0 +1,577 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-06-28T06:35:58.980160+00:00",
+  "source": "business_concepts_seed.json (solo status=seed) + ateco_ict_kb.json",
+  "description": "Sorgente dell'indice dei concetti. Il campo 'embedding_text' va passato allo STESSO embedder usato per la KB ATECO.",
+  "stats": {
+    "n_concetti": 29
+  },
+  "concepts": [
+    {
+      "id": "cloud_infrastructure",
+      "name": "Cloud Infrastructure",
+      "domain": "Cloud",
+      "aliases": [
+        "cloud",
+        "private cloud",
+        "public cloud",
+        "hybrid cloud",
+        "IaaS",
+        "virtual datacenter",
+        "VDC",
+        "infrastruttura cloud"
+      ],
+      "ateco_candidates_in_kb": [
+        "63.10.10",
+        "62.20.10",
+        "62.20.20"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Cloud Infrastructure. IaaS, private/public/hybrid cloud, virtual datacenter. cloud, private cloud, public cloud, hybrid cloud, IaaS, virtual datacenter, VDC, infrastruttura cloud."
+    },
+    {
+      "id": "managed_services",
+      "name": "Managed Services",
+      "domain": "IT Services",
+      "aliases": [
+        "managed services",
+        "servizi gestiti",
+        "MSP",
+        "outsourcing IT",
+        "gestione infrastruttura"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.20.20",
+        "62.20.10",
+        "62.90.09"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Managed Services. Ongoing management of customer IT systems. managed services, servizi gestiti, MSP, outsourcing IT, gestione infrastruttura."
+    },
+    {
+      "id": "software_development",
+      "name": "Software Development",
+      "domain": "Software",
+      "aliases": [
+        "sviluppo software",
+        "software development",
+        "applicazioni web",
+        "app mobile",
+        "API development",
+        "custom software"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.10.00"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Software Development. Custom software and application development. sviluppo software, software development, applicazioni web, app mobile, API development, custom software."
+    },
+    {
+      "id": "software_product",
+      "name": "Software Product / ISV",
+      "domain": "Software",
+      "aliases": [
+        "software vendor",
+        "ISV",
+        "SaaS",
+        "edizione software",
+        "licenza software",
+        "software proprietario"
+      ],
+      "ateco_candidates_in_kb": [
+        "58.29.00",
+        "62.10.00"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Software Product / ISV. Packaged software/SaaS product publishing. software vendor, ISV, SaaS, edizione software, licenza software, software proprietario."
+    },
+    {
+      "id": "system_integration",
+      "name": "System Integration",
+      "domain": "IT Services",
+      "aliases": [
+        "system integration",
+        "system integrator",
+        "integrazione sistemi",
+        "integrazione applicativa"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.20.10",
+        "62.90.09"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "System Integration. Integration of software, hardware and platforms. system integration, system integrator, integrazione sistemi, integrazione applicativa."
+    },
+    {
+      "id": "cybersecurity_services",
+      "name": "Cybersecurity Services",
+      "domain": "Cybersecurity",
+      "aliases": [
+        "cybersecurity",
+        "sicurezza informatica",
+        "security assessment",
+        "vulnerability assessment",
+        "penetration test"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.20.10",
+        "62.90.09"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Cybersecurity Services. Cybersecurity consulting and implementation. cybersecurity, sicurezza informatica, security assessment, vulnerability assessment, penetration test."
+    },
+    {
+      "id": "soc_mdr",
+      "name": "SOC / MDR",
+      "domain": "Cybersecurity",
+      "aliases": [
+        "SOC",
+        "MDR",
+        "managed detection",
+        "SIEM",
+        "XDR",
+        "security monitoring",
+        "incident response"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.20.20",
+        "62.20.10",
+        "62.90.09"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "SOC / MDR. Managed detection and response, security operations. SOC, MDR, managed detection, SIEM, XDR, security monitoring, incident response."
+    },
+    {
+      "id": "networking",
+      "name": "Networking",
+      "domain": "Networking",
+      "aliases": [
+        "networking",
+        "reti aziendali",
+        "LAN",
+        "WAN",
+        "Wi-Fi",
+        "routing",
+        "switching",
+        "SD-WAN"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.20.10",
+        "62.20.20"
+      ],
+      "ateco_candidates_excluded": [
+        "43.21.02"
+      ],
+      "embedding_text": "Networking. Enterprise networking, LAN/WAN/Wi-Fi/routing. networking, reti aziendali, LAN, WAN, Wi-Fi, routing, switching, SD-WAN."
+    },
+    {
+      "id": "telecom_operator",
+      "name": "Telecom Operator",
+      "domain": "Telecom",
+      "aliases": [
+        "operatore telecomunicazioni",
+        "carrier",
+        "connettività",
+        "fibra",
+        "FTTH",
+        "FWA",
+        "mobile network"
+      ],
+      "ateco_candidates_in_kb": [
+        "61.10.01",
+        "61.10.02",
+        "61.10.03",
+        "61.90.10"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Telecom Operator. Fixed/mobile/satellite carrier services. operatore telecomunicazioni, carrier, connettività, fibra, FTTH, FWA, mobile network."
+    },
+    {
+      "id": "internet_service_provider",
+      "name": "Internet Service Provider",
+      "domain": "Telecom",
+      "aliases": [
+        "ISP",
+        "internet access",
+        "accesso internet",
+        "connettività internet",
+        "banda larga",
+        "fibra ottica"
+      ],
+      "ateco_candidates_in_kb": [
+        "61.90.10",
+        "61.10.01"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Internet Service Provider. Internet access provision. ISP, internet access, accesso internet, connettività internet, banda larga, fibra ottica."
+    },
+    {
+      "id": "voip_uc",
+      "name": "VoIP / Unified Communications",
+      "domain": "Telecom",
+      "aliases": [
+        "VoIP",
+        "PBX",
+        "centralino",
+        "SIP",
+        "unified communications",
+        "Teams Phone"
+      ],
+      "ateco_candidates_in_kb": [
+        "61.90.90",
+        "62.20.10",
+        "33.20.02"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "VoIP / Unified Communications. VoIP, PBX, collaboration and telephony. VoIP, PBX, centralino, SIP, unified communications, Teams Phone."
+    },
+    {
+      "id": "datacenter_colocation",
+      "name": "Datacenter / Colocation",
+      "domain": "Cloud",
+      "aliases": [
+        "data center",
+        "datacenter",
+        "colocation",
+        "housing",
+        "rack",
+        "server farm"
+      ],
+      "ateco_candidates_in_kb": [
+        "63.10.10"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Datacenter / Colocation. Datacenter, housing, colocation services. data center, datacenter, colocation, housing, rack, server farm."
+    },
+    {
+      "id": "hosting",
+      "name": "Hosting",
+      "domain": "Cloud",
+      "aliases": [
+        "hosting",
+        "web hosting",
+        "managed hosting",
+        "server dedicati",
+        "VPS",
+        "hosting applicativo"
+      ],
+      "ateco_candidates_in_kb": [
+        "63.10.10"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Hosting. Web/app hosting and managed hosting. hosting, web hosting, managed hosting, server dedicati, VPS, hosting applicativo."
+    },
+    {
+      "id": "backup_dr",
+      "name": "Backup / Disaster Recovery",
+      "domain": "IT Services",
+      "aliases": [
+        "backup",
+        "disaster recovery",
+        "DRaaS",
+        "business continuity",
+        "replica dati",
+        "restore"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.20.20",
+        "63.10.10",
+        "62.20.10"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Backup / Disaster Recovery. Backup, restore, DR and business continuity. backup, disaster recovery, DRaaS, business continuity, replica dati, restore."
+    },
+    {
+      "id": "storage",
+      "name": "Storage",
+      "domain": "Infrastructure",
+      "aliases": [
+        "storage",
+        "SAN",
+        "NAS",
+        "object storage",
+        "S3",
+        "Ceph",
+        "NetApp"
+      ],
+      "ateco_candidates_in_kb": [
+        "63.10.10",
+        "62.20.20",
+        "46.50.10"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Storage. Enterprise storage, NAS/SAN/object storage. storage, SAN, NAS, object storage, S3, Ceph, NetApp."
+    },
+    {
+      "id": "virtualization",
+      "name": "Virtualization",
+      "domain": "Infrastructure",
+      "aliases": [
+        "virtualizzazione",
+        "VMware",
+        "vSphere",
+        "Hyper-V",
+        "KVM",
+        "Proxmox",
+        "hypervisor"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.20.20",
+        "62.20.10",
+        "63.10.10"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Virtualization. Server virtualization and hypervisors. virtualizzazione, VMware, vSphere, Hyper-V, KVM, Proxmox, hypervisor."
+    },
+    {
+      "id": "devops",
+      "name": "DevOps",
+      "domain": "Software",
+      "aliases": [
+        "DevOps",
+        "CI/CD",
+        "Kubernetes",
+        "Docker",
+        "Terraform",
+        "GitOps",
+        "platform engineering"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.10.00",
+        "62.20.10"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "DevOps. CI/CD, automation and platform engineering. DevOps, CI/CD, Kubernetes, Docker, Terraform, GitOps, platform engineering."
+    },
+    {
+      "id": "data_platform",
+      "name": "Data Platform",
+      "domain": "Data",
+      "aliases": [
+        "data platform",
+        "business intelligence",
+        "data warehouse",
+        "ETL",
+        "data lake",
+        "analytics"
+      ],
+      "ateco_candidates_in_kb": [
+        "63.10.29",
+        "62.10.00",
+        "62.20.10"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Data Platform. Data processing, analytics, BI and pipelines. data platform, business intelligence, data warehouse, ETL, data lake, analytics."
+    },
+    {
+      "id": "ai_ml",
+      "name": "AI / Machine Learning",
+      "domain": "Software",
+      "aliases": [
+        "AI",
+        "artificial intelligence",
+        "machine learning",
+        "LLM",
+        "generative AI",
+        "computer vision"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.10.00",
+        "62.20.10",
+        "58.29.00"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "AI / Machine Learning. AI solutions and ML applications. AI, artificial intelligence, machine learning, LLM, generative AI, computer vision."
+    },
+    {
+      "id": "erp_crm",
+      "name": "ERP / CRM",
+      "domain": "Software",
+      "aliases": [
+        "ERP",
+        "CRM",
+        "gestionale",
+        "SAP",
+        "Dynamics",
+        "Salesforce",
+        "Odoo"
+      ],
+      "ateco_candidates_in_kb": [
+        "58.29.00",
+        "62.10.00",
+        "62.20.10"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "ERP / CRM. Enterprise management software and CRM. ERP, CRM, gestionale, SAP, Dynamics, Salesforce, Odoo."
+    },
+    {
+      "id": "digital_workplace",
+      "name": "Digital Workplace",
+      "domain": "IT Services",
+      "aliases": [
+        "Microsoft 365",
+        "Office 365",
+        "SharePoint",
+        "Teams",
+        "Intune",
+        "endpoint management"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.20.10",
+        "62.20.20"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Digital Workplace. Microsoft 365, endpoint, collaboration. Microsoft 365, Office 365, SharePoint, Teams, Intune, endpoint management."
+    },
+    {
+      "id": "identity_access",
+      "name": "Identity & Access Management",
+      "domain": "Cybersecurity",
+      "aliases": [
+        "IAM",
+        "PAM",
+        "SSO",
+        "Active Directory",
+        "Entra ID",
+        "LDAP",
+        "MFA"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.20.10",
+        "62.20.20"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Identity & Access Management. IAM/PAM/SSO/directory services. IAM, PAM, SSO, Active Directory, Entra ID, LDAP, MFA."
+    },
+    {
+      "id": "firewall_network_security",
+      "name": "Firewall / Network Security",
+      "domain": "Cybersecurity",
+      "aliases": [
+        "firewall",
+        "VPN",
+        "NGFW",
+        "Fortinet",
+        "Palo Alto",
+        "Check Point",
+        "Sophos"
+      ],
+      "ateco_candidates_in_kb": [
+        "62.20.10",
+        "62.20.20"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Firewall / Network Security. Firewalls, VPN, secure networking. firewall, VPN, NGFW, Fortinet, Palo Alto, Check Point, Sophos."
+    },
+    {
+      "id": "ict_wholesale",
+      "name": "ICT Wholesale / Distribution",
+      "domain": "Distribution",
+      "aliases": [
+        "distributore ICT",
+        "grossista informatica",
+        "rivenditore software",
+        "VAR",
+        "computer wholesale"
+      ],
+      "ateco_candidates_in_kb": [
+        "46.50.10",
+        "46.50.20",
+        "46.14.03"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "ICT Wholesale / Distribution. Wholesale distribution of ICT equipment/software. distributore ICT, grossista informatica, rivenditore software, VAR, computer wholesale."
+    },
+    {
+      "id": "communication_equipment_installation",
+      "name": "Communication Equipment Installation",
+      "domain": "Infrastructure",
+      "aliases": [
+        "installazione apparati telecom",
+        "antenne",
+        "ponti radio",
+        "apparati comunicazione",
+        "impianti radio"
+      ],
+      "ateco_candidates_in_kb": [
+        "33.20.02"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Communication Equipment Installation. Installation of telecom/radio communication equipment. installazione apparati telecom, antenne, ponti radio, apparati comunicazione, impianti radio."
+    },
+    {
+      "id": "computer_hardware",
+      "name": "Computer Hardware",
+      "domain": "Hardware",
+      "aliases": [
+        "computer",
+        "server",
+        "workstation",
+        "periferiche",
+        "hardware informatico"
+      ],
+      "ateco_candidates_in_kb": [
+        "26.20.00",
+        "46.50.10"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Computer Hardware. PC/server/peripheral manufacturing or trade. computer, server, workstation, periferiche, hardware informatico."
+    },
+    {
+      "id": "network_equipment",
+      "name": "Network Equipment",
+      "domain": "Hardware",
+      "aliases": [
+        "router",
+        "switch",
+        "access point",
+        "apparati di rete",
+        "CPE",
+        "apparati telecom"
+      ],
+      "ateco_candidates_in_kb": [
+        "26.30.09",
+        "46.50.20"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Network Equipment. Routers, switches and telecom/network apparatus. router, switch, access point, apparati di rete, CPE, apparati telecom."
+    },
+    {
+      "id": "fiber_cables",
+      "name": "Fiber Optic Cables",
+      "domain": "Hardware",
+      "aliases": [
+        "cavi fibra ottica",
+        "fiber optic cable",
+        "patch cord",
+        "cavo ottico"
+      ],
+      "ateco_candidates_in_kb": [
+        "27.31.00"
+      ],
+      "ateco_candidates_excluded": [
+        "43.21.02",
+        "42.22.00"
+      ],
+      "embedding_text": "Fiber Optic Cables. Manufacturing/trade/installation of fiber cables. cavi fibra ottica, fiber optic cable, patch cord, cavo ottico."
+    },
+    {
+      "id": "messaging_notifications",
+      "name": "Messaging & Notifications",
+      "domain": "Telecom",
+      "aliases": [
+        "SMS gateway",
+        "notifiche",
+        "messaggistica",
+        "email delivery",
+        "OTP"
+      ],
+      "ateco_candidates_in_kb": [
+        "61.90.20",
+        "61.90.90"
+      ],
+      "ateco_candidates_excluded": [],
+      "embedding_text": "Messaging & Notifications. SMS, email notification, messaging services. SMS gateway, notifiche, messaggistica, email delivery, OTP."
+    }
+  ]
+}
