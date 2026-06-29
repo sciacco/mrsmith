@@ -51,10 +51,14 @@ const (
 	maSectorNoSignalFloorKey = "sector_no_signal_floor"
 	maSectorRerankCapKey     = "sector_rerank_cap"
 
-	maSectorConfirmProbDefault   = 0.65
+	// Calibrated 2026-06-29 on the corrected (2-way-softmax) reranker scale, whose
+	// P(yes) tops out ~0.3 for a strong match. Anchors: NETX64 (true positive,
+	// in-perimeter 0.296 -> confirm) vs Coherency (off-perimeter, in-perimeter 0.142
+	// -> ambiguous/weak). Overridable via the sector_* ma_parameter rows.
+	maSectorConfirmProbDefault   = 0.25
 	maSectorRejectMarginDefault  = 0.10
 	maSectorAmbiguityBandDefault = 0.15
-	maSectorNoSignalFloorDefault = 0.40
+	maSectorNoSignalFloorDefault = 0.08
 	maSectorRerankCapDefault     = 8
 )
 
@@ -400,10 +404,60 @@ func (s *maService) classifyCompanyConcepts(ctx context.Context, description str
 	return out, rerankApplied, nil
 }
 
-// deriveStrategyConcepts re-derives the strategy's perimeter concepts from its
-// sectorDescription using the SAME instruction + relative threshold as UC1, so the
-// "in perimeter" check matches exactly the concepts UC1 selected for the strategy.
+// deriveStrategyConcepts marks which KB concepts fall inside the strategy's perimeter.
+// The perimeter is defined by ATECO overlap: a concept is in-perimeter iff one of its
+// in_kb ATECO codes is among the strategy's (non-excluded) ATECO candidates — exactly
+// the explicit criteria used to select the strategy's targets, matched exactly (no
+// prefix), using the KB's own concept<->ATECO tagging.
+//
+// This replaces deriving the perimeter from embedding similarity to the
+// sector-description text, which was systematically misaligned with the ATECO scope:
+// it dropped in-scope concepts (security/infra sub-domains like identity_access,
+// soc_mdr, backup_dr that share the strategy's codes) and added out-of-scope ones
+// (telecom/ISP/hardware/wholesale whose codes are in a different division). That
+// misalignment wrongly declassed legitimate candidates (e.g. a cybersecurity firm
+// topping on identity_access, which shares the strategy's 62.20.20). Falls back to the
+// embedding derivation only when the strategy carries no ATECO codes (free-text /
+// non-ATECO strategies) or the KB is unavailable.
 func (s *maService) deriveStrategyConcepts(ctx context.Context, strategy MAStrategySpec) (map[string]bool, error) {
+	codes := map[string]bool{}
+	for _, cand := range strategy.AtecoCandidates {
+		if cand.Fit == maFitExcluded {
+			continue
+		}
+		if sc := atecoSearchCode(cand.Code); sc != "" {
+			codes[sc] = true
+		}
+	}
+	if len(codes) == 0 || s.kb == nil {
+		return s.deriveStrategyConceptsByEmbedding(ctx, strategy)
+	}
+	concepts, err := s.kb.LoadKBConcepts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]bool{}
+	for _, c := range concepts {
+		for _, raw := range c.InKB {
+			if codes[atecoSearchCode(raw)] {
+				out[c.ID] = true
+				break
+			}
+		}
+	}
+	if len(out) == 0 {
+		// Strategy codes matched no concept (unexpected, since strategy codes derive
+		// from concepts) — fall back rather than render an empty perimeter that would
+		// push every target off-perimeter.
+		return s.deriveStrategyConceptsByEmbedding(ctx, strategy)
+	}
+	return out, nil
+}
+
+// deriveStrategyConceptsByEmbedding is the fallback perimeter: concepts semantically
+// near the strategy's sector description (UC1 instruction + relative threshold). Used
+// only when the strategy has no ATECO codes to anchor the perimeter exactly.
+func (s *maService) deriveStrategyConceptsByEmbedding(ctx context.Context, strategy MAStrategySpec) (map[string]bool, error) {
 	sector := cleanText(strategy.SectorDescription, 400)
 	out := map[string]bool{}
 	if sector == "" {
@@ -471,11 +525,14 @@ func sectorVerdict(concepts []maConceptScore, cfg maSectorClassConfig, rerankApp
 	}
 }
 
+// sectorConfidence grades the verdict's confidence on the corrected reranker scale
+// (P(yes) tops out ~0.3 for a strong match), so the cutoffs are far below a textbook
+// probability scale. Bands sit around the confirm threshold (0.25).
 func sectorConfidence(prob float64) string {
 	switch {
-	case prob >= 0.8:
+	case prob >= 0.28:
 		return "alta"
-	case prob >= 0.6:
+	case prob >= 0.16:
 		return "media"
 	default:
 		return "bassa"
@@ -511,12 +568,18 @@ func (s *maService) representCompany(ctx context.Context, evidence maCompanyEvid
 	if _, ok := reqParams["max_tokens"]; !ok {
 		reqParams["max_tokens"] = maCompanyRepresentationMaxToken
 	}
+	// Guarantee the json_object contract only when the seeded prompt doesn't already
+	// request it (migration 064), to avoid duplicating the instruction.
+	systemContent := prompt.Prompt
+	if !strings.Contains(strings.ToLower(systemContent), "\"description\"") {
+		systemContent += maCompanyRepresentationJSONInstruction
+	}
 	chatReq := llm.ChatRequest{
 		Model:          model.Model,
 		Params:         reqParams,
 		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
 		Messages: []llm.Message{
-			{Role: "system", Content: prompt.Prompt + maCompanyRepresentationJSONInstruction},
+			{Role: "system", Content: systemContent},
 			{Role: "user", Content: string(input)},
 		},
 	}

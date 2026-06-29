@@ -3110,7 +3110,7 @@ function WebTabContent({ target }: { target: MATarget }) {
             <span className={`${styles.scoreBadge} ${styles[`finalAction_${validation.finalDecision.finalAction}`] ?? ''}`}>
               {finalActionLabel(validation.finalDecision.finalAction)}
             </span>
-            <span className={`${styles.scoreBadge} ${styles[`confidence_${validation.finalDecision.confidence}`] ?? ''}`}>
+            <span className={`${styles.scoreBadge} ${styles[`finalAction_${validation.finalDecision.finalAction}`] ?? ''}`}>
               {webValidationStateLabel(validation.webValidationState)}
             </span>
           </div>

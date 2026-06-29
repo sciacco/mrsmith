@@ -996,7 +996,7 @@ export function TestPage() {
                         <span className={`${styles.scoreBadge} ${styles[`finalAction_${evidencePipeline.data.finalDecision.finalAction}`] ?? ''}`}>
                           {finalActionLabel(evidencePipeline.data.finalDecision.finalAction)}
                         </span>
-                        <span className={`${styles.scoreBadge} ${styles[`confidence_${evidencePipeline.data.finalDecision.confidence}`] ?? ''}`}>
+                        <span className={`${styles.scoreBadge} ${styles[`finalAction_${evidencePipeline.data.finalDecision.finalAction}`] ?? ''}`}>
                           {webValidationStateLabel(evidencePipeline.data.finalDecision.webValidationState)}
                         </span>
                       </div>

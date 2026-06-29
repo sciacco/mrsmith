@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -209,9 +210,12 @@ func (c *Client) Embed(ctx context.Context, model string, inputs []string) ([][]
 }
 
 // Rerank scores each prompt via the provider's /embeddings endpoint in
-// return_logits mode: the reranker emits logits for the given "no"/"yes" token
-// ids and, with normalize=true, softmaxes them so each data[i].embedding is
-// [no_prob, yes_prob]. Returns the yes-probability per prompt, in input order.
+// return_logits mode: the reranker emits the raw logits for the given "no"/"yes"
+// token ids (normalize=false) as data[i].embedding = [no_logit, yes_logit]. We turn
+// each pair into the yes-probability with a two-way softmax. (The server-side
+// normalize=true value is NOT a probability — it can go negative and discards the
+// yes-vs-no contrast — so we compute the softmax ourselves.) Returns the
+// yes-probability per prompt, in input order.
 func (c *Client) Rerank(ctx context.Context, model string, prompts []string, noTokenID, yesTokenID int) ([]float64, Usage, error) {
 	if len(prompts) == 0 {
 		return nil, Usage{}, nil
@@ -220,7 +224,7 @@ func (c *Client) Rerank(ctx context.Context, model string, prompts []string, noT
 		"model":         model,
 		"input":         prompts,
 		"return_logits": []int{noTokenID, yesTokenID},
-		"normalize":     true,
+		"normalize":     false,
 	}
 	var decoded struct {
 		Data []struct {
@@ -248,7 +252,7 @@ func (c *Client) Rerank(ctx context.Context, model string, prompts []string, noT
 		if len(d.Embedding) < 2 {
 			return nil, Usage{}, fmt.Errorf("%s: rerank logits at index %d have %d values, want 2", c.name(), d.Index, len(d.Embedding))
 		}
-		out[d.Index] = d.Embedding[1] // yes-probability
+		out[d.Index] = rerankYesProbability(d.Embedding[0], d.Embedding[1])
 		seen[d.Index] = true
 	}
 	for i, ok := range seen {
@@ -257,6 +261,23 @@ func (c *Client) Rerank(ctx context.Context, model string, prompts []string, noT
 		}
 	}
 	return out, decoded.Usage, nil
+}
+
+// rerankYesProbability turns a [no_logit, yes_logit] pair into P(yes) via a
+// numerically stable two-way softmax (equivalently, sigmoid of the yes−no gap). The
+// result is a genuine probability in (0,1), comparable across prompts.
+func rerankYesProbability(noLogit, yesLogit float64) float64 {
+	max := noLogit
+	if yesLogit > max {
+		max = yesLogit
+	}
+	en := math.Exp(noLogit - max)
+	ey := math.Exp(yesLogit - max)
+	sum := en + ey
+	if sum == 0 {
+		return 0
+	}
+	return ey / sum
 }
 
 // bodyStructuralKeys are set explicitly from typed ChatRequest fields and must

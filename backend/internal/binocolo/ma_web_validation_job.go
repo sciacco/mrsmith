@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -33,27 +34,18 @@ const (
 // so the evidence cannot be confirmation-biased toward the expected answer.
 var maNeutralEvidenceProbes = []string{"chi siamo", "servizi soluzioni", "cosa facciamo"}
 
-// maEvidenceNoiseMarkers flag cookie-consent / consent-manager boilerplate (IAB TCF,
-// Complianz, etc.) that search engines index alongside real page content. It is pure
-// noise for "what does this company do" and, left in, poisons the self-description.
-var maEvidenceNoiseMarkers = []string{
-	"{vendor_count}",
-	"gestisci servizi",
-	"gestisci opzioni",
-	"gestisci i servizi",
-	"accetta nega",
-	"salva preferenze",
-	"salva le preferenze",
-	"visualizza le preferenze",
-	"per saperne di più su questi scopi",
-	"l'archiviazione tecnica o l'accesso",
-	"memorizzare e/o accedere alle informazioni",
-	"consenso a queste tecnologie",
-	"utilizziamo tecnologie come i cookie",
-}
+// maUnrenderedPlaceholderPattern matches templating leaks such as "{vendor_count}"
+// (or "{{var}}") that scrapers capture when a page's template variable was never
+// interpolated server-side. These mark non-content fragments (typically consent
+// banners) generically, regardless of language or CMS.
+var maUnrenderedPlaceholderPattern = regexp.MustCompile(`\{\{?[a-zA-Z0-9_]+\}?\}`)
 
-// isLowValueEvidence drops snippets that describe the consent banner or are raw
-// structured-data (JSON-LD) blobs rather than the company's actual activity.
+// isLowValueEvidence drops snippets that are NOT company self-description prose:
+// raw structured-data (JSON-LD) blobs and fragments carrying unrendered template
+// placeholders. These are content-type/structural filters with no domain-vocabulary
+// matching. Consent/cookie boilerplate PROSE is intentionally NOT pattern-matched
+// here — enumerating consent managers is brittle (language/plugin-specific) and risks
+// dropping real business vocabulary; the distiller is instructed to ignore it instead.
 func isLowValueEvidence(text string) bool {
 	lower := strings.ToLower(strings.TrimSpace(text))
 	if lower == "" {
@@ -65,12 +57,7 @@ func isLowValueEvidence(text string) bool {
 		strings.Contains(lower, "\"datepublished\"") {
 		return true
 	}
-	for _, marker := range maEvidenceNoiseMarkers {
-		if strings.Contains(lower, marker) {
-			return true
-		}
-	}
-	return false
+	return maUnrenderedPlaceholderPattern.MatchString(text)
 }
 
 type maWebValidationJobPayload struct {
