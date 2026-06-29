@@ -4,17 +4,12 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button, Icon, Skeleton, ToggleSwitch } from '@mrsmith/ui';
 import { useApiClient } from '../api/client';
 import type {
-  CandidateMatchAnalysisResponse,
-  CandidateMatchFinalDecision,
   CompanySearchRow,
-  DomainResolutionCandidate,
   DomainResolutionResponse,
   MASessionDetail,
   MASessionListResponse,
   MASessionVisibility,
-  MAStrategySpec,
   MATarget,
-  MAWebValidation,
   OpenAPIITEnvelope,
   PipelineFinalAction,
   PipelineWebValidationState,
@@ -24,7 +19,6 @@ import type {
 import styles from './TestPage.module.css';
 
 const numberFormat = new Intl.NumberFormat('it-IT');
-const candidateWebValidationPipelineVersion = 'candidate-web-validation-v1';
 const defaultCompanyFilters = {
   province: 'AG',
   dataEnrichment: 'start',
@@ -65,7 +59,6 @@ type DomainResolutionField = keyof DomainResolutionForm;
 type KeywordEvidenceForm = typeof defaultKeywordEvidenceForm;
 type KeywordEvidenceField = keyof Omit<KeywordEvidenceForm, 'rank'>;
 type TestTab = 'company' | 'pipeline' | 'classification' | 'domain' | 'keyword' | 'maintenance';
-type EvidenceBucket = 'core' | 'adjacent' | 'negative';
 
 const testTabs = [
   { id: 'company', label: 'Company search', icon: 'database' },
@@ -81,70 +74,6 @@ const sessionVisibilityOptions: Array<{ value: MASessionVisibility; label: strin
   { value: 'archived', label: 'Archiviate' },
   { value: 'deleted', label: 'Cestino' },
 ];
-
-interface PipelineKeywordSet {
-  intentLabel: string;
-  coreTerms: string[];
-  adjacentTerms: string[];
-  negativeTerms: string[];
-  sources: string[];
-}
-
-interface PipelineTermSpec {
-  bucket: EvidenceBucket;
-  term: string;
-}
-
-interface PipelineEvidenceRun extends PipelineTermSpec {
-  response?: WebSearchResponse;
-  error?: string;
-  resultCount: number;
-  bestScore?: number;
-  matched: boolean;
-}
-
-interface PipelineSummary {
-  score: number;
-  confidence: 'alta' | 'media' | 'bassa';
-  sectorEvidenceScore: number;
-  coverageScore: number;
-  domainScore: number;
-  negativePenalty: number;
-  coreMatches: number;
-  adjacentMatches: number;
-  negativeMatches: number;
-  searchedCoreTerms: number;
-  searchedAdjacentTerms: number;
-  searchedNegativeTerms: number;
-  totalCoreTerms: number;
-  totalAdjacentTerms: number;
-  totalNegativeTerms: number;
-}
-
-type PipelineFinalDecision = CandidateMatchFinalDecision;
-
-interface PipelineRunResult {
-  pipelineVersion: string;
-  inputHash: string;
-  keywordSetHash: string;
-  target: MATarget;
-  keywordSet: PipelineKeywordSet;
-  domainResponse: DomainResolutionResponse;
-  selectedDomain?: DomainResolutionCandidate;
-  evidenceRuns: PipelineEvidenceRun[];
-  summary: PipelineSummary;
-  candidateMatchAnalysis?: CandidateMatchAnalysisResponse;
-  candidateMatchError?: string;
-  persistedWebValidation?: MAWebValidation;
-  persistError?: string;
-  loadedFromCache?: boolean;
-  finalDecision: PipelineFinalDecision;
-}
-
-type PipelineReconciliationInput = Omit<
-  PipelineRunResult,
-  'finalDecision' | 'persistedWebValidation' | 'persistError' | 'loadedFromCache' | 'pipelineVersion' | 'inputHash' | 'keywordSetHash'
->;
 
 const dataEnrichmentOptions = [
   { value: '', label: 'Non impostato' },
@@ -358,288 +287,6 @@ function positiveInteger(value: string, fallback: number, min: number, max: numb
   return Math.max(min, Math.min(max, Math.trunc(parsed)));
 }
 
-function clampScore(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function ratioScore(value: number, total: number): number {
-  if (total <= 0) return 0;
-  return Math.max(0, Math.min(100, (value / total) * 100));
-}
-
-function cleanTerm(value: string): string {
-  return value.replace(/\s+/g, ' ').trim();
-}
-
-function addTerm(list: string[], value: string, limit = 12) {
-  const term = cleanTerm(value);
-  if (!term || list.length >= limit) return;
-  const key = term.toLowerCase();
-  if (list.some((item) => item.toLowerCase() === key)) return;
-  list.push(term);
-}
-
-function addTerms(list: string[], values: string[], limit = 12) {
-  for (const value of values) addTerm(list, value, limit);
-}
-
-function normalizeAteco(value: string | undefined): string {
-  return (value ?? '').replace(/\D/g, '');
-}
-
-function strategyAtecoCodes(strategy?: MAStrategySpec, target?: MATarget): string[] {
-  const codes = new Set<string>();
-  if (target?.atecoCode) codes.add(normalizeAteco(target.atecoCode));
-  for (const candidate of strategy?.atecoCandidates ?? []) {
-    const code = normalizeAteco(candidate.code);
-    if (code && candidate.fit !== 'excluded') codes.add(code);
-  }
-  return Array.from(codes).filter(Boolean);
-}
-
-function hasAtecoPrefix(codes: string[], prefixes: string[]): boolean {
-  return codes.some((code) => prefixes.some((prefix) => code.startsWith(prefix)));
-}
-
-function derivedKeywordSet(strategy?: MAStrategySpec, target?: MATarget, extraKeywords = ''): PipelineKeywordSet {
-  const coreTerms: string[] = [];
-  const adjacentTerms: string[] = [];
-  const negativeTerms: string[] = [];
-  const sources: string[] = [];
-  const atecoCodes = strategyAtecoCodes(strategy, target);
-  const sector = cleanTerm(strategy?.sectorDescription ?? '');
-
-  if (sector) sources.push(`settore: ${sector}`);
-  if (atecoCodes.length > 0) sources.push(`ATECO: ${atecoCodes.join(', ')}`);
-  if (target?.atecoDescription) sources.push(`target ATECO: ${target.atecoDescription}`);
-
-  addTerms(coreTerms, splitKeywords(extraKeywords), 10);
-  addTerms(coreTerms, strategy?.keywords ?? [], 10);
-
-  if (hasAtecoPrefix(atecoCodes, ['631010', '6310', '631'])) {
-    addTerms(coreTerms, [
-      'infrastrutture informatiche',
-      'hosting',
-      'cloud infrastructure',
-      'cloud native',
-      'data center',
-    ]);
-    addTerms(adjacentTerms, ['cloud', 'server', 'storage', 'backup', 'virtualizzazione']);
-  }
-
-  if (hasAtecoPrefix(atecoCodes, ['622020', '6220', '622'])) {
-    addTerms(coreTerms, [
-      'gestione strutture informatiche',
-      'gestione infrastrutture IT',
-      'IT operations',
-      'system management',
-      'assistenza sistemistica',
-    ]);
-    addTerms(adjacentTerms, ['networking', 'monitoraggio', 'help desk', 'SLA']);
-  }
-
-  if (hasAtecoPrefix(atecoCodes, ['629009', '6290', '629'])) {
-    addTerms(coreTerms, [
-      'servizi IT',
-      'servizi informatici',
-      'tecnologie informatiche',
-      'information technology services',
-    ]);
-    addTerms(adjacentTerms, ['cybersecurity', 'Microsoft 365', 'consulenza informatica']);
-  }
-
-  const text = `${sector} ${target?.atecoDescription ?? ''}`.toLowerCase();
-  if (text.includes('cloud')) addTerm(coreTerms, 'cloud');
-  if (text.includes('hosting')) addTerm(coreTerms, 'hosting');
-  if (text.includes('infrastrutt')) addTerm(coreTerms, 'infrastrutture informatiche');
-  if (text.includes('gestione')) addTerm(coreTerms, 'gestione infrastrutture IT');
-
-  if (coreTerms.length === 0) {
-    addTerms(coreTerms, ['servizi IT', 'tecnologie informatiche', 'consulenza informatica']);
-    sources.push('fallback: lente IT ampia');
-  }
-
-  addTerms(adjacentTerms, ['cloud', 'backup', 'cybersecurity', 'networking', 'virtualizzazione'], 8);
-  addTerms(negativeTerms, [
-    'web agency',
-    'marketing digitale',
-    'rivendita hardware',
-    'sviluppo software puro',
-    'formazione informatica',
-  ], 6);
-
-  return {
-    intentLabel: sector || 'Lente derivata da strategia M&A',
-    coreTerms: coreTerms.slice(0, 10),
-    adjacentTerms: adjacentTerms.slice(0, 8),
-    negativeTerms: negativeTerms.slice(0, 6),
-    sources,
-  };
-}
-
-function pipelineTermSpecs(keywordSet: PipelineKeywordSet): PipelineTermSpec[] {
-  return [
-    ...keywordSet.coreTerms.slice(0, 6).map((term) => ({ bucket: 'core' as const, term })),
-    ...keywordSet.adjacentTerms.slice(0, 4).map((term) => ({ bucket: 'adjacent' as const, term })),
-    ...keywordSet.negativeTerms.slice(0, 3).map((term) => ({ bucket: 'negative' as const, term })),
-  ];
-}
-
-function chooseDomainCandidate(candidates: DomainResolutionCandidate[]): DomainResolutionCandidate | undefined {
-  const credibleReasons = [
-    'host compatibile con ragione sociale',
-    'dominio citato come sameAs',
-    'dominio citato come sito ufficiale',
-    'email aziendale su dominio',
-  ];
-  return candidates.find((candidate) => {
-    if (candidate.confidence === 'bassa' || candidate.score < 45) return false;
-    return candidate.reasons.some((reason) => credibleReasons.includes(reason));
-  });
-}
-
-function bestWebSearchScore(response: WebSearchResponse): number | undefined {
-  const scores = response.results
-    .map((result) => result.score)
-    .filter((score): score is number => typeof score === 'number');
-  return scores.length > 0 ? Math.max(...scores) : undefined;
-}
-
-function evidenceResponseMatched(response: WebSearchResponse): boolean {
-  const bestScore = bestWebSearchScore(response);
-  if (typeof bestScore === 'number') return bestScore >= 45;
-  return !response.ranked && response.results.length > 0;
-}
-
-function bucketEvidenceScore(runs: PipelineEvidenceRun[], bucket: EvidenceBucket): number {
-  const bucketRuns = runs.filter((run) => run.bucket === bucket);
-  if (bucketRuns.length === 0) return 0;
-  const matchedRuns = bucketRuns.filter((run) => run.matched);
-  const matchedRate = matchedRuns.length / bucketRuns.length;
-  const quality =
-    matchedRuns.length > 0
-      ? matchedRuns.reduce((sum, run) => sum + (run.bestScore ?? 60), 0) / matchedRuns.length
-      : 0;
-
-  return clampScore(matchedRate * 70 + quality * 0.3);
-}
-
-function domainEvidenceScore(selectedDomain: DomainResolutionCandidate | undefined): number {
-  if (!selectedDomain) return 0;
-  const confidenceScore =
-    selectedDomain.confidence === 'alta'
-      ? 100
-      : selectedDomain.confidence === 'media'
-        ? 70
-        : 30;
-  return clampScore(selectedDomain.score * 0.75 + confidenceScore * 0.25);
-}
-
-function computePipelineSummary(
-  selectedDomain: DomainResolutionCandidate | undefined,
-  keywordSet: PipelineKeywordSet,
-  runs: PipelineEvidenceRun[],
-): PipelineSummary {
-  const matched = (bucket: EvidenceBucket) =>
-    runs.filter((run) => run.bucket === bucket && run.matched).length;
-  const searched = (bucket: EvidenceBucket) =>
-    runs.filter((run) => run.bucket === bucket).length;
-  const coreMatches = matched('core');
-  const adjacentMatches = matched('adjacent');
-  const negativeMatches = matched('negative');
-  const searchedCoreTerms = searched('core');
-  const searchedAdjacentTerms = searched('adjacent');
-  const searchedNegativeTerms = searched('negative');
-  const totalCoreTerms = keywordSet.coreTerms.length;
-  const totalAdjacentTerms = keywordSet.adjacentTerms.length;
-  const totalNegativeTerms = keywordSet.negativeTerms.length;
-  const coreEvidenceScore = bucketEvidenceScore(runs, 'core');
-  const adjacentEvidenceScore = bucketEvidenceScore(runs, 'adjacent');
-  const sectorEvidenceScore = clampScore(coreEvidenceScore * 0.72 + adjacentEvidenceScore * 0.28);
-  const coverageScore = clampScore(
-    ratioScore(coreMatches, Math.max(totalCoreTerms, searchedCoreTerms)) * 0.7 +
-      ratioScore(adjacentMatches, Math.max(totalAdjacentTerms, searchedAdjacentTerms)) * 0.3,
-  );
-  const domainScore = domainEvidenceScore(selectedDomain);
-  const negativeRate = ratioScore(negativeMatches, Math.max(1, searchedNegativeTerms));
-  const negativePenalty = clampScore(negativeMatches * 18 + negativeRate * 0.35);
-  const noNegativeScore = 100 - negativePenalty;
-  const rawScore =
-    sectorEvidenceScore * 0.45 +
-    coverageScore * 0.2 +
-    domainScore * 0.25 +
-    noNegativeScore * 0.1 -
-    negativePenalty * 0.35;
-  const score = selectedDomain ? clampScore(rawScore) : 0;
-  const confidence: PipelineSummary['confidence'] =
-    selectedDomain && score >= 70 && coreMatches >= 2 && negativePenalty < 25
-      ? 'alta'
-      : selectedDomain && score >= 45 && (coreMatches >= 1 || adjacentMatches >= 2)
-        ? 'media'
-        : 'bassa';
-
-  return {
-    score,
-    confidence,
-    sectorEvidenceScore,
-    coverageScore,
-    domainScore,
-    negativePenalty,
-    coreMatches,
-    adjacentMatches,
-    negativeMatches,
-    searchedCoreTerms,
-    searchedAdjacentTerms,
-    searchedNegativeTerms,
-    totalCoreTerms,
-    totalAdjacentTerms,
-    totalNegativeTerms,
-  };
-}
-
-function pipelineBucketLabel(bucket: EvidenceBucket): string {
-  switch (bucket) {
-    case 'core':
-      return 'Core';
-    case 'adjacent':
-      return 'Adiacente';
-    case 'negative':
-      return 'Negativo';
-  }
-}
-
-function candidateVerdictLabel(verdict: string): string {
-  switch (verdict) {
-    case 'strong_match':
-      return 'Strong match';
-    case 'match':
-      return 'Match';
-    case 'weak_match':
-      return 'Weak match';
-    case 'no_match':
-      return 'No match';
-    case 'unclear':
-      return 'Unclear';
-    default:
-      return verdict || 'N/D';
-  }
-}
-
-function candidateActionLabel(action: string): string {
-  switch (action) {
-    case 'confirm':
-      return 'Conferma';
-    case 'review':
-      return 'Review';
-    case 'downgrade':
-      return 'Downgrade';
-    case 'reject':
-      return 'Reject';
-    default:
-      return action || 'N/D';
-  }
-}
-
 function finalActionLabel(action: PipelineFinalAction): string {
   switch (action) {
     case 'confirm':
@@ -670,323 +317,6 @@ function webValidationStateLabel(state: PipelineWebValidationState): string {
     case 'unclear':
       return 'Incerto';
   }
-}
-
-function latestStaffCost(target: MATarget): number | undefined {
-  if (!isRecord(target.vendorPayload)) return undefined;
-  const balanceSheets = target.vendorPayload.balanceSheets;
-  if (!isRecord(balanceSheets)) return undefined;
-  const last = balanceSheets.last;
-  if (!isRecord(last)) return undefined;
-  return typeof last.totalStaffCost === 'number' ? last.totalStaffCost : undefined;
-}
-
-function targetBusinessRiskSignals(target: MATarget): string[] {
-  const signals: string[] = [];
-  if (target.employees === 0) signals.push('dipendenti dichiarati pari a 0');
-  const staffCost = latestStaffCost(target);
-  if (typeof staffCost === 'number' && staffCost <= 1000) signals.push('costo personale nullo o quasi nullo');
-  if (target.missingCriteria.some((criterion) => criterion.toLowerCase().includes('produtt'))) {
-    signals.push('produttivita non valutabile');
-  }
-  if (target.flags?.some((flag) => flag.code === 'bilancio_datato')) {
-    signals.push('ultimo bilancio datato');
-  }
-  return signals;
-}
-
-function stableStringify(value: unknown): string {
-  if (value === undefined) return 'null';
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(',')}]`;
-  const record = value as Record<string, unknown>;
-  return `{${Object.keys(record)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
-    .join(',')}}`;
-}
-
-function hashStableValue(value: unknown): string {
-  const raw = stableStringify(value);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < raw.length; index += 1) {
-    hash ^= raw.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return `fnv1a:${hash.toString(16).padStart(8, '0')}`;
-}
-
-function pipelineTargetFingerprint(target: MATarget): Record<string, unknown> {
-  return {
-    activityStatus: target.activityStatus ?? '',
-    adjustments: target.adjustments ?? null,
-    atecoCode: target.atecoCode ?? '',
-    atecoDescription: target.atecoDescription ?? '',
-    companyKey: target.companyKey ?? '',
-    companyName: target.companyName,
-    confidence: target.confidence ?? '',
-    employees: target.employees ?? null,
-    evidence: target.evidence,
-    flags: target.flags ?? null,
-    latestStaffCost: latestStaffCost(target) ?? null,
-    matchState: target.matchState,
-    missingCriteria: target.missingCriteria,
-    province: target.province ?? '',
-    rating: target.rating ?? null,
-    score: target.score,
-    taxCode: target.taxCode ?? '',
-    town: target.town ?? '',
-    turnover: target.turnover ?? null,
-    turnoverYear: target.turnoverYear ?? null,
-    vatCode: target.vatCode ?? '',
-  };
-}
-
-interface PipelineFingerprintOptions {
-  analyzeWithLLM: boolean;
-  domainCount: number;
-  includeIdentifiers: boolean;
-  keywordCount: number;
-  rank: boolean;
-}
-
-function pipelineKeywordSetHash(keywordSet: PipelineKeywordSet): string {
-  return hashStableValue(keywordSet);
-}
-
-function pipelineInputHash(target: MATarget, keywordSet: PipelineKeywordSet, options: PipelineFingerprintOptions): string {
-  return hashStableValue({
-    keywordSet,
-    options,
-    pipelineVersion: candidateWebValidationPipelineVersion,
-    target: pipelineTargetFingerprint(target),
-  });
-}
-
-function validationRuntimeFreshness(validation: MAWebValidation): string {
-  const expiresAt = Date.parse(validation.expiresAt);
-  if (Number.isFinite(expiresAt) && Date.now() > expiresAt) return 'expired';
-  const staleAfter = Date.parse(validation.staleAfter);
-  if (Number.isFinite(staleAfter) && Date.now() > staleAfter) return 'stale';
-  return validation.freshness || 'fresh';
-}
-
-function reusableWebValidation(validation: MAWebValidation, inputHash: string, keywordSetHash: string): boolean {
-  return (
-    validation.pipelineVersion === candidateWebValidationPipelineVersion &&
-    validation.inputHash === inputHash &&
-    validation.keywordSetHash === keywordSetHash &&
-    validationRuntimeFreshness(validation) === 'fresh'
-  );
-}
-
-function validationFreshnessLabel(validation?: MAWebValidation): string {
-  return validation ? validationRuntimeFreshness(validation) : 'N/D';
-}
-
-function reconcilePipelineDecision(input: PipelineReconciliationInput): PipelineFinalDecision {
-  const { target, selectedDomain, summary, candidateMatchAnalysis, candidateMatchError } = input;
-  const reasons: string[] = [];
-  const deterministicHigh = target.matchState === 'match' && target.score >= 75;
-  const businessRisks = targetBusinessRiskSignals(target);
-  if (businessRisks.length > 0) reasons.push(...businessRisks.map((risk) => `Rischio business: ${risk}.`));
-
-  if (!selectedDomain) {
-    reasons.unshift('Nessun dominio ufficiale credibile risolto.');
-    return {
-      initialMatchState: target.matchState,
-      deterministicScore: target.score,
-      webScore: summary.score,
-      webValidationState: 'domain_unresolved',
-      finalAction: 'needs_domain_review',
-      confidence: deterministicHigh ? 'media' : 'bassa',
-      reason: 'Score iniziale non validabile senza dominio ufficiale.',
-      reasons,
-    };
-  }
-
-  const weakWebEvidence = summary.score < 45 || summary.coreMatches === 0;
-  const moderateWebEvidence = summary.score < 70 || selectedDomain.confidence !== 'alta';
-  const negativeEvidence = summary.negativeMatches > 0 || summary.negativePenalty >= 25;
-
-  if (!candidateMatchAnalysis) {
-    if (candidateMatchError) reasons.unshift(`Analyst non disponibile: ${candidateMatchError}`);
-    if (weakWebEvidence || negativeEvidence) {
-      reasons.unshift('Web evidence insufficiente o rumorosa senza validazione LLM.');
-    }
-    return {
-      initialMatchState: target.matchState,
-      deterministicScore: target.score,
-      webScore: summary.score,
-      webValidationState: 'analysis_unavailable',
-      finalAction: deterministicHigh && !weakWebEvidence ? 'needs_business_validation' : 'deprioritize',
-      confidence: deterministicHigh && !weakWebEvidence ? 'media' : 'bassa',
-      reason: deterministicHigh
-        ? 'Il candidato resta interessante sulla carta, ma manca il giudizio LLM finale.'
-        : 'Validazione incompleta e segnale web non sufficiente per confermare.',
-      reasons,
-    };
-  }
-
-  const analystReject =
-    candidateMatchAnalysis.recommendedAction === 'reject' || candidateMatchAnalysis.verdict === 'no_match';
-  const analystDowngrade =
-    candidateMatchAnalysis.recommendedAction === 'downgrade' || candidateMatchAnalysis.verdict === 'weak_match';
-  const analystReview =
-    candidateMatchAnalysis.recommendedAction === 'review' ||
-    candidateMatchAnalysis.verdict === 'unclear' ||
-    candidateMatchAnalysis.confidence === 'bassa';
-  const analystConfirm =
-    candidateMatchAnalysis.recommendedAction === 'confirm' &&
-    (candidateMatchAnalysis.verdict === 'strong_match' || candidateMatchAnalysis.verdict === 'match');
-
-  if (candidateMatchAnalysis.evidenceAgainst.length > 0) {
-    reasons.push(...candidateMatchAnalysis.evidenceAgainst.map((item) => `Contro: ${item}`));
-  }
-  if (candidateMatchAnalysis.missingEvidence.length > 0) {
-    reasons.push(...candidateMatchAnalysis.missingEvidence.map((item) => `Lacuna: ${item}`));
-  }
-  if (candidateMatchAnalysis.negativeSignals.length > 0) {
-    reasons.push(...candidateMatchAnalysis.negativeSignals.map((item) => `Segnale negativo: ${item}`));
-  }
-  if (negativeEvidence) reasons.unshift('La web evidence contiene segnali negativi o penalty rilevante.');
-  if (weakWebEvidence) reasons.unshift('La web evidence non copre i termini core.');
-
-  if (analystConfirm && summary.score >= 70 && !negativeEvidence && businessRisks.length < 2) {
-    if (moderateWebEvidence) {
-      reasons.unshift('Analyst positivo, ma dominio/copertura non sono abbastanza forti per conferma automatica.');
-      return {
-        initialMatchState: target.matchState,
-        deterministicScore: target.score,
-        webScore: summary.score,
-        webValidationState: 'unclear',
-        finalAction: 'needs_business_validation',
-        confidence: 'media',
-        reason: 'Match promettente, da validare prima di promuoverlo.',
-        reasons,
-        analystVerdict: candidateMatchAnalysis.verdict,
-        analystAction: candidateMatchAnalysis.recommendedAction,
-      };
-    }
-    reasons.unshift('Score iniziale, web evidence e analyst sono coerenti.');
-    return {
-      initialMatchState: target.matchState,
-      deterministicScore: target.score,
-      webScore: summary.score,
-      webValidationState: 'confirmed',
-      finalAction: 'confirm',
-      confidence: candidateMatchAnalysis.confidence === 'alta' ? 'alta' : 'media',
-      reason: 'Candidato confermato dalla validazione web/LLM.',
-      reasons,
-      analystVerdict: candidateMatchAnalysis.verdict,
-      analystAction: candidateMatchAnalysis.recommendedAction,
-    };
-  }
-
-  if (analystReject) {
-    const hardReject = !deterministicHigh || summary.score < 30 || negativeEvidence;
-    reasons.unshift('Analyst orientato al reject.');
-    return {
-      initialMatchState: target.matchState,
-      deterministicScore: target.score,
-      webScore: summary.score,
-      webValidationState: hardReject ? 'rejected' : 'deprioritized',
-      finalAction: hardReject ? 'reject' : 'deprioritize',
-      confidence: hardReject ? 'alta' : 'media',
-      reason: hardReject
-        ? 'Il candidato non supera la validazione web/LLM.'
-        : 'Score camerale alto, ma validazione web/LLM contraria: non lavorarlo in priorita.',
-      reasons,
-      analystVerdict: candidateMatchAnalysis.verdict,
-      analystAction: candidateMatchAnalysis.recommendedAction,
-    };
-  }
-
-  if (analystDowngrade || weakWebEvidence || businessRisks.length >= 2) {
-    reasons.unshift(
-      deterministicHigh
-        ? 'Score camerale alto, ma web evidence/LLM non confermano abbastanza.'
-        : 'Web evidence/LLM non supportano il match iniziale.',
-    );
-    return {
-      initialMatchState: target.matchState,
-      deterministicScore: target.score,
-      webScore: summary.score,
-      webValidationState: 'deprioritized',
-      finalAction: deterministicHigh ? 'needs_business_validation' : 'deprioritize',
-      confidence: deterministicHigh ? 'media' : 'bassa',
-      reason: deterministicHigh
-        ? 'Buona candidata sulla carta, non confermata dalla validazione web/LLM.'
-        : 'Candidato declassato dalla validazione web/LLM.',
-      reasons,
-      analystVerdict: candidateMatchAnalysis.verdict,
-      analystAction: candidateMatchAnalysis.recommendedAction,
-    };
-  }
-
-  if (analystReview || moderateWebEvidence) {
-    reasons.unshift('Validazione non conclusiva.');
-    return {
-      initialMatchState: target.matchState,
-      deterministicScore: target.score,
-      webScore: summary.score,
-      webValidationState: 'unclear',
-      finalAction: deterministicHigh ? 'needs_business_validation' : 'deprioritize',
-      confidence: 'media',
-      reason: 'Serve revisione business prima di decidere.',
-      reasons,
-      analystVerdict: candidateMatchAnalysis.verdict,
-      analystAction: candidateMatchAnalysis.recommendedAction,
-    };
-  }
-
-  reasons.unshift('Nessun blocco forte, ma manca allineamento pieno per conferma.');
-  return {
-    initialMatchState: target.matchState,
-    deterministicScore: target.score,
-    webScore: summary.score,
-    webValidationState: 'unclear',
-    finalAction: 'needs_business_validation',
-    confidence: 'media',
-    reason: 'Decisione prudente: validazione manuale richiesta.',
-    reasons,
-    analystVerdict: candidateMatchAnalysis.verdict,
-    analystAction: candidateMatchAnalysis.recommendedAction,
-  };
-}
-
-function stringListsEqual(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((item, index) => item === b[index]);
-}
-
-function pipelineKeywordSetsEqual(a: PipelineKeywordSet, b: PipelineKeywordSet): boolean {
-  return (
-    a.intentLabel === b.intentLabel &&
-    stringListsEqual(a.coreTerms, b.coreTerms) &&
-    stringListsEqual(a.adjacentTerms, b.adjacentTerms) &&
-    stringListsEqual(a.negativeTerms, b.negativeTerms) &&
-    stringListsEqual(a.sources, b.sources)
-  );
-}
-
-function pipelineRunFromWebValidation(target: MATarget, validation: MAWebValidation): PipelineRunResult {
-  return {
-    pipelineVersion: validation.pipelineVersion,
-    inputHash: validation.inputHash ?? '',
-    keywordSetHash: validation.keywordSetHash ?? '',
-    target,
-    keywordSet: validation.keywordSet as PipelineKeywordSet,
-    domainResponse: validation.domainResponse,
-    selectedDomain: validation.selectedDomainPayload,
-    evidenceRuns: validation.evidenceRuns as PipelineEvidenceRun[],
-    summary: validation.summary as PipelineSummary,
-    candidateMatchAnalysis: validation.candidateMatchAnalysis,
-    candidateMatchError: validation.candidateMatchError || undefined,
-    persistedWebValidation: validation,
-    loadedFromCache: true,
-    finalDecision: validation.finalDecision,
-  };
 }
 
 function targetOptionLabel(target: MATarget): string {
@@ -1026,13 +356,7 @@ export function TestPage() {
   const [pipelineVisibility, setPipelineVisibility] = useState<MASessionVisibility>('active');
   const [pipelineSessionId, setPipelineSessionId] = useState('');
   const [pipelineTargetId, setPipelineTargetId] = useState('');
-  const [pipelineExtraKeywords, setPipelineExtraKeywords] = useState('');
-  const [pipelineDomainCount, setPipelineDomainCount] = useState('10');
-  const [pipelineKeywordCount, setPipelineKeywordCount] = useState('5');
-  const [pipelineIncludeIdentifiers, setPipelineIncludeIdentifiers] = useState(false);
-  const [pipelineRank, setPipelineRank] = useState(true);
   const [pipelineAnalyzeWithLLM, setPipelineAnalyzeWithLLM] = useState(true);
-  const [pipelineForceRecompute, setPipelineForceRecompute] = useState(false);
   const [sectorForm, setSectorForm] = useState({
     sectorDescription: '',
     companyDescription: '',
@@ -1121,103 +445,12 @@ export function TestPage() {
       }),
   });
   const evidencePipeline = useMutation({
-    mutationFn: async (): Promise<PipelineRunResult> => {
-      const detail = pipelineDetail.data;
-      if (!detail) throw new Error('Seleziona una sessione M&A.');
-      const target = detail.targets.find((item) => item.id === pipelineTargetId) ?? detail.targets[0];
-      if (!target) throw new Error('La sessione selezionata non contiene target.');
-
-      const keywordSet = derivedKeywordSet(detail.strategy?.strategy, target, pipelineExtraKeywords);
-      const fingerprintOptions: PipelineFingerprintOptions = {
-        analyzeWithLLM: pipelineAnalyzeWithLLM,
-        domainCount: positiveInteger(pipelineDomainCount, 10, 1, 20),
-        includeIdentifiers: pipelineIncludeIdentifiers,
-        keywordCount: positiveInteger(pipelineKeywordCount, 5, 1, 20),
-        rank: pipelineRank,
-      };
-      const keywordSetHash = pipelineKeywordSetHash(keywordSet);
-      const inputHash = pipelineInputHash(target, keywordSet, fingerprintOptions);
-      if (
-        target.webValidation &&
-        !pipelineForceRecompute &&
-        pipelineKeywordSetsEqual(keywordSet, target.webValidation.keywordSet as PipelineKeywordSet) &&
-        reusableWebValidation(target.webValidation, inputHash, keywordSetHash)
-      ) {
-        return pipelineRunFromWebValidation(target, target.webValidation);
-      }
-
-      const domainResponse = await api.post<DomainResolutionResponse>('/binocolo/v1/test/domain-resolution', {
-        companyName: target.companyName,
-        vatCode: pipelineIncludeIdentifiers ? target.vatCode : undefined,
-        taxCode: pipelineIncludeIdentifiers ? target.taxCode : undefined,
-        town: target.town || undefined,
-        province: target.province || undefined,
-        keywords: [...keywordSet.coreTerms.slice(0, 3), ...keywordSet.adjacentTerms.slice(0, 2)],
-        count: fingerprintOptions.domainCount,
-      });
-      const selectedDomain = chooseDomainCandidate(domainResponse.candidates);
-      const specs = selectedDomain ? pipelineTermSpecs(keywordSet) : [];
-      const evidenceRuns = await Promise.all(
-        specs.map(async (spec): Promise<PipelineEvidenceRun> => {
-          try {
-            const response = await api.post<WebSearchResponse>('/binocolo/v1/web-search', {
-              domain: selectedDomain?.domain ?? '',
-              keywords: [spec.term],
-              count: fingerprintOptions.keywordCount,
-              rank: fingerprintOptions.rank,
-            });
-            const bestScore = bestWebSearchScore(response);
-            return {
-              ...spec,
-              response,
-              resultCount: response.results.length,
-              bestScore,
-              matched: evidenceResponseMatched(response),
-            };
-          } catch (err) {
-            return { ...spec, error: errorLabel(err), resultCount: 0, matched: false };
-          }
-        }),
-      );
-
-      const result: PipelineReconciliationInput = {
-        target,
-        keywordSet,
-        domainResponse,
-        selectedDomain,
-        evidenceRuns,
-        summary: computePipelineSummary(selectedDomain, keywordSet, evidenceRuns),
-      };
-
-      if (selectedDomain && pipelineAnalyzeWithLLM) {
-        try {
-          result.candidateMatchAnalysis = await api.post<CandidateMatchAnalysisResponse>(
-            '/binocolo/v1/test/candidate-match-analysis',
-            result,
-          );
-        } catch (err) {
-          result.candidateMatchError = errorLabel(err);
-        }
-      }
-
-      const finalResult: PipelineRunResult = {
-        ...result,
-        pipelineVersion: candidateWebValidationPipelineVersion,
-        inputHash,
-        keywordSetHash,
-        finalDecision: result.candidateMatchAnalysis?.finalDecision ?? reconcilePipelineDecision(result),
-      };
-      try {
-        finalResult.persistedWebValidation = await api.put<MAWebValidation>(
-          `/binocolo/v1/ma/sessions/${target.sessionId}/web-validation`,
-          finalResult,
-        );
-        await pipelineDetail.refetch();
-      } catch (err) {
-        finalResult.persistError = errorLabel(err);
-      }
-      return finalResult;
-    },
+    mutationFn: () =>
+      api.post<SectorClassificationTestResponse>('/binocolo/v1/test/sector-classification', {
+        sessionId: pipelineSessionId,
+        targetId: pipelineTargetId,
+        analyze: pipelineAnalyzeWithLLM,
+      }),
   });
 
   const companyData = companySearch.data?.data;
@@ -1238,10 +471,6 @@ export function TestPage() {
   }, [selectedPipelineDetail?.targets]);
   const selectedPipelineTarget =
     pipelineTargets.find((target) => target.id === pipelineTargetId) ?? pipelineTargets[0];
-  const pipelineKeywordSet = useMemo(
-    () => derivedKeywordSet(selectedPipelineDetail?.strategy?.strategy, selectedPipelineTarget, pipelineExtraKeywords),
-    [pipelineExtraKeywords, selectedPipelineDetail?.strategy?.strategy, selectedPipelineTarget],
-  );
 
   useEffect(() => {
     if (activeTab !== 'pipeline' || pipelineSessionId || selectableSessions.length === 0) return;
@@ -1623,72 +852,8 @@ export function TestPage() {
                   ))}
                 </select>
               </label>
-              <label className={`${styles.filterField} ${styles.fieldWide}`}>
-                <span>Keyword core extra</span>
-                <input
-                  type="text"
-                  value={pipelineExtraKeywords}
-                  onChange={(event) => {
-                    setPipelineExtraKeywords(event.target.value);
-                    evidencePipeline.reset();
-                  }}
-                  placeholder="cloud, hosting, infrastrutture informatiche"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </label>
-              <label className={styles.filterField}>
-                <span>Resolver count</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  step={1}
-                  value={pipelineDomainCount}
-                  onChange={(event) => {
-                    setPipelineDomainCount(event.target.value);
-                    evidencePipeline.reset();
-                  }}
-                />
-              </label>
-              <label className={styles.filterField}>
-                <span>Evidence count</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  step={1}
-                  value={pipelineKeywordCount}
-                  onChange={(event) => {
-                    setPipelineKeywordCount(event.target.value);
-                    evidencePipeline.reset();
-                  }}
-                />
-              </label>
             </div>
             <div className={styles.formActions}>
-              <label className={styles.dryRunField}>
-                <span>Usa P.IVA/CF</span>
-                <ToggleSwitch
-                  id="binocolo-pipeline-identifiers"
-                  checked={pipelineIncludeIdentifiers}
-                  onChange={(value) => {
-                    setPipelineIncludeIdentifiers(value);
-                    evidencePipeline.reset();
-                  }}
-                />
-              </label>
-              <label className={styles.dryRunField}>
-                <span>Rank AI</span>
-                <ToggleSwitch
-                  id="binocolo-pipeline-rank"
-                  checked={pipelineRank}
-                  onChange={(value) => {
-                    setPipelineRank(value);
-                    evidencePipeline.reset();
-                  }}
-                />
-              </label>
               <label className={styles.dryRunField}>
                 <span>Analisi LLM</span>
                 <ToggleSwitch
@@ -1696,17 +861,6 @@ export function TestPage() {
                   checked={pipelineAnalyzeWithLLM}
                   onChange={(value) => {
                     setPipelineAnalyzeWithLLM(value);
-                    evidencePipeline.reset();
-                  }}
-                />
-              </label>
-              <label className={styles.dryRunField}>
-                <span>Forza ricalcolo</span>
-                <ToggleSwitch
-                  id="binocolo-pipeline-force-recompute"
-                  checked={pipelineForceRecompute}
-                  onChange={(value) => {
-                    setPipelineForceRecompute(value);
                     evidencePipeline.reset();
                   }}
                 />
@@ -1789,27 +943,6 @@ export function TestPage() {
                   <span>{selectedPipelineTarget.confidence ? `confidenza ${selectedPipelineTarget.confidence}` : 'confidenza N/D'}</span>
                 </div>
               </article>
-
-              <div className={styles.keywordGroups}>
-                <div className={styles.keywordGroup}>
-                  <span>Core</span>
-                  <div className={styles.termChips}>
-                    {pipelineKeywordSet.coreTerms.map((term) => <span key={term} className={styles.termChip}>{term}</span>)}
-                  </div>
-                </div>
-                <div className={styles.keywordGroup}>
-                  <span>Adiacenti</span>
-                  <div className={styles.termChips}>
-                    {pipelineKeywordSet.adjacentTerms.map((term) => <span key={term} className={styles.termChip}>{term}</span>)}
-                  </div>
-                </div>
-                <div className={styles.keywordGroup}>
-                  <span>Negativi</span>
-                  <div className={styles.termChips}>
-                    {pipelineKeywordSet.negativeTerms.map((term) => <span key={term} className={`${styles.termChip} ${styles.termChipNegative}`}>{term}</span>)}
-                  </div>
-                </div>
-              </div>
             </div>
 
             {evidencePipeline.isIdle ? (
@@ -1818,7 +951,10 @@ export function TestPage() {
                   <Icon name="route" size={22} />
                 </div>
                 <p className={styles.stateTitle}>Pipeline pronta</p>
-                <p className={styles.stateText}>Esegue domain resolution e ricerche Brave site-restricted sul target selezionato.</p>
+                <p className={styles.stateText}>
+                  Esegue la pipeline UC2 di classificazione settore sul target selezionato: risoluzione dominio,
+                  evidenza neutra, embedding + reranker e tie-breaker LLM opzionale.
+                </p>
               </div>
             ) : evidencePipeline.isPending ? (
               <div className={styles.skeletonWrap}>
@@ -1833,265 +969,104 @@ export function TestPage() {
                 <p className={styles.stateText}>{errorLabel(evidencePipeline.error)}</p>
               </div>
             ) : (
-              <>
+              <div className={styles.companyResult}>
                 <div className={styles.responseBar}>
                   <span>
-                    Web evidence score {evidencePipeline.data.summary.score} · {evidencePipeline.data.summary.confidence}
+                    Verdetto: <strong>{evidencePipeline.data.classification.verdict}</strong> · top{' '}
+                    {evidencePipeline.data.classification.topProb.toFixed(2)} ·{' '}
+                    {evidencePipeline.data.classification.rerankApplied ? 'rerank attivo' : 'solo embedding'}
                   </span>
-                  <span>
-                    Final action {finalActionLabel(evidencePipeline.data.finalDecision.finalAction)}
-                  </span>
-                  <span>
-                    {evidencePipeline.data.loadedFromCache
-                      ? `Validazione riusata · ${validationFreshnessLabel(evidencePipeline.data.persistedWebValidation)}`
-                      : evidencePipeline.data.persistedWebValidation
-                        ? `Validazione salvata · ${validationRuntimeFreshness(evidencePipeline.data.persistedWebValidation)}`
-                        : evidencePipeline.data.persistError
-                          ? 'Persistenza non riuscita'
-                        : 'Persistenza N/D'}
-                  </span>
+                  <span className={styles.path}>{evidencePipeline.data.classification.confidence}</span>
+                </div>
+                <div className={styles.responseBar}>
+                  <span>{evidencePipeline.data.companyName || selectedPipelineTarget.companyName}</span>
                   <span className={styles.path}>
-                    {evidencePipeline.data.selectedDomain?.domain ?? 'nessun dominio candidato'}
+                    {evidencePipeline.data.selectedDomain || 'nessun dominio risolto'}
                   </span>
                 </div>
-                <div className={styles.dryRunGrid}>
-                  <div className={styles.metricBox}>
-                    <span>Core match</span>
-                    <strong>
-                      {evidencePipeline.data.summary.coreMatches}/{evidencePipeline.data.summary.searchedCoreTerms}
-                    </strong>
-                    <p>{evidencePipeline.data.summary.totalCoreTerms} termini totali</p>
-                  </div>
-                  <div className={styles.metricBox}>
-                    <span>Adiacenti</span>
-                    <strong>
-                      {evidencePipeline.data.summary.adjacentMatches}/{evidencePipeline.data.summary.searchedAdjacentTerms}
-                    </strong>
-                    <p>{evidencePipeline.data.summary.totalAdjacentTerms} termini totali</p>
-                  </div>
-                  <div className={styles.metricBox}>
-                    <span>Negativi</span>
-                    <strong>
-                      {evidencePipeline.data.summary.negativeMatches}/{evidencePipeline.data.summary.searchedNegativeTerms}
-                    </strong>
-                    <p>penalty -{evidencePipeline.data.summary.negativePenalty}</p>
-                  </div>
-                  <div className={styles.metricBox}>
-                    <span>Settore</span>
-                    <strong>{evidencePipeline.data.summary.sectorEvidenceScore}</strong>
-                    <p>forza web evidence</p>
-                  </div>
-                  <div className={styles.metricBox}>
-                    <span>Copertura</span>
-                    <strong>{evidencePipeline.data.summary.coverageScore}</strong>
-                    <p>match su keyword set</p>
-                  </div>
-                  <div className={styles.metricBox}>
-                    <span>Dominio</span>
-                    <strong>{evidencePipeline.data.summary.domainScore}</strong>
-                    <p>{evidencePipeline.data.selectedDomain?.confidence ?? 'N/D'}</p>
-                  </div>
-                </div>
 
-                <article className={`${styles.resultCard} ${styles.finalDecisionCard}`}>
-                  <div className={styles.resultCardHead}>
-                    <div>
-                      <h3>Final reconciliation</h3>
-                      <p>{evidencePipeline.data.finalDecision.reason}</p>
-                    </div>
-                    <div className={styles.cardActions}>
-                      <span className={`${styles.scoreBadge} ${styles[`finalAction_${evidencePipeline.data.finalDecision.finalAction}`] ?? ''}`}>
-                        {finalActionLabel(evidencePipeline.data.finalDecision.finalAction)}
-                      </span>
-                      <span className={`${styles.scoreBadge} ${styles[`confidence_${evidencePipeline.data.finalDecision.confidence}`] ?? ''}`}>
-                        {webValidationStateLabel(evidencePipeline.data.finalDecision.webValidationState)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className={styles.analysisGrid}>
-                    <div>
-                      <span>Score iniziale</span>
-                      <p>
-                        {evidencePipeline.data.finalDecision.deterministicScore} ·{' '}
-                        {evidencePipeline.data.finalDecision.initialMatchState}
-                      </p>
-                    </div>
-                    <div>
-                      <span>Validazione web</span>
-                      <p>
-                        {evidencePipeline.data.finalDecision.webScore} ·{' '}
-                        {webValidationStateLabel(evidencePipeline.data.finalDecision.webValidationState)}
-                      </p>
-                    </div>
-                    <div>
-                      <span>Analyst</span>
-                      <p>
-                        {evidencePipeline.data.finalDecision.analystVerdict
-                          ? `${candidateVerdictLabel(evidencePipeline.data.finalDecision.analystVerdict)} · ${candidateActionLabel(
-                              evidencePipeline.data.finalDecision.analystAction ?? '',
-                            )}`
-                          : 'N/D'}
-                      </p>
-                    </div>
-                    <div>
-                      <span>Dominio</span>
-                      <p>
-                        {evidencePipeline.data.selectedDomain
-                          ? `${evidencePipeline.data.selectedDomain.domain} · ${evidencePipeline.data.selectedDomain.confidence}`
-                          : 'N/D'}
-                      </p>
-                    </div>
-                    <div>
-                      <span>Persistenza</span>
-                      <p>
-                        {evidencePipeline.data.loadedFromCache
-                          ? `riusata · ${new Date(evidencePipeline.data.persistedWebValidation?.updatedAt ?? '').toLocaleString('it-IT')}`
-                          : evidencePipeline.data.persistedWebValidation
-                            ? `salvata · ${new Date(evidencePipeline.data.persistedWebValidation.updatedAt).toLocaleString('it-IT')}`
-                            : evidencePipeline.data.persistError ?? 'N/D'}
-                      </p>
-                    </div>
-                    {evidencePipeline.data.persistedWebValidation ? (
-                      <div>
-                        <span>Freshness</span>
-                        <p>
-                          {validationRuntimeFreshness(evidencePipeline.data.persistedWebValidation)} · stale dopo{' '}
-                          {new Date(evidencePipeline.data.persistedWebValidation.staleAfter).toLocaleDateString('it-IT')}
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                  {evidencePipeline.data.finalDecision.reasons.length > 0 ? (
-                    <div className={styles.finalReasons}>
-                      {evidencePipeline.data.finalDecision.reasons.slice(0, 6).map((reason) => (
-                        <span key={reason}>{reason}</span>
-                      ))}
-                    </div>
-                  ) : null}
-                </article>
-
-                {evidencePipeline.data.candidateMatchAnalysis ? (
-                  <article className={`${styles.resultCard} ${styles.analysisCard}`}>
+                {evidencePipeline.data.finalDecision ? (
+                  <article className={`${styles.resultCard} ${styles.finalDecisionCard}`}>
                     <div className={styles.resultCardHead}>
                       <div>
-                        <h3>Candidate match analyst</h3>
-                        <p>{evidencePipeline.data.candidateMatchAnalysis.rationale}</p>
+                        <h3>Decisione finale</h3>
+                        <p>{evidencePipeline.data.finalDecision.reason}</p>
                       </div>
                       <div className={styles.cardActions}>
-                        <span className={`${styles.scoreBadge} ${styles[`confidence_${evidencePipeline.data.candidateMatchAnalysis.confidence}`] ?? ''}`}>
-                          {candidateVerdictLabel(evidencePipeline.data.candidateMatchAnalysis.verdict)}
+                        <span className={`${styles.scoreBadge} ${styles[`finalAction_${evidencePipeline.data.finalDecision.finalAction}`] ?? ''}`}>
+                          {finalActionLabel(evidencePipeline.data.finalDecision.finalAction)}
                         </span>
-                        <span className={styles.bucketBadge}>
-                          {candidateActionLabel(evidencePipeline.data.candidateMatchAnalysis.recommendedAction)}
+                        <span className={`${styles.scoreBadge} ${styles[`confidence_${evidencePipeline.data.finalDecision.confidence}`] ?? ''}`}>
+                          {webValidationStateLabel(evidencePipeline.data.finalDecision.webValidationState)}
                         </span>
                       </div>
                     </div>
-                    <div className={styles.analysisGrid}>
-                      <div>
-                        <span>Sector fit</span>
-                        <p>{evidencePipeline.data.candidateMatchAnalysis.sectorFit || 'N/D'}</p>
-                      </div>
-                      <div>
-                        <span>Business fit</span>
-                        <p>{evidencePipeline.data.candidateMatchAnalysis.businessFit || 'N/D'}</p>
-                      </div>
-                    </div>
-                    <div className={styles.analysisColumns}>
-                      <div>
-                        <span>Prove a favore</span>
-                        {evidencePipeline.data.candidateMatchAnalysis.evidenceFor.length > 0 ? (
-                          <ul>
-                            {evidencePipeline.data.candidateMatchAnalysis.evidenceFor.map((item) => <li key={item}>{item}</li>)}
-                          </ul>
-                        ) : <p>N/D</p>}
-                      </div>
-                      <div>
-                        <span>Contro / lacune</span>
-                        {[...evidencePipeline.data.candidateMatchAnalysis.evidenceAgainst, ...evidencePipeline.data.candidateMatchAnalysis.missingEvidence].length > 0 ? (
-                          <ul>
-                            {[...evidencePipeline.data.candidateMatchAnalysis.evidenceAgainst, ...evidencePipeline.data.candidateMatchAnalysis.missingEvidence].map((item) => <li key={item}>{item}</li>)}
-                          </ul>
-                        ) : <p>N/D</p>}
-                      </div>
-                    </div>
-                    {evidencePipeline.data.candidateMatchAnalysis.negativeSignals.length > 0 ? (
-                      <div className={styles.analysisList}>
-                        <span>Segnali negativi</span>
-                        <p>{evidencePipeline.data.candidateMatchAnalysis.negativeSignals.join(' · ')}</p>
-                      </div>
-                    ) : null}
-                    {evidencePipeline.data.candidateMatchAnalysis.conceptAliases.length > 0 ? (
-                      <div className={styles.aliasList}>
-                        <span>Alias concettuali</span>
-                        {evidencePipeline.data.candidateMatchAnalysis.conceptAliases.map((alias) => (
-                          <p key={`${alias.term}-${alias.matchedConcept}`}>
-                            <strong>{alias.term}</strong> -&gt; {alias.matchedConcept}
-                            {alias.evidence ? ` · ${alias.evidence}` : ''}
-                          </p>
+                    {evidencePipeline.data.finalDecision.reasons.length > 0 ? (
+                      <div className={styles.finalReasons}>
+                        {evidencePipeline.data.finalDecision.reasons.slice(0, 6).map((reason) => (
+                          <span key={reason}>{reason}</span>
                         ))}
                       </div>
                     ) : null}
                   </article>
-                ) : evidencePipeline.data.candidateMatchError ? (
-                  <div className={styles.responseBar}>
-                    <span>Candidate match analyst non disponibile: {evidencePipeline.data.candidateMatchError}</span>
-                  </div>
                 ) : null}
 
-                {evidencePipeline.data.selectedDomain ? (
-                  <div className={styles.cardList}>
-                    <article className={styles.resultCard}>
+                <div className={`${styles.rawBlock} ${styles.rawBlockSeparated}`}>
+                  <span>Descrizione azienda usata</span>
+                  <pre>{evidencePipeline.data.classification.companyDescription || '(nessuna)'}</pre>
+                </div>
+                {evidencePipeline.data.classification.reason ? (
+                  <div className={styles.responseBar}>
+                    <span>{evidencePipeline.data.classification.reason}</span>
+                  </div>
+                ) : null}
+                <div className={styles.cardList}>
+                  {evidencePipeline.data.classification.concepts.map((concept) => (
+                    <article key={concept.conceptId} className={styles.resultCard}>
                       <div className={styles.resultCardHead}>
                         <div>
-                          <h3>{evidencePipeline.data.selectedDomain.domain}</h3>
-                          <p>{evidencePipeline.data.selectedDomain.reasons.join(', ')}</p>
+                          <h3>
+                            {concept.name}
+                            {concept.inStrategy ? ' · in perimetro' : ''}
+                          </h3>
+                          <p>
+                            {concept.conceptId} · coseno {concept.cosine.toFixed(3)}
+                          </p>
                         </div>
-                        <span className={`${styles.scoreBadge} ${styles[`confidence_${evidencePipeline.data.selectedDomain.confidence}`] ?? ''}`}>
-                          {evidencePipeline.data.selectedDomain.score} · {evidencePipeline.data.selectedDomain.confidence}
-                        </span>
+                        <div className={styles.cardActions}>
+                          <span className={styles.bucketBadge}>{concept.kind}</span>
+                          <span className={styles.scoreBadge}>rerank {concept.rerankProb.toFixed(2)}</span>
+                        </div>
                       </div>
                     </article>
-                    {evidencePipeline.data.evidenceRuns.map((run) => (
-                      <article
-                        key={`${run.bucket}-${run.term}`}
-                        className={`${styles.resultCard} ${run.matched ? styles.pipelineRunMatched : ''}`}
-                      >
-                        <div className={styles.resultCardHead}>
-                          <div>
-                            <h3>{run.term}</h3>
-                            <p>
-                              {pipelineBucketLabel(run.bucket)} · {run.matched ? 'match' : 'rumore'} · {run.resultCount} risultati
-                              {run.error ? ` · ${run.error}` : ''}
-                            </p>
-                          </div>
-                          <span className={`${styles.bucketBadge} ${styles[`bucket_${run.bucket}`]}`}>
-                            {run.bestScore ?? run.resultCount}
-                          </span>
-                        </div>
-                        {run.response?.results.slice(0, 2).map((result) => (
-                          <a key={result.url} href={result.url} target="_blank" rel="noreferrer" className={styles.evidenceItem}>
-                            <span>{result.title || result.url}</span>
-                            <small>{result.snippets[0] || result.hostname}</small>
-                          </a>
-                        ))}
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <div className={`${styles.statePanel} ${styles.companyState}`}>
-                    <div className={styles.stateIcon}>
-                      <Icon name="network" size={22} />
-                    </div>
-                    <p className={styles.stateTitle}>Dominio non risolto</p>
-                    <p className={styles.stateText}>La pipeline non esegue keyword evidence senza un candidato dominio.</p>
-                  </div>
-                )}
-
-                <div className={`${styles.rawBlock} ${styles.rawBlockSeparated}`}>
-                  <span>Risposta</span>
-                  <pre>{rawPreview(evidencePipeline.data)}</pre>
+                  ))}
                 </div>
-              </>
+                {evidencePipeline.data.classification.strategyConcepts.length > 0 ? (
+                  <div className={styles.responseBar}>
+                    <span>Perimetro strategia: {evidencePipeline.data.classification.strategyConcepts.join(', ')}</span>
+                  </div>
+                ) : null}
+                {evidencePipeline.data.analysis ? (
+                  <article className={`${styles.resultCard} ${styles.analysisCard}`}>
+                    <div className={styles.resultCardHead}>
+                      <div>
+                        <h3>Analyst LLM (tie-breaker)</h3>
+                        <p>{evidencePipeline.data.analysis.rationale}</p>
+                      </div>
+                      <div className={styles.cardActions}>
+                        <span className={styles.scoreBadge}>{evidencePipeline.data.analysis.verdict}</span>
+                        <span className={styles.bucketBadge}>{evidencePipeline.data.analysis.recommendedAction}</span>
+                      </div>
+                    </div>
+                  </article>
+                ) : null}
+                {evidencePipeline.data.evidence.length > 0 ? (
+                  <div className={`${styles.rawBlock} ${styles.rawBlockSeparated}`}>
+                    <span>Evidenza neutra raccolta</span>
+                    <pre>{evidencePipeline.data.evidence.join('\n')}</pre>
+                  </div>
+                ) : null}
+              </div>
             )}
           </div>
         )}

@@ -29,9 +29,16 @@ const (
 	maSectorEmbedDefaultInstruct  = "Data l'autodescrizione di un'azienda, recupera il concetto di business corrispondente."
 	maSectorRerankDefaultInstruct = "Data l'autodescrizione di un'azienda, valuta se l'azienda opera nel concetto di business indicato."
 
-	maCompanyRepresentationMaxToken = 400
+	maCompanyRepresentationMaxToken = 800
 	maCompanyEvidenceTextCap        = 2400
 	maCompanyDescriptionCap         = 600
+
+	// maCompanyRepresentationJSONInstruction is appended to the distiller system
+	// prompt so the call works in json_object mode regardless of the seeded prompt
+	// revision (Fireworks requires the literal word "json" in the messages). Forcing
+	// structured output is what stops cheap reasoning models from leaking their
+	// chain-of-thought into the description (the analyst is clean for the same reason).
+	maCompanyRepresentationJSONInstruction = "\n\nRispondi ESCLUSIVAMENTE con un oggetto JSON valido nella forma {\"description\": \"<descrizione neutra e fattuale dell'azienda, 1-3 frasi in italiano>\"}. Nessun altro testo, nessun markdown, nessun ragionamento."
 )
 
 // UC2 calibration (ma_parameter, value_type='number'). Thresholds are ABSOLUTE:
@@ -191,11 +198,16 @@ func (s *maService) classifyCompanyDescription(ctx context.Context, description 
 }
 
 // SectorClassificationTestRequest is the lab probe input (Test page): classify one
-// company against a sector intent, in isolation from the funnel. Provide the
-// company as raw companyDescription (fastest, skips Brave + distiller), or as
-// snippets, or as a domain (gathers neutral evidence via Brave).
+// company against a sector intent, in isolation from the funnel. Two modes:
+//   - existing target: set SessionID + TargetID — the sector comes from the session
+//     strategy, the company from the target (domain resolution + neutral evidence,
+//     i.e. the exact production path minus persistence);
+//   - ad-hoc: set SectorDescription plus the company as raw CompanyDescription
+//     (fastest, skips Brave + distiller), Snippets, or a Domain (gathers via Brave).
 type SectorClassificationTestRequest struct {
-	SectorDescription  string   `json:"sectorDescription"`
+	SectorDescription  string   `json:"sectorDescription,omitempty"`
+	SessionID          string   `json:"sessionId,omitempty"`
+	TargetID           string   `json:"targetId,omitempty"`
 	CompanyName        string   `json:"companyName,omitempty"`
 	Domain             string   `json:"domain,omitempty"`
 	Snippets           []string `json:"snippets,omitempty"`
@@ -204,52 +216,136 @@ type SectorClassificationTestRequest struct {
 }
 
 type SectorClassificationTestResponse struct {
+	CompanyName    string                          `json:"companyName,omitempty"`
+	SelectedDomain string                          `json:"selectedDomain,omitempty"`
 	Evidence       []string                        `json:"evidence"`
 	Classification maSectorClassification          `json:"classification"`
 	Analysis       *CandidateMatchAnalysisResponse `json:"analysis,omitempty"`
+	FinalDecision  *CandidateMatchFinalDecision    `json:"finalDecision,omitempty"`
 }
 
 // testSectorClassification runs the UC2 concept pipeline on demand for the Test
 // page. It mirrors the production path (neutral evidence -> distiller -> embed +
-// rerank -> verdict -> optional analyst) but takes its company input directly.
+// rerank -> verdict -> optional analyst -> decision) but never persists. In
+// session/target mode it pulls the sector from the session strategy and the company
+// from the target (the exact production builder, read-only); in ad-hoc mode the
+// company is supplied directly.
 func (s *maService) testSectorClassification(ctx context.Context, req SectorClassificationTestRequest, subject, email string) (SectorClassificationTestResponse, error) {
-	strategy := MAStrategySpec{SectorDescription: cleanText(req.SectorDescription, 400)}
-	description := cleanText(req.CompanyDescription, maCompanyDescriptionCap)
-	evidenceUsed := []string{}
-	if description == "" {
-		evidence := maCompanyEvidence{Domain: strings.TrimSpace(req.Domain)}
-		switch {
-		case len(req.Snippets) > 0:
-			for _, snippet := range req.Snippets {
-				if cleaned := cleanText(snippet, 360); cleaned != "" {
-					evidence.Snippets = append(evidence.Snippets, cleaned)
-				}
-			}
-		case strings.TrimSpace(req.Domain) != "":
-			if s.brave == nil {
-				return SectorClassificationTestResponse{}, errMABraveUnavailable
-			}
-			gathered, _ := s.gatherNeutralEvidence(ctx, req.Domain, maWebValidationEvidenceCount, subject, email)
-			evidence = gathered
-		default:
-			return SectorClassificationTestResponse{}, fmt.Errorf("%w: serve companyDescription, snippets o domain", errMAStrategyInvalid)
+	var (
+		strategy       MAStrategySpec
+		target         MATarget
+		description    string
+		evidenceUsed   []string
+		selectedDomain string
+	)
+
+	if strings.TrimSpace(req.SessionID) != "" && strings.TrimSpace(req.TargetID) != "" {
+		if s.store == nil {
+			return SectorClassificationTestResponse{}, errMAStoreUnavailable
 		}
+		detail, err := s.store.GetMASession(ctx, req.SessionID)
+		if err != nil {
+			return SectorClassificationTestResponse{}, err
+		}
+		if detail.Strategy == nil {
+			return SectorClassificationTestResponse{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
+		}
+		strategy = detail.Strategy.Strategy
+		found := false
+		for _, item := range detail.Targets {
+			if item.ID == req.TargetID {
+				target = item
+				found = true
+				break
+			}
+		}
+		if !found {
+			return SectorClassificationTestResponse{}, fmt.Errorf("%w: target non trovato nella sessione", errMAStrategyInvalid)
+		}
+		if s.brave == nil {
+			return SectorClassificationTestResponse{}, errMABraveUnavailable
+		}
+		domainResponse, err := s.resolveDomainCandidates(ctx, DomainResolutionRequest{
+			CompanyName: target.CompanyName,
+			VATCode:     target.VATCode,
+			TaxCode:     target.TaxCode,
+			Town:        target.Town,
+			Province:    target.Province,
+			Count:       maWebValidationDefaultDomainCount,
+		})
+		if err != nil {
+			return SectorClassificationTestResponse{}, err
+		}
+		chosen := chooseMAWebValidationDomain(domainResponse.Candidates)
+		if chosen == nil {
+			decision := &CandidateMatchFinalDecision{
+				InitialMatchState:  target.MatchState,
+				DeterministicScore: target.Score,
+				WebValidationState: "domain_unresolved",
+				FinalAction:        "needs_domain_review",
+				Confidence:         "bassa",
+				Reason:             "Nessun dominio ufficiale credibile risolto.",
+				Reasons:            []string{"Nessun dominio ufficiale credibile risolto."},
+			}
+			return SectorClassificationTestResponse{
+				CompanyName:    target.CompanyName,
+				Evidence:       []string{},
+				Classification: maSectorClassification{Verdict: maSectorNoSignal, Confidence: "bassa", Reason: "Nessun dominio ufficiale credibile risolto."},
+				FinalDecision:  decision,
+			}, nil
+		}
+		selectedDomain = chosen.Domain
+		evidence, _ := s.gatherNeutralEvidence(ctx, chosen.Domain, maWebValidationEvidenceCount, subject, email)
 		evidenceUsed = evidence.Snippets
 		description = s.representCompany(ctx, evidence, subject, email)
+	} else {
+		strategy = MAStrategySpec{SectorDescription: cleanText(req.SectorDescription, 400)}
+		target = MATarget{CompanyName: cleanText(req.CompanyName, 200)}
+		description = cleanText(req.CompanyDescription, maCompanyDescriptionCap)
+		if description == "" {
+			evidence := maCompanyEvidence{Domain: strings.TrimSpace(req.Domain)}
+			switch {
+			case len(req.Snippets) > 0:
+				for _, snippet := range req.Snippets {
+					if cleaned := cleanText(snippet, 360); cleaned != "" {
+						evidence.Snippets = append(evidence.Snippets, cleaned)
+					}
+				}
+			case strings.TrimSpace(req.Domain) != "":
+				if s.brave == nil {
+					return SectorClassificationTestResponse{}, errMABraveUnavailable
+				}
+				gathered, _ := s.gatherNeutralEvidence(ctx, req.Domain, maWebValidationEvidenceCount, subject, email)
+				evidence = gathered
+			default:
+				return SectorClassificationTestResponse{}, fmt.Errorf("%w: serve companyDescription, snippets o domain", errMAStrategyInvalid)
+			}
+			selectedDomain = evidence.Domain
+			evidenceUsed = evidence.Snippets
+			description = s.representCompany(ctx, evidence, subject, email)
+		}
 	}
 
 	class, err := s.classifyCompanyDescription(ctx, description, strategy)
 	if err != nil {
 		return SectorClassificationTestResponse{}, err
 	}
-	resp := SectorClassificationTestResponse{Evidence: evidenceUsed, Classification: class}
+	var analysis *CandidateMatchAnalysisResponse
 	if req.Analyze && sectorVerdictNeedsLLM(class.Verdict) {
-		analysis, aErr := s.analyzeSectorAmbiguity(ctx, MATarget{CompanyName: cleanText(req.CompanyName, 200)}, strategy, maCompanyEvidence{Snippets: evidenceUsed}, class, subject, email)
+		result, aErr := s.analyzeSectorAmbiguity(ctx, target, strategy, maCompanyEvidence{Snippets: evidenceUsed}, class, subject, email)
 		if aErr == nil {
-			resp.Analysis = &analysis
+			analysis = &result
 		}
 	}
-	return resp, nil
+	decision := sectorFinalDecision(target, class, analysis, "")
+	return SectorClassificationTestResponse{
+		CompanyName:    target.CompanyName,
+		SelectedDomain: selectedDomain,
+		Evidence:       evidenceUsed,
+		Classification: class,
+		Analysis:       analysis,
+		FinalDecision:  decision,
+	}, nil
 }
 
 // classifyCompanyConcepts embeds the company description over the KB concepts
@@ -416,10 +512,11 @@ func (s *maService) representCompany(ctx context.Context, evidence maCompanyEvid
 		reqParams["max_tokens"] = maCompanyRepresentationMaxToken
 	}
 	chatReq := llm.ChatRequest{
-		Model:  model.Model,
-		Params: reqParams,
+		Model:          model.Model,
+		Params:         reqParams,
+		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
 		Messages: []llm.Message{
-			{Role: "system", Content: prompt.Prompt},
+			{Role: "system", Content: prompt.Prompt + maCompanyRepresentationJSONInstruction},
 			{Role: "user", Content: string(input)},
 		},
 	}
@@ -449,11 +546,28 @@ func (s *maService) representCompany(ctx context.Context, evidence maCompanyEvid
 	if chatErr != nil {
 		return fallback
 	}
-	description := cleanText(resp.Content, maCompanyDescriptionCap)
-	if description == "" {
-		return fallback
+	if description := parseCompanyRepresentation(resp.Content); description != "" {
+		return description
 	}
-	return description
+	return fallback
+}
+
+// parseCompanyRepresentation extracts the distilled description from the model's
+// JSON output ({"description": "..."}). If the output is not JSON (e.g. the call ran
+// against an older non-JSON prompt and the model returned plain text), it falls back
+// to the raw content. Returns "" when nothing usable is found.
+func parseCompanyRepresentation(content string) string {
+	if raw := extractJSONObject(content); raw != "" {
+		var obj struct {
+			Description string `json:"description"`
+		}
+		if err := json.Unmarshal([]byte(raw), &obj); err == nil {
+			if d := cleanText(obj.Description, maCompanyDescriptionCap); d != "" {
+				return d
+			}
+		}
+	}
+	return cleanText(content, maCompanyDescriptionCap)
 }
 
 func buildCompanyEvidenceText(evidence maCompanyEvidence) string {

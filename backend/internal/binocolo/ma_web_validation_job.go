@@ -21,12 +21,57 @@ const (
 	// the company says about itself, then classifies, instead of confirming the
 	// strategy's expectations).
 	maWebValidationEvidenceCount = 5
+	// maNeutralEvidenceSnippetCap bounds how many self-description snippets feed the
+	// distiller. Without it a content-heavy site (blog feeds, JSON-LD) bloats the
+	// distiller input to thousands of tokens and tips cheap models into rambling
+	// chain-of-thought instead of producing the description.
+	maNeutralEvidenceSnippetCap = 12
 )
 
 // maNeutralEvidenceProbes are the deliberately strategy-agnostic site queries used
 // to surface a company's self-description. They never mention the strategy sector,
 // so the evidence cannot be confirmation-biased toward the expected answer.
 var maNeutralEvidenceProbes = []string{"chi siamo", "servizi soluzioni", "cosa facciamo"}
+
+// maEvidenceNoiseMarkers flag cookie-consent / consent-manager boilerplate (IAB TCF,
+// Complianz, etc.) that search engines index alongside real page content. It is pure
+// noise for "what does this company do" and, left in, poisons the self-description.
+var maEvidenceNoiseMarkers = []string{
+	"{vendor_count}",
+	"gestisci servizi",
+	"gestisci opzioni",
+	"gestisci i servizi",
+	"accetta nega",
+	"salva preferenze",
+	"salva le preferenze",
+	"visualizza le preferenze",
+	"per saperne di più su questi scopi",
+	"l'archiviazione tecnica o l'accesso",
+	"memorizzare e/o accedere alle informazioni",
+	"consenso a queste tecnologie",
+	"utilizziamo tecnologie come i cookie",
+}
+
+// isLowValueEvidence drops snippets that describe the consent banner or are raw
+// structured-data (JSON-LD) blobs rather than the company's actual activity.
+func isLowValueEvidence(text string) bool {
+	lower := strings.ToLower(strings.TrimSpace(text))
+	if lower == "" {
+		return true
+	}
+	if strings.HasPrefix(lower, "{") ||
+		strings.Contains(lower, "\"headline\"") ||
+		strings.Contains(lower, "\"articlebody\"") ||
+		strings.Contains(lower, "\"datepublished\"") {
+		return true
+	}
+	for _, marker := range maEvidenceNoiseMarkers {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
 
 type maWebValidationJobPayload struct {
 	Limit              int  `json:"limit"`
@@ -277,8 +322,11 @@ func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, co
 	runs := make([]CandidateMatchEvidenceRun, 0, len(maNeutralEvidenceProbes))
 	seen := map[string]struct{}{}
 	add := func(text string) {
+		if len(evidence.Snippets) >= maNeutralEvidenceSnippetCap {
+			return
+		}
 		cleaned := cleanText(text, 360)
-		if cleaned == "" {
+		if cleaned == "" || isLowValueEvidence(cleaned) {
 			return
 		}
 		key := strings.ToLower(cleaned)

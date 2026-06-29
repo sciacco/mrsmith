@@ -240,9 +240,12 @@ export interface SectorClassification {
 }
 
 export interface SectorClassificationTestResponse {
+  companyName?: string;
+  selectedDomain?: string;
   evidence: string[];
   classification: SectorClassification;
   analysis?: CandidateMatchAnalysisResponse;
+  finalDecision?: CandidateMatchFinalDecision;
 }
 
 export interface MASessionListResponse {
