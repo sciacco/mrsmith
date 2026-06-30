@@ -172,6 +172,10 @@ type maService struct {
 	}
 	llmp maLLMProvider
 	now  func() time.Time
+	// compareSnippetCache memoizes re-gathered neutral web snippets per domain for the
+	// model-comparison harness (sector-eval-models with includeSnippets). Test-support
+	// only; persists for the process lifetime so a multi-request eval pays Brave once.
+	compareSnippetCache sync.Map
 }
 
 func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, provinceCache provinceCacheStore, ateco atecoStore, openapiitClient *openapiit.Client, llmp maLLMProvider) *maService {

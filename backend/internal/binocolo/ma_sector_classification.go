@@ -58,6 +58,11 @@ const (
 	maSectorAmbiguityBandKey   = "sector_ambiguity_band"
 	maSectorNoSignalFloorKey   = "sector_no_signal_floor"
 	maSectorRerankCapKey       = "sector_rerank_cap"
+	// sector_analyst_concept_grounding (number, >0 = on): whether to feed the embed+rerank
+	// concept matches to the LLM analyst. Default OFF — the 10× ablation (snippet-faithful,
+	// UC2-SECTOR-MODEL-EVALUATION.md §7.1) found the grounding net-harmful (biases toward
+	// keeping; decisively hurts gpt-oss). Flip to 1 to restore the old grounded payload.
+	maSectorAnalystGroundingKey = "sector_analyst_concept_grounding"
 
 	// Calibrated 2026-06-29 on the corrected (2-way-softmax) reranker scale, whose
 	// P(yes) tops out ~0.3 for a strong match. Anchors: NETX64 (true positive,
@@ -73,6 +78,8 @@ const (
 	maSectorAmbiguityBandDefault   = 0.15
 	maSectorNoSignalFloorDefault   = 0.08
 	maSectorRerankCapDefault       = 8
+	// Concept grounding for the analyst defaults OFF (see maSectorAnalystGroundingKey).
+	maSectorAnalystGroundingDefault = false
 )
 
 type maSectorVerdict string
@@ -92,6 +99,9 @@ type maSectorClassConfig struct {
 	AmbiguityBand   float64
 	NoSignalFloor   float64
 	RerankCap       int
+	// AnalystConceptGrounding gates whether the analyst payload includes the embed+rerank
+	// concept matches. Default false (grounding off).
+	AnalystConceptGrounding bool
 }
 
 func maSectorClassConfigFromParameters(params []MAParameter) maSectorClassConfig {
@@ -102,6 +112,8 @@ func maSectorClassConfigFromParameters(params []MAParameter) maSectorClassConfig
 		AmbiguityBand:   maSectorAmbiguityBandDefault,
 		NoSignalFloor:   maSectorNoSignalFloorDefault,
 		RerankCap:       maSectorRerankCapDefault,
+
+		AnalystConceptGrounding: maSectorAnalystGroundingDefault,
 	}
 	values := make(map[string]string, len(params))
 	for _, p := range params {
@@ -124,6 +136,9 @@ func maSectorClassConfigFromParameters(params []MAParameter) maSectorClassConfig
 	}
 	if v, ok := maParamFloat(values, maSectorRerankCapKey); ok && v >= 1 {
 		cfg.RerankCap = int(v)
+	}
+	if v, ok := maParamFloat(values, maSectorAnalystGroundingKey); ok {
+		cfg.AnalystConceptGrounding = v > 0
 	}
 	return cfg
 }
@@ -537,11 +552,14 @@ func sectorVerdict(concepts []maConceptScore, cfg maSectorClassConfig, rerankApp
 	switch {
 	case topProb < cfg.NoSignalFloor:
 		return maSectorNoSignal, topProb, "bassa", "Segnale troppo debole per classificare il settore."
-	case bestDistractorProb > 0 && bestDistractorProb-bestInStrategyProb >= cfg.RejectRelMargin:
-		// RELATIVE reject (perimeter-aware): an off-target distractor outranks the best
-		// in-perimeter target by the reject margin. This is the deterministic gate —
-		// terminal scarta, NOT escalated — label-validated to never reject a true keep.
-		return maSectorReject, topProb, sectorConfidence(bestDistractorProb), "Profilo coerente con un concetto off-target (distrattore)."
+	case concepts[0].Kind == "distractor" && bestInStrategyProb == 0:
+		// STRUCTURAL reject (threshold-free): the top-ranked concept is an off-target
+		// distractor AND nothing in the strategy perimeter matched at all. No magic margin —
+		// a company with ANY in-perimeter signal falls through to the LLM (ambiguous) instead
+		// of being terminally rejected, so the gate can no longer leak a true keep. Replaces
+		// the relative-margin reject (cfg.RejectRelMargin, now unused), which leaked keeps and
+		// did not generalize across sessions (see UC2-SECTOR-MODEL-EVALUATION.md + replay harness).
+		return maSectorReject, topProb, sectorConfidence(bestDistractorProb), "Profilo off-target: distrattore in testa e nessun concetto nel perimetro della strategia."
 	case bestInStrategyProb > 0 && bestInStrategyProb >= bestDistractorProb:
 		// In-perimeter target leads (or ties) the distractor: confirm, then escalate to
 		// the LLM (sectorVerdictNeedsLLM) for the keep decision the embedding can't make.
@@ -710,9 +728,32 @@ func (s *maService) analyzeSectorAmbiguity(ctx context.Context, target MATarget,
 	if err != nil {
 		return CandidateMatchAnalysisResponse{}, llmConfigError(err)
 	}
+	// Grounding gate (default OFF): the embed+rerank concept matches are net-harmful as
+	// analyst input (UC2-SECTOR-MODEL-EVALUATION.md §7.1). Drop them unless re-enabled via
+	// sector_analyst_concept_grounding=1. The analyst still gets the distilled description,
+	// strategy perimeter, and web snippets.
+	if cfg := s.loadSectorClassConfig(ctx); !cfg.AnalystConceptGrounding {
+		class.Concepts = nil
+	}
+	resp, _, err := s.runSectorAnalyst(ctx, model, prompt, target, strategy, evidence, class, subject, email, 0)
+	return resp, err
+}
+
+// runSectorAnalyst executes the sector analyst with an EXPLICITLY resolved model and
+// prompt, so callers can vary the model while holding the prompt fixed (the
+// model-comparison harness does exactly this). It builds the curated payload, records the
+// audit, and parses the structured verdict; it returns the parsed analysis plus the
+// call's token usage.
+// maxTokensOverride > 0 forces max_tokens for this call (the model-comparison harness uses
+// it to give reasoning models enough budget to finish their JSON); 0 keeps the model's
+// configured value or the analyst default.
+func (s *maService) runSectorAnalyst(ctx context.Context, model llm.Model, prompt llm.Prompt, target MATarget, strategy MAStrategySpec, evidence maCompanyEvidence, class maSectorClassification, subject, email string, maxTokensOverride int) (CandidateMatchAnalysisResponse, llm.Usage, error) {
+	if s.llmp == nil {
+		return CandidateMatchAnalysisResponse{}, llm.Usage{}, errMAOpenRouterUnavailable
+	}
 	client, err := s.llmp.ClientForModel(ctx, model)
 	if err != nil {
-		return CandidateMatchAnalysisResponse{}, llmConfigError(err)
+		return CandidateMatchAnalysisResponse{}, llm.Usage{}, llmConfigError(err)
 	}
 
 	concepts := make([]map[string]any, 0, len(class.Concepts))
@@ -761,11 +802,16 @@ func (s *maService) analyzeSectorAmbiguity(ctx context.Context, target MATarget,
 	}
 	payload, err := json.Marshal(curated)
 	if err != nil {
-		return CandidateMatchAnalysisResponse{}, err
+		return CandidateMatchAnalysisResponse{}, llm.Usage{}, err
 	}
 	reqParams := model.RawParams()
-	if _, ok := reqParams["max_tokens"]; !ok {
-		reqParams["max_tokens"] = candidateMatchAnalysisMaxToken
+	switch {
+	case maxTokensOverride > 0:
+		reqParams["max_tokens"] = maxTokensOverride
+	default:
+		if _, ok := reqParams["max_tokens"]; !ok {
+			reqParams["max_tokens"] = candidateMatchAnalysisMaxToken
+		}
 	}
 	chatReq := llm.ChatRequest{
 		Model:          model.Model,
@@ -807,17 +853,17 @@ func (s *maService) analyzeSectorAmbiguity(ctx context.Context, target MATarget,
 	}
 	_ = s.llmp.RecordAudit(ctx, audit)
 	if chatErr != nil {
-		return CandidateMatchAnalysisResponse{}, chatErr
+		return CandidateMatchAnalysisResponse{}, resp.Usage, chatErr
 	}
 
 	analysis, err := parseCandidateMatchAnalysis(resp.Content)
 	if err != nil {
-		return CandidateMatchAnalysisResponse{}, err
+		return CandidateMatchAnalysisResponse{}, resp.Usage, err
 	}
 	analysis.ModelID = model.ID
 	analysis.PromptID = prompt.ID
 	analysis.Model = model.Model
-	return analysis, nil
+	return analysis, resp.Usage, nil
 }
 
 func sortedKeys(set map[string]bool) []string {

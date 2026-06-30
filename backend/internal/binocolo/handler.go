@@ -131,6 +131,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/companies/{vat}/dossier", h.handleCreateCompanyDossier)
 	handle("POST /binocolo/v1/test/domain-resolution", h.handleTestDomainResolution)
 	handle("POST /binocolo/v1/test/sector-classification", h.handleTestSectorClassification)
+	handle("POST /binocolo/v1/test/sector-eval-models", h.handleCompareSectorEvalModels)
 	handle("POST /binocolo/v1/web-search", h.handleWebSearch)
 	return runWorkers
 }
@@ -364,6 +365,29 @@ func (h *Handler) handleSetSectorEvalLabel(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleCompareSectorEvalModels replays the UC2 analyst over already-labeled sessions with
+// multiple models in parallel (same prompt, model varies) and scores each against the
+// human ground truth — to pick a backup analyst on a different provider without re-running
+// the web pipeline. Read-only (no persistence beyond the per-call LLM audit).
+func (h *Handler) handleCompareSectorEvalModels(w http.ResponseWriter, r *http.Request) {
+	var body SectorModelCompareRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	if len(body.SessionIDs) == 0 {
+		httputil.Error(w, http.StatusBadRequest, "missing_session_ids")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	report, err := h.ma.compareSectorEvalModels(r.Context(), body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "sector_eval_models", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, report)
 }
 
 func (h *Handler) handleUpsertMAWebValidation(w http.ResponseWriter, r *http.Request) {
