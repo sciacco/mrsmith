@@ -41,25 +41,38 @@ const (
 	maCompanyRepresentationJSONInstruction = "\n\nRispondi ESCLUSIVAMENTE con un oggetto JSON valido nella forma {\"description\": \"<descrizione neutra e fattuale dell'azienda, 1-3 frasi in italiano>\"}. Nessun altro testo, nessun markdown, nessun ragionamento."
 )
 
-// UC2 calibration (ma_parameter, value_type='number'). Thresholds are ABSOLUTE:
-// the reranker returns a softmax-normalized yes-probability (0-1) comparable across
-// companies, so — unlike UC1's relative cosine — fixed cutoffs are meaningful.
+// UC2 calibration (ma_parameter, value_type='number'). The REJECT gate is RELATIVE:
+// the reranker's softmax P(yes) is NOT a calibrated absolute probability for this corpus
+// (it tops out ~0.3 and shifts with document style), so the decisive signal is the
+// MARGIN between the best off-target distractor and the best in-perimeter target, not a
+// fixed cutoff. Validated offline against human labels (replay harness, session
+// 391e7c67, ma_sector_replay.go): a relative reject margin of 0.04 lifts scarta-recall
+// 0.20 -> 0.66 at 0.96 precision with ZERO true-keep leakage, vs the old absolute rule
+// (which dumped 28/35 true-scarta into forse). NoSignalFloor still guards the "no usable
+// signal at all" case in absolute terms. ConfirmProb/RejectMargin/AmbiguityBand are
+// retained as tunable knobs but no longer drive the reject decision.
 const (
-	maSectorConfirmProbKey   = "sector_confirm_prob"
-	maSectorRejectMarginKey  = "sector_reject_margin"
-	maSectorAmbiguityBandKey = "sector_ambiguity_band"
-	maSectorNoSignalFloorKey = "sector_no_signal_floor"
-	maSectorRerankCapKey     = "sector_rerank_cap"
+	maSectorConfirmProbKey     = "sector_confirm_prob"
+	maSectorRejectMarginKey    = "sector_reject_margin"
+	maSectorRejectRelMarginKey = "sector_reject_rel_margin"
+	maSectorAmbiguityBandKey   = "sector_ambiguity_band"
+	maSectorNoSignalFloorKey   = "sector_no_signal_floor"
+	maSectorRerankCapKey       = "sector_rerank_cap"
 
 	// Calibrated 2026-06-29 on the corrected (2-way-softmax) reranker scale, whose
 	// P(yes) tops out ~0.3 for a strong match. Anchors: NETX64 (true positive,
 	// in-perimeter 0.296 -> confirm) vs Coherency (off-perimeter, in-perimeter 0.142
 	// -> ambiguous/weak). Overridable via the sector_* ma_parameter rows.
-	maSectorConfirmProbDefault   = 0.25
-	maSectorRejectMarginDefault  = 0.10
-	maSectorAmbiguityBandDefault = 0.15
-	maSectorNoSignalFloorDefault = 0.08
-	maSectorRerankCapDefault     = 8
+	maSectorConfirmProbDefault  = 0.25
+	maSectorRejectMarginDefault = 0.10
+	// Relative reject margin (2026-06-30): a distractor must beat the best in-perimeter
+	// target by this much to deterministically reject. 0.04 is the robust frontier point
+	// from the label-validated grid (0.02 was in-sample-optimal but tighter; 0.04 gives
+	// near-identical recall at higher precision and more headroom on unseen data).
+	maSectorRejectRelMarginDefault = 0.04
+	maSectorAmbiguityBandDefault   = 0.15
+	maSectorNoSignalFloorDefault   = 0.08
+	maSectorRerankCapDefault       = 8
 )
 
 type maSectorVerdict string
@@ -73,20 +86,22 @@ const (
 )
 
 type maSectorClassConfig struct {
-	ConfirmProb   float64
-	RejectMargin  float64
-	AmbiguityBand float64
-	NoSignalFloor float64
-	RerankCap     int
+	ConfirmProb     float64
+	RejectMargin    float64
+	RejectRelMargin float64
+	AmbiguityBand   float64
+	NoSignalFloor   float64
+	RerankCap       int
 }
 
 func maSectorClassConfigFromParameters(params []MAParameter) maSectorClassConfig {
 	cfg := maSectorClassConfig{
-		ConfirmProb:   maSectorConfirmProbDefault,
-		RejectMargin:  maSectorRejectMarginDefault,
-		AmbiguityBand: maSectorAmbiguityBandDefault,
-		NoSignalFloor: maSectorNoSignalFloorDefault,
-		RerankCap:     maSectorRerankCapDefault,
+		ConfirmProb:     maSectorConfirmProbDefault,
+		RejectMargin:    maSectorRejectMarginDefault,
+		RejectRelMargin: maSectorRejectRelMarginDefault,
+		AmbiguityBand:   maSectorAmbiguityBandDefault,
+		NoSignalFloor:   maSectorNoSignalFloorDefault,
+		RerankCap:       maSectorRerankCapDefault,
 	}
 	values := make(map[string]string, len(params))
 	for _, p := range params {
@@ -97,6 +112,9 @@ func maSectorClassConfigFromParameters(params []MAParameter) maSectorClassConfig
 	}
 	if v, ok := maParamFloat(values, maSectorRejectMarginKey); ok && v >= 0 && v < 1 {
 		cfg.RejectMargin = v
+	}
+	if v, ok := maParamFloat(values, maSectorRejectRelMarginKey); ok && v >= 0 && v < 1 {
+		cfg.RejectRelMargin = v
 	}
 	if v, ok := maParamFloat(values, maSectorAmbiguityBandKey); ok && v >= 0 && v < 1 {
 		cfg.AmbiguityBand = v
@@ -519,11 +537,18 @@ func sectorVerdict(concepts []maConceptScore, cfg maSectorClassConfig, rerankApp
 	switch {
 	case topProb < cfg.NoSignalFloor:
 		return maSectorNoSignal, topProb, "bassa", "Segnale troppo debole per classificare il settore."
-	case bestDistractorProb >= cfg.ConfirmProb && bestDistractorProb > bestTargetProb+cfg.RejectMargin:
+	case bestDistractorProb > 0 && bestDistractorProb-bestInStrategyProb >= cfg.RejectRelMargin:
+		// RELATIVE reject (perimeter-aware): an off-target distractor outranks the best
+		// in-perimeter target by the reject margin. This is the deterministic gate —
+		// terminal scarta, NOT escalated — label-validated to never reject a true keep.
 		return maSectorReject, topProb, sectorConfidence(bestDistractorProb), "Profilo coerente con un concetto off-target (distrattore)."
-	case bestInStrategyProb >= cfg.ConfirmProb && bestInStrategyProb >= bestDistractorProb+cfg.RejectMargin:
+	case bestInStrategyProb > 0 && bestInStrategyProb >= bestDistractorProb:
+		// In-perimeter target leads (or ties) the distractor: confirm, then escalate to
+		// the LLM (sectorVerdictNeedsLLM) for the keep decision the embedding can't make.
 		return maSectorConfirm, topProb, sectorConfidence(bestInStrategyProb), "Profilo coerente con il perimetro della strategia."
-	case bestTargetProb >= cfg.ConfirmProb && bestTargetProb > bestDistractorProb+cfg.RejectMargin:
+	case bestTargetProb > 0 && bestInStrategyProb == 0 && bestTargetProb >= bestDistractorProb:
+		// Legit IT target but no in-perimeter match and no rejecting distractor: off the
+		// strategy perimeter, left for review (forse) without an LLM call.
 		return maSectorWeak, topProb, "media", "Azienda IT legittima ma fuori dal perimetro della strategia."
 	default:
 		return maSectorAmbiguous, topProb, "bassa", "Segnali contrastanti o sotto soglia: serve giudizio LLM."

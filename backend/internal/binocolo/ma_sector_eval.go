@@ -150,6 +150,9 @@ type SectorEvalReport struct {
 	Perimeter SectorEvalPerimeter `json:"perimeter"`
 	Items     []SectorEvalItem    `json:"items"`
 	Metrics   SectorEvalMetrics   `json:"metrics"`
+	// Replay is the offline R1/R2/R3 re-analysis of the deterministic layer over the
+	// labeled rows (no live calls). Nil when nothing is labeled. See ma_sector_replay.go.
+	Replay *SectorReplayReport `json:"replay,omitempty"`
 }
 
 var sectorEvalBuckets = []string{"keep", "forse", "scarta"}
@@ -200,6 +203,7 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 		LLMVsDeterministic: map[string]int{"bothCorrect": 0, "detOnly": 0, "llmOnly": 0, "bothWrong": 0},
 	}
 	items := make([]SectorEvalItem, 0, len(detail.Targets))
+	replayInputs := make([]sectorReplayInput, 0, len(labels))
 
 	for _, t := range detail.Targets {
 		item := SectorEvalItem{
@@ -260,6 +264,15 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 				item.DistractorBeatsTarget = true
 				metrics.DistractorBeatsTarget++
 			}
+			// Collect the FULL concept set (not the capped TopConcepts) for the offline
+			// replay analysis — only for labeled rows, which are the only ones it scores.
+			if item.Label != "" {
+				replayInputs = append(replayInputs, sectorReplayInput{
+					label:                item.Label,
+					concepts:             wv.Summary.Concepts,
+					deterministicVerdict: wv.Summary.DeterministicVerdict,
+				})
+			}
 		}
 
 		if item.Label != "" && item.Validated {
@@ -314,7 +327,13 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 		}
 	}
 
-	return SectorEvalReport{SessionID: sessionID, Perimeter: perimeter, Items: items, Metrics: metrics}, nil
+	return SectorEvalReport{
+		SessionID: sessionID,
+		Perimeter: perimeter,
+		Items:     items,
+		Metrics:   metrics,
+		Replay:    computeSectorReplay(replayInputs),
+	}, nil
 }
 
 // scoreSectorPredictor records one (label, prediction) pair for a predictor. Rows where

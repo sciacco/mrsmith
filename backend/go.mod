@@ -11,6 +11,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.9.3
 	github.com/openai/openai-go/v3 v3.32.0
 	github.com/xuri/excelize/v2 v2.10.1
+	golang.org/x/sync v0.20.0
 )
 
 require (
@@ -47,7 +48,6 @@ require (
 	golang.org/x/image v0.37.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

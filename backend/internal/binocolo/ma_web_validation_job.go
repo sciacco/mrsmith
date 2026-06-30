@@ -8,17 +8,27 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode"
 
 	"github.com/sciacco/mrsmith/internal/platform/brave"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
 	maWebValidationDefaultLimit       = 100
 	maWebValidationMaxLimit           = 100
 	maWebValidationDefaultDomainCount = 20
+	// maWebValidationConcurrency is how many targets the batch validation processes at
+	// once. The loop body fans out to external services that have NO internal
+	// rate-limiter (Brave domain + probe queries, the self-hosted scrape service,
+	// Fireworks embed+rerank), so this is the throttle — 4 balances wall-clock against
+	// tripping Brave's rate limit / saturating the scraper. The shared state it touches
+	// is safe: the trace is mutex-guarded, the DB pool (50) covers the fan-out, targets
+	// upsert distinct rows, and the counters are atomic.
+	maWebValidationConcurrency = 4
 	// maWebValidationEvidenceCount is how many results each NEUTRAL self-description
 	// probe pulls from the company's own site (no strategy terms — UC2 gathers what
 	// the company says about itself, then classifies, instead of confirming the
@@ -214,9 +224,7 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 	}
 
 	targets := selectMAWebValidationTargets(detail.Targets, version.Strategy, payload, s.now(), payload.Limit)
-	processed := 0
-	skipped := 0
-	failed := 0
+	var processed, skipped, failed atomic.Int64
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_web_validation_started",
 		Status:    maTraceEventStarted,
@@ -227,28 +235,41 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 			"force":               payload.Force,
 			"limit":               payload.Limit,
 			"method":              "concept",
+			"concurrency":         maWebValidationConcurrency,
 		}),
 	})
 
+	// Process targets concurrently, bounded to maWebValidationConcurrency. Each iteration
+	// is independent (distinct upsert rows, no shared mutable state beyond the atomic
+	// counters and the mutex-guarded trace). The errgroup's shared ctx preserves the old
+	// abort-on-first-error semantics: a failed upsert cancels the in-flight peers.
+	group, gctx := errgroup.WithContext(ctx)
+	group.SetLimit(maWebValidationConcurrency)
 	for _, work := range targets {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		target := work.Target
-		if !payload.Force && reusableMAWebValidation(target.WebValidation, work.InputHash, work.InputHash, s.now()) {
-			skipped++
-			continue
-		}
+		group.Go(func() error {
+			if err := gctx.Err(); err != nil {
+				return err
+			}
+			target := work.Target
+			if !payload.Force && reusableMAWebValidation(target.WebValidation, work.InputHash, work.InputHash, s.now()) {
+				skipped.Add(1)
+				return nil
+			}
 
-		body, buildErr := s.buildMAWebValidation(ctx, target, version.Strategy, work.InputHash, payload, job.CreatedBySubject, job.CreatedByEmail)
-		if buildErr != nil {
-			body = failedMAWebValidationRequest(target, work.InputHash, buildErr)
-			failed++
-		}
-		if _, err := s.upsertTargetWebValidation(ctx, job.SessionID, body, job.CreatedBySubject, job.CreatedByEmail); err != nil {
-			return err
-		}
-		processed++
+			body, buildErr := s.buildMAWebValidation(gctx, target, version.Strategy, work.InputHash, payload, job.CreatedBySubject, job.CreatedByEmail)
+			if buildErr != nil {
+				body = failedMAWebValidationRequest(target, work.InputHash, buildErr)
+				failed.Add(1)
+			}
+			if _, err := s.upsertTargetWebValidation(gctx, job.SessionID, body, job.CreatedBySubject, job.CreatedByEmail); err != nil {
+				return err
+			}
+			processed.Add(1)
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return err
 	}
 
 	_ = s.traceEvent(ctx, maTraceEventWrite{
@@ -256,9 +277,9 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 		Status:    maTraceEventSucceeded,
 		Metadata: maTraceJSON(map[string]any{
 			"session_id":   job.SessionID,
-			"processed":    processed,
-			"skipped":      skipped,
-			"failed":       failed,
+			"processed":    processed.Load(),
+			"skipped":      skipped.Load(),
+			"failed":       failed.Load(),
 			"target_count": len(targets),
 		}),
 	})
