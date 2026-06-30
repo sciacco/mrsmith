@@ -1,20 +1,142 @@
 {
-  "version": "2.0",
-  "generated_at": "2026-06-30",
-  "source": "KB enrichment fan-out (model B) + ATECO grounding, deployed under current model. kind derived: target = in-stack layer AND vertical=horizontal; else distractor. layer/vertical/ateco_in_kb_all preserved for future model-B runtime (ignored by atego loader).",
+  "version": "2.0-candidate",
+  "generated_at": "2026-06-29",
+  "source": "fan-out workflow binocolo-kb-fanout (model B: layer/vertical tags, no fixed kind). Candidate for review; NOT yet loaded.",
+  "model": "B (strategy-relative roles): concepts neutral with layer+vertical; roles derived per-strategy. ateco_in_kb populated on all concepts. embedding_text raw, positive, no negation.",
   "stats": {
-    "n_concetti": 53,
-    "n_target": 35,
-    "n_distractor": 18
+    "n_concetti": 53
   },
+  "merge_flags": [
+    {
+      "a": "cloud_infrastructure",
+      "b": "virtualization",
+      "reason": "Footprint vicini: il compute virtuale (VM/hypervisor) e il cuore di entrambi. Cloud Infrastructure include 'macchine virtuali on-demand' e VDC, Virtualization include 'virtual machine'/VDI. La distinzione regge solo se l'embedding pesa fortemente IaaS/consumo (cloud) vs ESXi/vCenter/Proxmox (tecnologia hypervisor on-prem); valutare fusione se in retrieval i due collassano sullo stesso vettore compute-virtuale."
+    },
+    {
+      "a": "storage",
+      "b": "backup_dr",
+      "reason": "Adiacenza forte sul dato: storage = capacita/array, backup/DR = protezione/recupero. Condividono ATECO (63.10.10, 62.20.20) e il dominio 'dato a riposo'. Aziende reali spesso vendono entrambi insieme (es. appliance Veeam su array). Valutare se il segnale ATECO+contesto e sufficiente o se servono due concetti distinti."
+    },
+    {
+      "a": "software_development",
+      "b": "software_product",
+      "reason": "Entrambi rivendicavano l'alias 'software house' e condividono ATECO 62.10.00; in Italia molte software house fanno sia commessa sia prodotto, quindi il footprint reale si sovrappone. Restano distinti SOLO se il prodotto pacchettizzato/edizione (58.29.00) e la commessa custom restano lessicalmente separati. Rimosso 'software house' dagli alias di software_product per ridurre il bleed; valutare se in pratica i due si fondono."
+    },
+    {
+      "a": "software_product",
+      "b": "vertical_business_software",
+      "reason": "Vertical/Industry Software e' di fatto un Software Product specializzato per filiera: stessi ATECO (58.29.00, 62.10.00), stesso modello publishing/SaaS. La separazione e' solo nel vocabolario di filiera (LIS/HIS/core banking). Bleed alto su aziende vertical che si descrivono genericamente come 'software vendor/SaaS'."
+    },
+    {
+      "a": "erp_crm",
+      "b": "vertical_business_software",
+      "reason": "ERP/CRM di settore (es. gestionale sanitario, retail POS, core banking) cade in entrambi: stessi 3 ATECO, sovrapposizione su 'gestionale di filiera'. Un ERP verticalizzato e' contemporaneamente ERP e vertical software."
+    },
+    {
+      "a": "cybersecurity_services",
+      "b": "soc_mdr",
+      "reason": "Forte rischio di alto coseno: entrambi vivono sui codici ATECO ICT condivisi (62.20.10, 62.90.09) e nel macro-tema 'sicurezza informatica'. La distinzione regge solo se l'embedding pesa il contrasto progetto-una-tantum (pentest/assessment) vs operations-continue (SIEM/XDR/threat hunting). Da NON fondere — sono offerte commerciali distinte — ma il footprint testuale e' vicino; valutare se il reranker li separa o se serve gerarchia padre 'security advisory vs security operations'."
+    },
+    {
+      "a": "telecom_operator",
+      "b": "internet_service_provider",
+      "reason": "Footprint quasi sovrapposto: condividono DUE codici ATECO (61.10.01 telecom fisse + 61.90.10 accesso Internet) e nel mondo reale moltissimi operatori italiani sono al tempo stesso carrier e ISP retail (stesso soggetto vende fibra FTTH sia come rete propria sia come abbonamento). 61.90.10 e' l'unica ancora univoca dell'ISP ma e' anche detenuta dai carrier. Il coseno restera' alto perche' entrambi parlano di fibra/FTTH/banda larga. Valutare fusione in un unico concetto 'Telecom & Internet Access Provider' oppure mantenere separati solo se a valle si riesce a usare 61.10.02/61.10.03 (mobile/satellitare) come segnale carrier-only. Massimo punto di collisione del cluster."
+    },
+    {
+      "a": "iot_connectivity",
+      "b": "telecom_operator",
+      "reason": "Condividono 61.10.02 (telecom mobili) e 61.90.90 (altre telecom n.c.a.): l'IoT Connectivity e' di fatto un MVNO/servizio mobile specializzato. La separazione e' affidata interamente al testo (SIM IoT, M2M, NB-IoT/LTE-M, LPWAN, eSIM/eUICC) contro il vocabolario carrier generalista. Rischio bleed concreto se un'azienda descrive genericamente 'servizi mobili IoT'. Non fondere, ma monitorare: e' un sotto-segmento verticale del telecom mobile."
+    },
+    {
+      "a": "computer_hardware",
+      "b": "ict_wholesale",
+      "reason": "Condividono l'ATECO 46.50.10 e il vocabolario di commercio hardware. Restano concetti distinti (prodotto-finito di calcolo vs ruolo di distributore broadline/VAR al canale), ma il footprint sul commercio hardware si sovrappone: il codice 46.50.10 va disambiguato a valle perche entrambi lo rivendicano legittimamente."
+    },
+    {
+      "a": "network_equipment",
+      "b": "computer_hardware",
+      "reason": "Adiacenti nel manifatturiero ICT (26.30 vs 26.20) e nel commercio (46.50.20 vs 46.50.10). Non da fondere: si separano bene sul vocabolario di prodotto (router/switch/CPE vs PC/server/periferiche), ma vanno monitorati per match ambigui su 'apparato/dispositivo' generico."
+    }
+  ],
+  "overlap_warnings": [
+    "ATECO 63.10.10 (elaborazione dati, hosting e attivita connesse) e il codice primario condiviso da cloud_infrastructure, datacenter_colocation, hosting, storage, backup_dr ed edge_cdn: il segnale ATECO da solo NON discrimina dentro il layer infrastructure, tutto il carico discriminante ricade sull'embedding_text. Confermare che il retriever pesi adeguatamente il vocabolario testuale.",
+    "cloud_infrastructure vs hosting: 'server dedicati'/'VPS' (hosting) e 'macchine virtuali on-demand'/'compute elastico' (cloud) sono semanticamente vicini negli embedding; un provider che vende 'VPS cloud' puo attivare entrambi. Bleed residuo non risolvibile col solo testo.",
+    "edge_cdn 61.90.10/61.90.90: codici di telecomunicazioni non verificati in KB, potenziale collisione semantica col dominio telco/carrier (analoga all'esclusione 61.10.x fatta per networking). Da validare a valle prima di indicizzare.",
+    "datacenter_colocation vs cloud_infrastructure: operatori che gestiscono datacenter propri ed erogano cloud sopra (hyperscaler/colo+cloud) hanno footprint misto facility+IaaS; un'azienda reale di questo tipo puo attivare entrambi i concetti, bleed atteso e legittimo.",
+    "virtualization vs cloud_infrastructure: il termine generico 'virtual machine' compare in entrambi gli embedding_text; sebbene gli alias hypervisor (ESXi/vCenter) vs servizio (IaaS/VDC) divergano, le frasi restano vicine. Vedi merge_flag.",
+    "managed_services vs digital_workplace: entrambi condividono ATECO 62.20.10/62.20.20 e il framing 'gestione/amministrazione' (endpoint management vs gestione infrastruttura). La separazione regge solo sul vocabolario di brand (Microsoft 365/Intune/UEM vs RMM/NOC); aziende MSP che fanno anche modern workplace Microsoft potrebbero attivare entrambi i concetti.",
+    "system_integration vs managed_services: condividono 62.20.10 e il lessico 'infrastrutture IT'; il discrimine e build-progettuale vs run-continuativo. Una system integration con clausola di manutenzione post go-live puo bleedare su managed_services.",
+    "it_support_helpdesk vs managed_services: 'supporto/SLA' e termine ponte; un MSP con service desk integrato puo attivare entrambi. Il discrimine ticketing/incident-utente vs RMM/patch/NOC e l'unico segnale testuale.",
+    "Tutti e quattro i fratelli services condividono per design gran parte dei codici 62.20.xx/62.90.xx: l'ATECO non discrimina nel cluster (modello B), quindi qualsiasi degradazione del segnale embedding fa collassare la separazione interna.",
+    "software_development vs software_product: ATECO identici sul piano dichiarativo (62.10.00 dominante per entrambi) e l'alias 'software house' e' usato dal mercato indistintamente per chi fa commessa e chi fa prodotto. La sola leva testuale (modello prodotto/licenza vs commessa) non basta quando l'azienda non esplicita il modello di delivery; residuo di bleed non eliminabile col solo embedding_text.",
+    "Il quartetto horizontal software_product / erp_crm / lowcode_platform / vertical_business_software condivide tutti i 3 ATECO (58.29.00 / 62.10.00 / 62.20.10): la disambiguazione e' interamente lessicale. Aziende con copy generico ('soluzioni software, piattaforma SaaS') senza nominare il dominio funzionale (ERP/CRM, low-code/RPA) o la filiera (sanita/legale) ricadranno per default su software_product.",
+    "ai_ml e data_platform condividono 62.10.00 e 62.20.10 e nel mercato i fornitori 'data & AI' offrono entrambi (data engineering + ML); su descrizioni che citano 'analytics e AI' insieme l'assegnazione resta ambigua nonostante il vocabolario distinto (training/inferenza vs warehouse/ETL).",
+    "devops vs system_integration (contrasto, layer services) e devops vs cloud_infrastructure: 'integrazione cloud/on-prem' e 'platform engineering' possono attrarre testi di system integration e cloud; mitigato puntando su CI/CD/GitOps/SRE ma residuo su provider 'cloud & DevOps'.",
+    "iot_platform: l'esclusione ATECO usava 61.90.99 che NON esiste nel KB (codice reale = 61.90.90 'Altre attivita di telecomunicazioni n.c.a.'); corretto in 61.90.90. Resta bleed potenziale verso iot_connectivity (telecom) per aziende che offrono sia piattaforma sia connettivita SIM.",
+    "soc_mdr vs managed_services (contrasto): la parola 'managed/gestita' e i codici operations (62.20.20) sono condivisi; il SIEM/XDR/threat-hunting dovrebbe separarli ma un MSP che fa anche monitoraggio sicurezza rischia bleed bidirezionale.",
+    "cybersecurity_services vs grc_compliance: 'audit di sicurezza' e 'sicurezza informatica' creano un'area grigia; aziende che fanno sia assessment tecnico sia advisory ISO27001/NIS2 attireranno entrambi i concetti.",
+    "firewall_network_security vs networking (contrasto): VPN e gestione apparati di rete sono ambigui; un'azienda di reti che installa anche firewall puo attirare entrambi nonostante NGFW/UTM/IPS/IDS siano discriminanti.",
+    "Tutti e cinque i concetti security condividono lo stesso piccolo set ATECO (62.20.10/62.20.20/62.90.09); il perimetro ATECO non discrimina dentro il cluster e l'intero peso ricade su embedding+reranker (lessico distintivo), come da modello B.",
+    "identity_access vs cybersecurity_services: l'IAM e' spesso parte di un'offerta cyber piu ampia; aziende che listano sia 'sicurezza informatica' generica sia IAM possono generare bleed verso cybersecurity_services.",
+    "61.90.90 (Altre attivita di telecomunicazioni n.c.a.) e' un codice-catch-all condiviso da voip_uc, messaging_notifications, iot_connectivity e telecom_operator: come segnale ATECO e' quasi inutile per discriminare dentro il cluster telecom. La discriminazione di questi quattro deve poggiare interamente sul testo (cloud PBX/SIP vs SMS/A2P vs SIM IoT/M2M vs carrier di rete). Verificare a valle ogni collisione che ricade solo su 61.90.90.",
+    "telecom_operator vs internet_service_provider: doppio overlap ATECO (61.10.01 + 61.90.10) non risolvibile col solo testo perche' entrambi usano legittimamente 'fibra/FTTH/banda larga'. Ho spinto telecom_operator sul lessico di esercizio rete multi-accesso (mobile, satellitare, MNO, spettro, licenza) e ISP sul lessico IP/routing (peering, transito IP, BGP, autonomous system, assegnazione IP) per massimizzare la distanza, ma il bleed residuo resta alto per i soggetti che sono entrambe le cose.",
+    "voip_uc tiene 62.20.10 (consulenza informatica) come fit debole per system integrator di centralini: codice largamente condiviso con system_integration e managed_services, quindi nessun potere discriminante; e' solo un soft-recall, va verificato a valle. Il fit core resta 61.90.90.",
+    "iot_connectivity ancora 61.20.00 (rivendita/intermediazione telecom = MVNO/reseller) come codice piu' distintivo, ma 61.20.00 e' generico per qualunque MVNO/reseller telecom (anche reseller ISP/voce); il segnale forte resta il testo SIM IoT/M2M/LPWAN, non il codice.",
+    "computer_hardware vs ict_wholesale: ATECO 46.50.10 e condiviso. Il bleed testuale e smorzato (vocabolario di prodotto-finito vs vocabolario di canale/distribuzione/VAR), ma un'azienda con descrizione generica di 'commercio hardware' puo matchare entrambi. Disambiguare a valle: presenza di lessico di canale (distributore, grossista, broadline, VAR, volumi) -> ict_wholesale; lessico di prodotto specifico (PC, server, workstation, periferiche) -> computer_hardware.",
+    "electronics_manufacturing_ems con 26.11.00: 26.11.00 (fabbricazione di componenti elettronici) copre la produzione del singolo componente non assemblato, che e affine ma non identico all'EMS (assemblaggio conto terzi di schede). Mantenuto come secondario ma da verificare a valle: un fabbricante di soli componenti (semiconduttori/connettori) non e un EMS e potrebbe matchare per errore.",
+    "network_equipment vs networking (infrastructure): bleed residuo sul termine 'apparati di rete'. Il prodotto fisico (router/switch/modem/gateway come merce) si distingue dal servizio di progettazione/gestione reti (LAN/WAN/SD-WAN), ma aziende che vendono+installano+gestiscono apparati possono attivare entrambi.",
+    "communication_equipment_installation vs network_equipment: il confine produzione/fornitura vs installazione/messa-in-servizio dello stesso tipo di apparato telecom puo confondersi per aziende integratrici che fanno sia fornitura sia commissioning. Disambiguare sui verbi di campo (installazione, montaggio, commissioning, BTS) presenti nel testo.",
+    "fiber_cables vs telecom_civil_works: rischio residuo basso ma reale sul termine 'fibra ottica'. Il testo e ancorato al media fisico manufatturato (strand, singlemode/multimode, patch cord, connettore) mentre i civil works usano scavi/posa/tiratura/soffiaggio/giunzione; un'azienda che produce E posa la fibra puo attivare entrambi.",
+    "ATECO 46.50.10 (ingrosso computer/periferiche/software) e condiviso tra ict_wholesale e il trade-side di computer_hardware: una software/hardware house che vende all'ingrosso ma e percepita come 'produttore/commercio di prodotto' puo cadere nel codice 46.50.10 pur essendo semanticamente piu vicina a computer_hardware. Il testo discrimina sul canale (sell-in/sell-through, VAR, broadline), ma aziende ibride produttore+distributore restano a rischio di bleed e vanno disambiguate dal perimetro ATECO, non dal solo embedding.",
+    "Il termine 'value-added distributor / VAD' puo attrarre profili di system integration o managed services (valore aggiunto tecnico) che NON sono wholesale; il rischio e mitigato dall'ancoraggio a 'canale', 'rivenditori', 'volume' ma resta un bleed residuo verso concetti di servizi ICT a valore aggiunto non presenti in questo cluster.",
+    "industrial_automation_ot e building_av_automation condividono interamente il loro footprint ATECO-in-KB (62.20.10 consulenza, 62.10.00 programmazione): la KB ICT non contiene codici manifatturieri di strumentazione/quadri (26.51.x, 27.12.x) ne installazione macchine industriali (33.20.09) ne ingegneria (71.12.10), quindi questi due settori sono separabili SOLO dal vocabolario embedding (PLC/SCADA/DCS/fieldbus di processo vs KNX/DALI/BACnet/AV). Retrieval per solo-ATECO non li distingue: dipende dal segnale testuale.",
+    "industrial_automation_ot vs iot_platform: bleed residuo sul confine telemetria/edge. OT puro (PLC/SCADA/DCS/Modbus/Profibus/OPC-UA, controllo di processo deterministico real-time) e ancorato da vocabolario, ma aziende che fanno 'industrial IoT'/edge-gateway possono attivare entrambi i concetti; il testo IoT Platform e gia centrato su device management/MQTT/digital twin lato software, l'overlap non e eliminabile col solo testo OT.",
+    "building_av_automation vs communication_equipment_installation: entrambi possono rivendicare 33.20.02 (installazione apparecchiature per comunicazioni/radiotelevisive). Disambiguati nel testo (KNX/DALI/AV/room booking vs antenne/ponti radio/BTS), ma sullo strato ATECO il codice 33.20.02 e condiviso: integratori AV che montano anche distribuzione segnale possono generare ambiguita.",
+    "industrial_automation_ot, building_av_automation, system_integration e networking condividono 62.20.10/62.10.00 nella KB: il cardine ATECO ICT collassa molti settori tecnici sotto consulenza/programmazione informatica. La separazione e demandata quasi per intero al segnale embedding; rischio bleed verso System Integration per descrizioni aziendali generiche ('integrazione di sistemi industriali').",
+    "Possibile bleed con identity_access: i termini 'controllo accessi' e 'lettori badge' sono condivisi col mondo IAM (un badge fisico e anche una credenziale di autenticazione). Il qualificatore 'fisico' e il contesto impiantistico (varchi/tornelli) attenuano ma non eliminano il rischio; un'azienda di physical access control con offerta convergente logico-fisico potrebbe collassare verso identity_access.",
+    "Aziende installatrici generaliste che fanno sia videosorveglianza sia altri impianti elettrici/domotica (ATECO 43.21.x) potrebbero matchare debolmente questo concetto pur non essendo specialiste di sicurezza; il footprint impiantistico genera attrazione di confine non risolvibile col solo testo.",
+    "Il vocabolario e fortemente in italiano e orientato all'installazione; aziende a forte profilo software (VMS, video analytics AI) potrebbero non agganciarsi pienamente e disperdersi verso concetti software/AI fuori da questo layer.",
+    "web_agency vs ecommerce_retailer: il termine condiviso 'e-commerce' resta calamitante; un retailer che descrive il proprio shop online ('realizzazione e-commerce', 'Shopify', 'Magento') puo attrarre web_agency. Il discriminante 'su commessa dei clienti / chiavi in mano' aiuta ma il bleed sull'asse e-commerce non e azzerato col solo testo.",
+    "web_portal_media vs digital_marketing: 'advertising programmatico' compare in entrambi (qui come monetizzazione dell'audience, in digital_marketing come servizio di media buying). Il termine puo avvicinare i due embedding; il contesto 'gestisce in proprio testata/audience' lo mitiga ma non lo elimina.",
+    "web_portal_media vs ecommerce_retailer: 'marketplace' e ambiguo — qui inteso come piattaforma-marketplace operata in proprio (commissioni/audience), mentre un marketplace seller e retail. Possibile bleed sull'asse marketplace.",
+    "web_portal_media testate native digitali: gli ATECO editoria 58.13/58.14 sono off-stack rispetto alla KB ICT; se in KB compaiono aziende editoriali registrate su quei codici resteranno non coperte da 63.91/63.92 (limite di scope, non risolvibile col testo).",
+    "ecommerce_retailer vs web_agency: il token 'e-commerce' e i nomi di piattaforma (Shopify, Magento) compaiono in entrambi i mondi; un'azienda che realizza e-commerce per clienti puo' essere attratta dal vettore del retailer. Mitigato spostando il peso su checkout/gestione ordini/spedizioni/resi al consumatore (atti di vendita propria) ma il bleed residuo resta se il testo aziendale enfatizza la piattaforma senza chiarire chi vende.",
+    "ecommerce_retailer vs ict_wholesale: entrambi 'vendono prodotti'; la distinzione regge solo se il segnale al-dettaglio/consumatore-finale vs all'ingrosso/canale e' esplicito nel testo aziendale. Un distributore con vetrina online B2B2C puo' confondersi.",
+    "Rischio ATECO non risolvibile col solo embedding_text: la frammentazione merceologica dei retailer specializzati (registrati sul codice prodotto 47.2x-47.7x invece che su 47.9x) puo' far mancare il match ATECO esatto per molte aziende del settore; necessario allargare ateco_in_kb dopo verifica sul campione reale.",
+    "Bleed residuo verso web_agency: aziende che offrono sia realizzazione siti sia campagne (full-service agency) potrebbero attrarre entrambi i concetti; l'ancoraggio sui termini di media buying/programmatic riduce ma non elimina la sovrapposizione per le agenzie ibride.",
+    "Bleed residuo verso messaging_notifications sul termine 'email': anche limitando il corpo ai termini di campagna, l'alias 'email marketing' conservato nell'elenco puo avvicinare il concetto al delivery email; rischio basso perche il contrasto usa vocabolario transazionale (A2P, CPaaS, OTP, gateway) assente qui.",
+    "ATECO 73.11.0/73.12.0 sono fuori dal core ICT della KB: se il retrieval pesa molto i codici ATECO di stack, questo concetto puo risultare sotto-rappresentato rispetto ai siblings IT; da verificare in fase di tuning del retrieval.",
+    "it_training vs aziende IT-service/system-integrator (altro layer/vertical): un fornitore ICT con divisione academy o che eroga corsi prodotto puo attrarre questo concetto; il testo distingue con lessico di erogazione formativa (docenti, aule, certificazione) ma il bleed resta possibile per le aziende ibride implementazione+formazione.",
+    "it_training vs generic_consulting: residuo basso ma presente perche entrambi sono servizi professionali B2B di upskilling; mitigato dal vocabolario tecnico-certificativo vs gestionale-strategico, non eliminabile solo col testo per consulenze che includono training.",
+    "ateco_in_kb 85.59.90 e generico (altri servizi di istruzione nca) e calamita anche scuole/formazione non-IT: il potere discriminante poggia interamente sul vocabolario ICT del testo, non sul codice ATECO che e condiviso con altra formazione professionale.",
+    "office_equipment vs ict_wholesale: i nodi ATECO 46.14.03 e 46.50.30 sono codici di commercio all'ingrosso/intermediazione di macchine per ufficio, semanticamente vicini al footprint del distributore ICT (ict_wholesale). Il testo lo separa col vocabolario print/MFP/MPS, ma un'azienda grossista di macchine ufficio puro (senza print management) puo' attrarre entrambi i concetti via embedding.",
+    "office_equipment vs computer_hardware: la 'multifunzione MFP' e le periferiche di stampa confinano col vocabolario periferiche/peripheral di computer_hardware; il bleed e' contenuto puntando su fotocopiatrici/MPS/gestione documentale che hardware non usa, ma resta un rischio residuo sul termine generico 'periferiche'.",
+    "Noleggio puro (77.33.00 - Noleggio macchine e attrezzature per ufficio) NON e' nei nodi KB e quindi escluso da ateco_in_kb; le aziende di solo noleggio operativo stampanti potrebbero non essere coperte dai codici elencati.",
+    "generic_consulting vs grc_compliance: residuo di bleed sull'asse 'consulenza/advisory/rischio/audit'. Mitigato spostando la firma GRC su sigle normative (ISO27001/NIS2/GDPR/DORA, SGSI, DPO) e tenendo qui solo 'controllo di gestione/risk management gestionale' generalista; ma una PMI che fa risk management organizzativo puo ancora avvicinare entrambi.",
+    "generic_consulting vs it_staffing_bodyrental: il termine 'consulente' presso il cliente puo attrarre lo staffing (T&M, body rental). Mitigato evitando lemmi di fornitura-persone (somministrazione, contractor, time and material) e ancorando a deliverable progettuali (business plan, riorganizzazione, change management), ma resta un rischio se l'azienda target si descrive come 'consulenza ICT a progetto'.",
+    "ateco_in_kb 69.20.30 (consulenza fiscale/tributaria) e codice di confine con la division 69 (commercialisti): tenuto solo per coprire l'asse fiscale degli alias; se si vuole un concetto di pura consulenza direzionale (div. 70) va rimosso e va ristretto l'embedding_text. Da verificare a valle.",
+    "Bleed residuo verso Fiber Optic Cables [hardware]: entrambi condividono il token 'fibra ottica'. Mitigato spostando il peso lessicale su azioni di cantiere (scavo, soffiaggio, giunzione) ma una query generica 'fibra ottica' puo ancora attrarre entrambi.",
+    "Bleed residuo verso Telecom Operator [telecom] sul termine 'FTTH/rete TLC': un'azienda che fa sia infrastrutturazione sia erogazione (carrier verticalmente integrato) puo cadere in mezzo; il segnale discriminante resta la presenza di vocabolario di opere civili.",
+    "Ambiguita ATECO: 42.22.00 e un codice misto energia+telecomunicazioni e 43.21.0x copre cablaggi elettrici in genere; nessuno e specifico al 100% per la posa fibra TLC, quindi possibile attrazione spuria da imprese di scavi/cablaggi generici.",
+    "Bleed residuo verso software_development: i contractor IT forniti in staffing sono spesso sviluppatori, quindi alias come 'sviluppatori a contratto' e 'profili ICT' condividono il campo lessicale di 'sviluppo software'; il segnale discriminante resta il vocabolario della fornitura di persone (somministrazione/contractor/T&M), che e debole se l'azienda descrive i profili per competenza tecnica anziche per modello di ingaggio.",
+    "Bleed residuo verso generic_consulting: 'consulenti a tempo e materiale' e 'consulenza del lavoro' giuslavoristica condividono la radice 'consulen-' con il management consulting; il termine 'consulente' da solo non discrimina, serve il contesto somministrazione/profili per ancorare lo staffing.",
+    "ATECO non discriminante: 78.10/78.20 coprono ogni somministrazione (non solo IT) e tipicamente NON sono i codici dichiarati da un'azienda di IT staffing (che spesso usa 62.0x/70.22), quindi il grounding ATECO ha basso potere di separazione rispetto al solo embedding testuale.",
+    "Il termine 'outsourcing' e 'gestione processi per conto terzi' e condiviso lessicalmente con Managed Services (outsourcing IT): residuo bleed possibile su query generiche di 'outsourcing'. Mitigato ancorando il vocabolario BPO a relazione cliente/amministrativo (contact center, teleselling, recupero crediti) anziche infrastruttura/SLA tecnici.",
+    "'back-office' e 'supporto' possono attrarre debolmente IT Support / Help Desk; il rischio e basso perche il footprint BPO e dominato da customer care telefonico e telemarketing, vocabolario assente nei due contrasti IT.",
+    "ATECO del settore (82.20.00 call center, 82.99.99/82.99.40 altri servizi di supporto alle imprese, 66.19.21 recupero crediti) NON sono codici ICT: questa KB e ICT-centrica, quindi ateco_in_kb resta vuoto e i codici vanno gestiti off-stack a valle (verificare mapping 82.20.00 e 66.19.21).",
+    "Residuo verso it_support_helpdesk: il termine generico \"assistenza tecnica\"/\"troubleshooting\" puo attrarre debolmente query di supporto utente. Mitigato ancorando il testo a sostantivi fisici di banco (dissaldatura, schede madri, display, ricambi, laboratorio) che l'help desk non usa.",
+    "Il sotto-codice 95.10.21/95.10.29 (riparazione apparecchiature di comunicazione: telefoni/tablet) puo generare bleed con eventuali concetti futuri di riparazione mobile/telefonia dedicata, se introdotti in altri layer.",
+    "data_entry_digitization vs bpo_callcenter: l'asse 'servizio documentale per conto terzi / back-office in outsourcing' e' condiviso. La separazione regge solo finche' il vocabolario fisico-documentale (scansione, OCR, dematerializzazione) e' presente nel testo aziendale; per aziende descritte genericamente come 'gestione documentale in outsourcing' senza menzione di scansione/OCR il bleed verso BPO resta probabile e non risolvibile col solo embedding_text.",
+    "Copertura ATECO incompleta: i codici fisico-documentali piu' propri (82.19 preparazione documenti, 63.99 conservazione/dematerializzazione) non sono in KB. Aziende classificate solo su questi codici non verranno agganciate al concetto fino all'aggiunta a valle.",
+    "gis_surveying contiene 'georeferenziazione' e 'dati territoriali': il token 'dati' puo' generare bleed residuo verso data_platform/software_development per aziende geo-IT ibride (GIS web, SDI software). Il rischio e' contenuto perche' il footprint dominante e' fisico-cartografico, ma per aziende che vendono piattaforme software GIS la distinzione testo-only resta debole.",
+    "Le ATECO 71.12.30/71.12.50 sono adiacenze sotto 71.12 ma il cardine semantico (cartografia/aerofotogrammetria) e' 71.12.40; aziende solo-topografia (geometri) o solo-geologia potrebbero attrarre debolmente verso questo concetto generalista invece di un eventuale concetto piu' specifico — da monitorare se la KB aggiunge sotto-settori engineering."
+  ],
   "concepts": [
     {
       "id": "cloud_infrastructure",
       "name": "Cloud Infrastructure",
-      "domain": "Infrastructure",
       "layer": "infrastructure",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "cloud",
         "private cloud",
@@ -29,27 +151,19 @@
         "compute elastico",
         "cloud provider"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "63.10.10",
         "62.20.10",
         "62.20.20"
       ],
-      "ateco_candidates_excluded": [],
       "embedding_text": "Cloud Infrastructure. IaaS: provisioning self-service ed elastico di compute e virtual datacenter (VDC) su cloud privato, pubblico e ibrido, fatturato a consumo. IaaS, infrastructure as a service, private cloud, public cloud, hybrid cloud, virtual datacenter, VDC, compute elastico on-demand, infrastruttura cloud, cloud provider.",
-      "ateco_in_kb_all": [
-        "63.10.10",
-        "62.20.10",
-        "62.20.20"
-      ],
       "sibling_contrast_notes": "Il vocabolario distintivo (IaaS, provisioning self-service/elastico, compute on-demand a consumo, virtual datacenter/VDC, private/public/hybrid cloud) e il footprint discriminante. vs Hosting: risorse infrastrutturali astratte e scalabili a consumo, non piani su singoli server/VPS gestiti. vs Datacenter/Colocation: servizio di calcolo virtuale erogato, non struttura fisica (rack, housing). vs Virtualization: lessico di servizio/consumo cloud, non lo strato hypervisor (ESXi, vCenter). vs Edge/CDN: assenti PoP/caching/acceleration. ATECO mantenuti: 63.10.10 (elaborazione dati/hosting), 62.20.10 e 62.20.20 (gestione/installazione infrastrutture IT), coerenti coi cloud provider IaaS."
     },
     {
       "id": "datacenter_colocation",
       "name": "Datacenter / Colocation",
-      "domain": "Infrastructure",
       "layer": "infrastructure",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "data center",
         "datacenter",
@@ -69,23 +183,17 @@
         "raffreddamento",
         "alimentazione ridondata"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "63.10.10"
       ],
-      "ateco_candidates_excluded": [],
       "embedding_text": "Datacenter / Colocation. Strutture datacenter carrier-neutral con spazi rack/cage, alimentazione e raffreddamento ridondati, certificazioni Tier III/IV Uptime Institute, PUE, meet-me room. data center, datacenter, colocation, colocazione, housing, rack, cage, carrier-neutral, Tier IV, PUE, meet-me room, server farm.",
-      "ateco_in_kb_all": [
-        "63.10.10"
-      ],
       "sibling_contrast_notes": "Footprint distintivo: lessico della struttura fisica/facility (rack/cage, alimentazione e raffreddamento ridondati, Tier III/IV Uptime Institute, PUE, meet-me room, carrier-neutral). Cloud Infrastructure usa lessico logico/virtuale (IaaS, VDC), Hosting quello applicativo/server (web hosting, VPS), nessuno di questi termini di facility ricorre li. ATECO 63.10.10 confermato (elaborazione dati, hosting e attivita connesse: condiviso con cloud/hosting/storage, ma la KB discrimina via embedding_text)."
     },
     {
       "id": "hosting",
       "name": "Hosting",
-      "domain": "Infrastructure",
       "layer": "infrastructure",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "hosting",
         "web hosting",
@@ -101,23 +209,18 @@
         "registrazione domini",
         "domain registration"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "63.10.10"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Hosting. Hosting provider: piani di shared hosting, VPS, server dedicati e managed hosting con pannelli cPanel/Plesk, hosting di siti ed email, registrazione domini. hosting, web hosting, shared hosting, managed hosting, server dedicati, dedicated server, VPS, hosting applicativo, email hosting, cPanel, Plesk, registrazione domini, domain registration.",
-      "ateco_in_kb_all": [
-        "63.10.10"
-      ],
       "sibling_contrast_notes": "Footprint distintivo: lessico del provider di hosting (shared/managed hosting, VPS, server dedicati, pannelli cPanel/Plesk, registrazione domini). vs Cloud Infrastructure: piani-servizio su server, non IaaS/VDC/compute elastico a consumo. vs Datacenter/Colocation: server gestiti, non rack/housing/spazio fisico. vs Web Agency: eroga lo spazio server dove girano i siti, non li realizza per i clienti (cPanel/VPS/domini vs WordPress/Shopify/web design). ATECO 63.10.10 (elaborazione dati, hosting e attivita connesse) confermato."
     },
     {
       "id": "storage",
       "name": "Storage",
-      "domain": "Infrastructure",
       "layer": "infrastructure",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "storage",
         "block storage",
@@ -133,27 +236,20 @@
         "Ceph",
         "NetApp"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "63.10.10",
         "62.20.20",
         "46.50.10"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Storage. Enterprise storage array e tier di capacita: block, file e object storage su SAN/NAS. storage, block storage, file storage, object storage, SAN, NAS, iSCSI, Fibre Channel, all-flash array, software-defined storage, S3, Ceph, NetApp.",
-      "ateco_in_kb_all": [
-        "63.10.10",
-        "62.20.20",
-        "46.50.10"
-      ],
       "sibling_contrast_notes": "Footprint distintivo: lo strato di persistenza/capacita (array, tier block/file/object, SAN, NAS, iSCSI, Fibre Channel, all-flash, SDS/Ceph). vs Backup/Disaster Recovery: fornisco il volume e i protocolli del disco, non i workflow di protezione (RPO/RTO, snapshot, replica, failover, DRaaS). vs Virtualization: lessico storage-fabric e protocolli disco, non hypervisor/compute (VMware, vSphere, KVM). ATECO confermati: 63.10.10 (object/storage-as-a-service su infra hosting), 62.20.20 (gestione storage), 46.50.10 (commercio ingrosso hardware/array)."
     },
     {
       "id": "virtualization",
       "name": "Virtualization",
-      "domain": "Infrastructure",
       "layer": "infrastructure",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "virtualizzazione",
         "VMware",
@@ -166,27 +262,20 @@
         "hypervisor",
         "VDI"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.20.20",
         "62.20.10",
         "63.10.10"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Virtualization. Virtualizzazione server, deployment di hypervisor e VDI. virtualizzazione, VMware, vSphere, ESXi, vCenter, Hyper-V, KVM, Proxmox, hypervisor, virtual machine, VDI.",
-      "ateco_in_kb_all": [
-        "62.20.20",
-        "62.20.10",
-        "63.10.10"
-      ],
       "sibling_contrast_notes": "Footprint distintivo: lo strato hypervisor (ESXi, vCenter, vSphere, Hyper-V, KVM, Proxmox, VDI) — tecnologia di astrazione delle macchine virtuali. vs Cloud Infrastructure: la tecnologia hypervisor on-premise, non l'erogazione cloud-as-a-service a consumo (IaaS, public/hybrid cloud, VDC). vs Storage: virtual machine e calcolo, non dispositivi/protocolli di persistenza (SAN, NAS, object storage, S3, Ceph). ATECO 62.20.20/62.20.10/63.10.10 confermati e presenti in KB."
     },
     {
       "id": "networking",
       "name": "Networking",
-      "domain": "Infrastructure",
       "layer": "infrastructure",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "networking",
         "reti aziendali",
@@ -200,27 +289,21 @@
         "network design",
         "gestione reti"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.20.10",
         "62.20.20"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "43.21.02"
       ],
       "embedding_text": "Networking. Progettazione e gestione di reti aziendali LAN/WAN/Wi-Fi, configurazione di VLAN, routing e SD-WAN. networking, reti aziendali, LAN, WAN, Wi-Fi, VLAN, routing, SD-WAN, network design, gestione reti.",
-      "ateco_in_kb_all": [
-        "62.20.10",
-        "62.20.20"
-      ],
       "sibling_contrast_notes": "Footprint distintivo: servizi di progettazione/configurazione/gestione della rete (VLAN, routing, SD-WAN, network design, LAN/WAN/Wi-Fi). vs Network Equipment: servizio, non apparati come prodotto hardware (router/switch/access point/CPE). vs Firewall/Network Security: assente lessico di sicurezza (firewall, VPN, NGFW). vs Telecom Civil Works: assente scavo/posa fibra/opere civili. ATECO 62.20.10 (consulenza informatica) e 62.20.20 (gestione strutture informatiche) confermati; 43.21.02 (impianti elettrici) escluso (ricade in Telecom Civil Works); 61.10.x (telco da carrier) volutamente esclusa per evitare collisione col dominio telco."
     },
     {
       "id": "backup_dr",
       "name": "Backup / Disaster Recovery",
-      "domain": "Infrastructure",
       "layer": "infrastructure",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "backup",
         "disaster recovery",
@@ -238,27 +321,20 @@
         "immutable backup",
         "Veeam"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "63.10.10",
         "62.20.20",
         "62.20.10"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Backup / Disaster Recovery. Backup e ripristino dati, DRaaS e business continuity con obiettivi RPO/RTO, snapshot, replica e failover del sito. backup, BaaS, disaster recovery, DRaaS, ripristino dati, restore, business continuity, continuità operativa, replica dati, snapshot, RPO, RTO, failover, immutable backup, Veeam.",
-      "ateco_in_kb_all": [
-        "63.10.10",
-        "62.20.20",
-        "62.20.10"
-      ],
       "sibling_contrast_notes": "Footprint distintivo: protezione/recuperabilita del dato (RPO/RTO, ripristino, snapshot, replica, failover, immutable backup, DRaaS/BaaS, business continuity). vs Storage: garantisco recuperabilita e continuita, non capacita/supporto (SAN, NAS, object storage, S3, Ceph, NetApp). vs Managed Services: data protection specifica (DRaaS, RTO, failover), non gestione IT generica (MSP, outsourcing, RMM, NOC). ATECO confermati: 63.10.10 (DRaaS/cloud backup), 62.20.20 (backup gestito), 62.20.10 (progettazione BC/DR)."
     },
     {
       "id": "edge_cdn",
       "name": "Edge / CDN",
-      "domain": "Infrastructure",
       "layer": "infrastructure",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "CDN",
         "content delivery network",
@@ -275,23 +351,18 @@
         "accelerazione contenuti",
         "origin offload"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "63.10.10"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Edge / CDN. Content delivery network ed edge computing: PoP, edge node, anycast e caching per accelerare e distribuire contenuti web. CDN, content delivery network, edge computing, edge node, PoP, point of presence, anycast, caching, content acceleration, accelerazione contenuti, origin offload.",
-      "ateco_in_kb_all": [
-        "63.10.10"
-      ],
       "sibling_contrast_notes": "Footprint distintivo: distribuzione/accelerazione di contenuti (CDN, PoP/point of presence, edge node, anycast, caching, content acceleration, origin offload). vs Cloud Infrastructure: lo strato edge che serve/accelera contenuti, non compute IaaS/VDC. vs Hosting: accelero l'origine, non la ospito (web/app hosting, VPS, server dedicati). ATECO: 63.10.10 primario (infrastrutture informatiche, hosting e attivita connesse); 61.90.10 (accesso a Internet) e 61.90.90 (altre attivita di telecomunicazioni) plausibili per operatori CDN/edge con forte componente di rete — da verificare a valle, KB priva di codice ATECO dedicato a CDN."
     },
     {
       "id": "managed_services",
       "name": "Managed Services",
-      "domain": "IT Services",
       "layer": "services",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "managed services",
         "servizi gestiti",
@@ -304,27 +375,20 @@
         "patch management",
         "monitoraggio proattivo"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.20.20",
         "62.20.10",
         "62.90.09"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Managed Services. Gestione operativa continuativa dell'infrastruttura IT del cliente in outsourcing con SLA e canone ricorrente: monitoraggio proattivo 24x7, RMM, patch management, gestione NOC, manutenzione sistemi e reti. managed services, servizi gestiti, MSP, managed service provider, outsourcing IT, gestione infrastruttura, RMM, NOC, patch management.",
-      "ateco_in_kb_all": [
-        "62.20.20",
-        "62.20.10",
-        "62.90.09"
-      ],
       "sibling_contrast_notes": "Vocabolario distintivo (gestione operativa continuativa in outsourcing, SLA, canone ricorrente, RMM, monitoraggio proattivo 24x7, patch management, NOC) ancora il concetto al run/manage dell'infrastruttura. Si separa da IT Support/Help Desk (lessico ticket/incident/service desk/L1-L2 end-user) perche gestisce i sistemi non gli utenti; da System Integration (build/integrazione middleware una-tantum) perche e ongoing. ATECO 62.20.20 (gestione strutture informatiche) e il core esatto; 62.20.10 (consulenza, condiviso con System Integration) e 62.90.09 (servizi IT n.c.a.) secondari, plausibili ma a precisione minore."
     },
     {
       "id": "system_integration",
       "name": "System Integration",
-      "domain": "IT Services",
       "layer": "services",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "system integration",
         "system integrator",
@@ -336,25 +400,19 @@
         "migrazione dati",
         "interconnessione applicativi"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.20.10",
         "62.90.09"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "System Integration. Progetti di integrazione e interconnessione di applicativi e infrastrutture IT enterprise: middleware, ESB, API, connettori tra gestionali e piattaforme on-premise e cloud, migrazione dati e go-live. system integration, system integrator, integrazione sistemi, integrazione applicativa, middleware, ESB, API, migrazione dati.",
-      "ateco_in_kb_all": [
-        "62.20.10",
-        "62.90.09"
-      ],
       "sibling_contrast_notes": "Vocabolario IT-enterprise di build (middleware, ESB, API, connettori, applicativi gestionali, on-premise/cloud, migrazione, go-live) ancora il concetto all'integrazione software una-tantum. Si separa da Managed Services (gestione ongoing/MSP/canone) per la natura progettuale; da Industrial Automation/OT (PLC, SCADA, DCS) e Building/AV (KNX, BACnet, signage) per dominio; da CAD/PLM (software progettazione/ciclo vita prodotto) per oggetto. ATECO 62.20.10 (consulenza/system integration IT) e 62.90.09 confermati e coerenti."
     },
     {
       "id": "digital_workplace",
       "name": "Digital Workplace",
-      "domain": "IT Services",
       "layer": "services",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "digital workplace",
         "modern workplace",
@@ -371,25 +429,19 @@
         "gestione postazioni",
         "collaboration"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.20.10",
         "62.20.20"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Digital Workplace. Deployment e amministrazione della postazione end-user e delle suite di produttivita e collaboration cloud, con gestione dei device aziendali: Microsoft 365, Teams, SharePoint, Intune, Autopilot, MDM/UEM. modern workplace, postazione di lavoro digitale, Microsoft 365, Office 365, SharePoint, Teams, Intune, Autopilot, MDM, UEM, endpoint management, collaboration.",
-      "ateco_in_kb_all": [
-        "62.20.10",
-        "62.20.20"
-      ],
       "sibling_contrast_notes": "Si distingue da Managed Services (gestione continuativa generica dei sistemi IT del cliente) ancorandosi al vocabolario della postazione end-user e produttivita cloud: Microsoft 365/Office 365, Teams, SharePoint, Intune, Autopilot, MDM/UEM, endpoint management. Si distingue da System Integration (middleware/ESB/API server-side) perche opera sul device e sulla suite collaborativa dell'utente. ATECO 62.20.10 (consulenza informatica) e 62.20.20 (gestione strutture) confermati; condivisi coi fratelli services per design del modello B (discriminazione via embedding, non via ATECO)."
     },
     {
       "id": "it_support_helpdesk",
       "name": "IT Support / Help Desk",
-      "domain": "IT Services",
       "layer": "services",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "help desk",
         "service desk",
@@ -404,31 +456,24 @@
         "trouble ticket",
         "ITIL service desk"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.90.09",
         "62.90.01",
         "62.20.10"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "82.20.00",
         "95.10.10",
         "62.20.20"
       ],
       "embedding_text": "IT Support / Help Desk. Service desk e supporto L1/L2 agli utenti finali: incident management, ticketing ITIL, single point of contact, gestione richieste e troubleshooting remoto su SLA. help desk, service desk, supporto IT, assistenza utenti, supporto L1/L2, incident management, ticketing, single point of contact, end-user support.",
-      "ateco_in_kb_all": [
-        "62.90.09",
-        "62.90.01",
-        "62.20.10"
-      ],
       "sibling_contrast_notes": "Vocabolario distintivo (service desk, L1-L2, ticketing ITIL, incident management, single point of contact, end-user support) fissa il concetto all'assistenza utenti per ticket. Si separa da Managed Services (lessico ongoing management/MSP/RMM/NOC, gestisce sistemi non utenti); da Computer & Device Repair (break-fix hardware sul dispositivo) perche il lavoro e incident/request remoto su SLA; da BPO/Call Center (contact center generico per processi terzi) perche i ticket sono tecnico-informatici ITIL. ATECO in-KB: 62.90.09 (catch-all servizi ICT) e 62.90.01 (configurazione PC, supporto hands-on) i piu probabili; 62.20.10 (consulenza/assistenza) secondario. Off-stack 82.20.00, 95.11.00 e 62.20.20 (gestione strutture = managed_services) in excluded; da verificare a valle."
     },
     {
       "id": "software_development",
       "name": "Software Development",
-      "domain": "Software",
       "layer": "software",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "sviluppo software",
         "software development",
@@ -442,26 +487,21 @@
         "REST API",
         "system integration"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.10.00"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "58.29.00",
         "62.20.10"
       ],
       "embedding_text": "Software Development. Sviluppo di software su misura su commessa del cliente: applicazioni web, app mobile, backend e REST API, integrazione applicativa. software development, sviluppo software, software house, custom software, applicazioni web, app mobile, backend, REST API, sviluppo su commessa.",
-      "ateco_in_kb_all": [
-        "62.10.00"
-      ],
       "sibling_contrast_notes": "Vocabolario 'su misura / su commessa del cliente' separa da Software Product/ISV (prodotto pacchettizzato/edizione SaaS, ATECO 58.29.00 escluso). Termini 'backend, REST API, applicazioni web/mobile' = scrittura di codice applicativo, separa da DevOps (CI/CD, Kubernetes, platform engineering). Assenza di lessico CAD/CAE/PLM e di dominio di filiera lo distingue da CAD/PLM Engineering Software e Vertical/Industry Software. ATECO 62.10.00 (programmazione) unico; escludo 58.29.00 (edizione) e 62.20.10 (consulenza) per evitare drift verso ISV e consulenza. NOTA: l'alias 'software house' resta condiviso con software_product e l'ATECO 62.10.00 e' lo stesso usato dichiarativamente da entrambi: bleed residuo segnalato in merge_flags."
     },
     {
       "id": "software_product",
       "name": "Software Product / ISV",
-      "domain": "Software",
       "layer": "software",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "software vendor",
         "ISV",
@@ -474,25 +514,19 @@
         "abbonamento software",
         "release versionate"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "58.29.00",
         "62.10.00"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Software Product / ISV. Casa software che pubblica e commercializza un proprio prodotto a catalogo, con release versionate, listino licenze e abbonamenti SaaS multi-tenant. software vendor, ISV, edizione software, prodotto proprietario, licenza software, SaaS multi-tenant, abbonamento, release versionate.",
-      "ateco_in_kb_all": [
-        "58.29.00",
-        "62.10.00"
-      ],
       "sibling_contrast_notes": "Si separa da Software Development col vocabolario del modello di prodotto/publishing (prodotto proprietario a catalogo, edizione software, release versionate, listino licenze, abbonamenti SaaS multi-tenant) invece dello sviluppo su commessa. Distinto da ERP/CRM e Low-code/Automation perche non nomina categorie funzionali (gestionale, SAP, Salesforce) ne meccanismi (RPA, workflow, no-code); distinto da Vertical/Industry Software perche il prodotto e' orizzontale, senza filiera non-IT. ATECO 58.29.00 (Edizione di altri software) e' il codice cardine; 62.10.00 secondario. RIMOSSO l'alias 'software house' (condiviso col development, fonte di bleed) sostituito con 'casa software editrice'. Bleed residuo con software_development e vertical_business_software in merge_flags."
     },
     {
       "id": "devops",
       "name": "DevOps",
-      "domain": "Software",
       "layer": "software",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "DevOps",
         "CI/CD",
@@ -505,25 +539,19 @@
         "infrastructure as code",
         "pipeline di rilascio"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.10.00",
         "62.20.10"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "DevOps. Pipeline CI/CD di delivery, release automation, infrastructure as code e platform engineering. DevOps, CI/CD, Kubernetes, Docker, Terraform, GitOps, infrastructure as code, SRE, observability, platform engineering, pipeline di rilascio.",
-      "ateco_in_kb_all": [
-        "62.10.00",
-        "62.20.10"
-      ],
       "sibling_contrast_notes": "Vs Software Development (62.10.00 condiviso): vocabolario = pipeline di delivery e automazione del rilascio (CI/CD, GitOps, release automation, SRE), non costruzione di app web/mobile/API. Vs Cloud Infrastructure (layer infrastructure): resto sul lato software-delivery (pipeline, IaC, observability, platform engineering) mentre Cloud Infrastructure eroga IaaS/VDC; Terraform/Kubernetes qui sono strumenti di deploy, non offerta infrastrutturale. 'release automation/delivery pipelines' al posto del generico 'automation' per evitare overlap con Low-code/Automation. ATECO 62.10.00 (programmazione) e 62.20.10 (consulenza/configurazione IT), entrambi reali e in KB."
     },
     {
       "id": "ai_ml",
       "name": "AI / Machine Learning",
-      "domain": "Software",
       "layer": "software",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "intelligenza artificiale",
         "artificial intelligence",
@@ -542,27 +570,20 @@
         "computer vision",
         "MLOps"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.10.00",
         "62.20.10",
         "58.29.00"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "AI / Machine Learning. Addestramento e inferenza di modelli di machine learning, deep learning e reti neurali; NLP, computer vision, LLM, generative AI, MLOps. intelligenza artificiale, artificial intelligence, machine learning, deep learning, modelli predittivi, predictive models, LLM, generative AI, NLP, computer vision, MLOps.",
-      "ateco_in_kb_all": [
-        "62.10.00",
-        "62.20.10",
-        "58.29.00"
-      ],
       "sibling_contrast_notes": "Distinto da Data Platform: punta su training/inferenza di modelli, deep learning, reti neurali, NLP, computer vision, LLM, MLOps (lessico esclusivo AI), non su ETL/data warehouse/BI/pipeline (vocabolario di Data Platform). Distinto da Software Development perche usa lessico modellistico-statistico e non termini generici di sviluppo applicativo, e da IoT Platform (device management, telemetria). I 3 ATECO (62.10.00 sviluppo, 62.20.10 consulenza, 58.29.00 edizione) sono reali, in KB e gia seed di ai_ml; mantenuti. Bleed residuo con data_platform su fornitori 'data & AI' in overlap_warnings."
     },
     {
       "id": "data_platform",
       "name": "Data Platform",
-      "domain": "Software",
       "layer": "software",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "data platform",
         "data engineering",
@@ -577,29 +598,22 @@
         "OLAP",
         "reportistica e dashboard"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "63.10.29",
         "62.10.00",
         "62.20.10"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "63.10.21"
       ],
       "embedding_text": "Data Platform. Data engineering e business intelligence: data warehouse, data lake e lakehouse, pipeline ETL/ELT, modellazione OLAP e dashboard di reportistica. data platform, data engineering, business intelligence, BI, data warehouse, data lake, lakehouse, ETL, ELT, data pipeline, OLAP, reportistica.",
-      "ateco_in_kb_all": [
-        "63.10.29",
-        "62.10.00",
-        "62.20.10"
-      ],
       "sibling_contrast_notes": "Distinzione affidata al vocabolario di data-engineering infrastrutturale (data warehouse, data lake/lakehouse, ETL/ELT, OLAP, BI/dashboard) che non si sovrappone ad AI/ML (LLM, machine learning, computer vision): qui si spostano/modellano/aggregano dati, non si addestrano modelli. Lo stesso lessico separa da Data Entry/Document Digitization (data entry/scansione per conto terzi) e da GIS/Geospatial (cartografia/topografia/rilievi). ATECO: 63.10.29 'Elaborazione altri dati' e' l'anchor primario (verificato in KB: seed unico = data_platform); 62.10.00 e 62.20.10 secondari. Escluso 63.10.21 'Elaborazione dati contabili' (service contabile/data entry, verificato senza seed in KB), fonte di falsi match."
     },
     {
       "id": "erp_crm",
       "name": "ERP / CRM",
-      "domain": "Software",
       "layer": "software",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "ERP",
         "CRM",
@@ -612,27 +626,20 @@
         "Salesforce",
         "Odoo"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "58.29.00",
         "62.10.00",
         "62.20.10"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "ERP / CRM. Gestionale aziendale per contabilità, magazzino e ciclo ordini, e CRM con sales force automation e pipeline vendite. ERP, CRM, gestionale, sales force automation, contabilità e magazzino, ciclo ordini, SAP, Dynamics, Salesforce, Odoo.",
-      "ateco_in_kb_all": [
-        "58.29.00",
-        "62.10.00",
-        "62.20.10"
-      ],
       "sibling_contrast_notes": "Rispetto a Software Product/ISV (modello editoriale/licensing generico), il testo e' ancorato al DOMINIO FUNZIONALE: contabilita, magazzino, ciclo ordini, pipeline vendite, sales force automation, piu i marchi cardine SAP/Dynamics/Salesforce/Odoo. Rispetto a Vertical/Industry Software (filiera non-IT: sanita/legale/agro), resto su processi back-office e front-office orizzontali cross-settore. ATECO 58.29.00 (edizione), 62.10.00 (programmazione), 62.20.10 (consulenza) tutti reali e in KB. Bleed con vertical_business_software su ERP verticalizzati segnalato in merge_flags."
     },
     {
       "id": "lowcode_platform",
       "name": "Low-code / Automation Platform",
-      "domain": "Software",
       "layer": "software",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "low-code",
         "no-code",
@@ -647,27 +654,20 @@
         "piattaforma low-code",
         "process orchestration"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "58.29.00",
         "62.10.00",
         "62.20.10"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Low-code / Automation Platform. Piattaforme low-code/no-code, RPA e business process automation per citizen developer: visual app builder, BPM, iPaaS, orchestrazione di workflow. low-code, no-code, RPA, robotic process automation, workflow automation, BPM, iPaaS, visual app builder, automazione processi, citizen developer.",
-      "ateco_in_kb_all": [
-        "58.29.00",
-        "62.10.00",
-        "62.20.10"
-      ],
       "sibling_contrast_notes": "Si separa da Software Development (custom su codice) e Software Product/ISV (publishing di pacchetti/SaaS) col vocabolario low-code/no-code, RPA, BPM, iPaaS, visual app builder, citizen developer: piattaforme che generano applicazioni e automatizzano workflow senza scrittura di codice. Confine con DevOps: li l'automazione e' CI/CD/Kubernetes/GitOps dell'infrastruttura, qui automazione di processi applicativi/di business. ATECO 58.29.00/62.10.00/62.20.10 condivisi coi fratelli software (verificati reali e in KB); e' il vocabolario a separare."
     },
     {
       "id": "iot_platform",
       "name": "IoT Platform",
-      "domain": "Software",
       "layer": "software",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "piattaforma IoT",
         "IoT platform",
@@ -680,31 +680,24 @@
         "dashboard IoT",
         "MQTT broker"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.10.00",
         "58.29.00",
         "62.20.10"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "61.90.90",
         "26.30.09",
         "27.12.00"
       ],
       "embedding_text": "IoT Platform. Software per device management, provisioning e aggiornamento OTA del firmware, ingestione di telemetria dai dispositivi via MQTT, digital twin e dashboard IoT. piattaforma IoT, IoT platform, device management, ingestione telemetria, telemetry ingestion, digital twin, OTA firmware update, dashboard IoT, MQTT broker.",
-      "ateco_in_kb_all": [
-        "62.10.00",
-        "58.29.00",
-        "62.20.10"
-      ],
       "sibling_contrast_notes": "Si separa da AI/ML e Data Platform col vocabolario del ciclo di vita del dispositivo (device management, provisioning, OTA firmware, digital twin, MQTT) anziche model training o BI/warehouse/ETL. Si separa da IoT Connectivity (telecom) stando sul layer applicativo software (piattaforma, dashboard) anziche SIM/LPWAN/NB-IoT/rete, e da Industrial Automation/OT evitando DCS/PLC/SCADA: telemetria cloud e gestione parco dispositivi, non controllo di impianto. ateco_in_kb riusa i codici software condivisi (62.10.00, 58.29.00, 62.20.10), tutti verificati reali e in KB. CORREZIONE ateco_excluded: 61.90.99 NON esiste nel KB; sostituito con 61.90.90 'Altre attivita di telecomunicazioni n.c.a.', il codice reale. 26.30.09 e' in KB (apparecchiature comunicazioni); 27.12.00 plausibile ma non in KB ICT, tenuto come esclusione manifatturiera."
     },
     {
       "id": "cybersecurity_services",
       "name": "Cybersecurity Services",
-      "domain": "Cybersecurity",
       "layer": "security",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "cybersecurity",
         "sicurezza informatica",
@@ -719,25 +712,19 @@
         "phishing simulation",
         "code review sicurezza"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.20.10",
         "62.90.09"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Cybersecurity Services. Consulenza di sicurezza informatica con penetration test, vulnerability assessment, ethical hacking, red team e hardening dei sistemi su progetti puntuali. cybersecurity, sicurezza informatica, penetration test, ethical hacking, vulnerability assessment, red team, OWASP, security hardening, application security, phishing simulation.",
-      "ateco_in_kb_all": [
-        "62.20.10",
-        "62.90.09"
-      ],
       "sibling_contrast_notes": "Footprint = advisory e offensive testing su progetto/una-tantum: penetration test, ethical hacking, vulnerability assessment, red team, OWASP, hardening, code review sicurezza. SOC/MDR usa SIEM/XDR/EDR/threat hunting/incident response (operations continue); IAM usa IAM/PAM/SSO/MFA; Firewall/Network Security usa NGFW/UTM/IPS/IDS/vendor di rete; GRC usa ISO27001/NIS2/GDPR/audit; Electronic Security usa CCTV/videosorveglianza fisica. ATECO 62.20.10 (consulenza informatica) e 62.90.09 (altri servizi ICT n.c.a.) presenti in KB, condivisi coi fratelli per natura; disambiguazione lessicale."
     },
     {
       "id": "soc_mdr",
       "name": "SOC / MDR",
-      "domain": "Cybersecurity",
       "layer": "security",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "SOC",
         "MDR",
@@ -754,27 +741,20 @@
         "alert triage",
         "SOAR"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.20.20",
         "62.20.10",
         "62.90.09"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "SOC / MDR. Security operations center con rilevamento minacce 24/7, monitoraggio continuo e risposta agli incidenti gestita. SOC, MDR, managed detection and response, SIEM, XDR, EDR, SOAR, security monitoring, threat detection, threat hunting, alert triage, incident response, monitoraggio sicurezza 24/7.",
-      "ateco_in_kb_all": [
-        "62.20.20",
-        "62.20.10",
-        "62.90.09"
-      ],
       "sibling_contrast_notes": "Contrasto critico con Managed Services (condivide \"managed\"): qui il footprint e' SIEM/XDR/EDR/SOAR/threat hunting/alert triage/incident response/24-7, assente nella gestione IT generica (RMM/NOC/patch). Si separa da Cybersecurity Services (assessment/pentest una-tantum) per il carattere di operations continue di detection&response, e da Firewall/Network Security perche il fulcro e' detection&response su piattaforme SIEM/XDR, non appliance. ATECO 62.20.20 (gestione strutture informatiche, fit forte per managed operations), 62.20.10, 62.90.09 in KB; discriminazione demandata a embedding+reranker (modello B)."
     },
     {
       "id": "identity_access",
       "name": "Identity & Access Management",
-      "domain": "Cybersecurity",
       "layer": "security",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "IAM",
         "PAM",
@@ -792,25 +772,19 @@
         "directory services",
         "provisioning utenti"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.20.10",
         "62.20.20"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Identity & Access Management. Gestione del ciclo di vita delle identità digitali, provisioning utenti, autenticazione e governo degli accessi privilegiati. IAM, PAM, SSO, IGA, MFA, identity governance, single sign-on, privileged access management, Active Directory, Entra ID, LDAP, Okta, directory services, provisioning utenti.",
-      "ateco_in_kb_all": [
-        "62.20.10",
-        "62.20.20"
-      ],
       "sibling_contrast_notes": "Footprint distintivo = ciclo-di-vita-identità: IGA, PAM, SSO, MFA, provisioning, directory/Entra ID/LDAP/Okta. Separa da Cybersecurity Services (assessment/pentest senza lessico identità) e da Electronic Security & Surveillance (controllo accessi FISICO/varchi/tornelli/CCTV): qui identità DIGITALI e accessi privilegiati a sistemi/applicazioni. ATECO 62.20.10 (software/consulenza IT) e 62.20.20 (gestione reti e attività di sicurezza informatica) coerenti con system integrator/MSP IAM; presenti in KB, nessuna modifica."
     },
     {
       "id": "firewall_network_security",
       "name": "Firewall / Network Security",
-      "domain": "Cybersecurity",
       "layer": "security",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "firewall",
         "NGFW",
@@ -827,25 +801,19 @@
         "FortiGate",
         "microsegmentazione"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.20.10",
         "62.20.20"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Firewall / Network Security. Firewall NGFW e UTM, IPS/IDS, VPN IPsec, microsegmentazione e difesa perimetrale della rete con appliance dedicate. firewall, NGFW, UTM, IPS, IDS, VPN, IPsec, perimetrale, perimeter security, microsegmentazione, Fortinet, Palo Alto, Check Point, Sophos, FortiGate.",
-      "ateco_in_kb_all": [
-        "62.20.10",
-        "62.20.20"
-      ],
       "sibling_contrast_notes": "Footprint = enforcement perimetrale e appliance di sicurezza: NGFW, UTM, IPS/IDS, VPN IPsec, microsegmentazione, vendor Fortinet/Palo Alto/Check Point/Sophos. Le sigle NGFW/UTM/IPS/IDS sono quasi esclusive di questo settore. Separa da Networking (LAN/WAN/Wi-Fi/VLAN/routing/SD-WAN, connettività senza policy di sicurezza) e da Cybersecurity Services (qui apparati e configurazione perimetrale, non consulenza/assessment/pentest). ATECO 62.20.10 (consulenza informatica) e 62.20.20 (gestione/manutenzione apparati e reti) in KB; nessun codice rimosso."
     },
     {
       "id": "grc_compliance",
       "name": "GRC / Compliance",
-      "domain": "Cybersecurity",
       "layer": "security",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "GRC",
         "governance risk compliance",
@@ -864,27 +832,21 @@
         "conformità normativa",
         "privacy advisory"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "62.20.10",
         "62.90.09"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "70.20.09"
       ],
       "embedding_text": "GRC / Compliance. Governance, risk & compliance della sicurezza informatica: advisory ISO 27001/NIS2/GDPR/DORA, audit di sicurezza, gestione del rischio informatico, SGSI/ISMS, DPIA, servizi DPO. GRC, governance risk compliance, ISO 27001, NIS2, GDPR, DORA, DPO, SGSI, ISMS, DPIA, gestione del rischio informatico, conformità normativa.",
-      "ateco_in_kb_all": [
-        "62.20.10",
-        "62.90.09"
-      ],
       "sibling_contrast_notes": "Footprint = vocabolario regolatorio-organizzativo della sicurezza ICT: ISO 27001, NIS2, GDPR, DORA, SGSI/ISMS, DPIA, audit, gestione del rischio, DPO. Separa da Cybersecurity Services (termini tecnico-operativi: vulnerability assessment, penetration test) per il taglio normativo-governance, e da Generic Business Consulting (lessico organizzativo/gestionale/fiscale senza riferimento a sicurezza ICT) tramite l'ancoraggio a rischio informatico e norme di sicurezza. ATECO ICT condivisi 62.20.10 e 62.90.09 in KB. 70.22.09 (consulenza gestionale) escluso perche tirerebbe consulenza aziendale generica; lieve incertezza: alcune società GRC focalizzate su sistemi di gestione/certificazioni vi sono registrate, da verificare a valle."
     },
     {
       "id": "telecom_internet_provider",
       "name": "Telecom & Internet Access Provider",
-      "domain": "Telecom",
       "layer": "telecom",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "operatore telecomunicazioni",
         "carrier",
@@ -902,33 +864,25 @@
         "BGP",
         "autonomous system"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "61.10.01",
         "61.10.02",
         "61.10.03",
         "61.90.10"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "42.22.00",
         "43.21.02",
         "61.20.00"
       ],
       "embedding_text": "Telecom & Internet Access Provider. Operatore di telecomunicazioni e provider di accesso a Internet: esercizio di rete fissa, mobile e satellitare (FTTH, FWA, banda larga, spettro, licenza MNO) ed erogazione di connettività IP (peering, transito IP, BGP, autonomous system, assegnazione IP). operatore telecomunicazioni, carrier, ISP, connettività, fibra, FTTH, FWA, banda larga, accesso internet, mobile network, peering, transito IP, BGP.",
-      "ateco_in_kb_all": [
-        "61.10.01",
-        "61.10.02",
-        "61.10.03",
-        "61.90.10"
-      ],
       "sibling_contrast_notes": "Fusione di telecom_operator + internet_service_provider (merge_flag: condividevano 61.10.01 + 61.90.10 e nel reale lo stesso soggetto è carrier+ISP). Distinto da iot_connectivity (SIM IoT/M2M/LPWAN, MVNO) e da telecom_civil_works (scavi/posa fibra)."
     },
     {
       "id": "voip_uc",
       "name": "VoIP / Unified Communications",
-      "domain": "Telecom",
       "layer": "telecom",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "VoIP",
         "centralino cloud",
@@ -943,27 +897,21 @@
         "fonia VoIP",
         "numerazione geografica"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "61.90.90",
         "62.20.10"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "33.20.02"
       ],
       "embedding_text": "VoIP / Unified Communications. Centralino cloud, SIP trunk e piattaforme di unified communications per la fonia in VoIP con numerazione geografica e softphone. VoIP, centralino cloud, cloud PBX, hosted PBX, SIP trunk, UCaaS, Teams Phone, softphone, contact center, fonia VoIP, numerazione geografica.",
-      "ateco_in_kb_all": [
-        "61.90.90",
-        "62.20.10"
-      ],
       "sibling_contrast_notes": "Discriminato dal lessico application-layer di cloud telephony (cloud PBX, SIP trunk, UCaaS, softphone, Teams Phone, numerazione geografica) contro telecom_operator (rete fisica), messaging_notifications (SMS/notifiche, non voce) e communication_equipment_installation (montaggio fisico apparati). 33.20.02 (installazione apparecchiature comunicazioni) resta in ateco_excluded: e' il codice del contrasto e generava falsi match con installatori. 61.90.90 e' il fit core (la riga KB elenca VoIP/PBX/SIP trunk). 62.20.10 (consulenza informatica) e' un fit debole per integratori di centralini, largamente condiviso con system integration: solo soft-recall, da verificare a valle."
     },
     {
       "id": "messaging_notifications",
       "name": "Messaging & Notifications",
-      "domain": "Telecom",
       "layer": "telecom",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "SMS gateway",
         "A2P messaging",
@@ -977,25 +925,19 @@
         "short code",
         "deliverability"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "61.90.20",
         "61.90.90"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Messaging & Notifications. Erogazione di servizi di messaggistica e notifica A2P/CPaaS: SMS transazionali, email e push via gateway e API con OTP, sender ID e short code. SMS gateway, A2P, CPaaS, notifiche transazionali, OTP, sender ID, short code, push notification, email delivery, deliverability, messaggistica.",
-      "ateco_in_kb_all": [
-        "61.90.20",
-        "61.90.90"
-      ],
       "sibling_contrast_notes": "61.90.20 (Erogazione di servizi di messaggistica e di notifica) e' l'ancora ESATTA ed esclusiva del concetto nella KB: massimo potere discriminante via codice, raro nel cluster. Distinto da digital_marketing tramite il lessico di trasporto/transazionale (A2P, CPaaS, gateway, deliverability, OTP, sender ID, short code) contro promozione/campagne; da software_product tramite 'delivery via gateway/API' (servizio telecom, non SaaS licenziato); da voip_uc perche' tratta SMS/email/push (testo), non voce/SIP. 61.90.90 e' fit secondario condiviso col resto del cluster."
     },
     {
       "id": "iot_connectivity",
       "name": "IoT Connectivity",
-      "domain": "Telecom",
       "layer": "telecom",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "connettività IoT",
         "IoT connectivity",
@@ -1014,32 +956,25 @@
         "APN gestito",
         "cellular IoT"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "61.20.00",
         "61.10.02",
         "61.90.90"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "61.10.01",
         "61.10.03",
         "61.90.10",
         "61.90.20"
       ],
       "embedding_text": "IoT Connectivity. SIM IoT e profili M2M su reti cellulari NB-IoT/LTE-M e LPWAN (LoRaWAN, Sigfox); MVNO IoT con APN gestito ed eSIM/eUICC per dispositivi connessi. connettività IoT, SIM IoT, M2M, NB-IoT, LTE-M, LPWAN, LoRaWAN, Sigfox, eSIM, eUICC, MVNO IoT, APN gestito, cellular IoT.",
-      "ateco_in_kb_all": [
-        "61.20.00",
-        "61.10.02",
-        "61.90.90"
-      ],
       "sibling_contrast_notes": "Separato da telecom_operator con vocabolario device-centric (SIM IoT, M2M, NB-IoT/LTE-M, LPWAN/LoRaWAN/Sigfox, eSIM/eUICC, APN gestito, MVNO IoT) contro i servizi carrier generalisti; da internet_service_provider e messaging_notifications perche' trasporto dati machine-to-machine su reti dedicate ai sensori, non accesso broadband ne SMS. Da iot_platform (layer=software) resta sul piano del trasporto di rete e attivazione SIM, senza device management/telemetria/dashboard. ATECO: 61.20.00 (rivendita/intermediazione = MVNO/reseller IoT) e' l'anchor piu' distintivo ma generico per qualunque MVNO; 61.10.02 (mobili) e 61.90.90 (n.c.a. per LPWAN) condivisi con telecom_operator — discriminazione affidata al testo (modello B). Aggiunto 61.10.03 a ateco_excluded."
     },
     {
       "id": "computer_hardware",
       "name": "Computer Hardware",
-      "domain": "Hardware",
       "layer": "hardware",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "computer",
         "PC desktop",
@@ -1052,25 +987,19 @@
         "computer hardware",
         "peripheral equipment"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "26.20.00",
         "46.50.10"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Computer Hardware. Produzione e commercio di computer e periferiche informatiche come prodotto finito: PC desktop, notebook, server, workstation, monitor, tastiere, mouse, hard disk. computer, PC desktop, notebook, server, workstation, monitor, hard disk, periferiche, computer hardware, peripheral equipment.",
-      "ateco_in_kb_all": [
-        "26.20.00",
-        "46.50.10"
-      ],
       "sibling_contrast_notes": "Ancorato al vocabolario di prodotto-finito di calcolo (PC desktop, notebook, server, workstation, monitor, hard disk) che separa da Network Equipment (router/switch/access point/CPE), da EMS (PCBA/SMT conto terzi), da Computer & Device Repair (break-fix, ricambi in laboratorio) e da ICT Wholesale (canale/distributore/VAR/volumi). ATECO 26.20.00 (produzione computer e periferiche) e core; 46.50.10 (commercio all'ingrosso di computer e periferiche) e legittimo qui ma e CONDIVISO con ict_wholesale e va disambiguato a valle sul lessico di prodotto vs lessico di canale. Testo positivo, nessuna negazione."
     },
     {
       "id": "network_equipment",
       "name": "Network Equipment",
-      "domain": "Hardware",
       "layer": "hardware",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "router",
         "switch",
@@ -1083,25 +1012,19 @@
         "network appliance",
         "schede di rete"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "26.30.09",
         "46.50.20"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Network Equipment. Produzione e commercio di apparati di rete e telecomunicazione come prodotto fisico: router, switch, access point, modem, gateway, CPE, schede di rete. router, switch, access point, apparati di rete, CPE, apparati telecom, modem, gateway, network appliance, schede di rete.",
-      "ateco_in_kb_all": [
-        "26.30.09",
-        "46.50.20"
-      ],
       "sibling_contrast_notes": "Vocabolario distintivo di dispositivo fisico (router, switch, access point, CPE, modem, gateway) che separa da Computer Hardware (PC/server/periferiche, 46.50.10), da Networking (servizio di progettazione/gestione reti LAN/WAN/SD-WAN) e da Communication Equipment Installation (verbi di installazione/commissioning, antenne/ponti radio). ATECO 26.30.09 (fabbricazione altre apparecchiature per le comunicazioni) e 46.50.20 (commercio all'ingrosso apparecchiature per telecomunicazioni) verificati per produzione/commercio di apparati di rete fisici. Nessuna negazione."
     },
     {
       "id": "fiber_cables",
       "name": "Fiber Optic Cables",
-      "domain": "Hardware",
       "layer": "hardware",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "cavi fibra ottica",
         "fiber optic cable",
@@ -1112,26 +1035,21 @@
         "multimode",
         "connettore ottico"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "27.31.00"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "43.21.02",
         "42.22.00"
       ],
       "embedding_text": "Fiber Optic Cables. Fabbricazione e fornitura di cavo in fibra ottica come prodotto fisico: filati ottici singlemode/multimode (OS/OM), patch cord, connettori ottici. cavi fibra ottica, fiber optic cable, patch cord, cavo ottico, OFC, singlemode, multimode, connettore ottico.",
-      "ateco_in_kb_all": [
-        "27.31.00"
-      ],
       "sibling_contrast_notes": "ATECO 27.31.00 (Fabbricazione di cavi in fibra ottica) e manifatturiero puro: testo ancorato al media fisico manufatturato (filato/strand, gradi singlemode/multimode OS-OM, patch cord, connettore ottico). Separa da Telecom Civil Works (scavi/posa/tiratura/soffiaggio/giunzione, 43.21.02/42.22.00, correttamente esclusi) e da Network Equipment (cablaggio ottico passivo vs apparato attivo router/switch/CPE). 27.32.00 (altri fili e cavi elettrici) intenzionalmente escluso perche cavo elettrico generico, non ottico. Nessuna negazione."
     },
     {
       "id": "communication_equipment_installation",
       "name": "Communication Equipment Installation",
-      "domain": "Hardware",
       "layer": "hardware",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "installazione apparati telecom",
         "installazione antenne",
@@ -1144,23 +1062,18 @@
         "BTS commissioning",
         "broadcast equipment installation"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "33.20.02"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "Communication Equipment Installation. Installazione e messa in servizio sul campo di apparati per telecomunicazioni e apparecchiature radiotelevisive: antenne, ponti radio a microonde, apparati ricetrasmittenti, stazioni radio base. installazione apparati telecom, montaggio antenne, ponti radio, BTS commissioning, impianti radiotelevisivi, antenna installation, microwave link.",
-      "ateco_in_kb_all": [
-        "33.20.02"
-      ],
       "sibling_contrast_notes": "Vocabolario distintivo di installazione/messa in servizio sul campo (montaggio antenne, ponti radio a microonde, BTS commissioning) con apparati attivi RF/ricetrasmittenti. Separa da Network Equipment (produzione/fornitura di router/switch come merce), da Telecom Civil Works (scavi/posa cavi/opere civili) e da Building & AV Automation (KNX/DALI/BACnet/digital signage/AV). ATECO 33.20.02 (Installazione di apparecchiature per le comunicazioni e di apparecchiature radiotelevisive) verificato univoco. Nessuna negazione."
     },
     {
       "id": "electronics_manufacturing_ems",
       "name": "Electronics Manufacturing / EMS",
-      "domain": "Hardware",
       "layer": "hardware",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "EMS",
         "electronic manufacturing services",
@@ -1172,28 +1085,22 @@
         "contract electronics manufacturer",
         "fabbricazione schede elettroniche integrate"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "26.12.00",
         "26.11.00"
       ],
-      "ateco_candidates_excluded": [
+      "ateco_excluded": [
         "26.20.00",
         "26.30.01"
       ],
       "embedding_text": "Electronics Manufacturing / EMS. Assemblaggio conto terzi di schede elettroniche integrate e PCBA, montaggio SMT/THT di componenti su circuiti stampati. EMS, electronic manufacturing services, produzione elettronica conto terzi, assemblaggio PCB, PCBA, montaggio SMT, contract electronics manufacturer.",
-      "ateco_in_kb_all": [
-        "26.12.00",
-        "26.11.00"
-      ],
       "sibling_contrast_notes": "Vocabolario distintivo del processo di assemblaggio elettronico conto terzi: PCBA, montaggio SMT/THT, schede elettroniche integrate, conto terzi/contract manufacturer. Separa da Computer Hardware (prodotto finito PC/server/periferiche, 26.20, escluso) e da Network Equipment (apparato finito router/switch, 26.30, escluso): EMS produce la scheda assemblata come servizio, non l'apparato brandizzato. Anchor primario 26.12.00 (Fabbricazione di schede elettroniche integrate). 26.11.00 (componenti elettronici) e secondario AFFINE ma copre il singolo componente non assemblato: da verificare a valle per evitare match di puri fabbricanti di componenti. Nessuna negazione."
     },
     {
       "id": "ict_wholesale",
       "name": "ICT Wholesale / Distribution",
-      "domain": "Distribution",
       "layer": "distribution",
       "vertical": "horizontal",
-      "kind": "target",
       "aliases": [
         "distributore ICT",
         "grossista informatica",
@@ -1205,27 +1112,20 @@
         "sell-in sell-through",
         "distribuzione a due livelli"
       ],
-      "ateco_candidates_in_kb": [
+      "ateco_in_kb": [
         "46.50.10",
         "46.50.20",
         "46.14.03"
       ],
-      "ateco_candidates_excluded": [],
+      "ateco_excluded": [],
       "embedding_text": "ICT Wholesale / Distribution. Distributore grossista che vende all'ingrosso e in volume hardware, software e apparati di telecomunicazione al canale dei rivenditori e dei VAR, con listini di canale, logistica sell-in/sell-through e modello a due livelli. distributore ICT, grossista informatica, commercio all'ingrosso, canale rivenditori VAR, broadline distributor, value-added distributor VAD.",
-      "ateco_in_kb_all": [
-        "46.50.10",
-        "46.50.20",
-        "46.14.03"
-      ],
       "sibling_contrast_notes": "La chiave discriminante e il lessico del canale distributivo all'ingrosso: ingrosso/volume, canale rivenditori e VAR, broadline e value-added distributor (VAD), listino di canale, sell-in/sell-through, distribuzione a due livelli. Questo lo separa da Computer Hardware (lessico di prodotto: PC, server, periferiche, produzione/commercio del singolo apparato), da Office Equipment (lessico stampa/noleggio: stampanti, fotocopiatrici, MFP, managed print services), e da E-commerce Retailer (vendita al dettaglio online al consumatore finale: negozio online, carrello, marketplace). ATECO: 46.50.10 ingrosso computer/periferiche/software, 46.50.20 ingrosso apparecchiature per telecomunicazioni, 46.14.03 intermediari del commercio di macchine/attrezzature per ufficio, computer e apparecchiature per telecomunicazioni — tutti verificati in KB. 46.50.10 e condiviso col trade-side di Computer Hardware: li la chiave semantica resta il prodotto, qui il canale wholesale; aziende ibride produttore+distributore vanno disambiguate dal perimetro ATECO oltre che dall'embedding."
     },
     {
       "id": "industrial_automation_ot",
       "name": "Industrial Automation / OT",
-      "domain": "Industrial Automation",
       "layer": "automation_ot",
       "vertical": "manufacturing",
-      "kind": "distractor",
       "aliases": [
         "automazione industriale",
         "industrial automation",
@@ -1248,8 +1148,11 @@
         "controllo di processo",
         "MES"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [
+      "ateco_in_kb": [
+        "62.20.10",
+        "62.10.00"
+      ],
+      "ateco_excluded": [
         "26.51.10",
         "27.12.00",
         "33.20.09",
@@ -1258,19 +1161,13 @@
         "82.20.00"
       ],
       "embedding_text": "Industrial Automation / OT. Sistemi di controllo industriale PLC, SCADA, DCS e ICSS con bus Modbus, Profibus, Profinet e OPC-UA per automazione di processo e di fabbrica; HMI, RTU, MES e safety instrumented system (SIS) per impianti e macchinari. automazione industriale, industrial automation, PLC, SCADA, DCS, RTU, SIS, OPC-UA, Profinet, controllo di processo.",
-      "ateco_in_kb_all": [
-        "62.20.10",
-        "62.10.00"
-      ],
       "sibling_contrast_notes": "Vocabolario OT distintivo (PLC/SCADA/DCS/ICSS, fieldbus Modbus/Profibus/Profinet/OPC-UA, RTU, SIS, MES, controllo di processo real-time) per separare da IoT Platform (device management/MQTT/digital twin lato software), da System Integration (middleware/ESB/API enterprise), da Networking (LAN/WAN/IP) e dal fratello Building & AV Automation (KNX/DALI/BACnet, AV). ATECO: la KB ICT NON contiene i codici manifatturieri/ingegneristici di pertinenza (26.51.10 strumenti di misura e controllo, 27.12.00 quadri di comando, 33.20.09 installazione macchine industriali, 71.12.10 ingegneria) — verificati assenti dal subset KB e spostati in ateco_excluded come ancore off-stack; in-KB restano solo 62.20.10 (consulenza informatica) e 62.10.00 (programmazione, sviluppo software OT). Footprint ATECO-in-KB IDENTICO a building_av_automation: discriminazione affidata al testo. Da verificare a valle la suddivisione 2025 di 26.51 e 33.20."
     },
     {
       "id": "building_av_automation",
       "name": "Building & AV Automation",
-      "domain": "Industrial Automation",
       "layer": "automation_ot",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "building automation",
         "domotica",
@@ -1297,26 +1194,23 @@
         "Lutron",
         "audiovisivi professionali"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [
-        "43.21.01",
-        "43.21.02"
-      ],
-      "embedding_text": "Building & AV Automation. Domotica e building automation con BMS/BAS su bus KNX, DALI, BACnet e Modbus per controllo illuminazione e HVAC degli edifici. Sistemi audio-video professionali, digital signage, room booking e videowall per sale riunioni (Crestron, AMX, Extron, Lutron). building automation, domotica, BMS, KNX, DALI, BACnet, digital signage, room booking, AV integration, audiovisivi.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "33.20.02",
         "62.20.10",
         "62.10.00"
       ],
+      "ateco_excluded": [
+        "43.21.01",
+        "43.21.02"
+      ],
+      "embedding_text": "Building & AV Automation. Domotica e building automation con BMS/BAS su bus KNX, DALI, BACnet e Modbus per controllo illuminazione e HVAC degli edifici. Sistemi audio-video professionali, digital signage, room booking e videowall per sale riunioni (Crestron, AMX, Extron, Lutron). building automation, domotica, BMS, KNX, DALI, BACnet, digital signage, room booking, AV integration, audiovisivi.",
       "sibling_contrast_notes": "Field-bus per edifici (KNX, DALI, BACnet) + AV professionale (Crestron, AMX, Extron, Lutron, digital signage, room booking, videowall) per separare da Industrial Automation/OT (PLC/SCADA/DCS di fabbrica), da System Integration (piattaforme enterprise), da Networking (IP) e da Communication Equipment Installation (antenne/ponti radio/BTS); l'ancoraggio a comfort/illuminazione/HVAC/AV lo distingue da Electronic Security & Surveillance (TVCC/controllo accessi/antintrusione). ATECO in-KB: 33.20.02 (installazione apparecchiature per comunicazioni — overlap con Communication Equipment Installation, verificato in KB), 62.20.10 (consulenza), 62.10.00 (sviluppo software di automazione edifici). Il core impiantistico elettrico (43.21.01/02) NON e nella KB → ateco_excluded. Footprint 62.x identico a industrial_automation_ot: discriminazione affidata al testo."
     },
     {
       "id": "electronic_security_surveillance",
       "name": "Electronic Security & Surveillance",
-      "domain": "Physical Security",
       "layer": "physical_security",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "videosorveglianza",
         "TVCC",
@@ -1337,22 +1231,19 @@
         "physical access control",
         "intrusion alarm"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "Electronic Security & Surveillance. Impianti di videosorveglianza TVCC/CCTV con telecamere IP e NVR/DVR, controllo accessi fisico a varchi, tornelli e lettori badge, antintrusione con sensori volumetrici e centrale di vigilanza ARC. videosorveglianza, TVCC, CCTV, telecamere IP, NVR, DVR, controllo accessi fisico, antintrusione, impianti di allarme, antifurto, varchi e tornelli, lettori badge, sensori volumetrici, centrale ARC, video surveillance, physical access control, intrusion alarm.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "43.21.02",
         "80.09.00"
       ],
+      "ateco_excluded": [],
+      "embedding_text": "Electronic Security & Surveillance. Impianti di videosorveglianza TVCC/CCTV con telecamere IP e NVR/DVR, controllo accessi fisico a varchi, tornelli e lettori badge, antintrusione con sensori volumetrici e centrale di vigilanza ARC. videosorveglianza, TVCC, CCTV, telecamere IP, NVR, DVR, controllo accessi fisico, antintrusione, impianti di allarme, antifurto, varchi e tornelli, lettori badge, sensori volumetrici, centrale ARC, video surveillance, physical access control, intrusion alarm.",
       "sibling_contrast_notes": "Unico concetto del layer physical_security, nessun fratello. Discriminazione affidata a vocabolario fisico-elettrico esclusivo: telecamere IP/TVCC/CCTV, NVR/DVR, varchi/tornelli/lettori badge, sensori volumetrici, centrale di vigilanza ARC, antintrusione/antifurto. Nessuno di questi termini compare in Cybersecurity (penetration test, vulnerability, OWASP, endpoint), Identity & Access (SSO/PAM/MFA/Active Directory/directory) o Networking (LAN/WAN/VLAN/routing/SD-WAN): qui il controllo accessi e fisico (porte, varchi, badge), non logico-identitario. Rischio bleed maggiore verso Identity & Access per il termine condiviso 'controllo accessi' e 'lettori badge' (un badge fisico puo essere letto come credenziale IAM); mitigato col qualificatore 'fisico' e con il cluster impiantistico. ATECO: 43.21.02 (installazione impianti elettronici, incl. allarme/videosorveglianza senza monitoraggio) e 80.20.00 (servizi connessi ai sistemi di vigilanza, ARC/monitoraggio remoto) sono i codici core ma off-stack rispetto alla KB ICT (43.21.02 vi figura solo come escluso da Networking/ISP/telecom); inseriti come codici reali del settore, da verificare a valle. 80.09.00 (vigilanza n.c.a., monitoraggio senza installazione) e adiacente e resta in excluded."
     },
     {
       "id": "cad_plm_engineering_software",
       "name": "CAD / PLM / Engineering Software",
-      "domain": "Software",
       "layer": "software",
       "vertical": "manufacturing",
-      "kind": "distractor",
       "aliases": [
         "CAD",
         "CAE",
@@ -1373,22 +1264,19 @@
         "ECAD",
         "ciclo di vita del prodotto"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "CAD / PLM / Engineering Software. Software di progettazione e ingegneria per la manifattura: CAD/CAM, CAE, simulazione FEM/FEA, modellazione 3D e gestione del ciclo di vita del prodotto (PLM/PDM). CAD, CAE, CAM, PLM, PDM, BIM, FEM, FEA, software di progettazione, progettazione meccanica, simulazione, modellazione 3D, MCAD, ECAD, product lifecycle management.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "58.29.00",
         "62.10.00"
       ],
+      "ateco_excluded": [],
+      "embedding_text": "CAD / PLM / Engineering Software. Software di progettazione e ingegneria per la manifattura: CAD/CAM, CAE, simulazione FEM/FEA, modellazione 3D e gestione del ciclo di vita del prodotto (PLM/PDM). CAD, CAE, CAM, PLM, PDM, BIM, FEM, FEA, software di progettazione, progettazione meccanica, simulazione, modellazione 3D, MCAD, ECAD, product lifecycle management.",
       "sibling_contrast_notes": "Si distingue dai fratelli software orizzontali col vocabolario esclusivo dell'ingegneria di prodotto manifatturiera (CAD, CAE, CAM, PLM/PDM, FEM/FEA, simulazione, modellazione 3D), assente in Software Development (custom app/API), Software Product/ISV (publishing generico) e System Integration. ATECO: 58.29.00 (edizione altri software) e 62.10.00 (programmazione), gli stessi dei fratelli software (verificati reali e in KB); separazione puramente lessicale + tag vertical=manufacturing. RIMOSSO l'alias errato 'BPM di prodotto' (BPM appartiene a Low-code). Il software CAD/PLM puro non ha ATECO ingegneria dedicato (71.12 non e' in KB e fuori scope per concetto software)."
     },
     {
       "id": "vertical_business_software",
       "name": "Vertical / Industry Software",
-      "domain": "Software",
       "layer": "software",
       "vertical": "industry_specific",
-      "kind": "distractor",
       "aliases": [
         "software verticale",
         "software di settore",
@@ -1411,22 +1299,19 @@
         "industry-specific software",
         "vertical SaaS"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "Vertical / Industry Software. Applicativi dedicati a una singola filiera: software sanitario (cartella clinica, LIS, HIS, RIS), gestionali per studi legali e processo civile telematico, core banking e regtech, software agricolo e zootecnia, registro elettronico scolastico, retail software. software verticale, software di settore, cartella clinica elettronica, LIS, HIS, RIS, processo civile telematico, core banking, regtech, software agricolo, registro elettronico, retail software, vertical SaaS.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "62.10.00",
         "58.29.00"
       ],
+      "ateco_excluded": [],
+      "embedding_text": "Vertical / Industry Software. Applicativi dedicati a una singola filiera: software sanitario (cartella clinica, LIS, HIS, RIS), gestionali per studi legali e processo civile telematico, core banking e regtech, software agricolo e zootecnia, registro elettronico scolastico, retail software. software verticale, software di settore, cartella clinica elettronica, LIS, HIS, RIS, processo civile telematico, core banking, regtech, software agricolo, registro elettronico, retail software, vertical SaaS.",
       "sibling_contrast_notes": "L'ATECO non distingue: aziende di software verticale in Italia ricadono sui generici 62.10.00 (programmazione) e 58.29.00 (edizione software), gli stessi di Software Development, Software Product/ISV ed ERP/CRM; la discriminazione e' tutta nell'embedding_text. Separazione dai contrasti horizontal affidata a sigle/termini che SOLO una filiera usa: cartella clinica/LIS/HIS/RIS (sanita), processo civile telematico (legale), core banking/regtech (finanza), zootecnia/registro elettronico/POS gestionale (agro/scuola/retail). Bleed con software_product (vertical = product specializzato) ed erp_crm (ERP verticalizzati) segnalato in merge_flags; entrambi gli ATECO verificati reali e in KB."
     },
     {
       "id": "web_agency",
       "name": "Web Agency / Digital Agency",
-      "domain": "Web & Digital",
       "layer": "web_digital",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "web agency",
         "agenzia web",
@@ -1442,24 +1327,21 @@
         "landing page",
         "siti chiavi in mano per clienti"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [
+      "ateco_in_kb": [
+        "62.10.00"
+      ],
+      "ateco_excluded": [
         "63.91.00",
         "73.11.0"
       ],
       "embedding_text": "Web Agency / Digital Agency. Realizza siti web ed e-commerce chiavi in mano su commessa dei clienti, configurando CMS e temi grafici su misura. web agency, agenzia web, realizzazione siti web, sviluppo siti, realizzazione e-commerce, CMS, WordPress, Shopify, Magento, web design, UX/UI, landing page, siti chiavi in mano per clienti.",
-      "ateco_in_kb_all": [
-        "62.10.00"
-      ],
       "sibling_contrast_notes": "Discriminato col vocabolario di build-su-commessa per terzi: \"realizza siti chiavi in mano\", \"CMS/temi su misura\", piattaforme low-code (WordPress/Shopify/Magento) e \"web design/UX-UI\" — lessico assente in chi opera una piattaforma propria (web_portal_media). Da Software Development: web_agency vive su CMS/temi/site-builder grafici, mentre software_development usa custom software/REST API/app mobile/system integration su codice; nessun overlap di sigle tecniche. Da E-commerce Retailer: web_agency costruisce il negozio per il cliente (web design, tema), non vende beni/catalogo/spedizioni in proprio. Da Digital Marketing: nessun termine SEO/SEM/Ads/media buying, solo la realizzazione del sito. ATECO 62.10.00 (programmazione informatica) e l'unico codice reale in KB coerente con lo sviluppo del sito; 63.91.00 (portali operati in proprio) e 73.11.00 (agenzie pubblicitarie) esclusi e fuori KB. Incertezza: molte web agency si registrano anche come 73.11 o 70.21 — verificabile a valle, 62.10.00 resta il piu coerente col build tecnico."
     },
     {
       "id": "web_portal_media",
       "name": "Web Portal / Online Media",
-      "domain": "Web & Digital",
       "layer": "web_digital",
       "vertical": "media",
-      "kind": "distractor",
       "aliases": [
         "portale web",
         "web portal",
@@ -1474,26 +1356,23 @@
         "paywall e abbonamenti",
         "audience online"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [
+      "ateco_in_kb": [
+        "63.91.00",
+        "63.92.00"
+      ],
+      "ateco_excluded": [
         "58.13.00",
         "60.10.00",
         "60.20.00"
       ],
       "embedding_text": "Web Portal / Online Media. Gestisce in proprio portali web, marketplace e testate di editoria digitale con redazione interna, monetizzando l'audience con advertising programmatico, paywall e abbonamenti. portale web, web portal, testata online, editoria digitale, online media, marketplace online, aggregatore di contenuti, content aggregator, redazione digitale, advertising programmatico, paywall e abbonamenti, audience online.",
-      "ateco_in_kb_all": [
-        "63.91.00",
-        "63.92.00"
-      ],
       "sibling_contrast_notes": "Discriminato col lessico di editore-operatore proprietario: \"gestisce in proprio\", \"testata/redazione digitale\", \"audience\", \"advertising programmatico\", \"paywall/abbonamenti\", \"marketplace/aggregatore\" — termini di chi monetizza la propria piattaforma, assenti in chi realizza siti per clienti (web_agency), eroga hosting/server (hosting) o pubblica software a catalogo (software_product). ATECO: in KB ICT esistono solo 63.91.00 (portali) e 63.92.00 (altri servizi di informazione/aggregatori); i codici editoria/broadcasting (58.13 quotidiani, 58.14 periodici, 59.20, 60.10/60.20 radio-TV) sono fuori scope KB ICT, esclusi. Incertezza: le testate native digitali potrebbero classificarsi come 58.13/58.14 — da verificare a valle."
     },
     {
       "id": "ecommerce_retailer",
       "name": "E-commerce Retailer",
-      "domain": "Retail",
       "layer": "retail",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "e-commerce",
         "ecommerce",
@@ -1513,23 +1392,20 @@
         "DTC",
         "direct-to-consumer"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "E-commerce Retailer. Vende al dettaglio online il proprio assortimento di prodotti tramite negozio online e marketplace, con catalogo, carrello, checkout, gestione ordini, spedizioni e resi al consumatore finale. e-commerce, negozio online, vendita al dettaglio online, online store, marketplace seller, carrello, catalogo prodotti, gestione ordini, spedizione, resi, dropshipping, direct-to-consumer.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "47.91.20",
         "47.92.39",
         "47.91.10"
       ],
+      "ateco_excluded": [],
+      "embedding_text": "E-commerce Retailer. Vende al dettaglio online il proprio assortimento di prodotti tramite negozio online e marketplace, con catalogo, carrello, checkout, gestione ordini, spedizioni e resi al consumatore finale. e-commerce, negozio online, vendita al dettaglio online, online store, marketplace seller, carrello, catalogo prodotti, gestione ordini, spedizione, resi, dropshipping, direct-to-consumer.",
       "sibling_contrast_notes": "Il vocabolario di vendita al dettaglio del proprio assortimento (negozio online, carrello, checkout, gestione ordini, spedizioni e resi al consumatore, marketplace seller, dropshipping, DTC) separa il commerciante dalla web_agency, che usa termini di realizzazione/piattaforma (CMS, Shopify, web design, realizzazione siti per clienti); da ict_wholesale, che vende all'ingrosso B2B al canale rivenditori/VAR; e da software_product/ISV, che pubblica software/SaaS in licenza. ATECO 2025: la vecchia 47.91 \"commercio al dettaglio via internet\" e' stata ristrutturata; codici candidati 47.91.20 (prodotti nuovi, non specializzato), 47.92.39 (specializzato n.c.a.), 47.91.10 (seconda mano). INCERTEZZA da verificare a valle: i retailer online specializzati potrebbero registrarsi piu' spesso sul codice merceologico del prodotto venduto (es. 47.2x alimentari, 47.7x abbigliamento/elettronica) anziche' sull'intermediazione/vendita a distanza 47.9x; valutare se aggiungere i 47.x merceologici prevalenti come ateco_in_kb dopo controllo sul campione reale."
     },
     {
       "id": "digital_marketing",
       "name": "Digital Marketing / Advertising",
-      "domain": "Marketing",
       "layer": "marketing",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "marketing digitale",
         "social media marketing",
@@ -1549,22 +1425,18 @@
         "lead generation",
         "ROAS"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "Digital Marketing / Advertising. Pianificazione e gestione di campagne pubblicitarie online a performance: posizionamento SEO/SEM, Google Ads e Meta Ads, media buying e advertising programmatico, ottimizzazione ROAS e lead generation. marketing digitale, social media marketing, SEO, SEM, Google Ads, Meta Ads, advertising, content marketing, performance marketing, programmatic, media buying, lead generation, ROAS, agenzia pubblicitaria, concessionaria pubblicitaria.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "73.11.0",
         "73.12.0"
       ],
+      "embedding_text": "Digital Marketing / Advertising. Pianificazione e gestione di campagne pubblicitarie online a performance: posizionamento SEO/SEM, Google Ads e Meta Ads, media buying e advertising programmatico, ottimizzazione ROAS e lead generation. marketing digitale, social media marketing, SEO, SEM, Google Ads, Meta Ads, advertising, content marketing, performance marketing, programmatic, media buying, lead generation, ROAS, agenzia pubblicitaria, concessionaria pubblicitaria.",
       "sibling_contrast_notes": "Distinzione da Web Agency: il vocabolario distintivo è di pianificazione e acquisto media (media buying, programmatic, Google/Meta Ads, ROAS, performance, lead generation), non di produzione tecnica (CMS, WordPress, Shopify, web design). Distinzione da Messaging & Notifications: l'email qui è newsletter/campagna pubblicitaria a fini di marketing, non infrastruttura di delivery transazionale (gateway, OTP, A2P/CPaaS); ho rimosso 'email marketing' dal corpo della frase e lasciato solo i termini di campagna per ridurre l'attrazione verso il delivery. ATECO 73.11.0 (agenzie pubblicitarie) e 73.12.0 (concessionarie/intermediari di spazi pubblicitari) sono i codici corretti del settore advertising; off-stack rispetto al core ICT, da confermare a valle ma altamente probabili per agenzie di digital marketing."
     },
     {
       "id": "it_training",
       "name": "IT Training / Formazione Informatica",
-      "domain": "Education",
       "layer": "education",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "formazione informatica",
         "corsi IT",
@@ -1582,21 +1454,17 @@
         "centro di formazione accreditato",
         "training partner Microsoft Cisco AWS"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "IT Training / Formazione Informatica. Centro di formazione e academy che eroga corsi, bootcamp e percorsi di certificazione su programmazione, cloud, cybersecurity e tecnologie ICT, con docenti, aule e piattaforme e-learning per sviluppatori e tecnici. formazione informatica, corsi IT, certificazioni Cisco Microsoft AWS, coding bootcamp, academy ICT, e-learning, developer training, training partner.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "85.59.20"
       ],
+      "embedding_text": "IT Training / Formazione Informatica. Centro di formazione e academy che eroga corsi, bootcamp e percorsi di certificazione su programmazione, cloud, cybersecurity e tecnologie ICT, con docenti, aule e piattaforme e-learning per sviluppatori e tecnici. formazione informatica, corsi IT, certificazioni Cisco Microsoft AWS, coding bootcamp, academy ICT, e-learning, developer training, training partner.",
       "sibling_contrast_notes": "Unico concetto del layer education, nessun fratello. Vocabolario distintivo tutto didattico-certificativo (bootcamp, academy, docenti, aule, percorsi di certificazione Cisco/Microsoft/AWS, training partner, e-learning per sviluppatori) che calamita chi EROGA formazione tecnica. Si separa da Generic Business Consulting (advisory organizzativo/gestionale alle imprese) e dalle aziende IT-service (che IMPLEMENTANO soluzioni, non insegnano): qui il footprint e l'erogazione di corsi, non il servizio professionale o l'integrazione tecnologica. ATECO: 85.59.20 (corsi di aggiornamento professionale) primario per la formazione IT professionale; 85.59.90 (altri servizi di istruzione nca) secondario — la formazione informatica spesso non ha codice dedicato e ricade nella famiglia generica 85.59, da verificare a valle."
     },
     {
       "id": "office_equipment",
       "name": "Office Equipment / Soluzioni Ufficio",
-      "domain": "office",
       "layer": "office",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "noleggio stampanti",
         "fotocopiatrici",
@@ -1609,25 +1477,22 @@
         "office equipment",
         "copier rental"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [
-        "46.50.10"
-      ],
-      "embedding_text": "Office Equipment / Soluzioni Ufficio. Vendita, assistenza e noleggio di stampanti, fotocopiatrici e multifunzione MFP, con managed print services (MPS), monitoraggio toner e gestione documentale per l'ufficio. noleggio stampanti, fotocopiatrici, multifunzione MFP, print management, managed print services MPS, gestione documentale, copier rental.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "33.20.06",
         "46.14.03",
         "46.50.30"
       ],
+      "ateco_excluded": [
+        "46.50.10"
+      ],
+      "embedding_text": "Office Equipment / Soluzioni Ufficio. Vendita, assistenza e noleggio di stampanti, fotocopiatrici e multifunzione MFP, con managed print services (MPS), monitoraggio toner e gestione documentale per l'ufficio. noleggio stampanti, fotocopiatrici, multifunzione MFP, print management, managed print services MPS, gestione documentale, copier rental.",
       "sibling_contrast_notes": "Discriminato col vocabolario print/document business: stampanti, fotocopiatrici, multifunzione MFP, managed print services (MPS), monitoraggio toner, gestione documentale — termini che ict_wholesale (distributore/grossista/VAR/broadline) e computer_hardware (PC/server/workstation/periferiche) non usano. Rimosso il generico 'soluzioni ufficio'/'forniture per ufficio' (driftava verso wholesale) e sostituito con 'soluzioni di stampa ufficio'; aggiunti 'assistenza' e 'monitoraggio toner' per ancorare al modello MPS. ATECO: 33.20.06 (installazione macchine per ufficio), 46.14.03 (intermediari del commercio ingrosso macchine/attrezzature per ufficio), 46.50.30 (commercio ingrosso altre macchine e attrezzature per ufficio) sono nella KB e pertinenti. Incertezza: il noleggio operativo puro mappa a 77.33.00 (Noleggio macchine/attrezzature per ufficio) che NON e' nei nodi KB, quindi escluso; 46.50.10 (ingrosso computer/periferiche/software) escluso perche' appartiene ai contrasti ict_wholesale/computer_hardware. Confermati layer=office e vertical=horizontal."
     },
     {
       "id": "generic_consulting",
       "name": "Generic Business Consulting / Consulenza Aziendale",
-      "domain": "Consulting",
       "layer": "consulting",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "consulenza aziendale",
         "consulenza organizzativa",
@@ -1644,23 +1509,20 @@
         "consulenza del lavoro",
         "consulenza fiscale"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "Generic Business Consulting / Consulenza Aziendale. Consulenza direzionale e organizzativa alle imprese: riorganizzazione aziendale, controllo di gestione, business plan, ottimizzazione dei processi e change management, riposizionamento strategico. management consulting, consulenza gestionale, consulenza direzionale, consulenza strategica, controllo di gestione, business plan, riorganizzazione aziendale, change management.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "70.20.09",
         "69.20.04",
         "69.20.06"
       ],
+      "ateco_excluded": [],
+      "embedding_text": "Generic Business Consulting / Consulenza Aziendale. Consulenza direzionale e organizzativa alle imprese: riorganizzazione aziendale, controllo di gestione, business plan, ottimizzazione dei processi e change management, riposizionamento strategico. management consulting, consulenza gestionale, consulenza direzionale, consulenza strategica, controllo di gestione, business plan, riorganizzazione aziendale, change management.",
       "sibling_contrast_notes": "Unico concetto del layer consulting (nessun fratello). Firma distintiva: lessico di management generalista ancorato a deliverable progettuali (business plan, controllo di gestione, riorganizzazione, change management, ottimizzazione dei processi). Verso grc_compliance (security): qui il rischio e quello gestionale/organizzativo, mentre la firma GRC e su sigle normative (ISO27001/NIS2/GDPR/DORA, SGSI, DPO, audit di sicurezza) tenute fuori dal mio embedding_text per non avvicinarle. Verso it_staffing_bodyrental (staffing): qui si vendono progetti e advisory, non fornitura di persone, quindi evito lemmi come somministrazione, contractor, time and material, staff augmentation. ATECO: 70.22.0 (altra consulenza amministrativo-gestionale) e codice centrale e solido; 70.21.0 (PR/comunicazione) coerente con la division 70; 69.20.30 (consulenza fiscale/tributaria) e codice di confine con la division 69 (commercialisti), incluso solo per coprire l'asse fiscale/lavoro degli alias e da verificare/rimuovere se si restringe alla pura consulenza direzionale. Tutti off-stack rispetto alla ATECO ICT KB (sezione K, div. 26/46/58/61/62/63/95)."
     },
     {
       "id": "telecom_civil_works",
       "name": "Telecom Civil Works / Posa Infrastrutture di Rete",
-      "domain": "Construction",
       "layer": "construction",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "posa fibra ottica",
         "scavi per telecomunicazioni",
@@ -1676,23 +1538,20 @@
         "fiber splicing",
         "infrastrutturazione FTTH"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "Telecom Civil Works / Posa Infrastrutture di Rete. Opere civili per reti TLC: minitrincea e microtrincea, scavo e posa di cavidotti e pozzetti, tiratura e soffiaggio (blowing) della fibra, giunzione cavi a fusione. posa fibra ottica, scavi telecomunicazioni, cavidotti, pozzetti, minitrincea, microtrenching, soffiaggio fibra, fiber splicing, ducting, fiber trenching.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "42.22.00",
         "43.21.01",
         "43.21.02"
       ],
+      "ateco_excluded": [],
+      "embedding_text": "Telecom Civil Works / Posa Infrastrutture di Rete. Opere civili per reti TLC: minitrincea e microtrincea, scavo e posa di cavidotti e pozzetti, tiratura e soffiaggio (blowing) della fibra, giunzione cavi a fusione. posa fibra ottica, scavi telecomunicazioni, cavidotti, pozzetti, minitrincea, microtrenching, soffiaggio fibra, fiber splicing, ducting, fiber trenching.",
       "sibling_contrast_notes": "Unico concetto del layer construction, nessun fratello diretto. Distinzione costruita su vocabolario fisico-cantieristico esclusivo (scavo, minitrincea/microtrincea, cavidotti, pozzetti, soffiaggio/blowing, giunzione a fusione) che nessun vicino usa. Fiber Optic Cables [hardware] = manifattura del prodotto-cavo (filati ottici, patch cord, connettori); io poso il cavo nel terreno e non lo fabbrico. Telecom Operator [telecom] = erogazione servizio carrier su licenza (FTTH/FWA/MNO/connettività); io eseguo le opere civili a terra che abilitano quella rete. ATECO ora popolati in ateco_in_kb: 42.22.00 (costruzione opere di pubblica utilita per energia e telecomunicazioni), 43.21.01/43.21.02 (installazione impianti elettrici/cablaggi). Sono off-stack rispetto alla KB ICT ma sono i codici reali del settore: da verificare a valle che la KB li indicizzi; se la KB ICT resta priva di questi codici, andrebbero rispostati in ateco_excluded. Confermo layer=construction, vertical=horizontal."
     },
     {
       "id": "it_staffing_bodyrental",
       "name": "IT Staffing / Body Rental",
-      "domain": "Staffing",
       "layer": "staffing",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "IT staffing",
         "body rental",
@@ -1709,22 +1568,19 @@
         "sviluppatori a contratto",
         "contractor IT"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "IT Staffing / Body Rental. Somministrazione, ricerca e selezione di personale IT e staff augmentation: fornitura di consulenti e contractor tecnici collocati presso il cliente a tempo e materiale. IT staffing, body rental, staff augmentation, somministrazione personale IT, lavoro interinale, recruiting tecnico, agenzia per il lavoro, profili ICT, contractor, time and material.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "78.10.00",
         "78.20.00"
       ],
-      "sibling_contrast_notes": "Unico concetto del layer staffing, nessun fratello. Vocabolario discriminante (body rental, staff augmentation, somministrazione, lavoro interinale, agenzia per il lavoro, contractor, time and material, fornitura di profili/teste) ancora il concetto alla VENDITA DI RISORSE UMANE collocate presso il cliente. Separazione dai contrasti: Software Development vende deliverable/applicazioni custom su commessa (software house, REST API), Managed Services gestisce l'infrastruttura del cliente con SLA e canone (MSP, NOC, RMM), Generic Business Consulting vende advisory organizzativo/direzionale e consulenza del lavoro giuslavoristica (advisory, non fornitura di teste) — nessun termine staffing condiviso. ATECO 78.10.00 (attivita delle agenzie di collocamento) e 78.20.00 (attivita delle agenzie di lavoro temporaneo / fornitura risorse umane) sono i codici reali ATECO 2025; non esiste un ATECO IT-specifico per lo staffing tecnico, quindi i codici sono settoriali-generici. Incertezza da verificare a valle: un'azienda di IT staffing puo dichiarare anche 62.0x (consulenza/produzione software) o 70.22 (consulenza gestionale) come codice principale."
+      "embedding_text": "IT Staffing / Body Rental. Somministrazione, ricerca e selezione di personale IT e staff augmentation: fornitura di consulenti e contractor tecnici collocati presso il cliente a tempo e materiale. IT staffing, body rental, staff augmentation, somministrazione personale IT, lavoro interinale, recruiting tecnico, agenzia per il lavoro, profili ICT, contractor, time and material.",
+      "sibling_contrast_notes": "Unico concetto del layer staffing, nessun fratello. Vocabolario discriminante (body rental, staff augmentation, somministrazione, lavoro interinale, agenzia per il lavoro, contractor, time and material, fornitura di profili/teste) ancora il concetto alla VENDITA DI RISORSE UMANE collocate presso il cliente. Separazione dai contrasti: Software Development vende deliverable/applicazioni custom su commessa (software house, REST API), Managed Services gestisce l'infrastruttura del cliente con SLA e canone (MSP, NOC, RMM), Generic Business Consulting vende advisory organizzativo/direzionale e consulenza del lavoro giuslavoristica (advisory, non fornitura di teste) — nessun termine staffing condiviso. ATECO 78.10.00 (attivita delle agenzie di collocamento) e 78.20.00 (attivita delle agenzie di lavoro temporaneo / fornitura risorse umane) sono i codici reali ATECO 2025; non esiste un ATECO IT-specifico per lo staffing tecnico, quindi i codici sono settoriali-generici. Incertezza da verificare a valle: un'azienda di IT staffing puo dichiarare anche 62.0x (consulenza/produzione software) o 70.22 (consulenza gestionale) come codice principale.",
+      "ateco_excluded": []
     },
     {
       "id": "bpo_callcenter",
       "name": "BPO / Call Center",
-      "domain": "BPO",
       "layer": "bpo",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "BPO",
         "business process outsourcing",
@@ -1740,22 +1596,19 @@
         "back-office in outsourcing",
         "lead generation telefonica"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "BPO / Call Center. Contact center inbound e outbound, customer care telefonico, teleselling, telemarketing, lead generation, recupero crediti e back-office amministrativo gestiti per conto terzi (business process outsourcing). BPO, business process outsourcing, call center, contact center, customer care, teleselling, telemarketing, inbound, outbound, recupero crediti, debt collection.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "82.20.00",
         "82.99.99"
       ],
+      "ateco_excluded": [],
+      "embedding_text": "BPO / Call Center. Contact center inbound e outbound, customer care telefonico, teleselling, telemarketing, lead generation, recupero crediti e back-office amministrativo gestiti per conto terzi (business process outsourcing). BPO, business process outsourcing, call center, contact center, customer care, teleselling, telemarketing, inbound, outbound, recupero crediti, debt collection.",
       "sibling_contrast_notes": "Unico concetto del layer \"bpo\" (off-stack horizontal): nessun fratello interno da contrastare. Il footprint distintivo e relazione-cliente telefonica e processi amministrativi per conto terzi (contact center inbound/outbound, teleselling, telemarketing, recupero crediti), vocabolario assente in Managed Services (gestione infrastruttura IT con SLA/canone, MSP, RMM, NOC, patch management) e in IT Support / Help Desk (service desk L1/L2, incident management, ticketing ITIL, troubleshooting): li la 'gestione per conto terzi' e tecnico-informatica, qui e di relazione cliente e amministrativa. ATECO reali del settore NON sono codici ICT e quindi non figurano in questa KB: 82.20.00 (attivita dei call center), 82.99.99/82.99.40 (altri servizi di supporto alle imprese nca), 66.19.21 o 82.91.10 (recupero crediti); ateco_in_kb resta vuoto, da mappare off-stack a valle con verifica del codice esatto per recupero crediti."
     },
     {
       "id": "computer_repair",
       "name": "Computer & Device Repair",
-      "domain": "Repair",
       "layer": "repair",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "riparazione computer",
         "computer repair",
@@ -1770,23 +1623,19 @@
         "riparazione periferiche e smartphone",
         "laboratorio di riparazione"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "Computer & Device Repair. Riparazione break-fix di computer, notebook, smartphone, tablet e periferiche guaste: diagnosi guasti hardware, dissaldatura e sostituzione componenti, schede madri e display, recupero dati, ricambi in banco di laboratorio, riparazioni fuori garanzia. riparazione computer, computer repair, assistenza tecnica hardware, sostituzione componenti, ricambi, break-fix, device repair, laboratorio riparazione.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "95.10.10",
         "95.10.21",
         "95.10.29"
       ],
+      "embedding_text": "Computer & Device Repair. Riparazione break-fix di computer, notebook, smartphone, tablet e periferiche guaste: diagnosi guasti hardware, dissaldatura e sostituzione componenti, schede madri e display, recupero dati, ricambi in banco di laboratorio, riparazioni fuori garanzia. riparazione computer, computer repair, assistenza tecnica hardware, sostituzione componenti, ricambi, break-fix, device repair, laboratorio riparazione.",
       "sibling_contrast_notes": "Unico concetto del layer \"repair\". Mi calamita il vocabolario fisico del banco riparazione: \"diagnosi guasti hardware\", \"dissaldatura/sostituzione componenti\", \"schede madri/display\", \"recupero dati\", \"ricambi\", \"laboratorio\", \"fuori garanzia\" — intervento puntuale su un singolo apparato rotto da riportare in funzione. Managed Services usa lessico di servizio continuativo in outsourcing (MSP, SLA, canone ricorrente, RMM, NOC, patch management, monitoraggio infrastruttura), assente nel mio testo. IT Support / Help Desk usa lessico di relazione con l'utente e processo (service desk, ticketing ITIL, incident management, supporto L1/L2, single point of contact, troubleshooting remoto). Computer Hardware usa lessico di produzione/commercio di prodotti finiti (fabbricazione, vendita, distribuzione di PC, server, workstation, periferiche). Io riparo apparati esistenti, loro li gestiscono, li supportano o li vendono. Nota ATECO: il prompt indicava 95.11, ma i codici ATECO 2025 presenti nella KB sono 95.10.10 (riparazione computer e periferiche, primario), 95.10.21 e 95.10.29 (riparazione apparecchiature per le comunicazioni: telefoni/tablet e altre); usati questi, da verificare a valle la mappatura 95.11 → 95.10.x."
     },
     {
       "id": "data_entry_digitization",
       "name": "Data Entry / Document Digitization",
-      "domain": "Document Services",
       "layer": "document_services",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "data entry",
         "digitalizzazione documentale",
@@ -1805,22 +1654,19 @@
         "data capture",
         "inserimento dati"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "Data Entry / Document Digitization. Scansione e digitalizzazione di documenti cartacei conto terzi: dematerializzazione, acquisizione ottica con OCR, indicizzazione, conservazione sostitutiva e inserimento dati. data entry, digitalizzazione documentale, document scanning, dematerializzazione, OCR, acquisizione ottica, indicizzazione documenti, conservazione sostitutiva, imaging documentale, data capture, inserimento dati.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "63.10.29",
         "63.92.00"
       ],
+      "ateco_excluded": [],
+      "embedding_text": "Data Entry / Document Digitization. Scansione e digitalizzazione di documenti cartacei conto terzi: dematerializzazione, acquisizione ottica con OCR, indicizzazione, conservazione sostitutiva e inserimento dati. data entry, digitalizzazione documentale, document scanning, dematerializzazione, OCR, acquisizione ottica, indicizzazione documenti, conservazione sostitutiva, imaging documentale, data capture, inserimento dati.",
       "sibling_contrast_notes": "Unico concetto del layer document_services. Marcatore esclusivo: lessico fisico-documentale dell'acquisire-e-trasferire-su-digitale documenti cartacei per conto del cliente -- \"scansione\", \"dematerializzazione\", \"acquisizione ottica\", \"OCR\", \"indicizzazione\", \"conservazione sostitutiva\", \"imaging documentale\", \"data capture\", \"inserimento dati\". Digital Workplace usa Microsoft 365/SharePoint/Intune/endpoint (postazioni di lavoro). Data Platform usa data warehouse/ETL/BI/OLAP (trasformazione analitica di dati strutturati). BPO/Call Center usa contact center/customer care/teleselling: nessuno tocca scansione/dematerializzazione/OCR. Rischio residuo: \"gestione documentale conto terzi\" e \"per conto terzi\" risuonano col footprint outsourcing di BPO; tenuto sottotono nell'embedding_text, ma resta possibile bleed parziale verso bpo_callcenter. ATECO: nella KB IT-centrica gli unici nodi presenti sono 63.10.21 (elaborazione dati contabili, alias KB \"data entry contabile\"), 63.10.29 (elaborazione altri dati) e 63.92.00 (altri servizi di informazione). I codici ATECO 2025 piu' propri per preparazione/scansione documenti (gruppo 82.19) e conservazione/dematerializzazione (63.99) NON sono presenti in KB e andrebbero verificati/aggiunti a valle per coprire il perimetro fisico-documentale completo."
     },
     {
       "id": "gis_surveying",
       "name": "GIS / Geospatial & Surveying",
-      "domain": "Engineering Services",
       "layer": "engineering_services",
       "vertical": "horizontal",
-      "kind": "distractor",
       "aliases": [
         "GIS",
         "sistemi informativi territoriali",
@@ -1843,15 +1689,23 @@
         "rilievi GPS",
         "nuvola di punti"
       ],
-      "ateco_candidates_in_kb": [],
-      "ateco_candidates_excluded": [],
-      "embedding_text": "GIS / Geospatial & Surveying. Cartografia, aerofotogrammetria e rilievi topografici e geodetici del territorio; telerilevamento, scansione LiDAR e georeferenziazione catastale. GIS, SIT, geospatial, cartografia, aerofotogrammetria, fotogrammetria, topografia, rilievi topografici, geomatica, geodesia, telerilevamento, remote sensing, LiDAR, rilievi con drone, catasto, surveying.",
-      "ateco_in_kb_all": [
+      "ateco_in_kb": [
         "71.12.40",
         "71.12.30",
         "71.12.50"
       ],
+      "embedding_text": "GIS / Geospatial & Surveying. Cartografia, aerofotogrammetria e rilievi topografici e geodetici del territorio; telerilevamento, scansione LiDAR e georeferenziazione catastale. GIS, SIT, geospatial, cartografia, aerofotogrammetria, fotogrammetria, topografia, rilievi topografici, geomatica, geodesia, telerilevamento, remote sensing, LiDAR, rilievi con drone, catasto, surveying.",
       "sibling_contrast_notes": "Unico concetto del layer engineering_services, nessun fratello da contrastare internamente. Contro Data Platform e Software Development (software/horizontal): il punto di contatto e' la parola \"dati\", ma qui il vocabolario e' interamente geospaziale-fisico (cartografia, aerofotogrammetria, geodesia, topografia, telerilevamento, LiDAR, catasto, nuvola di punti) — misura e rappresentazione del territorio fisico, lessico assente in pipeline ETL/BI o sviluppo applicativo. ATECO 71.12.40 (cartografia e aerofotogrammetria) e' il cardine; 71.12.30 (attivita' tecniche di geometri/topografia) e 71.12.50 (prospezione geologica) sono adiacenze plausibili sotto 71.12 \"Attivita' di ingegneria e altre consulenze tecniche\" — da verificare a valle, fuori dal cardine IT-infra."
+    }
+  ],
+  "ateco_grounded": "2026-06-30 vs codici_ateco_2025.json",
+  "applied_merges": [
+    {
+      "from": [
+        "telecom_operator",
+        "internet_service_provider"
+      ],
+      "to": "telecom_internet_provider"
     }
   ]
 }
