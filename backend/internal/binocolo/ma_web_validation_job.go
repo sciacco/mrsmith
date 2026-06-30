@@ -65,9 +65,15 @@ type maWebValidationJobPayload struct {
 	Force              bool `json:"force"`
 	IncludeIdentifiers bool `json:"includeIdentifiers"`
 	AnalyzeWithLLM     bool `json:"analyzeWithLLM"`
-	DomainCount        int  `json:"domainCount"`
-	KeywordCount       int  `json:"keywordCount"`
-	Rank               bool `json:"rank"`
+	// LLMOnAll forces the LLM analyst to run on EVERY company, not only on the
+	// ambiguous/no_signal deterministic verdicts. Used by the sector-eval harness to
+	// learn what the LLM would have chosen even where embed+rerank was already terminal.
+	// It does NOT change the production decision (sectorFinalDecision still ignores the
+	// analyst for confirm/reject/weak) — it only records the extra opinion.
+	LLMOnAll     bool `json:"llmOnAll"`
+	DomainCount  int  `json:"domainCount"`
+	KeywordCount int  `json:"keywordCount"`
+	Rank         bool `json:"rank"`
 }
 
 func (s *maService) enqueueWebValidation(ctx context.Context, sessionID string, req MAWebValidationEnrichRequest, subject, email string) (MASessionDetail, error) {
@@ -150,6 +156,7 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 		Force:              payload.Force,
 		IncludeIdentifiers: payload.IncludeIdentifiers,
 		AnalyzeWithLLM:     boolPtr(payload.AnalyzeWithLLM),
+		LLMOnAll:           boolPtr(payload.LLMOnAll),
 		DomainCount:        payload.DomainCount,
 		KeywordCount:       payload.KeywordCount,
 		Rank:               boolPtr(payload.Rank),
@@ -283,7 +290,7 @@ func (s *maService) buildMAWebValidation(
 
 	var analysis *CandidateMatchAnalysisResponse
 	analysisErr := ""
-	if payload.AnalyzeWithLLM && sectorVerdictNeedsLLM(classification.Verdict) {
+	if payload.AnalyzeWithLLM && (payload.LLMOnAll || sectorVerdictNeedsLLM(classification.Verdict)) {
 		result, err := s.analyzeSectorAmbiguity(ctx, target, strategy, evidence, classification, subject, email)
 		if err != nil {
 			analysisErr = cleanText(err.Error(), 180)
@@ -465,7 +472,7 @@ func (s *maService) assembleWebValidationRequest(
 		evidenceRuns = []CandidateMatchEvidenceRun{}
 	}
 	keywordSet := classificationToKeywordSet(class)
-	summary := classificationToSummary(class, decision)
+	summary := classificationToSummary(class, decision, analysis)
 	return MAWebValidationUpsertRequest{
 		PipelineVersion:        maWebValidationPipelineVersion,
 		InputHash:              inputHash,
@@ -509,7 +516,7 @@ func classificationToKeywordSet(class maSectorClassification) CandidateMatchKeyw
 	}
 }
 
-func classificationToSummary(class maSectorClassification, decision *CandidateMatchFinalDecision) CandidateMatchEvidenceSummary {
+func classificationToSummary(class maSectorClassification, decision *CandidateMatchFinalDecision, analysis *CandidateMatchAnalysisResponse) CandidateMatchEvidenceSummary {
 	coreMatches, negativeMatches := 0, 0
 	for _, c := range class.Concepts {
 		if c.Kind == "distractor" {
@@ -526,15 +533,21 @@ func classificationToSummary(class maSectorClassification, decision *CandidateMa
 	if len(concepts) > 8 {
 		concepts = concepts[:8]
 	}
-	return CandidateMatchEvidenceSummary{
-		Score:              score,
-		Confidence:         class.Confidence,
-		CoreMatches:        coreMatches,
-		NegativeMatches:    negativeMatches,
-		TotalCoreTerms:     coreMatches,
-		CompanyDescription: cleanText(class.CompanyDescription, 1000),
-		Concepts:           concepts,
+	summary := CandidateMatchEvidenceSummary{
+		Score:                score,
+		Confidence:           class.Confidence,
+		CoreMatches:          coreMatches,
+		NegativeMatches:      negativeMatches,
+		TotalCoreTerms:       coreMatches,
+		CompanyDescription:   cleanText(class.CompanyDescription, 1000),
+		Concepts:             concepts,
+		DeterministicVerdict: string(class.Verdict),
 	}
+	if analysis != nil {
+		summary.LLMVerdictAll = analysis.Verdict
+		summary.LLMActionAll = analysis.RecommendedAction
+	}
+	return summary
 }
 
 func (s *maService) recordSectorClassificationTrace(ctx context.Context, target MATarget, class maSectorClassification, decision *CandidateMatchFinalDecision, analystUsed bool) {
@@ -715,6 +728,10 @@ func normalizeMAWebValidationPayload(req MAWebValidationEnrichRequest) maWebVali
 	if req.AnalyzeWithLLM != nil {
 		analyzeWithLLM = *req.AnalyzeWithLLM
 	}
+	llmOnAll := false
+	if req.LLMOnAll != nil {
+		llmOnAll = *req.LLMOnAll
+	}
 	rank := true
 	if req.Rank != nil {
 		rank = *req.Rank
@@ -745,6 +762,7 @@ func normalizeMAWebValidationPayload(req MAWebValidationEnrichRequest) maWebVali
 		Force:              req.Force,
 		IncludeIdentifiers: req.IncludeIdentifiers,
 		AnalyzeWithLLM:     analyzeWithLLM,
+		LLMOnAll:           llmOnAll,
 		DomainCount:        domainCount,
 		KeywordCount:       keywordCount,
 		Rank:               rank,
@@ -861,6 +879,7 @@ func maWebValidationInputHash(target MATarget, strategy MAStrategySpec, payload 
 func maWebValidationInputOptions(payload maWebValidationJobPayload) map[string]any {
 	return map[string]any{
 		"analyzeWithLLM":     payload.AnalyzeWithLLM,
+		"llmOnAll":           payload.LLMOnAll,
 		"domainCount":        payload.DomainCount,
 		"includeIdentifiers": payload.IncludeIdentifiers,
 		"keywordCount":       payload.KeywordCount,

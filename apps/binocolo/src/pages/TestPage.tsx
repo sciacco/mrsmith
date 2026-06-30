@@ -10,10 +10,12 @@ import type {
   MASessionListResponse,
   MASessionVisibility,
   MATarget,
+  MAWebValidationEnrichRequest,
   OpenAPIITEnvelope,
   PipelineFinalAction,
   PipelineWebValidationState,
   SectorClassificationTestResponse,
+  SectorEvalItem,
   SectorEvalLabel,
   SectorEvalReport,
   WebSearchResponse,
@@ -77,6 +79,30 @@ const sectorEvalBucketLabels: Record<SectorEvalLabel, string> = {
   forse: 'Forse',
   scarta: 'Scarta',
 };
+
+// Colour a prediction relative to the human label: green when it matches, amber when it
+// disagrees, neutral when there is no label yet or the predictor produced no call.
+const evalMarkClass = (
+  bucket: SectorEvalLabel | undefined,
+  label: SectorEvalLabel | undefined,
+): string => {
+  if (!label || !bucket) return styles.muted ?? '';
+  return (bucket === label ? styles.ok : styles.warn) ?? '';
+};
+
+const renderEvalPrediction = (
+  bucket: SectorEvalLabel | undefined,
+  sub: string | undefined,
+  label: SectorEvalLabel | undefined,
+) =>
+  bucket ? (
+    <>
+      <span className={evalMarkClass(bucket, label)}>{sectorEvalBucketLabels[bucket]}</span>
+      {sub ? <div className={styles.muted}>{sub}</div> : null}
+    </>
+  ) : (
+    <span className={styles.muted}>—</span>
+  );
 
 const sessionVisibilityOptions: Array<{ value: MASessionVisibility; label: string }> = [
   { value: 'active', label: 'Attive' },
@@ -477,7 +503,11 @@ export function TestPage() {
   });
   const runEvalValidation = useMutation({
     mutationFn: () =>
-      api.post<unknown>(`/binocolo/v1/ma/sessions/${evalSessionId}/web-validation/enrich`, {}),
+      api.post<unknown>(`/binocolo/v1/ma/sessions/${evalSessionId}/web-validation/enrich`, {
+        force: true,
+        analyzeWithLLM: true,
+        llmOnAll: true,
+      } satisfies MAWebValidationEnrichRequest),
   });
 
   const companyData = companySearch.data?.data;
@@ -1623,9 +1653,11 @@ export function TestPage() {
             </div>
             <h2 id="sector-eval-title" className={styles.sectionTitle}>Sector eval</h2>
             <p className={styles.sectionHint}>
-              Esegui la validazione web sull&apos;intera sessione, poi conferma o riclassifica ogni
-              azienda. Le label sono ground-truth (persistite, separate dalla predizione) e si
-              confrontano col verdetto del sistema. I disaccordi sono evidenziati.
+              Esegui la validazione (l&apos;LLM gira su <em>ogni</em> azienda, non solo sugli ambigui:
+              +1 chiamata LLM per azienda), poi conferma o riclassifica ogni riga. La label è
+              ground-truth (persistita, separata dalla predizione). Confronto su tre predittori: A
+              embed+rerank senza LLM, B solo LLM, C ibrido in produzione. Verde = concorda con la
+              label, ambra = diverge.
             </p>
           </div>
           <div className={styles.companyForm}>
@@ -1693,10 +1725,29 @@ export function TestPage() {
           <>
             <div className={styles.responseBar}>
               <span>
-                Accuratezza {(sectorEval.data.metrics.accuracy * 100).toFixed(0)}% (
-                {sectorEval.data.metrics.correct}/{sectorEval.data.metrics.evaluable})
+                <strong>A · embed+rerank</strong> {(sectorEval.data.metrics.deterministic.accuracy * 100).toFixed(0)}% (
+                {sectorEval.data.metrics.deterministic.correct}/{sectorEval.data.metrics.deterministic.evaluable})
               </span>
-              <span>Escalation LLM {(sectorEval.data.metrics.escalationRate * 100).toFixed(0)}%</span>
+              <span>
+                <strong>B · LLM sempre</strong> {(sectorEval.data.metrics.llm.accuracy * 100).toFixed(0)}% (
+                {sectorEval.data.metrics.llm.correct}/{sectorEval.data.metrics.llm.evaluable})
+              </span>
+              <span>
+                <strong>C · ibrido (prod)</strong> {(sectorEval.data.metrics.final.accuracy * 100).toFixed(0)}% (
+                {sectorEval.data.metrics.final.correct}/{sectorEval.data.metrics.final.evaluable})
+              </span>
+            </div>
+            <div className={styles.responseBar}>
+              <span>
+                Escalation LLM {(sectorEval.data.metrics.escalationRate * 100).toFixed(0)}% (
+                {sectorEval.data.metrics.escalations}/{sectorEval.data.metrics.validated})
+              </span>
+              <span>
+                LLM vs det — entrambi OK {sectorEval.data.metrics.llmVsDeterministic.bothCorrect} · solo det{' '}
+                {sectorEval.data.metrics.llmVsDeterministic.detOnly} (LLM peggiora) · solo LLM{' '}
+                {sectorEval.data.metrics.llmVsDeterministic.llmOnly} (LLM salva) · entrambi KO{' '}
+                {sectorEval.data.metrics.llmVsDeterministic.bothWrong}
+              </span>
               <span>Distrattore &gt; target: {sectorEval.data.metrics.distractorBeatsTarget}</span>
               <span>
                 Etichettate {sectorEval.data.metrics.labeled}/{sectorEval.data.metrics.targets} · validate{' '}
@@ -1709,14 +1760,18 @@ export function TestPage() {
                   <tr>
                     <th>Azienda</th>
                     <th>Self-description</th>
-                    <th>Sistema</th>
+                    <th>A · embed+rerank</th>
+                    <th>B · LLM sempre</th>
+                    <th>C · ibrido (prod)</th>
                     <th>Top concetti</th>
                     <th>Label (tu)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sectorEval.data.items.map((item) => (
-                    <tr key={item.companyKey} className={item.agreement === 'mismatch' ? styles.rowMismatch : ''}>
+                  {sectorEval.data.items.map((item: SectorEvalItem) => {
+                    const finalMismatch = Boolean(item.label && item.finalBucket && item.label !== item.finalBucket);
+                    return (
+                    <tr key={item.companyKey} className={finalMismatch ? styles.rowMismatch : ''}>
                       <td>
                         <strong>{item.companyName}</strong>
                         {item.domain ? <div className={styles.path}>{item.domain}</div> : null}
@@ -1728,15 +1783,25 @@ export function TestPage() {
                       <td>
                         {item.validated ? (
                           <>
-                            <span className={`${styles.scoreBadge} ${styles[`finalAction_${item.finalAction}`] ?? ''}`}>
-                              {item.predictedBucket ? sectorEvalBucketLabels[item.predictedBucket] : item.finalAction}
-                            </span>
-                            {item.escalated ? <div className={styles.muted}>LLM: {item.analystVerdict}</div> : null}
+                            {renderEvalPrediction(item.deterministicBucket, item.deterministicVerdict, item.label)}
+                            {item.escalated ? <div className={styles.muted}>→ escala LLM</div> : null}
                             {item.distractorBeatsTarget ? <div className={styles.warn}>⚠ distrattore &gt; target</div> : null}
                           </>
                         ) : (
                           <span className={styles.muted}>—</span>
                         )}
+                      </td>
+                      <td>
+                        {renderEvalPrediction(
+                          item.llmBucket,
+                          [item.llmVerdict, item.llmAction].filter(Boolean).join(' / ') || undefined,
+                          item.label,
+                        )}
+                      </td>
+                      <td>
+                        {item.validated
+                          ? renderEvalPrediction(item.finalBucket, item.finalState, item.label)
+                          : <span className={styles.muted}>—</span>}
                       </td>
                       <td className={styles.muted}>
                         {(item.topConcepts ?? []).map((concept) => (
@@ -1761,11 +1826,10 @@ export function TestPage() {
                           <option value="forse">Forse</option>
                           <option value="scarta">Scarta</option>
                         </select>
-                        {item.agreement === 'match' ? <span className={styles.ok}> ✓</span> : null}
-                        {item.agreement === 'mismatch' ? <span className={styles.warn}> ✗</span> : null}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

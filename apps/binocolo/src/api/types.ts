@@ -189,6 +189,8 @@ export interface MAWebValidationEnrichRequest {
   force?: boolean;
   includeIdentifiers?: boolean;
   analyzeWithLLM?: boolean;
+  /** Force the LLM analyst on EVERY company (not just ambiguous). Used by the sector-eval run. */
+  llmOnAll?: boolean;
   domainCount?: number;
   keywordCount?: number;
   rank?: boolean;
@@ -598,30 +600,42 @@ export interface SectorEvalItem {
   atecoDescription?: string;
   selfDescription?: string;
   validated: boolean;
-  verdict?: string;
+  // A — embed+rerank only (no LLM)
+  deterministicVerdict?: string;
+  deterministicBucket?: SectorEvalLabel;
+  // B — LLM analyst on this company (LLM-on-all); absent if it did not run
+  llmVerdict?: string;
+  llmAction?: string;
+  llmBucket?: SectorEvalLabel;
+  // C — production hybrid final decision
+  finalState?: string;
   finalAction?: string;
-  predictedBucket?: SectorEvalLabel;
-  analystVerdict?: string;
-  analystAction?: string;
+  finalBucket?: SectorEvalLabel;
   escalated: boolean;
   distractorBeatsTarget: boolean;
   topConcepts?: SectorEvalConcept[];
   label?: SectorEvalLabel;
   note?: string;
-  agreement: 'match' | 'mismatch' | 'unlabeled' | 'unvalidated';
+}
+
+export interface SectorEvalPredictorMetrics {
+  evaluable: number;
+  correct: number;
+  accuracy: number;
+  confusion: Record<string, Record<string, number>>;
 }
 
 export interface SectorEvalMetrics {
   targets: number;
   validated: number;
   labeled: number;
-  evaluable: number;
-  correct: number;
-  accuracy: number;
+  deterministic: SectorEvalPredictorMetrics;
+  llm: SectorEvalPredictorMetrics;
+  final: SectorEvalPredictorMetrics;
   escalations: number;
   escalationRate: number;
   distractorBeatsTarget: number;
-  confusion: Record<string, Record<string, number>>;
+  llmVsDeterministic: Record<string, number>;
 }
 
 export interface SectorEvalReport {

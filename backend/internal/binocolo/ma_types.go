@@ -203,6 +203,7 @@ type MAWebValidationEnrichRequest struct {
 	Force              bool  `json:"force,omitempty"`
 	IncludeIdentifiers bool  `json:"includeIdentifiers,omitempty"`
 	AnalyzeWithLLM     *bool `json:"analyzeWithLLM,omitempty"`
+	LLMOnAll           *bool `json:"llmOnAll,omitempty"`
 	DomainCount        int   `json:"domainCount,omitempty"`
 	KeywordCount       int   `json:"keywordCount,omitempty"`
 	Rank               *bool `json:"rank,omitempty"`

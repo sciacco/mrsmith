@@ -53,6 +53,15 @@ type CandidateMatchEvidenceSummary struct {
 	// the write-only classification trace.
 	CompanyDescription string           `json:"companyDescription,omitempty"`
 	Concepts           []maConceptScore `json:"concepts,omitempty"`
+	// DeterministicVerdict is the raw embed+rerank verdict BEFORE any LLM tie-break
+	// (confirm/reject/weak/ambiguous/no_signal). LLMVerdictAll/LLMActionAll record the
+	// analyst's call when it ran — in an LLM-on-all eval run that is every company, not
+	// just the ambiguous ones. The sector-eval harness reads these three to compare the
+	// deterministic-only path, the LLM-always path, and the production hybrid against the
+	// human label, without re-running anything.
+	DeterministicVerdict string `json:"deterministicVerdict,omitempty"`
+	LLMVerdictAll        string `json:"llmVerdictAll,omitempty"`
+	LLMActionAll         string `json:"llmActionAll,omitempty"`
 }
 
 type CandidateMatchAnalysisResponse struct {
