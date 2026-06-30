@@ -194,6 +194,8 @@ export interface MAWebValidationEnrichRequest {
   domainCount?: number;
   keywordCount?: number;
   rank?: boolean;
+  /** Dev-only: run in-process instead of enqueuing on the shared ma_job queue, so a foreign worker can't steal the job. */
+  inline?: boolean;
 }
 
 export interface CandidateMatchAnalysisResponse {

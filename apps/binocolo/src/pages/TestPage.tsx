@@ -538,6 +538,7 @@ export function TestPage() {
         force: true,
         analyzeWithLLM: true,
         llmOnAll: true,
+        inline: true,
       } satisfies MAWebValidationEnrichRequest),
   });
 

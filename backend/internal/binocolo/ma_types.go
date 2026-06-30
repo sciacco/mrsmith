@@ -207,6 +207,9 @@ type MAWebValidationEnrichRequest struct {
 	DomainCount        int   `json:"domainCount,omitempty"`
 	KeywordCount       int   `json:"keywordCount,omitempty"`
 	Rank               *bool `json:"rank,omitempty"`
+	// Inline (dev-only): run the work in-process instead of enqueuing on the shared
+	// ma_job queue, so a foreign worker on the shared DB can't claim it with stale code.
+	Inline bool `json:"inline,omitempty"`
 }
 
 type MAParameter struct {

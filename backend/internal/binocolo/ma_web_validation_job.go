@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/brave"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 const (
@@ -74,6 +75,7 @@ type maWebValidationJobPayload struct {
 	DomainCount  int  `json:"domainCount"`
 	KeywordCount int  `json:"keywordCount"`
 	Rank         bool `json:"rank"`
+	Inline       bool `json:"inline"`
 }
 
 func (s *maService) enqueueWebValidation(ctx context.Context, sessionID string, req MAWebValidationEnrichRequest, subject, email string) (MASessionDetail, error) {
@@ -100,6 +102,32 @@ func (s *maService) enqueueWebValidation(ctx context.Context, sessionID string, 
 	rawPayload, err := json.Marshal(payload)
 	if err != nil {
 		return MASessionDetail{}, fmt.Errorf("marshal ma web validation payload: %w", err)
+	}
+	// Inline (dev-only, off-queue): on a shared DB the ma_job queue can be claimed by a
+	// foreign worker running stale code, so a locally-enqueued job is processed by the
+	// wrong binary. Inline mode runs the work in THIS process via a detached goroutine and
+	// never writes an ma_job row — nothing for another worker to steal. No durability/resume
+	// (the reason the queue exists); acceptable for a dev eval run. See
+	// project_binocolo_shared_job_queue.
+	if payload.Inline {
+		job := maJob{
+			JobType:           maJobTypeWebValidation,
+			SessionID:         sessionID,
+			StrategyVersionID: detail.Strategy.ID,
+			Status:            maJobStatusRunning,
+			Payload:           rawPayload,
+			CreatedBySubject:  subject,
+			CreatedByEmail:    email,
+		}
+		go func() {
+			bg := context.WithoutCancel(ctx)
+			if _, err := s.runWebValidationJob(bg, job); err != nil {
+				logging.FromContext(bg).Error("binocolo inline web validation failed",
+					"component", "binocolo", "operation", "ma_web_validation_inline",
+					"session_id", sessionID, "error", err)
+			}
+		}()
+		return s.getSession(ctx, sessionID)
 	}
 	if _, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
 		JobType:           maJobTypeWebValidation,
@@ -766,6 +794,7 @@ func normalizeMAWebValidationPayload(req MAWebValidationEnrichRequest) maWebVali
 		DomainCount:        domainCount,
 		KeywordCount:       keywordCount,
 		Rank:               rank,
+		Inline:             req.Inline,
 	}
 }
 
