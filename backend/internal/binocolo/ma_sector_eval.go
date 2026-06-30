@@ -45,6 +45,17 @@ type SectorEvalItem struct {
 	SelfDescription  string `json:"selfDescription,omitempty"`
 	Validated        bool   `json:"validated"`
 
+	// Domain-resolution diagnostics (read-only, from the persisted DomainResponse).
+	// resolved = un dominio è stato scelto; retrieval_fail = 0 candidati (il sito non
+	// emerge); acceptance_fail = candidati trovati ma tutti scartati dal cancello.
+	DomainOutcome           string `json:"domainOutcome,omitempty"`
+	DomainConfidence        string `json:"domainConfidence,omitempty"`
+	DomainScore             int    `json:"domainScore,omitempty"`
+	DomainCandidateCount    int    `json:"domainCandidateCount"`
+	BestCandidateDomain     string `json:"bestCandidateDomain,omitempty"`
+	BestCandidateScore      int    `json:"bestCandidateScore,omitempty"`
+	BestCandidateConfidence string `json:"bestCandidateConfidence,omitempty"`
+
 	// A — embed+rerank only (no LLM).
 	DeterministicVerdict string `json:"deterministicVerdict,omitempty"` // confirm/reject/weak/ambiguous/no_signal
 	DeterministicBucket  string `json:"deterministicBucket,omitempty"`  // keep | forse | scarta
@@ -76,6 +87,17 @@ type SectorEvalPredictorMetrics struct {
 	Confusion map[string]map[string]int `json:"confusion"` // [label][predicted]
 }
 
+// SectorEvalDomainMetrics measures how effective domain resolution is, over validated
+// targets. The retrieval/acceptance split says WHERE recall breaks: retrievalFail = the
+// site never surfaced (fix = query/probing); acceptanceFail = it surfaced but the gate
+// rejected it (fix = relax the gate).
+type SectorEvalDomainMetrics struct {
+	Resolved       int     `json:"resolved"`
+	RetrievalFail  int     `json:"retrievalFail"`
+	AcceptanceFail int     `json:"acceptanceFail"`
+	ResolutionRate float64 `json:"resolutionRate"`
+}
+
 // SectorEvalMetrics aggregates the three predictors plus the operational stats that
 // answer the four questions: (1) deterministic accuracy, (2) escalation rate, (3) the
 // LLM column itself + its accuracy, (4) the deterministic-vs-LLM head-to-head.
@@ -83,6 +105,8 @@ type SectorEvalMetrics struct {
 	Targets   int `json:"targets"`
 	Validated int `json:"validated"`
 	Labeled   int `json:"labeled"`
+
+	Domain SectorEvalDomainMetrics `json:"domain"`
 
 	Deterministic SectorEvalPredictorMetrics `json:"deterministic"` // A
 	LLM           SectorEvalPredictorMetrics `json:"llm"`           // B
@@ -100,11 +124,32 @@ type SectorEvalMetrics struct {
 	LLMVsDeterministic map[string]int `json:"llmVsDeterministic"` // bothCorrect|detOnly|llmOnly|bothWrong
 }
 
+// SectorEvalPerimeter is the search perimeter (the strategy) that defines WHAT this
+// session looked for. Embedded in the report so the copied JSON is self-contained — the
+// keep/forse/scarta labels only mean anything relative to this perimeter.
+type SectorEvalPerimeter struct {
+	Title             string             `json:"title,omitempty"`
+	SectorDescription string             `json:"sectorDescription,omitempty"`
+	Thesis            string             `json:"thesis,omitempty"`
+	TerritoryLabel    string             `json:"territoryLabel,omitempty"`
+	Provinces         []string           `json:"provinces,omitempty"`
+	LegalForms        []string           `json:"legalForms,omitempty"`
+	ActivityStatus    string             `json:"activityStatus,omitempty"`
+	AtecoCandidates   []MAAtecoCandidate `json:"atecoCandidates,omitempty"`
+	Keywords          []string           `json:"keywords,omitempty"`
+	TurnoverAround    *int               `json:"turnoverAround,omitempty"`
+	TurnoverMin       *int               `json:"turnoverMin,omitempty"`
+	TurnoverMax       *int               `json:"turnoverMax,omitempty"`
+	EmployeeMin       *int               `json:"employeeMin,omitempty"`
+	EmployeeMax       *int               `json:"employeeMax,omitempty"`
+}
+
 // SectorEvalReport is the full eval payload (copyable JSON for the Test page tab).
 type SectorEvalReport struct {
-	SessionID string            `json:"sessionId"`
-	Items     []SectorEvalItem  `json:"items"`
-	Metrics   SectorEvalMetrics `json:"metrics"`
+	SessionID string              `json:"sessionId"`
+	Perimeter SectorEvalPerimeter `json:"perimeter"`
+	Items     []SectorEvalItem    `json:"items"`
+	Metrics   SectorEvalMetrics   `json:"metrics"`
 }
 
 var sectorEvalBuckets = []string{"keep", "forse", "scarta"}
@@ -174,6 +219,27 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 			item.Domain = wv.SelectedDomain
 			item.SelfDescription = wv.Summary.CompanyDescription
 
+			item.DomainCandidateCount = len(wv.DomainResponse.Candidates)
+			switch {
+			case wv.SelectedDomain != "":
+				item.DomainOutcome = "resolved"
+				item.DomainConfidence = wv.DomainConfidence
+				if wv.DomainScore != nil {
+					item.DomainScore = *wv.DomainScore
+				}
+				metrics.Domain.Resolved++
+			case item.DomainCandidateCount == 0:
+				item.DomainOutcome = "retrieval_fail"
+				metrics.Domain.RetrievalFail++
+			default:
+				item.DomainOutcome = "acceptance_fail"
+				best := wv.DomainResponse.Candidates[0] // sorted desc by score
+				item.BestCandidateDomain = best.Domain
+				item.BestCandidateScore = best.Score
+				item.BestCandidateConfidence = best.Confidence
+				metrics.Domain.AcceptanceFail++
+			}
+
 			item.DeterministicVerdict = wv.Summary.DeterministicVerdict
 			item.DeterministicBucket = deterministicVerdictToBucket(wv.Summary.DeterministicVerdict)
 
@@ -224,9 +290,31 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 	finalizeSectorPredictor(&metrics.Final)
 	if metrics.Validated > 0 {
 		metrics.EscalationRate = round4(float64(metrics.Escalations) / float64(metrics.Validated))
+		metrics.Domain.ResolutionRate = round4(float64(metrics.Domain.Resolved) / float64(metrics.Validated))
 	}
 
-	return SectorEvalReport{SessionID: sessionID, Items: items, Metrics: metrics}, nil
+	perimeter := SectorEvalPerimeter{}
+	if detail.Strategy != nil {
+		st := detail.Strategy.Strategy
+		perimeter = SectorEvalPerimeter{
+			Title:             st.Title,
+			SectorDescription: st.SectorDescription,
+			Thesis:            st.Thesis,
+			TerritoryLabel:    st.TerritoryLabel,
+			Provinces:         st.Provinces,
+			LegalForms:        st.LegalForms,
+			ActivityStatus:    st.ActivityStatus,
+			AtecoCandidates:   st.AtecoCandidates,
+			Keywords:          st.Keywords,
+			TurnoverAround:    st.TurnoverAround,
+			TurnoverMin:       st.TurnoverMin,
+			TurnoverMax:       st.TurnoverMax,
+			EmployeeMin:       st.EmployeeMin,
+			EmployeeMax:       st.EmployeeMax,
+		}
+	}
+
+	return SectorEvalReport{SessionID: sessionID, Perimeter: perimeter, Items: items, Metrics: metrics}, nil
 }
 
 // scoreSectorPredictor records one (label, prediction) pair for a predictor. Rows where

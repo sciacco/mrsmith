@@ -104,6 +104,37 @@ const renderEvalPrediction = (
     <span className={styles.muted}>—</span>
   );
 
+// Domain-resolution outcome cell: resolved (green) vs the two failure modes (amber).
+// acceptance_fail also shows the best candidate that the gate rejected, so the operator
+// sees how close it was.
+const renderDomainOutcome = (item: SectorEvalItem) => {
+  if (!item.validated) return <span className={styles.muted}>—</span>;
+  if (item.domainOutcome === 'resolved') {
+    return (
+      <>
+        <span className={styles.ok}>risolto</span>
+        <div className={styles.muted}>
+          {item.domainConfidence}
+          {item.domainScore ? ` · ${item.domainScore}` : ''}
+        </div>
+      </>
+    );
+  }
+  if (item.domainOutcome === 'retrieval_fail') {
+    return <span className={styles.warn}>retrieval · 0 candidati</span>;
+  }
+  return (
+    <>
+      <span className={styles.warn}>acceptance · scartato</span>
+      {item.bestCandidateDomain ? (
+        <div className={styles.muted}>
+          {item.bestCandidateDomain} ({item.bestCandidateScore}/{item.bestCandidateConfidence})
+        </div>
+      ) : null}
+    </>
+  );
+};
+
 const sessionVisibilityOptions: Array<{ value: MASessionVisibility; label: string }> = [
   { value: 'active', label: 'Attive' },
   { value: 'archived', label: 'Archiviate' },
@@ -1724,6 +1755,23 @@ export function TestPage() {
         {sectorEval.data ? (
           <>
             <div className={styles.responseBar}>
+              {sectorEval.data.perimeter.sectorDescription || sectorEval.data.perimeter.title ? (
+                <span><strong>Settore:</strong> {sectorEval.data.perimeter.sectorDescription || sectorEval.data.perimeter.title}</span>
+              ) : null}
+              {sectorEval.data.perimeter.territoryLabel || (sectorEval.data.perimeter.provinces?.length ?? 0) > 0 ? (
+                <span><strong>Territorio:</strong> {sectorEval.data.perimeter.territoryLabel || sectorEval.data.perimeter.provinces?.join(', ')}</span>
+              ) : null}
+              {(sectorEval.data.perimeter.atecoCandidates?.length ?? 0) > 0 ? (
+                <span><strong>ATECO:</strong> {sectorEval.data.perimeter.atecoCandidates?.map((a) => a.code).join(', ')}</span>
+              ) : null}
+              {(sectorEval.data.perimeter.legalForms?.length ?? 0) > 0 ? (
+                <span><strong>Forme:</strong> {sectorEval.data.perimeter.legalForms?.join(', ')}</span>
+              ) : null}
+              {sectorEval.data.perimeter.thesis ? (
+                <span><strong>Tesi:</strong> {sectorEval.data.perimeter.thesis}</span>
+              ) : null}
+            </div>
+            <div className={styles.responseBar}>
               <span>
                 <strong>A · embed+rerank</strong> {(sectorEval.data.metrics.deterministic.accuracy * 100).toFixed(0)}% (
                 {sectorEval.data.metrics.deterministic.correct}/{sectorEval.data.metrics.deterministic.evaluable})
@@ -1754,11 +1802,20 @@ export function TestPage() {
                 {sectorEval.data.metrics.validated}
               </span>
             </div>
+            <div className={styles.responseBar}>
+              <span>
+                <strong>Dominio risolto</strong> {(sectorEval.data.metrics.domain.resolutionRate * 100).toFixed(0)}% (
+                {sectorEval.data.metrics.domain.resolved}/{sectorEval.data.metrics.validated})
+              </span>
+              <span>retrieval-fail (0 candidati): {sectorEval.data.metrics.domain.retrievalFail}</span>
+              <span>acceptance-fail (scartati dal cancello): {sectorEval.data.metrics.domain.acceptanceFail}</span>
+            </div>
             <div className={styles.tableScroll}>
               <table className={styles.resultTable}>
                 <thead>
                   <tr>
                     <th>Azienda</th>
+                    <th>Dominio</th>
                     <th>Self-description</th>
                     <th>A · embed+rerank</th>
                     <th>B · LLM sempre</th>
@@ -1777,6 +1834,7 @@ export function TestPage() {
                         {item.domain ? <div className={styles.path}>{item.domain}</div> : null}
                         {item.atecoDescription ? <div className={styles.muted}>{item.atecoDescription}</div> : null}
                       </td>
+                      <td>{renderDomainOutcome(item)}</td>
                       <td className={styles.muted}>
                         {item.selfDescription || (item.validated ? '—' : 'non validata')}
                       </td>

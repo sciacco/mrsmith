@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	maWebValidationDefaultLimit       = 25
+	maWebValidationDefaultLimit       = 100
 	maWebValidationMaxLimit           = 100
 	maWebValidationDefaultDomainCount = 20
 	// maWebValidationEvidenceCount is how many results each NEUTRAL self-description

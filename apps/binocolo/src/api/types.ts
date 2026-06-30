@@ -600,6 +600,14 @@ export interface SectorEvalItem {
   atecoDescription?: string;
   selfDescription?: string;
   validated: boolean;
+  // Domain resolution diagnostics
+  domainOutcome?: 'resolved' | 'retrieval_fail' | 'acceptance_fail';
+  domainConfidence?: string;
+  domainScore?: number;
+  domainCandidateCount: number;
+  bestCandidateDomain?: string;
+  bestCandidateScore?: number;
+  bestCandidateConfidence?: string;
   // A — embed+rerank only (no LLM)
   deterministicVerdict?: string;
   deterministicBucket?: SectorEvalLabel;
@@ -625,10 +633,18 @@ export interface SectorEvalPredictorMetrics {
   confusion: Record<string, Record<string, number>>;
 }
 
+export interface SectorEvalDomainMetrics {
+  resolved: number;
+  retrievalFail: number;
+  acceptanceFail: number;
+  resolutionRate: number;
+}
+
 export interface SectorEvalMetrics {
   targets: number;
   validated: number;
   labeled: number;
+  domain: SectorEvalDomainMetrics;
   deterministic: SectorEvalPredictorMetrics;
   llm: SectorEvalPredictorMetrics;
   final: SectorEvalPredictorMetrics;
@@ -638,8 +654,26 @@ export interface SectorEvalMetrics {
   llmVsDeterministic: Record<string, number>;
 }
 
+export interface SectorEvalPerimeter {
+  title?: string;
+  sectorDescription?: string;
+  thesis?: string;
+  territoryLabel?: string;
+  provinces?: string[];
+  legalForms?: string[];
+  activityStatus?: string;
+  atecoCandidates?: MAAtecoCandidate[];
+  keywords?: string[];
+  turnoverAround?: number;
+  turnoverMin?: number;
+  turnoverMax?: number;
+  employeeMin?: number;
+  employeeMax?: number;
+}
+
 export interface SectorEvalReport {
   sessionId: string;
+  perimeter: SectorEvalPerimeter;
   items: SectorEvalItem[];
   metrics: SectorEvalMetrics;
 }

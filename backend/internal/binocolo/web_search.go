@@ -960,7 +960,12 @@ func compactAlnum(value string) string {
 
 func domainResolutionStopword(token string) bool {
 	switch token {
-	case "srl", "spa", "srls", "soc", "societa", "cooperativa", "coop", "consorzio", "azienda", "italia", "italiana", "group", "holding":
+	case "srl", "spa", "srls", "soc", "societa", "cooperativa", "coop", "consorzio", "azienda", "italia", "italiana", "group", "holding",
+		// Legal form spelled out in full (e.g. "società a responsabilità limitata
+		// abbreviabile ..."); without these the brand tokens become garbage. Both the
+		// accented form and the apostrophe-stripped form ("responsabilita") occur,
+		// depending on how the ragione sociale is written.
+		"responsabilita", "responsabilità", "limitata", "abbreviabile":
 		return true
 	default:
 		return false
@@ -992,6 +997,15 @@ func isDomainResolutionExcludedDomain(domain string) bool {
 		"glassdoor.it",
 		"crif.it",
 		"cerved.com",
+		// Business-data aggregators that surfaced as wrong domain matches in the eval
+		// (Liguria session). Subdomains like aziende.money.it / aziende.virgilio.it are
+		// caught by hostMatchesDomain's suffix match on the bare domain.
+		"fatturatoitalia.it",
+		"atoka.io",
+		"ufficiocamerale.it",
+		"money.it",
+		"icribis.com",
+		"virgilio.it",
 	}
 	for _, item := range excluded {
 		if hostMatchesDomain(domain, item) {
