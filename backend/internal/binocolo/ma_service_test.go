@@ -1460,6 +1460,14 @@ func (f *fakeMAWorkspaceStore) UpsertMAWebValidation(context.Context, maWebValid
 	return MAWebValidation{}, nil
 }
 
+func (f *fakeMAWorkspaceStore) UpsertMASectorEvalLabel(context.Context, string, string, string, string, string, string) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMASectorEvalLabels(context.Context, string) (map[string]MASectorEvalLabel, error) {
+	return nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) GetMASessionState(context.Context, string) (MASession, error) {
 	return MASession{}, nil
 }

@@ -14,6 +14,8 @@ import type {
   PipelineFinalAction,
   PipelineWebValidationState,
   SectorClassificationTestResponse,
+  SectorEvalLabel,
+  SectorEvalReport,
   WebSearchResponse,
 } from '../api/types';
 import styles from './TestPage.module.css';
@@ -58,16 +60,23 @@ type DomainResolutionForm = typeof defaultDomainResolutionForm;
 type DomainResolutionField = keyof DomainResolutionForm;
 type KeywordEvidenceForm = typeof defaultKeywordEvidenceForm;
 type KeywordEvidenceField = keyof Omit<KeywordEvidenceForm, 'rank'>;
-type TestTab = 'company' | 'pipeline' | 'classification' | 'domain' | 'keyword' | 'maintenance';
+type TestTab = 'company' | 'pipeline' | 'classification' | 'sector-eval' | 'domain' | 'keyword' | 'maintenance';
 
 const testTabs = [
   { id: 'company', label: 'Company search', icon: 'database' },
   { id: 'pipeline', label: 'Evidence pipeline', icon: 'route' },
   { id: 'classification', label: 'Classificazione settore', icon: 'sparkles' },
+  { id: 'sector-eval', label: 'Sector eval', icon: 'clipboard-check' },
   { id: 'domain', label: 'Domain resolver', icon: 'network' },
   { id: 'keyword', label: 'Keyword evidence', icon: 'search' },
   { id: 'maintenance', label: 'Manutenzione', icon: 'settings' },
 ] as const;
+
+const sectorEvalBucketLabels: Record<SectorEvalLabel, string> = {
+  keep: 'Keep',
+  forse: 'Forse',
+  scarta: 'Scarta',
+};
 
 const sessionVisibilityOptions: Array<{ value: MASessionVisibility; label: string }> = [
   { value: 'active', label: 'Attive' },
@@ -357,6 +366,7 @@ export function TestPage() {
   const [pipelineSessionId, setPipelineSessionId] = useState('');
   const [pipelineTargetId, setPipelineTargetId] = useState('');
   const [pipelineAnalyzeWithLLM, setPipelineAnalyzeWithLLM] = useState(true);
+  const [evalSessionId, setEvalSessionId] = useState('');
   const [sectorForm, setSectorForm] = useState({
     sectorDescription: '',
     companyDescription: '',
@@ -369,7 +379,7 @@ export function TestPage() {
     queryKey: ['binocolo-test-ma-sessions', pipelineVisibility],
     queryFn: () =>
       api.get<MASessionListResponse>(`/binocolo/v1/ma/sessions?visibility=${pipelineVisibility}`),
-    enabled: activeTab === 'pipeline',
+    enabled: activeTab === 'pipeline' || activeTab === 'sector-eval',
   });
 
   const pipelineDetail = useQuery({
@@ -451,6 +461,23 @@ export function TestPage() {
         targetId: pipelineTargetId,
         analyze: pipelineAnalyzeWithLLM,
       }),
+  });
+
+  const sectorEval = useQuery({
+    queryKey: ['binocolo-sector-eval', evalSessionId],
+    queryFn: () => api.get<SectorEvalReport>(`/binocolo/v1/ma/sessions/${evalSessionId}/sector-eval`),
+    enabled: activeTab === 'sector-eval' && Boolean(evalSessionId),
+  });
+  const setEvalLabel = useMutation({
+    mutationFn: (body: { companyKey: string; label: SectorEvalLabel | '' }) =>
+      api.put<void>(`/binocolo/v1/ma/sessions/${evalSessionId}/sector-eval/label`, body),
+    onSuccess: () => {
+      void sectorEval.refetch();
+    },
+  });
+  const runEvalValidation = useMutation({
+    mutationFn: () =>
+      api.post<unknown>(`/binocolo/v1/ma/sessions/${evalSessionId}/web-validation/enrich`, {}),
   });
 
   const companyData = companySearch.data?.data;
@@ -1582,6 +1609,167 @@ export function TestPage() {
                 : `Rigenerati ${regenerateBriefs.data?.regenerated ?? 0} brief via LLM (nessuna chiamata IT-full).`}
             </span>
           </div>
+        ) : null}
+      </section>
+      ) : null}
+
+      {activeTab === 'sector-eval' ? (
+      <section className={`${styles.panel} ${styles.companyPanel}`} aria-labelledby="sector-eval-title">
+        <div className={styles.panelHeader}>
+          <div>
+            <div className={styles.endpointLine}>
+              <span className={styles.method}>EVAL</span>
+              <span className={styles.path}>/binocolo/v1/ma/sessions/&#123;id&#125;/sector-eval</span>
+            </div>
+            <h2 id="sector-eval-title" className={styles.sectionTitle}>Sector eval</h2>
+            <p className={styles.sectionHint}>
+              Esegui la validazione web sull&apos;intera sessione, poi conferma o riclassifica ogni
+              azienda. Le label sono ground-truth (persistite, separate dalla predizione) e si
+              confrontano col verdetto del sistema. I disaccordi sono evidenziati.
+            </p>
+          </div>
+          <div className={styles.companyForm}>
+            <div className={styles.filterGrid}>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Sessione</span>
+                <select
+                  value={evalSessionId}
+                  onChange={(event) => setEvalSessionId(event.target.value)}
+                  disabled={pipelineSessions.isFetching || selectableSessions.length === 0}
+                >
+                  <option value="">Seleziona sessione</option>
+                  {selectableSessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {session.title || session.prompt.slice(0, 72)} · {session.resultCount} target · {session.status}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className={styles.formActions}>
+              <Button
+                variant="secondary"
+                loading={runEvalValidation.isPending}
+                disabled={!evalSessionId}
+                onClick={() => runEvalValidation.mutate()}
+                leftIcon={<Icon name="route" />}
+              >
+                Esegui validazione sessione
+              </Button>
+              <Button
+                variant="secondary"
+                loading={sectorEval.isFetching}
+                disabled={!evalSessionId}
+                onClick={() => void sectorEval.refetch()}
+                leftIcon={<Icon name="refresh-cw" />}
+              >
+                Carica report
+              </Button>
+              {sectorEval.data ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => void navigator.clipboard?.writeText(JSON.stringify(sectorEval.data, null, 2))}
+                >
+                  Copia JSON
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {runEvalValidation.isSuccess ? (
+          <div className={styles.responseBar}>
+            <span>Validazione avviata (async). Attendi il completamento, poi premi “Carica report”.</span>
+          </div>
+        ) : null}
+        {runEvalValidation.isError ? (
+          <div className={styles.responseBar}><span>{errorLabel(runEvalValidation.error)}</span></div>
+        ) : null}
+        {sectorEval.isError ? (
+          <div className={styles.responseBar}><span>{errorLabel(sectorEval.error)}</span></div>
+        ) : null}
+
+        {sectorEval.data ? (
+          <>
+            <div className={styles.responseBar}>
+              <span>
+                Accuratezza {(sectorEval.data.metrics.accuracy * 100).toFixed(0)}% (
+                {sectorEval.data.metrics.correct}/{sectorEval.data.metrics.evaluable})
+              </span>
+              <span>Escalation LLM {(sectorEval.data.metrics.escalationRate * 100).toFixed(0)}%</span>
+              <span>Distrattore &gt; target: {sectorEval.data.metrics.distractorBeatsTarget}</span>
+              <span>
+                Etichettate {sectorEval.data.metrics.labeled}/{sectorEval.data.metrics.targets} · validate{' '}
+                {sectorEval.data.metrics.validated}
+              </span>
+            </div>
+            <div className={styles.tableScroll}>
+              <table className={styles.resultTable}>
+                <thead>
+                  <tr>
+                    <th>Azienda</th>
+                    <th>Self-description</th>
+                    <th>Sistema</th>
+                    <th>Top concetti</th>
+                    <th>Label (tu)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sectorEval.data.items.map((item) => (
+                    <tr key={item.companyKey} className={item.agreement === 'mismatch' ? styles.rowMismatch : ''}>
+                      <td>
+                        <strong>{item.companyName}</strong>
+                        {item.domain ? <div className={styles.path}>{item.domain}</div> : null}
+                        {item.atecoDescription ? <div className={styles.muted}>{item.atecoDescription}</div> : null}
+                      </td>
+                      <td className={styles.muted}>
+                        {item.selfDescription || (item.validated ? '—' : 'non validata')}
+                      </td>
+                      <td>
+                        {item.validated ? (
+                          <>
+                            <span className={`${styles.scoreBadge} ${styles[`finalAction_${item.finalAction}`] ?? ''}`}>
+                              {item.predictedBucket ? sectorEvalBucketLabels[item.predictedBucket] : item.finalAction}
+                            </span>
+                            {item.escalated ? <div className={styles.muted}>LLM: {item.analystVerdict}</div> : null}
+                            {item.distractorBeatsTarget ? <div className={styles.warn}>⚠ distrattore &gt; target</div> : null}
+                          </>
+                        ) : (
+                          <span className={styles.muted}>—</span>
+                        )}
+                      </td>
+                      <td className={styles.muted}>
+                        {(item.topConcepts ?? []).map((concept) => (
+                          <div key={concept.conceptId}>
+                            {concept.kind === 'distractor' ? '·' : '✓'} {concept.name} {concept.rerankProb.toFixed(2)}
+                            {concept.inStrategy ? ' (perim)' : ''}
+                          </div>
+                        ))}
+                      </td>
+                      <td>
+                        <select
+                          value={item.label ?? ''}
+                          onChange={(event) =>
+                            setEvalLabel.mutate({
+                              companyKey: item.companyKey,
+                              label: event.target.value as SectorEvalLabel | '',
+                            })
+                          }
+                        >
+                          <option value="">—</option>
+                          <option value="keep">Keep</option>
+                          <option value="forse">Forse</option>
+                          <option value="scarta">Scarta</option>
+                        </select>
+                        {item.agreement === 'match' ? <span className={styles.ok}> ✓</span> : null}
+                        {item.agreement === 'mismatch' ? <span className={styles.warn}> ✗</span> : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : null}
       </section>
       ) : null}

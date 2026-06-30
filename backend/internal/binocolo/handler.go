@@ -110,6 +110,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("DELETE /binocolo/v1/ma/sessions/{id}", h.handleDeleteMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/purge", h.handlePurgeMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/rating", h.handleRateMATarget)
+	handle("GET /binocolo/v1/ma/sessions/{id}/sector-eval", h.handleGetSectorEval)
+	handle("PUT /binocolo/v1/ma/sessions/{id}/sector-eval/label", h.handleSetSectorEvalLabel)
 	handle("PUT /binocolo/v1/ma/sessions/{id}/web-validation", h.handleUpsertMAWebValidation)
 	handle("POST /binocolo/v1/ma/sessions/{id}/web-validation/enrich", h.handleEnrichMAWebValidation)
 	handle("POST /binocolo/v1/ma/sessions/{id}/deep-dive", h.handleDeepDiveMASession)
@@ -317,6 +319,41 @@ func (h *Handler) handleRateMATarget(w http.ResponseWriter, r *http.Request) {
 	subject, email := companySearchRefreshActor(r.Context())
 	if err := h.ma.setTargetRating(r.Context(), id, body.CompanyKey, body.Rating, subject, email); err != nil {
 		h.maFailure(w, r, "ma_target_rate", err, "session_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleGetSectorEval returns the UC2 sector-eval report for a session: each company
+// with its current system prediction + human label, plus the aggregate metrics. Read-only.
+func (h *Handler) handleGetSectorEval(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	report, err := h.ma.sectorEvalReport(r.Context(), id)
+	if err != nil {
+		h.maFailure(w, r, "ma_sector_eval", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, report)
+}
+
+// handleSetSectorEvalLabel upserts (or clears, with an empty label) the human ground-truth
+// sector label for a company in a session.
+func (h *Handler) handleSetSectorEvalLabel(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	var body SectorEvalLabelRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.setSectorEvalLabel(r.Context(), id, body, subject, email); err != nil {
+		h.maFailure(w, r, "ma_sector_eval_label", err, "session_id", id)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

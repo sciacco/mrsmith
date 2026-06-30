@@ -522,12 +522,18 @@ func classificationToSummary(class maSectorClassification, decision *CandidateMa
 	if decision != nil {
 		score = decision.WebScore
 	}
+	concepts := class.Concepts
+	if len(concepts) > 8 {
+		concepts = concepts[:8]
+	}
 	return CandidateMatchEvidenceSummary{
-		Score:           score,
-		Confidence:      class.Confidence,
-		CoreMatches:     coreMatches,
-		NegativeMatches: negativeMatches,
-		TotalCoreTerms:  coreMatches,
+		Score:              score,
+		Confidence:         class.Confidence,
+		CoreMatches:        coreMatches,
+		NegativeMatches:    negativeMatches,
+		TotalCoreTerms:     coreMatches,
+		CompanyDescription: cleanText(class.CompanyDescription, 1000),
+		Concepts:           concepts,
 	}
 }
 

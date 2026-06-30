@@ -577,3 +577,61 @@ export interface MATargetAdjustment {
   label: string;
   factor: number;
 }
+
+// --- UC2 sector-eval harness ---
+
+export type SectorEvalLabel = 'keep' | 'forse' | 'scarta';
+
+export interface SectorEvalConcept {
+  conceptId: string;
+  name: string;
+  kind: string;
+  cosine: number;
+  rerankProb: number;
+  inStrategy: boolean;
+}
+
+export interface SectorEvalItem {
+  companyKey: string;
+  companyName: string;
+  domain?: string;
+  atecoDescription?: string;
+  selfDescription?: string;
+  validated: boolean;
+  verdict?: string;
+  finalAction?: string;
+  predictedBucket?: SectorEvalLabel;
+  analystVerdict?: string;
+  analystAction?: string;
+  escalated: boolean;
+  distractorBeatsTarget: boolean;
+  topConcepts?: SectorEvalConcept[];
+  label?: SectorEvalLabel;
+  note?: string;
+  agreement: 'match' | 'mismatch' | 'unlabeled' | 'unvalidated';
+}
+
+export interface SectorEvalMetrics {
+  targets: number;
+  validated: number;
+  labeled: number;
+  evaluable: number;
+  correct: number;
+  accuracy: number;
+  escalations: number;
+  escalationRate: number;
+  distractorBeatsTarget: number;
+  confusion: Record<string, Record<string, number>>;
+}
+
+export interface SectorEvalReport {
+  sessionId: string;
+  items: SectorEvalItem[];
+  metrics: SectorEvalMetrics;
+}
+
+export interface SectorEvalLabelRequest {
+  companyKey: string;
+  label: SectorEvalLabel | '';
+  note?: string;
+}

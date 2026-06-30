@@ -47,6 +47,12 @@ type CandidateMatchEvidenceSummary struct {
 	TotalCoreTerms        int    `json:"totalCoreTerms"`
 	TotalAdjacentTerms    int    `json:"totalAdjacentTerms"`
 	TotalNegativeTerms    int    `json:"totalNegativeTerms"`
+	// CompanyDescription + Concepts are persisted (in the summary jsonb) so the
+	// sector-eval harness can read the distilled self-description and the concept
+	// breakdown from a clean read path — the full provenance otherwise lives only in
+	// the write-only classification trace.
+	CompanyDescription string           `json:"companyDescription,omitempty"`
+	Concepts           []maConceptScore `json:"concepts,omitempty"`
 }
 
 type CandidateMatchAnalysisResponse struct {

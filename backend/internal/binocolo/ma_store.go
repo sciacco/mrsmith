@@ -32,6 +32,8 @@ type maWorkspaceStore interface {
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
 	UpsertMATargetRating(ctx context.Context, sessionID, companyKey string, rating int, subject, email string) error
 	UpsertMAWebValidation(ctx context.Context, input maWebValidationUpsert) (MAWebValidation, error)
+	UpsertMASectorEvalLabel(ctx context.Context, sessionID, companyKey, label, note, subject, email string) error
+	ListMASectorEvalLabels(ctx context.Context, sessionID string) (map[string]MASectorEvalLabel, error)
 	StartMATrace(ctx context.Context, input maTraceStart) (string, error)
 	LinkMATrace(ctx context.Context, input maTraceLink) error
 	CompleteMATrace(ctx context.Context, input maTraceComplete) error
@@ -1409,6 +1411,65 @@ SET rating = EXCLUDED.rating,
     rated_at = now()
 `, sessionID, companyKey, rating, nullString(subject), nullString(email)); err != nil {
 		return fmt.Errorf("upsert ma target rating: %w", err)
+	}
+	return nil
+}
+
+// ListMASectorEvalLabels loads the human ground-truth sector labels for a session,
+// keyed by company_key. Used by the sector-eval harness to compare against predictions.
+func (s *SQLStore) ListMASectorEvalLabels(ctx context.Context, sessionID string) (map[string]MASectorEvalLabel, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT company_key, label, COALESCE(note, ''), COALESCE(labeled_by_email, ''), updated_at
+FROM binocolo.ma_sector_eval_label
+WHERE session_id = $1::uuid
+`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("load ma sector eval labels: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]MASectorEvalLabel{}
+	for rows.Next() {
+		var v MASectorEvalLabel
+		if err := rows.Scan(&v.CompanyKey, &v.Label, &v.Note, &v.LabeledByEmail, &v.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan ma sector eval label: %w", err)
+		}
+		out[v.CompanyKey] = v
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma sector eval labels: %w", err)
+	}
+	return out, nil
+}
+
+// UpsertMASectorEvalLabel saves (or, with an empty label, clears) the human ground-truth
+// sector label for a company in a session.
+func (s *SQLStore) UpsertMASectorEvalLabel(ctx context.Context, sessionID, companyKey, label, note, subject, email string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if label == "" {
+		if _, err := s.db.ExecContext(ctx, `
+DELETE FROM binocolo.ma_sector_eval_label
+WHERE session_id = $1::uuid AND company_key = $2
+`, sessionID, companyKey); err != nil {
+			return fmt.Errorf("clear ma sector eval label: %w", err)
+		}
+		return nil
+	}
+	if _, err := s.db.ExecContext(ctx, `
+INSERT INTO binocolo.ma_sector_eval_label (session_id, company_key, label, note, labeled_by_subject, labeled_by_email, updated_at)
+VALUES ($1::uuid, $2, $3, $4, $5, $6, now())
+ON CONFLICT (session_id, company_key) DO UPDATE
+SET label = EXCLUDED.label,
+    note = EXCLUDED.note,
+    labeled_by_subject = EXCLUDED.labeled_by_subject,
+    labeled_by_email = EXCLUDED.labeled_by_email,
+    updated_at = now()
+`, sessionID, companyKey, label, nullString(note), nullString(subject), nullString(email)); err != nil {
+		return fmt.Errorf("upsert ma sector eval label: %w", err)
 	}
 	return nil
 }
