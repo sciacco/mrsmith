@@ -1006,6 +1006,16 @@ func isDomainResolutionExcludedDomain(domain string) bool {
 		"money.it",
 		"icribis.com",
 		"virgilio.it",
+		// Link-in-bio platform + more directories/aggregators that surfaced in the
+		// Nord-Est eval (session 391e7c67). linktr.ee is the high-value one: it scored
+		// high enough (49) to be ACCEPTED as a resolved domain (COHERENCY) instead of
+		// being refused — a company's official site is never its Linktree page.
+		"linktr.ee",
+		"paginebianche.it",
+		"companyreports.it",
+		"aziendeeasy.it",
+		"empresite.it",
+		"amministrazionicomunali.it",
 	}
 	for _, item := range excluded {
 		if hostMatchesDomain(domain, item) {

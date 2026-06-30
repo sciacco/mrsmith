@@ -618,7 +618,7 @@
         "62.20.10"
       ],
       "ateco_candidates_excluded": [],
-      "embedding_text": "ERP / CRM. Gestionale aziendale per contabilità, magazzino e ciclo ordini, e CRM con sales force automation e pipeline vendite. ERP, CRM, gestionale, sales force automation, contabilità e magazzino, ciclo ordini, SAP, Dynamics, Salesforce, Odoo.",
+      "embedding_text": "ERP / CRM. Gestionale aziendale per contabilità, magazzino e ciclo ordini, e CRM con sales force automation e pipeline vendite; include rivenditori e partner di gestionali ERP cloud come Microsoft Dynamics 365 Business Central. ERP, CRM, gestionale, sales force automation, contabilità e magazzino, ciclo ordini, SAP, Dynamics, Microsoft Dynamics 365 Business Central, Business Central, Dynamics NAV, Salesforce, Odoo.",
       "ateco_in_kb_all": [
         "58.29.00",
         "62.10.00",

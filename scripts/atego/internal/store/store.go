@@ -89,12 +89,13 @@ func (s *Store) SyncConcepts(ctx context.Context, concepts []sources.BusinessCon
 
 	for _, c := range concepts {
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO binocolo.kb_concept (id, name, domain, kind, aliases, embedding_text)
-			VALUES ($1,$2,$3,$4,$5,$6)
+			INSERT INTO binocolo.kb_concept (id, name, domain, kind, aliases, embedding_text, contrast_text)
+			VALUES ($1,$2,$3,$4,$5,$6,$7)
 			ON CONFLICT (id) DO UPDATE SET
 			  name=EXCLUDED.name, domain=EXCLUDED.domain, kind=EXCLUDED.kind,
-			  aliases=EXCLUDED.aliases, embedding_text=EXCLUDED.embedding_text, updated_at=now()`,
-			c.ID, c.Name, c.Domain, c.Kind, c.Aliases, c.EmbeddingText); err != nil {
+			  aliases=EXCLUDED.aliases, embedding_text=EXCLUDED.embedding_text,
+			  contrast_text=EXCLUDED.contrast_text, updated_at=now()`,
+			c.ID, c.Name, c.Domain, c.Kind, c.Aliases, c.EmbeddingText, c.ContrastText); err != nil {
 			return fmt.Errorf("upsert concept %s: %w", c.ID, err)
 		}
 

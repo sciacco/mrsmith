@@ -333,7 +333,11 @@ func (s *maService) buildMAWebValidation(
 }
 
 func sectorVerdictNeedsLLM(verdict maSectorVerdict) bool {
-	return verdict == maSectorAmbiguous || verdict == maSectorNoSignal
+	// confirm escalates too: a confident deterministic "confirm" had 0% precision in
+	// the UC2 eval (every fire was a non-keeper, and short-circuiting it silenced a
+	// better LLM, e.g. MDOTM/AGSDIGITAL). reject keeps short-circuiting — it is safe
+	// (high precision) and cheap. Asymmetric by design: never auto-confirm.
+	return verdict == maSectorAmbiguous || verdict == maSectorNoSignal || verdict == maSectorConfirm
 }
 
 // gatherNeutralEvidence collects a company's self-description from its own site
@@ -399,19 +403,24 @@ func sectorFinalDecision(target MATarget, class maSectorClassification, analysis
 
 	state, action, confidence := "unclear", "needs_business_validation", class.Confidence
 	switch class.Verdict {
-	case maSectorConfirm:
-		state, action = "confirmed", "confirm"
 	case maSectorReject:
 		state, action = "rejected", "reject"
 	case maSectorWeak:
 		state, action = "deprioritized", "deprioritize"
-	case maSectorAmbiguous, maSectorNoSignal:
-		if analysis != nil {
+	case maSectorConfirm, maSectorAmbiguous, maSectorNoSignal:
+		// confirm no longer auto-confirms: it escalates to the LLM like ambiguous (det
+		// `confirm` had 0% precision in eval). The only difference is the no-analyst
+		// fallback — confirm honors the deterministic confirm (prior behavior, e.g. LLM
+		// disabled); ambiguous/no_signal degrade to needs_business_validation.
+		switch {
+		case analysis != nil:
 			state, action, confidence = analystToLifecycle(analysis)
 			if analysis.Verdict != "" {
 				reasons = append([]string{"Giudizio LLM: " + analysis.Verdict + " (" + analysis.RecommendedAction + ")."}, reasons...)
 			}
-		} else {
+		case class.Verdict == maSectorConfirm:
+			state, action = "confirmed", "confirm"
+		default:
 			state = "analysis_unavailable"
 			action = "needs_business_validation"
 			if confidence == "" {

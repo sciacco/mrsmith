@@ -18,6 +18,10 @@ type kbConcept struct {
 	// EmbeddingText is the curated descriptive text of the concept (what the loader
 	// embedded). UC2 sector classification uses it as the reranker document.
 	EmbeddingText string
+	// ContrastText is the curated discriminative text (sibling_contrast_notes):
+	// distinctive vocabulary + "vs sibling" boundaries. NOT embedded — it feeds the
+	// reranker document enrichment and the LLM analyst payload, not cosine recall.
+	ContrastText string
 	// EmbeddingModelID names the mrsmith.embedding_model that produced Vector. The
 	// runtime resolves it to embed the query with the SAME model (drift guard).
 	EmbeddingModelID string
@@ -44,7 +48,7 @@ func (s *SQLStore) LoadKBConcepts(ctx context.Context) ([]kbConcept, error) {
 		return nil, errMAStoreUnavailable
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT id, name, kind, COALESCE(embedding_text, ''), COALESCE(embedding_model_id::text, ''), COALESCE(embedding::text, '')
+SELECT id, name, kind, COALESCE(embedding_text, ''), COALESCE(contrast_text, ''), COALESCE(embedding_model_id::text, ''), COALESCE(embedding::text, '')
 FROM binocolo.kb_concept
 WHERE embedding IS NOT NULL
 ORDER BY id
@@ -58,9 +62,9 @@ ORDER BY id
 	out := []kbConcept{}
 	for rows.Next() {
 		var (
-			id, name, kind, embeddingText, modelID, vecText string
+			id, name, kind, embeddingText, contrastText, modelID, vecText string
 		)
-		if err := rows.Scan(&id, &name, &kind, &embeddingText, &modelID, &vecText); err != nil {
+		if err := rows.Scan(&id, &name, &kind, &embeddingText, &contrastText, &modelID, &vecText); err != nil {
 			return nil, fmt.Errorf("scan kb concept: %w", err)
 		}
 		vec, err := parsePGFloatArray(vecText)
@@ -70,7 +74,7 @@ ORDER BY id
 		if len(vec) == 0 {
 			continue
 		}
-		out = append(out, kbConcept{ID: id, Name: name, Kind: normalizeKBKind(kind), EmbeddingText: embeddingText, EmbeddingModelID: modelID, Vector: vec})
+		out = append(out, kbConcept{ID: id, Name: name, Kind: normalizeKBKind(kind), EmbeddingText: embeddingText, ContrastText: contrastText, EmbeddingModelID: modelID, Vector: vec})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate kb concepts: %w", err)

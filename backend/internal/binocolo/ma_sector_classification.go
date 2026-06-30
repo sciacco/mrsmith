@@ -138,6 +138,10 @@ type maConceptScore struct {
 	Cosine     float64 `json:"cosine"`
 	RerankProb float64 `json:"rerankProb"`
 	InStrategy bool    `json:"inStrategy"`
+	// Contrast is the concept's curated discriminator (sibling_contrast_notes):
+	// fed to the LLM analyst to separate confusable siblings. Transient — json:"-"
+	// keeps it out of the persisted summary/trace (it is invariant per concept).
+	Contrast string `json:"-"`
 }
 
 type maSectorClassification struct {
@@ -396,6 +400,7 @@ func (s *maService) classifyCompanyConcepts(ctx context.Context, description str
 			Cosine:     c.cosine,
 			RerankProb: prob,
 			InStrategy: strategyConcepts[c.concept.ID],
+			Contrast:   c.concept.ContrastText,
 		}
 	}
 	if rerankApplied {
@@ -690,12 +695,20 @@ func (s *maService) analyzeSectorAmbiguity(ctx context.Context, target MATarget,
 		if i >= 6 {
 			break
 		}
-		concepts = append(concepts, map[string]any{
+		entry := map[string]any{
 			"name":       c.Name,
 			"kind":       c.Kind,
 			"rerankProb": c.RerankProb,
 			"inStrategy": c.InStrategy,
-		})
+		}
+		// The curated discriminator separates confusable siblings (cloud vs hosting,
+		// managed vs system integration, software vs web agency). The LLM handles the
+		// "vs sibling" negation that the cross-encoder cannot; cap keeps the prose and
+		// drops the trailing ATECO/merge-flags curation meta.
+		if disc := cleanText(c.Contrast, 400); disc != "" {
+			entry["discriminator"] = disc
+		}
+		concepts = append(concepts, entry)
 	}
 	snippets := evidence.Snippets
 	if len(snippets) > 12 {

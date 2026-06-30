@@ -29,6 +29,7 @@ type AtecoNode struct {
 type BusinessConcept struct {
 	ID                      string
 	EmbeddingText           string
+	ContrastText            string // sibling_contrast_notes: discriminators, NOT embedded (rerank doc / LLM only)
 	Name                    string
 	Domain                  string
 	Kind                    string // "target" (default) | "distractor"
@@ -115,6 +116,7 @@ func LoadBusinessConcepts(path string) ([]BusinessConcept, string, error) {
 		concepts = append(concepts, BusinessConcept{
 			ID:                      id,
 			EmbeddingText:           embedText,
+			ContrastText:            stringOr(item["sibling_contrast_notes"]),
 			Name:                    stringOr(item["name"]),
 			Domain:                  stringOr(item["domain"]),
 			Kind:                    normalizeKind(stringOr(item["kind"])),
