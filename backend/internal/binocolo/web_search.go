@@ -1016,6 +1016,15 @@ func isDomainResolutionExcludedDomain(domain string) bool {
 		"aziendeeasy.it",
 		"empresite.it",
 		"amministrazionicomunali.it",
+		// Dun & Bradstreet business registry — same category as crif.it / cerved.com /
+		// icribis.com. Surfaced as the best domain candidate for INSYDE (session
+		// 84781682, score 16) where it was correctly refused; blocklist it so a
+		// higher-scoring D&B hit on another company can never be accepted as official.
+		"dnb.com",
+		"creditsafe.it",
+		// creditsafe.com surfaced as a CARDNOLOGY candidate (session 391e7c67,
+		// score 16) — same registry family as creditsafe.it; block both TLDs.
+		"creditsafe.com",
 	}
 	for _, item := range excluded {
 		if hostMatchesDomain(domain, item) {

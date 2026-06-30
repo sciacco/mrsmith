@@ -18,11 +18,13 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
+	"github.com/sciacco/mrsmith/internal/platform/scrape"
 )
 
 type Deps struct {
 	OpenAPIIT  *openapiit.Client
 	Brave      *brave.Client
+	Scrape     *scrape.Client
 	LLM        *llm.Service
 	AnisettaDB *sql.DB
 }
@@ -62,6 +64,11 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 		ma:                 newMAService(maStore, cache, provinceCache, ateco, deps.OpenAPIIT, llmProvider),
 	}
 	h.ma.brave = deps.Brave
+	// Guard the assignment: a nil *scrape.Client stored in the interface field would
+	// be a non-nil interface (typed-nil), defeating the s.scrape == nil fallback.
+	if deps.Scrape != nil {
+		h.ma.scrape = deps.Scrape
+	}
 	if sqlStore != nil {
 		h.ma.kb = sqlStore
 	}

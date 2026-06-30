@@ -1,6 +1,22 @@
 # Piano — Scraper diretto per conferma dominio + contenuto di prima mano (UC2)
 
-Stato: **da implementare**. Modifica piccola e contenuta. Nessuna migrazione DB.
+Stato: **IMPLEMENTATO (2026-06-30) via API esterna** — niente fetcher fatto in casa. Nessuna migrazione DB.
+
+## Implementazione effettiva (sostituisce i "Componenti" sotto)
+
+Invece di costruire `internal/platform/webfetch`, si usa un **servizio di scrape esterno** (Firecrawl-compatibile, `POST /v1/scrape` con `{"url":...,"formats":["markdown"]}`), così non manteniamo logica di crawling.
+
+- **Client**: `backend/internal/platform/scrape` — un solo metodo `Scrape(ctx, url) → {Markdown, Title, SourceURL, StatusCode}`. `New` ritorna `nil` se l'URL base non è configurato (opzionale, come `brave.New`).
+- **Config / wiring**: env var `BINOCOLO_SCRAPE_BASE_URL` (vuota = disabilitato) → `cfg.ScrapeBaseURL` → `scrape.New` in `main.go` → `binocolo.Deps.Scrape` → `maService.scrape` (assegnazione guardata per evitare il typed-nil dell'interfaccia).
+- **Innesto** (`ma_web_validation_job.go`): `verifyDomainByScrape(candidates, target)` rimpiazza `chooseMAWebValidationDomain` nel job path. Politica **aggressiva** (scelta dall'utente): scrape dei top-`maDomainVerifyCandidateCap`(=5) candidati in ordine di rango; vince subito il primo con **P.IVA/CF on-page** (`target.VATCode`/`TaxCode`, match alfanumerico, ≥8 char) — può promuovere un candidato a basso rango (recupera acceptance_fail tipo MYWAI). In assenza, primo con **nome azienda come parola intera** (non substring: "safe" ≠ "creditsafe"). Se un identificativo era disponibile, ≥1 pagina è stata letta e nessuna combacia → **reject** (`nil` → `domain_unresolved`/`needs_domain_review` = bucket `forse`, **recall-safe**, mai `scarta`). Scraper spento o tutti gli scrape falliti (transport/4xx) → fallback al pick score-only di oggi.
+- **Evidenza**: il markdown della homepage del dominio scelto viene riusato come corpus (`gatherNeutralEvidence(..., prefetchedMarkdown)`): `markdownToEvidenceSnippets` riduce link/immagini a testo, scarta righe-nav (<40 char), prende fino a `maScrapeEvidenceChunkCap`(=8) blocchi che precedono gli snippet Brave. Sistema l'evidenza-spazzatura (MDOTM pagina Apache, NG WAY snippet scollegati).
+- **Decisione aperta**: la verifica usa `target.VATCode` **a prescindere da `IncludeIdentifiers`** (il flag governa solo la query Brave; il match on-page è esplicitamente consentito). Se si vuole rispettare il toggle anche qui, è una riga.
+
+---
+
+## Piano originale (build-our-own — non seguito)
+
+Stato originale: da implementare. Modifica piccola e contenuta. Nessuna migrazione DB.
 
 ## Obiettivo
 

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/sciacco/mrsmith/internal/platform/brave"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
@@ -28,6 +29,13 @@ const (
 	// distiller input to thousands of tokens and tips cheap models into rambling
 	// chain-of-thought instead of producing the description.
 	maNeutralEvidenceSnippetCap = 12
+	// maDomainVerifyCandidateCap bounds how many ranked candidates the scrape-based
+	// entity verification will fetch (aggressive but cost-bounded). The chosen domain
+	// is normally among the top few, and a P.IVA hit short-circuits the loop.
+	maDomainVerifyCandidateCap = 5
+	// maScrapeEvidenceChunkCap bounds how many prose blocks from the scraped homepage
+	// markdown seed the evidence corpus (the rest of the snippet cap is left to Brave).
+	maScrapeEvidenceChunkCap = 8
 )
 
 // maNeutralEvidenceProbes are the deliberately strategy-agnostic site queries used
@@ -282,7 +290,7 @@ func (s *maService) buildMAWebValidation(
 	if err != nil {
 		return MAWebValidationUpsertRequest{}, fmt.Errorf("domain resolution: %w", err)
 	}
-	selectedDomain := chooseMAWebValidationDomain(domainResponse.Candidates)
+	selectedDomain, scrapedMarkdown := s.verifyDomainByScrape(ctx, domainResponse.Candidates, target)
 	if selectedDomain == nil {
 		decision := &CandidateMatchFinalDecision{
 			InitialMatchState:  target.MatchState,
@@ -290,13 +298,13 @@ func (s *maService) buildMAWebValidation(
 			WebValidationState: "domain_unresolved",
 			FinalAction:        "needs_domain_review",
 			Confidence:         "bassa",
-			Reason:             "Nessun dominio ufficiale credibile risolto.",
-			Reasons:            []string{"Nessun dominio ufficiale credibile risolto."},
+			Reason:             "Nessun dominio ufficiale verificato.",
+			Reasons:            []string{"Nessun dominio ufficiale verificato (punteggio insufficiente o identità non confermata in pagina)."},
 		}
 		return s.assembleWebValidationRequest(target, inputHash, domainResponse, nil, nil, maSectorClassification{}, nil, "", decision), nil
 	}
 
-	evidence, evidenceRuns := s.gatherNeutralEvidence(ctx, selectedDomain.Domain, payload.KeywordCount, subject, email)
+	evidence, evidenceRuns := s.gatherNeutralEvidence(ctx, selectedDomain.Domain, payload.KeywordCount, subject, email, scrapedMarkdown)
 
 	classification, classErr := s.classifyCompanySector(ctx, evidence, strategy, subject, email)
 	classError := ""
@@ -343,9 +351,9 @@ func sectorVerdictNeedsLLM(verdict maSectorVerdict) bool {
 // gatherNeutralEvidence collects a company's self-description from its own site
 // using strategy-agnostic probes. Returns the evidence corpus (for classification)
 // and per-probe runs (for the persisted contract / UI).
-func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, count int, subject, email string) (maCompanyEvidence, []CandidateMatchEvidenceRun) {
+func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, count int, subject, email, prefetchedMarkdown string) (maCompanyEvidence, []CandidateMatchEvidenceRun) {
 	evidence := maCompanyEvidence{Domain: domain}
-	runs := make([]CandidateMatchEvidenceRun, 0, len(maNeutralEvidenceProbes))
+	runs := make([]CandidateMatchEvidenceRun, 0, len(maNeutralEvidenceProbes)+1)
 	seen := map[string]struct{}{}
 	add := func(text string) {
 		if len(evidence.Snippets) >= maNeutralEvidenceSnippetCap {
@@ -361,6 +369,19 @@ func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, co
 		}
 		seen[key] = struct{}{}
 		evidence.Snippets = append(evidence.Snippets, cleaned)
+	}
+	// Seed from the scraped homepage markdown when available: real page content beats
+	// thin search snippets (fixes Apache-placeholder / unrelated-snippet evidence).
+	// Markdown leads (best slots); the Brave probes below fill what remains.
+	if chunks := markdownToEvidenceSnippets(prefetchedMarkdown); len(chunks) > 0 {
+		run := CandidateMatchEvidenceRun{Bucket: "scrape", Term: "homepage"}
+		before := len(evidence.Snippets)
+		for _, chunk := range chunks {
+			add(chunk)
+		}
+		run.ResultCount = len(evidence.Snippets) - before
+		run.Matched = run.ResultCount > 0
+		runs = append(runs, run)
 	}
 	for _, probe := range maNeutralEvidenceProbes {
 		run := CandidateMatchEvidenceRun{Bucket: "neutral", Term: probe}
@@ -387,6 +408,167 @@ func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, co
 		runs = append(runs, run)
 	}
 	return evidence, runs
+}
+
+// verifyDomainByScrape implements the aggressive entity-verification policy. It
+// scrapes ranked candidates and accepts the first whose page carries the target's
+// P.IVA / codice fiscale (strong identity match) — a low-ranked candidate can win
+// this way, rescuing domains the score-only heuristic under-rated. Failing that it
+// accepts the first page carrying the company name (medium). It returns the chosen
+// candidate plus its homepage markdown, which the caller reuses as evidence.
+//
+// Degradation / recall safety:
+//   - scraper disabled (s.scrape == nil)  -> chooseMAWebValidationDomain (today's pick), no markdown.
+//   - an identifier was available AND >=1 page was read AND none matched -> reject
+//     (nil): the target lands in needs_domain_review (forse), never scarta. This is
+//     the wrong-entity kill (a cinema / turbine maker won't carry the target's
+//     P.IVA) and it is recall-safe — the company is flagged for review, not rejected.
+//   - no identifier to check, or every scrape failed (transport/4xx) -> fall back to
+//     the score-only pick (with its markdown when we managed to fetch it).
+func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []DomainResolutionCandidate, target MATarget) (*DomainResolutionCandidate, string) {
+	chosen := chooseMAWebValidationDomain(candidates)
+	if s.scrape == nil {
+		return chosen, ""
+	}
+
+	vat := normalizeIdentifierForPageMatch(target.VATCode)
+	tax := normalizeIdentifierForPageMatch(target.TaxCode)
+	nameTokens := companyResolutionTokens(target.CompanyName)
+
+	markdownByDomain := map[string]string{}
+	anyPageRead := false
+	var nameMatch *DomainResolutionCandidate
+
+	for i := range candidates {
+		if i >= maDomainVerifyCandidateCap {
+			break
+		}
+		cand := candidates[i]
+		res, err := s.scrape.Scrape(ctx, "https://"+cand.Domain)
+		if err != nil {
+			continue
+		}
+		if res.StatusCode != 0 && (res.StatusCode < 200 || res.StatusCode >= 400) {
+			continue
+		}
+		md := strings.TrimSpace(res.Markdown)
+		if md == "" {
+			continue
+		}
+		anyPageRead = true
+		markdownByDomain[cand.Domain] = md
+		if (vat != "" && pageContainsIdentifier(md, vat)) || (tax != "" && pageContainsIdentifier(md, tax)) {
+			winner := cand
+			return &winner, md // strong identity match short-circuits
+		}
+		if nameMatch == nil && pageContainsCompanyName(md, nameTokens) {
+			winner := cand
+			nameMatch = &winner
+		}
+	}
+
+	// A name-match may override the score order only when the score-top (`chosen`)
+	// was itself read and didn't match — i.e. it is genuinely a different entity
+	// (e.g. makemu.it for CARDNOLOGY, beaten by tessere-online.com which carried
+	// the target's identity). If `chosen` FAILED to scrape, a name-match on a
+	// lower-ranked candidate is too weak to demote it: the score-top may be the
+	// correct site that simply didn't render, while the lower one false-matched on
+	// generic tokens (e.g. consorzioarsenal.it failing to render while ioveneto.it
+	// matched "veneto"/"ricerca" for ARSENAL). In that case fall through to the
+	// reject / score-only path rather than trusting the speculative name-match.
+	chosenRead := chosen != nil && markdownByDomain[chosen.Domain] != ""
+	if nameMatch != nil && chosen != nil && (chosenRead || nameMatch.Domain == chosen.Domain) {
+		return nameMatch, markdownByDomain[nameMatch.Domain]
+	}
+	// Aggressive: an available identifier absent from every page we actually read
+	// means the resolved site is a different entity -> reject.
+	if (vat != "" || tax != "") && anyPageRead {
+		return nil, ""
+	}
+	if chosen != nil {
+		return chosen, markdownByDomain[chosen.Domain]
+	}
+	return nil, ""
+}
+
+// normalizeIdentifierForPageMatch reduces a P.IVA / codice fiscale to bare
+// alphanumerics for substring matching against page text. Returns "" for values
+// too short to match reliably (avoids spurious hits on stray digit runs).
+func normalizeIdentifierForPageMatch(value string) string {
+	compact := compactAlnum(strings.ToLower(value))
+	if len([]rune(compact)) < 8 {
+		return ""
+	}
+	return compact
+}
+
+func pageContainsIdentifier(markdown, identifier string) bool {
+	if identifier == "" {
+		return false
+	}
+	return strings.Contains(compactAlnum(strings.ToLower(markdown)), identifier)
+}
+
+// pageContainsCompanyName checks the page carries the company's distinctive name
+// tokens as whole words (not substrings — "safe" must not match "creditsafe").
+// Requires all tokens for 1-2 token names, >=2 for longer ones. Used only as a
+// positive signal (promote a candidate), never to reject.
+func pageContainsCompanyName(markdown string, nameTokens []string) bool {
+	if len(nameTokens) == 0 {
+		return false
+	}
+	words := pageWordSet(markdown)
+	matched := 0
+	for _, token := range nameTokens {
+		if _, ok := words[token]; ok {
+			matched++
+		}
+	}
+	need := min(len(nameTokens), 2)
+	return matched >= need
+}
+
+func pageWordSet(text string) map[string]struct{} {
+	out := map[string]struct{}{}
+	for _, w := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		if len([]rune(w)) >= 2 {
+			out[w] = struct{}{}
+		}
+	}
+	return out
+}
+
+var (
+	markdownImageRe = regexp.MustCompile(`!\[[^\]]*\]\([^)]*\)`)
+	markdownLinkRe  = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
+)
+
+// markdownToEvidenceSnippets turns scraped homepage markdown into a handful of
+// prose blocks suitable as classification evidence: link/image syntax is reduced to
+// its visible text and short / navigation-like lines are dropped. It is not a full
+// markdown parser — the downstream LLM distiller handles the rest.
+func markdownToEvidenceSnippets(markdown string) []string {
+	plain := strings.TrimSpace(markdown)
+	if plain == "" {
+		return nil
+	}
+	plain = markdownImageRe.ReplaceAllString(plain, " ")
+	plain = markdownLinkRe.ReplaceAllString(plain, "$1")
+	plain = strings.ReplaceAll(plain, "`", " ")
+	out := []string{}
+	for _, line := range strings.Split(plain, "\n") {
+		line = strings.TrimSpace(strings.TrimLeft(line, "#*->| "))
+		if len([]rune(line)) < 40 {
+			continue // nav items, headings, list bullets, fragments
+		}
+		out = append(out, line)
+		if len(out) >= maScrapeEvidenceChunkCap {
+			break
+		}
+	}
+	return out
 }
 
 // sectorFinalDecision maps the concept verdict (+ optional analyst override) onto

@@ -46,6 +46,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
+	"github.com/sciacco/mrsmith/internal/platform/scrape"
 	"github.com/sciacco/mrsmith/internal/platform/staticspa"
 	"github.com/sciacco/mrsmith/internal/portal"
 	"github.com/sciacco/mrsmith/internal/quotes"
@@ -278,6 +279,11 @@ func main() {
 	braveCli := brave.New(brave.Config{APIKey: cfg.BraveAPIKey, BaseURL: cfg.BraveBaseURL})
 	if braveCli != nil {
 		logger.Info("shared brave client configured", "component", "brave")
+	}
+
+	scrapeCli := scrape.New(scrape.Config{BaseURL: cfg.ScrapeBaseURL})
+	if scrapeCli != nil {
+		logger.Info("binocolo scrape client configured", "component", "scrape")
 	}
 
 	mailer, err := email.NewSMTPClient(email.Config{
@@ -555,7 +561,7 @@ func main() {
 		appCatalog = filtered
 	}
 	portal.RegisterRoutes(api, appCatalog)
-	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, Brave: braveCli, LLM: llmSvc, AnisettaDB: anisettaDB})
+	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, Brave: braveCli, Scrape: scrapeCli, LLM: llmSvc, AnisettaDB: anisettaDB})
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	rda.RegisterRoutes(api, rda.Deps{

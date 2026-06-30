@@ -106,6 +106,10 @@ type Config struct {
 	BraveAPIKey  string
 	BraveBaseURL string
 
+	// Scrape service (optional — binocolo domain entity-verification + page
+	// evidence). Self-hosted Firecrawl-compatible /v1/scrape. Empty => disabled.
+	ScrapeBaseURL string
+
 	// SMTP email delivery (optional, disabled by default)
 	SMTPEnabled       bool
 	SMTPHost          string
@@ -232,6 +236,7 @@ func Load() Config {
 		OpenAPIITCompanyBaseURL:     envOr("OPENAPI_IT_COMPANY_BASE_URL", openapiit.DefaultCompanyBaseURL),
 		BraveAPIKey:                 envOr("BRAVE_API_KEY", ""),
 		BraveBaseURL:                envOr("BRAVE_BASE_URL", brave.DefaultBaseURL),
+		ScrapeBaseURL:               envOr("BINOCOLO_SCRAPE_BASE_URL", ""),
 		SMTPEnabled:                 boolEnvOr("SMTP_ENABLED", false),
 		SMTPHost:                    envOr("SMTP_HOST", ""),
 		SMTPPort:                    envOr("SMTP_PORT", "587"),

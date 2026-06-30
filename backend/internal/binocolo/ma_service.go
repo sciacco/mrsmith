@@ -21,6 +21,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
+	"github.com/sciacco/mrsmith/internal/platform/scrape"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -162,6 +163,12 @@ type maService struct {
 	openapiit *openapiit.Client
 	brave     interface {
 		LLMContext(context.Context, brave.LLMContextParams) (brave.LLMContextResult, error)
+	}
+	// scrape backs UC2 domain entity-verification + page-content evidence. Soft
+	// dependency, set post-construction like brave; nil falls back to the
+	// score-only domain pick and Brave-snippet evidence (today's behavior).
+	scrape interface {
+		Scrape(context.Context, string) (scrape.Result, error)
 	}
 	llmp maLLMProvider
 	now  func() time.Time
