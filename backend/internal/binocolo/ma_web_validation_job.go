@@ -46,6 +46,15 @@ const (
 	// maScrapeEvidenceChunkCap bounds how many prose blocks from the scraped homepage
 	// markdown seed the evidence corpus (the rest of the snippet cap is left to Brave).
 	maScrapeEvidenceChunkCap = 8
+	// Post-resolution crawl bounds (async, runs in the background job — not bound by
+	// the 60s HTTP write timeout). Shallow + few pages keeps it a respectful,
+	// cost-bounded site job that still reaches /chi-siamo, /servizi, /contatti.
+	maCrawlMaxDepth = 2
+	maCrawlMaxPages = 8
+	maCrawlTimeout  = 90 * time.Second
+	// maCrawlPageEvidenceCap bounds evidence chunks taken per crawled page when there
+	// is more than one, so a content-heavy homepage doesn't crowd out the other pages.
+	maCrawlPageEvidenceCap = 4
 )
 
 // maNeutralEvidenceProbes are the deliberately strategy-agnostic site queries used
@@ -325,7 +334,15 @@ func (s *maService) buildMAWebValidation(
 		return s.assembleWebValidationRequest(target, inputHash, domainResponse, nil, nil, maSectorClassification{}, nil, "", decision), nil
 	}
 
-	evidence, evidenceRuns := s.gatherNeutralEvidence(ctx, selectedDomain.Domain, payload.KeywordCount, subject, email, scrapedMarkdown)
+	// Enrich evidence with a shallow crawl of the resolved site: real multi-page
+	// self-description (services / about / contacts) classifies far better than the
+	// homepage alone, and an on-page P.IVA on a legal/contact page confirms identity
+	// the homepage often omits. Degrades to homepage-only evidence when disabled/failing.
+	evidencePages, identityVerified := s.crawlResolvedSite(ctx, selectedDomain.Domain, scrapedMarkdown, target)
+	if identityVerified && selectedDomain.Confidence != "alta" {
+		selectedDomain.Confidence = "alta" // on-page P.IVA is the strongest identity signal
+	}
+	evidence, evidenceRuns := s.gatherNeutralEvidence(ctx, selectedDomain.Domain, payload.KeywordCount, subject, email, evidencePages)
 
 	classification, classErr := s.classifyCompanySector(ctx, evidence, strategy, subject, email)
 	classError := ""
@@ -369,10 +386,62 @@ func sectorVerdictNeedsLLM(verdict maSectorVerdict) bool {
 	return verdict == maSectorAmbiguous || verdict == maSectorNoSignal || verdict == maSectorConfirm
 }
 
+// crawlResolvedSite shallow-crawls a resolved company domain to (1) gather
+// multi-page self-description evidence for classification and (2) confirm the
+// target's P.IVA / codice fiscale on pages the homepage omits (/contatti,
+// /note-legali). homepageMarkdown — already fetched during verification — is
+// always returned first so evidence degrades gracefully when the crawl is
+// disabled or fails. Returns the page markdowns and whether identity was confirmed.
+func (s *maService) crawlResolvedSite(ctx context.Context, domain, homepageMarkdown string, target MATarget) ([]string, bool) {
+	vat := normalizeIdentifierForPageMatch(target.VATCode)
+	tax := normalizeIdentifierForPageMatch(target.TaxCode)
+	verified := false
+	checkIdentity := func(md string) {
+		if verified || md == "" {
+			return
+		}
+		if (vat != "" && pageContainsIdentifier(md, vat)) || (tax != "" && pageContainsIdentifier(md, tax)) {
+			verified = true
+		}
+	}
+
+	pages := []string{}
+	if md := strings.TrimSpace(homepageMarkdown); md != "" {
+		pages = append(pages, md)
+		checkIdentity(md)
+	}
+	if s.scrape == nil {
+		return pages, verified
+	}
+
+	hosts := companyPageHosts(domain)
+	if len(hosts) == 0 {
+		return pages, verified
+	}
+	cctx, cancel := context.WithTimeout(ctx, maCrawlTimeout)
+	defer cancel()
+	crawled, err := s.scrape.Crawl(cctx, "https://"+hosts[0], maCrawlMaxDepth, maCrawlMaxPages)
+	if err != nil {
+		return pages, verified // soft dependency: keep homepage-only evidence
+	}
+	for _, p := range crawled {
+		md := strings.TrimSpace(p.Markdown)
+		if md == "" {
+			continue
+		}
+		if len(pages) > 0 && md == pages[0] {
+			continue // the crawl re-fetched the homepage we already have
+		}
+		pages = append(pages, md)
+		checkIdentity(md)
+	}
+	return pages, verified
+}
+
 // gatherNeutralEvidence collects a company's self-description from its own site
 // using strategy-agnostic probes. Returns the evidence corpus (for classification)
 // and per-probe runs (for the persisted contract / UI).
-func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, count int, subject, email, prefetchedMarkdown string) (maCompanyEvidence, []CandidateMatchEvidenceRun) {
+func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, count int, subject, email string, prefetchedPages []string) (maCompanyEvidence, []CandidateMatchEvidenceRun) {
 	evidence := maCompanyEvidence{Domain: domain}
 	runs := make([]CandidateMatchEvidenceRun, 0, len(maNeutralEvidenceProbes)+1)
 	seen := map[string]struct{}{}
@@ -391,18 +460,38 @@ func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, co
 		seen[key] = struct{}{}
 		evidence.Snippets = append(evidence.Snippets, cleaned)
 	}
-	// Seed from the scraped homepage markdown when available: real page content beats
-	// thin search snippets (fixes Apache-placeholder / unrelated-snippet evidence).
-	// Markdown leads (best slots); the Brave probes below fill what remains.
-	if chunks := markdownToEvidenceSnippets(prefetchedMarkdown); len(chunks) > 0 {
-		run := CandidateMatchEvidenceRun{Bucket: "scrape", Term: "homepage"}
+	// Seed from the scraped/crawled page markdown when available: real page content
+	// beats thin search snippets (fixes Apache-placeholder / unrelated-snippet
+	// evidence). Markdown leads (best slots); the Brave probes below fill what
+	// remains. With multiple crawled pages, cap per page so a content-heavy homepage
+	// doesn't crowd out /chi-siamo, /servizi, etc.
+	perPageCap := maScrapeEvidenceChunkCap
+	if len(prefetchedPages) > 1 {
+		perPageCap = maCrawlPageEvidenceCap
+	}
+	for i, pageMarkdown := range prefetchedPages {
+		chunks := markdownToEvidenceSnippets(pageMarkdown)
+		if len(chunks) == 0 {
+			continue
+		}
+		term := "page"
+		if i == 0 {
+			term = "homepage"
+		}
+		run := CandidateMatchEvidenceRun{Bucket: "scrape", Term: term}
 		before := len(evidence.Snippets)
-		for _, chunk := range chunks {
+		for taken, chunk := range chunks {
+			if taken >= perPageCap {
+				break
+			}
 			add(chunk)
 		}
 		run.ResultCount = len(evidence.Snippets) - before
 		run.Matched = run.ResultCount > 0
 		runs = append(runs, run)
+		if len(evidence.Snippets) >= maNeutralEvidenceSnippetCap {
+			break
+		}
 	}
 	for _, probe := range maNeutralEvidenceProbes {
 		run := CandidateMatchEvidenceRun{Bucket: "neutral", Term: probe}

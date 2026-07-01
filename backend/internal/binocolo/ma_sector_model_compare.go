@@ -351,7 +351,7 @@ func (s *maService) populateCompareSnippets(ctx context.Context, cases []sectorC
 				gathered[i] = cached.([]string)
 				return nil
 			}
-			ev, _ := s.gatherNeutralEvidence(gctx, domain, maWebValidationEvidenceCount, subject, email, "")
+			ev, _ := s.gatherNeutralEvidence(gctx, domain, maWebValidationEvidenceCount, subject, email, nil)
 			s.compareSnippetCache.Store(domain, ev.Snippets)
 			gathered[i] = ev.Snippets
 			return nil

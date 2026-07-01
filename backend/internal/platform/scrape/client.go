@@ -20,6 +20,7 @@ import (
 const (
 	scrapePath     = "/v1/scrape"
 	searchPath     = "/v1/search"
+	crawlPath      = "/v1/crawl"
 	defaultTimeout = 30 * time.Second
 )
 
@@ -212,6 +213,142 @@ type searchResponse struct {
 		Title       string `json:"title"`
 		Description string `json:"description"`
 		Snippet     string `json:"snippet"`
+	} `json:"data"`
+	Error string `json:"error"`
+}
+
+// CrawlPage is one page returned by a crawl job.
+type CrawlPage struct {
+	URL      string
+	Markdown string
+}
+
+// Crawl runs a bounded, same-site crawl via /v1/crawl. The endpoint is async:
+// this starts the job and polls until it completes, fails, or ctx is cancelled,
+// returning the per-page markdown collected. Binocolo uses it post-resolution to
+// gather multi-page self-description evidence and to confirm the target's P.IVA
+// on legal/contact pages the homepage omits. Bound the scope with maxDepth /
+// maxPages. Requires an API key.
+func (c *Client) Crawl(ctx context.Context, target string, maxDepth, maxPages int) ([]CrawlPage, error) {
+	reqBody := map[string]any{"url": target, "formats": []string{"markdown"}, "onlyMainContent": true}
+	if maxDepth > 0 {
+		reqBody["maxDepth"] = maxDepth
+	}
+	if maxPages > 0 {
+		reqBody["maxPages"] = maxPages
+	}
+	id, err := c.startCrawl(ctx, reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	const pollEvery = 2 * time.Second
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(pollEvery):
+		}
+		pages, status, err := c.pollCrawl(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		switch status {
+		case "completed":
+			return pages, nil
+		case "failed":
+			return pages, fmt.Errorf("scrape: crawl %s failed", id)
+		}
+	}
+}
+
+func (c *Client) startCrawl(ctx context.Context, reqBody map[string]any) (string, error) {
+	payload, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("scrape: encode crawl request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+crawlPath, bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("scrape: create crawl request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("scrape: request %s: %w", crawlPath, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("scrape: read crawl response: %w", err)
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return "", &APIError{StatusCode: resp.StatusCode, Body: string(body), Message: parseErrorMessage(body)}
+	}
+	var parsed struct {
+		Success bool   `json:"success"`
+		ID      string `json:"id"`
+		JobID   string `json:"jobId"`
+		Error   string `json:"error"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return "", fmt.Errorf("scrape: decode crawl response: %w", err)
+	}
+	id := firstNonEmpty(parsed.ID, parsed.JobID)
+	if !parsed.Success || id == "" {
+		return "", &APIError{StatusCode: resp.StatusCode, Body: string(body), Message: firstNonEmpty(parsed.Error, "no crawl id")}
+	}
+	return id, nil
+}
+
+func (c *Client) pollCrawl(ctx context.Context, id string) ([]CrawlPage, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+crawlPath+"/"+id, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("scrape: create crawl poll: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("scrape: poll %s: %w", crawlPath, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("scrape: read crawl poll: %w", err)
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, "", &APIError{StatusCode: resp.StatusCode, Body: string(body), Message: parseErrorMessage(body)}
+	}
+	var parsed crawlStatusResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, "", fmt.Errorf("scrape: decode crawl poll: %w", err)
+	}
+	pages := make([]CrawlPage, 0, len(parsed.Data))
+	for _, d := range parsed.Data {
+		pages = append(pages, CrawlPage{URL: d.Metadata.SourceURL, Markdown: d.Markdown})
+	}
+	return pages, parsed.Status, nil
+}
+
+// crawlStatusResponse mirrors the /v1/crawl/{id} poll JSON:
+//
+//	{ "success": true, "status": "scraping|completed|failed",
+//	  "total": 12, "completed": 12,
+//	  "data": [ { "markdown": "...", "metadata": { "sourceURL": "..." } } ] }
+type crawlStatusResponse struct {
+	Success bool   `json:"success"`
+	Status  string `json:"status"`
+	Data    []struct {
+		Markdown string `json:"markdown"`
+		Metadata struct {
+			SourceURL string `json:"sourceURL"`
+		} `json:"metadata"`
 	} `json:"data"`
 	Error string `json:"error"`
 }

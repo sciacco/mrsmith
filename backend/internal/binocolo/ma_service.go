@@ -170,6 +170,7 @@ type maService struct {
 	scrape interface {
 		Scrape(context.Context, string) (scrape.Result, error)
 		Search(context.Context, string, int) ([]scrape.SearchResult, error)
+		Crawl(context.Context, string, int, int) ([]scrape.CrawlPage, error)
 	}
 	llmp maLLMProvider
 	now  func() time.Time

@@ -336,7 +336,7 @@ func (s *maService) testSectorClassification(ctx context.Context, req SectorClas
 			}, nil
 		}
 		selectedDomain = chosen.Domain
-		evidence, _ := s.gatherNeutralEvidence(ctx, chosen.Domain, maWebValidationEvidenceCount, subject, email, "")
+		evidence, _ := s.gatherNeutralEvidence(ctx, chosen.Domain, maWebValidationEvidenceCount, subject, email, nil)
 		evidenceUsed = evidence.Snippets
 		description = s.representCompany(ctx, evidence, subject, email)
 	} else {
@@ -356,7 +356,7 @@ func (s *maService) testSectorClassification(ctx context.Context, req SectorClas
 				if s.brave == nil {
 					return SectorClassificationTestResponse{}, errMABraveUnavailable
 				}
-				gathered, _ := s.gatherNeutralEvidence(ctx, req.Domain, maWebValidationEvidenceCount, subject, email, "")
+				gathered, _ := s.gatherNeutralEvidence(ctx, req.Domain, maWebValidationEvidenceCount, subject, email, nil)
 				evidence = gathered
 			default:
 				return SectorClassificationTestResponse{}, fmt.Errorf("%w: serve companyDescription, snippets o domain", errMAStrategyInvalid)
