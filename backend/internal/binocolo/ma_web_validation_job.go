@@ -465,15 +465,8 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 			break
 		}
 		cand := candidates[i]
-		res, err := s.scrape.Scrape(ctx, "https://"+cand.Domain)
-		if err != nil {
-			continue
-		}
-		if res.StatusCode != 0 && (res.StatusCode < 200 || res.StatusCode >= 400) {
-			continue
-		}
-		md := strings.TrimSpace(res.Markdown)
-		if md == "" {
+		md, ok := s.scrapeHomepage(ctx, cand.Domain)
+		if !ok {
 			continue
 		}
 		anyPageRead = true
@@ -501,6 +494,17 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 	if nameMatch != nil && chosen != nil && (chosenRead || nameMatch.Domain == chosen.Domain) {
 		return nameMatch, markdownByDomain[nameMatch.Domain]
 	}
+	// Recall-safe brand-label trust: when the score-top domain's OWN site could not be
+	// scraped at all (blocked / 404 / renderer failure) but its label matches the
+	// company name (adawen.it for ADAWEN) and it ranked with high confidence, resolve
+	// it and let classification run on search snippets — the pre-scrape behaviour.
+	// Wrong-entity risk is low because the domain label IS the brand. Guarded on
+	// !chosenRead: a brand site that DID render without confirming identity stays
+	// rejected below (that unconfirmed render is the genuine wrong-entity signal).
+	if chosen != nil && !chosenRead && chosen.Confidence == "alta" &&
+		domainLooksCompanyOwned(chosen.Domain, nameTokens) {
+		return chosen, ""
+	}
 	// Aggressive: an available identifier absent from every page we actually read
 	// means the resolved site is a different entity -> reject.
 	if (vat != "" || tax != "") && anyPageRead {
@@ -510,6 +514,39 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 		return chosen, markdownByDomain[chosen.Domain]
 	}
 	return nil, ""
+}
+
+// scrapeHomepage fetches a candidate company homepage as markdown, trying the
+// www host first (almost always configured, and often the only variant that
+// renders — the bare apex frequently 404s or fails the renderer) then falling
+// back to the bare apex. Returns the first non-empty, 2xx markdown, or ok=false
+// when neither variant yields usable content.
+func (s *maService) scrapeHomepage(ctx context.Context, domain string) (string, bool) {
+	for _, host := range companyPageHosts(domain) {
+		res, err := s.scrape.Scrape(ctx, "https://"+host)
+		if err != nil {
+			continue
+		}
+		if res.StatusCode != 0 && (res.StatusCode < 200 || res.StatusCode >= 400) {
+			continue
+		}
+		if md := strings.TrimSpace(res.Markdown); md != "" {
+			return md, true
+		}
+	}
+	return "", false
+}
+
+// companyPageHosts returns the host variants to try for a resolved domain,
+// www-first then bare. Candidates are apex company domains, so prefixing www is
+// safe; the bare fallback covers the rare www-less site. A wrong www guess just
+// costs one failed call before the fallback.
+func companyPageHosts(domain string) []string {
+	d := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(domain)), "www.")
+	if d == "" {
+		return nil
+	}
+	return []string{"www." + d, d}
 }
 
 // normalizeIdentifierForPageMatch reduces a P.IVA / codice fiscale to bare
@@ -882,6 +919,47 @@ func (s *maService) resolveDomainCandidates(ctx context.Context, body DomainReso
 			break
 		}
 	}
+
+	// Retrieval fallback: Brave surfaced no credible official-site candidate (only
+	// registries/aggregators, or nothing). Try the fastcrw web search — it finds
+	// distinctive-brand company sites Brave misses (weytec.com, direte.it,
+	// digitalvirgo.com). Results feed the SAME ranker, so registries stay filtered
+	// and brand-match still decides. Fires only on Brave failure, so it never
+	// overrides a Brave success (avoids same-brand-wrong-company regressions). No
+	// P.IVA in the query (same anti-registry rule as Brave).
+	if s.scrape != nil && !hasCredibleDomainResolutionCandidate(candidates) {
+		for _, query := range buildFastcrwDomainQueries(body, companyName) {
+			if len(query) > webSearchMaxQueryLen || len(strings.Fields(query)) > webSearchMaxWords {
+				continue
+			}
+			hits, err := s.scrape.Search(ctx, query, count)
+			if err != nil {
+				break // soft dependency: keep whatever Brave returned
+			}
+			executedQueries = append(executedQueries, "fastcrw:"+query)
+			for _, h := range hits {
+				host, ok := normalizeDomain(h.URL)
+				if !ok {
+					continue
+				}
+				if _, exists := seenResults[h.URL]; exists {
+					continue
+				}
+				seenResults[h.URL] = struct{}{}
+				results = append(results, WebSearchResult{
+					Title:    h.Title,
+					URL:      h.URL,
+					Hostname: host,
+					Snippets: dedupNonEmpty([]string{h.Description, h.Snippet}),
+				})
+			}
+			candidates = rankDomainResolutionCandidates(body, companyName, results)
+			if hasCredibleDomainResolutionCandidate(candidates) {
+				break
+			}
+		}
+	}
+
 	if len(executedQueries) == 0 {
 		return DomainResolutionResponse{}, fmt.Errorf("%w: query too long", errMAStrategyInvalid)
 	}

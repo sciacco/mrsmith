@@ -19,16 +19,22 @@ import (
 
 const (
 	scrapePath     = "/v1/scrape"
+	searchPath     = "/v1/search"
 	defaultTimeout = 30 * time.Second
 )
 
 type Config struct {
-	BaseURL    string
+	BaseURL string
+	// APIKey, when set, is sent as an "Authorization: Bearer <key>" header.
+	// Self-hosted Firecrawl needs no auth (leave empty); managed services
+	// (e.g. fastcrw.com) require it.
+	APIKey     string
 	HTTPClient *http.Client
 }
 
 type Client struct {
 	baseURL    string
+	apiKey     string
 	httpClient *http.Client
 }
 
@@ -45,6 +51,7 @@ func New(cfg Config) *Client {
 	}
 	return &Client{
 		baseURL:    strings.TrimRight(baseURL, "/"),
+		apiKey:     strings.TrimSpace(cfg.APIKey),
 		httpClient: httpClient,
 	}
 }
@@ -93,6 +100,9 @@ func (c *Client) Scrape(ctx context.Context, target string) (Result, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -127,6 +137,83 @@ func (c *Client) Scrape(ctx context.Context, target string) (Result, error) {
 		SourceURL:  parsed.Data.Metadata.SourceURL,
 		StatusCode: parsed.Data.Metadata.StatusCode,
 	}, nil
+}
+
+// SearchResult is one web-search hit from the /v1/search endpoint.
+type SearchResult struct {
+	URL         string
+	Title       string
+	Description string
+	Snippet     string
+}
+
+// Search runs a web search via /v1/search (fastcrw-compatible). Binocolo uses it
+// as a domain-resolution retrieval fallback when the primary search engine fails
+// to surface a company's official site. Requires an API key. Returns an error on
+// transport failure, a non-2xx response, or success:false.
+func (c *Client) Search(ctx context.Context, query string, limit int) ([]SearchResult, error) {
+	if limit <= 0 {
+		limit = 8
+	}
+	payload, err := json.Marshal(map[string]any{"query": query, "limit": limit})
+	if err != nil {
+		return nil, fmt.Errorf("scrape: encode search request: %w", err)
+	}
+
+	endpoint := c.baseURL + searchPath
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("scrape: create search request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("scrape: request %s: %w", searchPath, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("scrape: read search response: %w", err)
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(body), Message: parseErrorMessage(body)}
+	}
+
+	var parsed searchResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, fmt.Errorf("scrape: decode search response: %w", err)
+	}
+	if !parsed.Success {
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(body), Message: firstNonEmpty(parsed.Error, "success=false")}
+	}
+
+	out := make([]SearchResult, 0, len(parsed.Data))
+	for _, d := range parsed.Data {
+		out = append(out, SearchResult{URL: d.URL, Title: d.Title, Description: d.Description, Snippet: d.Snippet})
+	}
+	return out, nil
+}
+
+// searchResponse mirrors the relevant slice of the /v1/search wire JSON:
+//
+//	{ "success": true,
+//	  "data": [ { "url", "title", "description", "snippet", ... } ],
+//	  "error": "..." }
+type searchResponse struct {
+	Success bool `json:"success"`
+	Data    []struct {
+		URL         string `json:"url"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Snippet     string `json:"snippet"`
+	} `json:"data"`
+	Error string `json:"error"`
 }
 
 // scrapeResponse mirrors the relevant slice of the wire JSON:

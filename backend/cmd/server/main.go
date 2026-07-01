@@ -281,7 +281,7 @@ func main() {
 		logger.Info("shared brave client configured", "component", "brave")
 	}
 
-	scrapeCli := scrape.New(scrape.Config{BaseURL: cfg.ScrapeBaseURL})
+	scrapeCli := scrape.New(scrape.Config{BaseURL: cfg.ScrapeBaseURL, APIKey: cfg.ScrapeAPIKey})
 	if scrapeCli != nil {
 		logger.Info("binocolo scrape client configured", "component", "scrape")
 	}

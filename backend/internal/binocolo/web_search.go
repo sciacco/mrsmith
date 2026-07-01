@@ -561,6 +561,41 @@ func buildDomainResolutionQueries(body DomainResolutionRequest, companyName stri
 	return cleanStringList(queries, 3, webSearchMaxQueryLen)
 }
 
+// binocoloLegalFormRe strips common Italian legal-form tokens so a company's
+// distinctive brand drives the fastcrw fallback query — the search engine returns
+// generic dictionary/registry noise when a short legal form dominates the query.
+var binocoloLegalFormRe = regexp.MustCompile(`(?i)\b(s\.?r\.?l\.?s?|s\.?p\.?a\.?|s\.?a\.?s\.?|s\.?n\.?c\.?|s\.?c\.?a\.?r\.?l\.?|societa'?\s+a\s+responsabilita'?\s+limitata|societa'?\s+benefit|societa'?\s+cooperativa|societa'?|soc\.?|a\s+socio\s+unico)\b\.?`)
+
+// companyBrandForSearch reduces a legal name to its brand for a fastcrw query.
+func companyBrandForSearch(name string) string {
+	cleaned := binocoloLegalFormRe.ReplaceAllString(name, " ")
+	cleaned = strings.Join(strings.Fields(cleaned), " ")
+	if cleaned == "" {
+		return strings.TrimSpace(name)
+	}
+	return cleaned
+}
+
+// buildFastcrwDomainQueries builds the retrieval-fallback web-search queries for
+// domain resolution, most specific first; the caller stops as soon as a credible
+// candidate emerges. NO P.IVA / codice fiscale (same anti-registry rule as Brave)
+// and NO forced "sito ufficiale" on the primary query — it biased fastcrw toward
+// unrelated pages for distinctive brands (e.g. "Digital Virgo" only resolved to
+// digitalvirgo.com without it), while location disambiguates generic names.
+func buildFastcrwDomainQueries(body DomainResolutionRequest, companyName string) []string {
+	brand := companyBrandForSearch(companyName)
+	parts := []string{brand}
+	if town := strings.TrimSpace(body.Town); town != "" {
+		parts = append(parts, town)
+	}
+	if province := strings.TrimSpace(body.Province); province != "" {
+		parts = append(parts, strings.ToUpper(province))
+	}
+	primary := strings.TrimSpace(strings.Join(parts, " "))
+	official := strings.TrimSpace(brand + " sito ufficiale")
+	return dedupNonEmpty([]string{primary, official})
+}
+
 func domainResolutionFallbackKeywords(keywords []string) []string {
 	out := []string{}
 	for _, keyword := range keywords {

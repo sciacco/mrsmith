@@ -169,6 +169,7 @@ type maService struct {
 	// score-only domain pick and Brave-snippet evidence (today's behavior).
 	scrape interface {
 		Scrape(context.Context, string) (scrape.Result, error)
+		Search(context.Context, string, int) ([]scrape.SearchResult, error)
 	}
 	llmp maLLMProvider
 	now  func() time.Time
