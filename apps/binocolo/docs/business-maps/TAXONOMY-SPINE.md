@@ -118,7 +118,7 @@ Ogni agente, **sibling-aware**, produce per la foglia:
 ## Stato avanzamento
 - ✅ **Fase 0** — decisioni #1–#5 risolte.
 - ✅ **Fase 1 (fan-out)** — 54 concetti authored/refined (workflow `binocolo-kb-fanout`, 75 agenti) +
-  review contrastiva per layer. Output: `concept_index_candidate.json` (10 merge_flags, 71 overlap_warnings).
+  review contrastiva per layer (10 merge_flags, 71 overlap_warnings). Output consolidato in `concept_index_source.json`.
 - ✅ **Fase 3 (grounding ATECO)** — ogni `ateco_in_kb`/`ateco_excluded` validato vs
   `docs/codici_ateco_2025.json`; corretti codici NACE/obsoleti (70.22→70.20, 95.11→95.10, 80.20→80.09…)
   e `bpo_callcenter` (era vuoto). Nessun codice inesistente residuo. Candidato `ateco_grounded`.

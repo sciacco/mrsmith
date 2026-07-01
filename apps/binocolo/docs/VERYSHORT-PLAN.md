@@ -1,6 +1,6 @@
 # Binocolo — Veryshort: piano di implementazione
 
-> Esecuzione del design in [`VERYSHORT-DESIGN.md`](./VERYSHORT-DESIGN.md). Branch `poc/aenad`. Migrazioni su `ANISETTA_DSN` (come 033/034, applicate a mano).
+> Esecuzione del design in [`VERYSHORT-DESIGN.md`](./archive/VERYSHORT-DESIGN.md). Branch `poc/aenad`. Migrazioni su `ANISETTA_DSN` (come 033/034, applicate a mano).
 >
 > **STATO 2026-06-17: IMPLEMENTATO** — tutte le 6 fasi, con QA gate adversariale per fase (build/vet/test/tsc + review correttezza/convenzioni). `go build ./...`, `go vet`, `tsc --noEmit`, `gofmt` verdi; test Go deterministici del motore/valutazione/export verdi (httptest preesistenti vanno in panic solo nel sandbox per port-bind).
 > **Da fare prima del deploy**: applicare migrazioni **036–040** su `ANISETTA_DSN`; validare il modello brief `openai/gpt-5.5` sul catalogo OpenRouter (il brief è best-effort: se il modello non risponde, scorecard+valutazione restano); **smoke live IT-full NON eseguito** — i path KPI sono derivati dallo schema `Full` di `company.openapi.json`, da calibrare sul primo payload reale (log "empty scorecard" se l'estrazione è vuota).

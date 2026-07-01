@@ -11,7 +11,7 @@ analyst.
 - **Test set:** 2 fully-labeled sessions, **54 companies** total
   - `391e7c67-f611-41f7-899f-0a396e4b8d2f` — "Target IT Nord-Est e Lombardia 3-6M" (36 cases)
   - `84781682-98b6-442d-877f-a1d9b72a8b9e` — "MSP / cybersecurity / virtualizzazione, Liguria" (18 cases)
-- Related: [`KB-ENRICHMENT-BRIEF.md`](KB-ENRICHMENT-BRIEF.md), [`MODELS-EVALS.md`](MODELS-EVALS.md) (separate scopes), [`business-maps/TAXONOMY-SPINE.md`](business-maps/TAXONOMY-SPINE.md)
+- Related: [`KB-ENRICHMENT-BRIEF.md`](KB-ENRICHMENT-BRIEF.md), [`business-maps/TAXONOMY-SPINE.md`](business-maps/TAXONOMY-SPINE.md)
 
 ---
 
