@@ -133,6 +133,26 @@ const (
 	// the runtime value is overridable via the ma_parameter table (migration 038).
 	maCostPerFullEUR = 0.30
 
+	// Gated-search pipeline unit costs (migration 074), overridable via ma_parameter.
+	// maCostPerAddressEUR is the OpenAPI.it IT-address (identity-only) price used by
+	// the gate on the whole surface; the fastcrw scrape/search costs are per page /
+	// per search of domain resolution + evidence. ($0.001 ≈ €0.001 at this scale.)
+	maCostPerAddressEUR    = 0.01
+	maCostPerScrapePageEUR = 0.001
+	maCostPerSearchEUR     = 0.001
+
+	// Gated-search cost-estimate assumptions (Step 1). Per company on the surface the
+	// gate pays: one Address enrichment, up to maGateScrapePagesEst scraped/crawled
+	// pages (the crawl cap is the conservative blended upper bound), and
+	// maGateSearchesEst domain searches. survivor_rate_default is the expected
+	// keep+forse fraction that then pays Advanced; the projected-cost band spans
+	// maSurvivorRateLow..maSurvivorRateHigh.
+	maGateScrapePagesEst  = maCrawlMaxPages
+	maGateSearchesEst     = 2
+	maSurvivorRateDefault = 0.35
+	maSurvivorRateLow     = 0.25
+	maSurvivorRateHigh    = 0.50
+
 	// Valuation defaults (Fase 4), overridable via ma_parameter (sme_haircut_pct,
 	// ebitda_fallback_threshold). Haircut is a percent applied to sector multiples;
 	// below the EBITDA-margin threshold (or EBITDA<=0) valuation falls back to EV/Sales.

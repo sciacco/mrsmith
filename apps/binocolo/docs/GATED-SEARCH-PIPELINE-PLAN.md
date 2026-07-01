@@ -50,6 +50,8 @@ Address €0.01/azienda · Advanced €0.10/azienda · fastcrw scrape+crawl $0.0
 
 ## Step 1 — Parametri costo + Estimate v2
 
+> **STATO 2026-07-01: PARZIALE (staged).** FATTO: migrazione 074 (4 parametri), `maPricing` estesa + `loadPricing` li legge, funzione pura `projectGatedSearchCost` (formula a due parti) con test (`ma_gated_cost_test.go`, 3 casi verdi). DA FARE nello Step 3: cablare la proiezione nell'endpoint di estimate della submission gated + far girare il dry-run a costo address + imporre il cap. La funzione è già testata e pronta al wiring.
+
 **Migrazione 074** — nuovi parametri in `binocolo.ma_parameter` (oggi c'è solo `cost_advanced_eur`): `cost_address_eur` (0.01), `cost_scrape_page_eur` (0.001), `cost_search_eur` (0.001). `INSERT ... ON CONFLICT DO NOTHING`, idempotente. `loadPricing` (`ma_service.go:289`) li legge con fallback ai default compilati.
 
 **Estimate v2** — oggi `probeMASearchSurface` (`ma_service.go:4437`) stima `count × cost_advanced`. Nuova formula per la pipeline gated:

@@ -286,6 +286,13 @@ type maPricing struct {
 	SMEHaircutPct              float64
 	EBITDAFallbackPct          float64
 	ThesisFitHoldingHaircutPct float64
+	// Gated-search pipeline levers (migration 074): CostAddress = per-company gate
+	// enrichment, CostScrapePage/CostSearch = fastcrw unit costs, SurvivorRate =
+	// expected keep+forse fraction (0-1) used by the estimate's Advanced projection.
+	CostAddress    float64
+	CostScrapePage float64
+	CostSearch     float64
+	SurvivorRate   float64
 }
 
 // loadPricing reads the configurable pricing levers; missing/unreadable values
@@ -310,6 +317,10 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 		SMEHaircutPct:              maSMEHaircutPctDefault,
 		EBITDAFallbackPct:          maEBITDAFallbackPctDefault,
 		ThesisFitHoldingHaircutPct: maThesisFitHoldingHaircutPctDefault,
+		CostAddress:                maCostPerAddressEUR,
+		CostScrapePage:             maCostPerScrapePageEUR,
+		CostSearch:                 maCostPerSearchEUR,
+		SurvivorRate:               maSurvivorRateDefault,
 	}
 	values := make(map[string]string, len(params))
 	for _, param := range params {
@@ -336,6 +347,18 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 	if v, ok := paramFloat(values, "thesis_fit_holding_haircut_pct"); ok && v < 100 {
 		pricing.ThesisFitHoldingHaircutPct = v
 	}
+	if v, ok := paramFloat(values, "cost_address_eur"); ok {
+		pricing.CostAddress = v
+	}
+	if v, ok := paramFloat(values, "cost_scrape_page_eur"); ok {
+		pricing.CostScrapePage = v
+	}
+	if v, ok := paramFloat(values, "cost_search_eur"); ok {
+		pricing.CostSearch = v
+	}
+	if v, ok := paramFloat(values, "survivor_rate_default"); ok && v > 0 && v <= 1 {
+		pricing.SurvivorRate = v
+	}
 	return pricing
 }
 
@@ -349,6 +372,49 @@ func paramFloat(values map[string]string, key string) (float64, bool) {
 		return 0, false
 	}
 	return v, true
+}
+
+func round2(v float64) float64 { return math.Round(v*100) / 100 }
+
+// maGatedCostProjection is the up-front cost estimate for a gated-search submission
+// over surfaceCount companies. With "tutto automatico" spend control this projection
+// (shown before launch) plus the surface cap are the only cost guardrails. The gate
+// cost is CERTAIN — every company on the surface pays Address + scrape + search; the
+// Advanced cost is EXPECTED — only the keep+forse survivors pay it — so it is a band
+// around survivor_rate_default. Wired into the gated-search estimate + cap in Step 3.
+type maGatedCostProjection struct {
+	SurfaceCount        int     `json:"surfaceCount"`
+	GatePerCompanyEUR   float64 `json:"gatePerCompanyEur"`
+	GateCostEUR         float64 `json:"gateCostEur"`         // certain: N × per-company gate
+	SurvivorRate        float64 `json:"survivorRate"`        // mid (survivor_rate_default)
+	ExpectedAdvancedEUR float64 `json:"expectedAdvancedEur"` // N × survivorRate × advanced
+	TotalEUR            float64 `json:"totalEur"`            // gate + expected advanced (mid)
+	TotalLowEUR         float64 `json:"totalLowEur"`         // gate + N × survivorLow × advanced
+	TotalHighEUR        float64 `json:"totalHighEur"`        // gate + N × survivorHigh × advanced
+}
+
+// projectGatedSearchCost applies the two-part gated-search cost formula. Pure
+// function of the surface count and pricing so it is unit-tested in isolation.
+func projectGatedSearchCost(surfaceCount int, pricing maPricing) maGatedCostProjection {
+	if surfaceCount < 0 {
+		surfaceCount = 0
+	}
+	n := float64(surfaceCount)
+	gatePerCompany := pricing.CostAddress +
+		float64(maGateScrapePagesEst)*pricing.CostScrapePage +
+		float64(maGateSearchesEst)*pricing.CostSearch
+	gateCost := n * gatePerCompany
+	advanced := func(rate float64) float64 { return n * rate * pricing.CostAdvanced }
+	return maGatedCostProjection{
+		SurfaceCount:        surfaceCount,
+		GatePerCompanyEUR:   round2(gatePerCompany),
+		GateCostEUR:         round2(gateCost),
+		SurvivorRate:        pricing.SurvivorRate,
+		ExpectedAdvancedEUR: round2(advanced(pricing.SurvivorRate)),
+		TotalEUR:            round2(gateCost + advanced(pricing.SurvivorRate)),
+		TotalLowEUR:         round2(gateCost + advanced(maSurvivorRateLow)),
+		TotalHighEUR:        round2(gateCost + advanced(maSurvivorRateHigh)),
+	}
 }
 
 // decorateMACost attaches the active enrichment budget and unit price so the UI
