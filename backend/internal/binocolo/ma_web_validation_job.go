@@ -583,16 +583,19 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 	if nameMatch != nil && chosen != nil && (chosenRead || nameMatch.Domain == chosen.Domain) {
 		return nameMatch, markdownByDomain[nameMatch.Domain]
 	}
-	// Recall-safe brand-label trust: when the score-top domain's OWN site could not be
-	// scraped at all (blocked / 404 / renderer failure) but its label matches the
-	// company name (adawen.it for ADAWEN) and it ranked with high confidence, resolve
-	// it and let classification run on search snippets — the pre-scrape behaviour.
-	// Wrong-entity risk is low because the domain label IS the brand. Guarded on
-	// !chosenRead: a brand site that DID render without confirming identity stays
-	// rejected below (that unconfirmed render is the genuine wrong-entity signal).
-	if chosen != nil && !chosenRead && chosen.Confidence == "alta" &&
-		domainLooksCompanyOwned(chosen.Domain, nameTokens) {
-		return chosen, ""
+	// Recall-safe brand-label trust: when the score-top candidate's domain LABEL
+	// matches the company name (adawen.it for ADAWEN) and it ranked with high
+	// confidence, resolve it even though on-page identity wasn't confirmed, and let
+	// classification run on whatever page/snippets we have (pre-scrape behaviour).
+	// This covers both the site that never rendered (blocked / 404 / renderer error)
+	// and the site that rendered thin or with a mistokenised brand (edisoftware.it ->
+	// "edi"+"software", so name-match can't fire). The one case we still refuse: a
+	// page that DID render and advertises a DIFFERENT P.IVA — that foreign identifier
+	// is the genuine wrong-entity signal (greenteam.it), so leave it for review.
+	if chosen != nil && chosen.Confidence == "alta" && domainLooksCompanyOwned(chosen.Domain, nameTokens) {
+		if !(chosenRead && pageHasForeignIdentifier(markdownByDomain[chosen.Domain])) {
+			return chosen, markdownByDomain[chosen.Domain]
+		}
 	}
 	// Aggressive: an available identifier absent from every page we actually read
 	// means the resolved site is a different entity -> reject.
@@ -654,6 +657,20 @@ func pageContainsIdentifier(markdown, identifier string) bool {
 		return false
 	}
 	return strings.Contains(compactAlnum(strings.ToLower(markdown)), identifier)
+}
+
+// foreignIdentifierRe matches a standalone 11-digit run — the shape of an Italian
+// P.IVA. It is evaluated on a page only AFTER the target's own P.IVA/CF failed to
+// match, so any hit is by definition a DIFFERENT entity's identifier.
+var foreignIdentifierRe = regexp.MustCompile(`\b\d{11}\b`)
+
+// pageHasForeignIdentifier reports whether the markdown advertises a P.IVA that is
+// not the target's — the wrong-entity signal that withholds brand-label trust from
+// an otherwise brand-compatible rendered page (e.g. greenteam.it carrying someone
+// else's P.IVA). Callers use it only past the target-identity short-circuit, so a
+// match here is a foreign identifier, never the target's.
+func pageHasForeignIdentifier(markdown string) bool {
+	return foreignIdentifierRe.MatchString(markdown)
 }
 
 // pageContainsCompanyName checks the page carries the company's distinctive name

@@ -56,6 +56,13 @@ type SectorModelCompareRequest struct {
 	// but NOT the raw snippets. Cached per domain across requests to bound Brave cost. The
 	// snippets are re-fetched now, so they may have drifted since the original validation.
 	IncludeSnippets bool `json:"includeSnippets,omitempty"`
+	// PromptText / PromptID override the analyst SYSTEM PROMPT for this run, so a prompt
+	// revision can be A/B'd on labeled data with the model held fixed (mirror of how
+	// ModelIDs A/Bs the model with the prompt fixed). PromptText is used verbatim (no DB
+	// row needed — draft a prompt and score it before migrating it); PromptID resolves a
+	// stored prompt by id; empty falls back to the default analyst prompt. PromptText wins.
+	PromptText string `json:"promptText,omitempty"`
+	PromptID   string `json:"promptId,omitempty"`
 }
 
 // SectorModelTokens is the summed token usage across all replayed calls for one model.
@@ -145,10 +152,18 @@ func (s *maService) compareSectorEvalModels(ctx context.Context, req SectorModel
 		return SectorModelCompareReport{}, fmt.Errorf("%w: sessionIds", errMAStrategyInvalid)
 	}
 
-	// One prompt for every model — only the model varies.
-	prompt, err := s.llmp.ResolvePrompt(ctx, maModelScopeCandidateMatchAnalyst, "")
-	if err != nil {
-		return SectorModelCompareReport{}, llmConfigError(err)
+	// One prompt for every model — only the model varies (unless a prompt override is
+	// given, to A/B a prompt revision with the model fixed).
+	var prompt llm.Prompt
+	switch {
+	case strings.TrimSpace(req.PromptText) != "":
+		prompt = llm.Prompt{Prompt: req.PromptText}
+	default:
+		p, err := s.llmp.ResolvePrompt(ctx, maModelScopeCandidateMatchAnalyst, req.PromptID)
+		if err != nil {
+			return SectorModelCompareReport{}, llmConfigError(err)
+		}
+		prompt = p
 	}
 
 	models, err := s.resolveCompareModels(ctx, req.ModelIDs)
