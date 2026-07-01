@@ -554,6 +554,7 @@ export interface MATarget {
   adjustments?: MATargetAdjustment[];
   deep?: MADeepAnalysis;
   webValidation?: MAWebValidation;
+  enrichmentLevel?: string;
   vendorPayload?: any;
 }
 

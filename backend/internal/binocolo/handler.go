@@ -122,6 +122,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("DELETE /binocolo/v1/ma/sessions/{id}", h.handleDeleteMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/purge", h.handlePurgeMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/rating", h.handleRateMATarget)
+	handle("POST /binocolo/v1/ma/sessions/{id}/associate-domain", h.handleAssociateMATargetDomain)
 	handle("GET /binocolo/v1/ma/sessions/{id}/sector-eval", h.handleGetSectorEval)
 	handle("PUT /binocolo/v1/ma/sessions/{id}/sector-eval/label", h.handleSetSectorEvalLabel)
 	handle("PUT /binocolo/v1/ma/sessions/{id}/web-validation", h.handleUpsertMAWebValidation)
@@ -135,6 +136,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/deep/regenerate-briefs", h.handleRegenerateMADeepBriefs)
 	handle("GET /binocolo/v1/companies/{vat}/dossier", h.handleGetCompanyDossier)
 	handle("POST /binocolo/v1/companies/{vat}/dossier", h.handleCreateCompanyDossier)
+	handle("POST /binocolo/v1/test/gated-search", h.handleTestGatedSearch)
 	handle("POST /binocolo/v1/test/domain-resolution", h.handleTestDomainResolution)
 	handle("POST /binocolo/v1/test/sector-classification", h.handleTestSectorClassification)
 	handle("POST /binocolo/v1/test/sector-eval-models", h.handleCompareSectorEvalModels)
@@ -336,6 +338,32 @@ func (h *Handler) handleRateMATarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleAssociateMATargetDomain is the manual-review remedy: the operator supplies an
+// official domain for a company the gate held as domain-unresolved. It re-gates that one
+// company with the forced domain (async — crawl can exceed the write timeout) and, if it
+// now survives, enriches + re-scores it. Returns the session in 'running'; the UI polls.
+func (h *Handler) handleAssociateMATargetDomain(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireBrave(w) || !h.requireOpenAPIIT(w) {
+		return
+	}
+	var body MAAssociateDomainRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	detail, err := h.ma.associateMATargetDomain(r.Context(), id, body.CompanyKey, body.Domain, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_target_associate_domain", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusAccepted, detail)
 }
 
 // handleGetSectorEval returns the UC2 sector-eval report for a session: each company
@@ -645,9 +673,35 @@ func (h *Handler) handleGatedSearchMASession(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	detail, err := h.ma.enqueueGatedSearch(r.Context(), id, body, subject, email)
+	detail, err := h.ma.enqueueGatedSearch(r.Context(), id, body, subject, email, false)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_gated_search", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusAccepted, detail)
+}
+
+// handleTestGatedSearch runs the gated-search funnel INLINE (off the shared queue) on an
+// existing session that already has a fresh estimate — the developer test surface for the
+// end-to-end pipeline. Same validation as the real endpoint (estimate freshness + surface
+// cap); returns 202 while a detached goroutine runs address→gate→advanced+score. The test
+// page polls GET .../sessions/{id} and reads the keep/forse/salta buckets off the targets.
+func (h *Handler) handleTestGatedSearch(w http.ResponseWriter, r *http.Request) {
+	var body MAGatedSearchTestRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	sessionID := strings.TrimSpace(body.SessionID)
+	if sessionID == "" {
+		httputil.Error(w, http.StatusBadRequest, "missing_session_id")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	req := MAExecuteSessionRequest{StrategyType: body.StrategyType, Limit: body.Limit}
+	detail, err := h.ma.enqueueGatedSearch(r.Context(), sessionID, req, subject, email, true)
+	if err != nil {
+		h.maFailure(w, r, "ma_session_gated_search", err, "session_id", sessionID)
 		return
 	}
 	httputil.JSON(w, http.StatusAccepted, detail)

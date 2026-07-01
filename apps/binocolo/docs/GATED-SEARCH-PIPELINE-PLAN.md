@@ -147,6 +147,15 @@ Approccio: **misurare col gate**. Su una sessione reale, allargare progressivame
 
 ---
 
+## Pagina di test (validazione end-to-end)
+
+> **STATO 2026-07-01: IMPLEMENTATA (staged).** Superficie di test per l'operatore/dev, **fuori** dalla UI utente (che è feature separata futura). Modello = tab `sector-eval` esistente.
+
+- **Backend**: `POST /binocolo/v1/test/gated-search` (`handleTestGatedSearch`) → `enqueueGatedSearch(..., inline=true)`. La modalità **inline** (come la web-validation) fa girare l'intero funnel in un goroutine staccato in-process, **senza riga `ma_job`** → niente furto-lease sulla coda condivisa durante il test. Guardia: rifiuta se la sessione è già `running` (no doppia spesa inline). Richiede sessione con stima fresca (stessa validazione dell'endpoint reale + cap).
+- **Frontend**: nuova tab **"Gated search"** in `apps/binocolo/src/pages/TestPage.tsx` — picker sessione + limite opzionale → "Esegui gated search (inline)"; `useQuery` con `refetchInterval` 2.5s mentre `session.status==='running'`; riepilogo bucket (keep/forse/scarta/in-attesa/scorati) + **stima costo** (Address su tutta la superficie + Advanced sui sopravvissuti, gate scrape a parte) + tabella per-azienda (bucket, score, match, enrichment_level, dominio, azione gate). `MATarget.enrichmentLevel` aggiunto ai tipi FE.
+- **Verifica**: build/vet/test BE verdi; `tsc --noEmit` FE verde; smoke di rendering (dev server già attivo, reuse) — tab presente, picker popolato con sessioni reali, bottoni disabilitati senza sessione (nessuna spesa triggerata).
+- **Uso (human)**: applicare 073/074/075, riavviare il backend (il binario in esecuzione è precedente a queste modifiche), aprire `/test` → tab **Gated search**, scegliere una sessione `completed`/con stima, lanciare inline su superficie piccola e osservare stadi/bucket/costo. Spesa reale (Address+scrape+Advanced): iniziare con poche decine.
+
 ## Recall-safety a scala (trasversale)
 
 `salta` è l'unico bucket che nasconde per sempre un'azienda → deve restare ad **alta precisione**. Invarianti:

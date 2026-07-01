@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 // maGatedSearchJobPayload is the gated-search job's self-contained args, validated
@@ -19,10 +21,11 @@ type maGatedSearchJobPayload struct {
 
 // maGatedScoreStats records what the enrich_score stage did, for the trace.
 type maGatedScoreStats struct {
-	Enriched int // survivors that paid IT-advanced this pass
-	Reused   int // survivors already advanced on a prior pass (no re-charge)
-	Skipped  int // salta (reject) targets kept identity-only, never charged
-	Unscored int // survivors whose advanced fetch failed → left as forse/identity
+	Enriched     int // survivors that paid IT-advanced this pass
+	Reused       int // survivors already advanced on a prior pass (no re-charge)
+	Skipped      int // salta (reject) targets kept identity-only, never charged
+	ManualReview int // domain-unresolved targets held for manual domain, never charged
+	Unscored     int // survivors whose advanced fetch failed → left as forse/identity
 }
 
 // enqueueGatedSearch is the synchronous half of the gated-search flow. It runs the
@@ -31,7 +34,7 @@ type maGatedScoreStats struct {
 // hard governor, because the gate pays ~€0.02/company across the whole surface. The
 // heavy multi-stage work runs in the worker (runGatedSearchJob), so the request never
 // times out. Coexists with execute as a distinct mode (one in-flight job per type).
-func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string) (MASessionDetail, error) {
+func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string, inline bool) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
@@ -85,12 +88,28 @@ func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, re
 	if len(detail.Estimates) == 0 || estimatedCount == 0 {
 		return MASessionDetail{}, fmt.Errorf("%w: estimate required", errMAStrategyInvalid)
 	}
-	limit := normalizeMASearchLimit(req.Limit)
-	if limit != strategyVersion.Strategy.SearchLimit {
-		return MASessionDetail{}, fmt.Errorf("%w: stale estimate", errMAStrategyInvalid)
-	}
-	if !estimatesMatchSearchLimit(detail.Estimates, strategyType, limit) {
-		return MASessionDetail{}, fmt.Errorf("%w: stale estimate", errMAStrategyInvalid)
+	// The real (queued) endpoint enforces execute's "run exactly what you estimated"
+	// contract: the confirmed limit must equal the pinned SearchLimit and match every
+	// per-combo estimate row. The test/inline path relaxes it — it runs the funnel on an
+	// EXISTING session's estimate, defaulting the limit to the pinned SearchLimit (so the
+	// dry-run cache matches) and letting the caller sub-sample a smaller, cheaper surface.
+	var limit int
+	if inline {
+		limit = normalizeMASearchLimit(req.Limit)
+		if req.Limit <= 0 {
+			limit = strategyVersion.Strategy.SearchLimit
+			if limit <= 0 {
+				limit = maDefaultSearchLimit
+			}
+		}
+	} else {
+		limit = normalizeMASearchLimit(req.Limit)
+		if limit != strategyVersion.Strategy.SearchLimit {
+			return MASessionDetail{}, fmt.Errorf("%w: stale estimate", errMAStrategyInvalid)
+		}
+		if !estimatesMatchSearchLimit(detail.Estimates, strategyType, limit) {
+			return MASessionDetail{}, fmt.Errorf("%w: stale estimate", errMAStrategyInvalid)
+		}
 	}
 	// Surface cap: the admitted surface is min(limit, available). Reject up front when
 	// it exceeds the cap — the gate spends across the WHOLE surface, so this is the
@@ -108,6 +127,39 @@ func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, re
 	if err != nil {
 		return MASessionDetail{}, fmt.Errorf("marshal ma gated search payload: %w", err)
 	}
+
+	// Inline (dev/test only, off-queue): the shared ma_job queue can be claimed by a
+	// foreign worker running stale code, which on this paid pipeline means double spend.
+	// Inline runs the whole funnel in THIS process via a detached goroutine and writes no
+	// ma_job row — nothing to steal. No durability/resume; used by the test page. Guard on
+	// session status so a re-trigger while a run is in flight cannot double-charge.
+	if inline {
+		if detail.Session.Status == maSessionStatusRunning {
+			return MASessionDetail{}, fmt.Errorf("%w: gated search already running", errMAStrategyInvalid)
+		}
+		if err := s.store.MarkMASessionExecuting(ctx, sessionID); err != nil {
+			return MASessionDetail{}, err
+		}
+		job := maJob{
+			JobType:           maJobTypeGatedSearch,
+			SessionID:         sessionID,
+			StrategyVersionID: strategyVersion.ID,
+			Status:            maJobStatusRunning,
+			Payload:           payload,
+			CreatedBySubject:  subject,
+			CreatedByEmail:    email,
+		}
+		go func() {
+			bg := context.WithoutCancel(ctx)
+			if _, err := s.runGatedSearchJob(bg, job); err != nil {
+				logging.FromContext(bg).Error("binocolo inline gated search failed",
+					"component", "binocolo", "operation", "ma_gated_search_inline",
+					"session_id", sessionID, "error", err)
+			}
+		}()
+		return s.getSession(ctx, sessionID)
+	}
+
 	_, created, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
 		JobType:           maJobTypeGatedSearch,
 		SessionID:         sessionID,
@@ -298,7 +350,7 @@ func (s *maService) gatedSearchJobWork(ctx context.Context, job maJob) error {
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_gated_enrich_completed",
 		Status:    maTraceEventSucceeded,
-		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "run_id": runID, "enriched": stats.Enriched, "reused": stats.Reused, "salta": stats.Skipped, "unscored": stats.Unscored, "scored": scoredCount}),
+		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "run_id": runID, "enriched": stats.Enriched, "reused": stats.Reused, "salta": stats.Skipped, "manual_review": stats.ManualReview, "unscored": stats.Unscored, "scored": scoredCount}),
 	})
 
 	// ---- Stage: ready ----
@@ -316,6 +368,8 @@ func (s *maService) gatedSearchJobWork(ctx context.Context, job maJob) error {
 // enrichAndScoreSurvivors is the isolated, idempotent enrich+score step. Given the
 // session's persisted (address-level) targets, each carrying a gate final_action, it:
 //   - keeps salta (reject) targets identity-only, never charged;
+//   - keeps manual_review (domain-unresolved) targets identity-only, never auto-charged —
+//     they await a manually associated domain before they can be processed;
 //   - for keep/forse survivors not yet advanced, fetches IT-advanced by VAT (€0.10),
 //     persists the payload immediately (MarkMATargetAdvancedEnriched) so a re-run skips
 //     it, and re-parses financials; a per-company fetch failure is tolerated (that
@@ -331,11 +385,20 @@ func (s *maService) enrichAndScoreSurvivors(ctx context.Context, targets []MATar
 
 	plan := planGatedEnrichment(targets)
 	var toScore []MATarget // advanced survivors, ready to score
-	var carried []MATarget // salta + un-enriched forse, kept identity-only
-	stats := maGatedScoreStats{Skipped: len(plan.Carry), Reused: len(plan.Reuse)}
+	var carried []MATarget // salta + manual_review + un-enriched forse, kept identity-only
+	stats := maGatedScoreStats{Skipped: len(plan.Carry), ManualReview: len(plan.ManualReview), Reused: len(plan.Reuse)}
 
 	// salta (reject): identity-only, never charged.
 	for _, target := range plan.Carry {
+		target.SessionID = sessionID
+		target.RunID = runID
+		target.EnrichmentLevel = maEnrichmentAddress
+		carried = append(carried, target)
+	}
+	// manual_review (domain unresolved): identity-only, held for manual domain association.
+	// Same spend safety as reject (never auto-charged), kept distinct only for telemetry
+	// and so the UI can surface them as actionable (associate a domain → auto-process).
+	for _, target := range plan.ManualReview {
 		target.SessionID = sessionID
 		target.RunID = runID
 		target.EnrichmentLevel = maEnrichmentAddress
@@ -381,28 +444,34 @@ func (s *maService) enrichAndScoreSurvivors(ctx context.Context, targets []MATar
 }
 
 // gatedEnrichPlan is the money-critical partition of a gated target set BEFORE any paid
-// Advanced fetch: which survivors pay €0.10 now, which are reused for free, and which
-// are never charged. Kept pure (no network/store) so the spend rules are unit-tested.
+// Advanced fetch: which survivors pay €0.10 now, which are reused for free, and which are
+// never charged. Kept pure (no network/store) so the spend rules are unit-tested.
 type gatedEnrichPlan struct {
-	ToEnrich []MATarget // keep/forse survivors not yet advanced → pay Advanced now
-	Reuse    []MATarget // survivors already advanced → re-scored free, never re-charged
-	Carry    []MATarget // salta (reject) → identity-only, never charged
+	ToEnrich     []MATarget // keep/forse survivors not yet advanced → pay Advanced now
+	Reuse        []MATarget // survivors already advanced → re-scored free, never re-charged
+	Carry        []MATarget // scarta (reject) → identity-only, never charged
+	ManualReview []MATarget // domain unresolved → held for manual domain, never auto-charged
 }
 
 // planGatedEnrichment classifies each target by gate bucket and prior enrichment. The
 // invariants it enforces are the whole point of the funnel: reject never pays Advanced;
-// an already-advanced survivor is never re-charged; a missing gate verdict is a forse
-// (survivor), never dropped.
+// a domain-unresolved company is HELD for manual review (never auto-charged, awaiting a
+// manually associated domain); an already-advanced survivor is never re-charged; a
+// missing gate verdict is a forse (survivor), never dropped.
 func planGatedEnrichment(targets []MATarget) gatedEnrichPlan {
 	plan := gatedEnrichPlan{}
 	for _, target := range targets {
-		switch {
-		case gatedTargetBucket(target) == maGatedBucketReject:
+		switch gatedTargetBucket(target) {
+		case maGatedBucketReject:
 			plan.Carry = append(plan.Carry, target)
-		case target.EnrichmentLevel == maEnrichmentAdvanced:
-			plan.Reuse = append(plan.Reuse, target)
+		case maGatedBucketManualReview:
+			plan.ManualReview = append(plan.ManualReview, target)
 		default:
-			plan.ToEnrich = append(plan.ToEnrich, target)
+			if target.EnrichmentLevel == maEnrichmentAdvanced {
+				plan.Reuse = append(plan.Reuse, target)
+			} else {
+				plan.ToEnrich = append(plan.ToEnrich, target)
+			}
 		}
 	}
 	return plan
@@ -460,12 +529,285 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 	return enriched, nil
 }
 
-// gatedTargetBucket maps a target's gate verdict onto keep/forse/salta. A missing
-// web-validation (gate did not decide) is recall-safe: it counts as forse, a survivor,
-// never salta.
+// gatedTargetBucket maps a target's gate verdict onto the gated funnel's buckets. It
+// layers a manual_review carve-out on top of sectorActionToBucket: a company whose
+// official domain could not be resolved (needs_domain_review / domain_unresolved) is NOT
+// an auto-processed forse — it is HELD for manual domain association and never pays
+// Advanced. This is the decision that stops the domain-unresolved false-positive spend
+// (off-thesis companies leaking into Advanced only because their site wasn't found). A
+// missing web-validation (gate did not decide at all) stays a recall-safe forse.
 func gatedTargetBucket(target MATarget) string {
 	if target.WebValidation == nil {
 		return maGatedBucketForse
 	}
+	if target.WebValidation.FinalAction == "needs_domain_review" ||
+		target.WebValidation.WebValidationState == "domain_unresolved" {
+		return maGatedBucketManualReview
+	}
 	return sectorActionToBucket(target.WebValidation.FinalAction)
+}
+
+// associateMATargetDomain is the manual-review remedy. For a company the gate could not
+// resolve (manual_review / domain_unresolved), the operator supplies an official domain;
+// this re-gates THAT one company with the forced domain and, if it now survives (keep/forse),
+// enriches it and RE-SCORES the whole advanced survivor set (scoring is set-relative). The
+// heavy work (crawl + classify + one Advanced fetch) runs off the request path in a detached
+// goroutine — the crawl can exceed the HTTP write timeout — so the caller gets the session
+// back in 'running' and polls. It validates synchronously so bad input fails fast.
+func (s *maService) associateMATargetDomain(ctx context.Context, sessionID, companyKey, domain string, subject, email string) (MASessionDetail, error) {
+	if s.store == nil {
+		return MASessionDetail{}, errMAStoreUnavailable
+	}
+	if s.openapiit == nil {
+		return MASessionDetail{}, errMAOpenAPIITUnavailable
+	}
+	if s.brave == nil {
+		return MASessionDetail{}, errMABraveUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MASessionDetail{}, fmt.Errorf("%w: company key", errMAStrategyInvalid)
+	}
+	if _, ok := normalizeDomain(domain); !ok {
+		return MASessionDetail{}, fmt.Errorf("%w: domain", errMAStrategyInvalid)
+	}
+	detail, err := s.store.GetMASession(ctx, sessionID)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	if err := ensureMASessionOperational(detail.Session); err != nil {
+		return MASessionDetail{}, err
+	}
+	if detail.Session.Status == maSessionStatusRunning {
+		return MASessionDetail{}, fmt.Errorf("%w: session busy", errMAStrategyInvalid)
+	}
+	if detail.Strategy == nil {
+		return MASessionDetail{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
+	}
+	runID := ""
+	found := false
+	for _, target := range detail.Targets {
+		if normalizeMACompanyKey(target.CompanyKey) == companyKey {
+			runID = target.RunID
+			found = true
+			break
+		}
+	}
+	if !found {
+		return MASessionDetail{}, fmt.Errorf("%w: target not found", errMAStrategyInvalid)
+	}
+	if runID == "" {
+		return MASessionDetail{}, fmt.Errorf("%w: target has no run", errMAStrategyInvalid)
+	}
+
+	if err := s.store.MarkMASessionExecuting(ctx, sessionID); err != nil {
+		return MASessionDetail{}, err
+	}
+	go func() {
+		bg := context.WithoutCancel(ctx)
+		if err := s.runAssociateDomainJob(bg, sessionID, companyKey, domain, runID, subject, email); err != nil {
+			logging.FromContext(bg).Error("binocolo associate domain failed",
+				"component", "binocolo", "operation", "ma_target_associate_domain",
+				"session_id", sessionID, "company_key", companyKey, "error", err)
+		}
+	}()
+	return s.getSession(ctx, sessionID)
+}
+
+// runAssociateDomainJob owns the operation trace for a manual domain association, so the
+// paid Advanced fetch + LLM analyst tokens are audited like every other spend path.
+func (s *maService) runAssociateDomainJob(ctx context.Context, sessionID, companyKey, domain, runID, subject, email string) error {
+	trace, err := s.startTrace(ctx, maTraceStart{
+		Operation:        "ma_target_associate_domain",
+		SessionID:        sessionID,
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	})
+	if err != nil {
+		s.releaseAssociateSession(ctx, sessionID, runID)
+		return err
+	}
+	ctx = withMATrace(ctx, trace)
+	if workErr := s.associateDomainWork(ctx, sessionID, companyKey, domain, runID, subject, email); workErr != nil {
+		_ = s.completeTrace(ctx, maTraceComplete{Status: maTraceStatusFailed, ErrorMessage: workErr.Error()})
+		return workErr
+	}
+	_ = s.completeTrace(ctx, maTraceComplete{Status: maTraceStatusSucceeded, HTTPStatus: http.StatusOK})
+	return nil
+}
+
+// associateDomainWork re-gates one company with the forced domain, then enriches+re-scores.
+// On any early failure it releases the session back to 'completed' (the prior run + targets
+// are untouched); the success path completes the run itself inside enrichAssociatedAndRescore.
+func (s *maService) associateDomainWork(ctx context.Context, sessionID, companyKey, domain, runID, subject, email string) (err error) {
+	success := false
+	defer func() {
+		if !success {
+			s.releaseAssociateSession(ctx, sessionID, runID)
+		}
+	}()
+
+	detail, err := s.store.GetMASession(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if detail.Strategy == nil {
+		return fmt.Errorf("%w: strategy", errMAStrategyInvalid)
+	}
+	// Canonicalize the current strategy once (deterministic, no spend) so the gate
+	// perimeter and scoring use the same curated AtecoCandidates as the run.
+	strategy, err := s.canonicalizeMAStrategyAteco(ctx, detail.Strategy.Strategy, nil, false)
+	if err != nil {
+		return err
+	}
+	var target *MATarget
+	for i := range detail.Targets {
+		if normalizeMACompanyKey(detail.Targets[i].CompanyKey) == companyKey {
+			target = &detail.Targets[i]
+			break
+		}
+	}
+	if target == nil {
+		return fmt.Errorf("%w: target not found", errMAStrategyInvalid)
+	}
+
+	// Re-gate this one company with the forced domain.
+	payload := normalizeMAWebValidationPayload(MAWebValidationEnrichRequest{Limit: 1})
+	inputHash := maWebValidationInputHash(*target, strategy, payload)
+	body, err := s.buildMAWebValidationForDomain(ctx, *target, strategy, inputHash, payload, domain, subject, email)
+	if err != nil {
+		return err
+	}
+	if _, err := s.upsertTargetWebValidation(ctx, sessionID, body, subject, email); err != nil {
+		return err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_target_domain_associated",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "company_key": companyKey, "final_action": body.FinalDecision.FinalAction}),
+	})
+
+	// Reload so the target carries the fresh verdict, then enrich (this company only) +
+	// re-score the survivor set.
+	detail, err = s.store.GetMASession(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if err := s.enrichAssociatedAndRescore(ctx, detail.Targets, strategy, sessionID, runID, companyKey); err != nil {
+		return err
+	}
+	success = true
+	return nil
+}
+
+// releaseAssociateSession flips a session held in 'running' by a failed association back to
+// 'completed', re-completing the (already-completed) run with its current scored count. The
+// prior results are intact, so 'completed' is the honest state — not 'failed'.
+func (s *maService) releaseAssociateSession(ctx context.Context, sessionID, runID string) {
+	detail, err := s.store.GetMASession(ctx, sessionID)
+	if err != nil {
+		return
+	}
+	scored := 0
+	for _, target := range detail.Targets {
+		if target.EnrichmentLevel == maEnrichmentAdvanced {
+			scored++
+		}
+	}
+	_ = s.store.CompleteMAExecutionRun(ctx, runID, maRunStatusCompleted, scored, "")
+}
+
+// domainAssociationPlan partitions targets after a manual domain association. Only the
+// associated company may pay Advanced this pass; existing advanced survivors are re-scored
+// for free and everything else is carried untouched. Kept pure so the tight spend contract
+// ("at most ONE company pays") is unit-tested.
+type domainAssociationPlan struct {
+	Enrich *MATarget  // the associated survivor to pay Advanced now (nil if none)
+	Reuse  []MATarget // already-advanced survivors → re-scored for free, never re-charged
+	Carry  []MATarget // non-survivors + un-enriched non-associated forse → identity-only, untouched
+}
+
+// planDomainAssociationEnrich classifies the target set for the association remedy. The
+// invariant: the ONLY target that can newly pay Advanced is the just-associated company,
+// and only if it now survives (keep/forse) and isn't already advanced. Every other target
+// is either re-scored for free (already advanced) or left untouched — so a per-company
+// action never fans out spend across lingering un-enriched survivors.
+func planDomainAssociationEnrich(targets []MATarget, companyKey string) domainAssociationPlan {
+	plan := domainAssociationPlan{}
+	for _, target := range targets {
+		associated := normalizeMACompanyKey(target.CompanyKey) == companyKey
+		bucket := gatedTargetBucket(target)
+		survivor := bucket == maGatedBucketKeep || bucket == maGatedBucketForse
+		switch {
+		case associated && survivor && target.EnrichmentLevel != maEnrichmentAdvanced:
+			t := target
+			plan.Enrich = &t
+		case survivor && target.EnrichmentLevel == maEnrichmentAdvanced:
+			plan.Reuse = append(plan.Reuse, target)
+		default:
+			plan.Carry = append(plan.Carry, target)
+		}
+	}
+	return plan
+}
+
+// enrichAssociatedAndRescore executes the association plan: pay Advanced for the associated
+// survivor (persisting immediately, tolerating a fetch failure), re-score the advanced
+// survivor set together (set-relative), carry the rest identity-only, and complete the run.
+func (s *maService) enrichAssociatedAndRescore(ctx context.Context, targets []MATarget, strategy MAStrategySpec, sessionID, runID, companyKey string) error {
+	pricing := s.loadPricing(ctx)
+	scoringParams := maScoringParams{ThesisFitHoldingFactor: 1 - pricing.ThesisFitHoldingHaircutPct/100}
+	plan := planDomainAssociationEnrich(targets, companyKey)
+
+	var toScore, carried []MATarget
+	for _, target := range plan.Reuse {
+		target.SessionID = sessionID
+		target.RunID = runID
+		toScore = append(toScore, target)
+	}
+	for _, target := range plan.Carry {
+		target.SessionID = sessionID
+		target.RunID = runID
+		target.EnrichmentLevel = maEnrichmentAddress
+		carried = append(carried, target)
+	}
+	if plan.Enrich != nil {
+		target := *plan.Enrich
+		target.SessionID = sessionID
+		target.RunID = runID
+		enriched, err := s.enrichTargetAdvanced(ctx, target)
+		if err != nil {
+			// Tolerate: the associated company stays identity-only, never dropped.
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType: "ma_gated_enrich_target_failed",
+				Status:    maTraceEventFailed,
+				Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "company": target.CompanyName, "vat": target.VATCode}),
+				Error:     err.Error(),
+			})
+			target.EnrichmentLevel = maEnrichmentAddress
+			carried = append(carried, target)
+		} else {
+			if err := s.store.MarkMATargetAdvancedEnriched(ctx, target.ID, enriched.VendorPayload); err != nil {
+				return err
+			}
+			toScore = append(toScore, enriched)
+		}
+	}
+
+	scored := scoreMATargetsV2(toScore, strategy, scoringParams, s.now())
+	merged := make([]MATarget, 0, len(scored)+len(carried))
+	merged = append(merged, scored...)
+	merged = append(merged, carried...)
+	if err := s.store.ReplaceMATargets(ctx, sessionID, runID, merged); err != nil {
+		return err
+	}
+	if err := s.store.CompleteMAExecutionRun(ctx, runID, maRunStatusCompleted, len(scored), ""); err != nil {
+		return err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_gated_enrich_completed",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "run_id": runID, "scored": len(scored), "reason": "domain_association"}),
+	})
+	return nil
 }

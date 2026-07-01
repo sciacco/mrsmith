@@ -62,13 +62,14 @@ type DomainResolutionForm = typeof defaultDomainResolutionForm;
 type DomainResolutionField = keyof DomainResolutionForm;
 type KeywordEvidenceForm = typeof defaultKeywordEvidenceForm;
 type KeywordEvidenceField = keyof Omit<KeywordEvidenceForm, 'rank'>;
-type TestTab = 'company' | 'pipeline' | 'classification' | 'sector-eval' | 'domain' | 'keyword' | 'maintenance';
+type TestTab = 'company' | 'pipeline' | 'classification' | 'sector-eval' | 'gated' | 'domain' | 'keyword' | 'maintenance';
 
 const testTabs = [
   { id: 'company', label: 'Company search', icon: 'database' },
   { id: 'pipeline', label: 'Evidence pipeline', icon: 'route' },
   { id: 'classification', label: 'Classificazione settore', icon: 'sparkles' },
   { id: 'sector-eval', label: 'Sector eval', icon: 'clipboard-check' },
+  { id: 'gated', label: 'Gated search', icon: 'filter' },
   { id: 'domain', label: 'Domain resolver', icon: 'network' },
   { id: 'keyword', label: 'Keyword evidence', icon: 'search' },
   { id: 'maintenance', label: 'Manutenzione', icon: 'settings' },
@@ -103,6 +104,29 @@ const renderEvalPrediction = (
   ) : (
     <span className={styles.muted}>—</span>
   );
+
+// Gated-search funnel bucket for a target, mirroring the backend gatedTargetBucket:
+// confirm→keep, reject→scarta, domain-unresolved→manual_review (HELD, never auto-charged),
+// anything else→forse. No gate verdict yet (address stage still running, or gate not
+// reached) → pending. Survivors that pay Advanced are keep+forse only.
+type GatedBucket = 'keep' | 'forse' | 'manual_review' | 'scarta' | 'pending';
+const gatedBucketOf = (target: MATarget): GatedBucket => {
+  const action = target.webValidation?.finalAction;
+  if (!action) return 'pending';
+  if (action === 'confirm') return 'keep';
+  if (action === 'reject') return 'scarta';
+  if (action === 'needs_domain_review' || target.webValidation?.webValidationState === 'domain_unresolved') {
+    return 'manual_review';
+  }
+  return 'forse';
+};
+const gatedBucketLabels: Record<GatedBucket, string> = {
+  keep: 'Keep',
+  forse: 'Forse',
+  manual_review: 'Manual review',
+  scarta: 'Scarta',
+  pending: 'In attesa',
+};
 
 // Domain-resolution outcome cell: resolved (green) vs the two failure modes (amber).
 // acceptance_fail also shows the best candidate that the gate rejected, so the operator
@@ -424,6 +448,10 @@ export function TestPage() {
   const [pipelineTargetId, setPipelineTargetId] = useState('');
   const [pipelineAnalyzeWithLLM, setPipelineAnalyzeWithLLM] = useState(true);
   const [evalSessionId, setEvalSessionId] = useState('');
+  const [gatedSessionId, setGatedSessionId] = useState('');
+  const [gatedLimit, setGatedLimit] = useState('');
+  // Per-company (company_key → domain) drafts for the manual-review remedy input.
+  const [gatedDomainDrafts, setGatedDomainDrafts] = useState<Record<string, string>>({});
   const [sectorForm, setSectorForm] = useState({
     sectorDescription: '',
     companyDescription: '',
@@ -436,7 +464,7 @@ export function TestPage() {
     queryKey: ['binocolo-test-ma-sessions', pipelineVisibility],
     queryFn: () =>
       api.get<MASessionListResponse>(`/binocolo/v1/ma/sessions?visibility=${pipelineVisibility}`),
-    enabled: activeTab === 'pipeline' || activeTab === 'sector-eval',
+    enabled: activeTab === 'pipeline' || activeTab === 'sector-eval' || activeTab === 'gated',
   });
 
   const pipelineDetail = useQuery({
@@ -542,6 +570,39 @@ export function TestPage() {
       } satisfies MAWebValidationEnrichRequest),
   });
 
+  // Gated-search test surface: run the whole funnel inline on an existing session, then
+  // poll the session detail while it is 'running' to watch the buckets fill in.
+  const gatedDetail = useQuery({
+    queryKey: ['binocolo-gated-detail', gatedSessionId],
+    queryFn: () => api.get<MASessionDetail>(`/binocolo/v1/ma/sessions/${gatedSessionId}`),
+    enabled: activeTab === 'gated' && Boolean(gatedSessionId),
+    refetchInterval: (query) =>
+      (query.state.data as MASessionDetail | undefined)?.session.status === 'running' ? 2500 : false,
+  });
+  const runGatedSearch = useMutation({
+    mutationFn: () =>
+      api.post<MASessionDetail>('/binocolo/v1/test/gated-search', {
+        sessionId: gatedSessionId,
+        limit: gatedLimit.trim() ? Number(gatedLimit.trim()) : undefined,
+      }),
+    onSuccess: () => {
+      void gatedDetail.refetch();
+    },
+  });
+  // Manual-review remedy: associate an official domain with a held (domain-unresolved)
+  // company. The backend re-gates that one company with the forced domain and, if it now
+  // survives, enriches+re-scores it — the session goes 'running', so we poll via refetch.
+  const associateDomain = useMutation({
+    mutationFn: ({ companyKey, domain }: { companyKey: string; domain: string }) =>
+      api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${gatedSessionId}/associate-domain`, {
+        companyKey,
+        domain,
+      }),
+    onSuccess: () => {
+      void gatedDetail.refetch();
+    },
+  });
+
   const companyData = companySearch.data?.data;
   const companyRows: CompanySearchRow[] = Array.isArray(companyData)
     ? (companyData as CompanySearchRow[])
@@ -560,6 +621,38 @@ export function TestPage() {
   }, [selectedPipelineDetail?.targets]);
   const selectedPipelineTarget =
     pipelineTargets.find((target) => target.id === pipelineTargetId) ?? pipelineTargets[0];
+
+  const gatedTargets = useMemo(() => {
+    const order: Record<GatedBucket, number> = { keep: 0, forse: 1, manual_review: 2, pending: 3, scarta: 4 };
+    return [...(gatedDetail.data?.targets ?? [])].sort((a, b) => {
+      const ba = gatedBucketOf(a);
+      const bb = gatedBucketOf(b);
+      if (order[ba] !== order[bb]) return order[ba] - order[bb];
+      if (b.score !== a.score) return b.score - a.score;
+      return a.companyName.localeCompare(b.companyName);
+    });
+  }, [gatedDetail.data?.targets]);
+  const gatedSummary = useMemo(() => {
+    const counts = { total: 0, keep: 0, forse: 0, manual_review: 0, scarta: 0, pending: 0, scored: 0 };
+    for (const target of gatedTargets) {
+      counts.total += 1;
+      counts[gatedBucketOf(target)] += 1;
+      if (target.enrichmentLevel === 'advanced') counts.scored += 1;
+    }
+    // Survivors that pay Advanced = keep+forse only. manual_review is HELD (no Advanced
+    // until a domain is manually associated), so it is deliberately excluded here.
+    const survivors = counts.keep + counts.forse;
+    // Rough cost readout (unit costs = migration 074 defaults): Address on the whole
+    // surface + Advanced only on survivors; gate scrape/search (~€0.011/co) shown apart.
+    return {
+      ...counts,
+      survivors,
+      addressCost: counts.total * 0.01,
+      advancedCost: survivors * 0.1,
+      gateScrapeCost: counts.total * 0.011,
+    };
+  }, [gatedTargets]);
+  const gatedRunning = gatedDetail.data?.session.status === 'running';
 
   useEffect(() => {
     if (activeTab !== 'pipeline' || pipelineSessionId || selectableSessions.length === 0) return;
@@ -1887,6 +1980,205 @@ export function TestPage() {
                         </select>
                       </td>
                     </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
+      </section>
+      ) : null}
+
+      {activeTab === 'gated' ? (
+      <section className={`${styles.panel} ${styles.companyPanel}`} aria-labelledby="gated-title">
+        <div className={styles.panelHeader}>
+          <div>
+            <div className={styles.endpointLine}>
+              <span className={styles.method}>POST</span>
+              <span className={styles.path}>/binocolo/v1/test/gated-search</span>
+            </div>
+            <h2 id="gated-title" className={styles.sectionTitle}>Gated search</h2>
+            <p className={styles.sectionHint}>
+              Esegue l&apos;intero funnel <strong>inline</strong> (fuori dalla coda condivisa) su una
+              sessione con stima: Address €0.01 su tutta la superficie → gate UC2
+              (keep/forse/manual review/scarta) → Advanced €0.10 + scoring solo sui sopravvissuti
+              (keep+forse). Le aziende con dominio non risolto finiscono in <em>manual review</em>:
+              tenute in attesa, mai processate in automatico finché non si associa un dominio. Polla
+              la sessione mentre gira e riempie i bucket. Per testare <em>anche</em> lo stadio address
+              usa una sessione{' '}
+              <strong>stimata ma non ancora eseguita</strong>: se ha già target, l&apos;address viene
+              saltato (resume) e i target esistenti vengono ri-gatati e sovrascritti. Spesa reale: usa
+              superfici piccole.
+            </p>
+          </div>
+          <div className={styles.companyForm}>
+            <div className={styles.filterGrid}>
+              <label className={`${styles.filterField} ${styles.fieldWide}`}>
+                <span>Sessione</span>
+                <select
+                  value={gatedSessionId}
+                  onChange={(event) => setGatedSessionId(event.target.value)}
+                  disabled={pipelineSessions.isFetching || selectableSessions.length === 0}
+                >
+                  <option value="">Seleziona sessione</option>
+                  {selectableSessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {session.title || session.prompt.slice(0, 72)} · {session.resultCount} target · {session.status}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.filterField}>
+                <span>Limite superficie (opz.)</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={gatedLimit}
+                  onChange={(event) => setGatedLimit(event.target.value)}
+                  placeholder="da sessione"
+                />
+              </label>
+            </div>
+            <div className={styles.formActions}>
+              <Button
+                variant="primary"
+                loading={runGatedSearch.isPending}
+                disabled={!gatedSessionId || gatedRunning}
+                onClick={() => runGatedSearch.mutate()}
+                leftIcon={<Icon name="filter" />}
+              >
+                Esegui gated search (inline)
+              </Button>
+              <Button
+                variant="secondary"
+                loading={gatedDetail.isFetching}
+                disabled={!gatedSessionId}
+                onClick={() => void gatedDetail.refetch()}
+                leftIcon={<Icon name="refresh-cw" />}
+              >
+                Aggiorna
+              </Button>
+              {gatedDetail.data ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => void navigator.clipboard?.writeText(JSON.stringify(gatedDetail.data, null, 2))}
+                >
+                  Copia JSON
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {runGatedSearch.isError ? (
+          <div className={styles.responseBar}><span>{errorLabel(runGatedSearch.error)}</span></div>
+        ) : null}
+        {gatedDetail.isError ? (
+          <div className={styles.responseBar}><span>{errorLabel(gatedDetail.error)}</span></div>
+        ) : null}
+        {associateDomain.isError ? (
+          <div className={styles.responseBar}><span>{errorLabel(associateDomain.error)}</span></div>
+        ) : null}
+
+        {gatedDetail.data ? (
+          <>
+            <div className={styles.responseBar}>
+              <span>
+                <strong>Stato:</strong> {gatedDetail.data.session.status}
+                {gatedRunning ? ' · polling…' : ''}
+              </span>
+              <span><strong>Superficie:</strong> {numberFormat.format(gatedSummary.total)} aziende</span>
+              <span className={styles.ok}>Keep {gatedSummary.keep}</span>
+              <span className={styles.warn}>Forse {gatedSummary.forse}</span>
+              {gatedSummary.manual_review > 0 ? (
+                <span className={styles.warn}>Manual review {gatedSummary.manual_review}</span>
+              ) : null}
+              <span className={styles.muted}>Scarta {gatedSummary.scarta}</span>
+              {gatedSummary.pending > 0 ? <span>In attesa {gatedSummary.pending}</span> : null}
+              <span><strong>Scorati:</strong> {gatedSummary.scored}</span>
+            </div>
+            <div className={styles.responseBar}>
+              <span>
+                <strong>Stima costo</strong> Address €{gatedSummary.addressCost.toFixed(2)} + Advanced €
+                {gatedSummary.advancedCost.toFixed(2)} (su {gatedSummary.survivors} sopravvissuti) = €
+                {(gatedSummary.addressCost + gatedSummary.advancedCost).toFixed(2)}
+              </span>
+              <span className={styles.muted}>+ gate scrape/search ≈ €{gatedSummary.gateScrapeCost.toFixed(2)}</span>
+            </div>
+            <div className={styles.tableScroll}>
+              <table className={styles.resultTable}>
+                <thead>
+                  <tr>
+                    <th>Azienda</th>
+                    <th>Bucket</th>
+                    <th>Score</th>
+                    <th>Match</th>
+                    <th>Enrichment</th>
+                    <th>Dominio</th>
+                    <th>Azione gate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gatedTargets.map((target) => {
+                    const bucket = gatedBucketOf(target);
+                    const bucketClass =
+                      bucket === 'keep' ? styles.ok : bucket === 'scarta' ? styles.muted : styles.warn;
+                    const held = bucket === 'manual_review';
+                    const scored = target.enrichmentLevel === 'advanced';
+                    return (
+                      <tr key={target.id}>
+                        <td>
+                          {target.companyName}
+                          {target.vatCode ? <div className={styles.muted}>{target.vatCode}</div> : null}
+                        </td>
+                        <td><span className={bucketClass}>{gatedBucketLabels[bucket]}</span></td>
+                        <td>{scored ? target.score : <span className={styles.muted}>—</span>}</td>
+                        <td>{scored && target.matchState ? target.matchState : <span className={styles.muted}>—</span>}</td>
+                        <td>{target.enrichmentLevel ?? <span className={styles.muted}>—</span>}</td>
+                        <td>
+                          {target.webValidation?.selectedDomain ? (
+                            target.webValidation.selectedDomain
+                          ) : held && target.companyKey ? (
+                            <form
+                              className={styles.formActions}
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                const key = target.companyKey as string;
+                                const domain = (gatedDomainDrafts[key] ?? '').trim();
+                                if (!domain || gatedRunning) return;
+                                associateDomain.mutate({ companyKey: key, domain });
+                              }}
+                            >
+                              <input
+                                className={styles.codeInput}
+                                placeholder="dominio.it"
+                                value={gatedDomainDrafts[target.companyKey] ?? ''}
+                                onChange={(event) => {
+                                  const key = target.companyKey as string;
+                                  setGatedDomainDrafts((prev) => ({ ...prev, [key]: event.target.value }));
+                                }}
+                              />
+                              <Button
+                                type="submit"
+                                variant="secondary"
+                                loading={
+                                  associateDomain.isPending &&
+                                  associateDomain.variables?.companyKey === target.companyKey
+                                }
+                                disabled={gatedRunning || !(gatedDomainDrafts[target.companyKey] ?? '').trim()}
+                              >
+                                Associa
+                              </Button>
+                            </form>
+                          ) : (
+                            <span className={styles.muted}>—</span>
+                          )}
+                        </td>
+                        <td>
+                          {target.webValidation?.finalAction ?? <span className={styles.muted}>—</span>}
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>

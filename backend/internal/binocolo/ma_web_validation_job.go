@@ -341,6 +341,27 @@ func (s *maService) buildMAWebValidation(
 		return s.assembleWebValidationRequest(target, inputHash, domainResponse, nil, nil, maSectorClassification{}, nil, "", decision), nil
 	}
 
+	return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, subject, email), nil
+}
+
+// classifyResolvedDomain runs the evidence → classification → decision tail of the gate
+// once an official domain has been chosen — whether auto-resolved+verified
+// (buildMAWebValidation) or MANUALLY associated (buildMAWebValidationForDomain). It crawls
+// the site for neutral self-description, classifies against the KB concepts, and escalates
+// ambiguous verdicts to the LLM analyst, producing the web-validation request. A classifier
+// failure (embedder/KB down) is surfaced as analysis_unavailable, never as a hard error.
+func (s *maService) classifyResolvedDomain(
+	ctx context.Context,
+	target MATarget,
+	strategy MAStrategySpec,
+	inputHash string,
+	payload maWebValidationJobPayload,
+	domainResponse DomainResolutionResponse,
+	selectedDomain *DomainResolutionCandidate,
+	scrapedMarkdown string,
+	subject string,
+	email string,
+) MAWebValidationUpsertRequest {
 	// Enrich evidence with a shallow crawl of the resolved site: real multi-page
 	// self-description (services / about / contacts) classifies far better than the
 	// homepage alone, and an on-page P.IVA on a legal/contact page confirms identity
@@ -352,11 +373,10 @@ func (s *maService) buildMAWebValidation(
 	evidence, evidenceRuns := s.gatherNeutralEvidence(ctx, selectedDomain.Domain, payload.KeywordCount, subject, email, evidencePages)
 
 	classification, classErr := s.classifyCompanySector(ctx, evidence, strategy, subject, email)
-	classError := ""
 	if classErr != nil {
 		// Embedder/KB unavailable: cannot classify. Surface as analysis_unavailable so
 		// the analyst reviews it; never silently confirm/reject.
-		classError = cleanText(classErr.Error(), 180)
+		classError := cleanText(classErr.Error(), 180)
 		decision := &CandidateMatchFinalDecision{
 			InitialMatchState:  target.MatchState,
 			DeterministicScore: target.Score,
@@ -366,7 +386,7 @@ func (s *maService) buildMAWebValidation(
 			Reason:             "Classificazione settore non disponibile (embedder/KB).",
 			Reasons:            []string{"Classificazione settore non disponibile: " + classError},
 		}
-		return s.assembleWebValidationRequest(target, inputHash, domainResponse, selectedDomain, evidenceRuns, maSectorClassification{}, nil, classError, decision), nil
+		return s.assembleWebValidationRequest(target, inputHash, domainResponse, selectedDomain, evidenceRuns, maSectorClassification{}, nil, classError, decision)
 	}
 
 	var analysis *CandidateMatchAnalysisResponse
@@ -382,7 +402,43 @@ func (s *maService) buildMAWebValidation(
 
 	decision := sectorFinalDecision(target, classification, analysis, analysisErr)
 	s.recordSectorClassificationTrace(ctx, target, classification, decision, analysis != nil)
-	return s.assembleWebValidationRequest(target, inputHash, domainResponse, selectedDomain, evidenceRuns, classification, analysis, analysisErr, decision), nil
+	return s.assembleWebValidationRequest(target, inputHash, domainResponse, selectedDomain, evidenceRuns, classification, analysis, analysisErr, decision)
+}
+
+// buildMAWebValidationForDomain re-runs the gate for ONE target with a MANUALLY associated
+// domain, skipping automatic resolution+verification — the operator vouches for the
+// identity. It scrapes/crawls the given site, classifies it, and produces the web-validation
+// request, so a company previously HELD in manual_review (official domain unresolved) gets a
+// real keep/forse/scarta verdict and can then be auto-enriched.
+func (s *maService) buildMAWebValidationForDomain(
+	ctx context.Context,
+	target MATarget,
+	strategy MAStrategySpec,
+	inputHash string,
+	payload maWebValidationJobPayload,
+	domain string,
+	subject string,
+	email string,
+) (MAWebValidationUpsertRequest, error) {
+	normalized, ok := normalizeDomain(domain)
+	if !ok {
+		return MAWebValidationUpsertRequest{}, fmt.Errorf("%w: domain", errMAStrategyInvalid)
+	}
+	// The operator's chosen domain IS the identity — high confidence, no resolution
+	// ranking. classifyResolvedDomain still tries to confirm the P.IVA on-page via the
+	// crawl, but the verdict is no longer gated on domain resolution succeeding.
+	selectedDomain := &DomainResolutionCandidate{
+		Domain:     normalized,
+		Score:      100,
+		Confidence: "alta",
+		Reasons:    []string{"dominio associato manualmente dall'operatore"},
+	}
+	scrapedMarkdown, _ := s.scrapeHomepage(ctx, normalized) // best-effort; crawl+evidence tolerate empty
+	domainResponse := DomainResolutionResponse{
+		Query:      "manual:" + normalized,
+		Candidates: []DomainResolutionCandidate{*selectedDomain},
+	}
+	return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, subject, email), nil
 }
 
 func sectorVerdictNeedsLLM(verdict maSectorVerdict) bool {

@@ -172,11 +172,15 @@ const (
 	maEnrichmentAddress  = "address"
 	maEnrichmentAdvanced = "advanced"
 
-	// Gated-search verdict buckets (the keep/forse/scarta space sectorActionToBucket
-	// maps onto). Survivors = keep+forse pay Advanced; scarta stays identity-only.
-	maGatedBucketKeep   = "keep"
-	maGatedBucketForse  = "forse"
-	maGatedBucketReject = "scarta"
+	// Gated-search verdict buckets. Survivors = keep+forse pay Advanced. scarta (rejected)
+	// and manual_review (official domain unresolved → held for manual domain association)
+	// stay identity-only and are NEVER auto-charged. sectorActionToBucket maps the shared
+	// confirm/reject/… actions onto keep/scarta/forse; gatedTargetBucket layers the
+	// manual_review carve-out on top so domain-unresolved companies are not auto-processed.
+	maGatedBucketKeep         = "keep"
+	maGatedBucketForse        = "forse"
+	maGatedBucketReject       = "scarta"
+	maGatedBucketManualReview = "manual_review"
 
 	// Valuation defaults (Fase 4), overridable via ma_parameter (sme_haircut_pct,
 	// ebitda_fallback_threshold). Haircut is a percent applied to sector multiples;
@@ -219,6 +223,15 @@ type MAExecuteSessionRequest struct {
 	AcknowledgeCost bool `json:"acknowledgeCost,omitempty"`
 }
 
+// MAGatedSearchTestRequest drives the developer test page: run the gated funnel inline
+// on an existing session (which must already carry a fresh estimate). StrategyType/Limit
+// override the persisted selection when set.
+type MAGatedSearchTestRequest struct {
+	SessionID    string `json:"sessionId"`
+	StrategyType string `json:"strategyType,omitempty"`
+	Limit        int    `json:"limit,omitempty"`
+}
+
 type MAExportRequest struct {
 	Format string `json:"format,omitempty"`
 }
@@ -226,6 +239,14 @@ type MAExportRequest struct {
 type MATargetRatingRequest struct {
 	CompanyKey string `json:"companyKey"`
 	Rating     int    `json:"rating"`
+}
+
+// MAAssociateDomainRequest is the manual-review remedy input: the operator supplies an
+// official domain for a company the gate held as domain-unresolved (manual_review), so it
+// can be re-gated with that domain and, if it now survives, auto-enriched.
+type MAAssociateDomainRequest struct {
+	CompanyKey string `json:"companyKey"`
+	Domain     string `json:"domain"`
 }
 
 type MAWebValidationUpsertRequest struct {
