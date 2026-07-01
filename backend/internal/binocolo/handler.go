@@ -140,6 +140,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/test/domain-resolution", h.handleTestDomainResolution)
 	handle("POST /binocolo/v1/test/sector-classification", h.handleTestSectorClassification)
 	handle("POST /binocolo/v1/test/sector-eval-models", h.handleCompareSectorEvalModels)
+	handle("POST /binocolo/v1/test/ateco-retrieval", h.handleTestAtecoRetrieval)
 	handle("POST /binocolo/v1/web-search", h.handleWebSearch)
 	return runWorkers
 }
@@ -705,6 +706,29 @@ func (h *Handler) handleTestGatedSearch(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	httputil.JSON(w, http.StatusAccepted, detail)
+}
+
+// handleTestAtecoRetrieval previews the ATECO concept retrieval for a raw sector
+// text: it returns the cosine of every KB concept (targets + distractors), which
+// clear the relative threshold, and the resulting candidates/divisions. Optional
+// relThreshold/coreRatio/floor/cap overrides tune the config for this call only
+// (never persisted), so the net width can be A/B'd on real cosines.
+func (h *Handler) handleTestAtecoRetrieval(w http.ResponseWriter, r *http.Request) {
+	var body MAAtecoRetrievalPreviewRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	if strings.TrimSpace(body.Text) == "" {
+		httputil.Error(w, http.StatusBadRequest, "missing_text")
+		return
+	}
+	preview, err := h.ma.previewMAAtecoRetrieval(r.Context(), body)
+	if err != nil {
+		h.maFailure(w, r, "ateco_retrieval_preview", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, preview)
 }
 
 func (h *Handler) handleExportMASession(w http.ResponseWriter, r *http.Request) {

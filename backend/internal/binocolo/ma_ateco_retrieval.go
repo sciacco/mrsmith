@@ -32,9 +32,9 @@ const (
 	maAtecoRetrievalFloorKey        = "ateco_retrieval_floor"
 	maAtecoRetrievalCapKey          = "ateco_retrieval_cap"
 
-	maAtecoRetrievalRelThresholdDefault = 0.75
+	maAtecoRetrievalRelThresholdDefault = 0.65
 	maAtecoRetrievalCoreRatioDefault    = 0.92
-	maAtecoRetrievalFloorDefault        = 0.30
+	maAtecoRetrievalFloorDefault        = 0.45
 	maAtecoRetrievalCapDefault          = 12
 
 	// Scope of the query-side embedding instruction in mrsmith.llm_prompt. Qwen3 is
@@ -443,4 +443,182 @@ func kbCosine(a, b []float32) float64 {
 		return 0
 	}
 	return dot / (math.Sqrt(na) * math.Sqrt(nb))
+}
+
+// --- ATECO retrieval preview (developer test surface) -----------------------
+//
+// previewMAAtecoRetrieval embeds a raw sector/thesis text and returns the cosine
+// of EVERY KB concept (targets + distractors, sorted), which ones clear the
+// (possibly overridden) relative threshold, and the resulting ATECO candidates +
+// divisions. It surfaces exactly what the production retrieval hides: the runner-up
+// cosines below the cut — so the ATECO net can be tuned on data, not intuition. The
+// production selection semantics are preserved (thresholds relative to the top
+// TARGET cosine; distractors never consume a cap slot). Overrides in the request
+// tune the config for this call only; they never touch ma_parameter.
+
+type MAAtecoRetrievalPreviewRequest struct {
+	Text         string   `json:"text"`
+	RelThreshold *float64 `json:"relThreshold,omitempty"`
+	CoreRatio    *float64 `json:"coreRatio,omitempty"`
+	Floor        *float64 `json:"floor,omitempty"`
+	Cap          *int     `json:"cap,omitempty"`
+}
+
+type MAAtecoRetrievalPreviewConcept struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Kind       string   `json:"kind"`
+	Cosine     float64  `json:"cosine"`
+	Matched    bool     `json:"matched"`
+	Fit        string   `json:"fit,omitempty"`
+	WithinCap  bool     `json:"withinCap"`
+	Divisions  []string `json:"divisions"`
+	AtecoCodes []string `json:"atecoCodes"`
+}
+
+type MAAtecoRetrievalPreview struct {
+	Query              string                           `json:"query"`
+	Instruction        string                           `json:"instruction"`
+	EmbeddingModel     string                           `json:"embeddingModel"`
+	Config             maAtecoRetrievalConfig           `json:"config"`
+	TopCosine          float64                          `json:"topCosine"`
+	RelCut             float64                          `json:"relCut"`
+	CoreCut            float64                          `json:"coreCut"`
+	BelowFloor         bool                             `json:"belowFloor"`
+	Concepts           []MAAtecoRetrievalPreviewConcept `json:"concepts"`
+	Candidates         []MAAtecoCandidate               `json:"candidates"`
+	CandidateDivisions []string                         `json:"candidateDivisions"`
+	PromptTokens       int                              `json:"promptTokens"`
+	TotalTokens        int                              `json:"totalTokens"`
+}
+
+func (s *maService) previewMAAtecoRetrieval(ctx context.Context, req MAAtecoRetrievalPreviewRequest) (MAAtecoRetrievalPreview, error) {
+	if s.llmp == nil || s.kb == nil || s.ateco == nil {
+		return MAAtecoRetrievalPreview{}, fmt.Errorf("ateco retrieval preview unavailable: kb/embedder not configured")
+	}
+	text := cleanText(req.Text, 400)
+	if text == "" {
+		return MAAtecoRetrievalPreview{}, fmt.Errorf("%w: text required", errMAStrategyInvalid)
+	}
+	cfg := s.loadAtecoRetrievalConfig(ctx)
+	if req.RelThreshold != nil && *req.RelThreshold > 0 && *req.RelThreshold <= 1 {
+		cfg.RelThreshold = *req.RelThreshold
+	}
+	if req.CoreRatio != nil && *req.CoreRatio > 0 && *req.CoreRatio <= 1 {
+		cfg.CoreRatio = *req.CoreRatio
+	}
+	if req.Floor != nil && *req.Floor >= 0 && *req.Floor < 1 {
+		cfg.Floor = *req.Floor
+	}
+	if req.Cap != nil && *req.Cap >= 1 {
+		cfg.Cap = *req.Cap
+	}
+
+	instruction, _ := s.loadAtecoEmbedInstruction(ctx)
+	// includeDistractors=true so the preview shows where the improbable sectors land
+	// relative to the targets; production selection below stays target-only.
+	scored, embModel, usage, ok, err := s.matchKBConcepts(ctx, instruction, text, true)
+	if err != nil {
+		return MAAtecoRetrievalPreview{}, err
+	}
+	if !ok {
+		return MAAtecoRetrievalPreview{}, fmt.Errorf("ateco retrieval preview unavailable: kb/embedder not usable")
+	}
+
+	preview := MAAtecoRetrievalPreview{
+		Query:          text,
+		Instruction:    instruction,
+		EmbeddingModel: embModel.Model,
+		Config:         cfg,
+		PromptTokens:   usage.PromptTokens,
+		TotalTokens:    usage.TotalTokens,
+	}
+
+	targetScored := make([]kbScored, 0, len(scored))
+	for _, sc := range scored {
+		if sc.concept.Kind != "distractor" {
+			targetScored = append(targetScored, sc)
+		}
+	}
+	if len(targetScored) == 0 {
+		return preview, nil
+	}
+
+	top := targetScored[0].cosine
+	relCut := top * cfg.RelThreshold
+	coreCut := top * cfg.CoreRatio
+	preview.TopCosine = roundCosine(top)
+	preview.RelCut = roundCosine(relCut)
+	preview.CoreCut = roundCosine(coreCut)
+	preview.BelowFloor = top < cfg.Floor
+
+	matched := make([]kbScored, 0, cfg.Cap)
+	if !preview.BelowFloor {
+		for _, sc := range targetScored {
+			if sc.cosine < relCut {
+				break
+			}
+			matched = append(matched, sc)
+			if len(matched) >= cfg.Cap {
+				break
+			}
+		}
+	}
+	matchedID := make(map[string]bool, len(matched))
+	for _, m := range matched {
+		matchedID[m.concept.ID] = true
+	}
+
+	for _, sc := range scored {
+		c := sc.concept
+		codes := append([]string{}, c.InKB...)
+		row := MAAtecoRetrievalPreviewConcept{
+			ID:         c.ID,
+			Name:       c.Name,
+			Kind:       c.Kind,
+			Cosine:     roundCosine(sc.cosine),
+			Divisions:  conceptDivisions(codes),
+			AtecoCodes: codes,
+		}
+		if matchedID[c.ID] {
+			row.Matched = true
+			row.WithinCap = true
+			if sc.cosine >= coreCut {
+				row.Fit = maFitCore
+			} else {
+				row.Fit = maFitWeak
+			}
+		}
+		preview.Concepts = append(preview.Concepts, row)
+	}
+
+	candidates, _, err := s.resolveKBFitToCandidates(ctx, matched, coreCut, map[string]AtecoCode{})
+	if err != nil {
+		return MAAtecoRetrievalPreview{}, err
+	}
+	preview.Candidates = candidates
+	preview.CandidateDivisions = atecoDivisions(candidates)
+	return preview, nil
+}
+
+func roundCosine(v float64) float64 { return math.Round(v*10000) / 10000 }
+
+// conceptDivisions extracts the distinct ATECO divisions (leading 2 digits) from a
+// concept's raw code list, e.g. "63.10.10" -> "63".
+func conceptDivisions(codes []string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, code := range codes {
+		div := strings.SplitN(strings.TrimSpace(code), ".", 2)[0]
+		if len(div) >= 2 {
+			div = div[:2]
+		}
+		if div == "" || seen[div] {
+			continue
+		}
+		seen[div] = true
+		out = append(out, div)
+	}
+	sort.Strings(out)
+	return out
 }
