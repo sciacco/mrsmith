@@ -20,7 +20,8 @@ INSERT INTO binocolo.ma_parameter (key, value, value_type, label, description) V
   ('cost_address_eur',      '0.01',  'money',  'Costo enrichment address (€/azienda)',   'Prezzo OpenAPI.it IT-address (solo identità+sede) per azienda: primo passo del gate.'),
   ('cost_scrape_page_eur',  '0.001', 'money',  'Costo scrape/crawl (€/pagina)',          'Prezzo fastcrw per pagina scrapeata/crawlata nella risoluzione dominio + evidenza del gate.'),
   ('cost_search_eur',       '0.001', 'money',  'Costo search dominio (€/ricerca)',       'Prezzo fastcrw per ricerca (5 risultati), fallback nella risoluzione dominio.'),
-  ('survivor_rate_default', '0.35',  'number', 'Tasso sopravvivenza keep+forse atteso',  'Frazione attesa (0-1) di aziende che il gate promuove a keep/forse e che pagano Advanced. Stima iniziale, calibrata dai run reali.')
+  ('survivor_rate_default', '0.35',  'number', 'Tasso sopravvivenza keep+forse atteso',  'Frazione attesa (0-1) di aziende che il gate promuove a keep/forse e che pagano Advanced. Stima iniziale, calibrata dai run reali.'),
+  ('gated_surface_cap',     '100',   'number', 'Cap superficie gated-search (aziende)',  'Massimo numero di aziende ammesse a una gated-search. Con spesa automatica è il freno di costo primario (il gate spende ~€0.02 su TUTTA la superficie). Tenuto = ceiling del batch gate; scalare oltre richiede alzarli insieme.')
 ON CONFLICT (key) DO NOTHING;
 
 COMMIT;

@@ -233,14 +233,24 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 		return err
 	}
 
-	targets := selectMAWebValidationTargets(detail.Targets, version.Strategy, payload, s.now(), payload.Limit)
+	return s.validateMATargetsBatch(ctx, job.SessionID, version.ID, version.Strategy, detail.Targets, payload, job.CreatedBySubject, job.CreatedByEmail)
+}
+
+// validateMATargetsBatch runs the UC2 concept gate over a candidate set, bounded to
+// maWebValidationConcurrency, and upserts one ma_target_web_validation row per target.
+// It is the shared core of both the standalone web-validation job and the gated-search
+// pipeline's gate stage. Idempotent: a target with a still-fresh validation (and no
+// Force) is skipped, so a retry re-charges only the un-validated tail. The errgroup's
+// shared ctx keeps the abort-on-first-error semantics (a failed upsert cancels peers).
+func (s *maService) validateMATargetsBatch(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec, candidates []MATarget, payload maWebValidationJobPayload, subject, email string) error {
+	targets := selectMAWebValidationTargets(candidates, strategy, payload, s.now(), payload.Limit)
 	var processed, skipped, failed atomic.Int64
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_web_validation_started",
 		Status:    maTraceEventStarted,
 		Metadata: maTraceJSON(map[string]any{
-			"session_id":          job.SessionID,
-			"strategy_version_id": version.ID,
+			"session_id":          sessionID,
+			"strategy_version_id": strategyVersionID,
 			"candidate_count":     len(targets),
 			"force":               payload.Force,
 			"limit":               payload.Limit,
@@ -249,10 +259,6 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 		}),
 	})
 
-	// Process targets concurrently, bounded to maWebValidationConcurrency. Each iteration
-	// is independent (distinct upsert rows, no shared mutable state beyond the atomic
-	// counters and the mutex-guarded trace). The errgroup's shared ctx preserves the old
-	// abort-on-first-error semantics: a failed upsert cancels the in-flight peers.
 	group, gctx := errgroup.WithContext(ctx)
 	group.SetLimit(maWebValidationConcurrency)
 	for _, work := range targets {
@@ -266,12 +272,12 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 				return nil
 			}
 
-			body, buildErr := s.buildMAWebValidation(gctx, target, version.Strategy, work.InputHash, payload, job.CreatedBySubject, job.CreatedByEmail)
+			body, buildErr := s.buildMAWebValidation(gctx, target, strategy, work.InputHash, payload, subject, email)
 			if buildErr != nil {
 				body = failedMAWebValidationRequest(target, work.InputHash, buildErr)
 				failed.Add(1)
 			}
-			if _, err := s.upsertTargetWebValidation(gctx, job.SessionID, body, job.CreatedBySubject, job.CreatedByEmail); err != nil {
+			if _, err := s.upsertTargetWebValidation(gctx, sessionID, body, subject, email); err != nil {
 				return err
 			}
 			processed.Add(1)
@@ -286,7 +292,7 @@ func (s *maService) webValidationJobWork(ctx context.Context, job maJob) error {
 		EventType: "ma_web_validation_completed",
 		Status:    maTraceEventSucceeded,
 		Metadata: maTraceJSON(map[string]any{
-			"session_id":   job.SessionID,
+			"session_id":   sessionID,
 			"processed":    processed.Load(),
 			"skipped":      skipped.Load(),
 			"failed":       failed.Load(),

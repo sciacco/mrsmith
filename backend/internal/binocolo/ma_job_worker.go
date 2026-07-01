@@ -54,6 +54,7 @@ func newMAJobWorker(svc *maService, store maJobWorkerStore, owner string) *maJob
 			maJobTypeEstimate,
 			maJobTypeExecute,
 			maJobTypeWebValidation,
+			maJobTypeGatedSearch,
 		},
 	}
 }
@@ -113,6 +114,8 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 		traceID, err = w.svc.runExecuteJob(ctx, job)
 	case maJobTypeWebValidation:
 		traceID, err = w.svc.runWebValidationJob(ctx, job)
+	case maJobTypeGatedSearch:
+		traceID, err = w.svc.runGatedSearchJob(ctx, job)
 	default:
 		logging.FromContext(ctx).Warn("binocolo job worker skipped unknown job type", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType)
 		return
@@ -152,7 +155,7 @@ func (w *maJobWorker) retryOrFail(ctx context.Context, job maJob, code string) {
 		if err := w.store.MarkMASessionEstimateFailed(ctx, job.SessionID); err != nil {
 			logging.FromContext(ctx).Warn("binocolo job worker session-fail failed", "component", "binocolo", "session_id", job.SessionID, "error", err)
 		}
-	case maJobTypeExecute:
+	case maJobTypeExecute, maJobTypeGatedSearch:
 		if err := w.store.MarkMASessionExecuteFailed(ctx, job.SessionID); err != nil {
 			logging.FromContext(ctx).Warn("binocolo job worker session-fail failed", "component", "binocolo", "session_id", job.SessionID, "error", err)
 		}
@@ -174,9 +177,13 @@ func classifyMAJobError(err error, jobType string) string {
 	case errors.Is(err, errMAStoreUnavailable):
 		return "store_unavailable"
 	default:
-		if jobType == maJobTypeWebValidation {
+		switch jobType {
+		case maJobTypeWebValidation:
 			return "web_validation_failed"
+		case maJobTypeGatedSearch:
+			return "gated_search_failed"
+		default:
+			return "estimate_failed"
 		}
-		return "estimate_failed"
 	}
 }

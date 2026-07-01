@@ -129,6 +129,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/deep-dive", h.handleDeepDiveMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/estimate", h.handleEstimateMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/execute", h.handleExecuteMASession)
+	handle("POST /binocolo/v1/ma/sessions/{id}/gated-search", h.handleGatedSearchMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/export", h.handleExportMASession)
 	handle("POST /binocolo/v1/ma/deep/recompute", h.handleRecomputeMADeep)
 	handle("POST /binocolo/v1/ma/deep/regenerate-briefs", h.handleRegenerateMADeepBriefs)
@@ -623,6 +624,30 @@ func (h *Handler) handleExecuteMASession(w http.ResponseWriter, r *http.Request)
 	detail, err := h.ma.enqueueExecute(r.Context(), id, body, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_execute", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusAccepted, detail)
+}
+
+// handleGatedSearchMASession enqueues the gated-search pipeline (address → UC2 gate →
+// advanced+score on survivors), the coexisting alternative to execute. Same request
+// shape as execute; the synchronous half validates the estimate and enforces the
+// surface cap, then returns 202 while the worker runs the multi-stage job. The UI
+// polls GET .../sessions/{id} until status leaves 'running'.
+func (h *Handler) handleGatedSearchMASession(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	var body MAExecuteSessionRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	detail, err := h.ma.enqueueGatedSearch(r.Context(), id, body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_session_gated_search", err, "session_id", id)
 		return
 	}
 	httputil.JSON(w, http.StatusAccepted, detail)

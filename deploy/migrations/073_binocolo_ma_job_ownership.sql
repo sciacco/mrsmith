@@ -26,6 +26,12 @@ BEGIN;
 ALTER TABLE binocolo.ma_job
   ADD COLUMN IF NOT EXISTS owner text;
 
+-- Nuovo tipo di job: la gated-search pipeline (surface → address → gate UC2 →
+-- advanced+score sui sopravvissuti) gira come singolo job multi-stadio.
+ALTER TABLE binocolo.ma_job DROP CONSTRAINT IF EXISTS ma_job_type_check;
+ALTER TABLE binocolo.ma_job ADD CONSTRAINT ma_job_type_check
+  CHECK (job_type IN ('estimate', 'execute', 'web_validation', 'gated_search'));
+
 -- Hot path del worker nuovo: righe pendenti del proprio owner (le legacy owner
 -- NULL restano coperte dall'indice pending esistente e dal branch owner IS NULL).
 CREATE INDEX IF NOT EXISTS ma_job_pending_owner_idx

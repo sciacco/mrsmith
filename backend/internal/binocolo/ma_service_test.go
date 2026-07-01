@@ -1452,6 +1452,10 @@ func (f *fakeMAWorkspaceStore) ReplaceMATargets(context.Context, string, string,
 	return errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) MarkMATargetAdvancedEnriched(context.Context, string, json.RawMessage) error {
+	return nil
+}
+
 func (f *fakeMAWorkspaceStore) UpsertMATargetRating(context.Context, string, string, int, string, string) error {
 	return nil
 }

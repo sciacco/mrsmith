@@ -90,6 +90,11 @@ Estrarre da `runExecution` (`ma_service.go:4510`) una variante che chiama IT-sea
 
 ## Step 3 — Orchestratore multi-stadio (nuovo `job_type = 'gated_search'`)
 
+> **STATO 2026-07-01: IMPLEMENTATO (staged).** Nuovo file `ma_gated_search_job.go`: `enqueueGatedSearch` (valida come execute ma sostituisce il budget-gate col **cap superficie**), `runGatedSearchJob`+`gatedSearchJobWork` (orchestratore address→gate→enrich_score→ready, **checkpoint derivato da stato durevole**, nessuna colonna stage), `enrichAndScoreSurvivors` (**Step 4 incluso**, idempotente), `enrichTargetAdvanced`, `gatedTargetBucket`. Wiring: `maJobTypeGatedSearch`+dispatch worker (`ma_job_worker.go`), route `POST /binocolo/v1/ma/sessions/{id}/gated-search`+handler (`handler.go`), gate estratto in `validateMATargetsBatch` condiviso con la web-validation. Migrazioni: **073** estesa (`ma_job_type_check` + `gated_search`), **074** estesa (`gated_surface_cap` 100). Store: `MarkMATargetAdvancedEnriched` (persistenza per-azienda dell'Advanced = money-safety su re-run). `maPricing.SurfaceCap`+`paramInt`. Build/vet/test verdi. **DA FARE nello Step 4**: test unitario idempotenza (Test Rule → richiede ok utente). Attivazione (human): applicare 073+074, riavviare.
+>
+> **Money-safety (coda condivisa, spesa reale):** ogni stadio è idempotente e ricava il resume da righe durevoli — address salta se i target esistono (run senza target = crash mid-address → **abbandona**, non ri-spende, come execute); gate salta via freshness per-azienda; enrich salta i target già `enrichment_level='advanced'` (persistiti singolarmente appena l'Advanced ritorna). Le chiavi d'identità (company_key) sono preservate dall'address sul target arricchito così il verdetto del gate non si scollega e non innesca ri-spesa. Finestra residua = crash mid-address dopo la fetch address ma prima del commit (spesa address di quel tentativo persa, mai raddoppiata) = stesso contratto dell'execute.
+
+
 Nuovo tipo di job che incolla gli stadi con **checkpoint durevole** (per resume dopo restart e per progresso visibile). Lo stage vive sul run (o su una colonna del job payload/`ma_execution_run`), così un restart riparte dallo stadio giusto senza rifare i precedenti.
 
 Stadi eseguiti dal worker (`runGatedSearchJob`, sul modello di `runExecuteJob` `ma_service.go:820`):
@@ -110,6 +115,8 @@ Handler: nuovo `POST /binocolo/v1/ma/sessions/{id}/gated-search` → `enqueueGat
 ---
 
 ## Step 4 — Advanced+score sui sopravvissuti (dentro Step 3.4, isolato per test)
+
+> **STATO 2026-07-01: COMPLETO (staged).** `enrichAndScoreSurvivors` isolata e idempotente (reject→identity-only mai addebitato; già-advanced→riuso senza ri-fetch; per-azienda `MarkMATargetAdvancedEnriched` prima dello scoring set-relative). Classificatore **puro** estratto `planGatedEnrichment` (ToEnrich/Reuse/Carry) + **test** `ma_gated_search_test.go`: `TestPlanGatedEnrichmentSpendPartition` (3 invarianti di spesa: reject mai paga, già-advanced mai ri-addebitato, verdetto-gate-assente=survivor recall-safe) + `TestGatedTargetBucket` (mappatura confirm/reject/deprioritize/needs_*→keep/scarta/forse, nil→forse). Verdi.
 
 Già descritto in 3.4; lo isolo come deliverable testabile: la funzione "enrich+score un set di company_key" deve essere pura e ri-eseguibile (idempotente sui `ma_target`), così un re-run non ri-paga l'Advanced se già presente (guardia su `enrichment_level='advanced'` + freshness, cfr. `ma_target_web_validation` freshness mig 055).
 

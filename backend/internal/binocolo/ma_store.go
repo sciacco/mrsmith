@@ -30,6 +30,7 @@ type maWorkspaceStore interface {
 	CreateMAExecutionRun(ctx context.Context, input maExecutionRunCreate) (MAExecutionRun, error)
 	CompleteMAExecutionRun(ctx context.Context, runID, status string, resultCount int, errorCode string) error
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
+	MarkMATargetAdvancedEnriched(ctx context.Context, targetID string, vendorPayload json.RawMessage) error
 	UpsertMATargetRating(ctx context.Context, sessionID, companyKey string, rating int, subject, email string) error
 	UpsertMAWebValidation(ctx context.Context, input maWebValidationUpsert) (MAWebValidation, error)
 	UpsertMASectorEvalLabel(ctx context.Context, sessionID, companyKey, label, note, subject, email string) error
@@ -805,6 +806,31 @@ INSERT INTO binocolo.ma_evidence (
 		}
 	}
 	return tx.Commit()
+}
+
+// MarkMATargetAdvancedEnriched flips one target to advanced enrichment, storing the
+// paid IT-advanced payload. The gated-search enrich stage calls this per company the
+// instant its €0.10 fetch returns, BEFORE scoring — so a crashed/reclaimed job re-runs
+// only the un-enriched tail (the enrichment_level guard) and never re-charges a company
+// already advanced. Score/match_state are left untouched here; the run's final
+// ReplaceMATargets writes them once the whole survivor set is scored together.
+func (s *SQLStore) MarkMATargetAdvancedEnriched(ctx context.Context, targetID string, vendorPayload json.RawMessage) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	payload := json.RawMessage(`{}`)
+	if len(vendorPayload) > 0 {
+		payload = vendorPayload
+	}
+	if _, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_target
+SET vendor_payload = $2::jsonb,
+    enrichment_level = 'advanced'
+WHERE id = $1::uuid
+`, targetID, []byte(payload)); err != nil {
+		return fmt.Errorf("mark ma target advanced enriched: %w", err)
+	}
+	return nil
 }
 
 func (s *SQLStore) StartMATrace(ctx context.Context, input maTraceStart) (string, error) {

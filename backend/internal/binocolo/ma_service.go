@@ -293,6 +293,9 @@ type maPricing struct {
 	CostScrapePage float64
 	CostSearch     float64
 	SurvivorRate   float64
+	// SurfaceCap is the max surface a gated search may admit (the one hard cost
+	// governor under automatic spend); overridable via ma_parameter.
+	SurfaceCap int
 }
 
 // loadPricing reads the configurable pricing levers; missing/unreadable values
@@ -321,6 +324,7 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 		CostScrapePage:             maCostPerScrapePageEUR,
 		CostSearch:                 maCostPerSearchEUR,
 		SurvivorRate:               maSurvivorRateDefault,
+		SurfaceCap:                 maGatedSurfaceCapDefault,
 	}
 	values := make(map[string]string, len(params))
 	for _, param := range params {
@@ -359,6 +363,9 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 	if v, ok := paramFloat(values, "survivor_rate_default"); ok && v > 0 && v <= 1 {
 		pricing.SurvivorRate = v
 	}
+	if v, ok := paramInt(values, "gated_surface_cap"); ok && v > 0 {
+		pricing.SurfaceCap = v
+	}
 	return pricing
 }
 
@@ -369,6 +376,18 @@ func paramFloat(values map[string]string, key string) (float64, bool) {
 	}
 	v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
 	if err != nil || v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0, false
+	}
+	return v, true
+}
+
+func paramInt(values map[string]string, key string) (int, bool) {
+	raw, ok := values[key]
+	if !ok {
+		return 0, false
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
 		return 0, false
 	}
 	return v, true

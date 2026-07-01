@@ -66,6 +66,10 @@ const (
 	maJobTypeEstimate      = "estimate"
 	maJobTypeExecute       = "execute"
 	maJobTypeWebValidation = "web_validation"
+	// maJobTypeGatedSearch is the gated-search pipeline: a single multi-stage job
+	// (surface → address → UC2 gate → advanced+score on survivors) that reuses the
+	// engines above but reorders them so only gate survivors pay the €0.10 Advanced.
+	maJobTypeGatedSearch = "gated_search"
 
 	maJobStatusQueued  = "queued"
 	maJobStatusRunning = "running"
@@ -153,12 +157,26 @@ const (
 	maSurvivorRateLow     = 0.25
 	maSurvivorRateHigh    = 0.50
 
+	// maGatedSurfaceCapDefault caps the surface a gated search may admit. With
+	// "tutto automatico" spend, the surface cap is the one hard governor: the gate
+	// pays ~€0.02/company across the WHOLE surface, so N is the cost driver. Kept
+	// equal to the gate batch ceiling (maWebValidationMaxLimit) so a single gate
+	// pass covers every admitted company; overridable via ma_parameter
+	// (gated_surface_cap). Scaling past it requires raising both together.
+	maGatedSurfaceCapDefault = maWebValidationMaxLimit
+
 	// Enrichment levels of a ma_target row (migration 075). The execute path and
 	// the gated enrich_score stage produce "advanced" (scored) rows; the gated
 	// address stage produces "address" (identity-only, score/match_state NULL).
 	// These are also the OpenAPI.it DataEnrichment values passed to IT-search.
 	maEnrichmentAddress  = "address"
 	maEnrichmentAdvanced = "advanced"
+
+	// Gated-search verdict buckets (the keep/forse/scarta space sectorActionToBucket
+	// maps onto). Survivors = keep+forse pay Advanced; scarta stays identity-only.
+	maGatedBucketKeep   = "keep"
+	maGatedBucketForse  = "forse"
+	maGatedBucketReject = "scarta"
 
 	// Valuation defaults (Fase 4), overridable via ma_parameter (sme_haircut_pct,
 	// ebitda_fallback_threshold). Haircut is a percent applied to sector multiples;
