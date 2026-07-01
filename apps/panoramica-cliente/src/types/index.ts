@@ -140,26 +140,22 @@ export interface IaaSAccount {
   data_attivazione: string | null;
 }
 
-export interface DailyCharge {
-  giorno: string;
-  domainid: string;
-  utCredit: number;
+// Aggregated charge time series point. `bucket` is an anchor date (YYYY-MM-DD)
+// whose meaning depends on the requested aggregation group.
+export interface ChargeSeriesPoint {
+  bucket: string;
   total_importo: number;
 }
 
-export interface MonthlyCharge {
-  mese: string;
-  importo: number;
-}
-
-export interface ChargeItem {
-  type: string;
-  label: string;
+// Charge composition by macro-category over a period.
+// Categories: VM, Storage, Licenze Windows, Altro (usage_type 9999 excluded).
+export interface CategoryAmount {
+  category: string;
   amount: number;
 }
 
-export interface ChargeBreakdown {
-  charges: ChargeItem[];
+export interface ChargeCategoryBreakdown {
+  categories: CategoryAmount[];
   total: number;
 }
 

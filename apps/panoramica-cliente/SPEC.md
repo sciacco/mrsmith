@@ -242,8 +242,8 @@ ORDER BY tipo_conn, fl.fornitore, provincia, comune, p.tipo, p.profilo_commercia
 
 ### Entity: IaaSAccount (read-only)
 
-- **Purpose:** Cloudstack billing accounts with daily/monthly consumption data and charge breakdown.
-- **Operations:** `listAccounts`, `listDailyCharges(domain)`, `listMonthlyCharges(domain)`, `getChargeBreakdown(domain, day)`, `listWindowsLicenses`
+- **Purpose:** Cloudstack billing accounts with consumption time series and category breakdown over a selectable period/aggregation.
+- **Operations:** `listAccounts`, `listCharges(domain, from, to, group)`, `getChargesByCategory(domain, from, to)`, `listWindowsLicenses`
 
 **Original queries:**
 
@@ -260,46 +260,39 @@ order by intestazione
 ```
 
 ```sql
--- get_daily_charges (IaaS PPU page)
--- Datasource: grappa (mysql), executeOnLoad: true
-SELECT c.charge_day as giorno, c.domainid,
-    CAST(SUM(CASE WHEN c.usage_type = 9999 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utCredit,
-    CAST(SUM(c.usage_charge) AS DECIMAL(10,2)) AS total_importo
-FROM cdl_charges c
-WHERE c.domainid = :domain AND charge_day >= date_sub(now(), interval 120 day)
-GROUP BY c.charge_day, c.domainid
-ORDER BY c.charge_day DESC
+-- get_charges (IaaS PPU page) — aggregated time series
+-- Datasource: grappa (mysql). group ∈ {daily, weekly, monthly, quarterly, yearly}.
+-- usage_type 9999 (Credit) is excluded from totals.
+SELECT <bucket_expr> AS bucket,
+    CAST(SUM(CASE WHEN usage_type = 9999 THEN 0 ELSE usage_charge END) AS DECIMAL(12,2)) AS total_importo
+FROM cdl_charges
+WHERE domainid = :domain AND charge_day BETWEEN :from AND :to
+GROUP BY bucket ORDER BY bucket ASC
+-- bucket_expr:
+--   daily     = charge_day
+--   weekly    = DATE(DATE_SUB(charge_day, INTERVAL WEEKDAY(charge_day) DAY))
+--   monthly   = DATE_FORMAT(charge_day, '%Y-%m-01')
+--   quarterly = DATE(CONCAT(YEAR(charge_day), '-', LPAD((QUARTER(charge_day)-1)*3+1, 2, '0'), '-01'))
+--   yearly    = DATE_FORMAT(charge_day, '%Y-01-01')
 ```
 
 ```sql
--- get_monthly_charges (IaaS PPU page)
--- Datasource: grappa (mysql), executeOnLoad: true
-select date_format(charge_day,'%Y-%m') as mese, cast(sum(usage_charge) as decimal(7,2)) importo
-from cdl_charges
-where domainid = :domain and charge_day >= date_sub(now(), interval 365 day)
-group by 1 order by 1 DESC limit 12
-```
-
-```sql
--- get_charges_by_type (IaaS PPU page)
--- Datasource: grappa (mysql), executeOnLoad: true
--- NOTE: backend returns as typed array [{type, label, amount}] instead of flat columns
-SELECT c.charge_day, c.domainid,
-    CAST(SUM(CASE WHEN c.usage_type = 1 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utRunningVM,
-    CAST(SUM(CASE WHEN c.usage_type = 2 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utAllocatedVM,
-    CAST(SUM(CASE WHEN c.usage_type = 3 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utIpCharge,
-    CAST(SUM(CASE WHEN c.usage_type = 6 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utVolume,
-    CAST(SUM(CASE WHEN c.usage_type = 7 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utTemplate,
-    CAST(SUM(CASE WHEN c.usage_type = 8 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utISO,
-    CAST(SUM(CASE WHEN c.usage_type = 9 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utSnapshot,
-    CAST(SUM(CASE WHEN c.usage_type = 26 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utVolumeSecondary,
-    CAST(SUM(CASE WHEN c.usage_type = 27 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utVmSnapshotOnPrimary,
-    CAST(SUM(CASE WHEN c.usage_type = 9999 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utCredit,
-    CAST(SUM(c.usage_charge) AS DECIMAL(10,2)) AS total_importo
-FROM cdl_charges c
-WHERE c.domainid = :domain AND charge_day = :day
-GROUP BY c.charge_day, c.domainid
-ORDER BY c.charge_day DESC
+-- get_charges_by_category (IaaS PPU page) — macro-category composition over a period
+-- Datasource: grappa (mysql). total = SUM of returned categories (computed in Go).
+-- usage_type 9999 (Credit) is excluded.
+SELECT
+  CASE
+    WHEN usage_type = 2 THEN 'VM'
+    WHEN usage_type IN (6,7,8,9) THEN 'Storage'
+    WHEN usage_type = 9998 THEN 'Licenze Windows'
+    ELSE 'Altro'
+  END AS category,
+  CAST(SUM(usage_charge) AS DECIMAL(12,2)) AS amount
+FROM cdl_charges
+WHERE domainid = :domain AND charge_day BETWEEN :from AND :to
+  AND (usage_type IS NULL OR usage_type != 9999)
+GROUP BY category
+ORDER BY FIELD(category, 'VM', 'Storage', 'Licenze Windows', 'Altro')
 ```
 
 ```sql
@@ -311,7 +304,7 @@ group by charge_day order by charge_day desc
 ```
 
 - **Usage type codes:** 1=RunningVM, 2=AllocatedVM, 3=IP, 6=Volume, 7=Template, 8=ISO, 9=Snapshot, 26=VolumeSecondary, 27=VmSnapshotOnPrimary, 9998=WindowsLicense, 9999=Credit
-- **Charge breakdown response:** Backend transforms flat SQL columns into typed array `[{type, label, amount}]`, filtering out zero-value entries
+- **Macro-category mapping (fixed backend-side):** VM=2; Storage=6,7,8,9; Licenze Windows=9998; Altro=1,3,26,27,NULL,unknown. `usage_type 9999` (Credit) is excluded from both series totals and category composition, so the four categories sum exactly to the "Totale periodo".
 - **Exclusions:** `codice_aggancio_gest NOT IN (385, 485)` — as-is, not centralized
 
 ---
@@ -437,14 +430,18 @@ Hidden columns (toggleable): `data_ultima_fatt`, `metodo_pagamento`, `durata_ser
 
 ### View: IaaS Pay Per Use
 
-- **User intent:** Monitor Cloudstack IaaS consumption per account.
-- **Interaction pattern:** Master-detail with tabs. Cascading selection: account → day → breakdown.
+- **User intent:** Monitor Cloudstack IaaS consumption per account over selectable periods and aggregations.
+- **Interaction pattern:** Dashboard a colonne. Master (account list, auto-select first) → detail with KPI, time-series chart, category pie, and bucket table.
 
-**Account table:** Selectable rows (auto-select first). Columns: Intestazione, Credito, Abbreviazione, Serialnumber, Data attivazione. `cloudstack_domain` hidden.
+**Master (account list):** Searchable list with accent-bar selection; shows Intestazione + Credito + Abbreviazione. `cloudstack_domain` is the hidden key. CSV export.
 
-**Tabs:**
-- **Giornaliero:** Daily charges table (120 days) + pie chart (charge breakdown by type, from typed array response, zero-value types filtered by frontend). Labels: as-is English technical names.
-- **Mensile:** Bar chart, monthly totals (12 months).
+**Detail:**
+- **Controls:** Period select (30/90/120 days, 6/12/24 months) + Aggregation select (Giornaliera/Settimanale/Mensile/Trimestrale/Annuale). Default aggregation is period-suggested but user-overridable.
+- **Drill-down (zoom + breadcrumb):** Clicking a chart bar narrows the window to that bucket and lowers aggregation by one level (stops at Giornaliera). The breadcrumb records the path and supports roll-up. Selectors lock while drilling; selecting an account resets the drill.
+- **KPI row:** Totale periodo + per-category amount/percent (VM, Storage, Licenze Windows, Altro). All exclude `usage_type 9999`.
+- **Time-series chart:** One bar per bucket (consumption, 9999 excluded). Clickable for drill when a finer granularity exists.
+- **Composition pie:** Macro-category split over the whole selected period (localized labels).
+- **Bucket table:** One row per bucket (Periodo, Totale), sortable + CSV export.
 
 ---
 
@@ -476,7 +473,7 @@ Hidden columns (toggleable): `data_ultima_fatt`, `metodo_pagamento`, `durata_ser
 | `data_ordine` computation | CASE in SQL, preserved exactly |
 | Sentinel date normalization | NULLIF in SQL, preserved exactly |
 | Document/order grouping | CASE expressions in SQL (as-is) |
-| Charge breakdown transform | SQL → typed array `[{type, label, amount}]` |
+| Charge aggregation & categorization | SQL bucket by group (daily/weekly/monthly/quarterly/yearly); fixed usage_type → category mapping (VM/Storage/Licenze Windows/Altro), 9999 excluded |
 | PBX totals aggregation | Sum users/SE, return with rows |
 | Period filter | Accept null as "no date filter" |
 | Exclusions | codice_aggancio_gest NOT IN (385,485); KlajdiandCo WHERE filter |
@@ -487,9 +484,9 @@ Hidden columns (toggleable): `data_ultima_fatt`, `metodo_pagamento`, `durata_ser
 |---------------|---------|
 | Master-Detail Drawer | Slide-over panel for Ordini pages (480px / 600px with tabs) |
 | Visual row grouping | First-row emphasis + tree-line connector for order tables |
-| Charge pie chart | Build series from typed array, filter zero-value types |
+| Charge pie + KPI | Build category composition from `charges-by-category`; localized labels |
 | Auto-refresh | Fatture (customer/period change), Timoo (tenant change) |
-| Cascading selection | IaaS: account → daily/monthly → day breakdown |
+| Period/aggregation controls | IaaS: period + granularity selectors; drill-down zoom with breadcrumb |
 | Currency/date formatting | EUR 2 decimals, DD-MM-YYYY |
 | Table features | Search, sort, pagination, column visibility toggle, CSV export |
 
@@ -516,9 +513,8 @@ Hidden columns (toggleable): `data_ultima_fatt`, `metodo_pagamento`, `durata_ser
 | Endpoint | Method | Original query |
 |----------|--------|---------------|
 | `.../iaas/accounts` | GET | `get_cdl_accounts` |
-| `.../iaas/daily-charges` | GET | `get_daily_charges` |
-| `.../iaas/monthly-charges` | GET | `get_monthly_charges` |
-| `.../iaas/charge-breakdown` | GET | `get_charges_by_type` |
+| `.../iaas/charges` | GET | `get_charges` (aggregated series: domain, from, to, group) |
+| `.../iaas/charges-by-category` | GET | `get_charges_by_category` (domain, from, to) |
 | `.../iaas/windows-licenses` | GET | `get_licenses_by_day` |
 
 ### Anisetta endpoints
@@ -528,7 +524,7 @@ Hidden columns (toggleable): `data_ultima_fatt`, `metodo_pagamento`, `durata_ser
 | `.../timoo/tenants` | GET | `getAnisettaTenants` |
 | `.../timoo/pbx-stats` | GET | `getPbxByTenandId` + aggregation |
 
-**Total: 16 GET endpoints, 0 write endpoints.**
+**Total: 15 GET endpoints, 0 write endpoints.**
 
 ---
 

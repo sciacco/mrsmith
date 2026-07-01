@@ -3,6 +3,8 @@ package panoramica
 import (
 	"database/sql"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
@@ -69,209 +71,199 @@ ORDER BY intestazione`)
 	httputil.JSON(w, http.StatusOK, result)
 }
 
-// handleListDailyCharges returns daily charge totals for an IaaS domain (last 120 days).
-// GET /panoramica/v1/iaas/daily-charges?domain=uuid-string
-func (h *Handler) handleListDailyCharges(w http.ResponseWriter, r *http.Request) {
+// bucketExpression maps an aggregation group to its SQL bucketing expression.
+// Every expression is wrapped in DATE_FORMAT(..., '%Y-%m-%d') so the bucket is
+// always a plain YYYY-MM-DD string. Without this, DATE columns are returned by
+// the MySQL driver (parseTime) as time.Time and serialized as RFC3339
+// (e.g. 2025-12-22T00:00:00Z), which breaks date validation and formatting.
+func bucketExpression(group string) (string, bool) {
+	switch group {
+	case "daily":
+		return "DATE_FORMAT(charge_day, '%Y-%m-%d')", true
+	case "weekly":
+		// Monday of the week
+		return "DATE_FORMAT(DATE_SUB(charge_day, INTERVAL WEEKDAY(charge_day) DAY), '%Y-%m-%d')", true
+	case "monthly":
+		return "DATE_FORMAT(charge_day, '%Y-%m-01')", true
+	case "quarterly":
+		return "DATE_FORMAT(DATE(CONCAT(YEAR(charge_day), '-', LPAD((QUARTER(charge_day)-1)*3+1, 2, '0'), '-01')), '%Y-%m-%d')", true
+	case "yearly":
+		return "DATE_FORMAT(charge_day, '%Y-01-01')", true
+	default:
+		return "", false
+	}
+}
+
+// validChargeDate validates a YYYY-MM-DD parameter.
+func validChargeDate(s string) bool {
+	_, err := time.Parse("2006-01-02", s)
+	return err == nil
+}
+
+// handleListCharges returns an aggregated charge time series for an IaaS domain.
+// GET /panoramica/v1/iaas/charges?domain=uuid&from=YYYY-MM-DD&to=YYYY-MM-DD&group=daily|weekly|monthly|quarterly|yearly
+//
+// usage_type 9999 (Credit) is excluded from totals.
+func (h *Handler) handleListCharges(w http.ResponseWriter, r *http.Request) {
 	if !h.requireGrappa(w) {
 		return
 	}
 
-	domain := r.URL.Query().Get("domain")
+	q := r.URL.Query()
+	domain := q.Get("domain")
 	if domain == "" {
 		httputil.Error(w, http.StatusBadRequest, "missing_domain_parameter")
 		return
 	}
+	from := q.Get("from")
+	if !validChargeDate(from) {
+		httputil.Error(w, http.StatusBadRequest, "invalid_from_parameter")
+		return
+	}
+	to := q.Get("to")
+	if !validChargeDate(to) {
+		httputil.Error(w, http.StatusBadRequest, "invalid_to_parameter")
+		return
+	}
+	group := strings.TrimSpace(q.Get("group"))
+	if group == "" {
+		group = "daily"
+	}
+	bucketExpr, ok := bucketExpression(group)
+	if !ok {
+		httputil.Error(w, http.StatusBadRequest, "invalid_group_parameter")
+		return
+	}
 
-	rows, err := h.grappaDB.QueryContext(r.Context(),
-		`SELECT c.charge_day AS giorno, c.domainid,
-    CAST(SUM(CASE WHEN c.usage_type = 9999 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utCredit,
-    CAST(SUM(c.usage_charge) AS DECIMAL(10,2)) AS total_importo
-FROM cdl_charges c
-WHERE c.domainid = ? AND charge_day >= DATE_SUB(NOW(), INTERVAL 120 DAY)
-GROUP BY c.charge_day, c.domainid
-ORDER BY c.charge_day DESC`, domain)
+	query := "SELECT " + bucketExpr + " AS bucket, " +
+		"CAST(SUM(CASE WHEN usage_type = 9999 THEN 0 ELSE usage_charge END) AS DECIMAL(12,2)) AS total_importo " +
+		"FROM cdl_charges " +
+		"WHERE domainid = ? AND charge_day BETWEEN ? AND ? " +
+		"GROUP BY bucket ORDER BY bucket ASC"
+
+	rows, err := h.grappaDB.QueryContext(r.Context(), query, domain, from, to)
 	if err != nil {
-		h.dbFailure(w, r, "list_daily_charges", err)
+		h.dbFailure(w, r, "list_charges", err)
 		return
 	}
 	defer rows.Close()
 
-	type dailyCharge struct {
-		Giorno       string  `json:"giorno"`
-		DomainID     string  `json:"domainid"`
-		UtCredit     float64 `json:"utCredit"`
-		TotalImporto float64 `json:"total_importo"`
+	type seriesPoint struct {
+		Bucket        string  `json:"bucket"`
+		TotalImporto  float64 `json:"total_importo"`
 	}
 
-	var result []dailyCharge
+	var result []seriesPoint
 	for rows.Next() {
-		var d dailyCharge
-		if err := rows.Scan(&d.Giorno, &d.DomainID, &d.UtCredit, &d.TotalImporto); err != nil {
-			h.dbFailure(w, r, "list_daily_charges_scan", err)
+		var p seriesPoint
+		if err := rows.Scan(&p.Bucket, &p.TotalImporto); err != nil {
+			h.dbFailure(w, r, "list_charges_scan", err)
 			return
 		}
-		result = append(result, d)
+		result = append(result, p)
 	}
-	if !h.rowsDone(w, r, rows, "list_daily_charges") {
+	if !h.rowsDone(w, r, rows, "list_charges") {
 		return
 	}
 	if result == nil {
-		result = []dailyCharge{}
+		result = []seriesPoint{}
 	}
 
 	httputil.JSON(w, http.StatusOK, result)
 }
 
-// handleListMonthlyCharges returns monthly charge totals for an IaaS domain (last 12 months).
-// GET /panoramica/v1/iaas/monthly-charges?domain=uuid-string
-func (h *Handler) handleListMonthlyCharges(w http.ResponseWriter, r *http.Request) {
+// categoryFromUsageType maps a raw usage_type to a billing macro-category.
+// 9999 (Credit) must be filtered out by the caller and never reaches here.
+func categoryFromUsageType(t sql.NullInt64) string {
+	if !t.Valid {
+		return "Altro"
+	}
+	switch t.Int64 {
+	case 2:
+		return "VM"
+	case 6, 7, 8, 9:
+		return "Storage"
+	case 9998:
+		return "Licenze Windows"
+	default:
+		return "Altro"
+	}
+}
+
+// handleChargesByCategory returns the charge composition by macro-category over a period.
+// GET /panoramica/v1/iaas/charges-by-category?domain=uuid&from=YYYY-MM-DD&to=YYYY-MM-DD
+//
+// Categories: VM (2), Storage (6,7,8,9), Licenze Windows (9998), Altro (1,3,26,27,NULL,unknown).
+// usage_type 9999 (Credit) is excluded. Total equals the sum of the returned categories.
+func (h *Handler) handleChargesByCategory(w http.ResponseWriter, r *http.Request) {
 	if !h.requireGrappa(w) {
 		return
 	}
 
-	domain := r.URL.Query().Get("domain")
+	q := r.URL.Query()
+	domain := q.Get("domain")
 	if domain == "" {
 		httputil.Error(w, http.StatusBadRequest, "missing_domain_parameter")
 		return
 	}
+	from := q.Get("from")
+	if !validChargeDate(from) {
+		httputil.Error(w, http.StatusBadRequest, "invalid_from_parameter")
+		return
+	}
+	to := q.Get("to")
+	if !validChargeDate(to) {
+		httputil.Error(w, http.StatusBadRequest, "invalid_to_parameter")
+		return
+	}
 
 	rows, err := h.grappaDB.QueryContext(r.Context(),
-		`SELECT DATE_FORMAT(charge_day, '%Y-%m') AS mese, CAST(SUM(usage_charge) AS DECIMAL(7,2)) AS importo
+		`SELECT
+  CASE
+    WHEN usage_type = 2 THEN 'VM'
+    WHEN usage_type IN (6,7,8,9) THEN 'Storage'
+    WHEN usage_type = 9998 THEN 'Licenze Windows'
+    ELSE 'Altro'
+  END AS category,
+  CAST(SUM(usage_charge) AS DECIMAL(12,2)) AS amount
 FROM cdl_charges
-WHERE domainid = ? AND charge_day >= DATE_SUB(NOW(), INTERVAL 365 DAY)
-GROUP BY 1 ORDER BY 1 DESC LIMIT 12`, domain)
+WHERE domainid = ? AND charge_day BETWEEN ? AND ?
+  AND (usage_type IS NULL OR usage_type != 9999)
+GROUP BY category
+ORDER BY FIELD(category, 'VM', 'Storage', 'Licenze Windows', 'Altro')`, domain, from, to)
 	if err != nil {
-		h.dbFailure(w, r, "list_monthly_charges", err)
+		h.dbFailure(w, r, "charges_by_category", err)
 		return
 	}
 	defer rows.Close()
 
-	type monthlyCharge struct {
-		Mese    string  `json:"mese"`
-		Importo float64 `json:"importo"`
+	type categoryAmount struct {
+		Category string  `json:"category"`
+		Amount   float64 `json:"amount"`
 	}
 
-	var result []monthlyCharge
+	var categories []categoryAmount
+	var total float64
 	for rows.Next() {
-		var m monthlyCharge
-		if err := rows.Scan(&m.Mese, &m.Importo); err != nil {
-			h.dbFailure(w, r, "list_monthly_charges_scan", err)
+		var ca categoryAmount
+		if err := rows.Scan(&ca.Category, &ca.Amount); err != nil {
+			h.dbFailure(w, r, "charges_by_category_scan", err)
 			return
 		}
-		result = append(result, m)
+		total += ca.Amount
+		categories = append(categories, ca)
 	}
-	if !h.rowsDone(w, r, rows, "list_monthly_charges") {
+	if !h.rowsDone(w, r, rows, "charges_by_category") {
 		return
 	}
-	if result == nil {
-		result = []monthlyCharge{}
+	if categories == nil {
+		categories = []categoryAmount{}
 	}
 
-	httputil.JSON(w, http.StatusOK, result)
-}
-
-// handleChargeBreakdown returns a typed breakdown of charges for a domain on a specific day.
-// GET /panoramica/v1/iaas/charge-breakdown?domain=uuid-string&day=2026-04-01
-func (h *Handler) handleChargeBreakdown(w http.ResponseWriter, r *http.Request) {
-	if !h.requireGrappa(w) {
-		return
-	}
-
-	domain := r.URL.Query().Get("domain")
-	if domain == "" {
-		httputil.Error(w, http.StatusBadRequest, "missing_domain_parameter")
-		return
-	}
-	day := r.URL.Query().Get("day")
-	if day == "" {
-		httputil.Error(w, http.StatusBadRequest, "missing_day_parameter")
-		return
-	}
-
-	row := h.grappaDB.QueryRowContext(r.Context(),
-		`SELECT c.charge_day, c.domainid,
-    CAST(SUM(CASE WHEN c.usage_type = 1 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utRunningVM,
-    CAST(SUM(CASE WHEN c.usage_type = 2 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utAllocatedVM,
-    CAST(SUM(CASE WHEN c.usage_type = 3 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utIpCharge,
-    CAST(SUM(CASE WHEN c.usage_type = 6 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utVolume,
-    CAST(SUM(CASE WHEN c.usage_type = 7 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utTemplate,
-    CAST(SUM(CASE WHEN c.usage_type = 8 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utISO,
-    CAST(SUM(CASE WHEN c.usage_type = 9 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utSnapshot,
-    CAST(SUM(CASE WHEN c.usage_type = 26 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utVolumeSecondary,
-    CAST(SUM(CASE WHEN c.usage_type = 27 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utVmSnapshotOnPrimary,
-    CAST(SUM(CASE WHEN c.usage_type = 9999 THEN c.usage_charge ELSE 0 END) AS DECIMAL(10,2)) AS utCredit,
-    CAST(SUM(c.usage_charge) AS DECIMAL(10,2)) AS total_importo
-FROM cdl_charges c
-WHERE c.domainid = ? AND charge_day = ?
-GROUP BY c.charge_day, c.domainid
-ORDER BY c.charge_day DESC`, domain, day)
-
-	var chargeDay, domainID string
-	var utRunningVM, utAllocatedVM, utIpCharge, utVolume, utTemplate float64
-	var utISO, utSnapshot, utVolumeSecondary, utVmSnapshotOnPrimary float64
-	var utCredit, totalImporto float64
-
-	err := row.Scan(&chargeDay, &domainID,
-		&utRunningVM, &utAllocatedVM, &utIpCharge, &utVolume, &utTemplate,
-		&utISO, &utSnapshot, &utVolumeSecondary, &utVmSnapshotOnPrimary,
-		&utCredit, &totalImporto)
-
-	if err == sql.ErrNoRows {
-		httputil.JSON(w, http.StatusOK, chargeBreakdownResponse{
-			Charges: []chargeItem{},
-			Total:   0,
-		})
-		return
-	}
-	if err != nil {
-		h.dbFailure(w, r, "charge_breakdown", err)
-		return
-	}
-
-	type typeMapping struct {
-		typ    string
-		label  string
-		amount float64
-	}
-
-	mappings := []typeMapping{
-		{"RunningVM", "utRunningVM", utRunningVM},
-		{"AllocatedVM", "utAllocatedVM", utAllocatedVM},
-		{"IpCharge", "utIpCharge", utIpCharge},
-		{"Volume", "utVolume", utVolume},
-		{"Template", "utTemplate", utTemplate},
-		{"ISO", "utISO", utISO},
-		{"Snapshot", "utSnapshot", utSnapshot},
-		{"VolumeSecondary", "utVolumeSecondary", utVolumeSecondary},
-		{"VmSnapshotOnPrimary", "utVmSnapshotOnPrimary", utVmSnapshotOnPrimary},
-		{"Credit", "utCredit", utCredit},
-	}
-
-	var charges []chargeItem
-	for _, m := range mappings {
-		if m.amount != 0 {
-			charges = append(charges, chargeItem{Type: m.typ, Label: m.label, Amount: m.amount})
-		}
-	}
-	if charges == nil {
-		charges = []chargeItem{}
-	}
-
-	httputil.JSON(w, http.StatusOK, chargeBreakdownResponse{
-		Charges: charges,
-		Total:   totalImporto,
+	httputil.JSON(w, http.StatusOK, map[string]any{
+		"categories": categories,
+		"total":      total,
 	})
-}
-
-type chargeItem struct {
-	Type   string  `json:"type"`
-	Label  string  `json:"label"`
-	Amount float64 `json:"amount"`
-}
-
-type chargeBreakdownResponse struct {
-	Charges []chargeItem `json:"charges"`
-	Total   float64      `json:"total"`
 }
 
 // handleListWindowsLicenses returns daily Windows license counts (last 14 days).

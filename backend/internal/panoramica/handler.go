@@ -42,9 +42,8 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB, anisettaDB *sql.DB) 
 
 	// ── Grappa: IaaS ──
 	handle("GET /panoramica/v1/iaas/accounts", h.handleListIaaSAccounts)
-	handle("GET /panoramica/v1/iaas/daily-charges", h.handleListDailyCharges)
-	handle("GET /panoramica/v1/iaas/monthly-charges", h.handleListMonthlyCharges)
-	handle("GET /panoramica/v1/iaas/charge-breakdown", h.handleChargeBreakdown)
+	handle("GET /panoramica/v1/iaas/charges", h.handleListCharges)
+	handle("GET /panoramica/v1/iaas/charges-by-category", h.handleChargesByCategory)
 	handle("GET /panoramica/v1/iaas/windows-licenses", h.handleListWindowsLicenses)
 
 	// ── Anisetta: Timoo ──

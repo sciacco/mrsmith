@@ -8,9 +8,8 @@ import type {
   InvoiceLine,
   AccessLine,
   IaaSAccount,
-  DailyCharge,
-  MonthlyCharge,
-  ChargeBreakdown,
+  ChargeSeriesPoint,
+  ChargeCategoryBreakdown,
   WindowsLicense,
   TimooTenant,
   PbxStatsResponse,
@@ -110,32 +109,24 @@ export function useIaaSAccounts() {
   });
 }
 
-export function useDailyCharges(domain: string | null) {
+export function useChargesSeries(domain: string | null, from: string, to: string, group: string) {
   const api = useApiClient();
+  const params = new URLSearchParams({ domain: domain!, from, to, group });
   return useQuery({
-    queryKey: ['panoramica', 'iaas', 'daily-charges', domain],
-    queryFn: () => api.get<DailyCharge[]>(`/panoramica/v1/iaas/daily-charges?domain=${domain}`),
+    queryKey: ['panoramica', 'iaas', 'charges', domain, from, to, group],
+    queryFn: () => api.get<ChargeSeriesPoint[]>(`/panoramica/v1/iaas/charges?${params}`),
     enabled: domain !== null,
     retry: false,
   });
 }
 
-export function useMonthlyCharges(domain: string | null) {
+export function useChargesByCategory(domain: string | null, from: string, to: string) {
   const api = useApiClient();
+  const params = new URLSearchParams({ domain: domain!, from, to });
   return useQuery({
-    queryKey: ['panoramica', 'iaas', 'monthly-charges', domain],
-    queryFn: () => api.get<MonthlyCharge[]>(`/panoramica/v1/iaas/monthly-charges?domain=${domain}`),
+    queryKey: ['panoramica', 'iaas', 'charges-by-category', domain, from, to],
+    queryFn: () => api.get<ChargeCategoryBreakdown>(`/panoramica/v1/iaas/charges-by-category?${params}`),
     enabled: domain !== null,
-    retry: false,
-  });
-}
-
-export function useChargeBreakdown(domain: string | null, day: string | null) {
-  const api = useApiClient();
-  return useQuery({
-    queryKey: ['panoramica', 'iaas', 'charge-breakdown', domain, day],
-    queryFn: () => api.get<ChargeBreakdown>(`/panoramica/v1/iaas/charge-breakdown?domain=${domain}&day=${day}`),
-    enabled: domain !== null && day !== null,
     retry: false,
   });
 }

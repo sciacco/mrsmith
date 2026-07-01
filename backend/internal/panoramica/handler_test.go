@@ -1,6 +1,7 @@
 package panoramica
 
 import (
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -76,23 +77,78 @@ func TestOrdersDetailNilDB(t *testing.T) {
 	}
 }
 
-func TestDailyChargesNilDB(t *testing.T) {
+func TestChargesNilDB(t *testing.T) {
 	h := &Handler{}
-	req := httptest.NewRequest("GET", "/panoramica/v1/iaas/daily-charges", nil)
+	req := httptest.NewRequest("GET", "/panoramica/v1/iaas/charges?domain=x&from=2026-01-01&to=2026-01-31&group=monthly", nil)
 	rec := httptest.NewRecorder()
-	h.handleListDailyCharges(rec, req)
+	h.handleListCharges(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", rec.Code)
 	}
 }
 
-func TestChargeBreakdownNilDB(t *testing.T) {
+func TestChargesByCategoryNilDB(t *testing.T) {
 	h := &Handler{}
-	req := httptest.NewRequest("GET", "/panoramica/v1/iaas/charge-breakdown", nil)
+	req := httptest.NewRequest("GET", "/panoramica/v1/iaas/charges-by-category?domain=x&from=2026-01-01&to=2026-01-31", nil)
 	rec := httptest.NewRecorder()
-	h.handleChargeBreakdown(rec, req)
+	h.handleChargesByCategory(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", rec.Code)
+	}
+}
+
+// ── Charge series parameter validation (handler returns 400 before touching the DB) ──
+
+func TestChargesMissingDomain(t *testing.T) {
+	h := &Handler{} // nil Grappa: requireGrappa short-circuits to 503 first
+	req := httptest.NewRequest("GET", "/panoramica/v1/iaas/charges?from=2026-01-01&to=2026-01-31", nil)
+	rec := httptest.NewRecorder()
+	h.handleListCharges(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 (nil DB), got %d", rec.Code)
+	}
+}
+
+func TestBucketExpressionValidation(t *testing.T) {
+	for _, g := range []string{"daily", "weekly", "monthly", "quarterly", "yearly"} {
+		expr, ok := bucketExpression(g)
+		if !ok {
+			t.Errorf("bucketExpression(%q): expected valid", g)
+		}
+		// Buckets must be plain YYYY-MM-DD strings, never RFC3339 time.Time.
+		// The MySQL driver (parseTime) would otherwise serialize DATE columns as
+		// e.g. 2025-12-22T00:00:00Z and break date validation/formatting.
+		if !strings.Contains(expr, "DATE_FORMAT") {
+			t.Errorf("bucketExpression(%q) = %q: expected a DATE_FORMAT-wrapped expression", g, expr)
+		}
+	}
+	if _, ok := bucketExpression("hourly"); ok {
+		t.Errorf("bucketExpression(%q): expected invalid", "hourly")
+	}
+}
+
+func TestCategoryFromUsageType(t *testing.T) {
+	cases := map[int64]string{
+		2:    "VM",
+		6:    "Storage",
+		7:    "Storage",
+		8:    "Storage",
+		9:    "Storage",
+		9998: "Licenze Windows",
+		1:    "Altro",
+		3:    "Altro",
+		26:   "Altro",
+		27:   "Altro",
+	}
+	for typ, want := range cases {
+		got := categoryFromUsageType(sql.NullInt64{Int64: typ, Valid: true})
+		if got != want {
+			t.Errorf("categoryFromUsageType(%d): expected %q, got %q", typ, want, got)
+		}
+	}
+	// NULL usage_type lands in Altro
+	if got := categoryFromUsageType(sql.NullInt64{Valid: false}); got != "Altro" {
+		t.Errorf("categoryFromUsageType(NULL): expected Altro, got %q", got)
 	}
 }
 

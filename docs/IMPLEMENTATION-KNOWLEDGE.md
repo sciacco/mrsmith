@@ -134,6 +134,26 @@ Alyante ERP ID
 | `385` | IaaS Prezzi risorse, IaaS Credito omaggio |
 | `485` | IaaS Credito omaggio |
 
+## Cloud / IaaS (Cloudstack) Billing
+
+### Cloudstack IaaS Charge Categories Are Fixed Backend-Side
+
+- Context: IaaS Pay Per Use consumption views and any future billing/exploration surface over Grappa `cdl_charges`.
+- Discovery: `cdl_charges.usage_type` is a flat code list. For human-facing consumption analysis it is grouped into fixed macro-categories, and `usage_type = 9999` (Credit) is a bookkeeping line, not real consumption, so it is excluded from all consumption totals and from the category composition.
+- Practical rule: group usage_type into **VM** (2), **Storage** (6,7,8,9), **Licenze Windows** (9998), **Altro** (1,3,26,27,NULL,unknown), and always exclude 9999. Compute the period total as the sum of the four returned categories so the KPI total and the pie stay consistent. Apply the same grouping in any new IaaS consumption surface instead of re-deriving it.
+- Evidence: `backend/internal/panoramica/handler_iaas.go` (`categoryFromUsageType`, `handleChargesByCategory`); `apps/panoramica-cliente/SPEC.md` IaaS entity/view sections.
+- Used by: `apps/panoramica-cliente` IaaS Pay Per Use.
+- Open questions: none.
+
+### Grappa DATE Columns Serialize as RFC3339 When Scanned to String
+
+- Context: any Go backend query against Grappa (MySQL) that selects a `DATE`/`DATETIME` column and scans it into a `string` (or returns it in JSON).
+- Discovery: the MySQL DSN runs with `parseTime`, so `DATE` columns come back as `time.Time`; `database/sql` then formats `time.Time` → `string` as RFC3339 (e.g. `2025-12-22T00:00:00Z`), not `2025-12-22`. This silently breaks YYYY-MM-DD validation and date formatting on the client and caused 400 `invalid_from_parameter` on the IaaS drill-down.
+- Practical rule: when a Go handler must return a clean date string for a `DATE`/`DATETIME` value, wrap the expression in `DATE_FORMAT(col, '%Y-%m-%d')` (or cast to CHAR) in SQL. Do not rely on scanning a raw DATE into a string. Frontend date helpers that consume these values should also tolerate an optional time/timezone suffix (take the first 10 chars).
+- Evidence: `backend/internal/panoramica/handler_iaas.go` `bucketExpression` (DATE_FORMAT-wrapped after the fix) and regression test `TestBucketExpressionValidation`; `apps/panoramica-cliente/src/hooks/useChargeDrill.ts` `parseDate`.
+- Used by: `apps/panoramica-cliente` IaaS Pay Per Use.
+- Open questions: none.
+
 ## API and Backend Contract Quirks
 
 ### OpenAPI.it Wrappers Stay Backend-Side
