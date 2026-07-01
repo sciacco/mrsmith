@@ -19,6 +19,13 @@ type maGatedSearchJobPayload struct {
 	EstimatedCount int    `json:"estimated_count"`
 }
 
+// maAssociateDomainJobPayload is the associate_domain job's args: which held company and
+// which operator-supplied domain to re-gate it with.
+type maAssociateDomainJobPayload struct {
+	CompanyKey string `json:"company_key"`
+	Domain     string `json:"domain"`
+}
+
 // maGatedScoreStats records what the enrich_score stage did, for the trace.
 type maGatedScoreStats struct {
 	Enriched     int // survivors that paid IT-advanced this pass
@@ -547,14 +554,13 @@ func gatedTargetBucket(target MATarget) string {
 	return sectorActionToBucket(target.WebValidation.FinalAction)
 }
 
-// associateMATargetDomain is the manual-review remedy. For a company the gate could not
-// resolve (manual_review / domain_unresolved), the operator supplies an official domain;
-// this re-gates THAT one company with the forced domain and, if it now survives (keep/forse),
-// enriches it and RE-SCORES the whole advanced survivor set (scoring is set-relative). The
-// heavy work (crawl + classify + one Advanced fetch) runs off the request path in a detached
-// goroutine — the crawl can exceed the HTTP write timeout — so the caller gets the session
-// back in 'running' and polls. It validates synchronously so bad input fails fast.
-func (s *maService) associateMATargetDomain(ctx context.Context, sessionID, companyKey, domain string, subject, email string) (MASessionDetail, error) {
+// enqueueAssociateDomain is the manual-review remedy. For a company held in manual_review
+// (domain unresolved), the operator supplies an official domain; this validates synchronously
+// (company exists, domain well-formed, session idle) then enqueues a DURABLE associate_domain
+// job pre-leased to this instance's owner — so a foreign worker on the shared queue can't
+// steal the paid re-gate+enrich, and a crash resumes (unlike the dev-only inline mode). The
+// worker runs runAssociateDomainJob; the caller gets the session in 'running' and polls.
+func (s *maService) enqueueAssociateDomain(ctx context.Context, sessionID, companyKey, domain, subject, email string) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
@@ -584,11 +590,9 @@ func (s *maService) associateMATargetDomain(ctx context.Context, sessionID, comp
 	if detail.Strategy == nil {
 		return MASessionDetail{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
 	}
-	runID := ""
 	found := false
 	for _, target := range detail.Targets {
 		if normalizeMACompanyKey(target.CompanyKey) == companyKey {
-			runID = target.RunID
 			found = true
 			break
 		}
@@ -596,67 +600,85 @@ func (s *maService) associateMATargetDomain(ctx context.Context, sessionID, comp
 	if !found {
 		return MASessionDetail{}, fmt.Errorf("%w: target not found", errMAStrategyInvalid)
 	}
-	if runID == "" {
-		return MASessionDetail{}, fmt.Errorf("%w: target has no run", errMAStrategyInvalid)
-	}
 
-	if err := s.store.MarkMASessionExecuting(ctx, sessionID); err != nil {
+	payload, err := json.Marshal(maAssociateDomainJobPayload{CompanyKey: companyKey, Domain: domain})
+	if err != nil {
+		return MASessionDetail{}, fmt.Errorf("marshal ma associate domain payload: %w", err)
+	}
+	_, created, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
+		JobType:           maJobTypeAssociateDomain,
+		SessionID:         sessionID,
+		StrategyVersionID: detail.Strategy.ID,
+		Subject:           subject,
+		Email:             email,
+		Payload:           payload,
+		Owner:             s.owner,
+	})
+	if err != nil {
 		return MASessionDetail{}, err
 	}
-	go func() {
-		bg := context.WithoutCancel(ctx)
-		if err := s.runAssociateDomainJob(bg, sessionID, companyKey, domain, runID, subject, email); err != nil {
-			logging.FromContext(bg).Error("binocolo associate domain failed",
-				"component", "binocolo", "operation", "ma_target_associate_domain",
-				"session_id", sessionID, "company_key", companyKey, "error", err)
+	if created {
+		if err := s.store.MarkMASessionExecuting(ctx, sessionID); err != nil {
+			return MASessionDetail{}, err
 		}
-	}()
+	}
 	return s.getSession(ctx, sessionID)
 }
 
-// runAssociateDomainJob owns the operation trace for a manual domain association, so the
-// paid Advanced fetch + LLM analyst tokens are audited like every other spend path.
-func (s *maService) runAssociateDomainJob(ctx context.Context, sessionID, companyKey, domain, runID, subject, email string) error {
+// runAssociateDomainJob executes a queued associate_domain job off the request path, owning
+// the operation trace so the paid Advanced fetch + LLM analyst tokens are audited like every
+// other spend path. Mirrors runGatedSearchJob's worker signature.
+func (s *maService) runAssociateDomainJob(ctx context.Context, job maJob) (string, error) {
 	trace, err := s.startTrace(ctx, maTraceStart{
 		Operation:        "ma_target_associate_domain",
-		SessionID:        sessionID,
-		CreatedBySubject: subject,
-		CreatedByEmail:   email,
+		SessionID:        job.SessionID,
+		CreatedBySubject: job.CreatedBySubject,
+		CreatedByEmail:   job.CreatedByEmail,
+		Request:          job.Payload,
 	})
 	if err != nil {
-		s.releaseAssociateSession(ctx, sessionID, runID)
-		return err
+		return "", err
 	}
 	ctx = withMATrace(ctx, trace)
-	if workErr := s.associateDomainWork(ctx, sessionID, companyKey, domain, runID, subject, email); workErr != nil {
+	if workErr := s.associateDomainWork(ctx, job); workErr != nil {
 		_ = s.completeTrace(ctx, maTraceComplete{Status: maTraceStatusFailed, ErrorMessage: workErr.Error()})
-		return workErr
+		return trace.id, workErr
 	}
 	_ = s.completeTrace(ctx, maTraceComplete{Status: maTraceStatusSucceeded, HTTPStatus: http.StatusOK})
-	return nil
+	return trace.id, nil
 }
 
 // associateDomainWork re-gates one company with the forced domain, then enriches+re-scores.
-// On any early failure it releases the session back to 'completed' (the prior run + targets
-// are untouched); the success path completes the run itself inside enrichAssociatedAndRescore.
-func (s *maService) associateDomainWork(ctx context.Context, sessionID, companyKey, domain, runID, subject, email string) (err error) {
-	success := false
-	defer func() {
-		if !success {
-			s.releaseAssociateSession(ctx, sessionID, runID)
+// Idempotent for the worker retry loop: buildMAWebValidationForDomain rebuilds the (cheap)
+// gate verdict each attempt, and enrichAssociatedAndRescore only pays Advanced for a survivor
+// not already advanced — so a retry after a mid-enrich crash reuses the persisted €0.10, never
+// re-charges. Returning an error triggers a retry; final give-up releases the session (worker
+// retryOrFail → releaseAssociateSession), so it never sticks in 'running'.
+func (s *maService) associateDomainWork(ctx context.Context, job maJob) error {
+	var payload maAssociateDomainJobPayload
+	if len(job.Payload) > 0 {
+		if err := json.Unmarshal(job.Payload, &payload); err != nil {
+			return fmt.Errorf("decode ma associate domain payload: %w", err)
 		}
-	}()
-
-	detail, err := s.store.GetMASession(ctx, sessionID)
+	}
+	companyKey := normalizeMACompanyKey(payload.CompanyKey)
+	if companyKey == "" {
+		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
+	}
+	detail, err := s.store.GetMASession(ctx, job.SessionID)
 	if err != nil {
 		return err
 	}
-	if detail.Strategy == nil {
-		return fmt.Errorf("%w: strategy", errMAStrategyInvalid)
+	if err := ensureMASessionOperational(detail.Session); err != nil {
+		return err
 	}
-	// Canonicalize the current strategy once (deterministic, no spend) so the gate
-	// perimeter and scoring use the same curated AtecoCandidates as the run.
-	strategy, err := s.canonicalizeMAStrategyAteco(ctx, detail.Strategy.Strategy, nil, false)
+	version, err := s.store.GetMAStrategyVersion(ctx, job.SessionID, job.StrategyVersionID)
+	if err != nil {
+		return err
+	}
+	// Canonicalize the pinned strategy once (deterministic, no spend) so the gate perimeter
+	// and scoring use the same curated AtecoCandidates on every attempt.
+	strategy, err := s.canonicalizeMAStrategyAteco(ctx, version.Strategy, nil, false)
 	if err != nil {
 		return err
 	}
@@ -670,49 +692,57 @@ func (s *maService) associateDomainWork(ctx context.Context, sessionID, companyK
 	if target == nil {
 		return fmt.Errorf("%w: target not found", errMAStrategyInvalid)
 	}
+	runID := target.RunID
+	if runID == "" {
+		return fmt.Errorf("%w: target has no run", errMAStrategyInvalid)
+	}
 
 	// Re-gate this one company with the forced domain.
-	payload := normalizeMAWebValidationPayload(MAWebValidationEnrichRequest{Limit: 1})
-	inputHash := maWebValidationInputHash(*target, strategy, payload)
-	body, err := s.buildMAWebValidationForDomain(ctx, *target, strategy, inputHash, payload, domain, subject, email)
+	gatePayload := normalizeMAWebValidationPayload(MAWebValidationEnrichRequest{Limit: 1})
+	inputHash := maWebValidationInputHash(*target, strategy, gatePayload)
+	body, err := s.buildMAWebValidationForDomain(ctx, *target, strategy, inputHash, gatePayload, payload.Domain, job.CreatedBySubject, job.CreatedByEmail)
 	if err != nil {
 		return err
 	}
-	if _, err := s.upsertTargetWebValidation(ctx, sessionID, body, subject, email); err != nil {
+	if _, err := s.upsertTargetWebValidation(ctx, job.SessionID, body, job.CreatedBySubject, job.CreatedByEmail); err != nil {
 		return err
 	}
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_target_domain_associated",
 		Status:    maTraceEventSucceeded,
-		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "company_key": companyKey, "final_action": body.FinalDecision.FinalAction}),
+		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "company_key": companyKey, "final_action": body.FinalDecision.FinalAction}),
 	})
 
 	// Reload so the target carries the fresh verdict, then enrich (this company only) +
-	// re-score the survivor set.
-	detail, err = s.store.GetMASession(ctx, sessionID)
+	// re-score the survivor set (which completes the run → session back to 'completed').
+	detail, err = s.store.GetMASession(ctx, job.SessionID)
 	if err != nil {
 		return err
 	}
-	if err := s.enrichAssociatedAndRescore(ctx, detail.Targets, strategy, sessionID, runID, companyKey); err != nil {
-		return err
-	}
-	success = true
-	return nil
+	return s.enrichAssociatedAndRescore(ctx, detail.Targets, strategy, job.SessionID, runID, companyKey)
 }
 
-// releaseAssociateSession flips a session held in 'running' by a failed association back to
-// 'completed', re-completing the (already-completed) run with its current scored count. The
-// prior results are intact, so 'completed' is the honest state — not 'failed'.
-func (s *maService) releaseAssociateSession(ctx context.Context, sessionID, runID string) {
+// releaseAssociateSession flips a session left in 'running' by a failed/abandoned association
+// back to 'completed', re-completing its run with the current scored count. The prior results
+// are intact, so 'completed' — not 'failed' — is the honest state. Called by the worker on a
+// final give-up; derives the run from the session's targets.
+func (s *maService) releaseAssociateSession(ctx context.Context, sessionID string) {
 	detail, err := s.store.GetMASession(ctx, sessionID)
 	if err != nil {
 		return
 	}
+	runID := ""
 	scored := 0
 	for _, target := range detail.Targets {
+		if runID == "" {
+			runID = target.RunID
+		}
 		if target.EnrichmentLevel == maEnrichmentAdvanced {
 			scored++
 		}
+	}
+	if runID == "" {
+		return
 	}
 	_ = s.store.CompleteMAExecutionRun(ctx, runID, maRunStatusCompleted, scored, "")
 }

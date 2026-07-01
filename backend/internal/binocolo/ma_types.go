@@ -70,6 +70,11 @@ const (
 	// (surface → address → UC2 gate → advanced+score on survivors) that reuses the
 	// engines above but reorders them so only gate survivors pay the €0.10 Advanced.
 	maJobTypeGatedSearch = "gated_search"
+	// maJobTypeAssociateDomain re-gates ONE company held in manual_review (domain
+	// unresolved) with an operator-supplied domain and, if it now survives, enriches +
+	// re-scores it. Durable/queued (production remedy for the manual_review bucket, not
+	// inline) so a crash resumes and the pre-leased row can't be stolen on the shared DB.
+	maJobTypeAssociateDomain = "associate_domain"
 
 	maJobStatusQueued  = "queued"
 	maJobStatusRunning = "running"

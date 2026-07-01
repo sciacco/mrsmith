@@ -341,9 +341,9 @@ func (h *Handler) handleRateMATarget(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAssociateMATargetDomain is the manual-review remedy: the operator supplies an
-// official domain for a company the gate held as domain-unresolved. It re-gates that one
-// company with the forced domain (async — crawl can exceed the write timeout) and, if it
-// now survives, enriches + re-scores it. Returns the session in 'running'; the UI polls.
+// official domain for a company the gate held as domain-unresolved. It enqueues a durable
+// associate_domain job that re-gates that one company with the forced domain and, if it now
+// survives, enriches + re-scores it. Returns the session in 'running'; the UI polls.
 func (h *Handler) handleAssociateMATargetDomain(w http.ResponseWriter, r *http.Request) {
 	id, ok := maSessionID(w, r)
 	if !ok {
@@ -358,7 +358,7 @@ func (h *Handler) handleAssociateMATargetDomain(w http.ResponseWriter, r *http.R
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	detail, err := h.ma.associateMATargetDomain(r.Context(), id, body.CompanyKey, body.Domain, subject, email)
+	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, body.Domain, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_target_associate_domain", err, "session_id", id)
 		return

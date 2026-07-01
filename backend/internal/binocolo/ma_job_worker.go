@@ -55,6 +55,7 @@ func newMAJobWorker(svc *maService, store maJobWorkerStore, owner string) *maJob
 			maJobTypeExecute,
 			maJobTypeWebValidation,
 			maJobTypeGatedSearch,
+			maJobTypeAssociateDomain,
 		},
 	}
 }
@@ -116,6 +117,8 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 		traceID, err = w.svc.runWebValidationJob(ctx, job)
 	case maJobTypeGatedSearch:
 		traceID, err = w.svc.runGatedSearchJob(ctx, job)
+	case maJobTypeAssociateDomain:
+		traceID, err = w.svc.runAssociateDomainJob(ctx, job)
 	default:
 		logging.FromContext(ctx).Warn("binocolo job worker skipped unknown job type", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType)
 		return
@@ -159,6 +162,10 @@ func (w *maJobWorker) retryOrFail(ctx context.Context, job maJob, code string) {
 		if err := w.store.MarkMASessionExecuteFailed(ctx, job.SessionID); err != nil {
 			logging.FromContext(ctx).Warn("binocolo job worker session-fail failed", "component", "binocolo", "session_id", job.SessionID, "error", err)
 		}
+	case maJobTypeAssociateDomain:
+		// The session was 'completed' before the association; a failed remedy must not
+		// destroy that — release it back to 'completed' (results intact), not 'failed'.
+		w.svc.releaseAssociateSession(ctx, job.SessionID)
 	}
 }
 
@@ -182,6 +189,8 @@ func classifyMAJobError(err error, jobType string) string {
 			return "web_validation_failed"
 		case maJobTypeGatedSearch:
 			return "gated_search_failed"
+		case maJobTypeAssociateDomain:
+			return "associate_domain_failed"
 		default:
 			return "estimate_failed"
 		}
