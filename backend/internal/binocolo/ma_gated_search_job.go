@@ -336,6 +336,13 @@ func (s *maService) gatedSearchJobWork(ctx context.Context, job maJob) error {
 	// ---- Stage: gate (UC2 keep/forse/salta over all address targets) ----
 	// Idempotent via per-company freshness reuse, so a retry re-gates only the tail.
 	gatePayload := normalizeMAWebValidationPayload(MAWebValidationEnrichRequest{Limit: limit})
+	// The gate MUST cover the WHOLE address surface. normalizeMAWebValidationPayload clamps
+	// to the standalone endpoint's 100-cap (maWebValidationMaxLimit), but here total gate
+	// cost is already bounded upstream by the surface cap, and any address target left
+	// un-gated would fall through enrichAndScoreSurvivors as a recall-safe forse and pay
+	// Advanced WITHOUT a verdict. So gate every persisted target — this is what lets the
+	// surface cap scale past 100 (the gate batch ceiling must scale WITH the surface cap).
+	gatePayload.Limit = len(detail.Targets)
 	if err := s.validateMATargetsBatch(ctx, job.SessionID, version.ID, strategy, detail.Targets, gatePayload, job.CreatedBySubject, job.CreatedByEmail); err != nil {
 		return err // gate is idempotent → safe to retry
 	}

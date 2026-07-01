@@ -164,11 +164,12 @@ const (
 
 	// maGatedSurfaceCapDefault caps the surface a gated search may admit. With
 	// "tutto automatico" spend, the surface cap is the one hard governor: the gate
-	// pays ~€0.02/company across the WHOLE surface, so N is the cost driver. Kept
-	// equal to the gate batch ceiling (maWebValidationMaxLimit) so a single gate
-	// pass covers every admitted company; overridable via ma_parameter
-	// (gated_surface_cap). Scaling past it requires raising both together.
-	maGatedSurfaceCapDefault = maWebValidationMaxLimit
+	// pays ~€0.02/company across the WHOLE surface, so N is the cost driver. The gate
+	// batch is no longer clamped in the gated flow (gatedSearchJobWork gates the whole
+	// surface), so this can exceed the standalone gate's 100-cap: 1000 is a runaway
+	// backstop (gate ~€20 at full surface), overridable via ma_parameter
+	// (gated_surface_cap).
+	maGatedSurfaceCapDefault = 1000
 
 	// Enrichment levels of a ma_target row (migration 075). The execute path and
 	// the gated enrich_score stage produce "advanced" (scored) rows; the gated
