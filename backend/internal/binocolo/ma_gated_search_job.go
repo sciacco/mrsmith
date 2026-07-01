@@ -266,12 +266,23 @@ func (s *maService) gatedSearchJobWork(ctx context.Context, job maJob) error {
 	})
 
 	// ---- Stage: address (identity-only fetch on the whole surface) ----
+	// Reuse persisted address targets ONLY when they were fetched for the SAME strategy.
+	// A strategy switch (e.g. the test page re-running ateco→expanded on a session that
+	// already ran) must re-fetch the whole surface — reusing the prior strategy's targets
+	// is exactly the "expanded still shows the ateco surface" bug. ReplaceMATargets wipes
+	// the session's targets, so the switch is clean; same-strategy reuse preserves the
+	// resume/idempotency contract (no re-charge).
 	runID := ""
-	if len(detail.Targets) > 0 {
+	reuseTargets := len(detail.Targets) > 0 &&
+		gatedRunStrategyType(detail.Runs, detail.Targets[0].RunID) == strategyType
+	if reuseTargets {
 		runID = detail.Targets[0].RunID
 	} else {
-		// No targets yet. If a run is already 'running', a prior attempt crashed
-		// mid-address before persisting anything → abandon rather than re-charge.
+		// Fresh address fetch: no targets yet, or a strategy switch that must replace the
+		// prior surface. A run already 'running' here means a prior attempt crashed
+		// mid-address before committing any targets for this strategy → abandon rather
+		// than re-charge. On a first strategy switch the prior run is already completed,
+		// so this passes through; it only fires on a genuine crashed/in-flight attempt.
 		inflight, err := s.store.HasRunningMAExecution(ctx, job.SessionID)
 		if err != nil {
 			return err
@@ -280,7 +291,7 @@ func (s *maService) gatedSearchJobWork(ctx context.Context, job maJob) error {
 			_ = s.traceEvent(ctx, maTraceEventWrite{
 				EventType: "ma_gated_search_abandoned",
 				Status:    maTraceEventFailed,
-				Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "reason": "run in flight with no targets (worker likely crashed mid-address)"}),
+				Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "reason": "run in flight with no committed targets for requested strategy (worker likely crashed mid-address)"}),
 			})
 			return s.store.AbandonMASessionExecution(ctx, job.SessionID, "gated_search_interrupted")
 		}
@@ -465,6 +476,22 @@ type gatedEnrichPlan struct {
 	Reuse        []MATarget // survivors already advanced → re-scored free, never re-charged
 	Carry        []MATarget // scarta (reject) → identity-only, never charged
 	ManualReview []MATarget // domain unresolved → held for manual domain, never auto-charged
+}
+
+// gatedRunStrategyType returns the strategy_type of the run that owns the session's
+// current targets, or "" when the run isn't found. Used to decide whether persisted
+// address targets can be reused for the requested strategy: a mismatch (or unknown run)
+// forces a fresh surface fetch so a strategy switch isn't silently ignored.
+func gatedRunStrategyType(runs []MAExecutionRun, runID string) string {
+	if runID == "" {
+		return ""
+	}
+	for _, run := range runs {
+		if run.ID == runID {
+			return run.StrategyType
+		}
+	}
+	return ""
 }
 
 // planGatedEnrichment classifies each target by gate bucket and prior enrichment. The

@@ -1060,6 +1060,23 @@ func isDomainResolutionExcludedDomain(domain string) bool {
 		// creditsafe.com surfaced as a CARDNOLOGY candidate (session 391e7c67,
 		// score 16) — same registry family as creditsafe.it; block both TLDs.
 		"creditsafe.com",
+		// PEC (posta elettronica certificata) provider domains. A certified-email
+		// endpoint is NEVER a company's website, but the resolver scored them "alta"
+		// via the "email aziendale su dominio" hint (session centro/5d2b043d:
+		// cia.legalmail.it ranked #1 @84 for CIA SERVIZI — a farmers'-assoc services
+		// co — with no site to classify → needs_business_validation → forse → paid).
+		// Blocklisting routes them to domain_unresolved → manual_review (held, €0).
+		// These are provider-hosted PEC domains (suffix-matched, so *.pec.it and
+		// company.legalmail.it are caught); company-OWNED PEC domains like
+		// geowebpec.it are a different registrable domain and need the ranker
+		// heuristic (Livello 2), not this blocklist.
+		"legalmail.it",
+		"pec.it",
+		"arubapec.it",
+		"postecert.it",
+		"sicurezzapostale.it",
+		"namirialpec.it",
+		"pecimprese.it",
 	}
 	for _, item := range excluded {
 		if hostMatchesDomain(domain, item) {

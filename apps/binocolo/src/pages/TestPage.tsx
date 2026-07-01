@@ -450,6 +450,8 @@ export function TestPage() {
   const [evalSessionId, setEvalSessionId] = useState('');
   const [gatedSessionId, setGatedSessionId] = useState('');
   const [gatedLimit, setGatedLimit] = useState('');
+  // '' = usa la strategia selezionata sulla sessione; altrimenti forza ateco/expanded.
+  const [gatedStrategyType, setGatedStrategyType] = useState<'' | 'ateco' | 'expanded'>('');
   // Per-company (company_key → domain) drafts for the manual-review remedy input.
   const [gatedDomainDrafts, setGatedDomainDrafts] = useState<Record<string, string>>({});
   const [sectorForm, setSectorForm] = useState({
@@ -583,12 +585,39 @@ export function TestPage() {
     mutationFn: () =>
       api.post<MASessionDetail>('/binocolo/v1/test/gated-search', {
         sessionId: gatedSessionId,
+        strategyType: gatedStrategyType || undefined,
         limit: gatedLimit.trim() ? Number(gatedLimit.trim()) : undefined,
       }),
     onSuccess: () => {
       void gatedDetail.refetch();
     },
   });
+  // Durable variant: enqueue on the shared ma_job queue (the production endpoint) so the
+  // run survives a backend restart — required for long surfaces (e.g. expanded/298) that
+  // the fragile inline goroutine would lose on any air rebuild. The production contract is
+  // strict: limit MUST equal the pinned strategy searchLimit and match the estimate rows,
+  // so we send searchLimit verbatim and ignore the inline sub-sample field.
+  const runGatedSearchQueued = useMutation({
+    mutationFn: () =>
+      api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${gatedSessionId}/gated-search`, {
+        strategyType: gatedStrategyType || undefined,
+        limit: gatedDetail.data?.strategy?.strategy?.searchLimit ?? undefined,
+      }),
+    onSuccess: () => {
+      void gatedDetail.refetch();
+    },
+  });
+  // Surface per strategy from the session's estimate rows (many combo rows summed),
+  // so the strategy picker shows ateco vs expanded size before you spend.
+  const gatedStrategyTotals = useMemo(() => {
+    let ateco = 0;
+    let expanded = 0;
+    for (const e of gatedDetail.data?.estimates ?? []) {
+      if (e.strategyType === 'ateco') ateco += e.estimatedCount ?? 0;
+      else if (e.strategyType === 'expanded') expanded += e.estimatedCount ?? 0;
+    }
+    return { ateco, expanded };
+  }, [gatedDetail.data?.estimates]);
   // Manual-review remedy: associate an official domain with a held (domain-unresolved)
   // company. The backend re-gates that one company with the forced domain and, if it now
   // survives, enriches+re-scores it — the session goes 'running', so we poll via refetch.
@@ -2030,6 +2059,23 @@ export function TestPage() {
                 </select>
               </label>
               <label className={styles.filterField}>
+                <span>Strategia</span>
+                <select
+                  value={gatedStrategyType}
+                  onChange={(event) => setGatedStrategyType(event.target.value as '' | 'ateco' | 'expanded')}
+                >
+                  <option value="">
+                    Da sessione{gatedDetail.data ? ` (${gatedDetail.data.session.selectedStrategy || '—'})` : ''}
+                  </option>
+                  <option value="ateco">
+                    ATECO{gatedStrategyTotals.ateco > 0 ? ` (${gatedStrategyTotals.ateco})` : ''}
+                  </option>
+                  <option value="expanded">
+                    Espansa{gatedStrategyTotals.expanded > 0 ? ` (${gatedStrategyTotals.expanded})` : ''}
+                  </option>
+                </select>
+              </label>
+              <label className={styles.filterField}>
                 <span>Limite superficie (opz.)</span>
                 <input
                   type="number"
@@ -2049,6 +2095,16 @@ export function TestPage() {
                 leftIcon={<Icon name="filter" />}
               >
                 Esegui gated search (inline)
+              </Button>
+              <Button
+                variant="primary"
+                loading={runGatedSearchQueued.isPending}
+                disabled={!gatedSessionId || gatedRunning || !gatedDetail.data?.strategy?.strategy?.searchLimit}
+                onClick={() => runGatedSearchQueued.mutate()}
+                leftIcon={<Icon name="server" />}
+                title="Enqueue sulla coda durabile (endpoint di produzione): sopravvive al restart del backend. Ignora il limite manuale e gira l'intera superficie stimata (limit = searchLimit)."
+              >
+                Esegui su coda (durabile)
               </Button>
               <Button
                 variant="secondary"
@@ -2073,6 +2129,9 @@ export function TestPage() {
 
         {runGatedSearch.isError ? (
           <div className={styles.responseBar}><span>{errorLabel(runGatedSearch.error)}</span></div>
+        ) : null}
+        {runGatedSearchQueued.isError ? (
+          <div className={styles.responseBar}><span>{errorLabel(runGatedSearchQueued.error)}</span></div>
         ) : null}
         {gatedDetail.isError ? (
           <div className={styles.responseBar}><span>{errorLabel(gatedDetail.error)}</span></div>
