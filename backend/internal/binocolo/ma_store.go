@@ -704,6 +704,19 @@ WHERE target_id IN (SELECT id FROM binocolo.ma_target WHERE session_id = $1::uui
 		if len(target.VendorPayload) > 0 {
 			payload = target.VendorPayload
 		}
+		// Address-stage rows carry identity only: score/match_state are NULL until
+		// the enrich_score stage scores the keep/forse survivors. Everything else
+		// (execute path, gated advanced stage) is "advanced" and persists both.
+		level := target.EnrichmentLevel
+		if level == "" {
+			level = maEnrichmentAdvanced
+		}
+		var scoreVal any = target.Score
+		var matchVal any = target.MatchState
+		if level == maEnrichmentAddress {
+			scoreVal = nil
+			matchVal = nil
+		}
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO binocolo.ma_target (
   id,
@@ -727,11 +740,12 @@ INSERT INTO binocolo.ma_target (
   flags,
   rationale,
   missing_criteria,
-  vendor_payload
+  vendor_payload,
+  enrichment_level
 ) VALUES (
   $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10,
   $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20,
-  $21::jsonb, $22::jsonb
+  $21::jsonb, $22::jsonb, $23
 )
 `, targetID,
 			sessionID,
@@ -748,13 +762,14 @@ INSERT INTO binocolo.ma_target (
 			nullInt(target.Employees),
 			nullString(target.AtecoCode),
 			nullString(target.AtecoDescription),
-			target.Score,
-			target.MatchState,
+			scoreVal,
+			matchVal,
 			nullString(target.Confidence),
 			flagsRaw,
 			target.Rationale,
 			missingRaw,
 			[]byte(payload),
+			level,
 		); err != nil {
 			return fmt.Errorf("insert ma target: %w", err)
 		}
@@ -1227,11 +1242,11 @@ func (s *SQLStore) loadMATargets(ctx context.Context, sessionID string) ([]MATar
 SELECT id::text, session_id::text, run_id::text, COALESCE(vendor_id, ''), company_name,
        COALESCE(vat_code, ''), COALESCE(tax_code, ''), COALESCE(province, ''), COALESCE(town, ''),
        COALESCE(activity_status, ''), turnover, turnover_year, employees, COALESCE(ateco_code, ''),
-       COALESCE(ateco_description, ''), score, match_state, COALESCE(confidence, ''), flags,
-       rationale, missing_criteria, vendor_payload, created_at
+       COALESCE(ateco_description, ''), score, COALESCE(match_state, ''), COALESCE(confidence, ''), flags,
+       rationale, missing_criteria, vendor_payload, COALESCE(enrichment_level, 'advanced'), created_at
 FROM binocolo.ma_target
 WHERE session_id = $1::uuid
-ORDER BY score DESC, company_name
+ORDER BY score DESC NULLS LAST, company_name
 `, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("load ma targets: %w", err)
@@ -1243,6 +1258,7 @@ ORDER BY score DESC, company_name
 		var turnover sql.NullInt64
 		var turnoverYear sql.NullInt64
 		var employees sql.NullInt64
+		var score sql.NullInt64
 		var missingRaw []byte
 		var flagsRaw []byte
 		if err := rows.Scan(
@@ -1261,16 +1277,21 @@ ORDER BY score DESC, company_name
 			&employees,
 			&item.AtecoCode,
 			&item.AtecoDescription,
-			&item.Score,
+			&score,
 			&item.MatchState,
 			&item.Confidence,
 			&flagsRaw,
 			&item.Rationale,
 			&missingRaw,
 			&item.VendorPayload,
+			&item.EnrichmentLevel,
 			&item.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan ma target: %w", err)
+		}
+		// Address-stage rows are unscored (score NULL); leave item.Score at 0.
+		if score.Valid {
+			item.Score = int(score.Int64)
 		}
 		if len(flagsRaw) > 0 {
 			_ = json.Unmarshal(flagsRaw, &item.Flags)

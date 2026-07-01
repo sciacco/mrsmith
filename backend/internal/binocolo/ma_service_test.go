@@ -457,7 +457,7 @@ func TestMASurfaceProbeExactRunsWithoutLimit(t *testing.T) {
 	strategy := validSurfaceStrategy()
 	dryRun := 1
 	limit := 25
-	params := baseMASearchParams(strategy, "MI", "", &dryRun, limit)
+	params := baseMASearchParams(strategy, "MI", "", &dryRun, limit, maEnrichmentAdvanced)
 
 	result, err := service.probeMASearchSurface(context.Background(), params, "", "")
 	if err != nil {

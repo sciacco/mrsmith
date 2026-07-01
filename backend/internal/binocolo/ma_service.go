@@ -990,7 +990,7 @@ func (s *maService) executeJobWork(ctx context.Context, job maJob) error {
 		return nil
 	}
 
-	targets, execErr := s.runExecution(ctx, strategy, strategyType, limit, job.CreatedBySubject, job.CreatedByEmail)
+	targets, execErr := s.runExecution(ctx, strategy, strategyType, limit, job.CreatedBySubject, job.CreatedByEmail, maEnrichmentAdvanced)
 	if execErr != nil {
 		_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, maErrorCode(execErr))
 		return nil
@@ -4579,7 +4579,10 @@ type maExecutionCombo struct {
 	count      int
 }
 
-func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, strategyType string, limit int, subject, email string) ([]MATarget, error) {
+func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, strategyType string, limit int, subject, email, enrichment string) ([]MATarget, error) {
+	if enrichment == "" {
+		enrichment = maEnrichmentAdvanced
+	}
 	provinces := strategy.Provinces
 	if len(provinces) == 0 {
 		provinces = []string{""}
@@ -4642,7 +4645,7 @@ func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, s
 		if slot <= 0 {
 			continue
 		}
-		params := baseMASearchParams(strategy, combo.province, combo.legalForm, &dryRun, slot)
+		params := baseMASearchParams(strategy, combo.province, combo.legalForm, &dryRun, slot, enrichment)
 		if combo.searchCode != "" {
 			params.AtecoCode = combo.searchCode
 		}
@@ -4663,6 +4666,11 @@ func (s *maService) runExecution(ctx context.Context, strategy MAStrategySpec, s
 	targets := dedupeMATargets(rawTargets)
 	if len(targets) > limit {
 		targets = targets[:limit]
+	}
+	// Tag each target with the enrichment level it was fetched at, so persistence
+	// knows whether it is a scored ("advanced") or identity-only ("address") row.
+	for index := range targets {
+		targets[index].EnrichmentLevel = enrichment
 	}
 	if err := s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_execution_queries_completed",
@@ -4963,16 +4971,19 @@ func decodeCompanySearchEnvelope(raw json.RawMessage) (openapiit.Envelope[openap
 // legalFormCode are single-valued at OpenAPI.it, so each is one axis of the
 // cartesian; the caller iterates and passes a single value per call. An empty
 // legalForm means "any form" (no server-side legal-form filter).
-func baseMASearchParams(strategy MAStrategySpec, province, legalForm string, dryRun *int, limit int) openapiit.CompanyITSearchParams {
+func baseMASearchParams(strategy MAStrategySpec, province, legalForm string, dryRun *int, limit int, enrichment string) openapiit.CompanyITSearchParams {
 	if limit <= 0 {
 		limit = maDefaultSearchLimit
 	}
 	if limit > maVendorLimit {
 		limit = maVendorLimit
 	}
+	if enrichment == "" {
+		enrichment = maEnrichmentAdvanced
+	}
 	params := openapiit.CompanyITSearchParams{
 		DryRun:         dryRun,
-		DataEnrichment: "advanced",
+		DataEnrichment: enrichment,
 		Province:       province,
 		LegalFormCode:  legalForm,
 		ActivityStatus: strategy.ActivityStatus,

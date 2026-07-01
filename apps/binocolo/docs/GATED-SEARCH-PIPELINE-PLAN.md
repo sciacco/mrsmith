@@ -71,6 +71,8 @@ Il dry-run resta a costo *address* (non advanced). L'estimate ritorna: N superfi
 
 ## Step 2 — Address-only search
 
+> **STATO 2026-07-01: IMPLEMENTATO (staged).** FATTO: migrazione 075 (`score`/`match_state` NULL-abili + colonna `enrichment_level` default `'advanced'` + CHECK), campo `MATarget.EnrichmentLevel` + costanti `maEnrichmentAddress`/`maEnrichmentAdvanced`, `runExecution`/`baseMASearchParams` parametrizzati sul livello (default advanced → path execute invariato, `address` ora raggiungibile), persistenza (`ReplaceMATargets` scrive `enrichment_level` e mette `score`/`match_state` a NULL per le righe address) + read (`loadMATargets` legge `enrichment_level`, tollera score NULL, `ORDER BY score DESC NULLS LAST`). Build/vet/test verdi; `parseMATargetsFromVendorData` regge il payload Address (finanziari mancanti → nil). Nessun test SQL unitario (raw SQL verificata a DB, coerente col repo). L'aggancio runtime (chiamata address + persistenza) avviene nello **Step 3** (orchestratore). Attivazione (human): applicare 075.
+
 Estrarre da `runExecution` (`ma_service.go:4510`) una variante che chiama IT-search con `DataEnrichment:"address"` invece di `"advanced"` (il gancio è a `ma_service.go:4903/4919`) e popola `ma_target` con **sola identità** (name/vatCode/taxCode/province/town/GPS/atecoCode), **senza** scoring.
 
 **Migrazione 075** — `ma_target` per lo stadio address:

@@ -153,6 +153,13 @@ const (
 	maSurvivorRateLow     = 0.25
 	maSurvivorRateHigh    = 0.50
 
+	// Enrichment levels of a ma_target row (migration 075). The execute path and
+	// the gated enrich_score stage produce "advanced" (scored) rows; the gated
+	// address stage produces "address" (identity-only, score/match_state NULL).
+	// These are also the OpenAPI.it DataEnrichment values passed to IT-search.
+	maEnrichmentAddress  = "address"
+	maEnrichmentAdvanced = "advanced"
+
 	// Valuation defaults (Fase 4), overridable via ma_parameter (sme_haircut_pct,
 	// ebitda_fallback_threshold). Haircut is a percent applied to sector multiples;
 	// below the EBITDA-margin threshold (or EBITDA<=0) valuation falls back to EV/Sales.
@@ -557,6 +564,7 @@ type MATarget struct {
 	Deep             *MADeepAnalysis      `json:"deep,omitempty"`
 	WebValidation    *MAWebValidation     `json:"webValidation,omitempty"`
 	VendorPayload    json.RawMessage      `json:"vendorPayload,omitempty"`
+	EnrichmentLevel  string               `json:"enrichmentLevel,omitempty"`
 	CreatedAt        time.Time            `json:"createdAt"`
 }
 
