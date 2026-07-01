@@ -12,8 +12,8 @@ import (
 // maJobWorkerStore is the persistence the async job worker needs. *SQLStore
 // satisfies it; kept narrow so the worker stays testable and decoupled.
 type maJobWorkerStore interface {
-	ListMAJobs(ctx context.Context, limit int, workerID string, jobTypes []string) ([]maJob, error)
-	AcquireMAJobLease(ctx context.Context, jobID, workerID string, leaseSeconds int) (bool, error)
+	ListMAJobs(ctx context.Context, limit int, owner, workerID string, jobTypes []string) ([]maJob, error)
+	AcquireMAJobLease(ctx context.Context, jobID, owner, workerID string, leaseSeconds int) (bool, error)
 	ClaimMAJobQueued(ctx context.Context, jobID string) (bool, error)
 	SetMAJobTrace(ctx context.Context, jobID, traceID string) error
 	CompleteMAJob(ctx context.Context, jobID string) error
@@ -29,7 +29,12 @@ type maJobWorkerStore interface {
 // picks up queued/running rows. Same lease/claim mechanics as the deep worker,
 // correct with multiple replicas on one DB.
 type maJobWorker struct {
+	// id is this worker process's ephemeral lease identity (a fresh uuid per start);
+	// owner is this instance's stable identity (config InstanceOwner). A row is
+	// claimable when it belongs to this owner (or is legacy owner-NULL) and is
+	// unleased / pre-leased to the owner / already held by this worker / expired.
 	id       string
+	owner    string
 	svc      *maService
 	store    maJobWorkerStore
 	interval time.Duration
@@ -37,9 +42,10 @@ type maJobWorker struct {
 	jobTypes []string
 }
 
-func newMAJobWorker(svc *maService, store maJobWorkerStore) *maJobWorker {
+func newMAJobWorker(svc *maService, store maJobWorkerStore, owner string) *maJobWorker {
 	return &maJobWorker{
 		id:       uuid.NewString(),
+		owner:    owner,
 		svc:      svc,
 		store:    store,
 		interval: 2 * time.Second,
@@ -67,7 +73,7 @@ func (w *maJobWorker) run(ctx context.Context) {
 }
 
 func (w *maJobWorker) tick(ctx context.Context) {
-	jobs, err := w.store.ListMAJobs(ctx, w.batch, w.id, w.jobTypes)
+	jobs, err := w.store.ListMAJobs(ctx, w.batch, w.owner, w.id, w.jobTypes)
 	if err != nil {
 		logging.FromContext(ctx).Warn("binocolo job worker list failed", "component", "binocolo", "operation", "ma_job_worker", "error", err)
 		return
@@ -80,7 +86,7 @@ func (w *maJobWorker) tick(ctx context.Context) {
 func (w *maJobWorker) process(ctx context.Context, job maJob) {
 	// Per-row lease: only the owning worker advances a row, so multiple replicas (or
 	// devs sharing one staging DB) never run the same job twice.
-	owned, err := w.store.AcquireMAJobLease(ctx, job.ID, w.id, maJobLeaseSeconds)
+	owned, err := w.store.AcquireMAJobLease(ctx, job.ID, w.owner, w.id, maJobLeaseSeconds)
 	if err != nil {
 		logging.FromContext(ctx).Warn("binocolo job worker lease failed", "component", "binocolo", "job_id", job.ID, "error", err)
 		return

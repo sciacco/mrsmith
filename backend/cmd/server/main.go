@@ -561,7 +561,7 @@ func main() {
 		appCatalog = filtered
 	}
 	portal.RegisterRoutes(api, appCatalog)
-	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, Brave: braveCli, Scrape: scrapeCli, LLM: llmSvc, AnisettaDB: anisettaDB})
+	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, Brave: braveCli, Scrape: scrapeCli, LLM: llmSvc, AnisettaDB: anisettaDB, InstanceOwner: cfg.InstanceOwner})
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	rda.RegisterRoutes(api, rda.Deps{

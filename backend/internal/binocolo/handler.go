@@ -27,6 +27,10 @@ type Deps struct {
 	Scrape     *scrape.Client
 	LLM        *llm.Service
 	AnisettaDB *sql.DB
+	// InstanceOwner stamps enqueued ma_job rows with this instance's stable identity
+	// (config InstanceOwner) so they are pre-leased to it and foreign workers on the
+	// shared Anisetta DB can't steal them. Empty tolerated (see EnqueueMAJob).
+	InstanceOwner string
 }
 
 type Handler struct {
@@ -64,6 +68,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 		ma:                 newMAService(maStore, cache, provinceCache, ateco, deps.OpenAPIIT, llmProvider),
 	}
 	h.ma.brave = deps.Brave
+	h.ma.owner = deps.InstanceOwner
 	// Guard the assignment: a nil *scrape.Client stored in the interface field would
 	// be a non-nil interface (typed-nil), defeating the s.scrape == nil fallback.
 	if deps.Scrape != nil {
@@ -79,7 +84,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	//   - maDeepWorker drains queued IT-full deep-dive jobs.
 	var runners []func(context.Context)
 	if sqlStore != nil {
-		runners = append(runners, newMAJobWorker(h.ma, sqlStore).run)
+		runners = append(runners, newMAJobWorker(h.ma, sqlStore, deps.InstanceOwner).run)
 		if deps.OpenAPIIT != nil {
 			runners = append(runners, newMADeepWorker(sqlStore, deps.OpenAPIIT, llmProvider, h.ma.loadPricing).run)
 		}

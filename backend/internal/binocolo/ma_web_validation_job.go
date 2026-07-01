@@ -156,7 +156,7 @@ func (s *maService) enqueueWebValidation(ctx context.Context, sessionID string, 
 		}()
 		return s.getSession(ctx, sessionID)
 	}
-	if _, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
+	if _, _, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
 		JobType:           maJobTypeWebValidation,
 		SessionID:         sessionID,
 		StrategyVersionID: detail.Strategy.ID,
@@ -164,6 +164,7 @@ func (s *maService) enqueueWebValidation(ctx context.Context, sessionID string, 
 		Subject:           subject,
 		Email:             email,
 		Payload:           rawPayload,
+		Owner:             s.owner,
 	}); err != nil {
 		return MASessionDetail{}, err
 	}

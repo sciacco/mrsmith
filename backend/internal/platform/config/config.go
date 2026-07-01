@@ -113,6 +113,14 @@ type Config struct {
 	ScrapeBaseURL string
 	ScrapeAPIKey  string
 
+	// InstanceOwner identifies this backend instance for the binocolo ma_job
+	// queue ownership fix: enqueued jobs are stamped with this owner and pre-leased
+	// to it, so foreign workers (other dev/staging instances on the shared Anisetta
+	// DB, possibly running older code) can't steal and run them. Stable across
+	// restarts. Defaults to the machine hostname; override per deployment via
+	// BINOCOLO_INSTANCE_OWNER (set the same value on all pods of one release).
+	InstanceOwner string
+
 	// SMTP email delivery (optional, disabled by default)
 	SMTPEnabled       bool
 	SMTPHost          string
@@ -183,6 +191,15 @@ func Load() Config {
 		deriveKeycloakAdminTokenURL(keycloakAdminBaseURL, keycloakAdminRealm, keycloakIssuerURL),
 	)
 
+	// Stable per-instance owner for the binocolo job queue. Env override wins; else
+	// fall back to the machine hostname (distinct + stable per dev machine / pod).
+	instanceOwner := envOr("BINOCOLO_INSTANCE_OWNER", "")
+	if instanceOwner == "" {
+		if hostname, err := os.Hostname(); err == nil {
+			instanceOwner = hostname
+		}
+	}
+
 	return Config{
 		Port:                         envOr("PORT", "8080"),
 		LogLevel:                     envOr("LOG_LEVEL", "info"),
@@ -241,6 +258,7 @@ func Load() Config {
 		BraveBaseURL:                envOr("BRAVE_BASE_URL", brave.DefaultBaseURL),
 		ScrapeBaseURL:               envOr("BINOCOLO_SCRAPE_BASE_URL", ""),
 		ScrapeAPIKey:                envOr("BINOCOLO_SCRAPE_API_KEY", ""),
+		InstanceOwner:               instanceOwner,
 		SMTPEnabled:                 boolEnvOr("SMTP_ENABLED", false),
 		SMTPHost:                    envOr("SMTP_HOST", ""),
 		SMTPPort:                    envOr("SMTP_PORT", "587"),

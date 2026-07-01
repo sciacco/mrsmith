@@ -2,6 +2,7 @@ package binocolo
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,16 +36,27 @@ type maJobEnqueue struct {
 	Subject           string
 	Email             string
 	Payload           json.RawMessage
+	// Owner is this instance's stable identity (config InstanceOwner). The row is
+	// PRE-LEASED to it at insert so foreign workers can't steal it. Empty is
+	// tolerated (degrades to a shared owner) but the config default is the hostname.
+	Owner string
 }
 
-// EnqueueMAJob inserts a queued job. The partial unique index
-// ma_job_inflight_idx makes a second in-flight job for the same (session,
-// job_type) a no-op (ON CONFLICT DO NOTHING), so a double-submit while a job is
-// queued/running does not launch duplicate work. Returns true only when a row
-// was actually created.
-func (s *SQLStore) EnqueueMAJob(ctx context.Context, input maJobEnqueue) (bool, error) {
+// EnqueueMAJob inserts a queued job PRE-LEASED to input.Owner and returns its id
+// (the "ticket"). The partial unique index ma_job_inflight_idx makes a second
+// in-flight job for the same (session, job_type) a no-op (ON CONFLICT DO NOTHING),
+// so a double-submit while a job is queued/running does not launch duplicate work
+// — that case returns created=false and an empty jobID.
+//
+// Pre-lease: the row is stamped owner=locked_by=input.Owner with a future
+// lease_until. A foreign worker on the shared DB (older code, no `owner` column
+// awareness) evaluates its UNCHANGED claim predicate
+// `lease_until < now() OR locked_by = <its uuid>` as false → it skips the row.
+// The owning worker reclaims it via ListMAJobs/AcquireMAJobLease (locked_by=owner
+// branch) and CAS-es the lease onto its concrete worker uuid.
+func (s *SQLStore) EnqueueMAJob(ctx context.Context, input maJobEnqueue) (string, bool, error) {
 	if s == nil || s.db == nil {
-		return false, errors.New("binocolo ma store not configured")
+		return "", false, errors.New("binocolo ma store not configured")
 	}
 	payload := json.RawMessage(`{}`)
 	if len(input.Payload) > 0 {
@@ -58,27 +70,35 @@ func (s *SQLStore) EnqueueMAJob(ctx context.Context, input maJobEnqueue) (bool, 
 	if status == maJobStatusPending {
 		conflictPredicate = "status IN ('queued', 'running', 'pending', 'processing')"
 	}
-	result, err := s.db.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO binocolo.ma_job (id, job_type, session_id, strategy_version_id, status, payload, created_by_subject, created_by_email)
-VALUES ($1::uuid, $2, $3::uuid, $4::uuid, $5, $6::jsonb, $7, $8)
+	jobID := uuid.NewString()
+	// owner AND locked_by are set to input.Owner (a plain string, NOT nullString):
+	// the owning worker's reclaim branch matches on `locked_by = owner`, and
+	// `NULL = NULL` is not true in SQL — a NULL locked_by would lock the owner out
+	// of its own pre-leased row.
+	var returnedID string
+	err := s.db.QueryRowContext(ctx, fmt.Sprintf(`
+INSERT INTO binocolo.ma_job
+  (id, job_type, session_id, strategy_version_id, status, payload, created_by_subject, created_by_email, owner, locked_by, lease_until)
+VALUES
+  ($1::uuid, $2, $3::uuid, $4::uuid, $5, $6::jsonb, $7, $8, $9, $9, now() + ($10::int * interval '1 second'))
 ON CONFLICT (session_id, job_type) WHERE %s
 DO NOTHING
-`, conflictPredicate), uuid.NewString(), input.JobType, input.SessionID, input.StrategyVersionID, status, []byte(payload), nullString(input.Subject), nullString(input.Email))
-	if err != nil {
-		return false, fmt.Errorf("enqueue ma job: %w", err)
+RETURNING id::text
+`, conflictPredicate), jobID, input.JobType, input.SessionID, input.StrategyVersionID, status, []byte(payload), nullString(input.Subject), nullString(input.Email), input.Owner, maJobLeaseSeconds).Scan(&returnedID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil // dedup: an in-flight job for this (session, job_type) already exists
 	}
-	affected, err := result.RowsAffected()
 	if err != nil {
-		return false, fmt.Errorf("enqueue ma job rows: %w", err)
+		return "", false, fmt.Errorf("enqueue ma job: %w", err)
 	}
-	return affected == 1, nil
+	return returnedID, true, nil
 }
 
 // ListMAJobs returns pending jobs of the types this binary can process. The
 // job-type filter is part of the rollout contract: during progressive deploys,
 // older workers must ignore job types introduced by newer versions instead of
 // failing them as unknown.
-func (s *SQLStore) ListMAJobs(ctx context.Context, limit int, workerID string, jobTypes []string) ([]maJob, error) {
+func (s *SQLStore) ListMAJobs(ctx context.Context, limit int, owner, workerID string, jobTypes []string) ([]maJob, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
@@ -88,7 +108,7 @@ func (s *SQLStore) ListMAJobs(ctx context.Context, limit int, workerID string, j
 	if len(jobTypes) == 0 {
 		return []maJob{}, nil
 	}
-	args := []any{limit, workerID}
+	args := []any{limit, owner, workerID}
 	placeholders := make([]string, 0, len(jobTypes))
 	for _, jobType := range jobTypes {
 		if jobType == "" {
@@ -105,7 +125,8 @@ SELECT id::text, job_type, session_id::text, strategy_version_id::text, status, 
        payload, COALESCE(trace_id::text, ''), COALESCE(created_by_subject, ''), COALESCE(created_by_email, '')
 FROM binocolo.ma_job
 WHERE status IN ('queued', 'running', 'pending', 'processing')
-  AND (lease_until IS NULL OR lease_until < now() OR locked_by = $2)
+  AND (owner IS NULL OR owner = $2)
+  AND (lease_until IS NULL OR lease_until < now() OR locked_by = $2 OR locked_by = $3)
   AND job_type IN (%s)
 ORDER BY updated_at
 LIMIT $1
@@ -138,16 +159,22 @@ LIMIT $1
 // Returns true only for the worker that wins the atomic update; a crashed
 // worker's lease simply expires and the row becomes reclaimable. Same mechanism
 // as AcquireMADeepLease — correct with multiple replicas on one DB.
-func (s *SQLStore) AcquireMAJobLease(ctx context.Context, jobID, workerID string, leaseSeconds int) (bool, error) {
+func (s *SQLStore) AcquireMAJobLease(ctx context.Context, jobID, owner, workerID string, leaseSeconds int) (bool, error) {
 	if s == nil || s.db == nil {
 		return false, errors.New("binocolo ma store not configured")
 	}
+	// CAS the lease onto this concrete worker uuid ($3). Eligible rows: pre-leased
+	// to this owner ($2, freshly enqueued, not yet grabbed), already ours ($3,
+	// refresh), or expired (crash recovery). The owner filter ($2) keeps foreign
+	// instances' rows out; two same-owner replicas racing a fresh row serialize on
+	// this atomic UPDATE (only one flips locked_by to its uuid).
 	result, err := s.db.ExecContext(ctx, `
 UPDATE binocolo.ma_job
-SET lease_until = now() + ($3::int * interval '1 second'), locked_by = $2
+SET lease_until = now() + ($4::int * interval '1 second'), locked_by = $3
 WHERE id = $1::uuid AND status IN ('queued', 'running', 'pending', 'processing')
-  AND (lease_until IS NULL OR lease_until < now() OR locked_by = $2)
-`, jobID, workerID, leaseSeconds)
+  AND (owner IS NULL OR owner = $2)
+  AND (lease_until IS NULL OR lease_until < now() OR locked_by = $2 OR locked_by = $3)
+`, jobID, owner, workerID, leaseSeconds)
 	if err != nil {
 		return false, fmt.Errorf("acquire ma job lease: %w", err)
 	}

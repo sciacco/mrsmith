@@ -22,7 +22,7 @@ type maWorkspaceStore interface {
 	AddMAStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error)
 	GetMAStrategyVersion(ctx context.Context, sessionID, versionID string) (MAStrategyVersion, error)
 	ReplaceMAEstimates(ctx context.Context, sessionID, strategyVersionID, selectedStrategy string, estimates []MAEstimate) error
-	EnqueueMAJob(ctx context.Context, input maJobEnqueue) (bool, error)
+	EnqueueMAJob(ctx context.Context, input maJobEnqueue) (jobID string, created bool, err error)
 	SetMASessionEstimateStatus(ctx context.Context, sessionID, strategyVersionID, status string) error
 	MarkMASessionExecuting(ctx context.Context, sessionID string) error
 	HasRunningMAExecution(ctx context.Context, sessionID string) (bool, error)

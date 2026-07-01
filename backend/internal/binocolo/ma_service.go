@@ -174,6 +174,10 @@ type maService struct {
 	}
 	llmp maLLMProvider
 	now  func() time.Time
+	// owner is this instance's stable identity (config InstanceOwner), stamped on
+	// every enqueued ma_job so the job is pre-leased to this instance and foreign
+	// workers on the shared DB can't steal it. Set post-construction like brave.
+	owner string
 	// compareSnippetCache memoizes re-gathered neutral web snippets per domain for the
 	// model-comparison harness (sector-eval-models with includeSnippets). Test-support
 	// only; persists for the process lifetime so a multi-request eval pays Brave once.
@@ -590,12 +594,13 @@ func (s *maService) enqueueEstimate(ctx context.Context, sessionID string, req M
 	// job is queued/running is a no-op here: that job estimates whatever the active
 	// version is at run time and loops if it changes, so the latest strategy is
 	// always covered without launching duplicate work.
-	if _, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
+	if _, _, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
 		JobType:           maJobTypeEstimate,
 		SessionID:         sessionID,
 		StrategyVersionID: strategyVersion.ID,
 		Subject:           subject,
 		Email:             email,
+		Owner:             s.owner,
 	}); err != nil {
 		return MASessionDetail{}, err
 	}
@@ -796,13 +801,14 @@ func (s *maService) enqueueExecute(ctx context.Context, sessionID string, req MA
 	// while a run is queued/running is a no-op (no second run created). The worker
 	// creates the execution run when it picks the job up, so there is never a
 	// dangling run without a job.
-	created, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
+	_, created, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
 		JobType:           maJobTypeExecute,
 		SessionID:         sessionID,
 		StrategyVersionID: strategyVersion.ID,
 		Subject:           subject,
 		Email:             email,
 		Payload:           payload,
+		Owner:             s.owner,
 	})
 	if err != nil {
 		return MASessionDetail{}, err
