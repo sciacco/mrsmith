@@ -313,6 +313,31 @@ export interface MASessionSummary {
   archivedByEmail?: string;
   deletedAt?: string;
   deletedByEmail?: string;
+  initiativeId?: string;
+  initiativeTitle?: string;
+}
+
+export interface MAInitiative {
+  id: string;
+  title: string;
+  description: string;
+  createdBySubject?: string;
+  createdByEmail?: string;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string;
+  archivedBySubject?: string;
+  archivedByEmail?: string;
+}
+
+export interface MAInitiativeSummary extends MAInitiative {
+  counts: Record<string, number>;
+  lastActivityAt?: string;
+  sessionCount: number;
+}
+
+export interface MAInitiativeListResponse {
+  items: MAInitiativeSummary[];
 }
 
 export interface MASessionDetail {
@@ -455,6 +480,7 @@ export interface MASession {
   deletedAt?: string;
   deletedBySubject?: string;
   deletedByEmail?: string;
+  initiativeId?: string;
 }
 
 export interface MAStrategyVersion {

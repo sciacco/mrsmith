@@ -6,6 +6,7 @@ import { useOptionalAuth } from './hooks/useOptionalAuth';
 
 const navItems = [
   { label: 'Ricerche', path: '/ricerche' },
+  { label: 'Iniziative', path: '/iniziative' },
   { label: 'Dossier azienda', path: '/azienda' },
   { label: 'Ricerca web', path: '/ricerca-web' },
   { label: 'Configurazione', path: '/config' },
