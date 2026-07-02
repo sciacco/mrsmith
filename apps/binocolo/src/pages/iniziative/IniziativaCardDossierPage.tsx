@@ -70,6 +70,10 @@ export function IniziativaCardDossierPage() {
       api.get<MACardDossier>(
         `/binocolo/v1/ma/initiatives/${id}/cards/${encodeURIComponent(companyKey ?? '')}/dossier`,
       ),
+    // Il 404 (card assente o sessioni sganciate) è uno stato, non un guasto:
+    // niente retry, l'empty state deve comparire subito.
+    retry: (failureCount, error) =>
+      !(error instanceof ApiError && error.status === 404) && failureCount < 2,
   });
 
   if (query.isLoading) {
